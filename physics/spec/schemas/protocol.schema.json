@@ -1,0 +1,684 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/physics/protocol.schema.json",
+  "title": "WIA Physics Protocol Message Schema",
+  "description": "JSON Schema for WIA Physics Protocol (WPP) messages",
+  "version": "1.0.0",
+
+  "definitions": {
+    "messageEnvelope": {
+      "type": "object",
+      "description": "Base message envelope for all WPP messages",
+      "properties": {
+        "wpp": {
+          "type": "string",
+          "description": "Protocol version",
+          "pattern": "^\\d+\\.\\d+$",
+          "examples": ["1.0"]
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique message identifier (UUID v4)",
+          "format": "uuid"
+        },
+        "type": {
+          "type": "string",
+          "description": "Message type",
+          "enum": [
+            "connect",
+            "connect_ack",
+            "disconnect",
+            "subscribe",
+            "subscribe_ack",
+            "unsubscribe",
+            "unsubscribe_ack",
+            "data",
+            "command",
+            "response",
+            "event",
+            "error",
+            "ping",
+            "pong"
+          ]
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO 8601 timestamp with milliseconds",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Type-specific payload"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Optional metadata",
+          "additionalProperties": true
+        }
+      },
+      "required": ["wpp", "id", "type", "timestamp", "payload"]
+    },
+
+    "authInfo": {
+      "type": "object",
+      "description": "Authentication information",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["token", "api_key", "certificate"],
+          "description": "Authentication method"
+        },
+        "token": {
+          "type": "string",
+          "description": "JWT bearer token"
+        },
+        "api_key": {
+          "type": "string",
+          "description": "API key"
+        }
+      },
+      "required": ["method"]
+    },
+
+    "connectionOptions": {
+      "type": "object",
+      "description": "Connection options",
+      "properties": {
+        "heartbeat_interval": {
+          "type": "integer",
+          "description": "Heartbeat interval in milliseconds",
+          "default": 30000,
+          "minimum": 1000,
+          "maximum": 300000
+        },
+        "compression": {
+          "type": "string",
+          "enum": ["none", "lz4", "zstd"],
+          "default": "none"
+        },
+        "binary_mode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use binary (MessagePack) encoding"
+        }
+      }
+    },
+
+    "channelInfo": {
+      "type": "object",
+      "description": "Channel information",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Channel name",
+          "pattern": "^[a-z0-9_]+(/[a-z0-9_*]+)*$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["fusion", "time_crystal", "particle", "dark_matter", "antimatter", "quantum_gravity"],
+          "description": "Data type for this channel"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": ["name", "type"]
+    },
+
+    "subscriptionFilter": {
+      "type": "object",
+      "description": "Subscription filter options",
+      "properties": {
+        "quality": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["GOOD", "VALIDATED", "PRELIMINARY", "SIMULATED", "FLAGGED"]
+          },
+          "description": "Filter by quality flags"
+        },
+        "min_rate": {
+          "type": "number",
+          "description": "Minimum data rate (Hz)",
+          "minimum": 0
+        },
+        "max_rate": {
+          "type": "number",
+          "description": "Maximum data rate (Hz)",
+          "minimum": 0
+        }
+      }
+    },
+
+    "subscriptionOptions": {
+      "type": "object",
+      "description": "Subscription options",
+      "properties": {
+        "buffer_size": {
+          "type": "integer",
+          "description": "Client-side buffer size",
+          "default": 100,
+          "minimum": 1
+        },
+        "throttle_ms": {
+          "type": "integer",
+          "description": "Throttle interval in milliseconds",
+          "default": 0,
+          "minimum": 0
+        },
+        "include_history": {
+          "type": "boolean",
+          "description": "Include historical data on subscription",
+          "default": false
+        },
+        "history_limit": {
+          "type": "integer",
+          "description": "Maximum historical data points",
+          "default": 100,
+          "minimum": 0
+        },
+        "qos": {
+          "type": "string",
+          "enum": ["at_most_once", "at_least_once", "exactly_once"],
+          "default": "at_most_once"
+        }
+      }
+    },
+
+    "commandStatus": {
+      "type": "string",
+      "description": "Command execution status",
+      "enum": ["success", "pending", "executing", "failed", "timeout", "rejected", "cancelled"]
+    },
+
+    "eventType": {
+      "type": "string",
+      "description": "Event type",
+      "enum": ["state_change", "threshold", "alarm", "warning", "info", "discovery"]
+    },
+
+    "severity": {
+      "type": "string",
+      "description": "Event severity level",
+      "enum": ["critical", "error", "warning", "info", "debug"]
+    },
+
+    "errorCode": {
+      "type": "integer",
+      "description": "Error code",
+      "minimum": 1000,
+      "maximum": 7999
+    },
+
+    "disconnectReason": {
+      "type": "string",
+      "description": "Disconnect reason",
+      "enum": ["client_shutdown", "server_shutdown", "timeout", "error", "auth_failure"]
+    }
+  },
+
+  "oneOf": [
+    { "$ref": "#/definitions/connectMessage" },
+    { "$ref": "#/definitions/connectAckMessage" },
+    { "$ref": "#/definitions/disconnectMessage" },
+    { "$ref": "#/definitions/subscribeMessage" },
+    { "$ref": "#/definitions/subscribeAckMessage" },
+    { "$ref": "#/definitions/unsubscribeMessage" },
+    { "$ref": "#/definitions/unsubscribeAckMessage" },
+    { "$ref": "#/definitions/dataMessage" },
+    { "$ref": "#/definitions/commandMessage" },
+    { "$ref": "#/definitions/responseMessage" },
+    { "$ref": "#/definitions/eventMessage" },
+    { "$ref": "#/definitions/errorMessage" },
+    { "$ref": "#/definitions/pingMessage" },
+    { "$ref": "#/definitions/pongMessage" }
+  ],
+
+  "definitions": {
+    "connectMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "connect" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "client_id": {
+                  "type": "string",
+                  "description": "Client identifier"
+                },
+                "client_name": {
+                  "type": "string",
+                  "description": "Human-readable client name"
+                },
+                "client_version": {
+                  "type": "string",
+                  "description": "Client version"
+                },
+                "capabilities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["streaming", "commands", "events", "binary"]
+                  }
+                },
+                "auth": { "$ref": "#/definitions/authInfo" },
+                "options": { "$ref": "#/definitions/connectionOptions" }
+              },
+              "required": ["client_id"]
+            }
+          }
+        }
+      ]
+    },
+
+    "connectAckMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "connect_ack" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string",
+                  "description": "Server-assigned session ID"
+                },
+                "server_name": {
+                  "type": "string",
+                  "description": "Server name"
+                },
+                "server_version": {
+                  "type": "string",
+                  "description": "Server version"
+                },
+                "capabilities": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "heartbeat_interval": {
+                  "type": "integer",
+                  "description": "Negotiated heartbeat interval"
+                },
+                "max_subscriptions": {
+                  "type": "integer",
+                  "description": "Maximum allowed subscriptions"
+                },
+                "channels": {
+                  "type": "array",
+                  "items": { "$ref": "#/definitions/channelInfo" }
+                }
+              },
+              "required": ["session_id"]
+            }
+          }
+        }
+      ]
+    },
+
+    "disconnectMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "disconnect" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "reason": { "$ref": "#/definitions/disconnectReason" },
+                "message": {
+                  "type": "string",
+                  "description": "Human-readable message"
+                }
+              },
+              "required": ["reason"]
+            }
+          }
+        }
+      ]
+    },
+
+    "subscribeMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "subscribe" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "description": "Channel name or pattern"
+                },
+                "filter": { "$ref": "#/definitions/subscriptionFilter" },
+                "options": { "$ref": "#/definitions/subscriptionOptions" }
+              },
+              "required": ["channel"]
+            }
+          }
+        }
+      ]
+    },
+
+    "subscribeAckMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "subscribe_ack" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "description": "Subscribed channel"
+                },
+                "subscription_id": {
+                  "type": "string",
+                  "description": "Subscription identifier"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["active", "pending"]
+                },
+                "effective_rate": {
+                  "type": "number",
+                  "description": "Effective data rate (Hz)"
+                },
+                "history_sent": {
+                  "type": "integer",
+                  "description": "Number of historical records sent"
+                }
+              },
+              "required": ["channel", "subscription_id", "status"]
+            }
+          }
+        }
+      ]
+    },
+
+    "unsubscribeMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "unsubscribe" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "description": "Channel to unsubscribe from"
+                },
+                "subscription_id": {
+                  "type": "string",
+                  "description": "Subscription ID (alternative to channel)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "unsubscribeAckMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "unsubscribe_ack" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "channel": { "type": "string" },
+                "subscription_id": { "type": "string" },
+                "status": {
+                  "type": "string",
+                  "enum": ["success", "not_found"]
+                }
+              },
+              "required": ["status"]
+            }
+          }
+        }
+      ]
+    },
+
+    "dataMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "data" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "description": "Source channel"
+                },
+                "sequence": {
+                  "type": "integer",
+                  "description": "Sequence number",
+                  "minimum": 0
+                },
+                "data_type": {
+                  "type": "string",
+                  "enum": ["fusion", "time_crystal", "particle", "dark_matter", "antimatter", "quantum_gravity"]
+                },
+                "data": {
+                  "type": "object",
+                  "description": "Physics data (Phase 1 schema format)"
+                },
+                "batch": {
+                  "type": "boolean",
+                  "description": "Is this a batch message?",
+                  "default": false
+                },
+                "sequence_start": {
+                  "type": "integer",
+                  "description": "First sequence number in batch"
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "Number of items in batch"
+                },
+                "items": {
+                  "type": "array",
+                  "description": "Batch data items",
+                  "items": { "type": "object" }
+                }
+              },
+              "required": ["channel", "data_type"]
+            }
+          }
+        }
+      ]
+    },
+
+    "commandMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "command" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "description": "Target device/system"
+                },
+                "action": {
+                  "type": "string",
+                  "description": "Command action"
+                },
+                "parameters": {
+                  "type": "object",
+                  "description": "Command parameters",
+                  "additionalProperties": true
+                },
+                "timeout": {
+                  "type": "integer",
+                  "description": "Command timeout in milliseconds",
+                  "default": 30000
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["low", "normal", "high", "critical"],
+                  "default": "normal"
+                }
+              },
+              "required": ["target", "action"]
+            }
+          }
+        }
+      ]
+    },
+
+    "responseMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "response" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "command_id": {
+                  "type": "string",
+                  "description": "Original command message ID"
+                },
+                "status": { "$ref": "#/definitions/commandStatus" },
+                "result": {
+                  "type": "object",
+                  "description": "Command result data",
+                  "additionalProperties": true
+                },
+                "execution_time": {
+                  "type": "integer",
+                  "description": "Execution time in milliseconds"
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "$ref": "#/definitions/errorCode" },
+                    "message": { "type": "string" }
+                  }
+                }
+              },
+              "required": ["command_id", "status"]
+            }
+          }
+        }
+      ]
+    },
+
+    "eventMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "event" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "description": "Event source"
+                },
+                "event_type": { "$ref": "#/definitions/eventType" },
+                "severity": { "$ref": "#/definitions/severity" },
+                "data": {
+                  "type": "object",
+                  "description": "Event data",
+                  "additionalProperties": true
+                }
+              },
+              "required": ["source", "event_type", "severity"]
+            }
+          }
+        }
+      ]
+    },
+
+    "errorMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "error" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "code": { "$ref": "#/definitions/errorCode" },
+                "category": {
+                  "type": "string",
+                  "enum": ["connection", "authentication", "protocol", "subscription", "command", "data", "server"]
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Human-readable error message"
+                },
+                "details": {
+                  "type": "object",
+                  "description": "Additional error details",
+                  "additionalProperties": true
+                },
+                "related_message_id": {
+                  "type": "string",
+                  "description": "ID of the message that caused the error"
+                }
+              },
+              "required": ["code", "category", "message"]
+            }
+          }
+        }
+      ]
+    },
+
+    "pingMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "ping" },
+            "payload": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "pongMessage": {
+      "allOf": [
+        { "$ref": "#/definitions/messageEnvelope" },
+        {
+          "properties": {
+            "type": { "const": "pong" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "ping_id": {
+                  "type": "string",
+                  "description": "Original ping message ID"
+                },
+                "latency_ms": {
+                  "type": "integer",
+                  "description": "Round-trip latency in milliseconds"
+                }
+              },
+              "required": ["ping_id"]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

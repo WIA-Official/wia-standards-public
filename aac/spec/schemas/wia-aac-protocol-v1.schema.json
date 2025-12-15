@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/aac/protocol/v1/message.schema.json",
+  "title": "WIA AAC Protocol Message",
+  "description": "Message format for WIA AAC communication protocol",
+  "type": "object",
+  "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"],
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "const": "wia-aac",
+      "description": "Protocol identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Protocol version (SemVer)"
+    },
+    "messageId": {
+      "type": "string",
+      "description": "Unique message identifier (UUID v4)"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp in milliseconds"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "connect",
+        "connect_ack",
+        "disconnect",
+        "disconnect_ack",
+        "signal",
+        "command",
+        "command_ack",
+        "subscribe",
+        "subscribe_ack",
+        "unsubscribe",
+        "unsubscribe_ack",
+        "error",
+        "ping",
+        "pong"
+      ],
+      "description": "Message type"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Message payload (varies by type)"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "connect" } }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/definitions/connectPayload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "connect_ack" } }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/definitions/connectAckPayload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "error" } }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/definitions/errorPayload"
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "connectPayload": {
+      "type": "object",
+      "required": ["clientId"],
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "Unique client identifier"
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Human-readable client name"
+        },
+        "clientVersion": {
+          "type": "string",
+          "description": "Client application version"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["eye_tracker", "switch", "muscle_sensor", "brain_interface", "breath", "head_movement"]
+          },
+          "description": "Supported sensor types"
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "signalRate": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "compression": {
+              "type": "boolean"
+            },
+            "heartbeatInterval": {
+              "type": "integer",
+              "minimum": 1000
+            }
+          }
+        }
+      }
+    },
+    "connectAckPayload": {
+      "type": "object",
+      "required": ["success"],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "serverName": {
+          "type": "string"
+        },
+        "serverVersion": {
+          "type": "string"
+        },
+        "availableSensors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "manufacturer": { "type": "string" },
+              "model": { "type": "string" },
+              "deviceId": { "type": "string" }
+            }
+          }
+        },
+        "error": {
+          "$ref": "#/definitions/errorPayload"
+        }
+      }
+    },
+    "errorPayload": {
+      "type": "object",
+      "required": ["code", "name", "message"],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "description": "Error code"
+        },
+        "name": {
+          "type": "string",
+          "description": "Error name"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "recoverable": {
+          "type": "boolean",
+          "description": "Whether the error is recoverable"
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional error details"
+        },
+        "relatedMessageId": {
+          "type": "string",
+          "description": "ID of the message that caused the error"
+        }
+      }
+    }
+  }
+}

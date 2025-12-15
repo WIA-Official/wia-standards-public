@@ -1,0 +1,417 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/climate/protocol-message.schema.json",
+  "title": "WIA Climate Protocol Message",
+  "description": "Communication protocol message format for WIA Climate Standard",
+  "type": "object",
+  "required": ["protocol", "version", "messageId", "timestamp", "type"],
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "const": "wia-climate",
+      "description": "Protocol identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Protocol version in SemVer format"
+    },
+    "messageId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique message identifier (UUID v4)"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Message creation time in Unix milliseconds"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "connect",
+        "connect_ack",
+        "disconnect",
+        "data",
+        "command",
+        "command_ack",
+        "subscribe",
+        "subscribe_ack",
+        "unsubscribe",
+        "error",
+        "ping",
+        "pong"
+      ],
+      "description": "Message type"
+    },
+    "payload": {
+      "description": "Message payload (type-dependent)"
+    },
+    "meta": {
+      "$ref": "#/definitions/MessageMeta"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "connect" } } },
+      "then": { "properties": { "payload": { "$ref": "#/definitions/ConnectPayload" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "connect_ack" } } },
+      "then": { "properties": { "payload": { "$ref": "#/definitions/ConnectAckPayload" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "disconnect" } } },
+      "then": { "properties": { "payload": { "$ref": "#/definitions/DisconnectPayload" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "data" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/DataPayload" } },
+        "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"]
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "command" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/CommandPayload" } },
+        "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"]
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "command_ack" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/CommandAckPayload" } },
+        "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"]
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "subscribe" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/SubscribePayload" } },
+        "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"]
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "subscribe_ack" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/SubscribeAckPayload" } },
+        "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"]
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "unsubscribe" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/UnsubscribePayload" } },
+        "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"]
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "error" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/definitions/ErrorPayload" } },
+        "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"]
+      }
+    }
+  ],
+  "definitions": {
+    "MessageMeta": {
+      "type": "object",
+      "properties": {
+        "signature": {
+          "type": "object",
+          "properties": {
+            "algorithm": {
+              "type": "string",
+              "enum": ["HMAC-SHA256", "HMAC-SHA512", "RSA-SHA256"]
+            },
+            "value": {
+              "type": "string",
+              "description": "Base64-encoded signature"
+            }
+          },
+          "required": ["algorithm", "value"]
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID for request tracing"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source identifier"
+        }
+      }
+    },
+    "AuthInfo": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["api_key", "jwt", "oauth2", "none"]
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": ["method"]
+    },
+    "ConnectPayload": {
+      "type": "object",
+      "required": ["clientId"],
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Unique client identifier"
+        },
+        "clientType": {
+          "type": "string",
+          "enum": ["sensor", "gateway", "dashboard", "service", "other"],
+          "description": "Type of client"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "carbon_capture",
+              "weather_control",
+              "geoengineering",
+              "vertical_farming",
+              "ocean_cleanup",
+              "climate_model"
+            ]
+          },
+          "description": "Supported data types"
+        },
+        "auth": {
+          "$ref": "#/definitions/AuthInfo"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional client metadata"
+        }
+      }
+    },
+    "ConnectAckPayload": {
+      "type": "object",
+      "required": ["success"],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session identifier (on success)"
+        },
+        "serverInfo": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string" }
+          }
+        },
+        "keepAliveInterval": {
+          "type": "integer",
+          "minimum": 1000,
+          "description": "Keep-alive interval in milliseconds"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorPayload"
+        }
+      }
+    },
+    "DisconnectPayload": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": ["normal", "error", "timeout", "auth_expired", "server_shutdown"]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable disconnect reason"
+        }
+      }
+    },
+    "DataPayload": {
+      "type": "object",
+      "description": "Phase 1 ClimateMessage format - see wia-climate-data-v1.schema.json",
+      "required": ["version", "type", "timestamp", "location", "device", "data"],
+      "properties": {
+        "version": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": [
+            "carbon_capture",
+            "weather_control",
+            "geoengineering",
+            "vertical_farming",
+            "ocean_cleanup",
+            "climate_model"
+          ]
+        },
+        "timestamp": { "type": "object" },
+        "location": { "type": "object" },
+        "device": { "type": "object" },
+        "data": { "type": "object" },
+        "meta": { "type": "object" }
+      }
+    },
+    "CommandPayload": {
+      "type": "object",
+      "required": ["targetId", "action"],
+      "properties": {
+        "targetId": {
+          "type": "string",
+          "description": "Target device or service ID"
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Command action name"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Command parameters"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Command timeout in milliseconds"
+        }
+      }
+    },
+    "CommandAckPayload": {
+      "type": "object",
+      "required": ["commandId", "success"],
+      "properties": {
+        "commandId": {
+          "type": "string",
+          "description": "Original command messageId"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "result": {
+          "type": "object",
+          "description": "Command execution result"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorPayload"
+        },
+        "executionTime": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Execution time in milliseconds"
+        }
+      }
+    },
+    "TopicSubscription": {
+      "type": "object",
+      "required": ["pattern"],
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Topic pattern with wildcards (* or **)"
+        },
+        "filter": {
+          "type": "object",
+          "description": "Data filter conditions"
+        }
+      }
+    },
+    "SubscribePayload": {
+      "type": "object",
+      "required": ["topics"],
+      "properties": {
+        "topics": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/TopicSubscription" },
+          "minItems": 1
+        },
+        "qos": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "default": 0,
+          "description": "Quality of Service level"
+        }
+      }
+    },
+    "SubscribeAckPayload": {
+      "type": "object",
+      "required": ["success"],
+      "properties": {
+        "subscriptionId": {
+          "type": "string",
+          "description": "Subscription identifier"
+        },
+        "topics": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorPayload"
+        }
+      }
+    },
+    "UnsubscribePayload": {
+      "type": "object",
+      "required": ["subscriptionId"],
+      "properties": {
+        "subscriptionId": {
+          "type": "string"
+        }
+      }
+    },
+    "ErrorPayload": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "PROTOCOL_ERROR",
+            "VERSION_MISMATCH",
+            "AUTH_FAILED",
+            "AUTH_EXPIRED",
+            "PERMISSION_DENIED",
+            "VALIDATION_ERROR",
+            "NOT_FOUND",
+            "CONFLICT",
+            "RATE_LIMITED",
+            "TIMEOUT",
+            "INTERNAL_ERROR",
+            "SERVICE_UNAVAILABLE"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional error details"
+        },
+        "relatedMessageId": {
+          "type": "string",
+          "description": "Related message ID"
+        },
+        "retryable": {
+          "type": "boolean",
+          "description": "Whether the operation can be retried"
+        },
+        "retryAfter": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Suggested retry delay in milliseconds"
+        }
+      }
+    }
+  }
+}

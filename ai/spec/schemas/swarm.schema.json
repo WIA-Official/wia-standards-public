@@ -1,0 +1,301 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/ai/swarm.schema.json",
+  "title": "WIA AI Swarm",
+  "description": "Schema for WIA AI multi-agent swarm configuration",
+  "type": "object",
+  "required": [
+    "wia_version",
+    "swarm_id",
+    "swarm_info",
+    "agents",
+    "topology"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
+    "wia_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "WIA AI specification version"
+    },
+    "swarm_id": {
+      "type": "string",
+      "pattern": "^swarm-[a-zA-Z0-9-]+$",
+      "description": "Unique swarm identifier"
+    },
+    "swarm_info": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "architecture": {
+          "type": "string",
+          "enum": ["hierarchical", "flat", "swarm", "pipeline", "mesh", "hybrid"]
+        },
+        "author": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/agentReference"
+      },
+      "minItems": 1
+    },
+    "topology": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["hierarchical", "flat", "ring", "star", "mesh", "custom"]
+        },
+        "root": {
+          "type": "string",
+          "description": "Root agent ID for hierarchical topology"
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/connection"
+          }
+        }
+      }
+    },
+    "communication": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "enum": ["a2a", "mcp", "custom", "direct"]
+        },
+        "message_format": {
+          "type": "string",
+          "enum": ["json", "protobuf", "msgpack"]
+        },
+        "shared_memory": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["none", "in_memory", "redis", "vector_store", "database"]
+            },
+            "provider": {
+              "type": "string"
+            },
+            "config": {
+              "type": "object"
+            }
+          }
+        },
+        "broadcast": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["sequential", "parallel", "conditional", "loop", "dag", "reactive"]
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/workflowStep"
+          }
+        },
+        "entry_point": {
+          "type": "string",
+          "description": "Starting step or agent"
+        },
+        "exit_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "max_total_iterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_concurrent_agents": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "budget_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_tokens_total": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "error_handling": {
+      "type": "object",
+      "properties": {
+        "retry_policy": {
+          "type": "object",
+          "properties": {
+            "max_retries": {
+              "type": "integer"
+            },
+            "backoff_strategy": {
+              "type": "string",
+              "enum": ["none", "linear", "exponential"]
+            }
+          }
+        },
+        "fallback_agent": {
+          "type": "string"
+        },
+        "on_failure": {
+          "type": "string",
+          "enum": ["abort", "skip", "fallback", "human_escalation"]
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "logging_level": {
+          "type": "string",
+          "enum": ["debug", "info", "warning", "error"]
+        },
+        "metrics_enabled": {
+          "type": "boolean"
+        },
+        "tracing_enabled": {
+          "type": "boolean"
+        },
+        "dashboard_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "agentReference": {
+      "type": "object",
+      "required": ["agent_id", "role"],
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "config": {
+          "type": "string",
+          "description": "Path to agent config file"
+        },
+        "instances": {
+          "type": "integer",
+          "default": 1,
+          "description": "Number of instances for this agent"
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "required": ["from", "to", "type"],
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["delegation", "handoff", "broadcast", "request", "subscribe"]
+        },
+        "bidirectional": {
+          "type": "boolean",
+          "default": false
+        },
+        "condition": {
+          "type": "string",
+          "description": "Condition for this connection"
+        }
+      }
+    },
+    "workflowStep": {
+      "type": "object",
+      "required": ["step", "agent", "action"],
+      "properties": {
+        "step": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "agent": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "condition": {
+          "type": "string"
+        },
+        "loop_until": {
+          "type": "string"
+        },
+        "on_success": {
+          "type": "string"
+        },
+        "on_failure": {
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

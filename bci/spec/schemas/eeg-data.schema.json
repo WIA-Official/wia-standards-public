@@ -1,0 +1,293 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/bci/eeg-data.schema.json",
+  "title": "WIA BCI EEG Data",
+  "description": "Schema for EEG data file metadata",
+  "type": "object",
+  "required": [
+    "data_format",
+    "dimensions"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
+    "data_format": {
+      "type": "object",
+      "required": ["type", "encoding"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["binary", "text", "compressed"],
+          "description": "Data storage type"
+        },
+        "encoding": {
+          "type": "string",
+          "enum": [
+            "float32_le",
+            "float64_le",
+            "int16_le",
+            "int24_le",
+            "int32_le",
+            "float32_be",
+            "float64_be",
+            "int16_be",
+            "int32_be"
+          ],
+          "description": "Binary encoding format"
+        },
+        "interleaved": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether channels are interleaved (true) or contiguous (false)"
+        },
+        "byte_order": {
+          "type": "string",
+          "enum": ["little_endian", "big_endian"],
+          "description": "Byte order for multi-byte values"
+        },
+        "compression": {
+          "type": "string",
+          "enum": ["none", "gzip", "lz4", "zstd"],
+          "default": "none"
+        }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "required": ["num_channels", "num_samples", "sampling_rate_hz"],
+      "properties": {
+        "num_channels": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of data channels"
+        },
+        "num_samples": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of samples per channel"
+        },
+        "sampling_rate_hz": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Sampling rate in Hz"
+        },
+        "duration_seconds": {
+          "type": "number",
+          "description": "Recording duration in seconds"
+        }
+      }
+    },
+    "units": {
+      "type": "object",
+      "properties": {
+        "amplitude": {
+          "type": "string",
+          "enum": ["uV", "mV", "V", "count"],
+          "default": "uV",
+          "description": "Amplitude unit"
+        },
+        "time": {
+          "type": "string",
+          "enum": ["seconds", "milliseconds", "samples"],
+          "default": "seconds",
+          "description": "Time unit"
+        }
+      }
+    },
+    "scaling": {
+      "type": "object",
+      "properties": {
+        "applied": {
+          "type": "boolean",
+          "description": "Whether scaling has been applied to data"
+        },
+        "scale_factors": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "array", "items": {"type": "number"}}
+          ],
+          "description": "Scale factor(s) - single value or per-channel"
+        },
+        "offsets": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "array", "items": {"type": "number"}}
+          ],
+          "description": "DC offset(s) - single value or per-channel"
+        }
+      }
+    },
+    "preprocessing": {
+      "type": "object",
+      "properties": {
+        "applied": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether preprocessing has been applied"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/preprocessingStep"
+          },
+          "description": "Ordered list of preprocessing steps"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "good_channels": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "description": "Indices of good quality channels"
+        },
+        "bad_channels": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "description": "Indices of bad/excluded channels"
+        },
+        "interpolated_channels": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "description": "Indices of interpolated channels"
+        },
+        "artifact_segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/artifactSegment"
+          },
+          "description": "Detected artifact segments"
+        },
+        "snr_db": {
+          "type": "number",
+          "description": "Signal-to-noise ratio in dB"
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "mean": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Mean value per channel"
+        },
+        "std": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Standard deviation per channel"
+        },
+        "min": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Minimum value per channel"
+        },
+        "max": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Maximum value per channel"
+        }
+      }
+    },
+    "checksum": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["md5", "sha1", "sha256", "sha512"],
+          "description": "Checksum algorithm"
+        },
+        "value": {
+          "type": "string",
+          "description": "Checksum value"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "preprocessingStep": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Processing step name"
+        },
+        "order": {
+          "type": "integer",
+          "description": "Order in processing pipeline"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Step-specific parameters"
+        },
+        "software": {
+          "type": "string",
+          "description": "Software used for this step"
+        },
+        "version": {
+          "type": "string",
+          "description": "Software version"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When step was applied"
+        }
+      }
+    },
+    "artifactSegment": {
+      "type": "object",
+      "required": ["start_sample", "end_sample", "type"],
+      "properties": {
+        "start_sample": {
+          "type": "integer",
+          "description": "Artifact start sample"
+        },
+        "end_sample": {
+          "type": "integer",
+          "description": "Artifact end sample"
+        },
+        "start_seconds": {
+          "type": "number"
+        },
+        "end_seconds": {
+          "type": "number"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "eye_blink",
+            "eye_movement",
+            "muscle",
+            "movement",
+            "electrode_pop",
+            "line_noise",
+            "saturation",
+            "flat_line",
+            "unknown"
+          ],
+          "description": "Artifact type"
+        },
+        "channels": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "description": "Affected channels (empty = all)"
+        },
+        "detection_method": {
+          "type": "string",
+          "description": "How artifact was detected"
+        },
+        "corrected": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether artifact was corrected"
+        }
+      }
+    }
+  }
+}
