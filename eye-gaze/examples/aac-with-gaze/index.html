@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WIA AAC with Eye Gaze - Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #fff;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: #16213e;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 1.2em;
+      color: #00d4aa;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9em;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #e74c3c;
+    }
+
+    .status-dot.connected {
+      background: #2ecc71;
+    }
+
+    .status-dot.tracking {
+      background: #00d4aa;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Message bar */
+    .message-bar {
+      background: #0f0f23;
+      padding: 15px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .message-display {
+      flex: 1;
+      background: #16213e;
+      border-radius: 8px;
+      padding: 15px 20px;
+      min-height: 60px;
+      font-size: 1.4em;
+      display: flex;
+      align-items: center;
+    }
+
+    .message-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.2em;
+      background: #00d4aa;
+      animation: blink 1s infinite;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .speak-btn {
+      background: #00d4aa;
+      color: #1a1a2e;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 8px;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .speak-btn:hover {
+      background: #00ffcc;
+    }
+
+    /* Grid area */
+    .grid-container {
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    .aac-grid {
+      display: grid;
+      gap: 8px;
+      height: 100%;
+    }
+
+    /* 4x4 grid by default */
+    .aac-grid.grid-4x4 {
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+    }
+
+    .aac-cell {
+      background: #16213e;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 3px solid transparent;
+      position: relative;
+    }
+
+    .aac-cell:hover, .aac-cell.gaze-hover {
+      border-color: #00d4aa;
+      background: #1e2d4a;
+    }
+
+    .aac-cell.dwelling {
+      border-color: #ff0;
+    }
+
+    .aac-cell.selected {
+      background: #00d4aa;
+      border-color: #00d4aa;
+    }
+
+    .aac-cell.selected .cell-label {
+      color: #1a1a2e;
+    }
+
+    .cell-symbol {
+      font-size: 3em;
+      margin-bottom: 5px;
+    }
+
+    .cell-label {
+      font-size: 1em;
+      text-align: center;
+      color: #fff;
+    }
+
+    /* Dwell progress */
+    .dwell-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: #00d4aa;
+      border-radius: 0 0 12px 12px;
+      transition: width 0.1s linear;
+      width: 0%;
+    }
+
+    /* Action buttons row */
+    .action-cells {
+      background: #0f0f23;
+    }
+
+    .aac-cell.action {
+      background: #2c3e50;
+    }
+
+    .aac-cell.action.speak {
+      background: #27ae60;
+    }
+
+    .aac-cell.action.delete {
+      background: #c0392b;
+    }
+
+    .aac-cell.action.clear {
+      background: #e67e22;
+    }
+
+    /* Footer */
+    .footer {
+      background: #16213e;
+      padding: 10px 20px;
+      text-align: center;
+      font-size: 0.8em;
+      color: #666;
+    }
+
+    /* Gaze cursor */
+    .gaze-cursor {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1000;
+      width: 50px;
+      height: 50px;
+      border: 3px solid #00d4aa;
+      border-radius: 50%;
+      background: rgba(0, 212, 170, 0.2);
+      transform: translate(-50%, -50%);
+      display: none;
+    }
+
+    .gaze-cursor.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>👁 WIA AAC with Eye Gaze</h1>
+      <div class="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Disconnected</span>
+        <button onclick="toggleConnection()" style="margin-left: 10px; padding: 5px 10px; background: #333; border: none; color: #fff; border-radius: 4px; cursor: pointer;">
+          Connect
+        </button>
+      </div>
+    </div>
+
+    <!-- Message bar -->
+    <div class="message-bar">
+      <div class="message-display">
+        <span id="messageText"></span><span class="message-cursor"></span>
+      </div>
+      <button class="speak-btn" onclick="speakMessage()">🔊 Speak</button>
+    </div>
+
+    <!-- AAC Grid -->
+    <div class="grid-container">
+      <div class="aac-grid grid-4x4" id="aacGrid">
+        <!-- Cells will be generated by JavaScript -->
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      弘益人間 - 널리 인간을 이롭게 | WIA Eye Gaze Standard
+    </div>
+  </div>
+
+  <!-- Gaze cursor -->
+  <div class="gaze-cursor" id="gazeCursor"></div>
+
+  <script>
+    // AAC Grid data
+    const gridData = [
+      // Row 1 - Core words
+      { symbol: '😊', label: 'I', action: 'append', text: 'I ' },
+      { symbol: '❤️', label: 'want', action: 'append', text: 'want ' },
+      { symbol: '🙏', label: 'need', action: 'append', text: 'need ' },
+      { symbol: '👋', label: 'help', action: 'append', text: 'help ' },
+
+      // Row 2 - Actions
+      { symbol: '🍽️', label: 'eat', action: 'append', text: 'to eat ' },
+      { symbol: '🥤', label: 'drink', action: 'append', text: 'to drink ' },
+      { symbol: '🛏️', label: 'rest', action: 'append', text: 'to rest ' },
+      { symbol: '🚽', label: 'bathroom', action: 'append', text: 'bathroom ' },
+
+      // Row 3 - Objects/Feelings
+      { symbol: '💊', label: 'medicine', action: 'append', text: 'medicine ' },
+      { symbol: '😢', label: 'pain', action: 'append', text: 'I have pain ' },
+      { symbol: '🔥', label: 'hot', action: 'append', text: "it's hot " },
+      { symbol: '❄️', label: 'cold', action: 'append', text: "it's cold " },
+
+      // Row 4 - Quick phrases + Actions
+      { symbol: '✅', label: 'Yes', action: 'speak', text: 'Yes' },
+      { symbol: '❌', label: 'No', action: 'speak', text: 'No' },
+      { symbol: '⌫', label: 'Delete', action: 'delete', class: 'action delete' },
+      { symbol: '🗑️', label: 'Clear', action: 'clear', class: 'action clear' },
+    ];
+
+    // State
+    let messageBuffer = '';
+    let isConnected = false;
+    let isTracking = false;
+    let ws = null;
+    let dwellTarget = null;
+    let dwellStartTime = 0;
+    const dwellTime = 800; // ms
+
+    // DOM elements
+    const aacGrid = document.getElementById('aacGrid');
+    const messageText = document.getElementById('messageText');
+    const gazeCursor = document.getElementById('gazeCursor');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+
+    // Initialize grid
+    function initGrid() {
+      aacGrid.innerHTML = '';
+
+      gridData.forEach((cell, index) => {
+        const cellEl = document.createElement('div');
+        cellEl.className = `aac-cell ${cell.class || ''}`;
+        cellEl.dataset.index = index;
+        cellEl.innerHTML = `
+          <div class="cell-symbol">${cell.symbol}</div>
+          <div class="cell-label">${cell.label}</div>
+          <div class="dwell-progress"></div>
+        `;
+
+        cellEl.addEventListener('click', () => handleCellClick(cell));
+        aacGrid.appendChild(cellEl);
+      });
+    }
+
+    // Handle cell click/selection
+    function handleCellClick(cell) {
+      // Visual feedback
+      const cellEl = event?.target?.closest?.('.aac-cell');
+      if (cellEl) {
+        cellEl.classList.add('selected');
+        setTimeout(() => cellEl.classList.remove('selected'), 200);
+      }
+
+      // Execute action
+      switch (cell.action) {
+        case 'append':
+          messageBuffer += cell.text;
+          break;
+        case 'speak':
+          speak(cell.text);
+          break;
+        case 'delete':
+          messageBuffer = messageBuffer.trim().split(' ').slice(0, -1).join(' ');
+          if (messageBuffer) messageBuffer += ' ';
+          break;
+        case 'clear':
+          messageBuffer = '';
+          break;
+      }
+
+      updateDisplay();
+    }
+
+    // Update message display
+    function updateDisplay() {
+      messageText.textContent = messageBuffer;
+    }
+
+    // Speak text
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    // Speak current message
+    function speakMessage() {
+      if (messageBuffer.trim()) {
+        speak(messageBuffer.trim());
+      }
+    }
+
+    // WebSocket connection
+    function toggleConnection() {
+      if (isConnected) {
+        disconnect();
+      } else {
+        connect();
+      }
+    }
+
+    function connect() {
+      try {
+        ws = new WebSocket('ws://localhost:8765/wia-eye-gaze/v1/stream', ['wia-eye-gaze-v1']);
+
+        ws.onopen = () => {
+          isConnected = true;
+          updateStatus('connected');
+
+          // Start tracking
+          ws.send(JSON.stringify({
+            type: 'control',
+            timestamp: Date.now(),
+            action: 'start'
+          }));
+          isTracking = true;
+          gazeCursor.classList.add('active');
+          updateStatus('tracking');
+        };
+
+        ws.onclose = () => {
+          isConnected = false;
+          isTracking = false;
+          gazeCursor.classList.remove('active');
+          updateStatus('disconnected');
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          updateStatus('error');
+        };
+
+        ws.onmessage = (event) => {
+          handleGazeMessage(event.data);
+        };
+      } catch (error) {
+        console.error('Connection error:', error);
+      }
+    }
+
+    function disconnect() {
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+    }
+
+    function updateStatus(status) {
+      statusDot.className = 'status-dot ' + status;
+      statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+
+    // Handle incoming gaze data
+    function handleGazeMessage(data) {
+      try {
+        const msg = JSON.parse(data);
+
+        if (msg.type === 'gaze_data' && msg.points?.length > 0) {
+          const point = msg.points[msg.points.length - 1];
+          handleGazePoint(point.x, point.y);
+        }
+      } catch (error) {
+        console.error('Error parsing gaze data:', error);
+      }
+    }
+
+    // Handle gaze point
+    function handleGazePoint(x, y) {
+      // Update cursor position
+      const screenX = x * window.innerWidth;
+      const screenY = y * window.innerHeight;
+
+      gazeCursor.style.left = screenX + 'px';
+      gazeCursor.style.top = screenY + 'px';
+
+      // Find element under gaze
+      const element = document.elementFromPoint(screenX, screenY);
+      const cell = element?.closest('.aac-cell');
+
+      // Update hover state
+      document.querySelectorAll('.aac-cell').forEach(c => {
+        c.classList.remove('gaze-hover', 'dwelling');
+        c.querySelector('.dwell-progress').style.width = '0%';
+      });
+
+      if (cell) {
+        cell.classList.add('gaze-hover');
+        handleDwell(cell, parseInt(cell.dataset.index));
+      } else {
+        resetDwell();
+      }
+    }
+
+    // Handle dwell selection
+    function handleDwell(cellEl, index) {
+      if (dwellTarget === index) {
+        const elapsed = Date.now() - dwellStartTime;
+        const progress = Math.min(elapsed / dwellTime, 1);
+
+        cellEl.querySelector('.dwell-progress').style.width = (progress * 100) + '%';
+        cellEl.classList.add('dwelling');
+
+        if (progress >= 1) {
+          // Trigger selection
+          handleCellClick(gridData[index]);
+          resetDwell();
+        }
+      } else {
+        // New target
+        dwellTarget = index;
+        dwellStartTime = Date.now();
+      }
+    }
+
+    function resetDwell() {
+      dwellTarget = null;
+      dwellStartTime = 0;
+    }
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      // Space to speak
+      if (e.code === 'Space' && e.ctrlKey) {
+        e.preventDefault();
+        speakMessage();
+      }
+      // Escape to clear
+      if (e.code === 'Escape') {
+        messageBuffer = '';
+        updateDisplay();
+      }
+      // Backspace to delete
+      if (e.code === 'Backspace' && messageBuffer) {
+        messageBuffer = messageBuffer.trim().split(' ').slice(0, -1).join(' ');
+        if (messageBuffer) messageBuffer += ' ';
+        updateDisplay();
+      }
+    });
+
+    // Simulated gaze for demo (mouse tracking)
+    document.addEventListener('mousemove', (e) => {
+      if (!isTracking) {
+        const x = e.clientX / window.innerWidth;
+        const y = e.clientY / window.innerHeight;
+        handleGazePoint(x, y);
+
+        // Show cursor in demo mode
+        gazeCursor.classList.add('active');
+        gazeCursor.style.left = e.clientX + 'px';
+        gazeCursor.style.top = e.clientY + 'px';
+      }
+    });
+
+    // Initialize
+    initGrid();
+  </script>
+</body>
+</html>

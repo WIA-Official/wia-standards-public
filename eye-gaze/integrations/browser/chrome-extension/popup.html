@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WIA Eye Gaze</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      width: 320px;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin-bottom: 4px;
+      color: #00d4aa;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 16px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: #16213e;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #e74c3c;
+    }
+
+    .status-indicator.connected {
+      background: #2ecc71;
+    }
+
+    .status-indicator.tracking {
+      background: #00d4aa;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button.primary {
+      background: #00d4aa;
+      color: #1a1a2e;
+    }
+
+    button.primary:hover {
+      background: #00ffcc;
+    }
+
+    button.secondary {
+      background: #333;
+      color: #eee;
+    }
+
+    button.secondary:hover {
+      background: #444;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .settings {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .setting {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #333;
+    }
+
+    .setting:last-child {
+      border-bottom: none;
+    }
+
+    .setting label {
+      font-size: 13px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #00d4aa;
+    }
+
+    input[type="range"] {
+      width: 100px;
+      accent-color: #00d4aa;
+    }
+
+    .value {
+      font-size: 12px;
+      color: #888;
+      width: 40px;
+      text-align: right;
+    }
+
+    .footer {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .footer a {
+      color: #00d4aa;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>👁 WIA Eye Gaze</h1>
+  <p class="subtitle">Gaze-based Browser Control</p>
+
+  <div class="status">
+    <div class="status-indicator" id="statusIndicator"></div>
+    <span id="statusText">Disconnected</span>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="connectBtn">Connect</button>
+    <button class="secondary" id="startBtn" disabled>Start</button>
+    <button class="secondary" id="stopBtn" disabled>Stop</button>
+  </div>
+
+  <div class="settings">
+    <div class="setting">
+      <label>Show Cursor</label>
+      <input type="checkbox" id="showCursor" checked>
+    </div>
+    <div class="setting">
+      <label>Dwell Selection</label>
+      <input type="checkbox" id="dwellEnabled" checked>
+    </div>
+    <div class="setting">
+      <label>Dwell Time</label>
+      <input type="range" id="dwellTime" min="400" max="1500" value="800" step="100">
+      <span class="value" id="dwellTimeValue">800ms</span>
+    </div>
+    <div class="setting">
+      <label>Cursor Size</label>
+      <input type="range" id="cursorSize" min="20" max="80" value="40" step="10">
+      <span class="value" id="cursorSizeValue">40px</span>
+    </div>
+    <div class="setting">
+      <label>Edge Scrolling</label>
+      <input type="checkbox" id="scrollEnabled" checked>
+    </div>
+  </div>
+
+  <div class="footer">
+    弘益人間 - 널리 인간을 이롭게<br>
+    <a href="https://github.com/anthropics/wia-standards" target="_blank">WIA Standards</a>
+  </div>
+
+  <script>
+    // Elements
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+    const connectBtn = document.getElementById('connectBtn');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const showCursor = document.getElementById('showCursor');
+    const dwellEnabled = document.getElementById('dwellEnabled');
+    const dwellTime = document.getElementById('dwellTime');
+    const dwellTimeValue = document.getElementById('dwellTimeValue');
+    const cursorSize = document.getElementById('cursorSize');
+    const cursorSizeValue = document.getElementById('cursorSizeValue');
+    const scrollEnabled = document.getElementById('scrollEnabled');
+
+    // State
+    let isConnected = false;
+    let isTracking = false;
+
+    // Load initial status
+    chrome.runtime.sendMessage({ type: 'getStatus' }, (response) => {
+      if (response) {
+        isConnected = response.isConnected;
+        isTracking = response.isTracking;
+        updateUI();
+
+        // Load settings
+        const s = response.settings;
+        showCursor.checked = s.showCursor;
+        dwellEnabled.checked = s.dwellEnabled;
+        dwellTime.value = s.dwellTime;
+        dwellTimeValue.textContent = s.dwellTime + 'ms';
+        cursorSize.value = s.cursorSize;
+        cursorSizeValue.textContent = s.cursorSize + 'px';
+        scrollEnabled.checked = s.scrollEnabled;
+      }
+    });
+
+    // Update UI based on state
+    function updateUI() {
+      if (isTracking) {
+        statusIndicator.className = 'status-indicator tracking';
+        statusText.textContent = 'Tracking';
+        connectBtn.textContent = 'Disconnect';
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } else if (isConnected) {
+        statusIndicator.className = 'status-indicator connected';
+        statusText.textContent = 'Connected';
+        connectBtn.textContent = 'Disconnect';
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      } else {
+        statusIndicator.className = 'status-indicator';
+        statusText.textContent = 'Disconnected';
+        connectBtn.textContent = 'Connect';
+        startBtn.disabled = true;
+        stopBtn.disabled = true;
+      }
+    }
+
+    // Connect/Disconnect button
+    connectBtn.addEventListener('click', () => {
+      if (isConnected) {
+        chrome.runtime.sendMessage({ type: 'disconnect' }, () => {
+          isConnected = false;
+          isTracking = false;
+          updateUI();
+        });
+      } else {
+        connectBtn.disabled = true;
+        connectBtn.textContent = 'Connecting...';
+        chrome.runtime.sendMessage({ type: 'connect' }, (response) => {
+          connectBtn.disabled = false;
+          if (response && response.success) {
+            isConnected = true;
+          }
+          updateUI();
+        });
+      }
+    });
+
+    // Start button
+    startBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'start' }, () => {
+        isTracking = true;
+        updateUI();
+      });
+    });
+
+    // Stop button
+    stopBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'stop' }, () => {
+        isTracking = false;
+        updateUI();
+      });
+    });
+
+    // Settings change handlers
+    function updateSettings() {
+      const settings = {
+        showCursor: showCursor.checked,
+        dwellEnabled: dwellEnabled.checked,
+        dwellTime: parseInt(dwellTime.value),
+        cursorSize: parseInt(cursorSize.value),
+        scrollEnabled: scrollEnabled.checked,
+      };
+      chrome.runtime.sendMessage({ type: 'updateSettings', settings });
+    }
+
+    showCursor.addEventListener('change', updateSettings);
+    dwellEnabled.addEventListener('change', updateSettings);
+    scrollEnabled.addEventListener('change', updateSettings);
+
+    dwellTime.addEventListener('input', () => {
+      dwellTimeValue.textContent = dwellTime.value + 'ms';
+    });
+    dwellTime.addEventListener('change', updateSettings);
+
+    cursorSize.addEventListener('input', () => {
+      cursorSizeValue.textContent = cursorSize.value + 'px';
+    });
+    cursorSize.addEventListener('change', updateSettings);
+  </script>
+</body>
+</html>

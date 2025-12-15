@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Eye Gaze - WebSocket Client Example</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #00d4aa;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel h2 {
+            color: #00d4aa;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #00d4aa;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #00ffcc;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        button.danger:hover {
+            background: #ff5f4f;
+        }
+
+        input {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #eee;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #00d4aa;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .status-indicator.connected {
+            background: #2ecc71;
+        }
+
+        .status-indicator.streaming {
+            background: #00d4aa;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .gaze-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: #0f0f23;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00d4aa;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        #gazeCanvas {
+            width: 100%;
+            height: 300px;
+            background: #0f0f23;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .log {
+            background: #0f0f23;
+            padding: 15px;
+            border-radius: 8px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-bottom: 1px solid #222;
+        }
+
+        .log-entry.info { color: #3498db; }
+        .log-entry.success { color: #2ecc71; }
+        .log-entry.error { color: #e74c3c; }
+        .log-entry.data { color: #888; }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WIA Eye Gaze WebSocket Client</h1>
+        <p class="subtitle">Real-time Eye Tracking Protocol Demo</p>
+
+        <!-- Connection Panel -->
+        <div class="panel">
+            <h2>Connection</h2>
+            <div class="status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div class="controls">
+                <input type="text" id="serverUrl" value="ws://localhost:8765/wia-eye-gaze/v1/stream" style="flex: 1; min-width: 300px;">
+                <button id="connectBtn" onclick="connect()">Connect</button>
+                <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="panel">
+            <h2>Streaming Control</h2>
+            <div class="controls">
+                <button id="startBtn" onclick="sendControl('start')" disabled>Start Streaming</button>
+                <button id="stopBtn" onclick="sendControl('stop')" disabled>Stop Streaming</button>
+                <button id="pauseBtn" onclick="sendControl('pause')" disabled>Pause</button>
+                <button id="resumeBtn" onclick="sendControl('resume')" disabled>Resume</button>
+                <button onclick="toggleBinaryMode()">Toggle Binary Mode</button>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <!-- Gaze Data Panel -->
+            <div class="panel">
+                <h2>Gaze Data</h2>
+                <div class="gaze-display">
+                    <div class="stat-card">
+                        <div class="stat-value" id="gazeX">--</div>
+                        <div class="stat-label">X Position</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="gazeY">--</div>
+                        <div class="stat-label">Y Position</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="confidence">--</div>
+                        <div class="stat-label">Confidence</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="frequency">--</div>
+                        <div class="stat-label">Frequency (Hz)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Panel -->
+            <div class="panel">
+                <h2>Statistics</h2>
+                <div class="gaze-display">
+                    <div class="stat-card">
+                        <div class="stat-value" id="packetsReceived">0</div>
+                        <div class="stat-label">Packets Received</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="pointsReceived">0</div>
+                        <div class="stat-label">Points Received</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="latency">--</div>
+                        <div class="stat-label">Latency (ms)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="eventsReceived">0</div>
+                        <div class="stat-label">Events Received</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualization Panel -->
+        <div class="panel">
+            <h2>Gaze Visualization</h2>
+            <canvas id="gazeCanvas"></canvas>
+        </div>
+
+        <!-- Log Panel -->
+        <div class="panel">
+            <h2>Message Log</h2>
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let ws = null;
+        let binaryMode = false;
+        let stats = {
+            packetsReceived: 0,
+            pointsReceived: 0,
+            eventsReceived: 0
+        };
+        let gazeHistory = [];
+        const MAX_HISTORY = 100;
+
+        // Canvas setup
+        const canvas = document.getElementById('gazeCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Logging
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+
+            // Keep only last 100 entries
+            while (logEl.children.length > 100) {
+                logEl.removeChild(logEl.firstChild);
+            }
+        }
+
+        // WebSocket connection
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+            log(`Connecting to ${url}...`);
+
+            try {
+                ws = new WebSocket(url, ['wia-eye-gaze-v1']);
+
+                ws.onopen = () => {
+                    log('Connected!', 'success');
+                    updateConnectionStatus(true);
+                };
+
+                ws.onclose = () => {
+                    log('Disconnected', 'info');
+                    updateConnectionStatus(false);
+                    ws = null;
+                };
+
+                ws.onerror = (error) => {
+                    log(`Error: ${error.message || 'Connection failed'}`, 'error');
+                };
+
+                ws.onmessage = (event) => {
+                    handleMessage(event.data);
+                };
+            } catch (e) {
+                log(`Connection error: ${e.message}`, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resumeBtn = document.getElementById('resumeBtn');
+
+            if (connected) {
+                indicator.classList.add('connected');
+                statusText.textContent = 'Connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = false;
+                pauseBtn.disabled = false;
+                resumeBtn.disabled = false;
+            } else {
+                indicator.classList.remove('connected', 'streaming');
+                statusText.textContent = 'Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = true;
+                pauseBtn.disabled = true;
+                resumeBtn.disabled = true;
+            }
+        }
+
+        function sendControl(action, params = null) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected', 'error');
+                return;
+            }
+
+            const message = {
+                type: 'control',
+                timestamp: Date.now(),
+                action: action,
+            };
+
+            if (params) {
+                message.params = params;
+            }
+
+            ws.send(JSON.stringify(message));
+            log(`Sent control: ${action}`, 'info');
+
+            if (action === 'start') {
+                document.getElementById('statusIndicator').classList.add('streaming');
+                document.getElementById('statusText').textContent = 'Streaming';
+            } else if (action === 'stop') {
+                document.getElementById('statusIndicator').classList.remove('streaming');
+                document.getElementById('statusText').textContent = 'Connected';
+            }
+        }
+
+        function toggleBinaryMode() {
+            binaryMode = !binaryMode;
+            sendControl('set_format', { format: binaryMode ? 'binary' : 'json' });
+            log(`Binary mode: ${binaryMode ? 'ON' : 'OFF'}`, 'info');
+        }
+
+        function handleMessage(data) {
+            if (data instanceof Blob) {
+                // Binary message
+                handleBinaryMessage(data);
+                return;
+            }
+
+            try {
+                const msg = JSON.parse(data);
+
+                switch (msg.type) {
+                    case 'gaze_data':
+                        handleGazeData(msg);
+                        break;
+                    case 'gaze_event':
+                        handleGazeEvent(msg);
+                        break;
+                    case 'status':
+                        handleStatus(msg);
+                        break;
+                    case 'pong':
+                        const latency = Date.now() - msg.timestamp;
+                        document.getElementById('latency').textContent = latency;
+                        break;
+                    case 'error':
+                        log(`Server error: ${msg.error.message}`, 'error');
+                        break;
+                    default:
+                        log(`Unknown message type: ${msg.type}`, 'data');
+                }
+            } catch (e) {
+                log(`Parse error: ${e.message}`, 'error');
+            }
+        }
+
+        function handleGazeData(msg) {
+            stats.packetsReceived++;
+            stats.pointsReceived += msg.points.length;
+
+            document.getElementById('packetsReceived').textContent = stats.packetsReceived;
+            document.getElementById('pointsReceived').textContent = stats.pointsReceived;
+            document.getElementById('frequency').textContent = msg.frequency;
+
+            if (msg.points.length > 0) {
+                const latest = msg.points[msg.points.length - 1];
+                document.getElementById('gazeX').textContent = latest.x.toFixed(3);
+                document.getElementById('gazeY').textContent = latest.y.toFixed(3);
+                document.getElementById('confidence').textContent = (latest.c * 100).toFixed(0) + '%';
+
+                // Add to history
+                for (const point of msg.points) {
+                    gazeHistory.push({ x: point.x, y: point.y, t: point.t });
+                    if (gazeHistory.length > MAX_HISTORY) {
+                        gazeHistory.shift();
+                    }
+                }
+
+                drawGaze();
+            }
+        }
+
+        function handleGazeEvent(msg) {
+            stats.eventsReceived++;
+            document.getElementById('eventsReceived').textContent = stats.eventsReceived;
+            log(`Event: ${msg.event.eventType}`, 'success');
+        }
+
+        function handleStatus(msg) {
+            log(`Status: ${msg.status.state}`, 'info');
+        }
+
+        async function handleBinaryMessage(blob) {
+            const buffer = await blob.arrayBuffer();
+            const view = new DataView(buffer);
+
+            // Check magic
+            if (view.getUint8(0) !== 0x57 || view.getUint8(1) !== 0x49) {
+                log('Invalid binary message', 'error');
+                return;
+            }
+
+            const msgType = view.getUint8(3);
+
+            if (msgType === 0x01) { // GazeBatch
+                const baseTimestamp = Number(view.getBigUint64(8, true));
+                const count = view.getUint16(16, true);
+                const pointSize = view.getUint8(18);
+
+                stats.packetsReceived++;
+                stats.pointsReceived += count;
+
+                document.getElementById('packetsReceived').textContent = stats.packetsReceived;
+                document.getElementById('pointsReceived').textContent = stats.pointsReceived;
+
+                let offset = 20;
+                for (let i = 0; i < count; i++) {
+                    const tsOffset = view.getUint16(offset, true);
+                    const x = view.getFloat32(offset + 2, true);
+                    const y = view.getFloat32(offset + 6, true);
+                    const confidence = view.getUint16(offset + 10, true) / 65535;
+
+                    gazeHistory.push({ x, y, t: baseTimestamp + tsOffset });
+                    if (gazeHistory.length > MAX_HISTORY) {
+                        gazeHistory.shift();
+                    }
+
+                    if (i === count - 1) {
+                        document.getElementById('gazeX').textContent = x.toFixed(3);
+                        document.getElementById('gazeY').textContent = y.toFixed(3);
+                        document.getElementById('confidence').textContent = (confidence * 100).toFixed(0) + '%';
+                    }
+
+                    offset += pointSize;
+                }
+
+                drawGaze();
+            }
+        }
+
+        function drawGaze() {
+            const width = canvas.offsetWidth;
+            const height = canvas.offsetHeight;
+
+            // Clear
+            ctx.fillStyle = '#0f0f23';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw grid
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 10; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * width / 10, 0);
+                ctx.lineTo(i * width / 10, height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i * height / 10);
+                ctx.lineTo(width, i * height / 10);
+                ctx.stroke();
+            }
+
+            // Draw gaze trail
+            if (gazeHistory.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(gazeHistory[0].x * width, gazeHistory[0].y * height);
+
+                for (let i = 1; i < gazeHistory.length; i++) {
+                    ctx.lineTo(gazeHistory[i].x * width, gazeHistory[i].y * height);
+                }
+
+                ctx.strokeStyle = 'rgba(0, 212, 170, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Draw current point
+            if (gazeHistory.length > 0) {
+                const current = gazeHistory[gazeHistory.length - 1];
+                const x = current.x * width;
+                const y = current.y * height;
+
+                // Outer glow
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 30);
+                gradient.addColorStop(0, 'rgba(0, 212, 170, 0.8)');
+                gradient.addColorStop(1, 'rgba(0, 212, 170, 0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, 30, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Center dot
+                ctx.fillStyle = '#00ffcc';
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Ping for latency measurement
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'ping',
+                    timestamp: Date.now()
+                }));
+            }
+        }, 1000);
+
+        // Initial draw
+        drawGaze();
+    </script>
+</body>
+</html>
