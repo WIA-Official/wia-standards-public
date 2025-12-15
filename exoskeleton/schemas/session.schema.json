@@ -1,0 +1,462 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia-standards.org/exoskeleton/schemas/session.schema.json",
+  "title": "WIA Exoskeleton Session",
+  "description": "Schema for rehabilitation exoskeleton training session data",
+  "type": "object",
+  "required": ["metadata", "configuration", "timeSeries", "summary"],
+  "properties": {
+    "metadata": {
+      "$ref": "#/definitions/SessionMetadata"
+    },
+    "configuration": {
+      "$ref": "#/definitions/SessionConfiguration"
+    },
+    "timeSeries": {
+      "$ref": "#/definitions/TimeSeriesData"
+    },
+    "summary": {
+      "$ref": "#/definitions/SessionSummary"
+    }
+  },
+  "definitions": {
+    "SessionMetadata": {
+      "type": "object",
+      "description": "Session metadata",
+      "required": ["sessionId", "userId", "startTime", "endTime", "deviceInfo"],
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique session identifier (UUID v4)"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "User/patient identifier"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Session start time (ISO 8601)"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Session end time (ISO 8601)"
+        },
+        "deviceInfo": {
+          "$ref": "#/definitions/ExoDeviceInfo"
+        }
+      }
+    },
+    "ExoDeviceInfo": {
+      "type": "object",
+      "description": "Exoskeleton device information",
+      "required": ["deviceId", "model", "firmwareVersion", "calibrationDate"],
+      "properties": {
+        "deviceId": {
+          "type": "string",
+          "description": "Unique device identifier"
+        },
+        "model": {
+          "type": "string",
+          "description": "Exoskeleton model name"
+        },
+        "firmwareVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Firmware version (semver format)"
+        },
+        "calibrationDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Last calibration date"
+        },
+        "sensorConfig": {
+          "type": "object",
+          "description": "Sensor configuration details"
+        }
+      }
+    },
+    "SessionConfiguration": {
+      "type": "object",
+      "description": "Session configuration settings",
+      "required": ["assistanceMode", "assistanceLevel", "jointLimits"],
+      "properties": {
+        "assistanceMode": {
+          "$ref": "#/definitions/AssistanceMode"
+        },
+        "assistanceLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Assistance level (0-100%)"
+        },
+        "jointLimits": {
+          "$ref": "#/definitions/JointLimits"
+        }
+      }
+    },
+    "AssistanceMode": {
+      "type": "string",
+      "enum": ["passive", "active_assist", "active_resist", "transparent", "challenge"],
+      "description": "Exoskeleton assistance mode"
+    },
+    "JointLimits": {
+      "type": "object",
+      "description": "Joint range of motion limits",
+      "required": ["hip", "knee", "ankle"],
+      "properties": {
+        "hip": {
+          "$ref": "#/definitions/RangeLimit"
+        },
+        "knee": {
+          "$ref": "#/definitions/RangeLimit"
+        },
+        "ankle": {
+          "$ref": "#/definitions/RangeLimit"
+        }
+      }
+    },
+    "RangeLimit": {
+      "type": "object",
+      "description": "Range limit for a single joint",
+      "required": ["min", "max"],
+      "properties": {
+        "min": {
+          "type": "number",
+          "description": "Minimum angle (degrees)"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum angle (degrees)"
+        },
+        "velocityLimit": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum angular velocity (deg/s)"
+        },
+        "torqueLimit": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum torque (Nm)"
+        }
+      }
+    },
+    "TimeSeriesData": {
+      "type": "object",
+      "description": "Time series data collection",
+      "required": ["sampleRate", "jointStates", "gaitCycles", "events"],
+      "properties": {
+        "sampleRate": {
+          "type": "number",
+          "minimum": 50,
+          "description": "Sampling frequency in Hz"
+        },
+        "jointStates": {
+          "type": "array",
+          "items": {
+            "$ref": "joint-state.schema.json"
+          },
+          "description": "Array of joint state samples"
+        },
+        "gaitCycles": {
+          "type": "array",
+          "items": {
+            "$ref": "gait-cycle.schema.json"
+          },
+          "description": "Array of gait cycle data"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExoEvent"
+          },
+          "description": "Array of session events"
+        }
+      }
+    },
+    "ExoEvent": {
+      "type": "object",
+      "description": "Session event record",
+      "required": ["timestamp", "type", "severity", "message"],
+      "properties": {
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Event timestamp (Unix ms)"
+        },
+        "type": {
+          "$ref": "#/definitions/EventType"
+        },
+        "severity": {
+          "$ref": "#/definitions/EventSeverity"
+        },
+        "message": {
+          "type": "string",
+          "description": "Event description"
+        },
+        "data": {
+          "type": "object",
+          "description": "Additional event data"
+        }
+      }
+    },
+    "EventType": {
+      "type": "string",
+      "enum": [
+        "session_start",
+        "session_end",
+        "mode_change",
+        "assistance_change",
+        "fall_detected",
+        "stumble_detected",
+        "fatigue_warning",
+        "limit_reached",
+        "emergency_stop",
+        "calibration",
+        "rest_period"
+      ],
+      "description": "Type of session event"
+    },
+    "EventSeverity": {
+      "type": "string",
+      "enum": ["info", "warning", "error", "critical"],
+      "description": "Event severity level"
+    },
+    "SessionSummary": {
+      "type": "object",
+      "description": "Session summary statistics",
+      "required": ["duration", "distance", "gait", "performance"],
+      "properties": {
+        "duration": {
+          "$ref": "#/definitions/DurationSummary"
+        },
+        "distance": {
+          "$ref": "#/definitions/DistanceSummary"
+        },
+        "gait": {
+          "$ref": "#/definitions/GaitSummary"
+        },
+        "performance": {
+          "$ref": "#/definitions/PerformanceSummary"
+        },
+        "energy": {
+          "$ref": "#/definitions/EnergySummary"
+        }
+      }
+    },
+    "DurationSummary": {
+      "type": "object",
+      "description": "Duration statistics",
+      "required": ["total", "active", "rest", "standing", "walking"],
+      "properties": {
+        "total": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total session duration (ms)"
+        },
+        "active": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Active time (ms)"
+        },
+        "rest": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Rest time (ms)"
+        },
+        "standing": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Standing time (ms)"
+        },
+        "walking": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Walking time (ms)"
+        }
+      }
+    },
+    "DistanceSummary": {
+      "type": "object",
+      "description": "Distance statistics",
+      "required": ["total", "steps", "strides"],
+      "properties": {
+        "total": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total distance (m)"
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total step count"
+        },
+        "strides": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total stride count"
+        }
+      }
+    },
+    "GaitSummary": {
+      "type": "object",
+      "description": "Gait statistics",
+      "required": ["avgVelocity", "maxVelocity", "avgCadence", "avgStrideLength", "symmetryIndex", "stanceSwingRatio"],
+      "properties": {
+        "avgVelocity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average walking velocity (m/s)"
+        },
+        "maxVelocity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum walking velocity (m/s)"
+        },
+        "avgCadence": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average cadence (steps/min)"
+        },
+        "avgStrideLength": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average stride length (cm)"
+        },
+        "symmetryIndex": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Left-right symmetry index (%)"
+        },
+        "stanceSwingRatio": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Stance to swing phase ratio"
+        }
+      }
+    },
+    "PerformanceSummary": {
+      "type": "object",
+      "description": "Performance statistics",
+      "required": ["avgAssistanceUsed"],
+      "properties": {
+        "avgAssistanceUsed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Average assistance used (%)"
+        },
+        "peakTorque": {
+          "type": "object",
+          "description": "Peak torque values by joint"
+        },
+        "rangeOfMotion": {
+          "type": "object",
+          "description": "Range of motion used by joint"
+        },
+        "fatigueProgression": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "description": "Fatigue score progression over time"
+        }
+      }
+    },
+    "EnergySummary": {
+      "type": "object",
+      "description": "Energy statistics",
+      "properties": {
+        "metabolicCost": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Metabolic cost (J/kg/m)"
+        },
+        "assistEnergy": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Energy provided by exoskeleton (J)"
+        },
+        "userEnergy": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Energy expended by user (J)"
+        },
+        "efficiency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Energy efficiency (%)"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "metadata": {
+        "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+        "userId": "patient-001",
+        "startTime": "2025-12-14T09:00:00Z",
+        "endTime": "2025-12-14T09:30:00Z",
+        "deviceInfo": {
+          "deviceId": "EXO-2025-001",
+          "model": "WIA-RehabExo-Pro",
+          "firmwareVersion": "2.5.1",
+          "calibrationDate": "2025-12-01"
+        }
+      },
+      "configuration": {
+        "assistanceMode": "active_assist",
+        "assistanceLevel": 60,
+        "jointLimits": {
+          "hip": { "min": -10, "max": 100, "velocityLimit": 180, "torqueLimit": 40 },
+          "knee": { "min": 0, "max": 120, "velocityLimit": 200, "torqueLimit": 50 },
+          "ankle": { "min": -20, "max": 40, "velocityLimit": 150, "torqueLimit": 30 }
+        }
+      },
+      "timeSeries": {
+        "sampleRate": 200,
+        "jointStates": [],
+        "gaitCycles": [],
+        "events": [
+          {
+            "timestamp": 1702598400000,
+            "type": "session_start",
+            "severity": "info",
+            "message": "Session started"
+          }
+        ]
+      },
+      "summary": {
+        "duration": {
+          "total": 1800000,
+          "active": 1500000,
+          "rest": 300000,
+          "standing": 200000,
+          "walking": 1300000
+        },
+        "distance": {
+          "total": 850.5,
+          "steps": 1250,
+          "strides": 625
+        },
+        "gait": {
+          "avgVelocity": 0.85,
+          "maxVelocity": 1.15,
+          "avgCadence": 95,
+          "avgStrideLength": 136.08,
+          "symmetryIndex": 8.5,
+          "stanceSwingRatio": 1.45
+        },
+        "performance": {
+          "avgAssistanceUsed": 45.2
+        }
+      }
+    }
+  ]
+}
