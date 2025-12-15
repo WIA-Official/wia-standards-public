@@ -1,0 +1,541 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.org/schemas/myoelectric/electrode-placement.schema.json",
+  "title": "WIA Electrode Placement Configuration",
+  "description": "Standard electrode placement configuration for EMG-based myoelectric prosthetic systems",
+  "type": "object",
+  "required": ["version", "configuration", "electrodes"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Schema version in semver format",
+      "examples": ["1.0.0"]
+    },
+    "configuration": {
+      "$ref": "#/definitions/Configuration"
+    },
+    "electrodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ElectrodeConfig"
+      },
+      "minItems": 1,
+      "maxItems": 16,
+      "description": "Array of electrode configurations"
+    },
+    "reference": {
+      "$ref": "#/definitions/ReferenceElectrode"
+    },
+    "calibration": {
+      "$ref": "#/definitions/CalibrationData"
+    },
+    "metadata": {
+      "$ref": "#/definitions/PlacementMetadata"
+    }
+  },
+  "definitions": {
+    "Configuration": {
+      "type": "object",
+      "required": ["name", "channelCount", "electrodeType"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["minimal", "standard", "advanced", "custom"],
+          "description": "Predefined configuration name"
+        },
+        "channelCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Total number of EMG channels"
+        },
+        "electrodeType": {
+          "type": "string",
+          "enum": ["pregelled_ag_agcl", "dry_textile", "dry_metal", "custom"],
+          "description": "Type of electrodes used"
+        },
+        "interElectrodeDistance": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 50,
+          "default": 20,
+          "description": "Default inter-electrode distance in mm"
+        },
+        "referenceType": {
+          "type": "string",
+          "enum": ["monopolar", "bipolar", "differential"],
+          "default": "bipolar",
+          "description": "Electrode reference configuration"
+        }
+      }
+    },
+    "ElectrodeConfig": {
+      "type": "object",
+      "required": ["channelId", "muscle", "placement"],
+      "properties": {
+        "channelId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "description": "Channel identifier"
+        },
+        "muscle": {
+          "$ref": "#/definitions/MuscleInfo"
+        },
+        "placement": {
+          "$ref": "#/definitions/PlacementCoordinates"
+        },
+        "electrodeSpec": {
+          "$ref": "#/definitions/ElectrodeSpecification"
+        },
+        "qualityMetrics": {
+          "$ref": "#/definitions/QualityMetrics"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this channel is active"
+        }
+      }
+    },
+    "MuscleInfo": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Muscle identifier in snake_case"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable muscle name"
+        },
+        "group": {
+          "type": "string",
+          "enum": ["flexor", "extensor", "pronator", "supinator", "other"],
+          "description": "Functional muscle group"
+        },
+        "function": {
+          "type": "string",
+          "description": "Primary muscle function"
+        },
+        "depth": {
+          "type": "string",
+          "enum": ["superficial", "intermediate", "deep"],
+          "description": "Muscle depth from skin surface"
+        }
+      }
+    },
+    "PlacementCoordinates": {
+      "type": "object",
+      "required": ["xDistanceCm", "circumferenceDeg"],
+      "properties": {
+        "xDistanceCm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 40,
+          "description": "Distance from reference landmark (typically lateral epicondyle) in cm"
+        },
+        "yOffsetCm": {
+          "type": "number",
+          "minimum": -10,
+          "maximum": 10,
+          "default": 0,
+          "description": "Lateral offset from muscle midline in cm"
+        },
+        "circumferenceDeg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360,
+          "description": "Angular position on limb circumference in degrees (0° = posterior)"
+        },
+        "referenceLandmark": {
+          "type": "string",
+          "enum": [
+            "lateral_epicondyle",
+            "medial_epicondyle",
+            "radial_styloid",
+            "ulnar_styloid",
+            "olecranon_process",
+            "wrist_crease"
+          ],
+          "default": "lateral_epicondyle",
+          "description": "Anatomical reference point for measurements"
+        },
+        "orientation": {
+          "type": "string",
+          "enum": ["parallel", "perpendicular", "oblique"],
+          "default": "parallel",
+          "description": "Electrode orientation relative to muscle fibers"
+        },
+        "orientationAngle": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180,
+          "description": "Specific orientation angle in degrees (for oblique)"
+        }
+      }
+    },
+    "ElectrodeSpecification": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["pregelled_ag_agcl", "dry_textile", "dry_metal", "hydrogel", "custom"],
+          "description": "Electrode material/type"
+        },
+        "diameter": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Electrode diameter in mm"
+        },
+        "shape": {
+          "type": "string",
+          "enum": ["circular", "rectangular", "bar"],
+          "description": "Electrode shape"
+        },
+        "interElectrodeDistance": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 50,
+          "description": "Distance between electrode pairs in mm"
+        },
+        "manufacturer": {
+          "type": "string",
+          "description": "Electrode manufacturer"
+        },
+        "model": {
+          "type": "string",
+          "description": "Electrode model number"
+        }
+      }
+    },
+    "ReferenceElectrode": {
+      "type": "object",
+      "required": ["location"],
+      "properties": {
+        "location": {
+          "type": "string",
+          "enum": [
+            "lateral_epicondyle",
+            "medial_epicondyle",
+            "olecranon",
+            "ulnar_styloid",
+            "radial_styloid",
+            "wrist_dorsum",
+            "custom"
+          ],
+          "description": "Reference electrode placement location"
+        },
+        "customLocation": {
+          "type": "string",
+          "description": "Description of custom reference location"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["common", "per_channel", "driven_right_leg"],
+          "default": "common",
+          "description": "Reference configuration type"
+        }
+      }
+    },
+    "QualityMetrics": {
+      "type": "object",
+      "properties": {
+        "impedance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Electrode-skin impedance in kOhms"
+        },
+        "snrDb": {
+          "type": "number",
+          "description": "Signal-to-noise ratio in dB"
+        },
+        "restBaseline": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Resting EMG level in mV RMS"
+        },
+        "mvcAmplitude": {
+          "type": "number",
+          "minimum": 0,
+          "description": "MVC signal amplitude in mV RMS"
+        },
+        "crossTalkDb": {
+          "type": "number",
+          "description": "Cross-talk from adjacent channels in dB"
+        },
+        "qualityScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Overall quality score (0-100)"
+        },
+        "measurementDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When quality metrics were measured"
+        }
+      }
+    },
+    "CalibrationData": {
+      "type": "object",
+      "properties": {
+        "mvcCalibrations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MVCCalibration"
+          },
+          "description": "MVC calibration data per channel"
+        },
+        "calibrationDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Calibration timestamp"
+        },
+        "calibrationProtocol": {
+          "type": "string",
+          "enum": ["standard_mvc", "submaximal", "functional"],
+          "description": "Calibration protocol used"
+        },
+        "isValid": {
+          "type": "boolean",
+          "description": "Whether calibration is currently valid"
+        },
+        "expirationDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When calibration should be renewed"
+        }
+      }
+    },
+    "MVCCalibration": {
+      "type": "object",
+      "required": ["channelId", "mvcValue"],
+      "properties": {
+        "channelId": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Channel identifier"
+        },
+        "muscle": {
+          "type": "string",
+          "description": "Muscle name"
+        },
+        "mvcValue": {
+          "type": "number",
+          "minimum": 0,
+          "description": "MVC reference value in mV"
+        },
+        "restBaseline": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Resting baseline value in mV"
+        },
+        "numTrials": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of MVC trials performed"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score for calibration"
+        }
+      }
+    },
+    "PlacementMetadata": {
+      "type": "object",
+      "properties": {
+        "subjectId": {
+          "type": "string",
+          "description": "Anonymous subject identifier"
+        },
+        "limbSide": {
+          "type": "string",
+          "enum": ["left", "right"],
+          "description": "Which arm/limb"
+        },
+        "amputationLevel": {
+          "type": "string",
+          "enum": [
+            "intact",
+            "partial_hand",
+            "wrist_disarticulation",
+            "transradial_short",
+            "transradial_medium",
+            "transradial_long",
+            "elbow_disarticulation",
+            "transhumeral"
+          ],
+          "description": "Amputation level if applicable"
+        },
+        "residualLimbLength": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Residual limb length in cm (if applicable)"
+        },
+        "forearmCircumference": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 50,
+          "description": "Forearm circumference at electrode site in cm"
+        },
+        "skinCondition": {
+          "type": "string",
+          "enum": ["normal", "dry", "oily", "scarred", "sensitive"],
+          "description": "Skin condition at electrode sites"
+        },
+        "preparationMethod": {
+          "type": "string",
+          "enum": ["alcohol_wipe", "abrasion", "conductive_gel", "none"],
+          "description": "Skin preparation method used"
+        },
+        "clinician": {
+          "type": "string",
+          "description": "Name or ID of person who placed electrodes"
+        },
+        "placementDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When electrodes were placed"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about placement"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "1.0.0",
+      "configuration": {
+        "name": "standard",
+        "channelCount": 4,
+        "electrodeType": "pregelled_ag_agcl",
+        "interElectrodeDistance": 20,
+        "referenceType": "bipolar"
+      },
+      "electrodes": [
+        {
+          "channelId": 0,
+          "muscle": {
+            "id": "flexor_carpi_radialis",
+            "name": "Flexor Carpi Radialis",
+            "group": "flexor",
+            "function": "Wrist flexion, radial deviation",
+            "depth": "superficial"
+          },
+          "placement": {
+            "xDistanceCm": 10.0,
+            "yOffsetCm": 0.0,
+            "circumferenceDeg": 145.0,
+            "referenceLandmark": "lateral_epicondyle",
+            "orientation": "parallel"
+          },
+          "electrodeSpec": {
+            "type": "pregelled_ag_agcl",
+            "diameter": 10,
+            "shape": "circular",
+            "interElectrodeDistance": 20
+          },
+          "qualityMetrics": {
+            "impedance": 5.2,
+            "snrDb": 25.0,
+            "restBaseline": 0.015,
+            "mvcAmplitude": 0.85,
+            "qualityScore": 92
+          },
+          "enabled": true
+        },
+        {
+          "channelId": 1,
+          "muscle": {
+            "id": "flexor_carpi_ulnaris",
+            "name": "Flexor Carpi Ulnaris",
+            "group": "flexor",
+            "function": "Wrist flexion, ulnar deviation",
+            "depth": "superficial"
+          },
+          "placement": {
+            "xDistanceCm": 11.0,
+            "yOffsetCm": 0.0,
+            "circumferenceDeg": 210.0,
+            "referenceLandmark": "lateral_epicondyle",
+            "orientation": "parallel"
+          },
+          "enabled": true
+        },
+        {
+          "channelId": 2,
+          "muscle": {
+            "id": "extensor_carpi_radialis_longus",
+            "name": "Extensor Carpi Radialis Longus",
+            "group": "extensor",
+            "function": "Wrist extension, radial deviation",
+            "depth": "superficial"
+          },
+          "placement": {
+            "xDistanceCm": 7.0,
+            "yOffsetCm": 0.0,
+            "circumferenceDeg": 50.0,
+            "referenceLandmark": "lateral_epicondyle",
+            "orientation": "parallel"
+          },
+          "enabled": true
+        },
+        {
+          "channelId": 3,
+          "muscle": {
+            "id": "extensor_digitorum",
+            "name": "Extensor Digitorum",
+            "group": "extensor",
+            "function": "Finger extension",
+            "depth": "superficial"
+          },
+          "placement": {
+            "xDistanceCm": 9.0,
+            "yOffsetCm": 0.0,
+            "circumferenceDeg": 5.0,
+            "referenceLandmark": "lateral_epicondyle",
+            "orientation": "parallel"
+          },
+          "enabled": true
+        }
+      ],
+      "reference": {
+        "location": "lateral_epicondyle",
+        "type": "common"
+      },
+      "calibration": {
+        "calibrationDate": "2025-01-15T10:30:00Z",
+        "calibrationProtocol": "standard_mvc",
+        "isValid": true,
+        "mvcCalibrations": [
+          {
+            "channelId": 0,
+            "muscle": "flexor_carpi_radialis",
+            "mvcValue": 0.85,
+            "restBaseline": 0.015,
+            "numTrials": 3,
+            "confidence": 0.95
+          }
+        ]
+      },
+      "metadata": {
+        "subjectId": "WIA-SUBJ-001",
+        "limbSide": "right",
+        "amputationLevel": "transradial_medium",
+        "forearmCircumference": 24.5,
+        "skinCondition": "normal",
+        "preparationMethod": "alcohol_wipe",
+        "placementDate": "2025-01-15T10:00:00Z"
+      }
+    }
+  ]
+}

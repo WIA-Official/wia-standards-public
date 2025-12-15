@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.org/schemas/myoelectric/emg-data.schema.json",
+  "title": "WIA EMG Data Frame",
+  "description": "Standard data format for EMG signals in myoelectric prosthetic systems",
+  "type": "object",
+  "required": ["version", "metadata", "channels", "startTime", "duration"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Schema version in semver format",
+      "examples": ["1.0.0"]
+    },
+    "metadata": {
+      "$ref": "#/definitions/Metadata"
+    },
+    "channels": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/EMGChannel"
+      },
+      "minItems": 1,
+      "maxItems": 16,
+      "description": "Array of EMG channel data"
+    },
+    "startTime": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp in milliseconds when recording started"
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Duration of the recording in milliseconds"
+    }
+  },
+  "definitions": {
+    "Metadata": {
+      "type": "object",
+      "required": ["sampleRate", "channelCount", "resolution", "gain", "referenceType"],
+      "properties": {
+        "sampleRate": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 10000,
+          "description": "Sampling frequency in Hz (1000-2000 recommended)"
+        },
+        "channelCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Number of EMG channels"
+        },
+        "resolution": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 32,
+          "description": "ADC resolution in bits"
+        },
+        "gain": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Amplification gain factor"
+        },
+        "referenceType": {
+          "type": "string",
+          "enum": ["monopolar", "bipolar", "differential"],
+          "description": "Electrode configuration type"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Unique identifier for the sensor device"
+        },
+        "firmwareVersion": {
+          "type": "string",
+          "description": "Device firmware version"
+        },
+        "subjectId": {
+          "type": "string",
+          "description": "Anonymous subject identifier"
+        },
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique session identifier"
+        }
+      }
+    },
+    "EMGChannel": {
+      "type": "object",
+      "required": ["id", "name", "placement", "samples", "unit"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-indexed channel identifier"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Muscle name in snake_case format"
+        },
+        "placement": {
+          "$ref": "#/definitions/ElectrodePlacement"
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Raw EMG samples as 32-bit floats"
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["mV", "uV", "V", "raw"],
+          "description": "Measurement unit"
+        },
+        "calibration": {
+          "$ref": "#/definitions/ChannelCalibration"
+        }
+      }
+    },
+    "ElectrodePlacement": {
+      "type": "object",
+      "required": ["muscle", "location"],
+      "properties": {
+        "muscle": {
+          "type": "string",
+          "$ref": "#/definitions/MuscleIdentifier",
+          "description": "Target muscle name"
+        },
+        "location": {
+          "type": "object",
+          "required": ["x", "y", "circumference"],
+          "properties": {
+            "x": {
+              "type": "number",
+              "description": "Distance from elbow (lateral epicondyle) in cm"
+            },
+            "y": {
+              "type": "number",
+              "description": "Offset from muscle center in cm"
+            },
+            "circumference": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 360,
+              "description": "Angular position on forearm circumference in degrees"
+            }
+          }
+        },
+        "anatomicalLandmark": {
+          "type": "string",
+          "enum": [
+            "lateral_epicondyle",
+            "medial_epicondyle",
+            "radial_styloid",
+            "ulnar_styloid",
+            "olecranon_process"
+          ],
+          "description": "Reference anatomical point"
+        },
+        "orientation": {
+          "type": "string",
+          "enum": ["parallel", "perpendicular", "oblique"],
+          "description": "Electrode orientation relative to muscle fibers"
+        },
+        "interElectrodeDistance": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 50,
+          "description": "Distance between electrode pairs in mm"
+        }
+      }
+    },
+    "ChannelCalibration": {
+      "type": "object",
+      "properties": {
+        "mvcValue": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum Voluntary Contraction reference value"
+        },
+        "restBaseline": {
+          "type": "number",
+          "description": "Resting EMG baseline value"
+        },
+        "calibrationDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of calibration"
+        },
+        "impedance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Electrode-skin impedance in kOhms"
+        }
+      }
+    },
+    "MuscleIdentifier": {
+      "type": "string",
+      "enum": [
+        "flexor_carpi_radialis",
+        "flexor_carpi_ulnaris",
+        "flexor_digitorum_superficialis",
+        "flexor_digitorum_profundus",
+        "flexor_pollicis_longus",
+        "pronator_teres",
+        "pronator_quadratus",
+        "extensor_carpi_radialis_longus",
+        "extensor_carpi_radialis_brevis",
+        "extensor_carpi_ulnaris",
+        "extensor_digitorum",
+        "extensor_digiti_minimi",
+        "extensor_indicis",
+        "extensor_pollicis_longus",
+        "extensor_pollicis_brevis",
+        "supinator",
+        "abductor_pollicis_longus",
+        "brachioradialis",
+        "biceps_brachii",
+        "triceps_brachii",
+        "custom"
+      ],
+      "description": "Standard muscle identifiers for forearm and upper arm"
+    }
+  },
+  "examples": [
+    {
+      "version": "1.0.0",
+      "metadata": {
+        "sampleRate": 1000,
+        "channelCount": 4,
+        "resolution": 16,
+        "gain": 1000,
+        "referenceType": "bipolar",
+        "deviceId": "WIA-EMG-001",
+        "sessionId": "550e8400-e29b-41d4-a716-446655440000"
+      },
+      "channels": [
+        {
+          "id": 0,
+          "name": "flexor_carpi_radialis",
+          "placement": {
+            "muscle": "flexor_carpi_radialis",
+            "location": {
+              "x": 10.0,
+              "y": 0.0,
+              "circumference": 145.0
+            },
+            "anatomicalLandmark": "medial_epicondyle",
+            "orientation": "parallel",
+            "interElectrodeDistance": 20
+          },
+          "samples": [0.012, -0.008, 0.015, 0.022, -0.005],
+          "unit": "mV",
+          "calibration": {
+            "mvcValue": 0.85,
+            "restBaseline": 0.015,
+            "calibrationDate": "2025-01-15T10:30:00Z",
+            "impedance": 5.2
+          }
+        }
+      ],
+      "startTime": 1705312800000,
+      "duration": 1000
+    }
+  ]
+}
