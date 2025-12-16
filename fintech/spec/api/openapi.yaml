@@ -1,0 +1,1215 @@
+openapi: 3.1.0
+info:
+  title: WIA Fintech Accessibility API
+  version: 1.0.0
+  description: |
+    WIA (World Inclusive Accessibility) 금융 접근성 API
+
+    ## 접근성 기능
+    - 다중 모달 응답 (시각, 청각, 촉각)
+    - 확장된 타임아웃 옵션
+    - 간소화된 언어 지원
+    - WIA 디바이스 통합
+
+    ## 보안
+    - OAuth 2.0 + PKCE
+    - PCI-DSS Level 1 준수
+    - TLS 1.3 필수
+
+    弘益人間 - Financial Accessibility for All
+  contact:
+    name: WIA Standards Committee
+    email: api@wia-standards.org
+    url: https://wia-standards.org
+  license:
+    name: CC BY 4.0
+    url: https://creativecommons.org/licenses/by/4.0/
+  x-accessibility:
+    wcagLevel: AA
+    screenReaderOptimized: true
+    multiModalResponses: true
+
+servers:
+  - url: https://api.wia-fintech.org/v1
+    description: Production Server
+  - url: https://sandbox.wia-fintech.org/v1
+    description: Sandbox (Testing)
+
+tags:
+  - name: Authentication
+    description: 접근성 인증 엔드포인트
+  - name: Profiles
+    description: 사용자 접근성 프로필 관리
+  - name: ATMs
+    description: ATM 검색 및 접근성 정보
+  - name: Transactions
+    description: 접근성 거래 처리
+  - name: Notifications
+    description: 다중 모달 알림
+  - name: WIA Integration
+    description: WIA 디바이스 연동
+
+security:
+  - OAuth2:
+      - read:profile
+      - write:profile
+      - read:atm
+      - write:transaction
+  - BearerAuth: []
+
+paths:
+  # ============================================================================
+  # Authentication
+  # ============================================================================
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: 접근성 로그인
+      description: |
+        다양한 인증 방식과 접근성 옵션을 지원하는 로그인 엔드포인트
+
+        **접근성 기능:**
+        - 확장된 타임아웃 (120초)
+        - 음성 피드백
+        - 촉각 피드백 (WIA 디바이스)
+        - 단계별 안내
+      operationId: accessibleLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessibleLoginRequest'
+            examples:
+              standardLogin:
+                summary: 표준 로그인
+                value:
+                  credentials:
+                    type: password
+                    value: "encrypted_password"
+                  accessibility:
+                    extendedTimeout: false
+                    voiceFeedback: false
+                    hapticFeedback: false
+                    simplifiedFlow: false
+                    stepByStepGuidance: false
+                  deviceContext:
+                    deviceId: "device-001"
+                    deviceType: "mobile"
+                    wiaDeviceConnected: false
+              accessibleLogin:
+                summary: 접근성 로그인 (시각장애)
+                value:
+                  credentials:
+                    type: biometric
+                    biometricToken: "fingerprint_token"
+                  accessibility:
+                    extendedTimeout: true
+                    voiceFeedback: true
+                    voiceLanguage: "ko-KR"
+                    hapticFeedback: true
+                    hapticDeviceId: "exo-001"
+                    simplifiedFlow: false
+                    stepByStepGuidance: true
+                  deviceContext:
+                    deviceId: "device-001"
+                    deviceType: "mobile"
+                    wiaDeviceConnected: true
+                    wiaDeviceIds: ["exo-001"]
+      responses:
+        '200':
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessibleLoginResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '408':
+          $ref: '#/components/responses/TimeoutError'
+
+  /auth/pin/verify:
+    post:
+      tags:
+        - Authentication
+      summary: 접근성 PIN 인증
+      description: |
+        접근성 기능이 포함된 PIN 인증
+
+        **접근성 기능:**
+        - 각 숫자 입력 시 오디오 톤 피드백
+        - 촉각 피드백
+        - 확장된 입력 시간 (최대 180초)
+      operationId: verifyPin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessiblePinVerifyRequest'
+      responses:
+        '200':
+          description: PIN 인증 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessiblePinVerifyResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ============================================================================
+  # Profiles
+  # ============================================================================
+  /profiles/{profileId}:
+    get:
+      tags:
+        - Profiles
+      summary: 사용자 프로필 조회
+      description: 사용자의 금융 접근성 프로필을 조회합니다
+      operationId: getProfile
+      security:
+        - BearerAuth: []
+        - OAuth2:
+            - read:profile
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/WIADeviceId'
+      responses:
+        '200':
+          description: 프로필 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProfileResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags:
+        - Profiles
+      summary: 사용자 프로필 업데이트
+      description: |
+        사용자 프로필을 업데이트하고 연결된 WIA 디바이스에 동기화합니다
+
+        **충돌 해결:**
+        - server_wins: 서버 버전 우선
+        - client_wins: 클라이언트 버전 우선
+        - merge: 자동 병합
+        - manual: 수동 해결 필요
+      operationId: updateProfile
+      security:
+        - BearerAuth: []
+        - OAuth2:
+            - write:profile
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - name: If-Match
+          in: header
+          description: 버전 해시 (낙관적 잠금)
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: 프로필 업데이트 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateProfileResponse'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  # ============================================================================
+  # ATMs
+  # ============================================================================
+  /atms/search:
+    get:
+      tags:
+        - ATMs
+      summary: 접근성 ATM 검색
+      description: |
+        사용자 위치와 접근성 요구사항에 맞는 ATM을 검색합니다
+
+        **기능:**
+        - 사용자 프로필 기반 호환성 점수
+        - 접근성 필터링 (휠체어, 오디오 안내, 점자 등)
+        - 도보/차량 이동 시간 포함
+      operationId: searchATMs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          description: 위도
+          schema:
+            type: number
+            format: double
+            example: 37.5665
+        - name: lng
+          in: query
+          required: true
+          description: 경도
+          schema:
+            type: number
+            format: double
+            example: 126.9780
+        - name: radius
+          in: query
+          description: 검색 반경 (km)
+          schema:
+            type: number
+            default: 5
+            maximum: 50
+        - name: profileId
+          in: query
+          description: 호환성 계산을 위한 사용자 프로필 ID
+          schema:
+            type: string
+        - name: wheelchairAccessible
+          in: query
+          description: 휠체어 접근 가능 필터
+          schema:
+            type: boolean
+        - name: audioGuidance
+          in: query
+          description: 오디오 안내 필터
+          schema:
+            type: boolean
+        - name: wiaEnabled
+          in: query
+          description: WIA 디바이스 지원 필터
+          schema:
+            type: boolean
+        - name: minAccessibilityScore
+          in: query
+          description: 최소 접근성 점수 (0-100)
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100
+        - name: sortBy
+          in: query
+          description: 정렬 기준
+          schema:
+            type: string
+            enum: [distance, accessibility_score, compatibility]
+            default: distance
+      responses:
+        '200':
+          description: ATM 검색 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ATMSearchResponse'
+
+  /atms/{atmId}:
+    get:
+      tags:
+        - ATMs
+      summary: ATM 상세 정보
+      description: 특정 ATM의 접근성 프로필과 실시간 상태를 조회합니다
+      operationId: getATM
+      parameters:
+        - $ref: '#/components/parameters/ATMId'
+      responses:
+        '200':
+          description: ATM 정보
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ATMAccessibilityProfile'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /atms/{atmId}/status:
+    get:
+      tags:
+        - ATMs
+      summary: ATM 실시간 상태
+      description: ATM의 실시간 운영 및 접근성 상태를 조회합니다
+      operationId: getATMStatus
+      parameters:
+        - $ref: '#/components/parameters/ATMId'
+      responses:
+        '200':
+          description: ATM 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ATMStatusResponse'
+
+  # ============================================================================
+  # Transactions
+  # ============================================================================
+  /transactions:
+    post:
+      tags:
+        - Transactions
+      summary: 접근성 거래 시작
+      description: |
+        접근성 옵션이 포함된 금융 거래를 시작합니다
+
+        **접근성 기능:**
+        - 다중 모달 확인 (시각/청각/촉각)
+        - 금액 음성 읽기
+        - 간소화된 언어
+        - 확장된 검토 시간
+      operationId: initiateTransaction
+      security:
+        - BearerAuth: []
+        - OAuth2:
+            - write:transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessibleTransactionRequest'
+      responses:
+        '201':
+          description: 거래 시작됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessibleTransactionResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '422':
+          $ref: '#/components/responses/InsufficientFundsError'
+
+  /transactions/{transactionId}/confirm:
+    post:
+      tags:
+        - Transactions
+      summary: 거래 확인
+      description: 대기 중인 거래를 확인합니다
+      operationId: confirmTransaction
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmed:
+                  type: boolean
+                confirmationMethod:
+                  type: string
+                  enum: [visual, audio, haptic, biometric]
+      responses:
+        '200':
+          description: 거래 확인됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionConfirmationResponse'
+
+  # ============================================================================
+  # Notifications
+  # ============================================================================
+  /notifications/register:
+    post:
+      tags:
+        - Notifications
+      summary: 알림 등록
+      description: 다중 모달 알림 수신을 등록합니다
+      operationId: registerNotifications
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRegistrationRequest'
+      responses:
+        '201':
+          description: 알림 등록 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registrationId:
+                    type: string
+                  channels:
+                    type: array
+                    items:
+                      type: string
+
+  /notifications/{notificationId}/ack:
+    post:
+      tags:
+        - Notifications
+      summary: 알림 확인
+      description: 알림을 확인 처리합니다
+      operationId: acknowledgeNotification
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                acknowledgedVia:
+                  type: string
+                  enum: [visual, audio, haptic, wia_device]
+      responses:
+        '200':
+          description: 알림 확인됨
+
+  # ============================================================================
+  # WIA Integration
+  # ============================================================================
+  /wia/devices:
+    get:
+      tags:
+        - WIA Integration
+      summary: 연결된 WIA 디바이스 목록
+      description: 사용자에게 연결된 WIA 디바이스 목록을 조회합니다
+      operationId: listWIADevices
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: WIA 디바이스 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WIADeviceInfo'
+
+  /wia/devices/{deviceId}/sync:
+    post:
+      tags:
+        - WIA Integration
+      summary: WIA 디바이스 프로필 동기화
+      description: 특정 WIA 디바이스와 프로필을 동기화합니다
+      operationId: syncWIADevice
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 동기화 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WIASyncResponse'
+
+  /wia/haptic/send:
+    post:
+      tags:
+        - WIA Integration
+      summary: 햅틱 피드백 전송
+      description: WIA 엑소스켈레톤에 햅틱 피드백을 전송합니다
+      operationId: sendHapticFeedback
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HapticFeedbackRequest'
+      responses:
+        '200':
+          description: 햅틱 전송됨
+
+components:
+  # ============================================================================
+  # Security Schemes
+  # ============================================================================
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT 액세스 토큰
+
+    OAuth2:
+      type: oauth2
+      description: OAuth 2.0 + PKCE
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.wia-fintech.org/authorize
+          tokenUrl: https://auth.wia-fintech.org/token
+          scopes:
+            read:profile: 프로필 읽기
+            write:profile: 프로필 수정
+            read:atm: ATM 정보 조회
+            write:transaction: 거래 실행
+
+  # ============================================================================
+  # Parameters
+  # ============================================================================
+  parameters:
+    ProfileId:
+      name: profileId
+      in: path
+      required: true
+      description: 사용자 프로필 ID
+      schema:
+        type: string
+
+    ATMId:
+      name: atmId
+      in: path
+      required: true
+      description: ATM ID
+      schema:
+        type: string
+
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      description: 선호 언어
+      schema:
+        type: string
+        example: ko-KR
+
+    WIADeviceId:
+      name: X-WIA-Device-Id
+      in: header
+      description: 연결된 WIA 디바이스 ID
+      schema:
+        type: string
+
+  # ============================================================================
+  # Responses
+  # ============================================================================
+  responses:
+    UnauthorizedError:
+      description: 인증 실패
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessibleErrorResponse'
+          example:
+            error:
+              code: AUTH_FAILED
+              message: Authentication failed
+            accessibility:
+              userMessage: "인증에 실패했습니다."
+              simpleMessage: "로그인할 수 없어요. 다시 시도해 주세요."
+              voiceMessage: "인증에 실패했습니다. 다시 시도해 주세요."
+            recovery:
+              steps:
+                - order: 1
+                  action: retry
+                  description: 자격 증명을 확인하고 다시 시도하세요
+
+    TimeoutError:
+      description: 시간 초과
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessibleErrorResponse'
+
+    NotFoundError:
+      description: 리소스 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessibleErrorResponse'
+
+    ConflictError:
+      description: 충돌 발생
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessibleErrorResponse'
+
+    ValidationError:
+      description: 유효성 검사 실패
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessibleErrorResponse'
+
+    InsufficientFundsError:
+      description: 잔액 부족
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessibleErrorResponse'
+          example:
+            error:
+              code: INSUFFICIENT_FUNDS
+              message: Insufficient balance
+            accessibility:
+              userMessage: "잔액이 부족합니다."
+              simpleMessage: "돈이 모자라요."
+              voiceMessage: "계좌 잔액이 부족합니다. 잔액을 확인해 주세요."
+              hapticPattern:
+                pattern: warning_double_pulse
+                intensity: 70
+                meaning: warning
+
+  # ============================================================================
+  # Schemas
+  # ============================================================================
+  schemas:
+    # Authentication
+    AccessibleLoginRequest:
+      type: object
+      required:
+        - credentials
+        - deviceContext
+      properties:
+        credentials:
+          type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              enum: [password, biometric, pin, voice, passkey]
+            value:
+              type: string
+            biometricToken:
+              type: string
+        accessibility:
+          type: object
+          properties:
+            extendedTimeout:
+              type: boolean
+              default: false
+            voiceFeedback:
+              type: boolean
+              default: false
+            voiceLanguage:
+              type: string
+            hapticFeedback:
+              type: boolean
+              default: false
+            hapticDeviceId:
+              type: string
+            simplifiedFlow:
+              type: boolean
+              default: false
+            stepByStepGuidance:
+              type: boolean
+              default: false
+        deviceContext:
+          type: object
+          required:
+            - deviceId
+            - deviceType
+          properties:
+            deviceId:
+              type: string
+            deviceType:
+              type: string
+              enum: [mobile, atm, web, pos]
+            wiaDeviceConnected:
+              type: boolean
+            wiaDeviceIds:
+              type: array
+              items:
+                type: string
+
+    AccessibleLoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        tokenType:
+          type: string
+        accessibilityProfile:
+          $ref: '#/components/schemas/UserFinancialAccessibilityProfile'
+        confirmation:
+          $ref: '#/components/schemas/MultiModalConfirmation'
+
+    AccessiblePinVerifyRequest:
+      type: object
+      required:
+        - encryptedPin
+      properties:
+        encryptedPin:
+          type: string
+          description: RSA-OAEP 암호화된 PIN
+        accessibility:
+          type: object
+          properties:
+            audioToneFeedback:
+              type: boolean
+            hapticPerDigit:
+              type: boolean
+            timeout:
+              type: integer
+              maximum: 180
+            confirmPinLength:
+              type: boolean
+
+    AccessiblePinVerifyResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+        attemptsRemaining:
+          type: integer
+        error:
+          $ref: '#/components/schemas/AccessibleError'
+
+    # Profiles
+    UserFinancialAccessibilityProfile:
+      type: object
+      properties:
+        profileId:
+          type: string
+        wiaId:
+          type: string
+        version:
+          type: string
+        personalInfo:
+          type: object
+          properties:
+            preferredName:
+              type: string
+            preferredLanguage:
+              type: string
+            region:
+              type: string
+            timezone:
+              type: string
+        accessibilityNeeds:
+          type: object
+        financialPreferences:
+          type: object
+        wiaIntegration:
+          type: object
+
+    GetProfileResponse:
+      type: object
+      properties:
+        profile:
+          $ref: '#/components/schemas/UserFinancialAccessibilityProfile'
+        sync:
+          type: object
+          properties:
+            lastSyncAt:
+              type: string
+              format: date-time
+            version:
+              type: string
+            checksum:
+              type: string
+        wiaDevices:
+          type: array
+          items:
+            $ref: '#/components/schemas/WIADeviceInfo'
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        profile:
+          $ref: '#/components/schemas/UserFinancialAccessibilityProfile'
+        conflictResolution:
+          type: string
+          enum: [server_wins, client_wins, merge, manual]
+        syncToDevices:
+          type: boolean
+        targetDevices:
+          type: array
+          items:
+            type: string
+
+    UpdateProfileResponse:
+      type: object
+      properties:
+        profile:
+          $ref: '#/components/schemas/UserFinancialAccessibilityProfile'
+        conflicts:
+          type: array
+          items:
+            type: object
+        syncStatus:
+          type: array
+          items:
+            type: object
+
+    # ATMs
+    ATMAccessibilityProfile:
+      type: object
+      properties:
+        atmId:
+          type: string
+        bankCode:
+          type: string
+        location:
+          $ref: '#/components/schemas/ATMLocation'
+        status:
+          type: string
+          enum: [operational, limited, offline]
+        physicalAccessibility:
+          type: object
+        audioAccessibility:
+          type: object
+        tactileAccessibility:
+          type: object
+        screenAccessibility:
+          type: object
+        wiaIntegration:
+          type: object
+        certification:
+          type: object
+
+    ATMLocation:
+      type: object
+      properties:
+        address:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        locationDescription:
+          type: string
+        accessInstructions:
+          type: string
+
+    ATMSearchResponse:
+      type: object
+      properties:
+        atms:
+          type: array
+          items:
+            type: object
+            properties:
+              atm:
+                $ref: '#/components/schemas/ATMAccessibilityProfile'
+              distance:
+                type: number
+              compatibility:
+                type: object
+              navigation:
+                type: object
+        meta:
+          type: object
+          properties:
+            totalResults:
+              type: integer
+            searchRadius:
+              type: number
+            searchTime:
+              type: integer
+
+    ATMStatusResponse:
+      type: object
+      properties:
+        atmId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        operational:
+          type: object
+        accessibility:
+          type: object
+        wiaStatus:
+          type: object
+        waitTime:
+          type: object
+
+    # Transactions
+    AccessibleTransactionRequest:
+      type: object
+      required:
+        - transaction
+        - channel
+      properties:
+        transaction:
+          type: object
+          required:
+            - type
+            - amount
+          properties:
+            type:
+              type: string
+              enum: [withdrawal, deposit, transfer, payment, bill_pay]
+            amount:
+              type: object
+              properties:
+                value:
+                  type: number
+                currency:
+                  type: string
+            recipient:
+              type: object
+        accessibility:
+          type: object
+          properties:
+            confirmationMode:
+              type: string
+              enum: [visual, audio, haptic, all]
+            voiceReadback:
+              type: boolean
+            voiceLanguage:
+              type: string
+            hapticConfirmation:
+              type: boolean
+            hapticDeviceId:
+              type: string
+            useSimpleLanguage:
+              type: boolean
+            extendedReviewTime:
+              type: boolean
+            reviewTimeSeconds:
+              type: integer
+        channel:
+          type: object
+          required:
+            - type
+            - deviceId
+          properties:
+            type:
+              type: string
+              enum: [mobile, atm, web, pos]
+            deviceId:
+              type: string
+            wiaDeviceIds:
+              type: array
+              items:
+                type: string
+
+    AccessibleTransactionResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        status:
+          type: string
+          enum: [pending_confirmation, processing, completed, failed]
+        confirmation:
+          $ref: '#/components/schemas/MultiModalConfirmation'
+        requiredAction:
+          type: object
+
+    TransactionConfirmationResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        status:
+          type: string
+        completedAt:
+          type: string
+          format: date-time
+        confirmation:
+          $ref: '#/components/schemas/MultiModalConfirmation'
+
+    # Notifications
+    NotificationRegistrationRequest:
+      type: object
+      required:
+        - profileId
+      properties:
+        profileId:
+          type: string
+        channels:
+          type: object
+        accessibility:
+          type: object
+        subscriptions:
+          type: array
+          items:
+            type: object
+
+    # WIA Integration
+    WIADeviceInfo:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        deviceType:
+          type: string
+          enum: [exoskeleton, bionic_eye, voice_sign, smart_wheelchair, hearing_aid]
+        status:
+          type: string
+          enum: [connected, disconnected, syncing]
+        lastSeen:
+          type: string
+          format: date-time
+        firmwareVersion:
+          type: string
+        batteryLevel:
+          type: integer
+
+    WIASyncResponse:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        syncStatus:
+          type: string
+          enum: [success, partial, failed]
+        syncedAt:
+          type: string
+          format: date-time
+        syncedItems:
+          type: array
+          items:
+            type: string
+
+    HapticFeedbackRequest:
+      type: object
+      required:
+        - deviceId
+        - pattern
+      properties:
+        deviceId:
+          type: string
+        pattern:
+          type: string
+        intensity:
+          type: integer
+          minimum: 0
+          maximum: 100
+        bodyRegion:
+          type: string
+          enum: [left_hand, right_hand, left_wrist, right_wrist, left_arm, right_arm, torso]
+        duration:
+          type: integer
+        context:
+          type: object
+          properties:
+            eventType:
+              type: string
+            transactionId:
+              type: string
+
+    # Common
+    MultiModalConfirmation:
+      type: object
+      properties:
+        visual:
+          type: object
+          properties:
+            message:
+              type: string
+            icon:
+              type: string
+            color:
+              type: string
+        audio:
+          type: object
+          properties:
+            message:
+              type: string
+            ssml:
+              type: string
+        haptic:
+          type: object
+          properties:
+            pattern:
+              type: string
+            intensity:
+              type: integer
+            deviceId:
+              type: string
+        simpleLanguage:
+          type: object
+          properties:
+            message:
+              type: string
+
+    AccessibleError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        messageSimple:
+          type: string
+        voiceMessage:
+          type: string
+        hapticPattern:
+          type: string
+
+    AccessibleErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+        accessibility:
+          type: object
+          properties:
+            userMessage:
+              type: string
+            simpleMessage:
+              type: string
+            voiceMessage:
+              type: string
+            voiceSSML:
+              type: string
+            hapticPattern:
+              type: object
+            signLanguageVideo:
+              type: string
+        recovery:
+          type: object
+          properties:
+            steps:
+              type: array
+              items:
+                type: object
+            autoRecovery:
+              type: boolean
+            retryAfterSeconds:
+              type: integer
+            supportContact:
+              type: object
+        localizations:
+          type: object
+          additionalProperties:
+            type: object
