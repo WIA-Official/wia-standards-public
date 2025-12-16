@@ -395,7 +395,7 @@ wia_sign_hybrid:   0x0901
 
 ```bash
 # Install WIA-PQ-CRYPTO tools
-curl -sSL https://wia.family/pq | bash
+curl -sSL https://wiastandards.com/pq | bash
 
 # Migrate your server
 wia-pq-migrate --domain your-site.com
@@ -415,6 +415,6 @@ Your site is now quantum-safe!
 
 **World Certification Industry Association**
 
-https://wia.family
+https://wiastandards.com
 
 홍익인간 (弘益人間) - Benefit All Humanity

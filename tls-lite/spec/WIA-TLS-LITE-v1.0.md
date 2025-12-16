@@ -341,6 +341,6 @@ WIA_TLS_LITE_AES_128_GCM_SHA256:       0x1392
 
 **World Certification Industry Association**
 
-https://wia.family
+https://wiastandards.com
 
 홍익인간 (弘益人間) - Benefit All Humanity

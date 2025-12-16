@@ -331,7 +331,7 @@ interface DataBlock {
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wia.family/schemas/ci/config.json",
+  "$id": "https://wiastandards.com/schemas/ci/config.json",
   "title": "WIA-CI Configuration",
   "type": "object",
   "required": ["version", "audioInput", "electrodeMap"],

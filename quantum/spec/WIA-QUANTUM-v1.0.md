@@ -905,6 +905,6 @@ CCNOT(c0, c1, t) =
 
 **World Certification Industry Association**
 
-https://wia.family
+https://wiastandards.com
 
 홍익인간 (弘益人間) - Benefit All Humanity

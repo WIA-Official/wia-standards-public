@@ -98,7 +98,7 @@ did:wia:testnet:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK
 {
   "@context": [
     "https://www.w3.org/ns/did/v1",
-    "https://wia.family/ns/dpki/v1"
+    "https://wiastandards.com/ns/dpki/v1"
   ],
   "id": "did:wia:mainnet:0x1234...5678",
   "controller": "did:wia:mainnet:0x1234...5678",
@@ -246,7 +246,7 @@ interface IWIARegistry {
 {
   "@context": [
     "https://www.w3.org/2018/credentials/v1",
-    "https://wia.family/ns/dpki/v1"
+    "https://wiastandards.com/ns/dpki/v1"
   ],
   "type": ["VerifiableCredential", "DomainOwnershipCredential"],
   "issuer": "did:wia:mainnet:0xABCD...DCBA",
@@ -433,7 +433,7 @@ wia-dpki revoke did:wia:mainnet:0x1234...5678
 
 ```
 Method Name: wia
-Method Specification: https://wia.family/specs/dpki
+Method Specification: https://wiastandards.com/specs/dpki
 ```
 
 ### TLS Extension
@@ -455,6 +455,6 @@ Extension Code: 0x0055 (proposed)
 
 **World Certification Industry Association**
 
-https://wia.family
+https://wiastandards.com
 
 홍익인간 (弘益人間) - Benefit All Humanity
