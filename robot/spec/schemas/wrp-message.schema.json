@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/robot/v1/wrp-message.schema.json",
+  "title": "WIA Robot Protocol Message",
+  "description": "Base message schema for WIA Robot Protocol (WRP)",
+  "type": "object",
+  "required": [
+    "protocol",
+    "version",
+    "message_id",
+    "timestamp",
+    "sequence",
+    "type",
+    "priority",
+    "source",
+    "destination",
+    "safety",
+    "payload"
+  ],
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "const": "wia-robot",
+      "description": "Protocol identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Protocol version (SemVer)",
+      "examples": ["1.0.0"]
+    },
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique message identifier (UUID v4)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp with milliseconds"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Message sequence number"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "handshake",
+        "handshake_ack",
+        "heartbeat",
+        "telemetry",
+        "control",
+        "control_ack",
+        "emergency_stop",
+        "emergency_stop_ack",
+        "safety_alert",
+        "status",
+        "config",
+        "config_ack",
+        "error",
+        "log"
+      ],
+      "description": "Message type"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "normal", "high", "critical", "emergency"],
+      "default": "normal",
+      "description": "Message priority level"
+    },
+    "source": {
+      "$ref": "#/definitions/Endpoint",
+      "description": "Source endpoint"
+    },
+    "destination": {
+      "$ref": "#/definitions/Endpoint",
+      "description": "Destination endpoint"
+    },
+    "safety": {
+      "$ref": "#/definitions/SafetyInfo",
+      "description": "Safety information"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Message payload (format depends on message type)"
+    },
+    "checksum": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}$",
+      "description": "CRC32 checksum (hex)"
+    }
+  },
+  "definitions": {
+    "Endpoint": {
+      "type": "object",
+      "required": ["device_id", "device_type"],
+      "properties": {
+        "device_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Device identifier"
+        },
+        "device_type": {
+          "type": "string",
+          "enum": [
+            "exoskeleton",
+            "prosthetics",
+            "rehabilitation",
+            "care_robot",
+            "surgical",
+            "mobility_aid",
+            "server",
+            "gateway",
+            "console",
+            "surgeon_console",
+            "all"
+          ],
+          "description": "Device type"
+        },
+        "location": {
+          "$ref": "#/definitions/Location"
+        }
+      }
+    },
+    "Location": {
+      "type": "object",
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90,
+          "description": "Latitude in degrees"
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Longitude in degrees"
+        },
+        "altitude_m": {
+          "type": "number",
+          "description": "Altitude in meters"
+        }
+      }
+    },
+    "SafetyInfo": {
+      "type": "object",
+      "required": ["emergency_stop", "safety_level"],
+      "properties": {
+        "emergency_stop": {
+          "type": "boolean",
+          "description": "Emergency stop active"
+        },
+        "safety_level": {
+          "type": "string",
+          "enum": ["normal", "warning", "caution", "critical", "emergency"],
+          "default": "normal",
+          "description": "Current safety level"
+        },
+        "requires_ack": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether acknowledgment is required"
+        },
+        "ack_timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000,
+          "description": "Acknowledgment timeout in milliseconds"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "protocol": "wia-robot",
+      "version": "1.0.0",
+      "message_id": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2025-01-15T10:30:00.123Z",
+      "sequence": 12345,
+      "type": "telemetry",
+      "priority": "normal",
+      "source": {
+        "device_id": "exo-001",
+        "device_type": "exoskeleton"
+      },
+      "destination": {
+        "device_id": "server-001",
+        "device_type": "server"
+      },
+      "safety": {
+        "emergency_stop": false,
+        "safety_level": "normal",
+        "requires_ack": false
+      },
+      "payload": {},
+      "checksum": "a1b2c3d4"
+    }
+  ]
+}

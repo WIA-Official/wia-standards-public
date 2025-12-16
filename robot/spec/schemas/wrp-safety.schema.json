@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/robot/v1/wrp-safety.schema.json",
+  "title": "WIA Robot Protocol Safety Message",
+  "description": "Safety-related message schemas for WRP",
+  "definitions": {
+    "EmergencyStopPayload": {
+      "type": "object",
+      "required": ["reason", "source"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": [
+            "user_button",
+            "software_command",
+            "fall_detected",
+            "force_exceeded",
+            "thermal_exceeded",
+            "battery_critical",
+            "communication_lost",
+            "external_trigger",
+            "watchdog_timeout",
+            "collision_detected",
+            "workspace_violation",
+            "unknown"
+          ],
+          "description": "Reason for emergency stop"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source that triggered E-Stop"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When E-Stop was triggered"
+        },
+        "affected_devices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of affected device IDs"
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional details about the E-Stop"
+        }
+      }
+    },
+    "EmergencyStopAckPayload": {
+      "type": "object",
+      "required": ["original_message_id", "acknowledged"],
+      "properties": {
+        "original_message_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the E-Stop message being acknowledged"
+        },
+        "acknowledged": {
+          "type": "boolean",
+          "description": "Whether E-Stop was acknowledged"
+        },
+        "device_state": {
+          "type": "string",
+          "enum": ["stopped", "stopping", "safe_position", "error"],
+          "description": "Current device state after E-Stop"
+        },
+        "time_to_stop_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Time taken to stop in milliseconds"
+        }
+      }
+    },
+    "SafetyAlertPayload": {
+      "type": "object",
+      "required": ["alert_type", "severity"],
+      "properties": {
+        "alert_type": {
+          "type": "string",
+          "enum": [
+            "fall_risk",
+            "force_warning",
+            "thermal_warning",
+            "battery_low",
+            "communication_degraded",
+            "sensor_fault",
+            "calibration_needed",
+            "maintenance_due",
+            "workspace_warning",
+            "collision_warning",
+            "vital_sign_abnormal",
+            "patient_distress"
+          ],
+          "description": "Type of safety alert"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "caution", "critical"],
+          "description": "Alert severity"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable alert message"
+        },
+        "threshold": {
+          "type": "object",
+          "properties": {
+            "parameter": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "current": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            }
+          },
+          "description": "Threshold violation details"
+        },
+        "recommended_action": {
+          "type": "string",
+          "description": "Recommended action to resolve"
+        },
+        "auto_escalation": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "escalate_after_ms": {
+              "type": "integer"
+            },
+            "escalate_to": {
+              "type": "string"
+            }
+          },
+          "description": "Automatic escalation settings"
+        }
+      }
+    },
+    "SafetyStatus": {
+      "type": "object",
+      "required": ["overall_status"],
+      "properties": {
+        "overall_status": {
+          "type": "string",
+          "enum": ["safe", "warning", "caution", "critical", "emergency"],
+          "description": "Overall safety status"
+        },
+        "emergency_stop_active": {
+          "type": "boolean",
+          "default": false
+        },
+        "safety_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Safety score (0-100)"
+        },
+        "active_alerts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SafetyAlertPayload"
+          }
+        },
+        "subsystems": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["ok", "warning", "fault", "offline"]
+              },
+              "last_check": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "description": "Status of safety subsystems"
+        }
+      }
+    },
+    "EStopSource": {
+      "type": "object",
+      "required": ["code", "name"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "0x01",
+            "0x02",
+            "0x03",
+            "0x04",
+            "0x05",
+            "0x06",
+            "0x07",
+            "0x08",
+            "0x09"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "enum": [
+            "UserButton",
+            "Software",
+            "ImuSensor",
+            "ForceSensor",
+            "ThermalSensor",
+            "BatteryLow",
+            "Communication",
+            "External",
+            "Watchdog"
+          ]
+        }
+      }
+    }
+  },
+  "type": "object",
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "const": "emergency_stop" },
+        "payload": { "$ref": "#/definitions/EmergencyStopPayload" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "emergency_stop_ack" },
+        "payload": { "$ref": "#/definitions/EmergencyStopAckPayload" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "safety_alert" },
+        "payload": { "$ref": "#/definitions/SafetyAlertPayload" }
+      }
+    }
+  ]
+}
