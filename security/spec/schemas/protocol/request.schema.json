@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wia.live/schemas/security/protocol/request/v1.schema.json",
+  "title": "WIA Security Protocol Request",
+  "description": "Request message for WIA Security Communication Protocol",
+  "allOf": [
+    {
+      "$ref": "message.schema.json"
+    }
+  ],
+  "properties": {
+    "message_type": {
+      "const": "request"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["content_type", "data"],
+      "properties": {
+        "content_type": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/RequestData"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "RequestType": {
+      "type": "string",
+      "enum": [
+        "access_decision",
+        "scan_start",
+        "scan_stop",
+        "threat_query",
+        "ioc_lookup",
+        "policy_update",
+        "subscribe",
+        "unsubscribe",
+        "health_check",
+        "discovery",
+        "collections",
+        "objects",
+        "inference",
+        "custom"
+      ],
+      "description": "Type of request"
+    },
+    "RequestData": {
+      "type": "object",
+      "required": ["request_type"],
+      "properties": {
+        "request_type": {
+          "$ref": "#/$defs/RequestType"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Request-specific parameters"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 300000,
+          "description": "Request timeout in milliseconds"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "request_type": { "const": "access_decision" }
+            }
+          },
+          "then": {
+            "properties": {
+              "subject": { "$ref": "#/$defs/AccessSubject" },
+              "resource": { "$ref": "#/$defs/AccessResource" },
+              "action": { "type": "string" },
+              "context": { "$ref": "#/$defs/AccessContext" }
+            },
+            "required": ["subject", "resource", "action"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "request_type": { "const": "scan_start" }
+            }
+          },
+          "then": {
+            "properties": {
+              "scan_config": { "$ref": "#/$defs/ScanConfig" }
+            },
+            "required": ["scan_config"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "request_type": { "const": "subscribe" }
+            }
+          },
+          "then": {
+            "properties": {
+              "subscription": { "$ref": "#/$defs/SubscriptionConfig" }
+            },
+            "required": ["subscription"]
+          }
+        }
+      ]
+    },
+    "AccessSubject": {
+      "type": "object",
+      "required": ["user_id"],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "description": "User identifier"
+        },
+        "device_id": {
+          "type": "string",
+          "description": "Device identifier"
+        },
+        "device_posture": {
+          "$ref": "#/$defs/DevicePosture"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "authentication": {
+          "$ref": "#/$defs/AuthenticationInfo"
+        },
+        "risk_signals": {
+          "$ref": "#/$defs/RiskSignals"
+        }
+      }
+    },
+    "DevicePosture": {
+      "type": "object",
+      "properties": {
+        "os_version": { "type": "string" },
+        "patch_level": { "type": "string", "format": "date" },
+        "antivirus_status": {
+          "type": "string",
+          "enum": ["up_to_date", "outdated", "disabled", "not_installed", "unknown"]
+        },
+        "disk_encryption": { "type": "boolean" },
+        "firewall_enabled": { "type": "boolean" },
+        "trust_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "Location": {
+      "type": "object",
+      "properties": {
+        "ip": { "type": "string", "format": "ipv4" },
+        "country": { "type": "string", "pattern": "^[A-Z]{2}$" },
+        "city": { "type": "string" },
+        "network_type": {
+          "type": "string",
+          "enum": ["corporate", "corporate_vpn", "home", "public", "unknown"]
+        }
+      }
+    },
+    "AuthenticationInfo": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["password", "mfa", "sso", "certificate", "biometric", "api_key"]
+        },
+        "factors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["password", "totp", "sms", "push", "biometric", "hardware_token"]
+          }
+        },
+        "auth_time": { "type": "string", "format": "date-time" },
+        "session_id": { "type": "string" }
+      }
+    },
+    "RiskSignals": {
+      "type": "object",
+      "properties": {
+        "impossible_travel": { "type": "boolean" },
+        "unusual_time": { "type": "boolean" },
+        "unusual_device": { "type": "boolean" },
+        "compromised_credential": { "type": "boolean" },
+        "anomaly_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "AccessResource": {
+      "type": "object",
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["database", "api", "file", "application", "network", "custom"]
+        },
+        "id": { "type": "string" },
+        "classification": {
+          "type": "string",
+          "enum": ["public", "internal", "confidential", "restricted", "top_secret"]
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production"]
+        },
+        "location": { "type": "string" }
+      }
+    },
+    "AccessContext": {
+      "type": "object",
+      "properties": {
+        "request_time": { "type": "string", "format": "date-time" },
+        "day_type": {
+          "type": "string",
+          "enum": ["business_day", "weekend", "holiday"]
+        },
+        "business_justification": { "type": "string" }
+      }
+    },
+    "ScanConfig": {
+      "type": "object",
+      "required": ["scan_id", "target"],
+      "properties": {
+        "scan_id": { "type": "string" },
+        "target": {
+          "type": "object",
+          "properties": {
+            "ip_range": { "type": "string" },
+            "hosts": { "type": "array", "items": { "type": "string" } },
+            "ports": { "type": "array", "items": { "type": "integer" } }
+          }
+        },
+        "scan_type": {
+          "type": "string",
+          "enum": ["quick", "standard", "full", "custom"]
+        },
+        "options": {
+          "type": "object"
+        }
+      }
+    },
+    "SubscriptionConfig": {
+      "type": "object",
+      "required": ["id", "channels"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "channels": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "filters": {
+          "type": "object"
+        },
+        "delivery": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": ["webhook", "websocket", "kafka", "sqs"]
+            },
+            "endpoint": { "type": "string", "format": "uri" },
+            "format": { "type": "string" },
+            "batch_size": { "type": "integer" },
+            "flush_interval_seconds": { "type": "integer" }
+          }
+        }
+      }
+    }
+  }
+}

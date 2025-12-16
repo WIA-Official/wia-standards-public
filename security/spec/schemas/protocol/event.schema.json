@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wia.live/schemas/security/protocol/event/v1.schema.json",
+  "title": "WIA Security Protocol Event",
+  "description": "Event message for WIA Security Communication Protocol",
+  "allOf": [
+    {
+      "$ref": "message.schema.json"
+    }
+  ],
+  "properties": {
+    "message_type": {
+      "const": "event"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["content_type", "data"],
+      "properties": {
+        "content_type": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EventData"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        },
+        "requires_acknowledgment": {
+          "type": "boolean",
+          "default": false
+        },
+        "escalation_timeout_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sequence": {
+          "type": "integer",
+          "description": "Event sequence number for ordering"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "EventType": {
+      "type": "string",
+      "enum": [
+        "vulnerability_found",
+        "threat_detected",
+        "policy_violation",
+        "access_denied",
+        "scan_started",
+        "scan_completed",
+        "incident_created",
+        "incident_updated",
+        "ioc_matched",
+        "anomaly_detected",
+        "config_changed",
+        "connection_established",
+        "connection_closed",
+        "heartbeat",
+        "custom"
+      ],
+      "description": "Type of event"
+    },
+    "EventData": {
+      "type": "object",
+      "required": ["event_type"],
+      "properties": {
+        "event_type": {
+          "$ref": "#/$defs/EventType"
+        },
+        "event_id": {
+          "type": "string",
+          "description": "Unique event identifier"
+        },
+        "event_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the event occurred"
+        },
+        "event_data": {
+          "type": "object",
+          "description": "Event-specific data"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "vulnerability_found" }
+            }
+          },
+          "then": {
+            "properties": {
+              "vulnerability": { "$ref": "#/$defs/VulnerabilityEvent" }
+            },
+            "required": ["vulnerability"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "threat_detected" }
+            }
+          },
+          "then": {
+            "properties": {
+              "threat": { "$ref": "#/$defs/ThreatEvent" }
+            },
+            "required": ["threat"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "policy_violation" }
+            }
+          },
+          "then": {
+            "properties": {
+              "violation": { "$ref": "#/$defs/PolicyViolationEvent" }
+            },
+            "required": ["violation"]
+          }
+        }
+      ]
+    },
+    "VulnerabilityEvent": {
+      "type": "object",
+      "required": ["vuln_id", "severity"],
+      "properties": {
+        "scan_id": {
+          "type": "string"
+        },
+        "vuln_id": {
+          "type": "string",
+          "description": "CVE or internal vulnerability ID"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"]
+        },
+        "cvss_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "affected_host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "service": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        }
+      }
+    },
+    "ThreatEvent": {
+      "type": "object",
+      "required": ["threat_type", "severity"],
+      "properties": {
+        "threat_type": {
+          "type": "string",
+          "enum": ["malware", "phishing", "intrusion", "data_exfiltration", "ransomware", "apt", "botnet", "custom"]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/NetworkEndpoint"
+        },
+        "destination": {
+          "$ref": "#/$defs/NetworkEndpoint"
+        },
+        "indicators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Indicator"
+          }
+        },
+        "mitre_attack": {
+          "$ref": "#/$defs/MitreAttack"
+        },
+        "recommended_actions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "PolicyViolationEvent": {
+      "type": "object",
+      "required": ["policy_id", "violation_type"],
+      "properties": {
+        "policy_id": {
+          "type": "string"
+        },
+        "policy_name": {
+          "type": "string"
+        },
+        "violation_type": {
+          "type": "string",
+          "enum": ["access_denied", "data_leak", "compliance", "behavioral", "custom"]
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "user_id": { "type": "string" },
+            "device_id": { "type": "string" }
+          }
+        },
+        "resource": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "id": { "type": "string" }
+          }
+        },
+        "action_attempted": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "NetworkEndpoint": {
+      "type": "object",
+      "properties": {
+        "ip": { "type": "string" },
+        "port": { "type": "integer" },
+        "hostname": { "type": "string" },
+        "country": { "type": "string" },
+        "reputation": {
+          "type": "string",
+          "enum": ["trusted", "neutral", "suspicious", "malicious", "unknown"]
+        }
+      }
+    },
+    "Indicator": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ip", "domain", "url", "file_hash", "email", "registry", "mutex"]
+        },
+        "value": { "type": "string" },
+        "context": { "type": "string" }
+      }
+    },
+    "MitreAttack": {
+      "type": "object",
+      "properties": {
+        "tactic": { "type": "string" },
+        "tactic_name": { "type": "string" },
+        "technique": { "type": "string" },
+        "technique_name": { "type": "string" },
+        "sub_technique": { "type": "string" },
+        "sub_technique_name": { "type": "string" }
+      }
+    }
+  }
+}

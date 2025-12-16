@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wia.live/schemas/security/protocol/message/v1.schema.json",
+  "title": "WIA Security Protocol Message",
+  "description": "Base message envelope for WIA Security Communication Protocol",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "message_id",
+    "timestamp",
+    "message_type",
+    "sender",
+    "receiver",
+    "security",
+    "payload"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "JSON Schema reference"
+    },
+    "protocol_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Protocol version (SemVer)",
+      "examples": ["1.0.0"]
+    },
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique message identifier"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Message creation timestamp (ISO 8601)"
+    },
+    "message_type": {
+      "$ref": "#/$defs/MessageType"
+    },
+    "sender": {
+      "$ref": "#/$defs/Component"
+    },
+    "receiver": {
+      "$ref": "#/$defs/Component"
+    },
+    "security": {
+      "$ref": "#/$defs/SecurityInfo"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "MessageType": {
+      "type": "string",
+      "enum": ["request", "response", "event", "notification"],
+      "description": "Type of message"
+    },
+    "ComponentType": {
+      "type": "string",
+      "enum": [
+        "scanner",
+        "siem",
+        "pdp",
+        "pep",
+        "threat_intel",
+        "endpoint",
+        "firewall",
+        "ids",
+        "edr",
+        "soar",
+        "gateway",
+        "api_server",
+        "custom"
+      ],
+      "description": "Type of security component"
+    },
+    "Component": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Component unique identifier"
+        },
+        "type": {
+          "$ref": "#/$defs/ComponentType"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable component name"
+        },
+        "certificate_fingerprint": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$",
+          "description": "SHA-256 fingerprint of TLS certificate"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EncryptionType": {
+      "type": "string",
+      "enum": ["TLS1.3", "PQC_HYBRID", "NONE"],
+      "description": "Encryption method used"
+    },
+    "SignatureAlgorithm": {
+      "type": "string",
+      "enum": ["Ed25519", "Dilithium3", "ECDSA_P256", "RSA_PSS"],
+      "description": "Digital signature algorithm"
+    },
+    "SecurityInfo": {
+      "type": "object",
+      "required": ["encryption"],
+      "properties": {
+        "encryption": {
+          "$ref": "#/$defs/EncryptionType"
+        },
+        "signature_algorithm": {
+          "$ref": "#/$defs/SignatureAlgorithm"
+        },
+        "signature": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Base64-encoded digital signature"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Unique nonce for replay protection"
+        },
+        "certificate_chain": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "contentEncoding": "base64"
+          },
+          "description": "Certificate chain for verification"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContentType": {
+      "type": "string",
+      "enum": [
+        "application/json",
+        "application/stix+json",
+        "application/taxii+json",
+        "application/octet-stream"
+      ],
+      "description": "Payload content type"
+    },
+    "Payload": {
+      "type": "object",
+      "required": ["content_type", "data"],
+      "properties": {
+        "content_type": {
+          "$ref": "#/$defs/ContentType"
+        },
+        "encoding": {
+          "type": "string",
+          "default": "utf-8",
+          "description": "Character encoding"
+        },
+        "data": {
+          "type": "object",
+          "description": "Message payload data"
+        },
+        "compressed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether payload is compressed"
+        },
+        "compression_algorithm": {
+          "type": "string",
+          "enum": ["gzip", "zstd", "lz4"],
+          "description": "Compression algorithm if compressed"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Priority": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low"],
+      "description": "Message priority"
+    },
+    "Metadata": {
+      "type": "object",
+      "properties": {
+        "correlation_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID to correlate request/response pairs"
+        },
+        "causation_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the message that caused this message"
+        },
+        "priority": {
+          "$ref": "#/$defs/Priority"
+        },
+        "ttl_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "Time-to-live in seconds"
+        },
+        "trace_id": {
+          "type": "string",
+          "description": "Distributed tracing identifier"
+        },
+        "span_id": {
+          "type": "string",
+          "description": "Span identifier for distributed tracing"
+        },
+        "requires_acknowledgment": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether acknowledgment is required"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

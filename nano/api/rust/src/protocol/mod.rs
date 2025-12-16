@@ -8,9 +8,11 @@ mod message_types;
 mod router;
 mod swarm;
 mod codec;
+pub mod quorum_sensing;
 
 pub use channel::*;
 pub use message_types::*;
 pub use router::*;
 pub use swarm::*;
 pub use codec::*;
+pub use quorum_sensing::*;

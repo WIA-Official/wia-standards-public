@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wia.live/schemas/security/protocol/notification/v1.schema.json",
+  "title": "WIA Security Protocol Notification",
+  "description": "Notification message for WIA Security Communication Protocol",
+  "allOf": [
+    {
+      "$ref": "message.schema.json"
+    }
+  ],
+  "properties": {
+    "message_type": {
+      "const": "notification"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["content_type", "data"],
+      "properties": {
+        "content_type": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/NotificationData"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "NotificationType": {
+      "type": "string",
+      "enum": [
+        "system_status",
+        "heartbeat",
+        "config_change",
+        "maintenance",
+        "rate_limit_warning",
+        "certificate_expiry",
+        "subscription_status",
+        "acknowledgment",
+        "custom"
+      ],
+      "description": "Type of notification"
+    },
+    "NotificationData": {
+      "type": "object",
+      "required": ["notification_type"],
+      "properties": {
+        "notification_type": {
+          "$ref": "#/$defs/NotificationType"
+        },
+        "notification_id": {
+          "type": "string"
+        },
+        "notification_data": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "notification_type": { "const": "heartbeat" }
+            }
+          },
+          "then": {
+            "properties": {
+              "heartbeat": { "$ref": "#/$defs/HeartbeatNotification" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "notification_type": { "const": "system_status" }
+            }
+          },
+          "then": {
+            "properties": {
+              "system_status": { "$ref": "#/$defs/SystemStatusNotification" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "notification_type": { "const": "config_change" }
+            }
+          },
+          "then": {
+            "properties": {
+              "config_change": { "$ref": "#/$defs/ConfigChangeNotification" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "notification_type": { "const": "acknowledgment" }
+            }
+          },
+          "then": {
+            "properties": {
+              "acknowledgment": { "$ref": "#/$defs/AcknowledgmentNotification" }
+            }
+          }
+        }
+      ]
+    },
+    "HeartbeatNotification": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["healthy", "degraded", "unhealthy"]
+        },
+        "uptime_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_activity": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "cpu_percent": { "type": "number" },
+            "memory_percent": { "type": "number" },
+            "connections_active": { "type": "integer" },
+            "messages_processed": { "type": "integer" },
+            "errors_count": { "type": "integer" }
+          }
+        },
+        "next_heartbeat_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SystemStatusNotification": {
+      "type": "object",
+      "required": ["status", "components"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["operational", "degraded", "partial_outage", "major_outage", "maintenance"]
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ComponentStatus"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "incident_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "ComponentStatus": {
+      "type": "object",
+      "required": ["name", "status"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["operational", "degraded", "outage"]
+        },
+        "latency_ms": { "type": "integer" }
+      }
+    },
+    "ConfigChangeNotification": {
+      "type": "object",
+      "required": ["change_type", "affected_component"],
+      "properties": {
+        "change_type": {
+          "type": "string",
+          "enum": ["policy_update", "certificate_rotation", "endpoint_change", "feature_toggle", "custom"]
+        },
+        "affected_component": { "type": "string" },
+        "change_id": { "type": "string" },
+        "changed_by": { "type": "string" },
+        "previous_value": {},
+        "new_value": {},
+        "effective_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "requires_restart": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "AcknowledgmentNotification": {
+      "type": "object",
+      "required": ["original_message_id", "ack_status"],
+      "properties": {
+        "original_message_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "ack_status": {
+          "type": "string",
+          "enum": ["received", "processed", "failed"]
+        },
+        "ack_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "RateLimitNotification": {
+      "type": "object",
+      "required": ["limit", "remaining", "reset_at"],
+      "properties": {
+        "limit": { "type": "integer" },
+        "remaining": { "type": "integer" },
+        "reset_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window_seconds": { "type": "integer" },
+        "warning_threshold_percent": { "type": "integer" }
+      }
+    },
+    "CertificateExpiryNotification": {
+      "type": "object",
+      "required": ["certificate_subject", "expires_at"],
+      "properties": {
+        "certificate_subject": { "type": "string" },
+        "certificate_issuer": { "type": "string" },
+        "certificate_fingerprint": { "type": "string" },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "days_until_expiry": { "type": "integer" },
+        "renewal_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "MaintenanceNotification": {
+      "type": "object",
+      "required": ["maintenance_type", "scheduled_start", "scheduled_end"],
+      "properties": {
+        "maintenance_type": {
+          "type": "string",
+          "enum": ["scheduled", "emergency", "completed"]
+        },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "scheduled_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "scheduled_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "affected_services": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "status_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  }
+}

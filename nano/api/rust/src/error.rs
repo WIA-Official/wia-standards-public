@@ -45,6 +45,15 @@ pub enum NanoError {
     /// Collision detected
     CollisionDetected { object_id: Option<String>, position: [f64; 3] },
 
+    /// Transport layer error
+    TransportFailed(String),
+
+    /// Protocol error
+    ProtocolError(String),
+
+    /// Quorum sensing error
+    QuorumError { current: usize, required: usize, message: String },
+
     /// IO error
     Io(std::io::Error),
 
@@ -82,6 +91,11 @@ impl fmt::Display for NanoError {
                     Some(id) => write!(f, "Collision with {} at {:?}", id, position),
                     None => write!(f, "Collision at {:?}", position),
                 }
+            }
+            Self::TransportFailed(msg) => write!(f, "Transport failed: {}", msg),
+            Self::ProtocolError(msg) => write!(f, "Protocol error: {}", msg),
+            Self::QuorumError { current, required, message } => {
+                write!(f, "Quorum error: {} (current: {}, required: {})", message, current, required)
             }
             Self::Io(e) => write!(f, "IO error: {}", e),
             Self::Custom(msg) => write!(f, "{}", msg),

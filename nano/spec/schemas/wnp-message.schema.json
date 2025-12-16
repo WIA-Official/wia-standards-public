@@ -1,0 +1,303 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/nano/wnp-message.schema.json",
+  "title": "WIA Nano Protocol Message",
+  "description": "Schema for WIA Nano Protocol (WNP) messages",
+  "type": "object",
+  "required": ["protocol", "version", "messageId", "timestamp", "type", "source", "destination", "transport", "payload"],
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "const": "wia-nano",
+      "description": "Protocol identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Protocol version (semantic versioning)"
+    },
+    "messageId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique message identifier (UUID v4)"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp in milliseconds"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["signal", "command", "telemetry", "acknowledgment", "coordination", "emergency", "error"],
+      "description": "Message type"
+    },
+    "source": {
+      "$ref": "#/definitions/nodeInfo",
+      "description": "Source node information"
+    },
+    "destination": {
+      "$ref": "#/definitions/destinationInfo",
+      "description": "Destination node information"
+    },
+    "transport": {
+      "$ref": "#/definitions/transportInfo",
+      "description": "Transport method and parameters"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Message-type-specific payload"
+    },
+    "ttl": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400,
+      "default": 3600,
+      "description": "Time-to-live in seconds"
+    },
+    "checksum": {
+      "type": "string",
+      "description": "CRC32 checksum for integrity verification"
+    },
+    "security": {
+      "$ref": "#/definitions/securityInfo",
+      "description": "Optional security parameters"
+    }
+  },
+  "definitions": {
+    "nodeInfo": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique node identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["nanorobot", "nanomachine", "nanosensor", "controller", "cell", "gateway"],
+          "description": "Node type"
+        },
+        "location_nm": {
+          "$ref": "#/definitions/position3D",
+          "description": "3D position in nanometers"
+        }
+      }
+    },
+    "destinationInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": ["string", "null"],
+          "description": "Destination node ID (null for broadcast)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["nanorobot", "nanomachine", "nanosensor", "controller", "cell", "gateway"],
+          "description": "Destination node type"
+        },
+        "broadcast": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this is a broadcast message"
+        },
+        "range_nm": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Broadcast range in nanometers"
+        },
+        "target_region": {
+          "$ref": "#/definitions/sphericalRegion",
+          "description": "Target geographic region"
+        },
+        "cell_type": {
+          "type": "string",
+          "description": "Target cell type for bio-interface"
+        },
+        "marker": {
+          "type": "string",
+          "description": "Cell surface marker for targeting"
+        }
+      }
+    },
+    "transportInfo": {
+      "type": "object",
+      "required": ["method"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["diffusion", "guided", "direct"],
+          "description": "Transport method"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Method-specific parameters"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "method": { "const": "diffusion" } }
+          },
+          "then": {
+            "properties": {
+              "parameters": {
+                "$ref": "#/definitions/diffusionParams"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "method": { "const": "guided" } }
+          },
+          "then": {
+            "properties": {
+              "parameters": {
+                "$ref": "#/definitions/guidedParams"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "method": { "const": "direct" } }
+          },
+          "then": {
+            "properties": {
+              "parameters": {
+                "$ref": "#/definitions/directParams"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "diffusionParams": {
+      "type": "object",
+      "properties": {
+        "carrier_molecule": {
+          "type": "string",
+          "description": "Signal carrier molecule"
+        },
+        "diffusion_coefficient_m2_per_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Diffusion coefficient in m^2/s"
+        },
+        "medium_viscosity_pa_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Medium viscosity in Pa*s"
+        },
+        "temperature_k": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Temperature in Kelvin"
+        }
+      }
+    },
+    "guidedParams": {
+      "type": "object",
+      "properties": {
+        "guidance_type": {
+          "type": "string",
+          "enum": ["magnetic_field", "acoustic", "optical", "chemical_gradient"],
+          "description": "Guidance mechanism type"
+        },
+        "field_strength_tesla": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Magnetic field strength in Tesla"
+        },
+        "gradient_t_per_m": {
+          "type": "number",
+          "description": "Field gradient in T/m"
+        },
+        "frequency_hz": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Oscillation frequency in Hz"
+        }
+      }
+    },
+    "directParams": {
+      "type": "object",
+      "properties": {
+        "mechanism": {
+          "type": "string",
+          "enum": ["gap_junction", "nanotube", "conjugation", "vesicle"],
+          "description": "Direct transfer mechanism"
+        },
+        "channel_conductance_ps": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Channel conductance in picosiemens"
+        },
+        "contact_duration_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Contact duration in milliseconds"
+        }
+      }
+    },
+    "position3D": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": {
+          "type": "number",
+          "description": "X coordinate in nanometers"
+        },
+        "y": {
+          "type": "number",
+          "description": "Y coordinate in nanometers"
+        },
+        "z": {
+          "type": "number",
+          "description": "Z coordinate in nanometers"
+        }
+      }
+    },
+    "sphericalRegion": {
+      "type": "object",
+      "required": ["center_nm", "radius_nm"],
+      "properties": {
+        "center_nm": {
+          "$ref": "#/definitions/position3D",
+          "description": "Region center in nanometers"
+        },
+        "radius_nm": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Region radius in nanometers"
+        }
+      }
+    },
+    "securityInfo": {
+      "type": "object",
+      "properties": {
+        "authentication": {
+          "type": "string",
+          "enum": ["none", "dna_signature", "molecular_key"],
+          "description": "Authentication method"
+        },
+        "signature_sequence": {
+          "type": "string",
+          "pattern": "^[ATCG]+$",
+          "description": "DNA signature sequence"
+        },
+        "encryption": {
+          "type": "string",
+          "enum": ["none", "molecular_key", "quantum"],
+          "description": "Encryption method"
+        },
+        "integrity_check": {
+          "type": "string",
+          "enum": ["none", "crc32", "sha256"],
+          "description": "Integrity check method"
+        }
+      }
+    }
+  }
+}
