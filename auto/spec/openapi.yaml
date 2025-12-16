@@ -1,0 +1,944 @@
+openapi: 3.1.0
+info:
+  title: WIA Autonomous Vehicle Accessibility API
+  description: |
+    REST API for the WIA Autonomous Vehicle Accessibility Standard.
+
+    This API enables accessible transportation through autonomous vehicles,
+    supporting passengers with disabilities including wheelchair users,
+    visually impaired, hearing impaired, and cognitive disabilities.
+
+    ## Authentication
+    - OAuth 2.0 with PKCE for mobile apps
+    - API keys for server-to-server communication
+    - JWT tokens with 15-minute expiration
+
+    ## Rate Limits
+    - Public: 100 req/min
+    - Authenticated: 1000 req/min
+
+    弘益人間 - Benefit All Humanity
+  version: 1.0.0
+  contact:
+    name: WIA Standards
+    url: https://github.com/WIA-Official/wia-standards
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.wia-auto.org/v1
+    description: Production server
+  - url: https://sandbox.wia-auto.org/v1
+    description: Sandbox server
+  - url: https://mock.wia-auto.org/v1
+    description: Mock server for testing
+
+tags:
+  - name: Profiles
+    description: Passenger profile management
+  - name: Trips
+    description: Trip request and management
+  - name: Vehicles
+    description: Vehicle information and availability
+  - name: Emergency
+    description: Emergency reporting and handling
+
+paths:
+  /profiles:
+    post:
+      tags: [Profiles]
+      summary: Create passenger profile
+      description: Create a new accessibility profile for a passenger
+      operationId: createProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProfileRequest'
+      responses:
+        '201':
+          description: Profile created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateProfileResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /profiles/{profile_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProfileId'
+    get:
+      tags: [Profiles]
+      summary: Get passenger profile
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassengerProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Profiles]
+      summary: Update passenger profile
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassengerProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Profiles]
+      summary: Delete passenger profile
+      operationId: deleteProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Profile deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trips:
+    post:
+      tags: [Trips]
+      summary: Request a trip
+      description: Request an accessible trip with specified requirements
+      operationId: requestTrip
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TripRequest'
+      responses:
+        '202':
+          description: Trip request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /trips/{request_id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      tags: [Trips]
+      summary: Get trip status
+      operationId: getTripStatus
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Trip status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Trips]
+      summary: Cancel trip
+      operationId: cancelTrip
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Trip cancelled successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Trip cannot be cancelled (already completed or in progress)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /vehicles:
+    get:
+      tags: [Vehicles]
+      summary: List available vehicles
+      description: Find available vehicles matching accessibility requirements
+      operationId: listVehicles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+          description: Latitude of search center
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+          description: Longitude of search center
+        - name: radius_km
+          in: query
+          schema:
+            type: number
+            format: float
+            default: 5
+            minimum: 0.1
+            maximum: 50
+          description: Search radius in kilometers
+        - name: wheelchair
+          in: query
+          schema:
+            type: boolean
+          description: Filter for wheelchair accessible vehicles
+        - name: ramp
+          in: query
+          schema:
+            type: boolean
+          description: Filter for vehicles with ramp
+        - name: lift
+          in: query
+          schema:
+            type: boolean
+          description: Filter for vehicles with lift
+        - name: service_animal
+          in: query
+          schema:
+            type: boolean
+          description: Filter for vehicles allowing service animals
+      responses:
+        '200':
+          description: List of available vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vehicles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VehicleMatch'
+
+  /vehicles/{vehicle_id}:
+    parameters:
+      - $ref: '#/components/parameters/VehicleId'
+    get:
+      tags: [Vehicles]
+      summary: Get vehicle details
+      operationId: getVehicle
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vehicle details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleCapabilities'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /emergency:
+    post:
+      tags: [Emergency]
+      summary: Report emergency
+      description: Report an emergency situation during a trip
+      operationId: reportEmergency
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmergencyRequest'
+      responses:
+        '201':
+          description: Emergency reported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmergencyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    ProfileId:
+      name: profile_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique profile identifier
+    RequestId:
+      name: request_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique trip request identifier
+    VehicleId:
+      name: vehicle_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique vehicle identifier
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid accessibility requirements
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  issue:
+                    type: string
+            request_id:
+              type: string
+              format: uuid
+            documentation_url:
+              type: string
+              format: uri
+
+    GeoLocation:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        address:
+          type: string
+
+    Dimensions:
+      type: object
+      required: [width_cm, length_cm, height_cm, weight_kg]
+      properties:
+        width_cm:
+          type: number
+          format: float
+          minimum: 0
+        length_cm:
+          type: number
+          format: float
+          minimum: 0
+        height_cm:
+          type: number
+          format: float
+          minimum: 0
+        weight_kg:
+          type: number
+          format: float
+          minimum: 0
+
+    DisabilityType:
+      type: string
+      enum:
+        - visual_blind
+        - visual_low_vision
+        - hearing_deaf
+        - hearing_hard
+        - mobility_wheelchair_manual
+        - mobility_wheelchair_power
+        - mobility_walker
+        - mobility_cane
+        - mobility_crutches
+        - cognitive_intellectual
+        - cognitive_autism
+        - cognitive_dementia
+        - speech
+        - multiple
+
+    MobilityAidType:
+      type: string
+      enum:
+        - none
+        - manual_wheelchair
+        - power_wheelchair
+        - scooter
+        - walker
+        - cane
+        - crutches
+
+    InteractionModality:
+      type: string
+      enum:
+        - visual_screen
+        - visual_led
+        - audio_tts
+        - audio_chime
+        - audio_speech_rec
+        - haptic_vibration
+        - haptic_force
+        - braille
+        - physical_button
+
+    ServiceAnimal:
+      type: object
+      required: [has_animal]
+      properties:
+        has_animal:
+          type: boolean
+        animal_type:
+          type: string
+        animal_size:
+          type: string
+          enum: [small, medium, large]
+
+    MobilityAid:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: '#/components/schemas/MobilityAidType'
+        dimensions:
+          $ref: '#/components/schemas/Dimensions'
+        requires_ramp:
+          type: boolean
+          default: false
+        requires_lift:
+          type: boolean
+          default: false
+        requires_securement:
+          type: boolean
+          default: false
+
+    CommunicationPrefs:
+      type: object
+      properties:
+        preferred_language:
+          type: string
+          example: ko
+        preferred_modalities:
+          type: array
+          items:
+            $ref: '#/components/schemas/InteractionModality'
+        aac_device:
+          type: boolean
+          default: false
+        sign_language:
+          type: string
+
+    PassengerInfo:
+      type: object
+      required: [disabilities]
+      properties:
+        name:
+          type: string
+        disabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisabilityType'
+          minItems: 1
+        service_animal:
+          $ref: '#/components/schemas/ServiceAnimal'
+
+    EmergencyContact:
+      type: object
+      required: [name, phone]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        relationship:
+          type: string
+
+    UserPreferences:
+      type: object
+      properties:
+        audio_volume:
+          type: integer
+          minimum: 0
+          maximum: 100
+        screen_brightness:
+          type: integer
+          minimum: 0
+          maximum: 100
+        high_contrast:
+          type: boolean
+          default: false
+        large_text:
+          type: boolean
+          default: false
+        haptic_intensity:
+          type: integer
+          minimum: 0
+          maximum: 100
+        minimize_walking:
+          type: boolean
+          default: false
+
+    AssistanceNeeds:
+      type: object
+      properties:
+        needs_boarding_help:
+          type: boolean
+          default: false
+        needs_securement_help:
+          type: boolean
+          default: false
+        companion_present:
+          type: boolean
+          default: false
+        emergency_contact:
+          $ref: '#/components/schemas/EmergencyContact'
+
+    PassengerProfile:
+      type: object
+      required: [profile_id, version, passenger]
+      properties:
+        profile_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+          example: "1.0.0"
+        passenger:
+          $ref: '#/components/schemas/PassengerInfo'
+        mobility_aid:
+          $ref: '#/components/schemas/MobilityAid'
+        communication:
+          $ref: '#/components/schemas/CommunicationPrefs'
+        assistance:
+          $ref: '#/components/schemas/AssistanceNeeds'
+        preferences:
+          $ref: '#/components/schemas/UserPreferences'
+
+    CreateProfileRequest:
+      type: object
+      required: [passenger]
+      properties:
+        passenger:
+          $ref: '#/components/schemas/PassengerInfo'
+        mobility_aid:
+          $ref: '#/components/schemas/MobilityAid'
+        communication:
+          $ref: '#/components/schemas/CommunicationPrefs'
+        assistance:
+          $ref: '#/components/schemas/AssistanceNeeds'
+        preferences:
+          $ref: '#/components/schemas/UserPreferences'
+
+    UpdateProfileRequest:
+      $ref: '#/components/schemas/CreateProfileRequest'
+
+    CreateProfileResponse:
+      type: object
+      required: [profile_id, version, created_at]
+      properties:
+        profile_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    TripLocation:
+      type: object
+      required: [location]
+      properties:
+        location:
+          $ref: '#/components/schemas/GeoLocation'
+        notes:
+          type: string
+        pickup_side:
+          type: string
+          enum: [same_side, any]
+        curb_to_curb:
+          type: boolean
+          default: false
+
+    TripDetails:
+      type: object
+      required: [pickup, dropoff]
+      properties:
+        pickup:
+          $ref: '#/components/schemas/TripLocation'
+        dropoff:
+          $ref: '#/components/schemas/TripLocation'
+        scheduled_time:
+          type: string
+          format: date-time
+        flexibility_minutes:
+          type: integer
+          minimum: 0
+          maximum: 120
+
+    AccessibilityRequirements:
+      type: object
+      properties:
+        wheelchair_accessible:
+          type: boolean
+          default: false
+        ramp_required:
+          type: boolean
+          default: false
+        lift_required:
+          type: boolean
+          default: false
+        service_animal_space:
+          type: boolean
+          default: false
+        companion_space:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 0
+        preferred_modalities:
+          type: array
+          items:
+            $ref: '#/components/schemas/InteractionModality'
+
+    TripPreferences:
+      type: object
+      properties:
+        minimize_walking:
+          type: boolean
+          default: false
+        audio_guidance:
+          type: boolean
+          default: false
+        visual_guidance:
+          type: boolean
+          default: false
+        haptic_feedback:
+          type: boolean
+          default: false
+        quiet_ride:
+          type: boolean
+          default: false
+
+    TripRequest:
+      type: object
+      required: [trip]
+      properties:
+        passenger_profile_id:
+          type: string
+          format: uuid
+        trip:
+          $ref: '#/components/schemas/TripDetails'
+        accessibility_requirements:
+          $ref: '#/components/schemas/AccessibilityRequirements'
+        preferences:
+          $ref: '#/components/schemas/TripPreferences'
+
+    VehicleAssignment:
+      type: object
+      required: [vehicle_id, eta_minutes, distance_km]
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        eta_minutes:
+          type: number
+          format: float
+        distance_km:
+          type: number
+          format: float
+
+    AccessibilityMatch:
+      type: object
+      required: [match_score]
+      properties:
+        wheelchair_accessible:
+          type: boolean
+        ramp_available:
+          type: boolean
+        lift_available:
+          type: boolean
+        service_animal_ok:
+          type: boolean
+        modalities_supported:
+          type: array
+          items:
+            $ref: '#/components/schemas/InteractionModality'
+        match_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    WayfindingInfo:
+      type: object
+      properties:
+        pickup_instructions:
+          type: string
+        audio_guidance_available:
+          type: boolean
+        find_vehicle_features:
+          type: array
+          items:
+            type: string
+            enum: [horn, lights, melody]
+        braille_identifier:
+          type: string
+
+    TripStatus:
+      type: string
+      enum:
+        - searching
+        - confirmed
+        - no_vehicle
+        - en_route
+        - arrived
+        - in_progress
+        - completed
+        - cancelled
+
+    TripResponse:
+      type: object
+      required: [response_id, request_id, version, timestamp, status]
+      properties:
+        response_id:
+          type: string
+          format: uuid
+        request_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/TripStatus'
+        vehicle:
+          $ref: '#/components/schemas/VehicleAssignment'
+        accessibility_match:
+          $ref: '#/components/schemas/AccessibilityMatch'
+        wayfinding:
+          $ref: '#/components/schemas/WayfindingInfo'
+
+    VehicleInfo:
+      type: object
+      required: [make, model, sae_level]
+      properties:
+        make:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        sae_level:
+          type: integer
+          minimum: 0
+          maximum: 5
+        license_plate:
+          type: string
+
+    VehicleCapabilities:
+      type: object
+      required: [vehicle_id, version, vehicle_info, accessibility_features]
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        vehicle_info:
+          $ref: '#/components/schemas/VehicleInfo'
+        accessibility_features:
+          type: object
+          description: Full accessibility features object
+        capacity:
+          type: object
+          properties:
+            total_passengers:
+              type: integer
+            wheelchair_passengers:
+              type: integer
+            service_animals:
+              type: boolean
+
+    VehicleMatch:
+      type: object
+      required: [vehicle_id, distance_km, eta_minutes, match_score]
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        vehicle_info:
+          $ref: '#/components/schemas/VehicleInfo'
+        location:
+          $ref: '#/components/schemas/GeoLocation'
+        distance_km:
+          type: number
+          format: float
+        eta_minutes:
+          type: number
+          format: float
+        match_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        accessibility:
+          $ref: '#/components/schemas/AccessibilityMatch'
+
+    EmergencyType:
+      type: string
+      enum:
+        - panic_button
+        - pull_over
+        - collision
+        - medical
+        - fire
+        - other
+
+    EmergencySeverity:
+      type: string
+      enum:
+        - low
+        - medium
+        - high
+        - critical
+
+    EmergencyRequest:
+      type: object
+      required: [event_type, severity, location]
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        trip_id:
+          type: string
+          format: uuid
+        event_type:
+          $ref: '#/components/schemas/EmergencyType'
+        severity:
+          $ref: '#/components/schemas/EmergencySeverity'
+        location:
+          $ref: '#/components/schemas/GeoLocation'
+        passenger:
+          type: object
+          properties:
+            profile_id:
+              type: string
+              format: uuid
+            disabilities:
+              type: array
+              items:
+                $ref: '#/components/schemas/DisabilityType'
+
+    EmergencyResponseData:
+      type: object
+      properties:
+        auto_pulled_over:
+          type: boolean
+        support_contacted:
+          type: boolean
+        emergency_services_called:
+          type: boolean
+        eta_support_minutes:
+          type: number
+          format: float
+
+    EmergencyResponse:
+      type: object
+      required: [event_id]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        response:
+          $ref: '#/components/schemas/EmergencyResponseData'

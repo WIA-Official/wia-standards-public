@@ -1,0 +1,694 @@
+// WIA Autonomous Vehicle Accessibility Standard
+// gRPC Service Definitions
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package wia.auto.v1;
+
+option go_package = "github.com/WIA-Official/wia-auto/gen/go/wia/auto/v1";
+option java_package = "org.wia.auto.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// =============================================================================
+// Vehicle Control Service
+// Real-time vehicle control and monitoring
+// =============================================================================
+
+service VehicleControl {
+  // Stream vehicle location updates
+  rpc StreamLocation(StreamLocationRequest) returns (stream Location);
+
+  // Stream securement status updates
+  rpc StreamSecurement(StreamSecurementRequest) returns (stream SecurementStatus);
+
+  // Send HMI command to vehicle
+  rpc SendHmiCommand(HmiCommand) returns (HmiResponse);
+
+  // Trigger emergency stop
+  rpc EmergencyStop(EmergencyStopRequest) returns (EmergencyStopResponse);
+
+  // Configure HMI settings
+  rpc ConfigureHmi(HmiConfigRequest) returns (HmiConfigResponse);
+
+  // Start wheelchair securement
+  rpc StartSecurement(SecurementRequest) returns (SecurementResponse);
+
+  // Release wheelchair securement
+  rpc ReleaseSecurement(SecurementRequest) returns (SecurementResponse);
+
+  // Get current securement status
+  rpc GetSecurementStatus(SecurementRequest) returns (SecurementStatus);
+}
+
+// =============================================================================
+// Fleet Management Service
+// Vehicle discovery and dispatch
+// =============================================================================
+
+service FleetManagement {
+  // Find available vehicles matching requirements
+  rpc FindVehicles(FindVehiclesRequest) returns (FindVehiclesResponse);
+
+  // Dispatch vehicle to pickup location
+  rpc DispatchVehicle(DispatchRequest) returns (DispatchResponse);
+
+  // Get vehicle status
+  rpc GetVehicleStatus(VehicleStatusRequest) returns (VehicleStatus);
+
+  // Stream fleet status updates
+  rpc StreamFleetStatus(StreamFleetRequest) returns (stream FleetStatusUpdate);
+
+  // Register vehicle in fleet
+  rpc RegisterVehicle(RegisterVehicleRequest) returns (RegisterVehicleResponse);
+
+  // Unregister vehicle from fleet
+  rpc UnregisterVehicle(UnregisterVehicleRequest) returns (UnregisterVehicleResponse);
+}
+
+// =============================================================================
+// Trip Service
+// Trip management and tracking
+// =============================================================================
+
+service TripService {
+  // Request a new trip
+  rpc RequestTrip(TripRequestProto) returns (TripResponseProto);
+
+  // Get trip status
+  rpc GetTripStatus(GetTripStatusRequest) returns (TripResponseProto);
+
+  // Cancel a trip
+  rpc CancelTrip(CancelTripRequest) returns (CancelTripResponse);
+
+  // Stream trip updates
+  rpc StreamTripUpdates(StreamTripRequest) returns (stream TripUpdate);
+}
+
+// =============================================================================
+// Common Messages
+// =============================================================================
+
+message Location {
+  double latitude = 1;
+  double longitude = 2;
+  optional string address = 3;
+  optional float heading_degrees = 4;
+  optional float speed_kmh = 5;
+  optional float accuracy_m = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+// =============================================================================
+// Vehicle Control Messages
+// =============================================================================
+
+message StreamLocationRequest {
+  string vehicle_id = 1;
+  int32 update_interval_ms = 2;  // Default: 1000ms
+}
+
+message StreamSecurementRequest {
+  string vehicle_id = 1;
+  int32 update_interval_ms = 2;  // Default: 500ms
+}
+
+message SecurementStatus {
+  string status_id = 1;
+  string vehicle_id = 2;
+  optional string trip_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+
+  OverallSecurementStatus overall_status = 5;
+  bool wheelchair_detected = 6;
+  optional WheelchairType wheelchair_type = 7;
+  repeated SecurementPoint securement_points = 8;
+  bool safety_check_passed = 9;
+  bool ready_to_move = 10;
+  optional string error_message = 11;
+
+  enum OverallSecurementStatus {
+    OVERALL_SECUREMENT_STATUS_UNSPECIFIED = 0;
+    UNSECURED = 1;
+    SECURING = 2;
+    SECURED = 3;
+    ERROR = 4;
+  }
+
+  enum WheelchairType {
+    WHEELCHAIR_TYPE_UNSPECIFIED = 0;
+    MANUAL = 1;
+    POWER = 2;
+    SCOOTER = 3;
+  }
+}
+
+message SecurementPoint {
+  string point_id = 1;
+  SecurementPosition position = 2;
+  SecurementPointStatus status = 3;
+  optional float force_newtons = 4;
+  bool locked = 5;
+
+  enum SecurementPosition {
+    SECUREMENT_POSITION_UNSPECIFIED = 0;
+    FRONT_LEFT = 1;
+    FRONT_RIGHT = 2;
+    REAR_LEFT = 3;
+    REAR_RIGHT = 4;
+  }
+
+  enum SecurementPointStatus {
+    SECUREMENT_POINT_STATUS_UNSPECIFIED = 0;
+    DISENGAGED = 1;
+    ENGAGING = 2;
+    ENGAGED = 3;
+    ERROR = 4;
+  }
+}
+
+message HmiCommand {
+  string vehicle_id = 1;
+  HmiCommandType command = 2;
+  map<string, string> parameters = 3;
+
+  enum HmiCommandType {
+    HMI_COMMAND_TYPE_UNSPECIFIED = 0;
+    ANNOUNCE = 1;      // TTS announcement
+    DISPLAY = 2;       // Display message
+    HAPTIC = 3;        // Haptic feedback
+    CHIME = 4;         // Audio chime
+    FIND_VEHICLE = 5;  // Horn/lights/melody
+  }
+}
+
+message HmiResponse {
+  bool success = 1;
+  optional string message = 2;
+  optional string error_code = 3;
+}
+
+message HmiConfigRequest {
+  string vehicle_id = 1;
+  optional string trip_id = 2;
+  VisualConfig visual = 3;
+  AudioConfig audio = 4;
+  HapticConfig haptic = 5;
+  PhysicalConfig physical = 6;
+}
+
+message VisualConfig {
+  bool enabled = 1;
+  int32 brightness = 2;  // 0-100
+  ContrastMode contrast = 3;
+  TextSize text_size = 4;
+  ColorScheme color_scheme = 5;
+  bool animations = 6;
+
+  enum ContrastMode {
+    CONTRAST_MODE_UNSPECIFIED = 0;
+    NORMAL = 1;
+    HIGH = 2;
+  }
+
+  enum TextSize {
+    TEXT_SIZE_UNSPECIFIED = 0;
+    SMALL = 1;
+    MEDIUM = 2;
+    LARGE = 3;
+    EXTRA_LARGE = 4;
+  }
+
+  enum ColorScheme {
+    COLOR_SCHEME_UNSPECIFIED = 0;
+    DEFAULT = 1;
+    HIGH_CONTRAST = 2;
+    DARK = 3;
+    LIGHT = 4;
+  }
+}
+
+message AudioConfig {
+  bool enabled = 1;
+  int32 volume = 2;  // 0-100
+  optional string tts_voice = 3;
+  TtsSpeed tts_speed = 4;
+  bool chimes_enabled = 5;
+  bool speech_recognition = 6;
+  string language = 7;
+
+  enum TtsSpeed {
+    TTS_SPEED_UNSPECIFIED = 0;
+    SLOW = 1;
+    NORMAL = 2;
+    FAST = 3;
+  }
+}
+
+message HapticConfig {
+  bool enabled = 1;
+  int32 intensity = 2;  // 0-100
+  HapticPatterns patterns = 3;
+
+  message HapticPatterns {
+    bool notification = 1;
+    bool navigation = 2;
+    bool warning = 3;
+    bool confirmation = 4;
+  }
+}
+
+message PhysicalConfig {
+  bool braille_output = 1;
+  bool button_audio_feedback = 2;
+  bool button_haptic_feedback = 3;
+}
+
+message HmiConfigResponse {
+  bool success = 1;
+  string config_id = 2;
+  optional string error_message = 3;
+}
+
+message EmergencyStopRequest {
+  string vehicle_id = 1;
+  optional string trip_id = 2;
+  EmergencyReason reason = 3;
+  optional Location location = 4;
+
+  enum EmergencyReason {
+    EMERGENCY_REASON_UNSPECIFIED = 0;
+    PANIC_BUTTON = 1;
+    SECUREMENT_FAILURE = 2;
+    OBSTACLE_DETECTED = 3;
+    MEDICAL = 4;
+    PASSENGER_REQUEST = 5;
+    SYSTEM_FAULT = 6;
+    OTHER = 7;
+  }
+}
+
+message EmergencyStopResponse {
+  bool success = 1;
+  bool vehicle_stopped = 2;
+  bool support_notified = 3;
+  bool emergency_services_notified = 4;
+  optional int32 eta_support_minutes = 5;
+  string event_id = 6;
+}
+
+message SecurementRequest {
+  string vehicle_id = 1;
+  optional string trip_id = 2;
+}
+
+message SecurementResponse {
+  bool success = 1;
+  SecurementStatus status = 2;
+  optional string error_message = 3;
+}
+
+// =============================================================================
+// Fleet Management Messages
+// =============================================================================
+
+message FindVehiclesRequest {
+  Location location = 1;
+  float radius_km = 2;
+  AccessibilityRequirements requirements = 3;
+  optional int32 max_results = 4;
+}
+
+message AccessibilityRequirements {
+  bool wheelchair_accessible = 1;
+  bool ramp_required = 2;
+  bool lift_required = 3;
+  bool service_animal_space = 4;
+  int32 companion_space = 5;
+  repeated InteractionModality preferred_modalities = 6;
+
+  enum InteractionModality {
+    INTERACTION_MODALITY_UNSPECIFIED = 0;
+    VISUAL_SCREEN = 1;
+    VISUAL_LED = 2;
+    AUDIO_TTS = 3;
+    AUDIO_CHIME = 4;
+    AUDIO_SPEECH_REC = 5;
+    HAPTIC_VIBRATION = 6;
+    HAPTIC_FORCE = 7;
+    BRAILLE = 8;
+    PHYSICAL_BUTTON = 9;
+  }
+}
+
+message FindVehiclesResponse {
+  repeated VehicleMatch vehicles = 1;
+  int32 total_available = 2;
+}
+
+message VehicleMatch {
+  string vehicle_id = 1;
+  VehicleInfo info = 2;
+  Location location = 3;
+  float distance_km = 4;
+  float eta_minutes = 5;
+  int32 match_score = 6;  // 0-100
+  AccessibilityMatch accessibility = 7;
+}
+
+message VehicleInfo {
+  string make = 1;
+  string model = 2;
+  optional int32 year = 3;
+  optional string license_plate = 4;
+  SaeLevel sae_level = 5;
+
+  enum SaeLevel {
+    SAE_LEVEL_UNSPECIFIED = 0;
+    LEVEL_0 = 1;
+    LEVEL_1 = 2;
+    LEVEL_2 = 3;
+    LEVEL_3 = 4;
+    LEVEL_4 = 5;
+    LEVEL_5 = 6;
+  }
+}
+
+message AccessibilityMatch {
+  bool wheelchair_accessible = 1;
+  bool ramp_available = 2;
+  bool lift_available = 3;
+  bool service_animal_ok = 4;
+  repeated string modalities_supported = 5;
+  int32 match_score = 6;
+}
+
+message DispatchRequest {
+  string vehicle_id = 1;
+  string trip_id = 2;
+  Location pickup = 3;
+  Location dropoff = 4;
+  optional AccessibilityRequirements requirements = 5;
+}
+
+message DispatchResponse {
+  bool success = 1;
+  string assignment_id = 2;
+  float eta_minutes = 3;
+  optional string error_message = 4;
+}
+
+message VehicleStatusRequest {
+  string vehicle_id = 1;
+}
+
+message VehicleStatus {
+  string vehicle_id = 1;
+  VehicleState state = 2;
+  Location location = 3;
+  optional string current_trip_id = 4;
+  google.protobuf.Timestamp last_updated = 5;
+  optional float battery_percent = 6;
+
+  enum VehicleState {
+    VEHICLE_STATE_UNSPECIFIED = 0;
+    OFFLINE = 1;
+    AVAILABLE = 2;
+    DISPATCHED = 3;
+    EN_ROUTE = 4;
+    ARRIVED = 5;
+    IN_SERVICE = 6;
+    RETURNING = 7;
+    MAINTENANCE = 8;
+  }
+}
+
+message StreamFleetRequest {
+  repeated string vehicle_ids = 1;  // Empty for all vehicles
+  optional float radius_km = 2;
+  optional Location center = 3;
+}
+
+message FleetStatusUpdate {
+  string vehicle_id = 1;
+  VehicleStatus status = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  UpdateType update_type = 4;
+
+  enum UpdateType {
+    UPDATE_TYPE_UNSPECIFIED = 0;
+    LOCATION = 1;
+    STATE_CHANGE = 2;
+    AVAILABILITY = 3;
+  }
+}
+
+message RegisterVehicleRequest {
+  string vehicle_id = 1;
+  VehicleInfo info = 2;
+  VehicleCapabilities capabilities = 3;
+}
+
+message VehicleCapabilities {
+  EntryFeatures entry = 1;
+  InteriorFeatures interior = 2;
+  HmiFeatures hmi = 3;
+  CommunicationFeatures communication = 4;
+  VehicleCapacity capacity = 5;
+
+  message EntryFeatures {
+    optional RampFeatures ramp = 1;
+    optional LiftFeatures lift = 2;
+    optional DoorFeatures doors = 3;
+  }
+
+  message RampFeatures {
+    bool available = 1;
+    optional string ramp_type = 2;
+    optional float max_weight_kg = 3;
+    optional float width_cm = 4;
+    bool auto_deploy = 5;
+  }
+
+  message LiftFeatures {
+    bool available = 1;
+    optional string lift_type = 2;
+    optional float max_weight_kg = 3;
+    optional float width_cm = 4;
+  }
+
+  message DoorFeatures {
+    optional string door_type = 1;
+    optional float width_cm = 2;
+    bool auto_open = 3;
+    bool low_step = 4;
+    optional float step_height_cm = 5;
+  }
+
+  message InteriorFeatures {
+    int32 wheelchair_spaces = 1;
+    optional SecurementFeatures securement = 2;
+    bool transfer_seat = 3;
+    bool lowered_floor = 4;
+    optional float floor_height_cm = 5;
+    optional float headroom_cm = 6;
+  }
+
+  message SecurementFeatures {
+    bool available = 1;
+    optional string securement_type = 2;
+    optional float max_width_cm = 3;
+    optional float max_length_cm = 4;
+    optional float max_weight_kg = 5;
+  }
+
+  message HmiFeatures {
+    optional ScreenFeatures screen = 1;
+    optional AudioFeatures audio = 2;
+    optional HapticFeatures haptic = 3;
+    optional PhysicalControlFeatures physical_controls = 4;
+  }
+
+  message ScreenFeatures {
+    bool available = 1;
+    optional float size_inches = 2;
+    bool touch = 3;
+    bool high_contrast = 4;
+    bool adjustable_brightness = 5;
+  }
+
+  message AudioFeatures {
+    bool tts = 1;
+    bool speech_recognition = 2;
+    repeated string languages = 3;
+    bool volume_control = 4;
+    bool chimes = 5;
+  }
+
+  message HapticFeatures {
+    bool vibration = 1;
+    bool force_feedback = 2;
+  }
+
+  message PhysicalControlFeatures {
+    bool braille_labels = 1;
+    bool tactile_buttons = 2;
+    bool panic_button = 3;
+    bool pull_over_button = 4;
+  }
+
+  message CommunicationFeatures {
+    bool live_support = 1;
+    bool video_call = 2;
+    bool text_chat = 3;
+    bool sign_language_support = 4;
+  }
+
+  message VehicleCapacity {
+    int32 total_passengers = 1;
+    int32 wheelchair_passengers = 2;
+    bool service_animals = 3;
+  }
+}
+
+message RegisterVehicleResponse {
+  bool success = 1;
+  optional string error_message = 2;
+}
+
+message UnregisterVehicleRequest {
+  string vehicle_id = 1;
+}
+
+message UnregisterVehicleResponse {
+  bool success = 1;
+  optional string error_message = 2;
+}
+
+// =============================================================================
+// Trip Service Messages
+// =============================================================================
+
+message TripRequestProto {
+  string request_id = 1;
+  string version = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  optional string passenger_profile_id = 4;
+  TripDetails trip = 5;
+  optional AccessibilityRequirements accessibility_requirements = 6;
+  optional TripPreferences preferences = 7;
+
+  message TripDetails {
+    TripLocation pickup = 1;
+    TripLocation dropoff = 2;
+    optional google.protobuf.Timestamp scheduled_time = 3;
+    optional int32 flexibility_minutes = 4;
+  }
+
+  message TripLocation {
+    Location location = 1;
+    optional string notes = 2;
+    optional PickupSide pickup_side = 3;
+    bool curb_to_curb = 4;
+
+    enum PickupSide {
+      PICKUP_SIDE_UNSPECIFIED = 0;
+      SAME_SIDE = 1;
+      ANY = 2;
+    }
+  }
+
+  message TripPreferences {
+    bool minimize_walking = 1;
+    bool audio_guidance = 2;
+    bool visual_guidance = 3;
+    bool haptic_feedback = 4;
+    bool quiet_ride = 5;
+  }
+}
+
+message TripResponseProto {
+  string response_id = 1;
+  string request_id = 2;
+  string version = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  TripStatus status = 5;
+  optional VehicleAssignment vehicle = 6;
+  optional AccessibilityMatch accessibility_match = 7;
+  optional WayfindingInfo wayfinding = 8;
+
+  enum TripStatus {
+    TRIP_STATUS_UNSPECIFIED = 0;
+    SEARCHING = 1;
+    CONFIRMED = 2;
+    NO_VEHICLE = 3;
+    EN_ROUTE = 4;
+    ARRIVED = 5;
+    IN_PROGRESS = 6;
+    COMPLETED = 7;
+    CANCELLED = 8;
+  }
+
+  message VehicleAssignment {
+    string vehicle_id = 1;
+    float eta_minutes = 2;
+    float distance_km = 3;
+  }
+
+  message WayfindingInfo {
+    optional string pickup_instructions = 1;
+    bool audio_guidance_available = 2;
+    repeated FindVehicleFeature find_vehicle_features = 3;
+    optional string braille_identifier = 4;
+
+    enum FindVehicleFeature {
+      FIND_VEHICLE_FEATURE_UNSPECIFIED = 0;
+      HORN = 1;
+      LIGHTS = 2;
+      MELODY = 3;
+    }
+  }
+}
+
+message GetTripStatusRequest {
+  string request_id = 1;
+}
+
+message CancelTripRequest {
+  string request_id = 1;
+  optional string reason = 2;
+}
+
+message CancelTripResponse {
+  bool success = 1;
+  optional string error_message = 2;
+}
+
+message StreamTripRequest {
+  string trip_id = 1;
+}
+
+message TripUpdate {
+  string trip_id = 1;
+  TripUpdateType update_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  oneof data {
+    TripResponseProto.TripStatus status = 4;
+    Location vehicle_location = 5;
+    float eta_minutes = 6;
+    SecurementStatus securement = 7;
+    string message = 8;
+  }
+
+  enum TripUpdateType {
+    TRIP_UPDATE_TYPE_UNSPECIFIED = 0;
+    STATUS_CHANGE = 1;
+    LOCATION_UPDATE = 2;
+    ETA_UPDATE = 3;
+    SECUREMENT_UPDATE = 4;
+    MESSAGE = 5;
+  }
+}

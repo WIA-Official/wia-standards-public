@@ -38,16 +38,34 @@ This standard aims to:
 
 | Phase | Title | Description | Status |
 |:-----:|-------|-------------|:------:|
-| **1** | Data Format | Standard data format | ⏳ Planned |
-| **2** | API Interface | SDK for developers | ⏳ Planned |
-| **3** | Communication Protocol | Device protocols | ⏳ Planned |
-| **4** | Ecosystem Integration | WIA integration | ⏳ Planned |
+| **1** | Data Format | Passenger profiles, vehicle capabilities, trip requests | ✅ Complete |
+| **2** | API Interface | TypeScript/Rust SDK for developers | ⏳ Planned |
+| **3** | Communication Protocol | V2X, Fleet management protocols | ⏳ Planned |
+| **4** | Ecosystem Integration | WIA integration, Smart city | ⏳ Planned |
 
 ---
 
 ## 🚀 Quick Start
 
-Coming soon...
+### Phase 1: Data Formats
+
+```json
+{
+  "wia_auto": {
+    "version": "1.0.0",
+    "message_type": "trip_request",
+    "payload": {
+      "accessibility_requirements": {
+        "wheelchair_accessible": true,
+        "ramp_required": true,
+        "preferred_modalities": ["audio_tts", "haptic_vibration"]
+      }
+    }
+  }
+}
+```
+
+See [spec/PHASE-1-DATA-FORMAT.md](spec/PHASE-1-DATA-FORMAT.md) for full specification.
 
 ---
 
@@ -55,13 +73,23 @@ Coming soon...
 
 ```
 auto/
-├── spec/                    # Specifications
+├── spec/
+│   ├── RESEARCH-PHASE-1.md          # Research findings
+│   ├── PHASE-1-DATA-FORMAT.md       # Data format specification
+│   └── schemas/
+│       ├── passenger-profile.schema.json
+│       ├── vehicle-capabilities.schema.json
+│       ├── trip-request.schema.json
+│       ├── trip-response.schema.json
+│       ├── hmi-config.schema.json
+│       ├── securement-status.schema.json
+│       ├── emergency-event.schema.json
+│       └── message-envelope.schema.json
 ├── api/
-│   ├── typescript/          # TypeScript SDK
-│   └── python/              # Python SDK
-├── examples/
+│   ├── typescript/          # TypeScript SDK (Phase 2)
+│   └── rust/                # Rust SDK (Phase 2)
 ├── prompts/                 # Claude Code prompts
-└── docs/
+└── README.md
 ```
 
 ---
