@@ -42,7 +42,7 @@ This standard aims to:
 | **1** | Data Format | Standard data format for nanoscale systems | ✅ Complete |
 | **2** | API Interface | Rust SDK for developers | ✅ Complete |
 | **3** | Communication Protocol | WIA Nano Protocol (WNP) | ✅ Complete |
-| **4** | Ecosystem Integration | WIA integration | ⏳ Planned |
+| **4** | Ecosystem Integration | Export to visualization/simulation tools | ✅ Complete |
 
 ---
 
@@ -103,6 +103,22 @@ loop {
 }
 ```
 
+### Export to Visualization Tools
+
+```rust
+use wia_nano::output::{OutputManager, OutputFormat};
+use wia_nano::types::Molecule;
+
+// Create a molecule (e.g., from Molecule::fullerene_c60())
+let molecule = Molecule::fullerene_c60();
+
+// Export to various formats
+let manager = OutputManager::new();
+let pdb = manager.export(OutputFormat::Pdb, &molecule)?;
+let xyz = manager.export(OutputFormat::Xyz, &molecule)?;
+let lammps = manager.export(OutputFormat::LammpsData, &molecule)?;
+```
+
 ### Run Examples
 
 ```bash
@@ -110,6 +126,8 @@ cd api/rust
 cargo run --example protocol_demo
 cargo run --example quorum_sensing_sim
 cargo run --example swarm_coordination
+cargo run --example export_molecule
+cargo run --example lammps_export
 ```
 
 ---
@@ -121,8 +139,10 @@ nano/
 ├── spec/                           # Specifications
 │   ├── PHASE-1-DATA-FORMAT.md      # Data format specification
 │   ├── PHASE-3-PROTOCOL.md         # WNP protocol specification
+│   ├── PHASE-4-INTEGRATION.md      # Ecosystem integration spec
 │   ├── RESEARCH-PHASE-1.md         # Phase 1 research
 │   ├── RESEARCH-PHASE-3.md         # Phase 3 research
+│   ├── RESEARCH-PHASE-4.md         # Phase 4 research
 │   └── schemas/                    # JSON Schemas
 │       ├── wia-nano-base-v1.schema.json
 │       ├── nanorobot.schema.json
@@ -142,12 +162,22 @@ nano/
 │       │   │   ├── diffusion.rs
 │       │   │   ├── guided.rs
 │       │   │   └── mock.rs
+│       │   ├── output/             # Ecosystem export (Phase 4)
+│       │   │   ├── pdb.rs          # PDB format
+│       │   │   ├── xyz.rs          # XYZ format
+│       │   │   ├── mol2.rs         # MOL2 format
+│       │   │   ├── lammps.rs       # LAMMPS data
+│       │   │   ├── gromacs.rs      # GROMACS topology
+│       │   │   ├── cif.rs          # CIF format
+│       │   │   └── manager.rs      # Export manager
 │       │   ├── types/              # Data types
 │       │   └── ...
 │       └── examples/               # Example code
 │           ├── protocol_demo.rs
 │           ├── quorum_sensing_sim.rs
-│           └── swarm_coordination.rs
+│           ├── swarm_coordination.rs
+│           ├── export_molecule.rs   # Export demo
+│           └── lammps_export.rs     # LAMMPS demo
 ├── examples/
 │   └── sample-data/                # Sample JSON data
 ├── prompts/                        # Claude Code prompts
@@ -194,6 +224,36 @@ nano/
 | Diffusion | Molecular signaling | Slow (seconds) |
 | Guided | Targeted delivery | Fast (μm/s) |
 | Direct | Cell-cell transfer | Instant |
+
+---
+
+## 🔬 Phase 4: Ecosystem Integration
+
+### Supported Export Formats
+
+| Format | Extension | Use Case |
+|--------|-----------|----------|
+| **PDB** | `.pdb` | Protein Data Bank visualization |
+| **XYZ** | `.xyz` | Simple coordinate format |
+| **MOL2** | `.mol2` | Tripos SYBYL with bonds/charges |
+| **CIF** | `.cif` | Crystallographic Information File |
+| **LAMMPS** | `.data` | Molecular dynamics simulation |
+| **GROMACS** | `.gro`, `.top` | MD simulation topology |
+
+### Visualization Tools Support
+
+- **VMD** - Visual Molecular Dynamics
+- **PyMOL** - Molecular visualization
+- **UCSF Chimera/ChimeraX** - Structure analysis
+- **NGL Viewer** - Web-based visualization
+- **Avogadro** - Molecular editor
+
+### Simulation Tools Support
+
+- **LAMMPS** - Large-scale Atomic/Molecular Massively Parallel Simulator
+- **GROMACS** - Molecular dynamics package
+- **NAMD** - Parallel molecular dynamics
+- **OpenMM** - High-performance MD
 
 ---
 

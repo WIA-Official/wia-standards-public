@@ -59,6 +59,7 @@ pub mod simulator;
 pub mod protocol;
 pub mod integration;
 pub mod transport;
+pub mod output;
 
 /// Prelude module for convenient imports
 pub mod prelude {

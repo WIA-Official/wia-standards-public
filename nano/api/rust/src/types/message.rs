@@ -162,7 +162,7 @@ mod tests {
             "test": "value"
         });
 
-        let msg = NanoMessage::builder(NanoSystemType::Nanosensor)
+        let msg = NanoMessage::builder_for(NanoSystemType::Nanosensor)
             .device(Device::new("WIA", "Test-Sensor"))
             .sequence(1)
             .build(data)
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_message_serialization() {
-        let msg = NanoMessage::builder(NanoSystemType::Nanorobot)
+        let msg = NanoMessage::builder_for(NanoSystemType::Nanorobot)
             .device(Device::new("WIA", "Test-Robot"))
             .build(serde_json::json!({"position": {"x": 0, "y": 0, "z": 0}}))
             .unwrap();
