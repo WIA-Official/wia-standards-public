@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: Phase 3 - 스트리밍 프로토콜 - WIA 감정 AI 표준</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+</head>
+<body>
+
+<p><a href="index.html">← 목차로 돌아가기</a></p>
+
+<h1>제6장: Phase 3 - 스트리밍 프로토콜</h1>
+
+<blockquote>
+<p>"실시간 감정 분석은 라이브 상호작용, 화상 회의, 게임, 운전자 모니터링 등에서 필수적입니다. Phase 3는 지연 시간을 최소화하고 연속적인 감정 데이터 스트림을 제공하는 WebSocket 프로토콜을 정의합니다."</p>
+</blockquote>
+
+<hr>
+
+<h2>6.1 실시간 WebSocket 프로토콜</h2>
+
+<h3>6.1.1 연결 설정</h3>
+
+<pre>
+# WebSocket 연결 URL
+wss://stream.{provider}.com/wia/emotion/v1/stream
+
+# 연결 요청 예시
+GET /wia/emotion/v1/stream HTTP/1.1
+Host: stream.provider.com
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+Sec-WebSocket-Version: 13
+Authorization: Bearer {access_token}
+X-WIA-Version: 1.0.0
+</pre>
+
+<h3>6.1.2 핸드셰이크 프로세스</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>단계</th>
+            <th>방향</th>
+            <th>메시지</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>1</td>
+            <td>클라이언트 → 서버</td>
+            <td>WebSocket 업그레이드 요청</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>서버 → 클라이언트</td>
+            <td>101 Switching Protocols</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td>클라이언트 → 서버</td>
+            <td>세션 초기화 (session.start)</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td>서버 → 클라이언트</td>
+            <td>세션 확인 (session.started)</td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td>양방향</td>
+            <td>데이터 스트리밍 시작</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.1.3 세션 초기화</h3>
+
+<pre>
+// 클라이언트 → 서버: 세션 시작
+{
+    "type": "session.start",
+    "session_id": "client-generated-uuid",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "config": {
+        "modalities": ["facial", "voice"],
+        "facial_config": {
+            "frame_rate": 15,
+            "detect_action_units": true,
+            "detect_micro_expressions": true,
+            "resolution": "640x480"
+        },
+        "voice_config": {
+            "sample_rate": 16000,
+            "encoding": "LINEAR16",
+            "language": "ko-KR"
+        },
+        "output_config": {
+            "include_dimensional": true,
+            "include_raw_scores": false,
+            "confidence_threshold": 0.5,
+            "emit_interval_ms": 100
+        }
+    }
+}
+</pre>
+
+<pre>
+// 서버 → 클라이언트: 세션 확인
+{
+    "type": "session.started",
+    "session_id": "server-assigned-session-id",
+    "timestamp": "2025-01-15T14:30:00.050Z",
+    "config_applied": {
+        "modalities": ["facial", "voice"],
+        "max_frame_rate": 15,
+        "session_timeout_seconds": 3600
+    },
+    "server_info": {
+        "version": "1.0.0",
+        "region": "ap-northeast-2"
+    }
+}
+</pre>
+
+<hr>
+
+<h2>6.2 이벤트 기반 스트리밍</h2>
+
+<h3>6.2.1 메시지 타입</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>타입</th>
+            <th>방향</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>session.start</td>
+            <td>C → S</td>
+            <td>세션 초기화 요청</td>
+        </tr>
+        <tr>
+            <td>session.started</td>
+            <td>S → C</td>
+            <td>세션 초기화 확인</td>
+        </tr>
+        <tr>
+            <td>data.frame</td>
+            <td>C → S</td>
+            <td>비디오/오디오 프레임 전송</td>
+        </tr>
+        <tr>
+            <td>emotion.event</td>
+            <td>S → C</td>
+            <td>감정 분석 결과</td>
+        </tr>
+        <tr>
+            <td>emotion.aggregate</td>
+            <td>S → C</td>
+            <td>집계된 감정 요약</td>
+        </tr>
+        <tr>
+            <td>heartbeat.ping</td>
+            <td>양방향</td>
+            <td>연결 유지 핑</td>
+        </tr>
+        <tr>
+            <td>heartbeat.pong</td>
+            <td>양방향</td>
+            <td>핑 응답</td>
+        </tr>
+        <tr>
+            <td>session.end</td>
+            <td>C → S</td>
+            <td>세션 종료 요청</td>
+        </tr>
+        <tr>
+            <td>session.ended</td>
+            <td>S → C</td>
+            <td>세션 종료 확인</td>
+        </tr>
+        <tr>
+            <td>error</td>
+            <td>S → C</td>
+            <td>오류 알림</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.2.2 데이터 프레임 전송</h3>
+
+<pre>
+// 비디오 프레임 전송
+{
+    "type": "data.frame",
+    "modality": "facial",
+    "timestamp": "2025-01-15T14:30:01.000Z",
+    "sequence": 150,
+    "data": {
+        "frame": "{base64_encoded_frame}",
+        "format": "jpeg",
+        "resolution": "640x480"
+    }
+}
+
+// 오디오 청크 전송
+{
+    "type": "data.frame",
+    "modality": "voice",
+    "timestamp": "2025-01-15T14:30:01.000Z",
+    "sequence": 450,
+    "data": {
+        "audio": "{base64_encoded_audio_chunk}",
+        "encoding": "LINEAR16",
+        "duration_ms": 100
+    }
+}
+</pre>
+
+<h3>6.2.3 감정 이벤트 수신</h3>
+
+<pre>
+// 서버 → 클라이언트: 감정 이벤트
+{
+    "type": "emotion.event",
+    "event_id": "evt-12345-abcde",
+    "timestamp": "2025-01-15T14:30:01.100Z",
+    "sequence": 150,
+    "latency_ms": 85,
+    "emotions": [
+        {
+            "category": "happiness",
+            "intensity": 0.78,
+            "confidence": 0.91
+        }
+    ],
+    "action_units": [
+        {
+            "au": "AU6",
+            "intensity": 0.72,
+            "confidence": 0.89
+        },
+        {
+            "au": "AU12",
+            "intensity": 0.81,
+            "confidence": 0.93
+        }
+    ],
+    "dimensional": {
+        "valence": 0.72,
+        "arousal": 0.55
+    },
+    "source_modality": "facial",
+    "face_detected": true,
+    "micro_expression": false
+}
+</pre>
+
+<h3>6.2.4 집계 이벤트</h3>
+
+<pre>
+// 서버 → 클라이언트: 주기적 집계 (매 5초)
+{
+    "type": "emotion.aggregate",
+    "timestamp": "2025-01-15T14:30:05.000Z",
+    "window_start": "2025-01-15T14:30:00.000Z",
+    "window_end": "2025-01-15T14:30:05.000Z",
+    "frame_count": 75,
+    "aggregate": {
+        "dominant_emotion": "happiness",
+        "emotion_distribution": {
+            "happiness": 0.65,
+            "neutral": 0.25,
+            "surprise": 0.10
+        },
+        "average_valence": 0.68,
+        "average_arousal": 0.52,
+        "emotional_stability": 0.85,
+        "engagement_score": 0.72
+    },
+    "modality_quality": {
+        "facial": {
+            "average_confidence": 0.88,
+            "frames_processed": 75,
+            "frames_dropped": 0
+        },
+        "voice": {
+            "average_confidence": 0.82,
+            "segments_processed": 50
+        }
+    }
+}
+</pre>
+
+<hr>
+
+<h2>6.3 프레임 레이트 및 지연시간 요구사항</h2>
+
+<h3>6.3.1 프레임 레이트 권장사항</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>모달리티</th>
+            <th>최소</th>
+            <th>권장</th>
+            <th>최대</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>표정 분석</td>
+            <td>5 fps</td>
+            <td>15 fps</td>
+            <td>30 fps</td>
+        </tr>
+        <tr>
+            <td>미세표정</td>
+            <td>25 fps</td>
+            <td>30 fps</td>
+            <td>60 fps</td>
+        </tr>
+        <tr>
+            <td>음성 분석</td>
+            <td>100ms 청크</td>
+            <td>100ms 청크</td>
+            <td>50ms 청크</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.3.2 지연시간 요구사항</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>사용 사례</th>
+            <th>최대 지연시간</th>
+            <th>목표 지연시간</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>실시간 화상 통화</td>
+            <td>200ms</td>
+            <td>100ms</td>
+        </tr>
+        <tr>
+            <td>게임/인터랙션</td>
+            <td>100ms</td>
+            <td>50ms</td>
+        </tr>
+        <tr>
+            <td>운전자 모니터링</td>
+            <td>150ms</td>
+            <td>75ms</td>
+        </tr>
+        <tr>
+            <td>고객 서비스</td>
+            <td>500ms</td>
+            <td>250ms</td>
+        </tr>
+        <tr>
+            <td>녹화 분석</td>
+            <td>N/A</td>
+            <td>실시간 아님</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.3.3 품질 vs 지연시간 트레이드오프</h3>
+
+<pre>
+// 저지연 모드 설정
+{
+    "type": "session.start",
+    "config": {
+        "mode": "low_latency",
+        "facial_config": {
+            "frame_rate": 15,
+            "detect_action_units": false,
+            "detect_micro_expressions": false,
+            "lightweight_model": true
+        },
+        "output_config": {
+            "include_dimensional": true,
+            "include_raw_scores": false,
+            "emit_interval_ms": 50
+        }
+    }
+}
+
+// 고품질 모드 설정
+{
+    "type": "session.start",
+    "config": {
+        "mode": "high_quality",
+        "facial_config": {
+            "frame_rate": 30,
+            "detect_action_units": true,
+            "detect_micro_expressions": true,
+            "high_precision_model": true
+        },
+        "output_config": {
+            "include_dimensional": true,
+            "include_raw_scores": true,
+            "emit_interval_ms": 200
+        }
+    }
+}
+</pre>
+
+<hr>
+
+<h2>6.4 보안 및 인증</h2>
+
+<h3>6.4.1 연결 보안</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>요구사항</th>
+            <th>사양</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>전송 암호화</td>
+            <td>TLS 1.3 필수 (최소 TLS 1.2)</td>
+        </tr>
+        <tr>
+            <td>WebSocket 보안</td>
+            <td>wss:// 프로토콜만 허용</td>
+        </tr>
+        <tr>
+            <td>인증서</td>
+            <td>신뢰할 수 있는 CA 발급 필수</td>
+        </tr>
+        <tr>
+            <td>암호화 스위트</td>
+            <td>AES-256-GCM, CHACHA20-POLY1305</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.4.2 인증 토큰</h3>
+
+<pre>
+// JWT 토큰 구조
+{
+    "header": {
+        "alg": "RS256",
+        "typ": "JWT"
+    },
+    "payload": {
+        "sub": "user-12345",
+        "iss": "https://auth.provider.com",
+        "aud": "wia-emotion-stream",
+        "iat": 1705329000,
+        "exp": 1705332600,
+        "scope": ["stream:read", "stream:write"],
+        "session_limit": 5,
+        "rate_limit": {
+            "frames_per_second": 30,
+            "max_concurrent_sessions": 3
+        }
+    },
+    "signature": "..."
+}
+</pre>
+
+<h3>6.4.3 세션 보안</h3>
+
+<pre>
+// 보안 세션 설정
+{
+    "type": "session.start",
+    "security": {
+        "encryption": {
+            "enable_payload_encryption": true,
+            "algorithm": "AES-256-GCM"
+        },
+        "consent": {
+            "user_consent_token": "{signed_consent_token}",
+            "consent_scope": ["emotion_analysis", "data_storage"],
+            "consent_timestamp": "2025-01-15T14:25:00.000Z"
+        },
+        "data_handling": {
+            "store_raw_data": false,
+            "anonymize_results": true,
+            "retention_period": "session_only"
+        }
+    }
+}
+</pre>
+
+<hr>
+
+<h2>6.5 오류 처리</h2>
+
+<h3>6.5.1 오류 메시지 형식</h3>
+
+<pre>
+{
+    "type": "error",
+    "error_code": "PROCESSING_FAILED",
+    "message": "프레임 처리에 실패했습니다",
+    "timestamp": "2025-01-15T14:30:05.000Z",
+    "details": {
+        "sequence": 155,
+        "modality": "facial",
+        "reason": "face_not_detected"
+    },
+    "severity": "warning",
+    "recoverable": true,
+    "action": "skip_frame"
+}
+</pre>
+
+<h3>6.5.2 오류 코드</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>오류 코드</th>
+            <th>심각도</th>
+            <th>설명</th>
+            <th>조치</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>AUTH_EXPIRED</td>
+            <td>critical</td>
+            <td>인증 토큰 만료</td>
+            <td>재인증 필요</td>
+        </tr>
+        <tr>
+            <td>SESSION_TIMEOUT</td>
+            <td>critical</td>
+            <td>세션 시간 초과</td>
+            <td>세션 재시작</td>
+        </tr>
+        <tr>
+            <td>RATE_LIMITED</td>
+            <td>warning</td>
+            <td>속도 제한 초과</td>
+            <td>프레임 레이트 감소</td>
+        </tr>
+        <tr>
+            <td>PROCESSING_FAILED</td>
+            <td>warning</td>
+            <td>프레임 처리 실패</td>
+            <td>프레임 건너뛰기</td>
+        </tr>
+        <tr>
+            <td>MODALITY_UNAVAILABLE</td>
+            <td>warning</td>
+            <td>모달리티 일시 불가</td>
+            <td>다른 모달리티 사용</td>
+        </tr>
+        <tr>
+            <td>QUALITY_LOW</td>
+            <td>info</td>
+            <td>입력 품질 낮음</td>
+            <td>품질 개선 권장</td>
+        </tr>
+        <tr>
+            <td>SERVER_OVERLOAD</td>
+            <td>critical</td>
+            <td>서버 과부하</td>
+            <td>재연결 대기</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.5.3 재연결 프로토콜</h3>
+
+<pre>
+// 재연결 로직
+{
+    "reconnection_policy": {
+        "max_attempts": 5,
+        "backoff_strategy": "exponential",
+        "initial_delay_ms": 1000,
+        "max_delay_ms": 30000,
+        "backoff_multiplier": 2.0,
+        "jitter": 0.1
+    },
+    "session_resumption": {
+        "enabled": true,
+        "resume_token": "{session_resume_token}",
+        "resume_from_sequence": 155,
+        "max_gap_seconds": 30
+    }
+}
+</pre>
+
+<hr>
+
+<h2>6.6 연결 관리</h2>
+
+<h3>6.6.1 하트비트</h3>
+
+<pre>
+// 클라이언트 → 서버: 핑
+{
+    "type": "heartbeat.ping",
+    "timestamp": "2025-01-15T14:30:30.000Z",
+    "client_sequence": 500
+}
+
+// 서버 → 클라이언트: 퐁
+{
+    "type": "heartbeat.pong",
+    "timestamp": "2025-01-15T14:30:30.050Z",
+    "client_sequence": 500,
+    "server_sequence": 495,
+    "latency_ms": 50
+}
+</pre>
+
+<h3>6.6.2 세션 종료</h3>
+
+<pre>
+// 클라이언트 → 서버: 세션 종료 요청
+{
+    "type": "session.end",
+    "timestamp": "2025-01-15T15:00:00.000Z",
+    "reason": "user_initiated",
+    "request_summary": true
+}
+
+// 서버 → 클라이언트: 세션 종료 확인
+{
+    "type": "session.ended",
+    "session_id": "session-12345",
+    "timestamp": "2025-01-15T15:00:00.100Z",
+    "duration_seconds": 1800,
+    "summary": {
+        "total_frames_processed": 27000,
+        "total_events_emitted": 18000,
+        "dominant_emotion": "neutral",
+        "average_engagement": 0.68,
+        "average_valence": 0.35
+    }
+}
+</pre>
+
+<h3>6.6.3 연결 상태</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>상태</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>connecting</td>
+            <td>WebSocket 연결 시도 중</td>
+        </tr>
+        <tr>
+            <td>authenticating</td>
+            <td>인증 진행 중</td>
+        </tr>
+        <tr>
+            <td>initializing</td>
+            <td>세션 초기화 중</td>
+        </tr>
+        <tr>
+            <td>streaming</td>
+            <td>데이터 스트리밍 활성</td>
+        </tr>
+        <tr>
+            <td>paused</td>
+            <td>스트리밍 일시 중지</td>
+        </tr>
+        <tr>
+            <td>reconnecting</td>
+            <td>재연결 시도 중</td>
+        </tr>
+        <tr>
+            <td>closing</td>
+            <td>세션 종료 중</td>
+        </tr>
+        <tr>
+            <td>closed</td>
+            <td>연결 종료됨</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.7 요약</h2>
+
+<p>Phase 3는 실시간 감정 분석을 위한 WebSocket 스트리밍 프로토콜을 정의합니다:</p>
+
+<ul>
+    <li><strong>연결 관리</strong>: 세션 초기화, 하트비트, 재연결</li>
+    <li><strong>이벤트 스트리밍</strong>: 데이터 프레임 전송 및 감정 이벤트 수신</li>
+    <li><strong>성능 요구사항</strong>: 프레임 레이트 및 지연시간 사양</li>
+    <li><strong>보안</strong>: TLS 암호화, JWT 인증, 데이터 보호</li>
+    <li><strong>오류 처리</strong>: 복구 가능한 오류 및 재연결 전략</li>
+</ul>
+
+<blockquote>
+<p><strong>홍익인간 (弘益人間)</strong>: 널리 인간을 이롭게 하라</p>
+<p>실시간 감정 분석은 교육, 헬스케어, 안전 등 다양한 분야에서 사람들을 도울 수 있습니다.</p>
+</blockquote>
+
+<hr>
+
+<p><a href="chapter-05.html">← 이전: 제5장 - Phase 2: API 인터페이스</a> | <a href="chapter-07.html">다음: 제7장 - Phase 4: 통합 →</a></p>
+
+<hr>
+
+<p><strong>Copyright 2025 스마일스토리 주식회사 / WIA</strong></p>
+<p>MIT 라이선스로 배포</p>
+
+</body>
+</html>
