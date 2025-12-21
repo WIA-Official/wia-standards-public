@@ -272,7 +272,7 @@ Use WIA Books header/footer. Languages: English, Korean only.
         </a>
         <nav class="nav-links">
             <a href="https://wiastandards.com" class="nav-link">WIA Standards</a>
-            <a href="https://wia.family" class="nav-link">WIA Family</a>
+            <a href="https://wiastandards.com" class="nav-link">WIA Family</a>
             <a href="https://thekoreantoday.global" class="nav-link">KONAN</a>
             <button class="lang-btn" onclick="toggleLanguage()">
                 <span id="currentLang">EN</span>
@@ -1211,7 +1211,7 @@ The simulator should look professional and impressive like wiabooks.store/reader
             </a>
             <nav class="nav-links">
                 <a href="https://wiastandards.com" class="nav-link">WIA Standards</a>
-                <a href="https://wia.family" class="nav-link">WIA Family</a>
+                <a href="https://wiastandards.com" class="nav-link">WIA Family</a>
                 <a href="https://thekoreantoday.global" class="nav-link">KONAN</a>
                 <div class="lang-switch">
                     <button class="lang-btn active" onclick="setLang('en')">EN</button>
