@@ -6,7 +6,7 @@
 
 ---
 
-## 📚 Published Standards (28)
+## 📚 Published Standards (29)
 
 ### 🔬 Future Technology Standards (10)
 
@@ -23,12 +23,13 @@ Advanced technology standards for breakthrough innovations:
 - [**Nanotechnology**](nano/) - Molecular machines, nanobots, nano-medicine
 - [**Security**](security/) - Post-quantum cryptography, ethical hacking
 
-### 🤟 Core Standards (2)
+### 🤟 Core Standards (3)
 
 Foundation standards for universal accessibility:
 
 - [**Brain-Computer Interface**](bci/) - 14 sub-protocols for direct neural communication
 - [**PubScript**](pubscript/) - World's first publishing-specific programming language with 5 equal representations
+- [**WIHP**](wihp/) - IPA → Hangul phonetic mapping (100% IPA coverage, 7,000+ languages)
 
 ### ♿ Accessibility Standards (16)
 
@@ -95,6 +96,7 @@ Each standard has a dedicated subdomain:
 - `quantum.wiastandards.com`
 - `ai.wiastandards.com`
 - `bio.wiastandards.com`
+- `wihp.wiastandards.com`
 - ... and 25 more
 
 ---
