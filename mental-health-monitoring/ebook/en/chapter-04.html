@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chapter 4: CBT App Integration - WIA-MED-020</title><link rel="icon" href="/favicon.ico"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+<h1 style="color: #a855f7;">Chapter 4: CBT App Integration</h1>
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #10b981; margin: 20px 0;"><p style="color: #10b981; font-style: italic;">"Cognitive-behavioral therapy works when it is practised, not when it is promised. A platform's job is to make the right practice the easy practice — at the right moment, in the right frame of mind."</p><p style="color: #64748b; font-size: 0.9em; margin-top: 10px;">— WIA-MED-020, Therapy-App Interoperability Charter</p></blockquote>
+<hr style="border-color: #334155;">
+<h2 style="color: #c4b5fd;">4.1 What CBT looks like in software</h2>
+<p>CBT is an evidence-based, structured psychotherapy developed by Aaron T. Beck and refined over five decades. Software adaptations — guided self-help apps, clinician-assisted programmes, and chatbot companions — share a common core: psychoeducation, thought records, behavioural activation, exposure hierarchies, sleep and worry scheduling, relapse prevention, and between-session homework. WIA-MED-020 does not prescribe a specific therapeutic school but defines the <em>interfaces</em> through which any reputable CBT implementation can plug into the monitoring platform.</p>
+<h2 style="color: #c4b5fd;">4.2 Supported CBT modules</h2>
+<ul style="color: #94a3b8;">
+  <li><strong style="color: #e2e8f0;">Thought records (ABC, columns).</strong> Structured capture of activating event, automatic thought, cognitive distortion, alternative thought, and outcome; each record is an FHIR <code>QuestionnaireResponse</code> linked to the <code>thought-record</code> Questionnaire canonical.</li>
+  <li><strong style="color: #e2e8f0;">Behavioural activation.</strong> Pleasure/mastery ratings, activity scheduling, and follow-through tracking.</li>
+  <li><strong style="color: #e2e8f0;">Exposure hierarchies.</strong> SUDS-rated ladders for anxiety and OCD; the module MUST ensure no one-click escalation — every step requires affirmative user confirmation.</li>
+  <li><strong style="color: #e2e8f0;">Sleep restriction and worry time.</strong> Combined with the Chapter 2 sleep metrics to allow <em>closed-loop</em> feedback.</li>
+  <li><strong style="color: #e2e8f0;">Relapse prevention.</strong> Warning-sign inventory, coping card library, safety plan (Chapter 5) co-editable with clinician.</li>
+</ul>
+<h2 style="color: #c4b5fd;">4.3 Interoperability contract</h2>
+<p>Any compliant third-party CBT app exposes:</p>
+<ol style="color: #94a3b8;">
+  <li>OAuth 2.1 + PKCE authorisation with WIA as the resource server.</li>
+  <li>FHIR R5 <code>Task</code> + <code>QuestionnaireResponse</code> endpoints for homework assignments and completions.</li>
+  <li>A SMART-on-FHIR launch context so the clinician dashboard can jump straight into the relevant exercise.</li>
+  <li>A deep-link URI scheme (<code>wia-mhm://cbt/module/{id}?exercise={eid}</code>) so notifications route users into the right place without lengthy navigation.</li>
+</ol>
+<p>All communication happens over TLS 1.3. CBT apps never see raw digital-phenotype data; they receive coarse-grained, user-approved summaries such as <code>{"mood_7d": "declining", "sleep_7d": "fragmented"}</code> so that the exercises chosen are contextually relevant without privacy leakage.</p>
+<h2 style="color: #c4b5fd;">4.4 Evidence quality</h2>
+<p>Digital CBT efficacy is supported by an extensive randomised-controlled-trial literature, with notable meta-analyses (Carlbring 2018; Andersson 2019) showing effect sizes comparable to face-to-face CBT for mild-to-moderate depression and anxiety. However, the evidence base is heterogeneous: some apps in the consumer market have never been tested. WIA-MED-020 therefore defines an <em>evidence badge</em> — displayed next to each integrated app — that classifies it by the strength of public evidence (RCT, open trial, uncontrolled, not yet tested). Clinicians can filter recommendations to only show apps meeting a configurable evidence minimum.</p>
+<h2 style="color: #c4b5fd;">4.5 Worked example: thought-record sync</h2>
+<pre style="background: #1e293b; padding: 16px; overflow-x: auto; border-radius: 8px; color: #e2e8f0;"><code>POST /fhir/r5/QuestionnaireResponse
+Authorization: Bearer ...
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "QuestionnaireResponse",
+  "status": "completed",
+  "questionnaire": "https://wia-mhm.org/fhir/Questionnaire/thought-record",
+  "subject": { "reference": "Patient/pat-0042" },
+  "authored": "2026-04-25T14:30:00Z",
+  "item": [
+    { "linkId": "1.situation",     "answer": [{"valueString":"Meeting with manager"}] },
+    { "linkId": "2.automatic",     "answer": [{"valueString":"I'm going to be fired"}] },
+    { "linkId": "3.distortion",    "answer": [{"valueCoding":{"code":"catastrophizing"}}] },
+    { "linkId": "4.evidence-for",  "answer": [{"valueString":"Tone was curt"}] },
+    { "linkId": "5.evidence-against","answer": [{"valueString":"Agenda mentioned roadmap, not review"}] },
+    { "linkId": "6.alternative",   "answer": [{"valueString":"This may be a roadmap discussion"}] },
+    { "linkId": "7.outcome-mood",  "answer": [{"valueInteger": 58}] }
+  ]
+}</code></pre>
+<p>The response is stored on the user's own device first; upload to a clinician or research endpoint is always preceded by an explicit toggle and a summary of what fields will leave the device.</p>
+<h2 style="color: #c4b5fd;">4.6 Cultural and linguistic adaptation</h2>
+<p>CBT was developed in a specific cultural context and does not translate uncritically. WIA-MED-020 requires integrators to declare which locales and cultural adaptations a module supports. Modules validated specifically for non-Western contexts (e.g., Korean, Japanese, Arabic cognitive restructuring adaptations) are preferentially offered when the user's locale matches. The goal is not to maximise engagement but to maximise <em>effective</em> engagement.</p>
+<hr style="border-color: #334155;">
+<p style="text-align: center; color: #64748b; font-size: 0.9em;">
+  <a href="chapter-03.html" style="color: #a855f7;">← Chapter 3</a> &nbsp;|&nbsp;
+  <a href="index.html" style="color: #a855f7;">Contents</a> &nbsp;|&nbsp;
+  <a href="chapter-05.html" style="color: #a855f7;">Chapter 5 →</a>
+</p>
+</body></html>

@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Mental Health Simulator</title>
+    <style>
+        :root {
+            --primary: #14B8A6;
+            --primary-dark: #0D9488;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-left { display: flex; align-items: center; gap: 15px; }
+        .nav-home {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .nav-title { color: var(--text-muted); font-size: 0.9rem; }
+        .lang-switch { display: flex; gap: 5px; }
+        .lang-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .lang-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .tab:hover { border-color: var(--primary); color: var(--text); }
+        .tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+        }
+        .panel.active { display: block; }
+        .panel-title {
+            font-size: 1.3rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 15px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .slider-value {
+            min-width: 40px;
+            text-align: center;
+            color: var(--primary);
+            font-weight: bold;
+        }
+        .btn-center {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 25px 0;
+        }
+        .btn {
+            padding: 12px 30px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid var(--border);
+            color: var(--text);
+        }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .output-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .score-bar {
+            height: 12px;
+            background: var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .score-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+        .score-fill.low { background: var(--secondary); }
+        .score-fill.moderate { background: var(--warning); }
+        .score-fill.high { background: var(--danger); }
+        .result-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .result-card-title {
+            font-size: 1rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        .result-label { color: var(--text-muted); }
+        .severity-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .severity-none { background: #065f46; color: #6ee7b7; }
+        .severity-mild { background: #065f46; color: #6ee7b7; }
+        .severity-moderate { background: #78350f; color: #fcd34d; }
+        .severity-severe { background: #7f1d1d; color: #fca5a5; }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .crisis-alert {
+            background: linear-gradient(135deg, #7f1d1d, #991b1b);
+            border: 2px solid var(--danger);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        .crisis-level {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fca5a5;
+            margin-bottom: 10px;
+        }
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+        .philosophy {
+            font-size: 1.1rem;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; align-items: center; }
+            .tab { width: 100%; text-align: center; }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-nav">
+        <div class="nav-left">
+            <a href="../" class="nav-home">🧠 Mental Health</a>
+            <span class="nav-title" data-en="Interactive Simulator" data-ko="인터랙티브 시뮬레이터">Interactive Simulator</span>
+        </div>
+        <div class="lang-switch">
+            <button class="lang-btn active" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" onclick="setLang('ko')">KO</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Assessment" data-ko="📊 평가">📊 Assessment</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🧬 Biomarkers" data-ko="🧬 바이오마커">🧬 Biomarkers</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🚨 Crisis Screen" data-ko="🚨 위기 검사">🚨 Crisis Screen</div>
+            <div class="tab" onclick="showPanel(3)" data-en="💊 Treatment" data-ko="💊 치료">💊 Treatment</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔗 API Demo" data-ko="🔗 API 데모">🔗 API Demo</div>
+        </div>
+
+        <!-- Panel 0: Assessment -->
+        <div class="panel active" id="panel-0">
+            <h2 class="panel-title" data-en="Mental Health Assessment" data-ko="정신 건강 평가">Mental Health Assessment</h2>
+
+            <div class="grid-2">
+                <div>
+                    <h3 style="color: var(--primary); margin-bottom: 15px;" data-en="PHQ-9 (Depression)" data-ko="PHQ-9 (우울증)">PHQ-9 (Depression)</h3>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q1: Little interest or pleasure" data-ko="Q1: 흥미나 즐거움 감소">Q1: Little interest or pleasure</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="phq1" min="0" max="3" value="0" oninput="updateSlider('phq1')">
+                            <span class="slider-value" id="phq1-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q2: Feeling down, depressed" data-ko="Q2: 우울감, 절망감">Q2: Feeling down, depressed</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="phq2" min="0" max="3" value="0" oninput="updateSlider('phq2')">
+                            <span class="slider-value" id="phq2-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q3: Sleep problems" data-ko="Q3: 수면 문제">Q3: Sleep problems</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="phq3" min="0" max="3" value="0" oninput="updateSlider('phq3')">
+                            <span class="slider-value" id="phq3-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q4: Feeling tired" data-ko="Q4: 피로감">Q4: Feeling tired</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="phq4" min="0" max="3" value="0" oninput="updateSlider('phq4')">
+                            <span class="slider-value" id="phq4-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q5: Poor appetite or overeating" data-ko="Q5: 식욕 변화">Q5: Poor appetite or overeating</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="phq5" min="0" max="3" value="0" oninput="updateSlider('phq5')">
+                            <span class="slider-value" id="phq5-val">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h3 style="color: var(--primary); margin-bottom: 15px;" data-en="GAD-7 (Anxiety)" data-ko="GAD-7 (불안)">GAD-7 (Anxiety)</h3>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q1: Feeling nervous or anxious" data-ko="Q1: 초조하거나 불안함">Q1: Feeling nervous or anxious</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="gad1" min="0" max="3" value="0" oninput="updateSlider('gad1')">
+                            <span class="slider-value" id="gad1-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q2: Can't stop worrying" data-ko="Q2: 걱정을 멈출 수 없음">Q2: Can't stop worrying</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="gad2" min="0" max="3" value="0" oninput="updateSlider('gad2')">
+                            <span class="slider-value" id="gad2-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q3: Worrying too much" data-ko="Q3: 과도한 걱정">Q3: Worrying too much</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="gad3" min="0" max="3" value="0" oninput="updateSlider('gad3')">
+                            <span class="slider-value" id="gad3-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q4: Trouble relaxing" data-ko="Q4: 휴식 어려움">Q4: Trouble relaxing</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="gad4" min="0" max="3" value="0" oninput="updateSlider('gad4')">
+                            <span class="slider-value" id="gad4-val">0</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-en="Q5: Being restless" data-ko="Q5: 안절부절">Q5: Being restless</label>
+                        <div class="slider-group">
+                            <input type="range" class="slider" id="gad5" min="0" max="3" value="0" oninput="updateSlider('gad5')">
+                            <span class="slider-value" id="gad5-val">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="calculateAssessment()">
+                    <span data-en="Calculate Scores" data-ko="점수 계산">Calculate Scores</span>
+                </button>
+            </div>
+
+            <div id="assessment-result"></div>
+        </div>
+
+        <!-- Panel 1: Biomarkers -->
+        <div class="panel" id="panel-1">
+            <h2 class="panel-title" data-en="Biomarker Analysis" data-ko="바이오마커 분석">Biomarker Analysis</h2>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label" data-en="Cortisol (ng/mL)" data-ko="코르티솔 (ng/mL)">Cortisol (ng/mL)</label>
+                    <input type="number" class="form-input" id="cortisol" value="15" min="0" max="50" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" data-en="CRP (mg/L)" data-ko="CRP (mg/L)">CRP (mg/L)</label>
+                    <input type="number" class="form-input" id="crp" value="1.5" min="0" max="20" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" data-en="HRV RMSSD (ms)" data-ko="HRV RMSSD (ms)">HRV RMSSD (ms)</label>
+                    <input type="number" class="form-input" id="hrv" value="35" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" data-en="Sleep Efficiency (%)" data-ko="수면 효율 (%)">Sleep Efficiency (%)</label>
+                    <input type="number" class="form-input" id="sleep" value="85" min="0" max="100">
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="analyzeBiomarkers()">
+                    <span data-en="Analyze Biomarkers" data-ko="바이오마커 분석">Analyze Biomarkers</span>
+                </button>
+            </div>
+
+            <div id="biomarker-result"></div>
+        </div>
+
+        <!-- Panel 2: Crisis Screen -->
+        <div class="panel" id="panel-2">
+            <h2 class="panel-title" data-en="Crisis Screening" data-ko="위기 선별 검사">Crisis Screening</h2>
+
+            <div class="form-group">
+                <label class="form-label" data-en="Thoughts of self-harm or suicide (0-3)" data-ko="자해 또는 자살에 대한 생각 (0-3)">Thoughts of self-harm or suicide (0-3)</label>
+                <div class="slider-group">
+                    <input type="range" class="slider" id="suicide" min="0" max="3" value="0" oninput="updateSlider('suicide')">
+                    <span class="slider-value" id="suicide-val">0</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" data-en="Urges to hurt yourself (0-3)" data-ko="자해 충동 (0-3)">Urges to hurt yourself (0-3)</label>
+                <div class="slider-group">
+                    <input type="range" class="slider" id="selfharm" min="0" max="3" value="0" oninput="updateSlider('selfharm')">
+                    <span class="slider-value" id="selfharm-val">0</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" data-en="Current substance intoxication" data-ko="현재 약물/알코올 영향">Current substance intoxication</label>
+                <select class="form-select" id="intoxication">
+                    <option value="false" data-en="No" data-ko="아니오">No</option>
+                    <option value="true" data-en="Yes" data-ko="예">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" data-en="Experiencing hallucinations or delusions" data-ko="환각 또는 망상 경험">Experiencing hallucinations or delusions</label>
+                <select class="form-select" id="psychosis">
+                    <option value="false" data-en="No" data-ko="아니오">No</option>
+                    <option value="true" data-en="Yes" data-ko="예">Yes</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="screenCrisis()">
+                    <span data-en="Screen Crisis Level" data-ko="위기 수준 검사">Screen Crisis Level</span>
+                </button>
+            </div>
+
+            <div id="crisis-result"></div>
+        </div>
+
+        <!-- Panel 3: Treatment -->
+        <div class="panel" id="panel-3">
+            <h2 class="panel-title" data-en="Treatment Recommendations" data-ko="치료 권장사항">Treatment Recommendations</h2>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label" data-en="Primary Condition" data-ko="주 진단">Primary Condition</label>
+                    <select class="form-select" id="condition">
+                        <option value="depression" data-en="Major Depressive Disorder" data-ko="주요 우울장애">Major Depressive Disorder</option>
+                        <option value="anxiety" data-en="Generalized Anxiety Disorder" data-ko="범불안장애">Generalized Anxiety Disorder</option>
+                        <option value="ptsd" data-en="PTSD" data-ko="외상 후 스트레스 장애">PTSD</option>
+                        <option value="ocd" data-en="OCD" data-ko="강박장애">OCD</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" data-en="Severity" data-ko="심각도">Severity</label>
+                    <select class="form-select" id="severity">
+                        <option value="mild" data-en="Mild" data-ko="경도">Mild</option>
+                        <option value="moderate" data-en="Moderate" data-ko="중등도">Moderate</option>
+                        <option value="severe" data-en="Severe" data-ko="중증">Severe</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" data-en="Therapy Preference" data-ko="치료 선호도">Therapy Preference</label>
+                    <select class="form-select" id="therapyPref">
+                        <option value="any" data-en="Open to all" data-ko="모두 가능">Open to all</option>
+                        <option value="therapy" data-en="Prefer therapy only" data-ko="심리치료만">Prefer therapy only</option>
+                        <option value="medication" data-en="Open to medication" data-ko="약물 치료 가능">Open to medication</option>
+                        <option value="digital" data-en="Prefer digital/app-based" data-ko="디지털/앱 기반">Prefer digital/app-based</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" data-en="Previous Treatment Attempts" data-ko="이전 치료 시도">Previous Treatment Attempts</label>
+                    <select class="form-select" id="prevTreatment">
+                        <option value="0" data-en="None" data-ko="없음">None</option>
+                        <option value="1" data-en="1 prior attempt" data-ko="1회">1 prior attempt</option>
+                        <option value="2" data-en="2+ prior attempts" data-ko="2회 이상">2+ prior attempts</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="recommendTreatment()">
+                    <span data-en="Get Recommendations" data-ko="권장사항 받기">Get Recommendations</span>
+                </button>
+            </div>
+
+            <div id="treatment-result"></div>
+        </div>
+
+        <!-- Panel 4: API Demo -->
+        <div class="panel" id="panel-4">
+            <h2 class="panel-title" data-en="API Response Demo" data-ko="API 응답 데모">API Response Demo</h2>
+
+            <div class="form-group">
+                <label class="form-label" data-en="Select Endpoint" data-ko="엔드포인트 선택">Select Endpoint</label>
+                <select class="form-select" id="endpoint" onchange="showApiExample()">
+                    <option value="assessment">POST /assessments</option>
+                    <option value="history">GET /assessments/history/{id}</option>
+                    <option value="crisis">POST /assessments/crisis-screen</option>
+                    <option value="recommend">POST /treatments/recommend</option>
+                    <option value="biomarkers">POST /biomarkers</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="showApiExample()">
+                    <span data-en="Generate Example" data-ko="예제 생성">Generate Example</span>
+                </button>
+            </div>
+
+            <div class="output-box" id="api-output"></div>
+        </div>
+    </div>
+
+    <footer>
+        <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+        <p>WIA - World Certification Industry Association</p>
+        <p>© 2025 MIT License</p>
+    </footer>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+        }
+
+        function updateSlider(id) {
+            document.getElementById(id + '-val').textContent = document.getElementById(id).value;
+        }
+
+        function calculateAssessment() {
+            const phq = [1,2,3,4,5].map(i => parseInt(document.getElementById('phq' + i).value));
+            const gad = [1,2,3,4,5].map(i => parseInt(document.getElementById('gad' + i).value));
+
+            const phqTotal = phq.reduce((a, b) => a + b, 0);
+            const gadTotal = gad.reduce((a, b) => a + b, 0);
+
+            // Extrapolate to full scale (5 questions instead of 9/7)
+            const phqFull = Math.round(phqTotal * 9 / 5);
+            const gadFull = Math.round(gadTotal * 7 / 5);
+
+            const phqNorm = (phqFull / 27).toFixed(2);
+            const gadNorm = (gadFull / 21).toFixed(2);
+
+            let phqSeverity, gadSeverity;
+            if (phqFull <= 4) phqSeverity = 'none';
+            else if (phqFull <= 9) phqSeverity = 'mild';
+            else if (phqFull <= 14) phqSeverity = 'moderate';
+            else if (phqFull <= 19) phqSeverity = 'moderately-severe';
+            else phqSeverity = 'severe';
+
+            if (gadFull <= 4) gadSeverity = 'none';
+            else if (gadFull <= 9) gadSeverity = 'mild';
+            else if (gadFull <= 14) gadSeverity = 'moderate';
+            else gadSeverity = 'severe';
+
+            const phqClass = phqNorm <= 0.3 ? 'low' : phqNorm <= 0.6 ? 'moderate' : 'high';
+            const gadClass = gadNorm <= 0.3 ? 'low' : gadNorm <= 0.6 ? 'moderate' : 'high';
+
+            const severityClass = s => s === 'none' || s === 'mild' ? 'severity-mild' : s === 'moderate' ? 'severity-moderate' : 'severity-severe';
+
+            document.getElementById('assessment-result').innerHTML = `
+                <div class="result-card">
+                    <div class="result-card-title" data-en="Depression (PHQ-9)" data-ko="우울증 (PHQ-9)">Depression (PHQ-9)</div>
+                    <div class="result-row">
+                        <span class="result-label" data-en="Raw Score (extrapolated)" data-ko="원점수 (추정)">Raw Score (extrapolated)</span>
+                        <span>${phqFull}/27</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label" data-en="Normalized Score" data-ko="정규화 점수">Normalized Score</span>
+                        <span style="color: var(--primary)">${phqNorm}</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label" data-en="Severity" data-ko="심각도">Severity</span>
+                        <span class="severity-badge ${severityClass(phqSeverity)}">${phqSeverity}</span>
+                    </div>
+                    <div class="score-bar"><div class="score-fill ${phqClass}" style="width: ${phqNorm * 100}%"></div></div>
+                </div>
+                <div class="result-card">
+                    <div class="result-card-title" data-en="Anxiety (GAD-7)" data-ko="불안 (GAD-7)">Anxiety (GAD-7)</div>
+                    <div class="result-row">
+                        <span class="result-label" data-en="Raw Score (extrapolated)" data-ko="원점수 (추정)">Raw Score (extrapolated)</span>
+                        <span>${gadFull}/21</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label" data-en="Normalized Score" data-ko="정규화 점수">Normalized Score</span>
+                        <span style="color: var(--primary)">${gadNorm}</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label" data-en="Severity" data-ko="심각도">Severity</span>
+                        <span class="severity-badge ${severityClass(gadSeverity)}">${gadSeverity}</span>
+                    </div>
+                    <div class="score-bar"><div class="score-fill ${gadClass}" style="width: ${gadNorm * 100}%"></div></div>
+                </div>
+            `;
+            setLang(currentLang);
+        }
+
+        function analyzeBiomarkers() {
+            const cortisol = parseFloat(document.getElementById('cortisol').value);
+            const crp = parseFloat(document.getElementById('crp').value);
+            const hrv = parseInt(document.getElementById('hrv').value);
+            const sleep = parseInt(document.getElementById('sleep').value);
+
+            const cortisolStatus = cortisol > 25 ? 'Elevated' : cortisol < 5 ? 'Low' : 'Normal';
+            const crpStatus = crp > 3 ? 'Elevated (inflammation)' : 'Normal';
+            const hrvStatus = hrv < 20 ? 'Low (poor autonomic balance)' : hrv > 50 ? 'Excellent' : 'Normal';
+            const sleepStatus = sleep < 75 ? 'Poor' : sleep < 85 ? 'Fair' : 'Good';
+
+            document.getElementById('biomarker-result').innerHTML = `
+                <div class="output-box">
+{
+  "biomarker_analysis": {
+    "cortisol": {
+      "value": ${cortisol},
+      "unit": "ng/mL",
+      "status": "${cortisolStatus}",
+      "interpretation": "${cortisol > 25 ? 'Chronic stress indicated' : 'Within normal range'}"
+    },
+    "crp": {
+      "value": ${crp},
+      "unit": "mg/L",
+      "status": "${crpStatus}",
+      "interpretation": "${crp > 3 ? 'Inflammatory response may affect mood' : 'No significant inflammation'}"
+    },
+    "heart_rate_variability": {
+      "rmssd": ${hrv},
+      "unit": "ms",
+      "status": "${hrvStatus}",
+      "interpretation": "${hrv < 20 ? 'Consider stress reduction techniques' : 'Healthy autonomic function'}"
+    },
+    "sleep_efficiency": {
+      "value": ${sleep},
+      "unit": "%",
+      "status": "${sleepStatus}",
+      "interpretation": "${sleep < 75 ? 'Sleep hygiene intervention recommended' : 'Adequate sleep quality'}"
+    }
+  },
+  "correlations": {
+    "stress_mood": ${cortisol > 20 ? '"High cortisol may contribute to symptoms"' : '"Normal stress response"'},
+    "inflammation_depression": ${crp > 3 ? '"Elevated CRP associated with depression risk"' : '"No inflammatory contribution likely"'}
+  }
+}
+                </div>
+            `;
+        }
+
+        function screenCrisis() {
+            const suicide = parseInt(document.getElementById('suicide').value);
+            const selfharm = parseInt(document.getElementById('selfharm').value);
+            const intoxication = document.getElementById('intoxication').value === 'true';
+            const psychosis = document.getElementById('psychosis').value === 'true';
+
+            let level, action, color;
+            if (suicide >= 3 || psychosis) {
+                level = 'IMMINENT';
+                action = 'Call emergency services (911)';
+                color = '#ef4444';
+            } else if (suicide >= 2 || (selfharm >= 2 && intoxication)) {
+                level = 'HIGH';
+                action = 'Immediate clinical contact required';
+                color = '#f97316';
+            } else if (suicide >= 1 || selfharm >= 2) {
+                level = 'MODERATE';
+                action = 'Activate safety plan, schedule urgent appointment';
+                color = '#f59e0b';
+            } else if (selfharm >= 1 || intoxication) {
+                level = 'LOW';
+                action = 'Continue current care, monitor closely';
+                color = '#22c55e';
+            } else {
+                level = 'NONE';
+                action = 'Continue standard care';
+                color = '#10b981';
+            }
+
+            document.getElementById('crisis-result').innerHTML = `
+                <div class="crisis-alert" style="border-color: ${color}; background: linear-gradient(135deg, ${color}22, ${color}11);">
+                    <div class="crisis-level" style="color: ${color}">Crisis Level: ${level}</div>
+                    <p style="color: var(--text); margin-bottom: 15px;"><strong>Recommended Action:</strong> ${action}</p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">
+                        ${level === 'IMMINENT' || level === 'HIGH' ? '📞 988 Suicide & Crisis Lifeline available 24/7' : ''}
+                    </p>
+                </div>
+            `;
+        }
+
+        function recommendTreatment() {
+            const condition = document.getElementById('condition').value;
+            const severity = document.getElementById('severity').value;
+            const pref = document.getElementById('therapyPref').value;
+            const prev = document.getElementById('prevTreatment').value;
+
+            const treatments = {
+                depression: {
+                    mild: ['CBT (digital or group)', 'Behavioral Activation', 'Mindfulness-based therapy'],
+                    moderate: ['Individual CBT', 'SSRI medication', 'Combined therapy + medication'],
+                    severe: ['Intensive outpatient', 'TMS or ketamine referral', 'Psychiatry consultation']
+                },
+                anxiety: {
+                    mild: ['Guided self-help', 'Relaxation training', 'Mindfulness app'],
+                    moderate: ['Individual CBT', 'Exposure therapy', 'SSRI or SNRI'],
+                    severe: ['Intensive CBT', 'Combined approach', 'Specialist referral']
+                },
+                ptsd: {
+                    mild: ['CPT or PE', 'EMDR', 'Supportive therapy'],
+                    moderate: ['Prolonged Exposure', 'EMDR', 'Prazosin for nightmares'],
+                    severe: ['Intensive trauma program', 'MDMA-assisted therapy (if eligible)', 'Specialist care']
+                },
+                ocd: {
+                    mild: ['ERP (self-guided)', 'CBT', 'Support group'],
+                    moderate: ['Individual ERP', 'SSRI (higher dose)', 'Combined approach'],
+                    severe: ['Intensive ERP', 'Augmentation strategies', 'Specialist OCD program']
+                }
+            };
+
+            const recs = treatments[condition][severity];
+
+            document.getElementById('treatment-result').innerHTML = `
+                <div class="result-card">
+                    <div class="result-card-title" data-en="Recommended Treatments" data-ko="권장 치료법">Recommended Treatments</div>
+                    ${recs.map((r, i) => `
+                        <div class="result-row">
+                            <span class="result-label">#${i + 1}</span>
+                            <span style="color: var(--primary)">${r}</span>
+                        </div>
+                    `).join('')}
+                    <hr style="border-color: var(--border); margin: 15px 0;">
+                    <div class="result-row">
+                        <span class="result-label" data-en="Evidence Level" data-ko="근거 수준">Evidence Level</span>
+                        <span>1A (Strong)</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label" data-en="Neuroplasticity Mechanism" data-ko="신경가소성 메커니즘">Neuroplasticity Mechanism</span>
+                        <span style="color: var(--secondary)">${
+                            condition === 'ptsd' ? 'Memory reconsolidation & extinction learning' :
+                            condition === 'depression' ? 'Prefrontal strengthening & BDNF upregulation' :
+                            condition === 'anxiety' ? 'Amygdala downregulation & inhibitory control' :
+                            'Cortico-striatal circuit modification'
+                        }</span>
+                    </div>
+                </div>
+            `;
+            setLang(currentLang);
+        }
+
+        function showApiExample() {
+            const endpoint = document.getElementById('endpoint').value;
+            const examples = {
+                assessment: `// POST /api/v1/mental-health/assessments
+
+Request:
+{
+  "subject_id": "patient-12345",
+  "assessment_type": "monitoring",
+  "instruments": ["PHQ-9", "GAD-7"],
+  "responses": {
+    "PHQ-9": {
+      "items": [
+        { "item_id": 1, "response": 2 },
+        { "item_id": 2, "response": 1 },
+        ...
+      ]
+    }
+  }
+}
+
+Response (201 Created):
+{
+  "assessment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "timestamp": "2025-01-15T10:30:00Z",
+  "mental_health_index": {
+    "depression_score": {
+      "value": 0.45,
+      "severity": "moderate",
+      "raw_score": 12,
+      "instrument": "PHQ-9"
+    },
+    "anxiety_score": {
+      "value": 0.28,
+      "severity": "mild",
+      "raw_score": 8,
+      "instrument": "GAD-7"
+    }
+  },
+  "clinical_flags": {
+    "suicide_risk": false,
+    "requires_immediate_attention": false
+  }
+}`,
+                history: `// GET /api/v1/mental-health/assessments/history/patient-12345
+
+Response (200 OK):
+{
+  "subject_id": "patient-12345",
+  "assessments": [
+    {
+      "assessment_id": "uuid-1",
+      "timestamp": "2025-01-15T10:30:00Z",
+      "mental_health_index": { ... },
+      "trend": "improving"
+    },
+    {
+      "assessment_id": "uuid-2",
+      "timestamp": "2025-01-08T10:30:00Z",
+      "mental_health_index": { ... },
+      "trend": "stable"
+    }
+  ],
+  "aggregate_trends": {
+    "depression": {
+      "30_day_change": -0.15,
+      "trend": "improving"
+    }
+  }
+}`,
+                crisis: `// POST /api/v1/mental-health/assessments/crisis-screen
+
+Request:
+{
+  "subject_id": "patient-12345",
+  "responses": {
+    "suicide_ideation": 2,
+    "self_harm_urges": 1,
+    "substance_intoxication": false,
+    "psychosis_symptoms": false
+  }
+}
+
+Response (200 OK):
+{
+  "crisis_level": "high",
+  "recommended_action": "crisis_line",
+  "resources": [
+    {
+      "name": "988 Suicide & Crisis Lifeline",
+      "phone": "988",
+      "available": true
+    }
+  ],
+  "safety_plan_active": true,
+  "notification_sent_to": ["primary_provider"]
+}`,
+                recommend: `// POST /api/v1/mental-health/treatments/recommend
+
+Request:
+{
+  "subject_id": "patient-12345",
+  "assessment_id": "latest",
+  "preferences": {
+    "modality_preferences": ["telehealth"],
+    "medication_openness": 0.7
+  }
+}
+
+Response (200 OK):
+{
+  "recommendations": [
+    {
+      "rank": 1,
+      "protocol": {
+        "category": "psychotherapy",
+        "modality": "CBT",
+        "format": "individual",
+        "frequency": "weekly"
+      },
+      "evidence_level": "1A",
+      "match_score": 0.92,
+      "neuroplasticity_mechanism": "Prefrontal cortex strengthening",
+      "expected_outcome": {
+        "symptom_reduction": 0.40,
+        "confidence_interval": [0.30, 0.50]
+      }
+    }
+  ]
+}`,
+                biomarkers: `// POST /api/v1/mental-health/biomarkers
+
+Request:
+{
+  "subject_id": "patient-12345",
+  "collection_date": "2025-01-15T08:00:00Z",
+  "source": "wearable",
+  "biomarkers": {
+    "cortisol": {
+      "value": 15.2,
+      "unit": "ng/mL",
+      "time_of_day": "morning"
+    },
+    "heart_rate_variability": {
+      "rmssd": 35.5,
+      "unit": "ms"
+    },
+    "sleep_metrics": {
+      "total_sleep_time": 420,
+      "sleep_efficiency": 0.88
+    }
+  }
+}
+
+Response (201 Created):
+{
+  "record_id": "biomarker-uuid-123",
+  "analysis": {
+    "stress_level": "normal",
+    "sleep_quality": "good",
+    "autonomic_balance": "healthy"
+  }
+}`
+            };
+
+            document.getElementById('api-output').textContent = examples[endpoint];
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+            showApiExample();
+        });
+    </script>
+</body>
+</html>
