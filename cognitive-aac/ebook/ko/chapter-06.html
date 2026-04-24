@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: Phase 2 - API 및 적응형 UI - WIA 인지 AAC 표준 전자책</title>
+</head>
+<body>
+
+<p><a href="index.html">[Cognitive AAC] WIA 인지 AAC 표준 전자책</a> | 제6장 (총 8장)</p>
+
+<hr>
+
+<h1>[Cognitive AAC] 제6장: Phase 2 - API 및 적응형 UI</h1>
+
+<blockquote>
+<p><strong>홍익인간 (弘益人間)</strong></p>
+<p>"널리 인간을 이롭게 하라"</p>
+<p>WIA 인지 AAC 표준은 인지 능력에 관계없이 모든 사람이 동등하게 의사소통할 수 있는 기술 생태계를 구축합니다.</p>
+</blockquote>
+
+<hr>
+
+<h1 id="wia-cognitive-aac---phase-2-adaptive-ui-engine">WIA Cognitive AAC - Phase 2: Adaptive UI Engine</h1>
+<h1 id="적응형-ui-엔진-명세서">적응형 UI 엔진 명세서</h1>
+<p><strong>Version</strong>: 1.0.0 <strong>Date</strong>: 2025-01-14 <strong>Status</strong>: Complete</p>
+<hr />
+<h2 id="철학">철학</h2>
+<p><strong>홍익인간 (弘益人間)</strong> - 널리 인간을 이롭게 하라</p>
+<hr />
+<h2 id="개요">1. 개요</h2>
+<h3 id="목적">1.1 목적</h3>
+<p>Phase 1에서 정의한 인지 프로파일을 기반으로 AAC 인터페이스를 동적으로 적응시키는 UI 엔진을 구현합니다.</p>
+<h3 id="핵심-기능">1.2 핵심 기능</h3>
+<ul>
+<li>인지 프로파일 → UI 설정 자동 변환</li>
+<li>실시간 인지 부하 모니터링 및 조정</li>
+<li>자폐/치매 특화 UI 조정</li>
+<li>사용 이력 기반 최적화</li>
+</ul>
+<h3 id="기술-스택">1.3 기술 스택</h3>
+<ul>
+<li><strong>언어</strong>: TypeScript 5.x</li>
+<li><strong>프레임워크</strong>: React 18+</li>
+<li><strong>빌드</strong>: tsup</li>
+<li><strong>패키지</strong>: <span class="citation" data-cites="wia/cognitive-aac">@wia/cognitive-aac</span></li>
+</ul>
+<hr />
+<h2 id="아키텍처">2. 아키텍처</h2>
+<h3 id="모듈-구조">2.1 모듈 구조</h3>
+<pre><code>@wia/cognitive-aac
+├── types/              # 타입 정의
+│   └── index.ts
+├── engine/             # 핵심 엔진 로직
+│   ├── UIEngine.ts     # 메인 적응 엔진
+│   ├── ProfileAdapter.ts # 프로파일 → UI 변환
+│   └── Presets.ts      # 인지 수준별 프리셋
+├── components/         # React 컴포넌트
+│   ├── AdaptiveGrid.tsx
+│   ├── AdaptiveSymbol.tsx
+│   ├── AdaptiveButton.tsx
+│   └── CognitiveLoadManager.tsx
+└── hooks/              # React Hooks
+    ├── useCognitiveProfile.ts
+    └── useAdaptiveUI.ts</code></pre>
+<h3 id="데이터-흐름">2.2 데이터 흐름</h3>
+<pre><code>┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ CognitiveProfile │────▶│  ProfileAdapter  │────▶│ UIConfiguration │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                                          │
+                                                          ▼
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ User Interaction│────▶│    UIEngine      │────▶│  UIAdjustment   │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                │
+                                ▼
+                        ┌──────────────────┐
+                        │  React Components │
+                        └──────────────────┘</code></pre>
+<hr />
+<h2 id="핵심-엔진">3. 핵심 엔진</h2>
+<h3 id="uiengine">3.1 UIEngine</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> AdaptiveUIEngine {</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 프로파일 기반 UI 생성</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">generateUI</span>(profile<span class="op">:</span> CognitiveProfile)<span class="op">:</span> UIConfiguration<span class="op">;</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 실시간 조정</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">adjustUI</span>(event<span class="op">:</span> UserInteractionEvent)<span class="op">:</span> UIAdjustment <span class="op">|</span> <span class="dt">null</span><span class="op">;</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 사용 이력 기반 최적화</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">optimizeFromUsage</span>(history<span class="op">:</span> UsageHistory)<span class="op">:</span> UIConfiguration<span class="op">;</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="engineconfig">3.2 EngineConfig</h3>
+<div class="sourceCode" id="cb4"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> EngineConfig {</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  enableRealTimeAdjustment<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>  <span class="co">// 실시간 조정 활성화</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  enableLearning<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>            <span class="co">// 학습 기반 최적화</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  adjustmentThreshold<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>        <span class="co">// 조정 임계값 (0-1)</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  maxAdjustmentsPerSession<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>   <span class="co">// 세션당 최대 조정 횟수</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  minEventsForLearning<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>       <span class="co">// 학습에 필요한 최소 이벤트 수</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="프로파일-유형별-엔진-생성">3.3 프로파일 유형별 엔진 생성</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 자폐 스펙트럼용 (민감한 조정)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> UIEngine<span class="op">.</span><span class="fu">forAutism</span>(profile<span class="op">,</span> {</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  adjustmentThreshold<span class="op">:</span> <span class="fl">0.25</span><span class="op">,</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">// 치매용 (안정성 우선)</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> UIEngine<span class="op">.</span><span class="fu">forDementia</span>(profile<span class="op">,</span> {</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  enableLearning<span class="op">:</span> <span class="kw">false</span><span class="op">,</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  maxAdjustmentsPerSession<span class="op">:</span> <span class="dv">5</span><span class="op">,</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">// 일반용</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> UIEngine<span class="op">.</span><span class="fu">forGeneral</span>(profile)<span class="op">;</span></span></code></pre></div>
+<hr />
+<h2 id="인지-수준별-프리셋">4. 인지 수준별 프리셋</h2>
+<h3 id="ui-설정-매핑">4.1 UI 설정 매핑</h3>
+<table>
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 15%" />
+<col style="width: 15%" />
+<col style="width: 11%" />
+<col style="width: 15%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">인지 수준</th>
+<th style="text-align: center;">그리드</th>
+<th style="text-align: center;">셀 크기</th>
+<th style="text-align: center;">상징</th>
+<th style="text-align: center;">피드백</th>
+<th style="text-align: center;">인지 부하</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">PROFOUND (1)</td>
+<td style="text-align: center;">2×2</td>
+<td style="text-align: center;">xlarge</td>
+<td style="text-align: center;">사진, 레이블 없음</td>
+<td style="text-align: center;">모두 활성</td>
+<td style="text-align: center;">4항목, 100% 필터</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">SEVERE (2)</td>
+<td style="text-align: center;">3×2</td>
+<td style="text-align: center;">large</td>
+<td style="text-align: center;">사진, 하단 레이블</td>
+<td style="text-align: center;">모두 활성</td>
+<td style="text-align: center;">6항목, 80% 필터</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">MODERATE (3)</td>
+<td style="text-align: center;">4×3</td>
+<td style="text-align: center;">medium</td>
+<td style="text-align: center;">PCS, 하단 레이블</td>
+<td style="text-align: center;">오디오만</td>
+<td style="text-align: center;">12항목, 50% 필터</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">MILD (4)</td>
+<td style="text-align: center;">5×4</td>
+<td style="text-align: center;">medium</td>
+<td style="text-align: center;">PCS, 하단 레이블</td>
+<td style="text-align: center;">없음</td>
+<td style="text-align: center;">20항목, 20% 필터</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">TYPICAL (5)</td>
+<td style="text-align: center;">6×5</td>
+<td style="text-align: center;">small</td>
+<td style="text-align: center;">PCS, 하단 레이블</td>
+<td style="text-align: center;">없음</td>
+<td style="text-align: center;">30항목, 필터 없음</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dwell-time-설정">4.2 Dwell Time 설정</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">인지 수준</th>
+<th style="text-align: center;">Dwell Time</th>
+<th style="text-align: center;">확인 필요</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">PROFOUND</td>
+<td style="text-align: center;">2000ms</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">SEVERE</td>
+<td style="text-align: center;">1500ms</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">MODERATE</td>
+<td style="text-align: center;">1000ms</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">MILD</td>
+<td style="text-align: center;">800ms</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">TYPICAL</td>
+<td style="text-align: center;">0ms (탭)</td>
+<td style="text-align: center;">No</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="자폐-스펙트럼-특화-조정">5. 자폐 스펙트럼 특화 조정</h2>
+<h3 id="autismuiadjustments">5.1 AutismUIAdjustments</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> AutismUIAdjustments {</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 감각 과민 대응</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  sensoryAccommodations<span class="op">:</span> {</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    reducedAnimation<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>     <span class="co">// 애니메이션 최소화</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    mutedColors<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>          <span class="co">// 채도 낮춤</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    noFlashing<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>           <span class="co">// 깜빡임 제거</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    quietMode<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>            <span class="co">// 소리 최소화</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 예측 가능성</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  predictability<span class="op">:</span> {</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    consistentLayout<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>     <span class="co">// 레이아웃 고정</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    transitionWarnings<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>   <span class="co">// 전환 전 알림</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    visualSchedule<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>       <span class="co">// 시각적 일정</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    progressIndicator<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>    <span class="co">// 진행 표시</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 특별 관심사 활용</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  specialInterests<span class="op">:</span> {</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    enabled<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    interests<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    integratedInUI<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>       <span class="co">// UI에 관심사 통합</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="감각-반응성-기반-조정">5.2 감각 반응성 기반 조정</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">감각</th>
+<th style="text-align: left;">과반응 (Hyper)</th>
+<th style="text-align: left;">저반응 (Hypo)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>시각</strong></td>
+<td style="text-align: left;">밝기↓, 채도↓, 애니메이션 비활성</td>
+<td style="text-align: left;">고대비, 눈에 띄는 색상</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>청각</strong></td>
+<td style="text-align: left;">소리 비활성, 볼륨↓</td>
+<td style="text-align: left;">오디오 피드백 활성</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>촉각</strong></td>
+<td style="text-align: left;">햅틱 비활성</td>
+<td style="text-align: left;">햅틱 활성</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dsm-5-지원-수준별-프리셋">5.3 DSM-5 지원 수준별 프리셋</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">지원 수준</th>
+<th>특징</th>
+<th>UI 조정</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">Level 1</td>
+<td>지원 필요</td>
+<td>전환 경고, 관심사 통합</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">Level 2</td>
+<td>상당한 지원</td>
+<td>+ 애니메이션↓, 채도↓, 시각적 일정</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">Level 3</td>
+<td>매우 상당한 지원</td>
+<td>+ 조용한 모드, 최대 단순화</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="치매-특화-조정">6. 치매 특화 조정</h2>
+<h3 id="dementiauiadjustments">6.1 DementiaUIAdjustments</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> DementiaUIAdjustments {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 친숙함 강조</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  familiarity<span class="op">:</span> {</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    usePersonalPhotos<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>    <span class="co">// 가족 사진 등</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    familiarFaces<span class="op">:</span> FamiliarPerson[]<span class="op">;</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    lifeStoryIntegration<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 단순화</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  simplification<span class="op">:</span> {</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    minimalNavigation<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>    <span class="co">// 깊이 1 네비게이션</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    largeText<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    reducedChoices<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    clearLabeling<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 시간 지원</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  temporalSupport<span class="op">:</span> {</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    dayNightAwareness<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    mealTimeReminders<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    routineBasedSuggestions<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 오류 방지</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>  errorPrevention<span class="op">:</span> {</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    confirmBeforeAction<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    undoSupport<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    noDestructiveActions<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="치매-단계별-ui-복잡도">6.2 치매 단계별 UI 복잡도</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">단계</th>
+<th style="text-align: center;">화면 항목</th>
+<th style="text-align: center;">메뉴 깊이</th>
+<th style="text-align: center;">셀 크기</th>
+<th>특징</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">MCI</td>
+<td style="text-align: center;">16</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">medium</td>
+<td>단어 찾기 지원</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">초기</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">1-2</td>
+<td style="text-align: center;">large</td>
+<td>회상 요소</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">중기</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">large</td>
+<td>친숙한 얼굴, 기본 요구</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">말기</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">xlarge</td>
+<td>예/아니오, 최소 요구</td>
+</tr>
+</tbody>
+</table>
+<h3 id="회상-요소">6.3 회상 요소</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> ReminiscenceElements {</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  familyPhotos<span class="op">:</span> { name<span class="op">:</span> <span class="dt">string</span><span class="op">;</span> relationship<span class="op">:</span> <span class="dt">string</span> }[]<span class="op">;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  preferredMusic<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  accessibleMemoryPeriods<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  suggestedActivities<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="react-컴포넌트">7. React 컴포넌트</h2>
+<h3 id="adaptivegrid">7.1 AdaptiveGrid</h3>
+<pre class="tsx"><code>&lt;AdaptiveGrid
+  page={symbolPage}
+  config={uiConfig}
+  selectedItems={[&#39;item-1&#39;]}
+  onSelectItem={(item) =&gt; handleSelect(item)}
+  onNavigate={(pageId) =&gt; handleNavigate(pageId)}
+/&gt;</code></pre>
+<h3 id="adaptivesymbol">7.2 AdaptiveSymbol</h3>
+<pre class="tsx"><code>&lt;AdaptiveSymbol
+  item={symbolItem}
+  symbolConfig={config.symbols}
+  interactionConfig={config.interaction}
+  cellSize={config.grid.cellSize}
+  onSelect={handleSelect}
+  onDwellComplete={handleDwellComplete}
+/&gt;</code></pre>
+<h3 id="cognitiveloadmanager">7.3 CognitiveLoadManager</h3>
+<pre class="tsx"><code>&lt;CognitiveLoadManagerProvider
+  profile={profile}
+  onConfigChange={handleConfigChange}
+  onOverload={handleOverload}
+&gt;
+  &lt;CognitiveLoadIndicator position=&quot;top-right&quot; /&gt;
+  &lt;AdaptiveGrid ... /&gt;
+&lt;/CognitiveLoadManagerProvider&gt;</code></pre>
+<hr />
+<h2 id="react-hooks">8. React Hooks</h2>
+<h3 id="usecognitiveprofile">8.1 useCognitiveProfile</h3>
+<div class="sourceCode" id="cb12"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> {</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">,</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  isAutism<span class="op">,</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  isDementia<span class="op">,</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  cognitiveLevel<span class="op">,</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  setProfile<span class="op">,</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  updateProfile<span class="op">,</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  getStrengths<span class="op">,</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  getChallenges<span class="op">,</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>} <span class="op">=</span> <span class="fu">useCognitiveProfile</span>({</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  initialProfile<span class="op">,</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  persistKey<span class="op">:</span> <span class="st">&#39;user-profile&#39;</span><span class="op">,</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<h3 id="useadaptiveui">8.2 useAdaptiveUI</h3>
+<div class="sourceCode" id="cb13"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> {</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  config<span class="op">,</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  autismAdjustments<span class="op">,</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  dementiaAdjustments<span class="op">,</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  specialInterestElements<span class="op">,</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  reminiscenceElements<span class="op">,</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  loadLevel<span class="op">,</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  recordInteraction<span class="op">,</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  simplify<span class="op">,</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  resetConfig<span class="op">,</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>} <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">,</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>  onConfigChange<span class="op">:</span> handleConfigChange<span class="op">,</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<hr />
+<h2 id="인지-부하-모니터링">9. 인지 부하 모니터링</h2>
+<h3 id="부하-상태">9.1 부하 상태</h3>
+<div class="sourceCode" id="cb14"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> CognitiveLoadState {</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  currentLoad<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>           <span class="co">// 0-1</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  status<span class="op">:</span> <span class="st">&#39;optimal&#39;</span> <span class="op">|</span> <span class="st">&#39;elevated&#39;</span> <span class="op">|</span> <span class="st">&#39;high&#39;</span> <span class="op">|</span> <span class="st">&#39;overloaded&#39;</span><span class="op">;</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  errorRate<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  averageResponseTime<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  sessionDuration<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  adjustmentsMade<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="부하-상태-임계값">9.2 부하 상태 임계값</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">상태</th>
+<th style="text-align: center;">부하 수준</th>
+<th>권장 조치</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">optimal</td>
+<td style="text-align: center;">&lt; 0.3</td>
+<td>유지</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">elevated</td>
+<td style="text-align: center;">0.3-0.5</td>
+<td>모니터링</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">high</td>
+<td style="text-align: center;">0.5-0.7</td>
+<td>단순화 고려</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">overloaded</td>
+<td style="text-align: center;">&gt; 0.7</td>
+<td>즉시 단순화</td>
+</tr>
+</tbody>
+</table>
+<h3 id="자동-조정-트리거">9.3 자동 조정 트리거</h3>
+<ul>
+<li>인지 부하 임계값 초과</li>
+<li>연속 오류 3회 이상</li>
+<li>연속 타임아웃 2회 이상</li>
+<li>평균 응답 시간 급증</li>
+</ul>
+<hr />
+<h2 id="api-사용-예시">10. API 사용 예시</h2>
+<h3 id="기본-사용">10.1 기본 사용</h3>
+<div class="sourceCode" id="cb15"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> {</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  UIEngine<span class="op">,</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  useCognitiveProfile<span class="op">,</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  useAdaptiveUI<span class="op">,</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  AdaptiveGrid<span class="op">,</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  CognitiveLoadManagerProvider<span class="op">,</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>} <span class="im">from</span> <span class="st">&#39;@wia/cognitive-aac&#39;</span><span class="op">;</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">AACApp</span>() {</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> { profile } <span class="op">=</span> <span class="fu">useCognitiveProfile</span>({</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    initialProfile<span class="op">:</span> loadedProfile<span class="op">,</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>  })<span class="op">;</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> { config<span class="op">,</span> recordInteraction } <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    profile<span class="op">:</span> profile<span class="op">!,</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  })<span class="op">;</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> (</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>    <span class="op">&lt;</span>CognitiveLoadManagerProvider profile<span class="op">=</span>{profile<span class="op">!</span>}<span class="op">&gt;</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>      <span class="op">&lt;</span>AdaptiveGrid</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>        page<span class="op">=</span>{currentPage}</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>        config<span class="op">=</span>{config}</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>        onSelectItem<span class="op">=</span>{(item) <span class="kw">=&gt;</span> {</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>          <span class="fu">recordInteraction</span>({</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>            type<span class="op">:</span> <span class="st">&#39;selection&#39;</span><span class="op">,</span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>            targetId<span class="op">:</span> item<span class="op">.</span><span class="at">id</span><span class="op">,</span></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>            successful<span class="op">:</span> <span class="kw">true</span><span class="op">,</span></span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>          })<span class="op">;</span></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>        }}</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>      <span class="op">/&gt;</span></span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>    <span class="op">&lt;/</span>CognitiveLoadManagerProvider<span class="op">&gt;</span></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>  )<span class="op">;</span></span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="자폐-스펙트럼-특화">10.2 자폐 스펙트럼 특화</h3>
+<div class="sourceCode" id="cb16"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> { config<span class="op">,</span> autismAdjustments<span class="op">,</span> specialInterestElements } <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">:</span> autismProfile<span class="op">,</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 특별 관심사 활용</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (specialInterestElements<span class="op">?.</span><span class="at">canUseForMotivation</span>) {</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> topics <span class="op">=</span> specialInterestElements<span class="op">.</span><span class="at">topics</span><span class="op">;</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 관심사 기반 어휘/테마 적용</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="co">// 감각 조정 적용</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (autismAdjustments<span class="op">?.</span><span class="at">sensoryAccommodations</span><span class="op">.</span><span class="at">reducedAnimation</span>) {</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 애니메이션 비활성화</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="치매-특화">10.3 치매 특화</h3>
+<div class="sourceCode" id="cb17"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> { config<span class="op">,</span> dementiaAdjustments<span class="op">,</span> reminiscenceElements } <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">:</span> dementiaProfile<span class="op">,</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 회상 요소 활용</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (reminiscenceElements) {</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> familyPhotos <span class="op">=</span> reminiscenceElements<span class="op">.</span><span class="at">familyPhotos</span><span class="op">;</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> preferredMusic <span class="op">=</span> reminiscenceElements<span class="op">.</span><span class="at">preferredMusic</span><span class="op">;</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 친숙한 요소 통합</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="co">// 시간 지원</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (dementiaAdjustments<span class="op">?.</span><span class="at">temporalSupport</span><span class="op">.</span><span class="at">mealTimeReminders</span>) {</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 식사 시간 알림 활성화</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="접근성-고려사항">11. 접근성 고려사항</h2>
+<h3 id="wcag-2.2-준수">11.1 WCAG 2.2 준수</h3>
+<ul>
+<li><strong>1.4.3</strong> 명암비 최소 4.5:1 (고대비 모드 7:1)</li>
+<li><strong>2.1.1</strong> 키보드 접근성</li>
+<li><strong>2.3.1</strong> 깜빡임 없음 (자폐 고려)</li>
+<li><strong>2.4.7</strong> 포커스 표시</li>
+<li><strong>2.5.5</strong> 터치 영역 최소 44×44px</li>
+</ul>
+<h3 id="인지-접근성-iso-21801-1">11.2 인지 접근성 (ISO 21801-1)</h3>
+<ul>
+<li>단순하고 일관된 레이아웃</li>
+<li>명확한 시각적 피드백</li>
+<li>오류 방지 및 복구</li>
+<li>적응형 복잡도</li>
+</ul>
+<hr />
+<h2 id="파일-목록">12. 파일 목록</h2>
+<pre><code>cognitive-aac/api/typescript/
+├── package.json
+├── tsconfig.json
+└── src/
+    ├── index.ts
+    ├── types/
+    │   └── index.ts
+    ├── engine/
+    │   ├── index.ts
+    │   ├── UIEngine.ts
+    │   ├── ProfileAdapter.ts
+    │   └── Presets.ts
+    ├── components/
+    │   ├── index.ts
+    │   ├── AdaptiveGrid.tsx
+    │   ├── AdaptiveSymbol.tsx
+    │   ├── AdaptiveButton.tsx
+    │   └── CognitiveLoadManager.tsx
+    └── hooks/
+        ├── index.ts
+        ├── useCognitiveProfile.ts
+        └── useAdaptiveUI.ts</code></pre>
+<hr />
+<h2 id="다음-단계-phase-3">13. 다음 단계: Phase 3</h2>
+<p>Phase 3에서는 <strong>예측/학습 알고리즘</strong>을 구현합니다: - 사용 패턴 분석 - 어휘 예측 - 상황 인식 기반 제안 - 개인화 학습</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> cognitive-aac <span class="kw">&amp;&amp;</span> <span class="fu">cat</span> prompts/PHASE-3-PROMPT.md</span></code></pre></div>
+<hr />
+<h2 id="참조">14. 참조</h2>
+<h3 id="접근성-표준">14.1 접근성 표준</h3>
+<ul>
+<li><a href="https://www.w3.org/TR/WCAG22/">WCAG 2.2</a></li>
+<li><a href="https://www.iso.org/standard/71711.html">ISO 21801-1:2020</a></li>
+</ul>
+<h3 id="aac-리소스">14.2 AAC 리소스</h3>
+<ul>
+<li><a href="https://www.asha.org/practice-portal/professional-issues/augmentative-and-alternative-communication/">ASHA AAC Practice Portal</a></li>
+<li><a href="https://www.isaac-online.org/">ISAAC</a></li>
+</ul>
+<hr />
+<div data-align="center">
+<p><strong>WIA Cognitive AAC - Phase 2 Complete</strong></p>
+<p><em>“인지를 이해하고, 인터페이스를 적응시키고, 소통을 연결하다”</em></p>
+<p><strong>홍익인간</strong> - 널리 인간을 이롭게 하라</p>
+<p><strong>Phase 3으로 계속 →</strong></p>
+</div>
+<hr />
+<h1 id="wia-cognitive-aac---phase-2-adaptive-ui-engine-1">WIA Cognitive AAC - Phase 2: Adaptive UI Engine</h1>
+<h1 id="적응형-ui-엔진-명세서-1">적응형 UI 엔진 명세서</h1>
+<p><strong>Version</strong>: 1.0.0 <strong>Date</strong>: 2025-01-14 <strong>Status</strong>: Complete</p>
+<hr />
+<h2 id="철학-1">철학</h2>
+<p><strong>홍익인간 (弘益人間)</strong> - 널리 인간을 이롭게 하라</p>
+<hr />
+<h2 id="개요-1">1. 개요</h2>
+<h3 id="목적-1">1.1 목적</h3>
+<p>Phase 1에서 정의한 인지 프로파일을 기반으로 AAC 인터페이스를 동적으로 적응시키는 UI 엔진을 구현합니다.</p>
+<h3 id="핵심-기능-1">1.2 핵심 기능</h3>
+<ul>
+<li>인지 프로파일 → UI 설정 자동 변환</li>
+<li>실시간 인지 부하 모니터링 및 조정</li>
+<li>자폐/치매 특화 UI 조정</li>
+<li>사용 이력 기반 최적화</li>
+</ul>
+<h3 id="기술-스택-1">1.3 기술 스택</h3>
+<ul>
+<li><strong>언어</strong>: TypeScript 5.x</li>
+<li><strong>프레임워크</strong>: React 18+</li>
+<li><strong>빌드</strong>: tsup</li>
+<li><strong>패키지</strong>: <span class="citation" data-cites="wia/cognitive-aac">@wia/cognitive-aac</span></li>
+</ul>
+<hr />
+<h2 id="아키텍처-1">2. 아키텍처</h2>
+<h3 id="모듈-구조-1">2.1 모듈 구조</h3>
+<pre><code>@wia/cognitive-aac
+├── types/              # 타입 정의
+│   └── index.ts
+├── engine/             # 핵심 엔진 로직
+│   ├── UIEngine.ts     # 메인 적응 엔진
+│   ├── ProfileAdapter.ts # 프로파일 → UI 변환
+│   └── Presets.ts      # 인지 수준별 프리셋
+├── components/         # React 컴포넌트
+│   ├── AdaptiveGrid.tsx
+│   ├── AdaptiveSymbol.tsx
+│   ├── AdaptiveButton.tsx
+│   └── CognitiveLoadManager.tsx
+└── hooks/              # React Hooks
+    ├── useCognitiveProfile.ts
+    └── useAdaptiveUI.ts</code></pre>
+<h3 id="데이터-흐름-1">2.2 데이터 흐름</h3>
+<pre><code>┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ CognitiveProfile │────▶│  ProfileAdapter  │────▶│ UIConfiguration │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                                          │
+                                                          ▼
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ User Interaction│────▶│    UIEngine      │────▶│  UIAdjustment   │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                │
+                                ▼
+                        ┌──────────────────┐
+                        │  React Components │
+                        └──────────────────┘</code></pre>
+<hr />
+<h2 id="핵심-엔진-1">3. 핵심 엔진</h2>
+<h3 id="uiengine-1">3.1 UIEngine</h3>
+<div class="sourceCode" id="cb22"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> AdaptiveUIEngine {</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 프로파일 기반 UI 생성</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">generateUI</span>(profile<span class="op">:</span> CognitiveProfile)<span class="op">:</span> UIConfiguration<span class="op">;</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 실시간 조정</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">adjustUI</span>(event<span class="op">:</span> UserInteractionEvent)<span class="op">:</span> UIAdjustment <span class="op">|</span> <span class="dt">null</span><span class="op">;</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 사용 이력 기반 최적화</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">optimizeFromUsage</span>(history<span class="op">:</span> UsageHistory)<span class="op">:</span> UIConfiguration<span class="op">;</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="engineconfig-1">3.2 EngineConfig</h3>
+<div class="sourceCode" id="cb23"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> EngineConfig {</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  enableRealTimeAdjustment<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>  <span class="co">// 실시간 조정 활성화</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  enableLearning<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>            <span class="co">// 학습 기반 최적화</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  adjustmentThreshold<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>        <span class="co">// 조정 임계값 (0-1)</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  maxAdjustmentsPerSession<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>   <span class="co">// 세션당 최대 조정 횟수</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>  minEventsForLearning<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>       <span class="co">// 학습에 필요한 최소 이벤트 수</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="프로파일-유형별-엔진-생성-1">3.3 프로파일 유형별 엔진 생성</h3>
+<div class="sourceCode" id="cb24"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 자폐 스펙트럼용 (민감한 조정)</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> UIEngine<span class="op">.</span><span class="fu">forAutism</span>(profile<span class="op">,</span> {</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  adjustmentThreshold<span class="op">:</span> <span class="fl">0.25</span><span class="op">,</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="co">// 치매용 (안정성 우선)</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> UIEngine<span class="op">.</span><span class="fu">forDementia</span>(profile<span class="op">,</span> {</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>  enableLearning<span class="op">:</span> <span class="kw">false</span><span class="op">,</span></span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>  maxAdjustmentsPerSession<span class="op">:</span> <span class="dv">5</span><span class="op">,</span></span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a><span class="co">// 일반용</span></span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> UIEngine<span class="op">.</span><span class="fu">forGeneral</span>(profile)<span class="op">;</span></span></code></pre></div>
+<hr />
+<h2 id="인지-수준별-프리셋-1">4. 인지 수준별 프리셋</h2>
+<h3 id="ui-설정-매핑-1">4.1 UI 설정 매핑</h3>
+<table>
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 15%" />
+<col style="width: 15%" />
+<col style="width: 11%" />
+<col style="width: 15%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">인지 수준</th>
+<th style="text-align: center;">그리드</th>
+<th style="text-align: center;">셀 크기</th>
+<th style="text-align: center;">상징</th>
+<th style="text-align: center;">피드백</th>
+<th style="text-align: center;">인지 부하</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">PROFOUND (1)</td>
+<td style="text-align: center;">2×2</td>
+<td style="text-align: center;">xlarge</td>
+<td style="text-align: center;">사진, 레이블 없음</td>
+<td style="text-align: center;">모두 활성</td>
+<td style="text-align: center;">4항목, 100% 필터</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">SEVERE (2)</td>
+<td style="text-align: center;">3×2</td>
+<td style="text-align: center;">large</td>
+<td style="text-align: center;">사진, 하단 레이블</td>
+<td style="text-align: center;">모두 활성</td>
+<td style="text-align: center;">6항목, 80% 필터</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">MODERATE (3)</td>
+<td style="text-align: center;">4×3</td>
+<td style="text-align: center;">medium</td>
+<td style="text-align: center;">PCS, 하단 레이블</td>
+<td style="text-align: center;">오디오만</td>
+<td style="text-align: center;">12항목, 50% 필터</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">MILD (4)</td>
+<td style="text-align: center;">5×4</td>
+<td style="text-align: center;">medium</td>
+<td style="text-align: center;">PCS, 하단 레이블</td>
+<td style="text-align: center;">없음</td>
+<td style="text-align: center;">20항목, 20% 필터</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">TYPICAL (5)</td>
+<td style="text-align: center;">6×5</td>
+<td style="text-align: center;">small</td>
+<td style="text-align: center;">PCS, 하단 레이블</td>
+<td style="text-align: center;">없음</td>
+<td style="text-align: center;">30항목, 필터 없음</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dwell-time-설정-1">4.2 Dwell Time 설정</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">인지 수준</th>
+<th style="text-align: center;">Dwell Time</th>
+<th style="text-align: center;">확인 필요</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">PROFOUND</td>
+<td style="text-align: center;">2000ms</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">SEVERE</td>
+<td style="text-align: center;">1500ms</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">MODERATE</td>
+<td style="text-align: center;">1000ms</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">MILD</td>
+<td style="text-align: center;">800ms</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">TYPICAL</td>
+<td style="text-align: center;">0ms (탭)</td>
+<td style="text-align: center;">No</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="자폐-스펙트럼-특화-조정-1">5. 자폐 스펙트럼 특화 조정</h2>
+<h3 id="autismuiadjustments-1">5.1 AutismUIAdjustments</h3>
+<div class="sourceCode" id="cb25"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> AutismUIAdjustments {</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 감각 과민 대응</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  sensoryAccommodations<span class="op">:</span> {</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>    reducedAnimation<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>     <span class="co">// 애니메이션 최소화</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>    mutedColors<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>          <span class="co">// 채도 낮춤</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    noFlashing<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>           <span class="co">// 깜빡임 제거</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    quietMode<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>            <span class="co">// 소리 최소화</span></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 예측 가능성</span></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  predictability<span class="op">:</span> {</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>    consistentLayout<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>     <span class="co">// 레이아웃 고정</span></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    transitionWarnings<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>   <span class="co">// 전환 전 알림</span></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>    visualSchedule<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>       <span class="co">// 시각적 일정</span></span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>    progressIndicator<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>    <span class="co">// 진행 표시</span></span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 특별 관심사 활용</span></span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>  specialInterests<span class="op">:</span> {</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>    enabled<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>    interests<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>    integratedInUI<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>       <span class="co">// UI에 관심사 통합</span></span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="감각-반응성-기반-조정-1">5.2 감각 반응성 기반 조정</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">감각</th>
+<th style="text-align: left;">과반응 (Hyper)</th>
+<th style="text-align: left;">저반응 (Hypo)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>시각</strong></td>
+<td style="text-align: left;">밝기↓, 채도↓, 애니메이션 비활성</td>
+<td style="text-align: left;">고대비, 눈에 띄는 색상</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>청각</strong></td>
+<td style="text-align: left;">소리 비활성, 볼륨↓</td>
+<td style="text-align: left;">오디오 피드백 활성</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>촉각</strong></td>
+<td style="text-align: left;">햅틱 비활성</td>
+<td style="text-align: left;">햅틱 활성</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dsm-5-지원-수준별-프리셋-1">5.3 DSM-5 지원 수준별 프리셋</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">지원 수준</th>
+<th>특징</th>
+<th>UI 조정</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">Level 1</td>
+<td>지원 필요</td>
+<td>전환 경고, 관심사 통합</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">Level 2</td>
+<td>상당한 지원</td>
+<td>+ 애니메이션↓, 채도↓, 시각적 일정</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">Level 3</td>
+<td>매우 상당한 지원</td>
+<td>+ 조용한 모드, 최대 단순화</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="치매-특화-조정-1">6. 치매 특화 조정</h2>
+<h3 id="dementiauiadjustments-1">6.1 DementiaUIAdjustments</h3>
+<div class="sourceCode" id="cb26"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> DementiaUIAdjustments {</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 친숙함 강조</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  familiarity<span class="op">:</span> {</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    usePersonalPhotos<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>    <span class="co">// 가족 사진 등</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    familiarFaces<span class="op">:</span> FamiliarPerson[]<span class="op">;</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    lifeStoryIntegration<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 단순화</span></span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>  simplification<span class="op">:</span> {</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>    minimalNavigation<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span>    <span class="co">// 깊이 1 네비게이션</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>    largeText<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>    reducedChoices<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>    clearLabeling<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 시간 지원</span></span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>  temporalSupport<span class="op">:</span> {</span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>    dayNightAwareness<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>    mealTimeReminders<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a>    routineBasedSuggestions<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-24"><a href="#cb26-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 오류 방지</span></span>
+<span id="cb26-25"><a href="#cb26-25" aria-hidden="true" tabindex="-1"></a>  errorPrevention<span class="op">:</span> {</span>
+<span id="cb26-26"><a href="#cb26-26" aria-hidden="true" tabindex="-1"></a>    confirmBeforeAction<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-27"><a href="#cb26-27" aria-hidden="true" tabindex="-1"></a>    undoSupport<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-28"><a href="#cb26-28" aria-hidden="true" tabindex="-1"></a>    noDestructiveActions<span class="op">:</span> <span class="dt">boolean</span><span class="op">;</span></span>
+<span id="cb26-29"><a href="#cb26-29" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb26-30"><a href="#cb26-30" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="치매-단계별-ui-복잡도-1">6.2 치매 단계별 UI 복잡도</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">단계</th>
+<th style="text-align: center;">화면 항목</th>
+<th style="text-align: center;">메뉴 깊이</th>
+<th style="text-align: center;">셀 크기</th>
+<th>특징</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">MCI</td>
+<td style="text-align: center;">16</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">medium</td>
+<td>단어 찾기 지원</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">초기</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">1-2</td>
+<td style="text-align: center;">large</td>
+<td>회상 요소</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">중기</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">large</td>
+<td>친숙한 얼굴, 기본 요구</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">말기</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">xlarge</td>
+<td>예/아니오, 최소 요구</td>
+</tr>
+</tbody>
+</table>
+<h3 id="회상-요소-1">6.3 회상 요소</h3>
+<div class="sourceCode" id="cb27"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> ReminiscenceElements {</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  familyPhotos<span class="op">:</span> { name<span class="op">:</span> <span class="dt">string</span><span class="op">;</span> relationship<span class="op">:</span> <span class="dt">string</span> }[]<span class="op">;</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  preferredMusic<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>  accessibleMemoryPeriods<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>  suggestedActivities<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="react-컴포넌트-1">7. React 컴포넌트</h2>
+<h3 id="adaptivegrid-1">7.1 AdaptiveGrid</h3>
+<pre class="tsx"><code>&lt;AdaptiveGrid
+  page={symbolPage}
+  config={uiConfig}
+  selectedItems={[&#39;item-1&#39;]}
+  onSelectItem={(item) =&gt; handleSelect(item)}
+  onNavigate={(pageId) =&gt; handleNavigate(pageId)}
+/&gt;</code></pre>
+<h3 id="adaptivesymbol-1">7.2 AdaptiveSymbol</h3>
+<pre class="tsx"><code>&lt;AdaptiveSymbol
+  item={symbolItem}
+  symbolConfig={config.symbols}
+  interactionConfig={config.interaction}
+  cellSize={config.grid.cellSize}
+  onSelect={handleSelect}
+  onDwellComplete={handleDwellComplete}
+/&gt;</code></pre>
+<h3 id="cognitiveloadmanager-1">7.3 CognitiveLoadManager</h3>
+<pre class="tsx"><code>&lt;CognitiveLoadManagerProvider
+  profile={profile}
+  onConfigChange={handleConfigChange}
+  onOverload={handleOverload}
+&gt;
+  &lt;CognitiveLoadIndicator position=&quot;top-right&quot; /&gt;
+  &lt;AdaptiveGrid ... /&gt;
+&lt;/CognitiveLoadManagerProvider&gt;</code></pre>
+<hr />
+<h2 id="react-hooks-1">8. React Hooks</h2>
+<h3 id="usecognitiveprofile-1">8.1 useCognitiveProfile</h3>
+<div class="sourceCode" id="cb31"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> {</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">,</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  isAutism<span class="op">,</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  isDementia<span class="op">,</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  cognitiveLevel<span class="op">,</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  setProfile<span class="op">,</span></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>  updateProfile<span class="op">,</span></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>  getStrengths<span class="op">,</span></span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>  getChallenges<span class="op">,</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>} <span class="op">=</span> <span class="fu">useCognitiveProfile</span>({</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>  initialProfile<span class="op">,</span></span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>  persistKey<span class="op">:</span> <span class="st">&#39;user-profile&#39;</span><span class="op">,</span></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<h3 id="useadaptiveui-1">8.2 useAdaptiveUI</h3>
+<div class="sourceCode" id="cb32"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> {</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  config<span class="op">,</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  autismAdjustments<span class="op">,</span></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>  dementiaAdjustments<span class="op">,</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  specialInterestElements<span class="op">,</span></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  reminiscenceElements<span class="op">,</span></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>  loadLevel<span class="op">,</span></span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>  recordInteraction<span class="op">,</span></span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>  simplify<span class="op">,</span></span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>  resetConfig<span class="op">,</span></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>} <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">,</span></span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>  onConfigChange<span class="op">:</span> handleConfigChange<span class="op">,</span></span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<hr />
+<h2 id="인지-부하-모니터링-1">9. 인지 부하 모니터링</h2>
+<h3 id="부하-상태-1">9.1 부하 상태</h3>
+<div class="sourceCode" id="cb33"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> CognitiveLoadState {</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  currentLoad<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>           <span class="co">// 0-1</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  status<span class="op">:</span> <span class="st">&#39;optimal&#39;</span> <span class="op">|</span> <span class="st">&#39;elevated&#39;</span> <span class="op">|</span> <span class="st">&#39;high&#39;</span> <span class="op">|</span> <span class="st">&#39;overloaded&#39;</span><span class="op">;</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>  errorRate<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  averageResponseTime<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>  sessionDuration<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>  adjustmentsMade<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="부하-상태-임계값-1">9.2 부하 상태 임계값</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">상태</th>
+<th style="text-align: center;">부하 수준</th>
+<th>권장 조치</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">optimal</td>
+<td style="text-align: center;">&lt; 0.3</td>
+<td>유지</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">elevated</td>
+<td style="text-align: center;">0.3-0.5</td>
+<td>모니터링</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">high</td>
+<td style="text-align: center;">0.5-0.7</td>
+<td>단순화 고려</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">overloaded</td>
+<td style="text-align: center;">&gt; 0.7</td>
+<td>즉시 단순화</td>
+</tr>
+</tbody>
+</table>
+<h3 id="자동-조정-트리거-1">9.3 자동 조정 트리거</h3>
+<ul>
+<li>인지 부하 임계값 초과</li>
+<li>연속 오류 3회 이상</li>
+<li>연속 타임아웃 2회 이상</li>
+<li>평균 응답 시간 급증</li>
+</ul>
+<hr />
+<h2 id="api-사용-예시-1">10. API 사용 예시</h2>
+<h3 id="기본-사용-1">10.1 기본 사용</h3>
+<div class="sourceCode" id="cb34"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> {</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>  UIEngine<span class="op">,</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  useCognitiveProfile<span class="op">,</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>  useAdaptiveUI<span class="op">,</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>  AdaptiveGrid<span class="op">,</span></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>  CognitiveLoadManagerProvider<span class="op">,</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>} <span class="im">from</span> <span class="st">&#39;@wia/cognitive-aac&#39;</span><span class="op">;</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">AACApp</span>() {</span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> { profile } <span class="op">=</span> <span class="fu">useCognitiveProfile</span>({</span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>    initialProfile<span class="op">:</span> loadedProfile<span class="op">,</span></span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>  })<span class="op">;</span></span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> { config<span class="op">,</span> recordInteraction } <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>    profile<span class="op">:</span> profile<span class="op">!,</span></span>
+<span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a>  })<span class="op">;</span></span>
+<span id="cb34-17"><a href="#cb34-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-18"><a href="#cb34-18" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> (</span>
+<span id="cb34-19"><a href="#cb34-19" aria-hidden="true" tabindex="-1"></a>    <span class="op">&lt;</span>CognitiveLoadManagerProvider profile<span class="op">=</span>{profile<span class="op">!</span>}<span class="op">&gt;</span></span>
+<span id="cb34-20"><a href="#cb34-20" aria-hidden="true" tabindex="-1"></a>      <span class="op">&lt;</span>AdaptiveGrid</span>
+<span id="cb34-21"><a href="#cb34-21" aria-hidden="true" tabindex="-1"></a>        page<span class="op">=</span>{currentPage}</span>
+<span id="cb34-22"><a href="#cb34-22" aria-hidden="true" tabindex="-1"></a>        config<span class="op">=</span>{config}</span>
+<span id="cb34-23"><a href="#cb34-23" aria-hidden="true" tabindex="-1"></a>        onSelectItem<span class="op">=</span>{(item) <span class="kw">=&gt;</span> {</span>
+<span id="cb34-24"><a href="#cb34-24" aria-hidden="true" tabindex="-1"></a>          <span class="fu">recordInteraction</span>({</span>
+<span id="cb34-25"><a href="#cb34-25" aria-hidden="true" tabindex="-1"></a>            type<span class="op">:</span> <span class="st">&#39;selection&#39;</span><span class="op">,</span></span>
+<span id="cb34-26"><a href="#cb34-26" aria-hidden="true" tabindex="-1"></a>            targetId<span class="op">:</span> item<span class="op">.</span><span class="at">id</span><span class="op">,</span></span>
+<span id="cb34-27"><a href="#cb34-27" aria-hidden="true" tabindex="-1"></a>            successful<span class="op">:</span> <span class="kw">true</span><span class="op">,</span></span>
+<span id="cb34-28"><a href="#cb34-28" aria-hidden="true" tabindex="-1"></a>          })<span class="op">;</span></span>
+<span id="cb34-29"><a href="#cb34-29" aria-hidden="true" tabindex="-1"></a>        }}</span>
+<span id="cb34-30"><a href="#cb34-30" aria-hidden="true" tabindex="-1"></a>      <span class="op">/&gt;</span></span>
+<span id="cb34-31"><a href="#cb34-31" aria-hidden="true" tabindex="-1"></a>    <span class="op">&lt;/</span>CognitiveLoadManagerProvider<span class="op">&gt;</span></span>
+<span id="cb34-32"><a href="#cb34-32" aria-hidden="true" tabindex="-1"></a>  )<span class="op">;</span></span>
+<span id="cb34-33"><a href="#cb34-33" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="자폐-스펙트럼-특화-1">10.2 자폐 스펙트럼 특화</h3>
+<div class="sourceCode" id="cb35"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> { config<span class="op">,</span> autismAdjustments<span class="op">,</span> specialInterestElements } <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">:</span> autismProfile<span class="op">,</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 특별 관심사 활용</span></span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (specialInterestElements<span class="op">?.</span><span class="at">canUseForMotivation</span>) {</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> topics <span class="op">=</span> specialInterestElements<span class="op">.</span><span class="at">topics</span><span class="op">;</span></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 관심사 기반 어휘/테마 적용</span></span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a><span class="co">// 감각 조정 적용</span></span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (autismAdjustments<span class="op">?.</span><span class="at">sensoryAccommodations</span><span class="op">.</span><span class="at">reducedAnimation</span>) {</span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 애니메이션 비활성화</span></span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="치매-특화-1">10.3 치매 특화</h3>
+<div class="sourceCode" id="cb36"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> { config<span class="op">,</span> dementiaAdjustments<span class="op">,</span> reminiscenceElements } <span class="op">=</span> <span class="fu">useAdaptiveUI</span>({</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>  profile<span class="op">:</span> dementiaProfile<span class="op">,</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 회상 요소 활용</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (reminiscenceElements) {</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> familyPhotos <span class="op">=</span> reminiscenceElements<span class="op">.</span><span class="at">familyPhotos</span><span class="op">;</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> preferredMusic <span class="op">=</span> reminiscenceElements<span class="op">.</span><span class="at">preferredMusic</span><span class="op">;</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 친숙한 요소 통합</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a><span class="co">// 시간 지원</span></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (dementiaAdjustments<span class="op">?.</span><span class="at">temporalSupport</span><span class="op">.</span><span class="at">mealTimeReminders</span>) {</span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 식사 시간 알림 활성화</span></span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="접근성-고려사항-1">11. 접근성 고려사항</h2>
+<h3 id="wcag-2.2-준수-1">11.1 WCAG 2.2 준수</h3>
+<ul>
+<li><strong>1.4.3</strong> 명암비 최소 4.5:1 (고대비 모드 7:1)</li>
+<li><strong>2.1.1</strong> 키보드 접근성</li>
+<li><strong>2.3.1</strong> 깜빡임 없음 (자폐 고려)</li>
+<li><strong>2.4.7</strong> 포커스 표시</li>
+<li><strong>2.5.5</strong> 터치 영역 최소 44×44px</li>
+</ul>
+<h3 id="인지-접근성-iso-21801-1-1">11.2 인지 접근성 (ISO 21801-1)</h3>
+<ul>
+<li>단순하고 일관된 레이아웃</li>
+<li>명확한 시각적 피드백</li>
+<li>오류 방지 및 복구</li>
+<li>적응형 복잡도</li>
+</ul>
+<hr />
+<h2 id="파일-목록-1">12. 파일 목록</h2>
+<pre><code>cognitive-aac/api/typescript/
+├── package.json
+├── tsconfig.json
+└── src/
+    ├── index.ts
+    ├── types/
+    │   └── index.ts
+    ├── engine/
+    │   ├── index.ts
+    │   ├── UIEngine.ts
+    │   ├── ProfileAdapter.ts
+    │   └── Presets.ts
+    ├── components/
+    │   ├── index.ts
+    │   ├── AdaptiveGrid.tsx
+    │   ├── AdaptiveSymbol.tsx
+    │   ├── AdaptiveButton.tsx
+    │   └── CognitiveLoadManager.tsx
+    └── hooks/
+        ├── index.ts
+        ├── useCognitiveProfile.ts
+        └── useAdaptiveUI.ts</code></pre>
+<hr />
+<h2 id="다음-단계-phase-3-1">13. 다음 단계: Phase 3</h2>
+<p>Phase 3에서는 <strong>예측/학습 알고리즘</strong>을 구현합니다: - 사용 패턴 분석 - 어휘 예측 - 상황 인식 기반 제안 - 개인화 학습</p>
+<div class="sourceCode" id="cb38"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> cognitive-aac <span class="kw">&amp;&amp;</span> <span class="fu">cat</span> prompts/PHASE-3-PROMPT.md</span></code></pre></div>
+<hr />
+<h2 id="참조-1">14. 참조</h2>
+<h3 id="접근성-표준-1">14.1 접근성 표준</h3>
+<ul>
+<li><a href="https://www.w3.org/TR/WCAG22/">WCAG 2.2</a></li>
+<li><a href="https://www.iso.org/standard/71711.html">ISO 21801-1:2020</a></li>
+</ul>
+<h3 id="aac-리소스-1">14.2 AAC 리소스</h3>
+<ul>
+<li><a href="https://www.asha.org/practice-portal/professional-issues/augmentative-and-alternative-communication/">ASHA AAC Practice Portal</a></li>
+<li><a href="https://www.isaac-online.org/">ISAAC</a></li>
+</ul>
+<hr />
+<div data-align="center">
+<p><strong>WIA Cognitive AAC - Phase 2 Complete</strong></p>
+<p><em>“인지를 이해하고, 인터페이스를 적응시키고, 소통을 연결하다”</em></p>
+<p><strong>홍익인간</strong> - 널리 인간을 이롭게 하라</p>
+<p><strong>Phase 3으로 계속 →</strong></p>
+</div>
+<hr />
+
+
+<hr>
+<footer>
+<p>© 2026 WIA OÜ | 위아북스 | 저자: 연삼흠 (Yeon Sam-heum, Ph.D.)</p>
+<p><a href="index.html">목차로 돌아가기</a></p>
+</footer>
+
+</body>
+</html>

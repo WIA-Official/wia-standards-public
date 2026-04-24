@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: Phase 3-4 - 프로토콜 및 통합 - WIA 인지 AAC 표준 전자책</title>
+</head>
+<body>
+
+<p><a href="index.html">[Cognitive AAC] WIA 인지 AAC 표준 전자책</a> | 제7장 (총 8장)</p>
+
+<hr>
+
+<h1>[Cognitive AAC] 제7장: Phase 3-4 - 프로토콜 및 통합</h1>
+
+<blockquote>
+<p><strong>홍익인간 (弘益人間)</strong></p>
+<p>"널리 인간을 이롭게 하라"</p>
+<p>WIA 인지 AAC 표준은 인지 능력에 관계없이 모든 사람이 동등하게 의사소통할 수 있는 기술 생태계를 구축합니다.</p>
+</blockquote>
+
+<hr>
+
+<h1 id="wia-cognitive-aac---prediction-learning-specification">WIA Cognitive AAC - Prediction &amp; Learning Specification</h1>
+<h2 id="phase-3-예측학습-알고리즘-명세">Phase 3: 예측/학습 알고리즘 명세</h2>
+<p><strong>홍익인간 (弘益人間) - 널리 인간을 이롭게 하라</strong></p>
+<hr />
+<h2 id="개요">1. 개요</h2>
+<h3 id="목적">1.1 목적</h3>
+<p>인지 장애 사용자의 AAC 의사소통 효율성을 높이기 위한 개인화된 예측 시스템. 사용자의 패턴을 학습하여 다음에 사용할 가능성이 높은 심볼을 예측합니다.</p>
+<h3 id="핵심-원칙">1.2 핵심 원칙</h3>
+<ol type="1">
+<li><strong>온디바이스 학습</strong>: 모든 학습은 사용자 기기에서 수행</li>
+<li><strong>프라이버시 우선</strong>: 개인 데이터는 기기를 떠나지 않음</li>
+<li><strong>적응적 예측</strong>: 사용자 특성에 맞는 맞춤 예측</li>
+<li><strong>투명한 설명</strong>: 예측 이유를 이해하기 쉽게 제공</li>
+</ol>
+<hr />
+<h2 id="예측-모델">2. 예측 모델</h2>
+<h3 id="다중-소스-예측">2.1 다중 소스 예측</h3>
+<p>예측은 여러 소스의 정보를 종합하여 생성됩니다:</p>
+<table>
+<thead>
+<tr class="header">
+<th>소스</th>
+<th>설명</th>
+<th>가중치</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>frequency</strong></td>
+<td>전체 사용 빈도 기반</td>
+<td>0.25</td>
+</tr>
+<tr class="even">
+<td><strong>sequence</strong></td>
+<td>심볼 연쇄 패턴</td>
+<td>0.30</td>
+</tr>
+<tr class="odd">
+<td><strong>context</strong></td>
+<td>상황(위치, 활동, 대화상대)</td>
+<td>0.25</td>
+</tr>
+<tr class="even">
+<td><strong>time</strong></td>
+<td>시간대/요일 패턴</td>
+<td>0.20</td>
+</tr>
+</tbody>
+</table>
+<h3 id="예측-결과-구조">2.2 예측 결과 구조</h3>
+<div class="sourceCode" id="cb1"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> PredictedSymbol {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  symbolId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span>           <span class="co">// 심볼 식별자</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  probability<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>        <span class="co">// 예측 확률 (0-1)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  source<span class="op">:</span> PredictionSource<span class="op">;</span>   <span class="co">// 예측 근거</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  explanation<span class="op">?:</span> <span class="dt">string</span><span class="op">;</span>       <span class="co">// 사용자 친화적 설명</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  rank<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>               <span class="co">// 순위</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> PredictionSource <span class="op">=</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;frequency&#39;</span>     <span class="co">// &quot;자주 사용하는 심볼&quot;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;sequence&#39;</span>      <span class="co">// &quot;이전에 이어서 사용했던 심볼&quot;</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;context&#39;</span>       <span class="co">// &quot;식사 시간에 자주 사용하는 심볼&quot;</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;time&#39;</span>          <span class="co">// &quot;아침에 자주 사용하는 심볼&quot;</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;routine&#39;</span>       <span class="co">// &quot;일과 시간에 필요한 심볼&quot; (자폐)</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;reminiscence&#39;</span><span class="op">;</span> <span class="co">// &quot;익숙한 기억과 연결된 심볼&quot; (치매)</span></span></code></pre></div>
+<hr />
+<h2 id="학습-알고리즘">3. 학습 알고리즘</h2>
+<h3 id="n-gram-시퀀스-모델">3.1 N-gram 시퀀스 모델</h3>
+<p>경량화된 N-gram 모델로 심볼 시퀀스 패턴 학습:</p>
+<pre><code>P(symbol_n | symbol_1, ..., symbol_{n-1})</code></pre>
+<h4 id="특징">특징:</h4>
+<ul>
+<li>최대 4-gram까지 지원</li>
+<li>Laplace smoothing 적용</li>
+<li>시간 기반 감쇠 (decay factor: 0.95/일)</li>
+<li>온디바이스 추론 가능한 경량 설계</li>
+</ul>
+<h4 id="예시">예시:</h4>
+<pre><code>사용자가 &quot;아침&quot; → &quot;먹다&quot; 시퀀스를 자주 사용하면:
+P(&quot;먹다&quot; | &quot;아침&quot;) = 높음
+→ &quot;아침&quot; 선택 후 &quot;먹다&quot; 예측 확률 상승</code></pre>
+<h3 id="컨텍스트-모델">3.2 컨텍스트 모델</h3>
+<p>다중 컨텍스트 신호를 통합한 예측:</p>
+<table>
+<thead>
+<tr class="header">
+<th>컨텍스트</th>
+<th>감지 방법</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>시간</strong></td>
+<td>시스템 시계</td>
+<td>7-9시 → 아침 식사</td>
+</tr>
+<tr class="even">
+<td><strong>위치</strong></td>
+<td>GPS/실내 위치</td>
+<td>부엌 → 식사 관련</td>
+</tr>
+<tr class="odd">
+<td><strong>활동</strong></td>
+<td>일과표/감지</td>
+<td>수업 시간 → 학습 관련</td>
+</tr>
+<tr class="even">
+<td><strong>대화상대</strong></td>
+<td>앱 설정</td>
+<td>엄마 → 가족 대화</td>
+</tr>
+<tr class="odd">
+<td><strong>기분</strong></td>
+<td>이전 선택</td>
+<td>통증 표현 → 불편함</td>
+</tr>
+</tbody>
+</table>
+<h3 id="인지장애-특화-모델">3.3 인지장애 특화 모델</h3>
+<h4 id="자폐-스펙트럼-autism">자폐 스펙트럼 (Autism)</h4>
+<div class="sourceCode" id="cb4"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> AutismPredictionModel {</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 루틴 기반 예측 강화</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  routineWeight<span class="op">:</span> <span class="fl">1.5</span><span class="op">;</span>  <span class="co">// 루틴 심볼 가중치 50% 상승</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 전환 예측</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  transitionPrediction<span class="op">:</span> {</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    warnBeforeMinutes<span class="op">:</span> <span class="dv">5</span><span class="op">;</span>  <span class="co">// 전환 5분 전 알림</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    suggestTransitionSymbols<span class="op">:</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 예측 가능성 최대화</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  consistentPredictions<span class="op">:</span> <span class="kw">true</span><span class="op">;</span>  <span class="co">// 동일 상황 → 동일 예측</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h4 id="치매-dementia">치매 (Dementia)</h4>
+<div class="sourceCode" id="cb5"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> DementiaPredictionModel {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 장기 기억 우선</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  longTermMemoryWeight<span class="op">:</span> <span class="fl">1.3</span><span class="op">;</span>  <span class="co">// 익숙한 심볼 가중치 상승</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 느린 학습</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  decayFactor<span class="op">:</span> <span class="fl">0.99</span><span class="op">;</span>  <span class="co">// 천천히 잊기</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 반복 허용</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  allowRepetition<span class="op">:</span> <span class="kw">true</span><span class="op">;</span>  <span class="co">// 같은 질문 반복 허용</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 지남력 지원</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  orientationSupport<span class="op">:</span> {</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    showDateTime<span class="op">:</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    showLocation<span class="op">:</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="사용-패턴-데이터-구조">4. 사용 패턴 데이터 구조</h2>
+<h3 id="시간별-패턴">4.1 시간별 패턴</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> TemporalPattern {</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  hourlyFrequency<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">number</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>  <span class="co">// 0-23시</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  dayOfWeek<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">number</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>        <span class="co">// 0-6 (일-토)</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  contextual<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>       <span class="co">// 식사, 수업 등</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="시퀀스-패턴">4.2 시퀀스 패턴</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> SequencePattern {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  commonPhrases<span class="op">:</span> Phrase[]<span class="op">;</span>      <span class="co">// 자주 사용하는 문장</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  symbolChains<span class="op">:</span> SymbolChain[]<span class="op">;</span>  <span class="co">// 심볼 연쇄</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> SymbolChain {</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  symbols<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span>     <span class="co">// [&quot;인사&quot;, &quot;감사&quot;]</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  frequency<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>     <span class="co">// 50회</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  avgInterval<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>   <span class="co">// 평균 500ms</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  probability<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>   <span class="co">// 0.75</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="컨텍스트별-패턴">4.3 컨텍스트별 패턴</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> ContextualPattern {</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  locationBased<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>   <span class="co">// 위치별</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  personBased<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>     <span class="co">// 대화상대별</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  activityBased<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>   <span class="co">// 활동별</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="api-명세">5. API 명세</h2>
+<h3 id="typescript-api">5.1 TypeScript API</h3>
+<div class="sourceCode" id="cb9"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 예측 엔진 생성</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> PredictionEngine<span class="op">.</span><span class="fu">forAutism</span>(config)<span class="op">;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co">// 다음 심볼 예측</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> predictions <span class="op">=</span> engine<span class="op">.</span><span class="fu">predictNext</span>(context<span class="op">,</span> recentSymbols)<span class="op">;</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co">// 문장 완성 예측</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> completions <span class="op">=</span> engine<span class="op">.</span><span class="fu">predictCompletion</span>(partialPhrase<span class="op">,</span> context)<span class="op">;</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co">// 상황 기반 보드 추천</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> board <span class="op">=</span> engine<span class="op">.</span><span class="fu">recommendForContext</span>(context)<span class="op">;</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="co">// 학습 이벤트 기록</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>engine<span class="op">.</span><span class="fu">recordSymbolSelection</span>(symbolId<span class="op">,</span> context<span class="op">,</span> responseTime)<span class="op">;</span></span></code></pre></div>
+<h3 id="python-api">5.2 Python API</h3>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 시퀀스 모델</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> SequenceModel()</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>model.train(sequences)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>predictions <span class="op">=</span> model.predict(context, top_k<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 컨텍스트 모델</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>ctx_model <span class="op">=</span> ContextModel()</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>ctx_model.update(symbol_id, context)</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>ctx_predictions <span class="op">=</span> ctx_model.predict(context)</span></code></pre></div>
+<hr />
+<h2 id="성능-요구사항">6. 성능 요구사항</h2>
+<h3 id="응답-시간">6.1 응답 시간</h3>
+<table>
+<thead>
+<tr class="header">
+<th>작업</th>
+<th>목표</th>
+<th>최대</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>다음 심볼 예측</td>
+<td>50ms</td>
+<td>100ms</td>
+</tr>
+<tr class="even">
+<td>문장 완성</td>
+<td>100ms</td>
+<td>200ms</td>
+</tr>
+<tr class="odd">
+<td>학습 업데이트</td>
+<td>10ms</td>
+<td>50ms</td>
+</tr>
+</tbody>
+</table>
+<h3 id="정확도-목표">6.2 정확도 목표</h3>
+<table>
+<thead>
+<tr class="header">
+<th>지표</th>
+<th>목표</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Top-1 정확도</td>
+<td>30%</td>
+</tr>
+<tr class="even">
+<td>Top-5 정확도</td>
+<td>60%</td>
+</tr>
+<tr class="odd">
+<td>Top-8 정확도</td>
+<td>75%</td>
+</tr>
+</tbody>
+</table>
+<h3 id="리소스-제한">6.3 리소스 제한</h3>
+<table>
+<thead>
+<tr class="header">
+<th>리소스</th>
+<th>제한</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>메모리</td>
+<td>&lt; 50MB</td>
+</tr>
+<tr class="even">
+<td>모델 크기</td>
+<td>&lt; 10MB</td>
+</tr>
+<tr class="odd">
+<td>배터리 영향</td>
+<td>&lt; 5%</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="적응-전략">7. 적응 전략</h2>
+<h3 id="신규-사용자">7.1 신규 사용자</h3>
+<ul>
+<li>첫 주: 인구 통계 기반 기본 예측</li>
+<li>2-4주: 빈도 기반 학습 시작</li>
+<li>1개월+: 전체 패턴 학습 활성화</li>
+</ul>
+<h3 id="점진적-학습">7.2 점진적 학습</h3>
+<pre><code>신뢰도 = min(1.0, 사용_횟수 / 100)
+예측_가중치 = 기본_가중치 × (0.5 + 0.5 × 신뢰도)</code></pre>
+<h3 id="감쇠-및-갱신">7.3 감쇠 및 갱신</h3>
+<ul>
+<li><strong>일간 감쇠</strong>: factor = 0.95</li>
+<li><strong>최소 임계값</strong>: 2회 미만 패턴 제거</li>
+<li><strong>최대 저장</strong>: 최근 90일 데이터</li>
+</ul>
+<hr />
+<h2 id="통합-가이드">8. 통합 가이드</h2>
+<h3 id="react-컴포넌트-통합">8.1 React 컴포넌트 통합</h3>
+<pre class="tsx"><code>function AACBoard() {
+  const { config } = useAdaptiveUI({ profile });
+  const [predictions, setPredictions] = useState([]);
+
+  const engine = useRef(PredictionEngine.forAutism());
+
+  const handleSymbolSelect = (symbolId: string) =&gt; {
+    engine.current.recordSymbolSelection(symbolId, currentContext);
+    const newPredictions = engine.current.predictNext(context, [symbolId]);
+    setPredictions(newPredictions);
+  };
+
+  return (
+    &lt;AdaptiveGrid&gt;
+      {predictions.map(pred =&gt; (
+        &lt;AdaptiveSymbol
+          key={pred.symbolId}
+          highlighted={pred.rank &lt;= 3}
+        /&gt;
+      ))}
+    &lt;/AdaptiveGrid&gt;
+  );
+}</code></pre>
+<h3 id="python-백엔드-통합">8.2 Python 백엔드 통합</h3>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> wia_cognitive_aac <span class="im">import</span> SequenceModel, ContextModel</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 모델 초기화</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>seq_model <span class="op">=</span> SequenceModel()</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>ctx_model <span class="op">=</span> ContextModel()</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 예측 서비스</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_predictions(context, recent_symbols):</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    seq_preds <span class="op">=</span> seq_model.predict(recent_symbols)</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    ctx_preds <span class="op">=</span> ctx_model.predict(context)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> merge_predictions(seq_preds, ctx_preds)</span></code></pre></div>
+<hr />
+<h2 id="다음-단계">9. 다음 단계</h2>
+<p>Phase 3 완료 후 Phase 4 (케어기버 연동) 진행: - 케어기버 앱 인터페이스 - 원격 설정 관리 - 사용 통계 대시보드</p>
+<hr />
+<p><em>WIA Cognitive AAC Prediction Specification v1.0</em> <em>Last Updated: 2024</em></p>
+<hr />
+<h1 id="wia-cognitive-aac---prediction-learning-specification-1">WIA Cognitive AAC - Prediction &amp; Learning Specification</h1>
+<h2 id="phase-3-예측학습-알고리즘-명세-1">Phase 3: 예측/학습 알고리즘 명세</h2>
+<p><strong>홍익인간 (弘益人間) - 널리 인간을 이롭게 하라</strong></p>
+<hr />
+<h2 id="개요-1">1. 개요</h2>
+<h3 id="목적-1">1.1 목적</h3>
+<p>인지 장애 사용자의 AAC 의사소통 효율성을 높이기 위한 개인화된 예측 시스템. 사용자의 패턴을 학습하여 다음에 사용할 가능성이 높은 심볼을 예측합니다.</p>
+<h3 id="핵심-원칙-1">1.2 핵심 원칙</h3>
+<ol type="1">
+<li><strong>온디바이스 학습</strong>: 모든 학습은 사용자 기기에서 수행</li>
+<li><strong>프라이버시 우선</strong>: 개인 데이터는 기기를 떠나지 않음</li>
+<li><strong>적응적 예측</strong>: 사용자 특성에 맞는 맞춤 예측</li>
+<li><strong>투명한 설명</strong>: 예측 이유를 이해하기 쉽게 제공</li>
+</ol>
+<hr />
+<h2 id="예측-모델-1">2. 예측 모델</h2>
+<h3 id="다중-소스-예측-1">2.1 다중 소스 예측</h3>
+<p>예측은 여러 소스의 정보를 종합하여 생성됩니다:</p>
+<table>
+<thead>
+<tr class="header">
+<th>소스</th>
+<th>설명</th>
+<th>가중치</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>frequency</strong></td>
+<td>전체 사용 빈도 기반</td>
+<td>0.25</td>
+</tr>
+<tr class="even">
+<td><strong>sequence</strong></td>
+<td>심볼 연쇄 패턴</td>
+<td>0.30</td>
+</tr>
+<tr class="odd">
+<td><strong>context</strong></td>
+<td>상황(위치, 활동, 대화상대)</td>
+<td>0.25</td>
+</tr>
+<tr class="even">
+<td><strong>time</strong></td>
+<td>시간대/요일 패턴</td>
+<td>0.20</td>
+</tr>
+</tbody>
+</table>
+<h3 id="예측-결과-구조-1">2.2 예측 결과 구조</h3>
+<div class="sourceCode" id="cb14"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> PredictedSymbol {</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  symbolId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span>           <span class="co">// 심볼 식별자</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  probability<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>        <span class="co">// 예측 확률 (0-1)</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  source<span class="op">:</span> PredictionSource<span class="op">;</span>   <span class="co">// 예측 근거</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  explanation<span class="op">?:</span> <span class="dt">string</span><span class="op">;</span>       <span class="co">// 사용자 친화적 설명</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  rank<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>               <span class="co">// 순위</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> PredictionSource <span class="op">=</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;frequency&#39;</span>     <span class="co">// &quot;자주 사용하는 심볼&quot;</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;sequence&#39;</span>      <span class="co">// &quot;이전에 이어서 사용했던 심볼&quot;</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;context&#39;</span>       <span class="co">// &quot;식사 시간에 자주 사용하는 심볼&quot;</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;time&#39;</span>          <span class="co">// &quot;아침에 자주 사용하는 심볼&quot;</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;routine&#39;</span>       <span class="co">// &quot;일과 시간에 필요한 심볼&quot; (자폐)</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;reminiscence&#39;</span><span class="op">;</span> <span class="co">// &quot;익숙한 기억과 연결된 심볼&quot; (치매)</span></span></code></pre></div>
+<hr />
+<h2 id="학습-알고리즘-1">3. 학습 알고리즘</h2>
+<h3 id="n-gram-시퀀스-모델-1">3.1 N-gram 시퀀스 모델</h3>
+<p>경량화된 N-gram 모델로 심볼 시퀀스 패턴 학습:</p>
+<pre><code>P(symbol_n | symbol_1, ..., symbol_{n-1})</code></pre>
+<h4 id="특징-1">특징:</h4>
+<ul>
+<li>최대 4-gram까지 지원</li>
+<li>Laplace smoothing 적용</li>
+<li>시간 기반 감쇠 (decay factor: 0.95/일)</li>
+<li>온디바이스 추론 가능한 경량 설계</li>
+</ul>
+<h4 id="예시-1">예시:</h4>
+<pre><code>사용자가 &quot;아침&quot; → &quot;먹다&quot; 시퀀스를 자주 사용하면:
+P(&quot;먹다&quot; | &quot;아침&quot;) = 높음
+→ &quot;아침&quot; 선택 후 &quot;먹다&quot; 예측 확률 상승</code></pre>
+<h3 id="컨텍스트-모델-1">3.2 컨텍스트 모델</h3>
+<p>다중 컨텍스트 신호를 통합한 예측:</p>
+<table>
+<thead>
+<tr class="header">
+<th>컨텍스트</th>
+<th>감지 방법</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>시간</strong></td>
+<td>시스템 시계</td>
+<td>7-9시 → 아침 식사</td>
+</tr>
+<tr class="even">
+<td><strong>위치</strong></td>
+<td>GPS/실내 위치</td>
+<td>부엌 → 식사 관련</td>
+</tr>
+<tr class="odd">
+<td><strong>활동</strong></td>
+<td>일과표/감지</td>
+<td>수업 시간 → 학습 관련</td>
+</tr>
+<tr class="even">
+<td><strong>대화상대</strong></td>
+<td>앱 설정</td>
+<td>엄마 → 가족 대화</td>
+</tr>
+<tr class="odd">
+<td><strong>기분</strong></td>
+<td>이전 선택</td>
+<td>통증 표현 → 불편함</td>
+</tr>
+</tbody>
+</table>
+<h3 id="인지장애-특화-모델-1">3.3 인지장애 특화 모델</h3>
+<h4 id="자폐-스펙트럼-autism-1">자폐 스펙트럼 (Autism)</h4>
+<div class="sourceCode" id="cb17"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> AutismPredictionModel {</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 루틴 기반 예측 강화</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  routineWeight<span class="op">:</span> <span class="fl">1.5</span><span class="op">;</span>  <span class="co">// 루틴 심볼 가중치 50% 상승</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 전환 예측</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  transitionPrediction<span class="op">:</span> {</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    warnBeforeMinutes<span class="op">:</span> <span class="dv">5</span><span class="op">;</span>  <span class="co">// 전환 5분 전 알림</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    suggestTransitionSymbols<span class="op">:</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 예측 가능성 최대화</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>  consistentPredictions<span class="op">:</span> <span class="kw">true</span><span class="op">;</span>  <span class="co">// 동일 상황 → 동일 예측</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h4 id="치매-dementia-1">치매 (Dementia)</h4>
+<div class="sourceCode" id="cb18"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> DementiaPredictionModel {</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 장기 기억 우선</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  longTermMemoryWeight<span class="op">:</span> <span class="fl">1.3</span><span class="op">;</span>  <span class="co">// 익숙한 심볼 가중치 상승</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 느린 학습</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  decayFactor<span class="op">:</span> <span class="fl">0.99</span><span class="op">;</span>  <span class="co">// 천천히 잊기</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 반복 허용</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>  allowRepetition<span class="op">:</span> <span class="kw">true</span><span class="op">;</span>  <span class="co">// 같은 질문 반복 허용</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 지남력 지원</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>  orientationSupport<span class="op">:</span> {</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>    showDateTime<span class="op">:</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>    showLocation<span class="op">:</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="사용-패턴-데이터-구조-1">4. 사용 패턴 데이터 구조</h2>
+<h3 id="시간별-패턴-1">4.1 시간별 패턴</h3>
+<div class="sourceCode" id="cb19"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> TemporalPattern {</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  hourlyFrequency<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">number</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>  <span class="co">// 0-23시</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  dayOfWeek<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">number</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>        <span class="co">// 0-6 (일-토)</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  contextual<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>       <span class="co">// 식사, 수업 등</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="시퀀스-패턴-1">4.2 시퀀스 패턴</h3>
+<div class="sourceCode" id="cb20"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> SequencePattern {</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  commonPhrases<span class="op">:</span> Phrase[]<span class="op">;</span>      <span class="co">// 자주 사용하는 문장</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  symbolChains<span class="op">:</span> SymbolChain[]<span class="op">;</span>  <span class="co">// 심볼 연쇄</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> SymbolChain {</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  symbols<span class="op">:</span> <span class="dt">string</span>[]<span class="op">;</span>     <span class="co">// [&quot;인사&quot;, &quot;감사&quot;]</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  frequency<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>     <span class="co">// 50회</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  avgInterval<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>   <span class="co">// 평균 500ms</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>  probability<span class="op">:</span> <span class="dt">number</span><span class="op">;</span>   <span class="co">// 0.75</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="컨텍스트별-패턴-1">4.3 컨텍스트별 패턴</h3>
+<div class="sourceCode" id="cb21"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> ContextualPattern {</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  locationBased<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>   <span class="co">// 위치별</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  personBased<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>     <span class="co">// 대화상대별</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  activityBased<span class="op">:</span> <span class="bu">Map</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> SymbolFrequency[]<span class="op">&gt;;</span>   <span class="co">// 활동별</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<hr />
+<h2 id="api-명세-1">5. API 명세</h2>
+<h3 id="typescript-api-1">5.1 TypeScript API</h3>
+<div class="sourceCode" id="cb22"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 예측 엔진 생성</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> engine <span class="op">=</span> PredictionEngine<span class="op">.</span><span class="fu">forAutism</span>(config)<span class="op">;</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="co">// 다음 심볼 예측</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> predictions <span class="op">=</span> engine<span class="op">.</span><span class="fu">predictNext</span>(context<span class="op">,</span> recentSymbols)<span class="op">;</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a><span class="co">// 문장 완성 예측</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> completions <span class="op">=</span> engine<span class="op">.</span><span class="fu">predictCompletion</span>(partialPhrase<span class="op">,</span> context)<span class="op">;</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a><span class="co">// 상황 기반 보드 추천</span></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> board <span class="op">=</span> engine<span class="op">.</span><span class="fu">recommendForContext</span>(context)<span class="op">;</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a><span class="co">// 학습 이벤트 기록</span></span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>engine<span class="op">.</span><span class="fu">recordSymbolSelection</span>(symbolId<span class="op">,</span> context<span class="op">,</span> responseTime)<span class="op">;</span></span></code></pre></div>
+<h3 id="python-api-1">5.2 Python API</h3>
+<div class="sourceCode" id="cb23"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 시퀀스 모델</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> SequenceModel()</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>model.train(sequences)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>predictions <span class="op">=</span> model.predict(context, top_k<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 컨텍스트 모델</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>ctx_model <span class="op">=</span> ContextModel()</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>ctx_model.update(symbol_id, context)</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>ctx_predictions <span class="op">=</span> ctx_model.predict(context)</span></code></pre></div>
+<hr />
+<h2 id="성능-요구사항-1">6. 성능 요구사항</h2>
+<h3 id="응답-시간-1">6.1 응답 시간</h3>
+<table>
+<thead>
+<tr class="header">
+<th>작업</th>
+<th>목표</th>
+<th>최대</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>다음 심볼 예측</td>
+<td>50ms</td>
+<td>100ms</td>
+</tr>
+<tr class="even">
+<td>문장 완성</td>
+<td>100ms</td>
+<td>200ms</td>
+</tr>
+<tr class="odd">
+<td>학습 업데이트</td>
+<td>10ms</td>
+<td>50ms</td>
+</tr>
+</tbody>
+</table>
+<h3 id="정확도-목표-1">6.2 정확도 목표</h3>
+<table>
+<thead>
+<tr class="header">
+<th>지표</th>
+<th>목표</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Top-1 정확도</td>
+<td>30%</td>
+</tr>
+<tr class="even">
+<td>Top-5 정확도</td>
+<td>60%</td>
+</tr>
+<tr class="odd">
+<td>Top-8 정확도</td>
+<td>75%</td>
+</tr>
+</tbody>
+</table>
+<h3 id="리소스-제한-1">6.3 리소스 제한</h3>
+<table>
+<thead>
+<tr class="header">
+<th>리소스</th>
+<th>제한</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>메모리</td>
+<td>&lt; 50MB</td>
+</tr>
+<tr class="even">
+<td>모델 크기</td>
+<td>&lt; 10MB</td>
+</tr>
+<tr class="odd">
+<td>배터리 영향</td>
+<td>&lt; 5%</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="적응-전략-1">7. 적응 전략</h2>
+<h3 id="신규-사용자-1">7.1 신규 사용자</h3>
+<ul>
+<li>첫 주: 인구 통계 기반 기본 예측</li>
+<li>2-4주: 빈도 기반 학습 시작</li>
+<li>1개월+: 전체 패턴 학습 활성화</li>
+</ul>
+<h3 id="점진적-학습-1">7.2 점진적 학습</h3>
+<pre><code>신뢰도 = min(1.0, 사용_횟수 / 100)
+예측_가중치 = 기본_가중치 × (0.5 + 0.5 × 신뢰도)</code></pre>
+<h3 id="감쇠-및-갱신-1">7.3 감쇠 및 갱신</h3>
+<ul>
+<li><strong>일간 감쇠</strong>: factor = 0.95</li>
+<li><strong>최소 임계값</strong>: 2회 미만 패턴 제거</li>
+<li><strong>최대 저장</strong>: 최근 90일 데이터</li>
+</ul>
+<hr />
+<h2 id="통합-가이드-1">8. 통합 가이드</h2>
+<h3 id="react-컴포넌트-통합-1">8.1 React 컴포넌트 통합</h3>
+<pre class="tsx"><code>function AACBoard() {
+  const { config } = useAdaptiveUI({ profile });
+  const [predictions, setPredictions] = useState([]);
+
+  const engine = useRef(PredictionEngine.forAutism());
+
+  const handleSymbolSelect = (symbolId: string) =&gt; {
+    engine.current.recordSymbolSelection(symbolId, currentContext);
+    const newPredictions = engine.current.predictNext(context, [symbolId]);
+    setPredictions(newPredictions);
+  };
+
+  return (
+    &lt;AdaptiveGrid&gt;
+      {predictions.map(pred =&gt; (
+        &lt;AdaptiveSymbol
+          key={pred.symbolId}
+          highlighted={pred.rank &lt;= 3}
+        /&gt;
+      ))}
+    &lt;/AdaptiveGrid&gt;
+  );
+}</code></pre>
+<h3 id="python-백엔드-통합-1">8.2 Python 백엔드 통합</h3>
+<div class="sourceCode" id="cb26"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> wia_cognitive_aac <span class="im">import</span> SequenceModel, ContextModel</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 모델 초기화</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>seq_model <span class="op">=</span> SequenceModel()</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>ctx_model <span class="op">=</span> ContextModel()</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 예측 서비스</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_predictions(context, recent_symbols):</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>    seq_preds <span class="op">=</span> seq_model.predict(recent_symbols)</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>    ctx_preds <span class="op">=</span> ctx_model.predict(context)</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> merge_predictions(seq_preds, ctx_preds)</span></code></pre></div>
+<hr />
+<h2 id="다음-단계-1">9. 다음 단계</h2>
+<p>Phase 3 완료 후 Phase 4 (케어기버 연동) 진행: - 케어기버 앱 인터페이스 - 원격 설정 관리 - 사용 통계 대시보드</p>
+<hr />
+<p><em>WIA Cognitive AAC Prediction Specification v1.0</em> <em>Last Updated: 2024</em></p>
+<hr />
+<h1 id="wia-cognitive-aac---phase-4-caregiver-integration-specification">WIA Cognitive AAC - Phase 4: Caregiver Integration Specification</h1>
+<h2 id="케어기버전문가-통합-시스템-명세">케어기버/전문가 통합 시스템 명세</h2>
+<p><strong>홍익인간 (弘益人間) - 널리 인간을 이롭게 하라</strong></p>
+<hr />
+<h2 id="개요-2">1. 개요</h2>
+<h3 id="목적-2">1.1 목적</h3>
+<p>인지 장애 AAC 사용자를 지원하는 케어기버, 전문가, 가족 간의 원활한 협업을 위한 통합 시스템.</p>
+<h3 id="핵심-원칙-2">1.2 핵심 원칙</h3>
+<ol type="1">
+<li><strong>사용자 중심</strong>: 모든 기능은 AAC 사용자의 이익을 위해</li>
+<li><strong>프라이버시 우선</strong>: 명시적 동의 기반 데이터 공유</li>
+<li><strong>접근성</strong>: 다양한 역할에 맞는 인터페이스</li>
+<li><strong>규정 준수</strong>: HIPAA, GDPR 완전 준수</li>
+</ol>
+<hr />
+<h2 id="시스템-아키텍처">2. 시스템 아키텍처</h2>
+<h3 id="전체-구조">2.1 전체 구조</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                      클라이언트 앱들                        │
+├─────────────┬─────────────┬─────────────┬──────────────────┤
+│  AAC 앱     │ 케어기버 앱 │ 전문가 웹   │ 가족 포털        │
+│  (사용자)   │ (모바일)    │ (대시보드)  │ (웹/모바일)      │
+└──────┬──────┴──────┬──────┴──────┬──────┴────────┬─────────┘
+       │             │             │               │
+       └─────────────┴──────┬──────┴───────────────┘
+                            │
+                   ┌────────▼────────┐
+                   │   API Gateway   │
+                   │  (인증/라우팅)  │
+                   └────────┬────────┘
+                            │
+       ┌────────────────────┼────────────────────┐
+       │                    │                    │
+┌──────▼──────┐     ┌───────▼──────┐     ┌──────▼──────┐
+│  REST API   │     │  WebSocket   │     │  Compliance │
+│  (CRUD)     │     │  (실시간)    │     │  (감사/동의)│
+└──────┬──────┘     └───────┬──────┘     └──────┬──────┘
+       │                    │                    │
+       └────────────────────┼────────────────────┘
+                            │
+                   ┌────────▼────────┐
+                   │    Database     │
+                   │  (암호화 저장)  │
+                   └─────────────────┘</code></pre>
+<h3 id="마이크로서비스-구성">2.2 마이크로서비스 구성</h3>
+<table>
+<thead>
+<tr class="header">
+<th>서비스</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>CaregiverService</strong></td>
+<td>케어기버 대시보드, 모니터링</td>
+</tr>
+<tr class="even">
+<td><strong>ProfessionalService</strong></td>
+<td>전문가 평가, 치료 계획</td>
+</tr>
+<tr class="odd">
+<td><strong>FamilyService</strong></td>
+<td>가족 참여, 회상 기능</td>
+</tr>
+<tr class="even">
+<td><strong>ComplianceService</strong></td>
+<td>HIPAA/GDPR 준수</td>
+</tr>
+<tr class="odd">
+<td><strong>RealtimeService</strong></td>
+<td>WebSocket 실시간 통신</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="api-명세-2">3. API 명세</h2>
+<h3 id="케어기버-api">3.1 케어기버 API</h3>
+<div class="sourceCode" id="cb28"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 실시간 모니터링</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>live</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> LiveMonitoringData</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 일간 요약</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>daily<span class="op">-</span>summary</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>Query<span class="op">:</span> { date<span class="op">?:</span> <span class="dt">string</span> }</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> DailySummary</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a><span class="co">// 주간 진행상황</span></span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>weekly<span class="op">-</span>progress</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>Query<span class="op">:</span> { weekStart<span class="op">?:</span> <span class="dt">string</span> }</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> WeeklyProgress</span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a><span class="co">// 활동 기록</span></span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>activities</span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> data }</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> Activity</span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a><span class="co">// UI 원격 조정</span></span>
+<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>adjust<span class="op">-</span>ui</span>
+<span id="cb28-22"><a href="#cb28-22" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> UIConfiguration</span>
+<span id="cb28-23"><a href="#cb28-23" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> { success<span class="op">,</span> message }</span>
+<span id="cb28-24"><a href="#cb28-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-25"><a href="#cb28-25" aria-hidden="true" tabindex="-1"></a><span class="co">// 기기 잠금</span></span>
+<span id="cb28-26"><a href="#cb28-26" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>lock</span>
+<span id="cb28-27"><a href="#cb28-27" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { locked<span class="op">:</span> <span class="dt">boolean</span> }</span>
+<span id="cb28-28"><a href="#cb28-28" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> { success<span class="op">,</span> locked }</span></code></pre></div>
+<h3 id="전문가-api">3.2 전문가 API</h3>
+<div class="sourceCode" id="cb29"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 클라이언트 목록</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ClientSummary[]</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 평가 실시</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>assessments</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> scores<span class="op">,</span> notes }</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> AssessmentResult</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a><span class="co">// 목표 설정</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>goals</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> Goal</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> Goal</span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a><span class="co">// 목표 진행 업데이트</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>PATCH <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>goals<span class="op">/:</span>goalId<span class="op">/</span>progress</span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { progress<span class="op">:</span> <span class="dt">number</span> }</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> GoalProgress</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a><span class="co">// 임상 보고서 생성</span></span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>reports</span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> period }</span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ClinicalReport</span></code></pre></div>
+<h3 id="가족-api">3.3 가족 API</h3>
+<div class="sourceCode" id="cb30"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 사진 업로드</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>photos</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> Photo</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> Photo</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a><span class="co">// 메시지 전송</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>messages</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { content<span class="op">,</span> <span class="kw">type</span><span class="op">,</span> senderName }</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> FamilyMessage</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a><span class="co">// 인생 이야기 추가</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>life<span class="op">-</span>story</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> LifeStoryEntry</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> LifeStoryEntry</span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a><span class="co">// 회상 세션 시작</span></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>reminiscence</span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { topic<span class="op">:</span> <span class="dt">string</span> }</span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ReminiscenceSession</span></code></pre></div>
+<h3 id="규정-준수-api">3.4 규정 준수 API</h3>
+<div class="sourceCode" id="cb31"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 동의 기록</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>consents</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> ConsentRecord</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ConsentRecord</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a><span class="co">// GDPR 데이터 접근</span></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>gdpr<span class="op">/</span>access</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> PersonalData</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a><span class="co">// GDPR 데이터 삭제</span></span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>DELETE <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>gdpr<span class="op">/</span>erasure</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> { success<span class="op">,</span> message }</span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a><span class="co">// 규정 준수 보고서</span></span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>reports</span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>Query<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> startDate<span class="op">,</span> endDate }</span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ComplianceReport</span></code></pre></div>
+<hr />
+<h2 id="실시간-통신">4. 실시간 통신</h2>
+<h3 id="websocket-프로토콜">4.1 WebSocket 프로토콜</h3>
+<div class="sourceCode" id="cb32"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 연결</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>ws<span class="op">:</span><span class="co">//api.wia-aac.org/ws?clientId=xxx&amp;token=yyy</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="co">// 메시지 유형</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> WSMessageType <span class="op">=</span></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;activity&#39;</span>        <span class="co">// 활동 업데이트</span></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;mood_change&#39;</span>     <span class="co">// 기분 변화</span></span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;alert&#39;</span>           <span class="co">// 알림</span></span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;config_change&#39;</span>   <span class="co">// 설정 변경</span></span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;message&#39;</span>         <span class="co">// 메시지</span></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;session_start&#39;</span>   <span class="co">// 세션 시작</span></span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;session_end&#39;</span><span class="op">;</span>    <span class="co">// 세션 종료</span></span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a><span class="co">// 메시지 형식</span></span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> WebSocketMessage {</span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>  type<span class="op">:</span> WSMessageType<span class="op">;</span></span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a>  clientId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb32-18"><a href="#cb32-18" aria-hidden="true" tabindex="-1"></a>  timestamp<span class="op">:</span> <span class="bu">Date</span><span class="op">;</span></span>
+<span id="cb32-19"><a href="#cb32-19" aria-hidden="true" tabindex="-1"></a>  payload<span class="op">:</span> <span class="dt">unknown</span><span class="op">;</span></span>
+<span id="cb32-20"><a href="#cb32-20" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="이벤트-흐름">4.2 이벤트 흐름</h3>
+<pre><code>AAC 앱                  서버                케어기버 앱
+  │                      │                      │
+  │ ── activity ──────► │                      │
+  │                      │ ── broadcast ──────►│
+  │                      │                      │ (화면 업데이트)
+  │                      │                      │
+  │ ── mood_change ───► │                      │
+  │                      │ ── broadcast ──────►│
+  │                      │                      │ (알림 표시)</code></pre>
+<hr />
+<h2 id="데이터-모델">5. 데이터 모델</h2>
+<h3 id="핵심-엔티티">5.1 핵심 엔티티</h3>
+<div class="sourceCode" id="cb34"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 클라이언트 (AAC 사용자)</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> Client {</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>  name<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>  type<span class="op">:</span> <span class="st">&#39;autism&#39;</span> <span class="op">|</span> <span class="st">&#39;dementia&#39;</span> <span class="op">|</span> <span class="st">&#39;general&#39;</span><span class="op">;</span></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>  dateOfBirth<span class="op">?:</span> <span class="bu">Date</span><span class="op">;</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>  profileId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>  caregivers<span class="op">:</span> CaregiverLink[]<span class="op">;</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>  professionals<span class="op">:</span> ProfessionalLink[]<span class="op">;</span></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>  family<span class="op">:</span> FamilyLink[]<span class="op">;</span></span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a><span class="co">// 활동</span></span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> Activity {</span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a>  clientId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-17"><a href="#cb34-17" aria-hidden="true" tabindex="-1"></a>  type<span class="op">:</span> <span class="st">&#39;communication&#39;</span> <span class="op">|</span> <span class="st">&#39;navigation&#39;</span> <span class="op">|</span> <span class="st">&#39;selection&#39;</span><span class="op">;</span></span>
+<span id="cb34-18"><a href="#cb34-18" aria-hidden="true" tabindex="-1"></a>  timestamp<span class="op">:</span> <span class="bu">Date</span><span class="op">;</span></span>
+<span id="cb34-19"><a href="#cb34-19" aria-hidden="true" tabindex="-1"></a>  data<span class="op">:</span> ActivityData<span class="op">;</span></span>
+<span id="cb34-20"><a href="#cb34-20" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb34-21"><a href="#cb34-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-22"><a href="#cb34-22" aria-hidden="true" tabindex="-1"></a><span class="co">// 목표</span></span>
+<span id="cb34-23"><a href="#cb34-23" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> Goal {</span>
+<span id="cb34-24"><a href="#cb34-24" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-25"><a href="#cb34-25" aria-hidden="true" tabindex="-1"></a>  clientId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-26"><a href="#cb34-26" aria-hidden="true" tabindex="-1"></a>  title<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb34-27"><a href="#cb34-27" aria-hidden="true" tabindex="-1"></a>  category<span class="op">:</span> GoalCategory<span class="op">;</span></span>
+<span id="cb34-28"><a href="#cb34-28" aria-hidden="true" tabindex="-1"></a>  status<span class="op">:</span> GoalStatus<span class="op">;</span></span>
+<span id="cb34-29"><a href="#cb34-29" aria-hidden="true" tabindex="-1"></a>  progress<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb34-30"><a href="#cb34-30" aria-hidden="true" tabindex="-1"></a>  milestones<span class="op">:</span> Milestone[]<span class="op">;</span></span>
+<span id="cb34-31"><a href="#cb34-31" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="관계도">5.2 관계도</h3>
+<pre><code>┌──────────┐       ┌──────────────┐       ┌──────────┐
+│  Client  │──1:N──│  Activity    │       │   Goal   │
+└────┬─────┘       └──────────────┘       └────┬─────┘
+     │                                         │
+     │ 1:N                                     │ 1:N
+     ▼                                         ▼
+┌──────────┐       ┌──────────────┐       ┌──────────┐
+│ Caregiver│       │ Professional │       │Milestone │
+│   Link   │       │    Link      │       │          │
+└──────────┘       └──────────────┘       └──────────┘</code></pre>
+<hr />
+<h2 id="보안-및-규정-준수">6. 보안 및 규정 준수</h2>
+<h3 id="인증인가">6.1 인증/인가</h3>
+<table>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>구현</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>인증</strong></td>
+<td>JWT + Refresh Token</td>
+</tr>
+<tr class="even">
+<td><strong>인가</strong></td>
+<td>RBAC (역할 기반 접근 제어)</td>
+</tr>
+<tr class="odd">
+<td><strong>세션</strong></td>
+<td>30분 타임아웃, 재인증</td>
+</tr>
+<tr class="even">
+<td><strong>MFA</strong></td>
+<td>전문가/관리자 필수</td>
+</tr>
+</tbody>
+</table>
+<h3 id="역할별-권한">6.2 역할별 권한</h3>
+<table>
+<thead>
+<tr class="header">
+<th>역할</th>
+<th>활동 보기</th>
+<th>UI 조정</th>
+<th>평가</th>
+<th>데이터 내보내기</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>케어기버</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr class="even">
+<td>전문가</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr class="odd">
+<td>가족</td>
+<td>제한적</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr class="even">
+<td>관리자</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hipaa-준수">6.3 HIPAA 준수</h3>
+<table>
+<thead>
+<tr class="header">
+<th>요구사항</th>
+<th>구현</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>PHI 암호화</td>
+<td>AES-256 (저장), TLS 1.3 (전송)</td>
+</tr>
+<tr class="even">
+<td>접근 제어</td>
+<td>역할 기반 + 동의 기반</td>
+</tr>
+<tr class="odd">
+<td>감사 추적</td>
+<td>모든 PHI 접근 로깅</td>
+</tr>
+<tr class="even">
+<td>위반 통지</td>
+<td>자동 감지 및 알림</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gdpr-준수">6.4 GDPR 준수</h3>
+<table>
+<thead>
+<tr class="header">
+<th>권리</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>접근권</td>
+<td><code>GET /gdpr/access</code></td>
+</tr>
+<tr class="even">
+<td>정정권</td>
+<td><code>PATCH /gdpr/rectification</code></td>
+</tr>
+<tr class="odd">
+<td>삭제권</td>
+<td><code>DELETE /gdpr/erasure</code></td>
+</tr>
+<tr class="even">
+<td>이동권</td>
+<td><code>POST /gdpr/portability</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="알림-시스템">7. 알림 시스템</h2>
+<h3 id="알림-유형">7.1 알림 유형</h3>
+<table>
+<thead>
+<tr class="header">
+<th>유형</th>
+<th>트리거</th>
+<th>수신자</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>긴급</strong></td>
+<td>도움 요청, 응급</td>
+<td>모든 케어기버</td>
+</tr>
+<tr class="even">
+<td><strong>경고</strong></td>
+<td>비활동, 기분 급변</td>
+<td>주 케어기버</td>
+</tr>
+<tr class="odd">
+<td><strong>정보</strong></td>
+<td>세션 시작/종료</td>
+<td>구독자</td>
+</tr>
+<tr class="even">
+<td><strong>일정</strong></td>
+<td>예약된 알림</td>
+<td>지정 수신자</td>
+</tr>
+</tbody>
+</table>
+<h3 id="전달-채널">7.2 전달 채널</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│              알림 서비스                │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌─────────┐  ┌────────┐  ┌─────────┐  │
+│  │  푸시   │  │  SMS   │  │ 이메일  │  │
+│  │ (FCM)  │  │(Twilio)│  │(SendGrid)│ │
+│  └─────────┘  └────────┘  └─────────┘  │
+│                                         │
+│  우선순위: 긴급 → 모든 채널             │
+│           경고 → 푸시 + SMS             │
+│           정보 → 푸시만                 │
+└─────────────────────────────────────────┘</code></pre>
+<hr />
+<h2 id="배포-구성">8. 배포 구성</h2>
+<h3 id="인프라">8.1 인프라</h3>
+<div class="sourceCode" id="cb37"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Docker Compose (개발)</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="fu">services</span><span class="kw">:</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">api</span><span class="kw">:</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">image</span><span class="kw">:</span><span class="at"> wia-cognitive-aac-api</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;3001:3001&quot;</span></span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">environment</span><span class="kw">:</span></span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> NODE_ENV=development</span></span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">database</span><span class="kw">:</span></span>
+<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">image</span><span class="kw">:</span><span class="at"> postgres:15</span></span>
+<span id="cb37-12"><a href="#cb37-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb37-13"><a href="#cb37-13" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> pgdata:/var/lib/postgresql/data</span></span>
+<span id="cb37-14"><a href="#cb37-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-15"><a href="#cb37-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">redis</span><span class="kw">:</span></span>
+<span id="cb37-16"><a href="#cb37-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">image</span><span class="kw">:</span><span class="at"> redis:7</span></span></code></pre></div>
+<h3 id="확장성">8.2 확장성</h3>
+<table>
+<thead>
+<tr class="header">
+<th>컴포넌트</th>
+<th>확장 전략</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>API 서버</td>
+<td>수평 확장 (로드 밸런서)</td>
+</tr>
+<tr class="even">
+<td>WebSocket</td>
+<td>Sticky 세션 + Redis Pub/Sub</td>
+</tr>
+<tr class="odd">
+<td>데이터베이스</td>
+<td>읽기 복제본</td>
+</tr>
+<tr class="even">
+<td>파일 저장소</td>
+<td>S3 호환 스토리지</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="구현-체크리스트">9. 구현 체크리스트</h2>
+<h3 id="백엔드-api">9.1 백엔드 API</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />타입 정의 (<code>types/index.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />케어기버 서비스 (<code>CaregiverService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />전문가 서비스 (<code>ProfessionalService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />가족 서비스 (<code>FamilyService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />규정 준수 서비스 (<code>ComplianceService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />API 라우트 (<code>routes/index.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />WebSocket 서버 (<code>index.ts</code>)</label></li>
+</ul>
+<h3 id="문서화">9.2 문서화</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />케어기버 가이드 (<code>CAREGIVER-GUIDE.md</code>)</label></li>
+<li><label><input type="checkbox" checked="" />전문가 가이드 (<code>PROFESSIONAL-GUIDE.md</code>)</label></li>
+<li><label><input type="checkbox" checked="" />Phase 4 명세 (이 문서)</label></li>
+</ul>
+<h3 id="향후-구현">9.3 향후 구현</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" />프론트엔드 앱 (React Native / React)</label></li>
+<li><label><input type="checkbox" />푸시 알림 서비스</label></li>
+<li><label><input type="checkbox" />데이터베이스 마이그레이션</label></li>
+<li><label><input type="checkbox" />E2E 테스트</label></li>
+</ul>
+<hr />
+<h2 id="결론">10. 결론</h2>
+<p>Phase 4는 WIA Cognitive AAC 표준의 마지막 단계로, 사용자-케어기버-전문가-가족 간의 연결을 완성합니다.</p>
+<p><strong>핵심 가치:</strong></p>
+<blockquote>
+<p>“인지 능력과 관계없이 모든 사람이 사랑하는 사람들과 연결될 수 있도록”</p>
+</blockquote>
+<hr />
+<p><em>WIA Cognitive AAC Phase 4 Specification v1.0</em> <em>Last Updated: 2024</em></p>
+<p><strong>홍익인간 (弘益人間) - 널리 인간을 이롭게 하라</strong> 🌏</p>
+<hr />
+<h1 id="wia-cognitive-aac---phase-4-caregiver-integration-specification-1">WIA Cognitive AAC - Phase 4: Caregiver Integration Specification</h1>
+<h2 id="케어기버전문가-통합-시스템-명세-1">케어기버/전문가 통합 시스템 명세</h2>
+<p><strong>홍익인간 (弘益人間) - 널리 인간을 이롭게 하라</strong></p>
+<hr />
+<h2 id="개요-3">1. 개요</h2>
+<h3 id="목적-3">1.1 목적</h3>
+<p>인지 장애 AAC 사용자를 지원하는 케어기버, 전문가, 가족 간의 원활한 협업을 위한 통합 시스템.</p>
+<h3 id="핵심-원칙-3">1.2 핵심 원칙</h3>
+<ol type="1">
+<li><strong>사용자 중심</strong>: 모든 기능은 AAC 사용자의 이익을 위해</li>
+<li><strong>프라이버시 우선</strong>: 명시적 동의 기반 데이터 공유</li>
+<li><strong>접근성</strong>: 다양한 역할에 맞는 인터페이스</li>
+<li><strong>규정 준수</strong>: HIPAA, GDPR 완전 준수</li>
+</ol>
+<hr />
+<h2 id="시스템-아키텍처-1">2. 시스템 아키텍처</h2>
+<h3 id="전체-구조-1">2.1 전체 구조</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                      클라이언트 앱들                        │
+├─────────────┬─────────────┬─────────────┬──────────────────┤
+│  AAC 앱     │ 케어기버 앱 │ 전문가 웹   │ 가족 포털        │
+│  (사용자)   │ (모바일)    │ (대시보드)  │ (웹/모바일)      │
+└──────┬──────┴──────┬──────┴──────┬──────┴────────┬─────────┘
+       │             │             │               │
+       └─────────────┴──────┬──────┴───────────────┘
+                            │
+                   ┌────────▼────────┐
+                   │   API Gateway   │
+                   │  (인증/라우팅)  │
+                   └────────┬────────┘
+                            │
+       ┌────────────────────┼────────────────────┐
+       │                    │                    │
+┌──────▼──────┐     ┌───────▼──────┐     ┌──────▼──────┐
+│  REST API   │     │  WebSocket   │     │  Compliance │
+│  (CRUD)     │     │  (실시간)    │     │  (감사/동의)│
+└──────┬──────┘     └───────┬──────┘     └──────┬──────┘
+       │                    │                    │
+       └────────────────────┼────────────────────┘
+                            │
+                   ┌────────▼────────┐
+                   │    Database     │
+                   │  (암호화 저장)  │
+                   └─────────────────┘</code></pre>
+<h3 id="마이크로서비스-구성-1">2.2 마이크로서비스 구성</h3>
+<table>
+<thead>
+<tr class="header">
+<th>서비스</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>CaregiverService</strong></td>
+<td>케어기버 대시보드, 모니터링</td>
+</tr>
+<tr class="even">
+<td><strong>ProfessionalService</strong></td>
+<td>전문가 평가, 치료 계획</td>
+</tr>
+<tr class="odd">
+<td><strong>FamilyService</strong></td>
+<td>가족 참여, 회상 기능</td>
+</tr>
+<tr class="even">
+<td><strong>ComplianceService</strong></td>
+<td>HIPAA/GDPR 준수</td>
+</tr>
+<tr class="odd">
+<td><strong>RealtimeService</strong></td>
+<td>WebSocket 실시간 통신</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="api-명세-3">3. API 명세</h2>
+<h3 id="케어기버-api-1">3.1 케어기버 API</h3>
+<div class="sourceCode" id="cb39"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 실시간 모니터링</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>live</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> LiveMonitoringData</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 일간 요약</span></span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>daily<span class="op">-</span>summary</span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a>Query<span class="op">:</span> { date<span class="op">?:</span> <span class="dt">string</span> }</span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> DailySummary</span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a><span class="co">// 주간 진행상황</span></span>
+<span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>weekly<span class="op">-</span>progress</span>
+<span id="cb39-12"><a href="#cb39-12" aria-hidden="true" tabindex="-1"></a>Query<span class="op">:</span> { weekStart<span class="op">?:</span> <span class="dt">string</span> }</span>
+<span id="cb39-13"><a href="#cb39-13" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> WeeklyProgress</span>
+<span id="cb39-14"><a href="#cb39-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-15"><a href="#cb39-15" aria-hidden="true" tabindex="-1"></a><span class="co">// 활동 기록</span></span>
+<span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>activities</span>
+<span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> data }</span>
+<span id="cb39-18"><a href="#cb39-18" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> Activity</span>
+<span id="cb39-19"><a href="#cb39-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-20"><a href="#cb39-20" aria-hidden="true" tabindex="-1"></a><span class="co">// UI 원격 조정</span></span>
+<span id="cb39-21"><a href="#cb39-21" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>adjust<span class="op">-</span>ui</span>
+<span id="cb39-22"><a href="#cb39-22" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> UIConfiguration</span>
+<span id="cb39-23"><a href="#cb39-23" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> { success<span class="op">,</span> message }</span>
+<span id="cb39-24"><a href="#cb39-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-25"><a href="#cb39-25" aria-hidden="true" tabindex="-1"></a><span class="co">// 기기 잠금</span></span>
+<span id="cb39-26"><a href="#cb39-26" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>caregiver<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>lock</span>
+<span id="cb39-27"><a href="#cb39-27" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { locked<span class="op">:</span> <span class="dt">boolean</span> }</span>
+<span id="cb39-28"><a href="#cb39-28" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> { success<span class="op">,</span> locked }</span></code></pre></div>
+<h3 id="전문가-api-1">3.2 전문가 API</h3>
+<div class="sourceCode" id="cb40"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 클라이언트 목록</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ClientSummary[]</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a><span class="co">// 평가 실시</span></span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>assessments</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> scores<span class="op">,</span> notes }</span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> AssessmentResult</span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a><span class="co">// 목표 설정</span></span>
+<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>goals</span>
+<span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> Goal</span>
+<span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> Goal</span>
+<span id="cb40-14"><a href="#cb40-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-15"><a href="#cb40-15" aria-hidden="true" tabindex="-1"></a><span class="co">// 목표 진행 업데이트</span></span>
+<span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a>PATCH <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>goals<span class="op">/:</span>goalId<span class="op">/</span>progress</span>
+<span id="cb40-17"><a href="#cb40-17" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { progress<span class="op">:</span> <span class="dt">number</span> }</span>
+<span id="cb40-18"><a href="#cb40-18" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> GoalProgress</span>
+<span id="cb40-19"><a href="#cb40-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-20"><a href="#cb40-20" aria-hidden="true" tabindex="-1"></a><span class="co">// 임상 보고서 생성</span></span>
+<span id="cb40-21"><a href="#cb40-21" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>professional<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>reports</span>
+<span id="cb40-22"><a href="#cb40-22" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> period }</span>
+<span id="cb40-23"><a href="#cb40-23" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ClinicalReport</span></code></pre></div>
+<h3 id="가족-api-1">3.3 가족 API</h3>
+<div class="sourceCode" id="cb41"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 사진 업로드</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>photos</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> Photo</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> Photo</span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a><span class="co">// 메시지 전송</span></span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>messages</span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { content<span class="op">,</span> <span class="kw">type</span><span class="op">,</span> senderName }</span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> FamilyMessage</span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a><span class="co">// 인생 이야기 추가</span></span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>life<span class="op">-</span>story</span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> LifeStoryEntry</span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> LifeStoryEntry</span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a><span class="co">// 회상 세션 시작</span></span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>family<span class="op">/</span>clients<span class="op">/:</span>clientId<span class="op">/</span>reminiscence</span>
+<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> { topic<span class="op">:</span> <span class="dt">string</span> }</span>
+<span id="cb41-19"><a href="#cb41-19" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ReminiscenceSession</span></code></pre></div>
+<h3 id="규정-준수-api-1">3.4 규정 준수 API</h3>
+<div class="sourceCode" id="cb42"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 동의 기록</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>POST <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>consents</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>Body<span class="op">:</span> ConsentRecord</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ConsentRecord</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a><span class="co">// GDPR 데이터 접근</span></span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>gdpr<span class="op">/</span>access</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> PersonalData</span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a><span class="co">// GDPR 데이터 삭제</span></span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>DELETE <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>gdpr<span class="op">/</span>erasure</span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> { success<span class="op">,</span> message }</span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a><span class="co">// 규정 준수 보고서</span></span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>GET  <span class="op">/</span>api<span class="op">/</span>v1<span class="op">/</span>compliance<span class="op">/</span>reports</span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>Query<span class="op">:</span> { <span class="kw">type</span><span class="op">,</span> startDate<span class="op">,</span> endDate }</span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a>Response<span class="op">:</span> ComplianceReport</span></code></pre></div>
+<hr />
+<h2 id="실시간-통신-1">4. 실시간 통신</h2>
+<h3 id="websocket-프로토콜-1">4.1 WebSocket 프로토콜</h3>
+<div class="sourceCode" id="cb43"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 연결</span></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>ws<span class="op">:</span><span class="co">//api.wia-aac.org/ws?clientId=xxx&amp;token=yyy</span></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a><span class="co">// 메시지 유형</span></span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> WSMessageType <span class="op">=</span></span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;activity&#39;</span>        <span class="co">// 활동 업데이트</span></span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;mood_change&#39;</span>     <span class="co">// 기분 변화</span></span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;alert&#39;</span>           <span class="co">// 알림</span></span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;config_change&#39;</span>   <span class="co">// 설정 변경</span></span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;message&#39;</span>         <span class="co">// 메시지</span></span>
+<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;session_start&#39;</span>   <span class="co">// 세션 시작</span></span>
+<span id="cb43-12"><a href="#cb43-12" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;session_end&#39;</span><span class="op">;</span>    <span class="co">// 세션 종료</span></span>
+<span id="cb43-13"><a href="#cb43-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-14"><a href="#cb43-14" aria-hidden="true" tabindex="-1"></a><span class="co">// 메시지 형식</span></span>
+<span id="cb43-15"><a href="#cb43-15" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> WebSocketMessage {</span>
+<span id="cb43-16"><a href="#cb43-16" aria-hidden="true" tabindex="-1"></a>  type<span class="op">:</span> WSMessageType<span class="op">;</span></span>
+<span id="cb43-17"><a href="#cb43-17" aria-hidden="true" tabindex="-1"></a>  clientId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb43-18"><a href="#cb43-18" aria-hidden="true" tabindex="-1"></a>  timestamp<span class="op">:</span> <span class="bu">Date</span><span class="op">;</span></span>
+<span id="cb43-19"><a href="#cb43-19" aria-hidden="true" tabindex="-1"></a>  payload<span class="op">:</span> <span class="dt">unknown</span><span class="op">;</span></span>
+<span id="cb43-20"><a href="#cb43-20" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="이벤트-흐름-1">4.2 이벤트 흐름</h3>
+<pre><code>AAC 앱                  서버                케어기버 앱
+  │                      │                      │
+  │ ── activity ──────► │                      │
+  │                      │ ── broadcast ──────►│
+  │                      │                      │ (화면 업데이트)
+  │                      │                      │
+  │ ── mood_change ───► │                      │
+  │                      │ ── broadcast ──────►│
+  │                      │                      │ (알림 표시)</code></pre>
+<hr />
+<h2 id="데이터-모델-1">5. 데이터 모델</h2>
+<h3 id="핵심-엔티티-1">5.1 핵심 엔티티</h3>
+<div class="sourceCode" id="cb45"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 클라이언트 (AAC 사용자)</span></span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> Client {</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>  name<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a>  type<span class="op">:</span> <span class="st">&#39;autism&#39;</span> <span class="op">|</span> <span class="st">&#39;dementia&#39;</span> <span class="op">|</span> <span class="st">&#39;general&#39;</span><span class="op">;</span></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>  dateOfBirth<span class="op">?:</span> <span class="bu">Date</span><span class="op">;</span></span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>  profileId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>  caregivers<span class="op">:</span> CaregiverLink[]<span class="op">;</span></span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>  professionals<span class="op">:</span> ProfessionalLink[]<span class="op">;</span></span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>  family<span class="op">:</span> FamilyLink[]<span class="op">;</span></span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb45-12"><a href="#cb45-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-13"><a href="#cb45-13" aria-hidden="true" tabindex="-1"></a><span class="co">// 활동</span></span>
+<span id="cb45-14"><a href="#cb45-14" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> Activity {</span>
+<span id="cb45-15"><a href="#cb45-15" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-16"><a href="#cb45-16" aria-hidden="true" tabindex="-1"></a>  clientId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-17"><a href="#cb45-17" aria-hidden="true" tabindex="-1"></a>  type<span class="op">:</span> <span class="st">&#39;communication&#39;</span> <span class="op">|</span> <span class="st">&#39;navigation&#39;</span> <span class="op">|</span> <span class="st">&#39;selection&#39;</span><span class="op">;</span></span>
+<span id="cb45-18"><a href="#cb45-18" aria-hidden="true" tabindex="-1"></a>  timestamp<span class="op">:</span> <span class="bu">Date</span><span class="op">;</span></span>
+<span id="cb45-19"><a href="#cb45-19" aria-hidden="true" tabindex="-1"></a>  data<span class="op">:</span> ActivityData<span class="op">;</span></span>
+<span id="cb45-20"><a href="#cb45-20" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb45-21"><a href="#cb45-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-22"><a href="#cb45-22" aria-hidden="true" tabindex="-1"></a><span class="co">// 목표</span></span>
+<span id="cb45-23"><a href="#cb45-23" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> Goal {</span>
+<span id="cb45-24"><a href="#cb45-24" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-25"><a href="#cb45-25" aria-hidden="true" tabindex="-1"></a>  clientId<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-26"><a href="#cb45-26" aria-hidden="true" tabindex="-1"></a>  title<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb45-27"><a href="#cb45-27" aria-hidden="true" tabindex="-1"></a>  category<span class="op">:</span> GoalCategory<span class="op">;</span></span>
+<span id="cb45-28"><a href="#cb45-28" aria-hidden="true" tabindex="-1"></a>  status<span class="op">:</span> GoalStatus<span class="op">;</span></span>
+<span id="cb45-29"><a href="#cb45-29" aria-hidden="true" tabindex="-1"></a>  progress<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb45-30"><a href="#cb45-30" aria-hidden="true" tabindex="-1"></a>  milestones<span class="op">:</span> Milestone[]<span class="op">;</span></span>
+<span id="cb45-31"><a href="#cb45-31" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="관계도-1">5.2 관계도</h3>
+<pre><code>┌──────────┐       ┌──────────────┐       ┌──────────┐
+│  Client  │──1:N──│  Activity    │       │   Goal   │
+└────┬─────┘       └──────────────┘       └────┬─────┘
+     │                                         │
+     │ 1:N                                     │ 1:N
+     ▼                                         ▼
+┌──────────┐       ┌──────────────┐       ┌──────────┐
+│ Caregiver│       │ Professional │       │Milestone │
+│   Link   │       │    Link      │       │          │
+└──────────┘       └──────────────┘       └──────────┘</code></pre>
+<hr />
+<h2 id="보안-및-규정-준수-1">6. 보안 및 규정 준수</h2>
+<h3 id="인증인가-1">6.1 인증/인가</h3>
+<table>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>구현</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>인증</strong></td>
+<td>JWT + Refresh Token</td>
+</tr>
+<tr class="even">
+<td><strong>인가</strong></td>
+<td>RBAC (역할 기반 접근 제어)</td>
+</tr>
+<tr class="odd">
+<td><strong>세션</strong></td>
+<td>30분 타임아웃, 재인증</td>
+</tr>
+<tr class="even">
+<td><strong>MFA</strong></td>
+<td>전문가/관리자 필수</td>
+</tr>
+</tbody>
+</table>
+<h3 id="역할별-권한-1">6.2 역할별 권한</h3>
+<table>
+<thead>
+<tr class="header">
+<th>역할</th>
+<th>활동 보기</th>
+<th>UI 조정</th>
+<th>평가</th>
+<th>데이터 내보내기</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>케어기버</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr class="even">
+<td>전문가</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr class="odd">
+<td>가족</td>
+<td>제한적</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr class="even">
+<td>관리자</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hipaa-준수-1">6.3 HIPAA 준수</h3>
+<table>
+<thead>
+<tr class="header">
+<th>요구사항</th>
+<th>구현</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>PHI 암호화</td>
+<td>AES-256 (저장), TLS 1.3 (전송)</td>
+</tr>
+<tr class="even">
+<td>접근 제어</td>
+<td>역할 기반 + 동의 기반</td>
+</tr>
+<tr class="odd">
+<td>감사 추적</td>
+<td>모든 PHI 접근 로깅</td>
+</tr>
+<tr class="even">
+<td>위반 통지</td>
+<td>자동 감지 및 알림</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gdpr-준수-1">6.4 GDPR 준수</h3>
+<table>
+<thead>
+<tr class="header">
+<th>권리</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>접근권</td>
+<td><code>GET /gdpr/access</code></td>
+</tr>
+<tr class="even">
+<td>정정권</td>
+<td><code>PATCH /gdpr/rectification</code></td>
+</tr>
+<tr class="odd">
+<td>삭제권</td>
+<td><code>DELETE /gdpr/erasure</code></td>
+</tr>
+<tr class="even">
+<td>이동권</td>
+<td><code>POST /gdpr/portability</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="알림-시스템-1">7. 알림 시스템</h2>
+<h3 id="알림-유형-1">7.1 알림 유형</h3>
+<table>
+<thead>
+<tr class="header">
+<th>유형</th>
+<th>트리거</th>
+<th>수신자</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>긴급</strong></td>
+<td>도움 요청, 응급</td>
+<td>모든 케어기버</td>
+</tr>
+<tr class="even">
+<td><strong>경고</strong></td>
+<td>비활동, 기분 급변</td>
+<td>주 케어기버</td>
+</tr>
+<tr class="odd">
+<td><strong>정보</strong></td>
+<td>세션 시작/종료</td>
+<td>구독자</td>
+</tr>
+<tr class="even">
+<td><strong>일정</strong></td>
+<td>예약된 알림</td>
+<td>지정 수신자</td>
+</tr>
+</tbody>
+</table>
+<h3 id="전달-채널-1">7.2 전달 채널</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│              알림 서비스                │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌─────────┐  ┌────────┐  ┌─────────┐  │
+│  │  푸시   │  │  SMS   │  │ 이메일  │  │
+│  │ (FCM)  │  │(Twilio)│  │(SendGrid)│ │
+│  └─────────┘  └────────┘  └─────────┘  │
+│                                         │
+│  우선순위: 긴급 → 모든 채널             │
+│           경고 → 푸시 + SMS             │
+│           정보 → 푸시만                 │
+└─────────────────────────────────────────┘</code></pre>
+<hr />
+<h2 id="배포-구성-1">8. 배포 구성</h2>
+<h3 id="인프라-1">8.1 인프라</h3>
+<div class="sourceCode" id="cb48"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Docker Compose (개발)</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a><span class="fu">services</span><span class="kw">:</span></span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">api</span><span class="kw">:</span></span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">image</span><span class="kw">:</span><span class="at"> wia-cognitive-aac-api</span></span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">&quot;3001:3001&quot;</span></span>
+<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">environment</span><span class="kw">:</span></span>
+<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> NODE_ENV=development</span></span>
+<span id="cb48-9"><a href="#cb48-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">database</span><span class="kw">:</span></span>
+<span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">image</span><span class="kw">:</span><span class="at"> postgres:15</span></span>
+<span id="cb48-12"><a href="#cb48-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb48-13"><a href="#cb48-13" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> pgdata:/var/lib/postgresql/data</span></span>
+<span id="cb48-14"><a href="#cb48-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-15"><a href="#cb48-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">redis</span><span class="kw">:</span></span>
+<span id="cb48-16"><a href="#cb48-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">image</span><span class="kw">:</span><span class="at"> redis:7</span></span></code></pre></div>
+<h3 id="확장성-1">8.2 확장성</h3>
+<table>
+<thead>
+<tr class="header">
+<th>컴포넌트</th>
+<th>확장 전략</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>API 서버</td>
+<td>수평 확장 (로드 밸런서)</td>
+</tr>
+<tr class="even">
+<td>WebSocket</td>
+<td>Sticky 세션 + Redis Pub/Sub</td>
+</tr>
+<tr class="odd">
+<td>데이터베이스</td>
+<td>읽기 복제본</td>
+</tr>
+<tr class="even">
+<td>파일 저장소</td>
+<td>S3 호환 스토리지</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="구현-체크리스트-1">9. 구현 체크리스트</h2>
+<h3 id="백엔드-api-1">9.1 백엔드 API</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />타입 정의 (<code>types/index.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />케어기버 서비스 (<code>CaregiverService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />전문가 서비스 (<code>ProfessionalService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />가족 서비스 (<code>FamilyService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />규정 준수 서비스 (<code>ComplianceService.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />API 라우트 (<code>routes/index.ts</code>)</label></li>
+<li><label><input type="checkbox" checked="" />WebSocket 서버 (<code>index.ts</code>)</label></li>
+</ul>
+<h3 id="문서화-1">9.2 문서화</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />케어기버 가이드 (<code>CAREGIVER-GUIDE.md</code>)</label></li>
+<li><label><input type="checkbox" checked="" />전문가 가이드 (<code>PROFESSIONAL-GUIDE.md</code>)</label></li>
+<li><label><input type="checkbox" checked="" />Phase 4 명세 (이 문서)</label></li>
+</ul>
+<h3 id="향후-구현-1">9.3 향후 구현</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" />프론트엔드 앱 (React Native / React)</label></li>
+<li><label><input type="checkbox" />푸시 알림 서비스</label></li>
+<li><label><input type="checkbox" />데이터베이스 마이그레이션</label></li>
+<li><label><input type="checkbox" />E2E 테스트</label></li>
+</ul>
+<hr />
+<h2 id="결론-1">10. 결론</h2>
+<p>Phase 4는 WIA Cognitive AAC 표준의 마지막 단계로, 사용자-케어기버-전문가-가족 간의 연결을 완성합니다.</p>
+<p><strong>핵심 가치:</strong></p>
+<blockquote>
+<p>“인지 능력과 관계없이 모든 사람이 사랑하는 사람들과 연결될 수 있도록”</p>
+</blockquote>
+<hr />
+<p><em>WIA Cognitive AAC Phase 4 Specification v1.0</em> <em>Last Updated: 2024</em></p>
+<p><strong>홍익인간 (弘益人間) - 널리 인간을 이롭게 하라</strong> 🌏</p>
+<hr />
+
+
+<hr>
+<footer>
+<p>© 2026 WIA OÜ | 위아북스 | 저자: 연삼흠 (Yeon Sam-heum, Ph.D.)</p>
+<p><a href="index.html">목차로 돌아가기</a></p>
+</footer>
+
+</body>
+</html>
