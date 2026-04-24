@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 프로토콜 사양 - WIA 바이오닉 아이 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>제4장: 프로토콜 사양</h1>
+        <p>실시간 이미지 전송 및 신경 인코딩</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>4.1 통신 프로토콜 개요</h2>
+
+            <p>WIA 바이오닉 아이 프로토콜은 외부 카메라에서 처리 장치를 거쳐 이식된 전극으로 시각 데이터를 전송하는 방법을 정의합니다. 프로토콜은 저지연, 신뢰성 및 안전성을 우선시합니다.</p>
+
+            <h3>프로토콜 스택</h3>
+            <pre><code>응용 계층         │ 시각 처리 및 신경 인코딩
+                  │
+전송 계층         │ WIA-BE 프로토콜 (사용자 정의)
+                  │
+네트워크 계층     │ 무선: BLE 5.0 / WiFi 6 / 사용자 정의 RF
+                  │ 유선: USB 3.0 / Thunderbolt
+                  │
+물리 계층         │ 전자기 / 광학 / 전기</code></pre>
+
+            <h3>설계 원칙</h3>
+            <ul>
+                <li><strong>저지연:</strong> 네비게이션을 위한 엔드 투 엔드 지연 &lt; 100ms</li>
+                <li><strong>신뢰성:</strong> 자극 명령의 보장된 전달</li>
+                <li><strong>안전성:</strong> 내장된 안전 제한 및 비상 정지</li>
+                <li><strong>전력 효율성:</strong> 이식된 장치의 전력 소비 최소화</li>
+            </ul>
+
+            <h2>4.2 데이터 전송 모드</h2>
+
+            <h3>연속 스트리밍 모드</h3>
+            <p>활성 네비게이션 및 이동성을 위한 실시간 비디오 스트리밍:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>매개변수</th>
+                        <th>값</th>
+                        <th>설명</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>프레임 속도</td>
+                        <td>15-30 FPS</td>
+                        <td>연속 시각 업데이트</td>
+                    </tr>
+                    <tr>
+                        <td>지연 시간</td>
+                        <td>&lt; 100ms</td>
+                        <td>카메라에서 포스핀까지 지연</td>
+                    </tr>
+                    <tr>
+                        <td>대역폭</td>
+                        <td>10-50 Mbps</td>
+                        <td>압축된 비디오 스트림</td>
+                    </tr>
+                    <tr>
+                        <td>우선순위</td>
+                        <td>높음</td>
+                        <td>실시간 요구 사항</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4.3 신경 인코딩 알고리즘</h2>
+
+            <h3>이미지에서 자극으로의 매핑</h3>
+            <p>카메라 이미지를 전극 자극 패턴으로 변환:</p>
+
+            <pre><code>┌──────────────┐
+│ 원시 이미지  │ 640x480 픽셀
+│ (카메라)     │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 다운샘플링   │ 전극 어레이 해상도에 맞춤
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 가장자리     │ 윤곽 및 경계 향상
+│ 감지         │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 강도 매핑    │ 밝기를 전류 진폭에 매핑
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 전극 활성화  │ 자극 매개변수 생성
+└──────────────┘</code></pre>
+
+            <h3>강도에서 전류로의 매핑</h3>
+            <p>픽셀 밝기를 자극 전류로 변환:</p>
+
+            <pre><code>function intensityToCurrentMapping(
+  pixelValue: number,        // 0-255
+  electrode: ElectrodeInfo
+): number {                  // μA 단위의 전류
+
+  // 안전 제한이 있는 선형 매핑
+  const normalized = pixelValue / 255;
+  const current = normalized *
+                  (electrode.maxSafe - electrode.threshold) +
+                  electrode.threshold;
+
+  // 지각을 위한 감마 보정
+  const gamma = 2.2;
+  const gammaCorrected = Math.pow(current / electrode.maxSafe, 1/gamma) *
+                         electrode.maxSafe;
+
+  return gammaCorrected;
+}</code></pre>
+
+            <h2>4.4 자극 매개변수</h2>
+
+            <h3>펄스 파형</h3>
+            <p>각 전극에 전달되는 전기 펄스:</p>
+
+            <pre><code>interface StimulationPulse {
+  type: 'biphasic_symmetric' | 'biphasic_asymmetric' | 'triphasic';
+
+  cathodicAmplitude: number;    // μA (0-1000)
+  cathodicWidth: number;        // μs (50-1000)
+
+  anodicAmplitude: number;      // μA
+  anodicWidth: number;          // μs
+
+  interphaseGap: number;        // μs (0-100)
+  frequency: number;            // Hz (10-100)
+
+  chargePerPhase: number;       // μC (계산됨)
+  chargeDensity: number;        // μC/cm² (< 35 권장)
+}</code></pre>
+
+            <h2>4.5 무선 전송 프로토콜</h2>
+
+            <h3>Bluetooth Low Energy (BLE 5.0)</h3>
+            <p>외부 카메라에서 처리 장치 통신용:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>매개변수</th>
+                        <th>값</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>데이터 속도</td>
+                        <td>2 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>범위</td>
+                        <td>10-30 미터</td>
+                    </tr>
+                    <tr>
+                        <td>지연 시간</td>
+                        <td>5-15 ms</td>
+                    </tr>
+                    <tr>
+                        <td>전력</td>
+                        <td>낮음 (배터리 친화적)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>유도 결합</h3>
+            <p>임플란트로의 경피 전력 및 데이터 전송용:</p>
+
+            <ul>
+                <li><strong>주파수:</strong> 13.56 MHz (ISM 대역)</li>
+                <li><strong>전력 전송:</strong> 100-500 mW</li>
+                <li><strong>데이터 속도:</strong> 100 kbps - 1 Mbps</li>
+                <li><strong>효율:</strong> 40-70%</li>
+                <li><strong>코일 간격:</strong> 1-10 mm</li>
+            </ul>
+
+            <h2>4.6 패킷 구조</h2>
+
+            <h3>자극 명령 패킷</h3>
+            <pre><code>┌────────────────────────────────────────────┐
+│ 헤더 (8 바이트)                            │
+├────────────────────────────────────────────┤
+│ - 패킷 유형: 0x01 (자극)                   │
+│ - 시퀀스 번호: uint32                      │
+│ - 타임스탬프: uint32 (ms)                  │
+├────────────────────────────────────────────┤
+│ 전극 데이터 (N × 6 바이트)                 │
+├────────────────────────────────────────────┤
+│ 각 전극에 대해:                            │
+│ - 전극 인덱스: uint8                       │
+│ - 전류 진폭: uint16 (μA × 10)              │
+│ - 펄스 폭: uint16 (μs)                     │
+│ - 주파수: uint8 (Hz)                       │
+├────────────────────────────────────────────┤
+│ 안전 검사 (4 바이트)                       │
+├────────────────────────────────────────────┤
+│ - 총 전류: uint16 (μA)                     │
+│ - CRC16 체크섬: uint16                     │
+└────────────────────────────────────────────┘</code></pre>
+
+            <h2>4.7 오류 감지 및 수정</h2>
+
+            <h3>CRC 체크섬</h3>
+            <p>모든 패킷에는 오류 감지를 위한 순환 중복 검사가 포함됩니다:</p>
+
+            <ul>
+                <li><strong>CRC-16:</strong> 제어 및 자극 패킷</li>
+                <li><strong>CRC-32:</strong> 프레임 데이터 패킷</li>
+                <li><strong>다항식:</strong> CRC-16-CCITT (0x1021)</li>
+            </ul>
+
+            <h2>4.8 동기화</h2>
+
+            <h3>시간 동기화</h3>
+            <p>구성 요소 간의 정밀한 타이밍:</p>
+
+            <pre><code>interface TimeSyncProtocol {
+  method: 'PTP' | 'NTP' | 'custom';
+  accuracy: number;           // μs
+  syncInterval: number;       // ms
+  masterClock: 'camera' | 'processor' | 'implant';
+}</code></pre>
+
+            <h2>4.9 서비스 품질 (QoS)</h2>
+
+            <h3>우선순위 수준</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>우선순위</th>
+                        <th>패킷 유형</th>
+                        <th>최대 지연 시간</th>
+                        <th>신뢰성</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>중요</td>
+                        <td>비상 정지</td>
+                        <td>1 ms</td>
+                        <td>100%</td>
+                    </tr>
+                    <tr>
+                        <td>높음</td>
+                        <td>자극 명령</td>
+                        <td>10 ms</td>
+                        <td>99.9%</td>
+                    </tr>
+                    <tr>
+                        <td>중간</td>
+                        <td>프레임 데이터</td>
+                        <td>100 ms</td>
+                        <td>95%</td>
+                    </tr>
+                    <tr>
+                        <td>낮음</td>
+                        <td>상태/원격 측정</td>
+                        <td>1000 ms</td>
+                        <td>90%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4.10 보안 프로토콜</h2>
+
+            <h3>암호화</h3>
+            <p>모든 무선 통신 암호화:</p>
+
+            <ul>
+                <li><strong>알고리즘:</strong> AES-256-GCM</li>
+                <li><strong>키 교환:</strong> ECDH (타원 곡선 Diffie-Hellman)</li>
+                <li><strong>키 교체:</strong> 24시간마다</li>
+                <li><strong>인증:</strong> 인증서 기반 장치 페어링</li>
+            </ul>
+
+            <div class="warning">
+                <strong>보안 중요:</strong> 바이오닉 아이 시스템은 의료 기기입니다. 보안 취약점으로 인해 공격자가 환자에게 불편함이나 해를 끼칠 수 있습니다. 심층 방어 보안 조치를 구현하십시오.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

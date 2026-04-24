@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA Bionic Eye Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 5: Integration Guide</h1>
+        <p>Retinal Implants, Cortical Implants, and Smart Glasses</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>5.1 System Integration Overview</h2>
+
+            <p>This chapter provides practical guidance for integrating WIA Bionic Eye standard components into complete artificial vision systems. We cover three main implementation types: retinal implants, cortical implants, and smart glasses.</p>
+
+            <h3>Integration Architecture</h3>
+            <pre><code>┌─────────────────────────────────────────────────┐
+│              Patient-Worn Components            │
+├─────────────────────────────────────────────────┤
+│  Camera → Processor → Transmitter → Implant    │
+└─────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────┐
+│           Cloud Services (Optional)             │
+├─────────────────────────────────────────────────┤
+│  Data Logging | ML Models | Remote Support     │
+└─────────────────────────────────────────────────┘</code></pre>
+
+            <h2>5.2 Retinal Implant Integration</h2>
+
+            <h3>Epiretinal Implant Systems</h3>
+            <p>Systems that stimulate ganglion cells on the retinal surface:</p>
+
+            <h4>Hardware Components</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Specification</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>External Camera</td>
+                        <td>VGA resolution, 20 FPS</td>
+                        <td>Glasses-mounted CMOS sensor</td>
+                    </tr>
+                    <tr>
+                        <td>Video Processing Unit</td>
+                        <td>ARM Cortex, 1 GHz</td>
+                        <td>Belt-worn processor</td>
+                    </tr>
+                    <tr>
+                        <td>Transmitter Coil</td>
+                        <td>13.56 MHz, 10 mm diameter</td>
+                        <td>Temple-mounted coil</td>
+                    </tr>
+                    <tr>
+                        <td>Receiver Implant</td>
+                        <td>Inductive receiver + electronics</td>
+                        <td>Scleral-mounted receiver</td>
+                    </tr>
+                    <tr>
+                        <td>Electrode Array</td>
+                        <td>60 electrodes, 10×6 grid</td>
+                        <td>Polyimide flex array</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Integration Steps</h4>
+            <ol>
+                <li><strong>Camera Calibration:</strong> Align camera FOV with patient's natural gaze direction</li>
+                <li><strong>Coil Alignment:</strong> Position external coil over implanted receiver for optimal coupling</li>
+                <li><strong>Impedance Testing:</strong> Verify all electrodes within normal impedance range (1-50 kΩ)</li>
+                <li><strong>Threshold Mapping:</strong> Determine minimum current for phosphene perception per electrode</li>
+                <li><strong>Comfort Optimization:</strong> Adjust maximum current levels based on patient feedback</li>
+                <li><strong>Image Processing Tuning:</strong> Configure edge detection and downsampling algorithms</li>
+            </ol>
+
+            <h4>Example Configuration</h4>
+            <pre><code>{
+  "deviceType": "epiretinal",
+  "electrodeArray": {
+    "totalElectrodes": 60,
+    "layout": "10x6",
+    "electrodeSpacing": 575,  // μm
+    "arraySize": {
+      "width": 6.0,   // mm
+      "height": 3.5   // mm
+    }
+  },
+  "stimulation": {
+    "pulseWidth": 460,         // μs
+    "frequency": 20,           // Hz
+    "returnElectrode": "case", // implant case as return
+    "waveform": "biphasic_symmetric"
+  },
+  "processing": {
+    "edgeDetection": true,
+    "edgeWeight": 0.7,
+    "dynamicRange": "high",
+    "gamma": 2.2
+  }
+}</code></pre>
+
+            <h3>Subretinal Implant Systems</h3>
+            <p>Systems implanted beneath the retina to stimulate bipolar cells:</p>
+
+            <h4>Key Differences from Epiretinal</h4>
+            <ul>
+                <li><strong>Higher Resolution:</strong> 1500+ electrodes possible</li>
+                <li><strong>Natural Pathway:</strong> Closer to photoreceptor location</li>
+                <li><strong>Smaller Electrodes:</strong> 70-100 μm diameter</li>
+                <li><strong>Lower Current:</strong> Closer to target neurons</li>
+                <li><strong>Photodiode Power:</strong> Some designs use ambient light for power</li>
+            </ul>
+
+            <h4>Integration Considerations</h4>
+            <div class="note">
+                <strong>Surgical Precision:</strong> Subretinal placement requires highly specialized surgical technique. Ensure surgical team is trained on specific implant model.
+            </div>
+
+            <pre><code>{
+  "deviceType": "subretinal",
+  "electrodeArray": {
+    "totalElectrodes": 1600,
+    "layout": "40x40",
+    "electrodeSpacing": 70,    // μm
+    "arraySize": {
+      "width": 3.0,   // mm
+      "height": 3.0   // mm
+    }
+  },
+  "stimulation": {
+    "pulseWidth": 100,         // μs (shorter due to proximity)
+    "frequency": 50,           // Hz
+    "maxCurrent": 300,         // μA (lower than epiretinal)
+    "waveform": "triphasic"
+  },
+  "powerSource": "hybrid",     // photodiode + wireless
+  "processing": {
+    "resolution": "high",
+    "motionCompensation": true,
+    "localContrast": true
+  }
+}</code></pre>
+
+            <h2>5.3 Cortical Implant Integration</h2>
+
+            <h3>Visual Cortex Stimulation</h3>
+            <p>Direct stimulation of primary visual cortex (V1) for patients with complete retinal damage:</p>
+
+            <h4>Surgical Placement</h4>
+            <ul>
+                <li><strong>Location:</strong> Occipital lobe, calcarine fissure region</li>
+                <li><strong>Depth:</strong> Surface electrodes or penetrating arrays</li>
+                <li><strong>Coverage:</strong> Typically represents central 10-20° of visual field</li>
+                <li><strong>Bilateral:</strong> May implant both hemispheres for full field</li>
+            </ul>
+
+            <h4>Technical Challenges</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Challenge</th>
+                        <th>Mitigation Strategy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Retinotopic mapping complexity</td>
+                        <td>Extensive calibration and phosphene mapping</td>
+                    </tr>
+                    <tr>
+                        <td>Brain movement in skull</td>
+                        <td>Flexible electrode arrays, secure anchoring</td>
+                    </tr>
+                    <tr>
+                        <td>Immune response</td>
+                        <td>Biocompatible coatings, anti-inflammatory protocol</td>
+                    </tr>
+                    <tr>
+                        <td>Complex phosphenes</td>
+                        <td>Machine learning for optimal stimulation patterns</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Integration Configuration</h4>
+            <pre><code>{
+  "deviceType": "cortical",
+  "implantLocation": {
+    "hemisphere": "right",     // or "bilateral"
+    "targetArea": "V1",
+    "coordinates": {
+      "x": -15,                // mm from midline
+      "y": -85,                // mm from anterior commissure
+      "z": 0                   // cortical surface
+    }
+  },
+  "electrodeArray": {
+    "totalElectrodes": 96,
+    "layout": "custom",        // Follows cortical topology
+    "electrodeType": "utah_array",
+    "electrodeLength": 1.5     // mm penetration depth
+  },
+  "stimulation": {
+    "pulseWidth": 200,         // μs
+    "frequency": 100,          // Hz (higher for cortical)
+    "maxCurrent": 100,         // μA (lower for direct neural)
+    "waveform": "biphasic_asymmetric"
+  },
+  "retinotopicMapping": {
+    "calibrationRequired": true,
+    "mappingDuration": 120     // minutes
+  }
+}</code></pre>
+
+            <div class="warning">
+                <strong>Clinical Warning:</strong> Cortical implants involve neurosurgery and carry risks including seizure, infection, and hemorrhage. Only proceed with experienced neurosurgical team and comprehensive patient consent.
+            </div>
+
+            <h2>5.4 Smart Glasses Integration</h2>
+
+            <h3>Non-Invasive Vision Assistance</h3>
+            <p>Smart glasses provide vision assistance without surgical implants:</p>
+
+            <h4>Use Cases</h4>
+            <ul>
+                <li><strong>Low Vision Enhancement:</strong> Magnification, contrast, edge enhancement</li>
+                <li><strong>Object Recognition:</strong> Audio description of detected objects</li>
+                <li><strong>Text Reading:</strong> OCR with text-to-speech output</li>
+                <li><strong>Navigation:</strong> Obstacle detection and guidance</li>
+                <li><strong>Face Recognition:</strong> Identify and announce familiar faces</li>
+            </ul>
+
+            <h4>Hardware Architecture</h4>
+            <pre><code>┌──────────────────────────────────────┐
+│      Smart Glasses Frame             │
+├──────────────────────────────────────┤
+│  • Dual HD cameras (stereo vision)   │
+│  • Depth sensor (ToF or structured)  │
+│  • IMU (orientation tracking)        │
+│  • Bone conduction speakers          │
+│  • Haptic feedback motors            │
+│  • WiFi/BLE connectivity             │
+│  • Battery (8 hours)                 │
+└──────────────────────────────────────┘</code></pre>
+
+            <h4>Software Integration</h4>
+            <pre><code>{
+  "deviceType": "smart_glasses",
+  "processingMode": "local",   // or "cloud" or "hybrid"
+  "features": {
+    "objectDetection": {
+      "enabled": true,
+      "model": "YOLOv8",
+      "classes": ["person", "car", "door", "stairs", "obstacle"],
+      "confidence": 0.7,
+      "maxObjects": 5
+    },
+    "textRecognition": {
+      "enabled": true,
+      "languages": ["en", "ko"],
+      "minFontSize": 12,
+      "outputMode": "audio"
+    },
+    "faceRecognition": {
+      "enabled": true,
+      "database": "local",
+      "maxDistance": 5.0         // meters
+    },
+    "depthMapping": {
+      "enabled": true,
+      "alertDistance": 1.5,      // meters
+      "feedbackMode": "haptic"
+    }
+  },
+  "output": {
+    "audioFeedback": true,
+    "hapticFeedback": true,
+    "displayOverlay": false      // for partial vision users
+  }
+}</code></pre>
+
+            <h2>5.5 Power Management</h2>
+
+            <h3>Implanted Device Power</h3>
+            <p>Critical power considerations for implanted components:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Power Draw</th>
+                        <th>Duty Cycle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Receiver electronics</td>
+                        <td>10-50 mW</td>
+                        <td>Continuous</td>
+                    </tr>
+                    <tr>
+                        <td>Stimulation circuitry</td>
+                        <td>100-300 mW</td>
+                        <td>20-50%</td>
+                    </tr>
+                    <tr>
+                        <td>Microcontroller</td>
+                        <td>5-20 mW</td>
+                        <td>Continuous</td>
+                    </tr>
+                    <tr>
+                        <td>Safety monitoring</td>
+                        <td>5-10 mW</td>
+                        <td>Continuous</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>External Device Power</h3>
+            <pre><code>{
+  "powerManagement": {
+    "camera": {
+      "activePower": 500,        // mW
+      "sleepPower": 5,
+      "sleepTimeout": 60000      // ms
+    },
+    "processor": {
+      "activePower": 2000,       // mW
+      "modes": {
+        "performance": 2000,
+        "balanced": 1000,
+        "economy": 500
+      }
+    },
+    "transmitter": {
+      "power": 300,              // mW
+      "efficiency": 0.6,
+      "targetImplantPower": 180  // mW delivered
+    },
+    "battery": {
+      "capacity": 2500,          // mAh
+      "voltage": 3.7,            // V
+      "estimatedRuntime": 480    // minutes
+    }
+  }
+}</code></pre>
+
+            <h2>5.6 Calibration Procedures</h2>
+
+            <h3>Initial System Calibration</h3>
+            <p>Step-by-step calibration process for new installations:</p>
+
+            <h4>1. Impedance Measurement</h4>
+            <pre><code>async function measureImpedance(electrodeArray) {
+  const results = [];
+
+  for (let i = 0; i < electrodeArray.totalElectrodes; i++) {
+    const impedance = await measureElectrodeImpedance(i, {
+      frequency: 1000,  // Hz
+      testCurrent: 10   // μA
+    });
+
+    results.push({
+      electrode: i,
+      impedance: impedance.magnitude,
+      phase: impedance.phase,
+      status: classifyImpedance(impedance)
+    });
+  }
+
+  return results;
+}</code></pre>
+
+            <h4>2. Threshold Detection</h4>
+            <pre><code>async function detectThresholds(electrodeArray) {
+  const thresholds = [];
+
+  for (let electrode of electrodeArray.functional) {
+    let current = 10;  // Start at 10 μA
+    let perceived = false;
+
+    while (!perceived && current < 1000) {
+      await stimulateElectrode(electrode, {
+        current: current,
+        pulseWidth: 460,
+        frequency: 20,
+        duration: 500
+      });
+
+      perceived = await getPatientResponse();
+
+      if (!perceived) {
+        current += 25;  // Increment by 25 μA
+      }
+    }
+
+    thresholds[electrode] = current;
+  }
+
+  return thresholds;
+}</code></pre>
+
+            <h4>3. Phosphene Mapping</h4>
+            <ol>
+                <li>Present fixed grid overlay to patient</li>
+                <li>Stimulate each electrode individually</li>
+                <li>Patient indicates perceived phosphene location</li>
+                <li>Record spatial mapping for each electrode</li>
+                <li>Build retinotopic or cortical map</li>
+            </ol>
+
+            <h3>Ongoing Calibration</h3>
+            <p>Regular recalibration schedule:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Calibration Type</th>
+                        <th>Frequency</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Impedance check</td>
+                        <td>Daily (automatic)</td>
+                        <td>2 minutes</td>
+                    </tr>
+                    <tr>
+                        <td>Threshold adjustment</td>
+                        <td>Weekly</td>
+                        <td>15 minutes</td>
+                    </tr>
+                    <tr>
+                        <td>Full phosphene remapping</td>
+                        <td>Quarterly</td>
+                        <td>60 minutes</td>
+                    </tr>
+                    <tr>
+                        <td>Image processing tuning</td>
+                        <td>As needed</td>
+                        <td>30 minutes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.7 Emergency Stop Integration</h2>
+
+            <h3>Automatic Safety Triggers</h3>
+            <pre><code>interface SafetyMonitor {
+  // Continuous monitoring
+  monitors: {
+    overCurrent: {
+      enabled: true,
+      singleElectrode: 1000,     // μA
+      totalCurrent: 50000,       // μA (50 mA)
+      responseTime: 0.1          // ms
+    },
+    impedanceAnomaly: {
+      enabled: true,
+      suddenChange: 30,          // % increase
+      openCircuit: 200,          // kΩ
+      shortCircuit: 0.5          // kΩ
+    },
+    thermal: {
+      enabled: true,
+      maxTemperature: 39.0,      // °C
+      maxDelta: 2.0              // °C above baseline
+    }
+  };
+
+  // Actions on trigger
+  emergencyResponse: {
+    disableStimulation: true,
+    shortElectrodes: true,
+    alertPatient: true,
+    logEvent: true,
+    notifyClinic: true
+  };
+}</code></pre>
+
+            <h3>Manual Stop Mechanisms</h3>
+            <ul>
+                <li><strong>Glasses Button:</strong> Instant stop with single press</li>
+                <li><strong>Voice Command:</strong> "Emergency stop" or "멈춰"</li>
+                <li><strong>Mobile App:</strong> Prominent stop button</li>
+                <li><strong>Caregiver Remote:</strong> Wireless remote control</li>
+            </ul>
+
+            <h2>5.8 Software Stack Integration</h2>
+
+            <h3>Recommended Architecture</h3>
+            <pre><code>┌─────────────────────────────────────────┐
+│         Application Layer               │
+│  (Patient UI, Clinician Dashboard)      │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│         WIA Bionic Eye SDK              │
+│  (Standard API Implementation)          │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│      Device-Specific Drivers            │
+│  (Manufacturer HAL)                     │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│         Hardware Layer                  │
+│  (Camera, Processor, Implant)           │
+└─────────────────────────────────────────┘</code></pre>
+
+            <h3>SDK Integration Example</h3>
+            <pre><code>import { WIABionicEyeSDK } from '@wia/bionic-eye';
+
+// Initialize SDK
+const sdk = new WIABionicEyeSDK({
+  apiKey: process.env.WIA_API_KEY,
+  environment: 'production'
+});
+
+// Connect to device
+const device = await sdk.devices.connect('BIO-EYE-001');
+
+// Start video streaming
+const stream = await device.camera.startStream({
+  resolution: { width: 640, height: 480 },
+  frameRate: 20,
+  format: 'gray8'
+});
+
+// Process frames
+stream.on('frame', async (frame) => {
+  const processed = await device.processor.processFrame(frame, {
+    edgeDetection: true,
+    downsampling: true
+  });
+
+  await device.stimulator.sendPattern(processed.stimulationMap);
+});
+
+// Safety monitoring
+device.safety.on('alert', (alert) => {
+  console.error('Safety alert:', alert);
+  device.emergency.stop();
+});</code></pre>
+
+            <div class="info">
+                <strong>Integration Best Practice:</strong> Use the WIA SDK abstraction layer to ensure compatibility across different hardware implementations and simplify future upgrades.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

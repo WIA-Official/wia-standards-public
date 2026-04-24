@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 구현 예제 - WIA 바이오닉 아이 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>제7장: 구현 예제</h1>
+        <p>바이오닉 아이 시스템용 Python, TypeScript, Bash</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>7.1 Python 구현</h2>
+
+            <h3>설치</h3>
+            <pre><code># WIA 바이오닉 아이 SDK 설치
+pip install wia-bionic-eye
+
+# 종속성 설치
+pip install numpy opencv-python pyserial websockets</code></pre>
+
+            <h3>기본 장치 연결</h3>
+            <pre><code>import asyncio
+from wia_bionic_eye import BionicEyeSDK, DeviceConfig
+
+async def connect_device():
+    # SDK 초기화
+    sdk = BionicEyeSDK(
+        api_key="your_api_key_here",
+        environment="production"
+    )
+
+    # 장치 검색
+    devices = await sdk.discover_devices()
+    print(f"{len(devices)}개의 장치 발견")
+
+    # 첫 번째 장치에 연결
+    device = await sdk.connect(devices[0].device_id)
+    print(f"{device.name}에 연결됨")
+
+    # 장치 상태 가져오기
+    status = await device.get_status()
+    print(f"배터리: {status.battery_level}%")
+    print(f"활성 전극: {status.active_electrodes}/{status.total_electrodes}")
+
+    return device
+
+# 연결 실행
+device = asyncio.run(connect_device())</code></pre>
+
+            <h3>카메라 프레임 캡처</h3>
+            <pre><code>import cv2
+import numpy as np
+from wia_bionic_eye import CameraConfig, ImageFormat
+
+class BionicEyeCamera:
+    def __init__(self, device):
+        self.device = device
+        self.camera = None
+
+    async def start_camera(self):
+        # 카메라 구성
+        config = CameraConfig(
+            resolution=(640, 480),
+            frame_rate=20,
+            format=ImageFormat.GRAY8,
+            auto_exposure=True
+        )
+
+        self.camera = await self.device.camera.start(config)
+        print("카메라 시작됨")
+
+    async def capture_frame(self):
+        # 단일 프레임 캡처
+        frame = await self.camera.capture()
+
+        return {
+            'frame_id': frame.frame_id,
+            'timestamp': frame.timestamp,
+            'image': np.frombuffer(frame.data, dtype=np.uint8).reshape(
+                frame.height, frame.width
+            ),
+            'metadata': {
+                'exposure': frame.camera_params.exposure,
+                'gain': frame.camera_params.gain,
+                'ambient_light': frame.sensor_data.ambient_light
+            }
+        }
+
+    async def process_frame(self, frame):
+        # numpy 배열로 변환
+        img = np.frombuffer(frame.data, dtype=np.uint8).reshape(
+            frame.height, frame.width
+        )
+
+        # 가장자리 감지 적용 (Canny)
+        edges = cv2.Canny(img, 50, 150)
+
+        # 전극 어레이 해상도로 다운샘플링
+        electrode_resolution = (10, 6)  # 60 전극
+        downsampled = cv2.resize(
+            edges,
+            electrode_resolution,
+            interpolation=cv2.INTER_AREA
+        )
+
+        return downsampled
+
+# 사용법
+camera = BionicEyeCamera(device)
+asyncio.run(camera.start_camera())
+frame_data = asyncio.run(camera.capture_frame())</code></pre>
+
+            <h3>신경 인코딩 및 자극</h3>
+            <pre><code>from wia_bionic_eye import StimulationMap, ElectrodeParams
+
+class NeuralEncoder:
+    def __init__(self, device, electrode_array):
+        self.device = device
+        self.array = electrode_array
+        self.thresholds = None
+        self.max_currents = None
+
+    async def load_calibration(self):
+        # 보정 데이터 로드
+        cal_data = await self.device.get_calibration()
+
+        self.thresholds = cal_data.thresholds
+        self.max_currents = cal_data.max_safe_currents
+
+        print(f"{len(self.thresholds)}개 전극에 대한 보정 로드됨")
+
+    def intensity_to_current(self, intensity, electrode_index):
+        """픽셀 강도를 자극 전류로 변환"""
+        # 강도를 0-1로 정규화
+        normalized = intensity / 255.0
+
+        # 전극별 매개변수 가져오기
+        threshold = self.thresholds[electrode_index]
+        max_current = self.max_currents[electrode_index]
+
+        # 안전 제한이 있는 선형 매핑
+        current = threshold + (normalized * (max_current - threshold))
+
+        # 지각된 밝기를 위한 감마 보정 적용
+        gamma = 2.2
+        current = ((current / max_current) ** (1/gamma)) * max_current
+
+        return round(current, 1)
+
+    async def send_stimulation(self, stimulation_map):
+        """임플란트에 자극 패턴 전송"""
+        try:
+            await self.device.stimulator.send(stimulation_map)
+        except Exception as e:
+            print(f"자극 오류: {e}")
+            await self.device.emergency_stop()
+
+# 사용법
+encoder = NeuralEncoder(device, device.electrode_array)
+asyncio.run(encoder.load_calibration())</code></pre>
+
+            <h2>7.2 TypeScript 구현</h2>
+
+            <h3>설치</h3>
+            <pre><code>npm install @wia/bionic-eye
+npm install @types/node ws</code></pre>
+
+            <h3>장치 연결 및 구성</h3>
+            <pre><code>import { WIABionicEyeSDK, DeviceConfig } from '@wia/bionic-eye';
+
+class BionicEyeController {
+  private sdk: WIABionicEyeSDK;
+  private device: any;
+
+  constructor(apiKey: string) {
+    this.sdk = new WIABionicEyeSDK({
+      apiKey: apiKey,
+      environment: 'production'
+    });
+  }
+
+  async connect(deviceId: string): Promise&lt;void&gt; {
+    this.device = await this.sdk.devices.connect(deviceId);
+    console.log(`${this.device.name}에 연결됨`);
+
+    // 장치 구성
+    await this.device.configure({
+      camera: {
+        resolution: { width: 640, height: 480 },
+        frameRate: 20,
+        format: 'gray8'
+      },
+      processing: {
+        edgeDetection: true,
+        edgeWeight: 0.7,
+        gamma: 2.2
+      }
+    });
+  }
+
+  async getStatus(): Promise&lt;DeviceStatus&gt; {
+    const status = await this.device.getStatus();
+    return {
+      batteryLevel: status.battery,
+      temperature: status.temperature,
+      activeElectrodes: status.electrodes.active
+    };
+  }
+}
+
+// 사용법
+const controller = new BionicEyeController(process.env.WIA_API_KEY);
+await controller.connect('BIO-EYE-001');</code></pre>
+
+            <h3>WebSocket 프레임 스트리밍</h3>
+            <pre><code>import WebSocket from 'ws';
+
+class FrameStreamer {
+  private ws: WebSocket | null = null;
+  private onFrameCallback: (frame: Frame) => void;
+
+  constructor(onFrame: (frame: Frame) => void) {
+    this.onFrameCallback = onFrame;
+  }
+
+  connect(deviceId: string, token: string): void {
+    const wsUrl = `wss://api.bionic-eye.wia.org/v1/stream/video?deviceId=${deviceId}&token=${token}`;
+    this.ws = new WebSocket(wsUrl);
+
+    this.ws.on('open', () => {
+      console.log('WebSocket 연결됨');
+    });
+
+    this.ws.on('message', (data: string) => {
+      const message = JSON.parse(data);
+
+      if (message.type === 'frame') {
+        const frame: Frame = {
+          frameId: message.frameId,
+          timestamp: message.timestamp,
+          data: Buffer.from(message.data, 'base64')
+        };
+
+        this.onFrameCallback(frame);
+      }
+    });
+  }
+}
+
+// 사용법
+const streamer = new FrameStreamer((frame) => {
+  console.log(`프레임 ${frame.sequenceNumber} 수신됨`);
+  processFrame(frame);
+});
+
+streamer.connect('BIO-EYE-001', apiToken);</code></pre>
+
+            <h2>7.3 Bash 스크립팅</h2>
+
+            <h3>장치 관리 스크립트</h3>
+            <pre><code>#!/bin/bash
+# bionic-eye-status.sh - 장치 상태 확인
+
+DEVICE_ID=${1:-"BIO-EYE-001"}
+API_KEY=${WIA_API_KEY}
+API_URL="https://api.bionic-eye.wia.org/v1"
+
+# 장치 상태 가져오기
+response=$(curl -s -X GET \
+  -H "Authorization: Bearer $API_KEY" \
+  "$API_URL/devices/$DEVICE_ID")
+
+# JSON 응답 파싱
+battery=$(echo "$response" | jq -r '.batteryLevel')
+temp=$(echo "$response" | jq -r '.temperature')
+active=$(echo "$response" | jq -r '.electrodes.active')
+total=$(echo "$response" | jq -r '.electrodes.total')
+
+# 상태 표시
+echo "장치: $DEVICE_ID"
+echo "배터리: $battery%"
+echo "온도: $temp°C"
+echo "전극: $active/$total 활성"
+
+# 배터리 수준 확인
+if [ "$battery" -lt 20 ]; then
+  echo "경고: 배터리 부족!"
+fi
+
+# 온도 확인
+if (( $(echo "$temp > 38.0" | bc -l) )); then
+  echo "경고: 높은 온도!"
+fi</code></pre>
+
+            <h3>보정 자동화</h3>
+            <pre><code>#!/bin/bash
+# calibrate-electrodes.sh - 자동화된 보정
+
+DEVICE_ID=${1:-"BIO-EYE-001"}
+API_KEY=${WIA_API_KEY}
+API_URL="https://api.bionic-eye.wia.org/v1"
+
+echo "$DEVICE_ID에 대한 전극 보정 시작"
+
+# 보정 세션 시작
+session=$(curl -s -X POST \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceId": "'$DEVICE_ID'",
+    "type": "threshold_detection",
+    "parameters": {
+      "startCurrent": 50,
+      "maxCurrent": 800,
+      "stepSize": 25
+    }
+  }' \
+  "$API_URL/calibration/start")
+
+session_id=$(echo "$session" | jq -r '.sessionId')
+echo "보정 세션 시작됨: $session_id"
+
+# 진행 상황 모니터링
+while true; do
+  status=$(curl -s -X GET \
+    -H "Authorization: Bearer $API_KEY" \
+    "$API_URL/calibration/status/$session_id")
+
+  progress=$(echo "$status" | jq -r '.progress')
+  state=$(echo "$status" | jq -r '.state')
+
+  echo "진행률: $progress% - 상태: $state"
+
+  if [ "$state" = "completed" ]; then
+    echo "보정 완료!"
+    break
+  elif [ "$state" = "error" ]; then
+    echo "보정 오류!"
+    exit 1
+  fi
+
+  sleep 5
+done</code></pre>
+
+            <h2>7.4 테스트 및 검증</h2>
+
+            <h3>단위 테스트 예제 (Python)</h3>
+            <pre><code>import unittest
+from wia_bionic_eye import NeuralEncoder
+
+class TestNeuralEncoder(unittest.TestCase):
+    def setUp(self):
+        self.encoder = NeuralEncoder(mock_device, mock_array)
+        self.encoder.thresholds = [100] * 60
+        self.encoder.max_currents = [800] * 60
+
+    def test_intensity_to_current(self):
+        # 최소 강도 테스트
+        current = self.encoder.intensity_to_current(0, 0)
+        self.assertEqual(current, 100)  # 임계값이어야 함
+
+        # 최대 강도 테스트
+        current = self.encoder.intensity_to_current(255, 0)
+        self.assertEqual(current, 800)  # 최대값이어야 함
+
+    def test_safety_limits(self):
+        # 전류가 최대 안전값을 초과하지 않는지 확인
+        for electrode in range(60):
+            for intensity in range(256):
+                current = self.encoder.intensity_to_current(intensity, electrode)
+                self.assertLessEqual(current, 800)
+                self.assertGreaterEqual(current, 100)
+
+if __name__ == '__main__':
+    unittest.main()</code></pre>
+
+            <div class="info">
+                <strong>모범 사례:</strong> 실제 장치에 배포하기 전에 항상 안전 제한이 있는 자극 알고리즘을 테스트하십시오. 개발 중에는 가능한 한 시뮬레이션 모드를 사용하십시오.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

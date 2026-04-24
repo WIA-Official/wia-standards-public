@@ -1,0 +1,250 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/security/v1/schema.json",
+  "title": "WIA Security Event",
+  "description": "WIA Security Data Format Standard v1.0.0",
+  "type": "object",
+  "required": ["version", "id", "type", "timestamp", "severity", "source", "data"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Schema URL"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Format version (SemVer)"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier (UUID)"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["alert", "threat_intel", "vulnerability", "incident", "network_event", "endpoint_event", "auth_event"],
+      "description": "Event type"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event timestamp (ISO 8601)"
+    },
+    "severity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Severity level (0-10)"
+    },
+    "source": {
+      "$ref": "#/definitions/Source"
+    },
+    "data": {
+      "type": "object",
+      "description": "Event-specific data"
+    },
+    "context": {
+      "$ref": "#/definitions/Context"
+    },
+    "mitre": {
+      "$ref": "#/definitions/Mitre"
+    },
+    "meta": {
+      "$ref": "#/definitions/Meta"
+    }
+  },
+  "definitions": {
+    "Source": {
+      "type": "object",
+      "required": ["type", "name"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["siem", "edr", "ids", "firewall", "scanner", "custom"],
+          "description": "Source type"
+        },
+        "name": {
+          "type": "string",
+          "description": "Source name"
+        },
+        "vendor": {
+          "type": "string",
+          "description": "Vendor name"
+        },
+        "version": {
+          "type": "string",
+          "description": "Source version"
+        }
+      }
+    },
+    "Context": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/Host"
+        },
+        "network": {
+          "$ref": "#/definitions/NetworkContext"
+        },
+        "user": {
+          "$ref": "#/definitions/User"
+        },
+        "cloud": {
+          "$ref": "#/definitions/Cloud"
+        }
+      }
+    },
+    "Host": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "type": "string"
+        },
+        "ip": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "mac": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "os": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string" },
+            "build": { "type": "string" }
+          }
+        }
+      }
+    },
+    "NetworkContext": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/definitions/NetworkEndpoint"
+        },
+        "destination": {
+          "$ref": "#/definitions/NetworkEndpoint"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["inbound", "outbound", "internal"]
+        }
+      }
+    },
+    "NetworkEndpoint": {
+      "type": "object",
+      "properties": {
+        "ip": { "type": "string" },
+        "port": { "type": "integer" },
+        "hostname": { "type": "string" }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "domain": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "employee_id": { "type": "string" }
+      }
+    },
+    "Cloud": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["aws", "azure", "gcp"]
+        },
+        "account_id": { "type": "string" },
+        "region": { "type": "string" }
+      }
+    },
+    "Mitre": {
+      "type": "object",
+      "properties": {
+        "tactic": {
+          "type": "string",
+          "pattern": "^TA\\d{4}$"
+        },
+        "tactic_name": { "type": "string" },
+        "technique": {
+          "type": "string",
+          "pattern": "^T\\d{4}(\\.\\d{3})?$"
+        },
+        "technique_name": { "type": "string" },
+        "sub_technique": {
+          "type": "string",
+          "pattern": "^T\\d{4}\\.\\d{3}$"
+        },
+        "sub_technique_name": { "type": "string" }
+      }
+    },
+    "Meta": {
+      "type": "object",
+      "properties": {
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "raw": { "type": "string" },
+        "correlation_id": { "type": "string" },
+        "custom": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "Indicator": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ip", "domain", "url", "hash", "email", "file", "file_hash_md5", "file_hash_sha1", "file_hash_sha256", "mutex", "registry"]
+        },
+        "value": { "type": "string" },
+        "context": { "type": "string" },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "first_seen": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_seen": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "GeoLocation": {
+      "type": "object",
+      "properties": {
+        "country": { "type": "string" },
+        "country_name": { "type": "string" },
+        "city": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "asn": { "type": "integer" },
+        "org": { "type": "string" }
+      }
+    }
+  }
+}

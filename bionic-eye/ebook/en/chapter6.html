@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA Bionic Eye Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 6: Security & Privacy</h1>
+        <p>Visual Data Protection and Consent for Visual Recording</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>6.1 Privacy Considerations</h2>
+
+            <p>Bionic eye systems capture continuous visual data from the user's perspective, creating unique privacy challenges. This chapter addresses data protection, patient consent, and security best practices.</p>
+
+            <h3>Privacy Risks</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Risk Category</th>
+                        <th>Description</th>
+                        <th>Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Continuous Recording</td>
+                        <td>Device captures everything the user sees</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td>Third-Party Exposure</td>
+                        <td>Others' faces, private spaces recorded</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td>Sensitive Information</td>
+                        <td>Medical records, documents, passwords</td>
+                        <td>Critical</td>
+                    </tr>
+                    <tr>
+                        <td>Location Tracking</td>
+                        <td>Visual data reveals user location</td>
+                        <td>Medium</td>
+                    </tr>
+                    <tr>
+                        <td>Unauthorized Access</td>
+                        <td>Hacking could provide access to user's view</td>
+                        <td>Critical</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="warning">
+                <strong>Privacy First:</strong> Bionic eye systems are more invasive than smartphones. Users must understand what data is collected, how it's stored, and who has access.
+            </div>
+
+            <h2>6.2 Data Collection and Storage</h2>
+
+            <h3>Data Minimization Principles</h3>
+            <p>Collect only data necessary for device function:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data Type</th>
+                        <th>Purpose</th>
+                        <th>Retention</th>
+                        <th>Storage Location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Real-time frames</td>
+                        <td>Vision generation</td>
+                        <td>Transient (not stored)</td>
+                        <td>Memory buffer only</td>
+                    </tr>
+                    <tr>
+                        <td>Calibration data</td>
+                        <td>Device optimization</td>
+                        <td>Permanent</td>
+                        <td>Local device</td>
+                    </tr>
+                    <tr>
+                        <td>Safety logs</td>
+                        <td>Medical monitoring</td>
+                        <td>1 year</td>
+                        <td>Encrypted local + cloud</td>
+                    </tr>
+                    <tr>
+                        <td>Usage statistics</td>
+                        <td>Device improvement</td>
+                        <td>Anonymous aggregate</td>
+                        <td>Cloud (anonymized)</td>
+                    </tr>
+                    <tr>
+                        <td>Debug recordings</td>
+                        <td>Troubleshooting</td>
+                        <td>User-initiated, 30 days</td>
+                        <td>Encrypted local</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Default Configuration</h3>
+            <pre><code>{
+  "dataCollection": {
+    "realTimeFrames": {
+      "store": false,            // Do not save by default
+      "processOnly": true
+    },
+    "calibrationData": {
+      "store": true,
+      "location": "local_encrypted",
+      "cloudBackup": false       // Opt-in only
+    },
+    "safetyEvents": {
+      "store": true,
+      "location": "local_encrypted",
+      "cloudSync": true,         // For medical monitoring
+      "retention": 365           // days
+    },
+    "debugging": {
+      "enabled": false,          // Opt-in only
+      "requireExplicitConsent": true,
+      "automaticDeletion": 30    // days
+    }
+  }
+}</code></pre>
+
+            <h2>6.3 Encryption</h2>
+
+            <h3>Data at Rest</h3>
+            <p>All stored data must be encrypted:</p>
+
+            <pre><code>interface EncryptionConfig {
+  algorithm: 'AES-256-GCM';
+  keyDerivation: {
+    function: 'PBKDF2' | 'scrypt' | 'Argon2id';
+    iterations: number;         // Min 100,000 for PBKDF2
+    salt: Uint8Array;           // 32 bytes minimum
+  };
+  keyStorage: {
+    method: 'secure_enclave' | 'tpm' | 'keychain';
+    backupEnabled: boolean;
+    backupMethod: 'paper_key' | 'recovery_phrase';
+  };
+}</code></pre>
+
+            <h4>Implementation Example</h4>
+            <pre><code>import { crypto } from '@wia/security';
+
+async function encryptFrameData(frameData: Uint8Array, userKey: string) {
+  // Derive encryption key from user password
+  const salt = crypto.randomBytes(32);
+  const key = await crypto.deriveKey({
+    password: userKey,
+    salt: salt,
+    iterations: 100000,
+    algorithm: 'PBKDF2-SHA256',
+    keyLength: 256
+  });
+
+  // Encrypt frame data
+  const iv = crypto.randomBytes(12);  // 96-bit IV for GCM
+  const encrypted = await crypto.encrypt({
+    algorithm: 'AES-256-GCM',
+    key: key,
+    iv: iv,
+    data: frameData,
+    additionalData: {
+      timestamp: Date.now(),
+      deviceId: 'BIO-EYE-001'
+    }
+  });
+
+  return {
+    encrypted: encrypted.ciphertext,
+    iv: iv,
+    salt: salt,
+    tag: encrypted.authTag
+  };
+}</code></pre>
+
+            <h3>Data in Transit</h3>
+            <p>All wireless communications encrypted using TLS 1.3 or higher:</p>
+
+            <ul>
+                <li><strong>Camera to Processor:</strong> BLE with pairing encryption</li>
+                <li><strong>Processor to Cloud:</strong> TLS 1.3 with certificate pinning</li>
+                <li><strong>API Calls:</strong> HTTPS with mutual TLS (mTLS)</li>
+                <li><strong>Processor to Implant:</strong> AES-256 with device-specific keys</li>
+            </ul>
+
+            <h2>6.4 Authentication and Access Control</h2>
+
+            <h3>User Authentication</h3>
+            <p>Multi-factor authentication for accessing bionic eye systems:</p>
+
+            <pre><code>interface AuthenticationConfig {
+  primary: {
+    method: 'biometric' | 'password' | 'pin';
+    biometricType?: 'fingerprint' | 'face' | 'iris';
+    minPasswordLength?: number;
+    pinLength?: number;
+  };
+  secondary: {
+    required: boolean;
+    method: 'sms' | 'totp' | 'hardware_key';
+    backupCodes: boolean;
+  };
+  sessionManagement: {
+    timeout: number;             // minutes
+    rememberDevice: boolean;
+    maxActiveSessions: number;
+  };
+}</code></pre>
+
+            <h3>Role-Based Access Control (RBAC)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Permissions</th>
+                        <th>Typical User</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Patient</td>
+                        <td>View own data, control settings, emergency stop</td>
+                        <td>Device user</td>
+                    </tr>
+                    <tr>
+                        <td>Caregiver</td>
+                        <td>Monitor status, emergency stop, basic settings</td>
+                        <td>Family member</td>
+                    </tr>
+                    <tr>
+                        <td>Clinician</td>
+                        <td>Calibration, advanced settings, diagnostic data</td>
+                        <td>Doctor</td>
+                    </tr>
+                    <tr>
+                        <td>Technician</td>
+                        <td>System maintenance, debugging, updates</td>
+                        <td>Device support</td>
+                    </tr>
+                    <tr>
+                        <td>Researcher</td>
+                        <td>Anonymous aggregate data only</td>
+                        <td>Scientists</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>API Token Management</h3>
+            <pre><code>interface APITokenPolicy {
+  tokenLifetime: 3600;           // seconds (1 hour)
+  refreshTokenLifetime: 2592000; // seconds (30 days)
+  rotationRequired: true;
+  scopes: string[];              // ['read:device', 'write:settings']
+  ipWhitelist?: string[];
+  deviceBinding: boolean;        // Token valid only for specific device
+}</code></pre>
+
+            <h2>6.5 Consent Management</h2>
+
+            <h3>Informed Consent Requirements</h3>
+            <p>Users must provide explicit consent for data collection and usage:</p>
+
+            <div class="note">
+                <strong>GDPR/HIPAA Compliance:</strong> Bionic eye data is protected health information (PHI). Ensure compliance with regional privacy regulations.
+            </div>
+
+            <h4>Consent Categories</h4>
+            <pre><code>interface ConsentManager {
+  essentialOperation: {
+    required: true,              // Cannot use device without
+    description: "Real-time image processing for vision generation",
+    canRevoke: false
+  };
+  calibrationData: {
+    required: true,
+    description: "Store calibration settings for optimal performance",
+    canRevoke: false
+  };
+  safetyLogging: {
+    required: true,
+    description: "Record safety events for medical monitoring",
+    canRevoke: false
+  };
+  debugRecording: {
+    required: false,             // Opt-in
+    description: "Record frames for troubleshooting issues",
+    canRevoke: true
+  };
+  cloudBackup: {
+    required: false,
+    description: "Backup calibration data to cloud",
+    canRevoke: true
+  };
+  researchData: {
+    required: false,
+    description: "Share anonymized usage data for research",
+    canRevoke: true
+  };
+  thirdPartyApps: {
+    required: false,
+    description: "Allow third-party apps to access device",
+    canRevoke: true
+  };
+}</code></pre>
+
+            <h3>Consent UI Example</h3>
+            <pre><code>async function requestConsent(category: ConsentCategory) {
+  const consent = await showConsentDialog({
+    category: category,
+    title: category.name,
+    description: category.fullDescription,
+    benefits: category.benefits,
+    risks: category.risks,
+    alternatives: category.alternatives,
+    revocable: category.canRevoke,
+    required: category.required
+  });
+
+  if (consent.granted) {
+    await saveConsent({
+      category: category.id,
+      granted: true,
+      timestamp: new Date(),
+      version: '1.0.0',
+      signature: await signConsent(consent)
+    });
+  }
+
+  return consent.granted;
+}</code></pre>
+
+            <h2>6.6 Third-Party Privacy</h2>
+
+            <h3>Bystander Privacy Protection</h3>
+            <p>Protecting privacy of people captured in bionic eye recordings:</p>
+
+            <h4>Face Blurring</h4>
+            <pre><code>interface PrivacyFilter {
+  faceDetection: {
+    enabled: true,
+    algorithm: 'YOLO' | 'MTCNN' | 'RetinaFace';
+    minConfidence: 0.8;
+  };
+  faceBlurring: {
+    method: 'gaussian' | 'pixelate' | 'blackbox';
+    radiusMultiplier: 1.2;      // Blur area larger than face
+    exemptKnownFaces: boolean;  // Don't blur family/friends
+  };
+  licensePlates: {
+    enabled: true,
+    blurMethod: 'blackbox'
+  };
+  sensitiveText: {
+    enabled: true,               // Blur SSN, credit cards, etc.
+    patterns: ['SSN', 'CREDIT_CARD', 'PASSWORD']
+  };
+}</code></pre>
+
+            <h3>Location Privacy</h3>
+            <p>Options to disable location tracking:</p>
+
+            <pre><code>{
+  "locationPrivacy": {
+    "gpsLogging": false,         // Disable GPS tagging
+    "visualLandmarks": {
+      "detection": true,
+      "logging": false           // Detect but don't record
+    },
+    "geofencing": {
+      "privatePlaces": [
+        {
+          "name": "Home",
+          "coordinates": { "lat": 37.7749, "lon": -122.4194 },
+          "radius": 100,         // meters
+          "action": "disable_recording"
+        }
+      ]
+    }
+  }
+}</code></pre>
+
+            <h2>6.7 Security Threats and Mitigations</h2>
+
+            <h3>Threat Model</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Threat</th>
+                        <th>Attack Vector</th>
+                        <th>Impact</th>
+                        <th>Mitigation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Unauthorized Access</td>
+                        <td>Stolen credentials</td>
+                        <td>Privacy breach</td>
+                        <td>MFA, biometric auth</td>
+                    </tr>
+                    <tr>
+                        <td>Man-in-the-Middle</td>
+                        <td>Wireless interception</td>
+                        <td>Data theft</td>
+                        <td>TLS, certificate pinning</td>
+                    </tr>
+                    <tr>
+                        <td>Malicious Stimulation</td>
+                        <td>Compromised processor</td>
+                        <td>Patient harm</td>
+                        <td>Signed firmware, safety limits</td>
+                    </tr>
+                    <tr>
+                        <td>Ransomware</td>
+                        <td>Malware infection</td>
+                        <td>Device lockout</td>
+                        <td>Offline mode, backups</td>
+                    </tr>
+                    <tr>
+                        <td>Privacy Invasion</td>
+                        <td>Hacked camera feed</td>
+                        <td>Surveillance</td>
+                        <td>Encryption, access logs</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Secure Boot and Firmware Verification</h3>
+            <pre><code>interface SecureBootConfig {
+  bootloader: {
+    signed: true,
+    publicKey: string;           // Manufacturer's public key
+    rollbackProtection: true;
+  };
+  firmware: {
+    signed: true,
+    algorithm: 'RSA-4096' | 'ECDSA-P384';
+    updateChannel: 'manufacturer_only';
+    automaticUpdates: 'notify_only';  // Don't auto-install
+  };
+  runtime: {
+    codeIntegrity: true,
+    memoryProtection: true,
+    sandboxing: true
+  };
+}</code></pre>
+
+            <h3>Intrusion Detection</h3>
+            <pre><code>interface IntrusionDetection {
+  monitoring: {
+    loginAttempts: {
+      maxFailed: 5,
+      lockoutDuration: 900       // seconds
+    };
+    apiCalls: {
+      rateLimiting: true,
+      maxPerHour: 1000,
+      anomalyDetection: true
+    };
+    fileIntegrity: {
+      enabled: true,
+      checkInterval: 3600        // seconds
+    };
+  };
+  alerts: {
+    email: true,
+    push: true,
+    emergencyStop: boolean;      // Stop device on critical threat
+  };
+}</code></pre>
+
+            <h2>6.8 Audit Logging</h2>
+
+            <h3>Security Event Logging</h3>
+            <p>Comprehensive logging for security monitoring and incident response:</p>
+
+            <pre><code>interface SecurityLog {
+  timestamp: Date;
+  eventType: SecurityEventType;
+  severity: 'info' | 'warning' | 'critical';
+  actor: {
+    userId: string;
+    role: string;
+    ipAddress: string;
+    deviceId: string;
+  };
+  action: string;
+  resource: string;
+  outcome: 'success' | 'failure';
+  details: Record<string, any>;
+  signature: string;             // Tamper-proof log signature
+}
+
+enum SecurityEventType {
+  LOGIN = 'login',
+  LOGOUT = 'logout',
+  FAILED_AUTH = 'failed_auth',
+  SETTINGS_CHANGE = 'settings_change',
+  CALIBRATION = 'calibration',
+  FIRMWARE_UPDATE = 'firmware_update',
+  DATA_EXPORT = 'data_export',
+  EMERGENCY_STOP = 'emergency_stop',
+  INTRUSION_DETECTED = 'intrusion_detected'
+}</code></pre>
+
+            <h3>Log Retention Policy</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Log Type</th>
+                        <th>Retention Period</th>
+                        <th>Storage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Authentication logs</td>
+                        <td>1 year</td>
+                        <td>Encrypted local + cloud</td>
+                    </tr>
+                    <tr>
+                        <td>Configuration changes</td>
+                        <td>Permanent</td>
+                        <td>Encrypted cloud</td>
+                    </tr>
+                    <tr>
+                        <td>Security incidents</td>
+                        <td>5 years</td>
+                        <td>Encrypted cloud, immutable</td>
+                    </tr>
+                    <tr>
+                        <td>Access logs</td>
+                        <td>90 days</td>
+                        <td>Encrypted local</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>6.9 Compliance and Standards</h2>
+
+            <h3>Regulatory Compliance</h3>
+            <ul>
+                <li><strong>HIPAA:</strong> Health Insurance Portability and Accountability Act (US)</li>
+                <li><strong>GDPR:</strong> General Data Protection Regulation (EU)</li>
+                <li><strong>CCPA:</strong> California Consumer Privacy Act (California)</li>
+                <li><strong>PIPEDA:</strong> Personal Information Protection and Electronic Documents Act (Canada)</li>
+                <li><strong>ISO 27001:</strong> Information security management</li>
+                <li><strong>IEC 62304:</strong> Medical device software lifecycle</li>
+            </ul>
+
+            <h3>Privacy by Design Principles</h3>
+            <ol>
+                <li><strong>Proactive not Reactive:</strong> Prevent privacy issues before they occur</li>
+                <li><strong>Privacy as Default:</strong> Highest privacy settings out of the box</li>
+                <li><strong>Privacy Embedded:</strong> Built into system architecture, not added later</li>
+                <li><strong>Full Functionality:</strong> Privacy without sacrificing functionality</li>
+                <li><strong>End-to-End Security:</strong> Protect data through entire lifecycle</li>
+                <li><strong>Visibility and Transparency:</strong> Users know what data is collected</li>
+                <li><strong>User-Centric:</strong> Put user privacy interests first</li>
+            </ol>
+
+            <h2>6.10 Data Breach Response</h2>
+
+            <h3>Incident Response Plan</h3>
+            <pre><code>interface IncidentResponse {
+  detection: {
+    automated: boolean;
+    reportingChannel: string;    // security@company.com
+    responseTime: number;        // hours
+  };
+
+  containment: {
+    isolateAffectedSystems: boolean;
+    revokeCompromisedCredentials: boolean;
+    notifyUsers: boolean;
+  };
+
+  investigation: {
+    preserveEvidence: boolean;
+    forensicAnalysis: boolean;
+    rootCauseAnalysis: boolean;
+  };
+
+  notification: {
+    usersNotified: number;       // hours from detection
+    regulatorsNotified: number;  // hours (GDPR: 72 hours)
+    publicDisclosure: boolean;
+  };
+
+  remediation: {
+    patchVulnerability: boolean;
+    enhanceSecurity: boolean;
+    userSupport: boolean;
+  };
+}</code></pre>
+
+            <div class="warning">
+                <strong>Critical Requirement:</strong> All bionic eye manufacturers must have a documented incident response plan and conduct regular security drills.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Endpoints - WIA Bionic Eye Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 3: API Endpoints</h1>
+        <p>Device Control, Image Streaming, and Calibration</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>3.1 API Overview</h2>
+
+            <p>The WIA Bionic Eye API provides RESTful endpoints for controlling bionic eye devices, streaming visual data, and managing system configuration. The API uses JSON for data exchange and supports both HTTP and WebSocket connections.</p>
+
+            <h3>Base URL</h3>
+            <pre><code>https://api.bionic-eye.wia.org/v1</code></pre>
+
+            <h3>Authentication</h3>
+            <p>All API requests require authentication using Bearer tokens:</p>
+            <pre><code>Authorization: Bearer {access_token}</code></pre>
+
+            <div class="warning">
+                <strong>Security:</strong> API tokens must be kept secure. Use HTTPS for all communications and implement token rotation every 24 hours.
+            </div>
+
+            <h2>3.2 Device Management</h2>
+
+            <h3>GET /devices</h3>
+            <p>List all registered bionic eye devices for the authenticated user.</p>
+
+            <h4>Request</h4>
+            <pre><code>GET /devices
+Authorization: Bearer {token}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "devices": [
+    {
+      "deviceId": "BIO-EYE-001",
+      "name": "Left Eye Argus II",
+      "type": "epiretinal",
+      "manufacturer": "Second Sight",
+      "model": "Argus II",
+      "status": "active",
+      "implantDate": "2024-03-15",
+      "electrodes": {
+        "total": 60,
+        "active": 58,
+        "failed": 2
+      },
+      "lastSync": "2025-12-20T10:30:00Z"
+    }
+  ]
+}</code></pre>
+
+            <h3>GET /devices/{deviceId}</h3>
+            <p>Get detailed information about a specific device.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "deviceId": "BIO-EYE-001",
+  "name": "Left Eye Argus II",
+  "type": "epiretinal",
+  "serialNumber": "AS2-123456",
+  "firmwareVersion": "2.5.1",
+  "batteryLevel": 87,
+  "temperature": 36.5,
+  "impedanceStatus": "normal",
+  "lastCalibration": "2025-12-15T14:00:00Z"
+}</code></pre>
+
+            <h3>POST /devices/{deviceId}/power</h3>
+            <p>Control device power state.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "action": "on" | "off" | "standby",
+  "reason": "User requested power on for navigation"
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "status": "success",
+  "powerState": "on",
+  "timestamp": "2025-12-20T10:35:00Z"
+}</code></pre>
+
+            <h2>3.3 Camera Control</h2>
+
+            <h3>GET /camera/parameters</h3>
+            <p>Get current camera configuration parameters.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "deviceId": "CAM-WIA-001",
+  "resolution": {
+    "width": 640,
+    "height": 480
+  },
+  "frameRate": 20,
+  "format": "gray8",
+  "fov": {
+    "horizontal": 85,
+    "vertical": 65
+  },
+  "exposure": 15.5,
+  "gain": 400,
+  "whiteBalance": 5500,
+  "autoExposure": true,
+  "autoWhiteBalance": true
+}</code></pre>
+
+            <h3>PUT /camera/parameters</h3>
+            <p>Update camera configuration.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "resolution": {
+    "width": 320,
+    "height": 240
+  },
+  "frameRate": 15,
+  "format": "gray8",
+  "autoExposure": true
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "status": "success",
+  "updated": ["resolution", "frameRate"],
+  "warning": "Frame rate reduced to conserve power"
+}</code></pre>
+
+            <h3>POST /camera/capture</h3>
+            <p>Capture a single frame for testing or calibration.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "saveToStorage": true,
+  "includeMetadata": true
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "frameId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "timestamp": 1703001234567,
+  "imageUrl": "/storage/frames/f47ac10b.jpg",
+  "metadata": {
+    "exposure": 15.5,
+    "gain": 400,
+    "ambientLight": 450
+  }
+}</code></pre>
+
+            <h2>3.4 Image Streaming</h2>
+
+            <h3>WebSocket: /stream/video</h3>
+            <p>Real-time video streaming from camera to client using WebSocket connection.</p>
+
+            <h4>Connection</h4>
+            <pre><code>ws://api.bionic-eye.wia.org/v1/stream/video?deviceId=BIO-EYE-001&token={access_token}</code></pre>
+
+            <h4>Message Format</h4>
+            <pre><code>{
+  "type": "frame",
+  "frameId": "uuid",
+  "timestamp": 1703001234567,
+  "sequenceNumber": 12345,
+  "encoding": "jpeg",
+  "data": "base64_encoded_image"
+}</code></pre>
+
+            <h4>Control Messages</h4>
+            <pre><code>// Client to Server
+{
+  "type": "control",
+  "action": "pause" | "resume" | "adjust_quality",
+  "parameters": {
+    "quality": 80
+  }
+}
+
+// Server to Client
+{
+  "type": "status",
+  "state": "streaming",
+  "fps": 18.5,
+  "droppedFrames": 2
+}</code></pre>
+
+            <h3>GET /stream/status</h3>
+            <p>Get current streaming status.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "isStreaming": true,
+  "clients": 2,
+  "currentFps": 19.8,
+  "bandwidth": "15.2 Mbps",
+  "latency": 45,
+  "droppedFrames": 5
+}</code></pre>
+
+            <h2>3.5 Calibration</h2>
+
+            <h3>POST /calibration/start</h3>
+            <p>Start a calibration session for electrode mapping.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "deviceId": "BIO-EYE-001",
+  "type": "phosphene_mapping" | "threshold_detection" | "impedance_check",
+  "electrodes": [0, 1, 2, 3, 4, 5],  // null for all electrodes
+  "parameters": {
+    "startCurrent": 50,    // μA
+    "maxCurrent": 800,
+    "stepSize": 25
+  }
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "sessionId": "cal-20251220-001",
+  "status": "started",
+  "estimatedDuration": 1800,  // seconds
+  "nextElectrode": 0
+}</code></pre>
+
+            <h3>POST /calibration/record</h3>
+            <p>Record patient response during calibration.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "sessionId": "cal-20251220-001",
+  "electrodeIndex": 0,
+  "currentLevel": 150,  // μA
+  "response": {
+    "perceived": true,
+    "brightness": 5,    // 0-10 scale
+    "location": {
+      "x": 0.3,         // normalized -1 to 1
+      "y": -0.2
+    },
+    "shape": "spot",    // spot, elongated, irregular
+    "size": "small"     // small, medium, large
+  }
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "status": "recorded",
+  "nextElectrode": 1,
+  "progress": 1.67  // percentage
+}</code></pre>
+
+            <h3>GET /calibration/results/{sessionId}</h3>
+            <p>Get calibration results.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "sessionId": "cal-20251220-001",
+  "completedAt": "2025-12-20T12:00:00Z",
+  "electrodeData": [
+    {
+      "index": 0,
+      "threshold": 125,        // μA
+      "optimalCurrent": 200,
+      "maxSafe": 650,
+      "phosphene": {
+        "location": { "x": 0.3, "y": -0.2 },
+        "reliableSize": "small"
+      }
+    }
+  ],
+  "recommendations": {
+    "disableElectrodes": [15, 42],
+    "reduceMaxCurrent": [7, 23]
+  }
+}</code></pre>
+
+            <h2>3.6 Stimulation Control</h2>
+
+            <h3>PUT /stimulation/parameters</h3>
+            <p>Update stimulation parameters for neural encoding.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "deviceId": "BIO-EYE-001",
+  "mode": "navigation" | "reading" | "face_detection",
+  "globalParameters": {
+    "pulseWidth": 450,          // μs
+    "frequency": 20,            // Hz
+    "maxCurrent": 800           // μA
+  },
+  "electrodeOverrides": [
+    {
+      "index": 5,
+      "maxCurrent": 650,
+      "disabled": false
+    }
+  ]
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "status": "updated",
+  "appliedAt": "2025-12-20T10:45:00Z",
+  "warnings": [
+    "Electrode 5 current reduced due to impedance increase"
+  ]
+}</code></pre>
+
+            <h3>POST /stimulation/test</h3>
+            <p>Send test stimulation pattern.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "pattern": "checkerboard" | "horizontal_lines" | "vertical_lines" | "single_electrode",
+  "duration": 5000,  // ms
+  "electrodes": [0, 2, 4, 6, 8]
+}</code></pre>
+
+            <h2>3.7 Safety and Emergency</h2>
+
+            <h3>POST /emergency/stop</h3>
+            <p>Immediately stop all stimulation.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "deviceId": "BIO-EYE-001",
+  "reason": "Patient discomfort",
+  "triggeredBy": "patient" | "caregiver" | "automatic"
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "status": "stopped",
+  "stoppedAt": "2025-12-20T10:50:00Z",
+  "responseTime": 2.3,  // ms
+  "allElectrodesDisabled": true
+}</code></pre>
+
+            <h3>GET /safety/status</h3>
+            <p>Get current safety status and alerts.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "overallStatus": "normal" | "warning" | "critical",
+  "temperature": 36.8,
+  "maxTemperature": 39.0,
+  "impedanceStatus": "normal",
+  "highImpedanceElectrodes": [],
+  "currentDraw": 4.5,      // mA
+  "maxCurrent": 50,
+  "alerts": []
+}</code></pre>
+
+            <h2>3.8 Data Export</h2>
+
+            <h3>GET /export/session/{sessionId}</h3>
+            <p>Export session data for research or analysis.</p>
+
+            <h4>Query Parameters</h4>
+            <ul>
+                <li><code>format</code>: json | csv | matlab</li>
+                <li><code>includeFrames</code>: true | false</li>
+                <li><code>includeStimulation</code>: true | false</li>
+            </ul>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "sessionId": "sess-20251220-001",
+  "downloadUrl": "/downloads/sess-20251220-001.zip",
+  "expiresAt": "2025-12-21T10:00:00Z",
+  "fileSize": "45.2 MB"
+}</code></pre>
+
+            <h2>3.9 System Configuration</h2>
+
+            <h3>GET /config</h3>
+            <p>Get system configuration.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "version": "1.0.0",
+  "features": {
+    "objectDetection": true,
+    "faceRecognition": true,
+    "textRecognition": true,
+    "depthSensing": true
+  },
+  "limits": {
+    "maxFrameRate": 30,
+    "maxResolution": "1920x1080",
+    "maxElectrodes": 1600,
+    "maxCurrent": 1000
+  }
+}</code></pre>
+
+            <h3>PUT /config/preferences</h3>
+            <p>Update user preferences.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "defaultMode": "navigation",
+  "brightnessBias": 1.2,
+  "contrastEnhancement": 0.8,
+  "edgeDetection": true,
+  "objectDetection": {
+    "enabled": true,
+    "priorityObjects": ["person", "door", "stairs", "car"]
+  },
+  "audioFeedback": true
+}</code></pre>
+
+            <h2>3.10 Error Handling</h2>
+
+            <h3>Error Response Format</h3>
+            <pre><code>{
+  "error": {
+    "code": "DEVICE_NOT_FOUND",
+    "message": "Device BIO-EYE-999 not found",
+    "status": 404,
+    "timestamp": "2025-12-20T10:55:00Z",
+    "requestId": "req-abc123"
+  }
+}</code></pre>
+
+            <h3>Common Error Codes</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>UNAUTHORIZED</td>
+                        <td>401</td>
+                        <td>Invalid or expired authentication token</td>
+                    </tr>
+                    <tr>
+                        <td>FORBIDDEN</td>
+                        <td>403</td>
+                        <td>Insufficient permissions for operation</td>
+                    </tr>
+                    <tr>
+                        <td>DEVICE_NOT_FOUND</td>
+                        <td>404</td>
+                        <td>Specified device does not exist</td>
+                    </tr>
+                    <tr>
+                        <td>DEVICE_OFFLINE</td>
+                        <td>503</td>
+                        <td>Device is not currently connected</td>
+                    </tr>
+                    <tr>
+                        <td>SAFETY_LIMIT_EXCEEDED</td>
+                        <td>400</td>
+                        <td>Requested parameters exceed safety limits</td>
+                    </tr>
+                    <tr>
+                        <td>CALIBRATION_IN_PROGRESS</td>
+                        <td>409</td>
+                        <td>Cannot modify settings during calibration</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info">
+                <strong>Best Practice:</strong> Always check error responses and implement appropriate error handling and user feedback in client applications.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

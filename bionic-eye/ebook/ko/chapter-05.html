@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 안전 및 생체적합성 | WIA-BIONIC_EYE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>5장: 안전 및 생체적합성</h1>
+
+    <h2>5.1 의료기기 안전 소개</h2>
+    <p>안전은 인공 눈 개발에서 가장 중요한 관심사입니다. 이 장치는 섬세한 신경 조직에 전기 자극을 전달하고, 수십 년 동안 이식되어 있으며, 실패 시 환자의 건강과 복지에 심각한 결과를 초래할 수 있습니다. WIA-BIONIC_EYE 표준은 전기 안전, 생체적합성, 전자기 호환성, 사이버보안, 장기 신뢰성을 다루는 포괄적인 안전 요구사항을 설정합니다.</p>
+
+    <div class="highlight">
+        <strong>안전 철학:</strong> 모든 인공 눈 시스템은 여러 층의 보호, 안전 장치 메커니즘, 보수적인 안전 마진을 갖추어 설계되어야 합니다. 성능과 안전 사이에 충돌이 발생하면 항상 안전이 우선입니다.
+    </div>
+
+    <h2>5.2 전기 안전 요구사항</h2>
+
+    <h3>5.2.1 전하 밀도 제한</h3>
+    <p>과도한 전기 자극은 신경 조직을 손상시킬 수 있습니다. 전하 밀도 제한은 전기화학적 손상으로부터 보호합니다:</p>
+
+    <table>
+        <tr><th>매개변수</th><th>제한</th><th>근거</th></tr>
+        <tr><td>전하 밀도 (위상당)</td><td>≤35 μC/cm²</td><td>안전한 자극을 위한 Shannon 한계</td></tr>
+        <tr><td>위상당 전하</td><td>≤100 nC</td><td>펄스당 총 전하 제한</td></tr>
+        <tr><td>전류 진폭</td><td>≤1 mA</td><td>조직을 통한 최대 전류</td></tr>
+        <tr><td>전압 준수</td><td>≤20 V</td><td>최대 전극 전압</td></tr>
+        <tr><td>DC 오프셋</td><td>&lt;25 mV</td><td>전극 용해 방지</td></tr>
+    </table>
+
+    <h3>5.2.2 전하 균형</h3>
+    <p>모든 자극 펄스는 전극 부식과 조직 손상을 방지하기 위해 전하 균형을 이루어야 합니다:</p>
+
+    <pre><code class="highlight">
+// 전하 균형 확인 시스템
+interface ChargeBalanceMonitor {
+    // 실시간 전하 추적
+    trackChargeDelivery(pulse: StimulationPulse): ChargeRecord;
+
+    // 균형 확인
+    verifyBalance(record: ChargeRecord): BalanceStatus;
+
+    // 교정 조치
+    applyCorrection(imbalance: number): void;
+
+    // 안전 임계값
+    readonly maxImbalance: number;  // 총 전하의 1%
+    readonly correctionTimeout: number;  // 최대 100ms
+}
+
+// 양상 펄스 요구사항
+interface SafeStimulationPulse {
+    cathodicPhase: {
+        amplitude: number;   // μA (음수)
+        duration: number;    // μs
+    };
+    interphaseGap: number;   // μs (일반적으로 25-100)
+    anodicPhase: {
+        amplitude: number;   // μA (양수, 동일 전하)
+        duration: number;    // μs
+    };
+
+    // 전하 균형 계산
+    getNetCharge(): number;  // 0이어야 함
+}
+    </code></pre>
+
+    <h3>5.2.3 전기 절연</h3>
+    <p>환자 연결 회로는 전원으로부터 전기적으로 절연되어야 합니다:</p>
+    <ul>
+        <li>최소 4 kV 등급의 절연 장벽</li>
+        <li>정상 조건에서 누설 전류 &lt;10 μA</li>
+        <li>단일 고장 시 누설 전류 &lt;50 μA</li>
+        <li>외부 전원에 대한 직접 갈바닉 연결 없음</li>
+    </ul>
+
+    <h2>5.3 생체적합성 요구사항</h2>
+
+    <h3>5.3.1 재료 선택</h3>
+    <p>조직과 접촉하는 모든 재료는 ISO 10993에 따라 생체적합성이어야 합니다:</p>
+
+    <table>
+        <tr><th>구성요소</th><th>재료</th><th>필요한 ISO 10993 테스트</th></tr>
+        <tr><td>전자장치 케이스</td><td>티타늄 Grade 2/5</td><td>세포독성, 감작성, 자극성</td></tr>
+        <tr><td>전극 배열 기판</td><td>실리콘, Parylene-C, 폴리이미드</td><td>이식, 만성 독성</td></tr>
+        <tr><td>전극 접점</td><td>백금, 백금-이리듐, IrOx, TiN</td><td>세포독성, 유전독성</td></tr>
+        <tr><td>밀폐 피드스루</td><td>알루미나 세라믹</td><td>이식</td></tr>
+        <tr><td>케이블/리드</td><td>실리콘 코팅</td><td>자극성, 이식</td></tr>
+    </table>
+
+    <h3>5.3.2 생체적합성 테스트 프로토콜</h3>
+    <pre><code class="highlight">
+// 생체적합성 테스트 스위트
+const biocompatibilityTests = {
+    shortTermTests: [
+        {
+            test: "세포독성 (ISO 10993-5)",
+            method: "L929 세포 배양, 직접/추출 접촉",
+            acceptance: "≥70% 세포 생존율"
+        },
+        {
+            test: "감작성 (ISO 10993-10)",
+            method: "기니피그 최대화 테스트",
+            acceptance: "감작 반응 없음"
+        },
+        {
+            test: "자극성 (ISO 10993-23)",
+            method: "재구성된 인간 표피",
+            acceptance: "비자극 분류"
+        }
+    ],
+
+    longTermTests: [
+        {
+            test: "만성 이식 (ISO 10993-6)",
+            method: "토끼/영장류 눈 이식 26-52주",
+            acceptance: "최소 조직 반응, 열화 없음"
+        },
+        {
+            test: "유전독성 (ISO 10993-3)",
+            method: "Ames 테스트, 소핵 분석",
+            acceptance: "비돌연변이성"
+        },
+        {
+            test: "발암성 위험 평가",
+            method: "재료 검토, 추출물 분석",
+            acceptance: "발암성 물질 없음"
+        }
+    ]
+};
+    </code></pre>
+
+    <h3>5.3.3 멸균 검증</h3>
+    <p>모든 이식 가능한 구성요소는 검증된 멸균을 거쳐야 합니다:</p>
+    <ul>
+        <li>일반적으로 에틸렌 옥사이드(EO) 멸균 사용</li>
+        <li>10⁻⁶의 무균 보증 수준(SAL)</li>
+        <li>ISO 10993-7 한계 이하의 잔류 EO 수준</li>
+        <li>멸균 후 패키지 무결성 테스트</li>
+        <li>유통기한 검증 (일반적으로 2-5년)</li>
+    </ul>
+
+    <h2>5.4 장기 신뢰성</h2>
+
+    <h3>5.4.1 설계 수명 요구사항</h3>
+    <div class="highlight">
+        <strong>최소 설계 수명:</strong> 인공 눈 이식물은 최소 10년의 운영 수명을 위해 설계되어야 하며, 모든 중요 구성요소는 가속 수명 테스트와 고장 모드 분석을 통해 신뢰성을 입증해야 합니다.
+    </div>
+
+    <h3>5.4.2 밀폐 밀봉 테스트</h3>
+    <table>
+        <tr><th>테스트</th><th>방법</th><th>허용 기준</th></tr>
+        <tr><td>총 누출</td><td>기포 방출</td><td>가시적 기포 없음</td></tr>
+        <tr><td>미세 누출</td><td>헬륨 누출 감지</td><td>&lt;10⁻⁹ atm·cc/s</td></tr>
+        <tr><td>가속 노화</td><td>85°C/85% RH, 1000시간</td><td>누출률 변화 없음</td></tr>
+        <tr><td>열 사이클링</td><td>-40°C ~ +60°C, 100사이클</td><td>누출률 변화 없음</td></tr>
+    </table>
+
+    <h3>5.4.3 전극 안정성</h3>
+    <pre><code class="highlight">
+// 전극 내구성 테스트 프로토콜
+interface ElectrodeDurabilityTest {
+    // 가속 자극 테스트
+    stimulationCycles: number;           // 최소 10^9 사이클
+    chargePerPhase: number;              // 최대 정격 전하에서
+    pulseDuration: number;               // 최소 펄스 폭에서
+
+    // 허용 기준
+    impedanceChange: number;             // 기준선에서 &lt;20%
+    chargeInjectionCapacity: number;     // &lt;10% 감소
+    surfaceDegradation: string;          // 500배에서 "가시적 없음"
+
+    // 모니터링
+    periodicMeasurements: {
+        interval: number;                // 10^8 사이클마다
+        parameters: string[];            // 임피던스, 전압, 시각적
+    };
+}
+
+// 장치 수명 동안 예상 성능
+const expectedLifetime = {
+    minimumYears: 10,
+    targetYears: 15,
+    stimulationCyclesPerYear: 3.15e9,    // 100 Hz 연속 시
+    totalCycles: 3.15e10                  // 10년 최소
+};
+    </code></pre>
+
+    <h2>5.5 전자기 호환성 (EMC)</h2>
+
+    <h3>5.5.1 내성 요구사항</h3>
+    <p>인공 눈 시스템은 일반적인 전자기 환경에서 안전하게 작동해야 합니다:</p>
+    <ul>
+        <li>방사 내성: 80 MHz - 2.7 GHz, 10 V/m</li>
+        <li>전도 내성: 150 kHz - 80 MHz, 10 Vrms</li>
+        <li>정전기 방전: ±8 kV 접촉, ±15 kV 공기</li>
+        <li>자기장 내성: 전원 주파수에서 400 A/m</li>
+    </ul>
+
+    <h3>5.5.2 MRI 호환성</h3>
+    <table>
+        <tr><th>분류</th><th>자장 강도</th><th>요구사항</th></tr>
+        <tr><td>MR 조건부</td><td>1.5T</td><td>특정 위치, SAR 제한, 영상 프로토콜</td></tr>
+        <tr><td>MR 조건부</td><td>3T</td><td>추가 제한, 더 짧은 스캔 시간</td></tr>
+        <tr><td>MR 비안전</td><td>&gt;3T</td><td>금기</td></tr>
+    </table>
+
+    <div class="highlight">
+        <strong>MRI 안전:</strong> 환자는 MRI 호환성 조건을 명시하는 이식물 식별 카드를 휴대해야 합니다. 의료 제공자는 MRI 절차 전에 호환성을 확인해야 합니다.
+    </div>
+
+    <h2>5.6 사이버보안 요구사항</h2>
+
+    <h3>5.6.1 보안 아키텍처</h3>
+    <pre><code class="highlight">
+// 인공 눈을 위한 사이버보안 프레임워크
+interface SecurityArchitecture {
+    // 인증
+    authentication: {
+        method: 'mutual_authentication';
+        algorithm: 'AES-256-GCM' | 'ChaCha20-Poly1305';
+        keyLength: 256;
+        keyExchange: 'ECDH';
+    };
+
+    // 통신 보안
+    communication: {
+        encryption: 'mandatory';
+        integrityCheck: 'HMAC-SHA256';
+        replayProtection: 'timestamp_nonce';
+        sessionTimeout: 300;  // 초
+    };
+
+    // 접근 제어
+    accessControl: {
+        levels: ['환자', '임상의', '제조업체'];
+        privilegeSeparation: true;
+        auditLogging: true;
+    };
+
+    // 펌웨어 보안
+    firmware: {
+        signedUpdates: true;
+        secureBootChain: true;
+        rollbackProtection: true;
+        integrityVerification: 'SHA-256';
+    };
+}
+    </code></pre>
+
+    <h3>5.6.2 위협 완화</h3>
+    <ul>
+        <li><strong>무단 접근:</strong> 강력한 인증으로 무단 장치 제어 방지</li>
+        <li><strong>데이터 가로채기:</strong> 종단 간 암호화로 환자 데이터 보호</li>
+        <li><strong>펌웨어 변조:</strong> 서명된 업데이트와 보안 부팅으로 악성 코드 방지</li>
+        <li><strong>서비스 거부:</strong> 속도 제한과 안전 장치 모드로 기본 기능 유지</li>
+    </ul>
+
+    <h2>5.7 안전 모니터링 시스템</h2>
+
+    <h3>5.7.1 실시간 모니터링</h3>
+    <table>
+        <tr><th>매개변수</th><th>모니터링 방법</th><th>이상 시 조치</th></tr>
+        <tr><td>전극 임피던스</td><td>지속적 측정</td><td>영향받은 채널 비활성화</td></tr>
+        <tr><td>온도</td><td>이식물 서미스터</td><td>&gt;39°C 시 전력 감소</td></tr>
+        <tr><td>전력 전달</td><td>전압/전류 모니터링</td><td>경고 및 전원 차단</td></tr>
+        <tr><td>통신 링크</td><td>하트비트 패킷</td><td>손실 시 안전 장치 모드</td></tr>
+        <tr><td>전하 전달</td><td>전하 누적기</td><td>과도 자극 차단</td></tr>
+    </table>
+
+    <h3>5.7.2 안전 장치 설계</h3>
+    <p>모든 고장 모드는 안전한 장치 상태로 귀결되어야 합니다:</p>
+    <ul>
+        <li>전력 손실: 자극 즉시 중단</li>
+        <li>통신 손실: 타임아웃 후 자극 중단</li>
+        <li>프로세서 오류: 하드웨어 워치독이 리셋 트리거</li>
+        <li>열 제한: 자동 전력 감소</li>
+        <li>전하 제한: 하드웨어 전류 제한</li>
+    </ul>
+
+    <h2>5.8 규제 준수</h2>
+    <p>인공 눈 시스템은 해당 규정을 준수해야 합니다:</p>
+    <ul>
+        <li><strong>FDA (미국):</strong> 클래스 III 의료기기, PMA 필요</li>
+        <li><strong>CE 마크 (EU):</strong> MDR 클래스 III, 인증기관 승인</li>
+        <li><strong>PMDA (일본):</strong> 클래스 IV 의료기기</li>
+        <li><strong>ISO 13485:</strong> 품질경영시스템</li>
+        <li><strong>IEC 60601-1:</strong> 의료용 전기기기 안전</li>
+        <li><strong>IEC 62304:</strong> 의료기기 소프트웨어 수명주기</li>
+    </ul>
+
+    <h2>5.9 요약</h2>
+    <p>안전과 생체적합성은 인공 눈 시스템의 기본 요구사항입니다. WIA-BIONIC_EYE 표준은 엄격한 전기 안전 한계, 포괄적인 생체적합성 테스트, 장기 신뢰성 입증, 전자기 호환성, 강력한 사이버보안을 의무화합니다. 여러 층의 보호, 지속적인 모니터링, 안전 장치 설계가 장치 수명 동안 환자 안전을 보장합니다. 국제 규제 요구사항 준수는 장치 안전성과 효과성에 대한 추가 보증을 제공합니다.</p>
+</body>
+</html>

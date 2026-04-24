@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Image Processing and Vision Algorithms | WIA-BIONIC_EYE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Image Processing and Vision Algorithms</h1>
+
+    <h2>3.1 The Challenge of Visual Information Reduction</h2>
+    <p>The human retina contains approximately 130 million photoreceptors, while current bionic eye electrode arrays range from 60 to a few thousand electrodes. This massive disparity—a reduction factor of 10,000 to over 1,000,000—presents the central challenge of bionic vision: how to extract and convey the most useful visual information through a severely limited channel.</p>
+
+    <p>Image processing algorithms bridge this gap by intelligently selecting, enhancing, and encoding visual features that maximize functional benefit for patients. Rather than simply downsampling images, sophisticated algorithms perform scene understanding, prioritize salient information, and adapt to user needs and preferences.</p>
+
+    <div class="highlight">
+        <strong>Design Principle:</strong> The goal is not to reproduce natural vision but to provide useful visual information that improves quality of life, independence, and safety for patients with visual impairment.
+    </div>
+
+    <h2>3.2 Image Acquisition and Preprocessing</h2>
+
+    <h3>3.2.1 Camera Input Processing</h3>
+    <pre><code class="highlight">
+// Image Preprocessing Pipeline
+interface PreprocessingPipeline {
+    // Raw input handling
+    demosaic(rawBayer: RawImage): RGBImage;
+    denoiseAdaptive(image: RGBImage, noiseLevel: number): RGBImage;
+
+    // Exposure and dynamic range
+    autoExpose(image: RGBImage): ExposureSettings;
+    toneMapHDR(hdrImage: HDRImage): RGBImage;
+
+    // Geometric corrections
+    undistortLens(image: RGBImage, calibration: LensCalibration): RGBImage;
+    stabilize(imageSequence: RGBImage[]): RGBImage[];
+
+    // Color processing
+    whiteBalance(image: RGBImage, illuminant: Illuminant): RGBImage;
+    convertToGrayscale(image: RGBImage): GrayscaleImage;
+}
+
+// Example preprocessing configuration
+const preprocessConfig = {
+    denoiseStrength: 0.3,
+    stabilizationEnabled: true,
+    hdrEnabled: true,
+    dynamicRangeCompression: 2.0,
+    contrastEnhancement: 1.5
+};
+    </code></pre>
+
+    <h3>3.2.2 Adaptive Exposure Control</h3>
+    <p>Bionic eye cameras must handle extreme lighting variations—from bright sunlight to dim indoor environments. Advanced algorithms include:</p>
+    <ul>
+        <li><strong>Multi-exposure fusion:</strong> Combining multiple exposures for high dynamic range</li>
+        <li><strong>Region-based metering:</strong> Prioritizing exposure for areas of interest</li>
+        <li><strong>Rapid adaptation:</strong> Quick response to lighting changes during movement</li>
+        <li><strong>Backlight compensation:</strong> Handling high-contrast scenes with bright backgrounds</li>
+    </ul>
+
+    <h2>3.3 Feature Extraction and Enhancement</h2>
+
+    <h3>3.3.1 Edge Detection</h3>
+    <p>Edges provide critical information about object boundaries and scene structure. Multiple edge detection approaches are employed:</p>
+
+    <table>
+        <tr><th>Algorithm</th><th>Strengths</th><th>Use Case</th></tr>
+        <tr><td>Canny</td><td>Clean, well-localized edges</td><td>General purpose</td></tr>
+        <tr><td>Sobel</td><td>Fast, gradient magnitude</td><td>Real-time processing</td></tr>
+        <tr><td>Laplacian of Gaussian</td><td>Scale-space analysis</td><td>Multi-scale features</td></tr>
+        <tr><td>Deep Learning</td><td>Semantic edges</td><td>Object boundaries</td></tr>
+    </table>
+
+    <pre><code class="highlight">
+// Edge Detection Implementation
+function detectEdges(image: GrayscaleImage, config: EdgeConfig): EdgeMap {
+    // Apply Gaussian blur to reduce noise
+    const blurred = gaussianBlur(image, config.blurSigma);
+
+    // Compute gradients in x and y directions
+    const gradX = convolve(blurred, SOBEL_X);
+    const gradY = convolve(blurred, SOBEL_Y);
+
+    // Compute gradient magnitude and direction
+    const magnitude = sqrt(gradX * gradX + gradY * gradY);
+    const direction = atan2(gradY, gradX);
+
+    // Non-maximum suppression
+    const suppressed = nonMaxSuppression(magnitude, direction);
+
+    // Hysteresis thresholding
+    const edges = hysteresisThreshold(
+        suppressed,
+        config.lowThreshold,
+        config.highThreshold
+    );
+
+    return edges;
+}
+    </code></pre>
+
+    <h3>3.3.2 Contrast Enhancement</h3>
+    <p>Patients with limited electrode resolution benefit significantly from enhanced contrast. Techniques include:</p>
+    <ul>
+        <li><strong>Adaptive Histogram Equalization:</strong> Local contrast enhancement that preserves global structure</li>
+        <li><strong>Unsharp Masking:</strong> Edge sharpening to emphasize boundaries</li>
+        <li><strong>Retinex-based Processing:</strong> Simulating natural retinal adaptation mechanisms</li>
+        <li><strong>Bilateral Filtering:</strong> Smoothing while preserving edges</li>
+    </ul>
+
+    <h2>3.4 Scene Understanding with AI</h2>
+
+    <h3>3.4.1 Object Detection and Recognition</h3>
+    <p>Modern bionic eye systems incorporate deep learning for semantic scene understanding:</p>
+
+    <pre><code class="highlight">
+// AI Scene Understanding Module
+interface SceneUnderstanding {
+    // Object detection
+    detectObjects(frame: Image): DetectedObject[];
+
+    // Semantic segmentation
+    segmentScene(frame: Image): SegmentationMap;
+
+    // Depth estimation
+    estimateDepth(frame: Image): DepthMap;
+
+    // Face detection
+    detectFaces(frame: Image): FaceLocation[];
+
+    // Text recognition
+    recognizeText(frame: Image): TextRegion[];
+
+    // Navigation assistance
+    detectObstacles(frame: Image): Obstacle[];
+    findPathway(frame: Image): NavigationPath;
+}
+
+// Detection results structure
+interface DetectedObject {
+    class: string;           // "person", "door", "car", etc.
+    confidence: number;      // 0.0 to 1.0
+    boundingBox: Rectangle;
+    distance?: number;       // If depth sensor available
+    priority: number;        // Display priority
+}
+    </code></pre>
+
+    <h3>3.4.2 Priority-Based Information Selection</h3>
+    <p>With limited electrodes, not all detected information can be displayed simultaneously. A priority system determines what to show:</p>
+
+    <table>
+        <tr><th>Priority</th><th>Category</th><th>Examples</th></tr>
+        <tr><td>1 (Highest)</td><td>Safety hazards</td><td>Approaching vehicles, stairs, drop-offs</td></tr>
+        <tr><td>2</td><td>Navigation aids</td><td>Doors, pathways, curbs</td></tr>
+        <tr><td>3</td><td>People</td><td>Faces, approaching persons</td></tr>
+        <tr><td>4</td><td>Interactive objects</td><td>Handles, buttons, signs</td></tr>
+        <tr><td>5</td><td>General scene</td><td>Room layout, furniture</td></tr>
+    </table>
+
+    <h2>3.5 Spatial Mapping to Electrode Array</h2>
+
+    <h3>3.5.1 Retinotopic Mapping</h3>
+    <p>Converting processed images to electrode stimulation patterns requires accurate mapping between image pixels and phosphene locations:</p>
+
+    <pre><code class="highlight">
+// Retinotopic Mapping System
+class RetinotopicMapper {
+    private electrodeMap: ElectrodePosition[];
+    private phospheneMap: PhospheneLocation[];
+    private calibrationMatrix: Matrix;
+
+    // Map image coordinates to electrode indices
+    mapImageToElectrodes(
+        processedImage: Image,
+        electrodeArray: ElectrodeArray
+    ): StimulationPattern {
+        const pattern = new StimulationPattern();
+
+        for (const electrode of electrodeArray.electrodes) {
+            // Get corresponding image region
+            const imageRegion = this.getCorrespondingRegion(electrode);
+
+            // Calculate stimulation amplitude
+            const intensity = this.calculateRegionIntensity(
+                processedImage,
+                imageRegion
+            );
+
+            // Apply patient-specific calibration
+            const calibratedAmplitude = this.applyCalibration(
+                electrode.id,
+                intensity
+            );
+
+            pattern.setElectrode(electrode.id, calibratedAmplitude);
+        }
+
+        return pattern;
+    }
+
+    // Calibration for individual patient
+    calibrate(patientResponses: PhospheneMappingData): void {
+        this.phospheneMap = patientResponses.phospheneLocations;
+        this.calibrationMatrix = this.computeCalibrationMatrix(
+            this.electrodeMap,
+            this.phospheneMap
+        );
+    }
+}
+    </code></pre>
+
+    <h3>3.5.2 Resolution Adaptation</h3>
+    <p>Algorithms must adapt image content to the electrode array's spatial resolution while preserving essential information:</p>
+    <ul>
+        <li><strong>Importance-weighted downsampling:</strong> Higher resolution for salient regions</li>
+        <li><strong>Foveated rendering:</strong> High detail at gaze center, lower at periphery</li>
+        <li><strong>Temporal multiplexing:</strong> Scanning patterns that exceed static resolution</li>
+        <li><strong>Predictive coding:</strong> Emphasizing changes rather than static content</li>
+    </ul>
+
+    <h2>3.6 Motion Processing</h2>
+
+    <h3>3.6.1 Motion Detection and Enhancement</h3>
+    <p>Motion is particularly valuable information for navigation and safety:</p>
+
+    <pre><code class="highlight">
+// Motion Processing Module
+interface MotionProcessor {
+    // Optical flow computation
+    computeOpticalFlow(
+        frame1: Image,
+        frame2: Image
+    ): OpticalFlowField;
+
+    // Motion segmentation
+    segmentMotion(
+        flow: OpticalFlowField,
+        threshold: number
+    ): MotionRegions;
+
+    // Self-motion compensation
+    compensateEgoMotion(
+        flow: OpticalFlowField,
+        imuData: IMUReading
+    ): ObjectMotionField;
+
+    // Approaching object detection
+    detectApproachingObjects(
+        motionField: ObjectMotionField
+    ): ApproachingObject[];
+}
+
+// Alert generation for approaching objects
+function generateMotionAlert(objects: ApproachingObject[]): Alert[] {
+    return objects
+        .filter(obj => obj.timeToContact < ALERT_THRESHOLD)
+        .map(obj => ({
+            type: 'approaching_object',
+            direction: obj.direction,
+            urgency: 1.0 / obj.timeToContact,
+            stimulationPattern: createAlertPattern(obj)
+        }));
+}
+    </code></pre>
+
+    <h2>3.7 User-Adaptive Processing</h2>
+
+    <h3>3.7.1 Personalization</h3>
+    <p>Processing algorithms adapt to individual patient capabilities and preferences:</p>
+    <ul>
+        <li><strong>Threshold adaptation:</strong> Adjusting to individual electrode thresholds</li>
+        <li><strong>Contrast preferences:</strong> User-adjustable enhancement levels</li>
+        <li><strong>Feature priorities:</strong> Emphasizing information types based on lifestyle</li>
+        <li><strong>Learning from usage:</strong> Adapting to patient scanning patterns</li>
+    </ul>
+
+    <h3>3.7.2 Context-Aware Modes</h3>
+    <table>
+        <tr><th>Mode</th><th>Processing Focus</th><th>Use Case</th></tr>
+        <tr><td>Navigation</td><td>Obstacles, pathways, depth</td><td>Walking outdoors</td></tr>
+        <tr><td>Reading</td><td>Text enhancement, OCR</td><td>Reading documents</td></tr>
+        <tr><td>Social</td><td>Face detection, gestures</td><td>Conversation</td></tr>
+        <tr><td>Indoor</td><td>Room layout, objects</td><td>Home navigation</td></tr>
+        <tr><td>Mobility</td><td>Traffic, signals, signs</td><td>Street crossing</td></tr>
+    </table>
+
+    <div class="highlight">
+        <strong>Machine Learning Integration:</strong> Modern systems continuously learn from patient usage patterns, automatically optimizing processing parameters and mode selection based on context, time of day, location, and historical preferences.
+    </div>
+
+    <h2>3.8 Real-Time Performance Requirements</h2>
+    <p>All processing must occur within strict latency budgets to maintain natural visual experience:</p>
+    <ul>
+        <li>Total end-to-end latency: &lt;50ms</li>
+        <li>Image acquisition: &lt;10ms</li>
+        <li>Preprocessing: &lt;5ms</li>
+        <li>Feature extraction: &lt;15ms</li>
+        <li>AI inference: &lt;15ms</li>
+        <li>Mapping and encoding: &lt;5ms</li>
+    </ul>
+
+    <h2>3.9 Summary</h2>
+    <p>Image processing algorithms are the intelligence of bionic eye systems, transforming raw visual data into meaningful neural stimulation patterns. Through sophisticated preprocessing, feature extraction, AI-powered scene understanding, and adaptive user customization, these algorithms maximize the functional vision achievable with limited electrode arrays. Continuous advancement in AI and computer vision promises ever-improving visual outcomes for bionic eye patients.</p>
+</body>
+</html>

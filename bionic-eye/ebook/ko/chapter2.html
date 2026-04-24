@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 데이터 스키마 - WIA 바이오닉 아이 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>제2장: 데이터 스키마</h1>
+        <p>프레임 데이터, 이미지 형식, 카메라 매개변수, 센서 데이터</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>2.1 프레임 데이터 사양</h2>
+
+            <p>WIA 바이오닉 아이 표준은 카메라에서 처리 장치로, 궁극적으로 신경 자극 장치로 시각 정보를 캡처하고 전송하기 위한 표준화된 데이터 구조를 정의합니다.</p>
+
+            <h3>프레임 메타데이터</h3>
+            <p>캡처된 모든 프레임에는 식별, 동기화 및 추적을 위한 메타데이터가 포함됩니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>필드</th>
+                        <th>유형</th>
+                        <th>설명</th>
+                        <th>예시</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>frameId</td>
+                        <td>string</td>
+                        <td>고유 프레임 식별자 (UUID)</td>
+                        <td>f47ac10b-58cc-4372-a567-0e02b2c3d479</td>
+                    </tr>
+                    <tr>
+                        <td>timestamp</td>
+                        <td>number</td>
+                        <td>Unix 타임스탬프 (밀리초)</td>
+                        <td>1703001234567</td>
+                    </tr>
+                    <tr>
+                        <td>sequenceNumber</td>
+                        <td>number</td>
+                        <td>순차 프레임 카운터</td>
+                        <td>12345</td>
+                    </tr>
+                    <tr>
+                        <td>deviceId</td>
+                        <td>string</td>
+                        <td>카메라 장치 식별자</td>
+                        <td>CAM-WIA-001</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>TypeScript 인터페이스</h3>
+            <pre><code>interface FrameMetadata {
+  frameId: string;
+  timestamp: number;
+  sequenceNumber: number;
+  deviceId: string;
+}</code></pre>
+
+            <h2>2.2 이미지 데이터 형식</h2>
+
+            <h3>지원되는 이미지 형식</h3>
+            <p>표준은 다양한 바이오닉 아이 응용 프로그램에 최적화된 여러 이미지 형식을 지원합니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>형식</th>
+                        <th>비트/픽셀</th>
+                        <th>사용 사례</th>
+                        <th>대역폭</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>GRAY8</td>
+                        <td>8-bit</td>
+                        <td>기본 네비게이션, 저대역폭</td>
+                        <td>낮음</td>
+                    </tr>
+                    <tr>
+                        <td>GRAY16</td>
+                        <td>16-bit</td>
+                        <td>높은 동적 범위 장면</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td>RGB24</td>
+                        <td>24-bit</td>
+                        <td>컬러 비전 연구</td>
+                        <td>높음</td>
+                    </tr>
+                    <tr>
+                        <td>RGBD32</td>
+                        <td>32-bit</td>
+                        <td>RGB + 깊이 정보</td>
+                        <td>매우 높음</td>
+                    </tr>
+                    <tr>
+                        <td>DEPTH16</td>
+                        <td>16-bit</td>
+                        <td>깊이 전용 매핑</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td>IR8</td>
+                        <td>8-bit</td>
+                        <td>저조도 네비게이션</td>
+                        <td>낮음</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>ImageData 구조</h3>
+            <pre><code>interface ImageData {
+  width: number;              // 픽셀 (320-1920)
+  height: number;             // 픽셀 (240-1080)
+  format: ImageFormat;
+  data: Uint8Array;
+  encoding: 'raw' | 'jpeg' | 'h264' | 'h265';
+  compression?: number;       // 압축률 (0-100)
+}</code></pre>
+
+            <div class="note">
+                <strong>성능 팁:</strong> 실시간 바이오닉 아이 응용 프로그램의 경우 320x240 해상도의 GRAY8 형식이 시각 정보와 처리 지연 시간 사이에서 최상의 균형을 제공합니다.
+            </div>
+
+            <h2>2.3 카메라 매개변수</h2>
+
+            <h3>광학 구성</h3>
+            <p>카메라 매개변수는 이미지 캡처 시스템의 광학 특성을 정의합니다:</p>
+
+            <pre><code>interface CameraParams {
+  fov: {
+    horizontal: number;       // degrees (60-120)
+    vertical: number;         // degrees (45-90)
+  };
+  exposure: number;           // ms (0.1-100)
+  gain: number;               // ISO 등가 (100-6400)
+  whiteBalance: number;       // Kelvin (2500-10000)
+  focusDistance: number;      // meters (0.1-infinity)
+  aperture?: number;          // f-stop (f/1.4 - f/16)
+}</code></pre>
+
+            <h3>시야각 (FOV)</h3>
+            <ul>
+                <li><strong>넓은 FOV (100-120°):</strong> 네비게이션을 위한 더 나은 주변 인식</li>
+                <li><strong>중간 FOV (70-90°):</strong> 일반 사용을 위한 균형 잡힌 뷰</li>
+                <li><strong>좁은 FOV (30-60°):</strong> 읽기 또는 세부 작업에 집중된 뷰</li>
+            </ul>
+
+            <h2>2.4 센서 데이터 통합</h2>
+
+            <h3>관성 측정 장치 (IMU)</h3>
+            <p>IMU 센서는 이미지를 안정화하고 공간 인식을 지원하기 위해 머리 방향 및 움직임 데이터를 제공합니다:</p>
+
+            <pre><code>interface SensorData {
+  ambientLight: number;       // lux (0-100000)
+  proximity: number;          // cm (0-500)
+  imu: {
+    accelerometer: [number, number, number];  // m/s² [x, y, z]
+    gyroscope: [number, number, number];      // rad/s [x, y, z]
+    magnetometer: [number, number, number];   // μT [x, y, z]
+    orientation: {
+      quaternion: [number, number, number, number];
+      euler: {
+        roll: number;         // degrees
+        pitch: number;        // degrees
+        yaw: number;          // degrees
+      };
+    };
+  };
+  timestamp: number;
+}</code></pre>
+
+            <h2>2.5 프레임 속도 요구 사항</h2>
+
+            <h3>응용 프로그램별 프레임 속도</h3>
+            <p>다양한 바이오닉 아이 응용 프로그램에는 다양한 프레임 속도 및 대기 시간 요구 사항이 있습니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>사용 사례</th>
+                        <th>최소 FPS</th>
+                        <th>권장 FPS</th>
+                        <th>최대 지연 시간</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>네비게이션</td>
+                        <td>10</td>
+                        <td>15-20</td>
+                        <td>100ms</td>
+                    </tr>
+                    <tr>
+                        <td>객체 감지</td>
+                        <td>5</td>
+                        <td>10</td>
+                        <td>200ms</td>
+                    </tr>
+                    <tr>
+                        <td>읽기</td>
+                        <td>1</td>
+                        <td>5</td>
+                        <td>500ms</td>
+                    </tr>
+                    <tr>
+                        <td>얼굴 인식</td>
+                        <td>10</td>
+                        <td>15</td>
+                        <td>150ms</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="warning">
+                <strong>대기 시간 영향:</strong> 150ms 이상의 대기 시간은 머리 움직임 중 방향 감각 상실을 유발할 수 있습니다. 실시간 네비게이션에는 100ms 미만의 엔드 투 엔드 대기 시간이 필요합니다.
+            </div>
+
+            <h2>2.6 완전한 프레임 데이터 구조</h2>
+
+            <h3>CapturedFrame 인터페이스</h3>
+            <pre><code>interface CapturedFrame {
+  // 메타데이터
+  metadata: FrameMetadata;
+
+  // 이미지 데이터
+  image: ImageData;
+
+  // 카메라 구성
+  cameraParams: CameraParams;
+
+  // 센서 판독값
+  sensorData: SensorData;
+
+  // 처리 힌트
+  processingHints?: {
+    priorityObjects: ObjectType[];
+    sceneType: 'indoor' | 'outdoor' | 'low_light' | 'high_contrast';
+    processingMode: 'navigation' | 'reading' | 'face_recognition';
+  };
+}</code></pre>
+
+            <h2>2.7 데이터 흐름 파이프라인</h2>
+
+            <h3>캡처에서 자극까지의 파이프라인</h3>
+            <pre><code>카메라 센서
+     │
+     ▼
+┌─────────────┐
+│ 원시 캡처   │ → CapturedFrame
+└─────────────┘
+     │
+     ▼
+┌─────────────┐
+│ 처리        │ → ProcessedVisual
+└─────────────┘
+     │
+     ▼
+┌─────────────┐
+│ 자극 매핑   │ → StimulationMap
+└─────────────┘
+     │
+     ▼
+  전극 어레이</code></pre>
+
+            <h2>2.8 데이터 크기 및 대역폭</h2>
+
+            <h3>대역폭 계산</h3>
+            <p>데이터 크기 이해는 무선 전송에 중요합니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>해상도</th>
+                        <th>형식</th>
+                        <th>프레임 크기</th>
+                        <th>대역폭 @ 20 FPS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>320x240</td>
+                        <td>GRAY8</td>
+                        <td>76.8 KB</td>
+                        <td>12.3 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>640x480</td>
+                        <td>GRAY8</td>
+                        <td>307 KB</td>
+                        <td>49.1 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>640x480</td>
+                        <td>RGB24</td>
+                        <td>922 KB</td>
+                        <td>147.5 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>1920x1080</td>
+                        <td>RGB24</td>
+                        <td>6.2 MB</td>
+                        <td>992 Mbps</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <strong>압축:</strong> JPEG 또는 H.264 압축은 바이오닉 아이 처리에 충분한 품질을 유지하면서 대역폭을 10-50배 줄일 수 있습니다.
+            </div>
+
+            <div class="info">
+                <strong>모범 사례:</strong> 수신 시스템이 정보를 적절하게 구문 분석하고 처리할 수 있도록 전송된 데이터에 항상 버전 정보를 포함하십시오.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

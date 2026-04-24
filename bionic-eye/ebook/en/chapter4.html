@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Bionic Eye Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 4: Protocol Specification</h1>
+        <p>Real-Time Image Transmission and Neural Encoding</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>4.1 Communication Protocol Overview</h2>
+
+            <p>The WIA Bionic Eye protocol defines how visual data is transmitted from external cameras through processing units to implanted electrodes. The protocol prioritizes low latency, reliability, and safety.</p>
+
+            <h3>Protocol Stack</h3>
+            <pre><code>Application Layer    │ Visual Processing & Neural Encoding
+                     │
+Transport Layer      │ WIA-BE Protocol (Custom)
+                     │
+Network Layer        │ Wireless: BLE 5.0 / WiFi 6 / Custom RF
+                     │ Wired: USB 3.0 / Thunderbolt
+                     │
+Physical Layer       │ Electromagnetic / Optical / Electrical</code></pre>
+
+            <h3>Design Principles</h3>
+            <ul>
+                <li><strong>Low Latency:</strong> End-to-end delay &lt; 100ms for navigation</li>
+                <li><strong>Reliability:</strong> Guaranteed delivery of stimulation commands</li>
+                <li><strong>Safety:</strong> Built-in safety limits and emergency stop</li>
+                <li><strong>Power Efficiency:</strong> Minimize power consumption for implanted devices</li>
+            </ul>
+
+            <h2>4.2 Data Transmission Modes</h2>
+
+            <h3>Continuous Streaming Mode</h3>
+            <p>Real-time video streaming for active navigation and mobility:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Frame Rate</td>
+                        <td>15-30 FPS</td>
+                        <td>Continuous visual updates</td>
+                    </tr>
+                    <tr>
+                        <td>Latency</td>
+                        <td>&lt; 100ms</td>
+                        <td>Camera to phosphene delay</td>
+                    </tr>
+                    <tr>
+                        <td>Bandwidth</td>
+                        <td>10-50 Mbps</td>
+                        <td>Compressed video stream</td>
+                    </tr>
+                    <tr>
+                        <td>Priority</td>
+                        <td>High</td>
+                        <td>Real-time requirement</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Event-Driven Mode</h3>
+            <p>Process frames only when significant changes detected:</p>
+            <ul>
+                <li>Motion detection triggers frame processing</li>
+                <li>Scene change triggers new capture</li>
+                <li>Lower power consumption</li>
+                <li>Suitable for reading or stationary tasks</li>
+            </ul>
+
+            <h3>Snapshot Mode</h3>
+            <p>Single frame capture on demand:</p>
+            <ul>
+                <li>User-triggered capture (button press)</li>
+                <li>Used for reading text or examining details</li>
+                <li>Can use higher resolution and processing time</li>
+                <li>No real-time latency requirement</li>
+            </ul>
+
+            <h2>4.3 Neural Encoding Algorithms</h2>
+
+            <h3>Image to Stimulation Mapping</h3>
+            <p>Converting camera images to electrode stimulation patterns:</p>
+
+            <pre><code>┌──────────────┐
+│ Raw Image    │ 640x480 pixels
+│ (Camera)     │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ Downsampling │ Match electrode array resolution
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ Edge         │ Enhance contours and boundaries
+│ Detection    │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ Intensity    │ Map brightness to current amplitude
+│ Mapping      │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ Electrode    │ Generate stimulation parameters
+│ Activation   │
+└──────────────┘</code></pre>
+
+            <h3>Downsampling Strategy</h3>
+            <p>Reducing high-resolution camera images to match electrode array resolution:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Camera Resolution</th>
+                        <th>Electrode Array</th>
+                        <th>Downsampling Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>640x480</td>
+                        <td>10x6 (60 electrodes)</td>
+                        <td>64x80 pixel blocks → 1 electrode</td>
+                    </tr>
+                    <tr>
+                        <td>640x480</td>
+                        <td>40x40 (1600 electrodes)</td>
+                        <td>16x12 pixel blocks → 1 electrode</td>
+                    </tr>
+                    <tr>
+                        <td>1920x1080</td>
+                        <td>40x40 (1600 electrodes)</td>
+                        <td>48x27 pixel blocks → 1 electrode</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Edge Detection</h3>
+            <p>Enhancing object boundaries for better perception:</p>
+
+            <pre><code>interface EdgeDetectionParams {
+  algorithm: 'canny' | 'sobel' | 'laplacian';
+  lowThreshold: number;      // 0-255
+  highThreshold: number;     // 0-255
+  kernelSize: 3 | 5 | 7;
+  edgeWeight: number;        // 0.0-1.0 (mix with original)
+}</code></pre>
+
+            <div class="note">
+                <strong>Clinical Insight:</strong> Patients with bionic eyes often report better perception of edges and contours compared to filled regions. Edge enhancement significantly improves functional vision.
+            </div>
+
+            <h3>Intensity to Current Mapping</h3>
+            <p>Converting pixel brightness to stimulation current:</p>
+
+            <pre><code>function intensityToCurrentMapping(
+  pixelValue: number,        // 0-255
+  electrode: ElectrodeInfo
+): number {                  // Current in μA
+
+  // Linear mapping with safety limits
+  const normalized = pixelValue / 255;
+  const current = normalized *
+                  (electrode.maxSafe - electrode.threshold) +
+                  electrode.threshold;
+
+  // Gamma correction for perception
+  const gamma = 2.2;
+  const gammaCorrected = Math.pow(current / electrode.maxSafe, 1/gamma) *
+                         electrode.maxSafe;
+
+  // Apply dynamic range compression
+  return dynamicRangeCompression(gammaCorrected, electrode);
+}</code></pre>
+
+            <h2>4.4 Stimulation Parameters</h2>
+
+            <h3>Pulse Waveform</h3>
+            <p>Electrical pulses delivered to each electrode:</p>
+
+            <pre><code>interface StimulationPulse {
+  // Waveform type
+  type: 'biphasic_symmetric' | 'biphasic_asymmetric' | 'triphasic';
+
+  // Cathodic phase (neuron activation)
+  cathodicAmplitude: number;    // μA (0-1000)
+  cathodicWidth: number;        // μs (50-1000)
+
+  // Anodic phase (charge balance)
+  anodicAmplitude: number;      // μA
+  anodicWidth: number;          // μs
+
+  // Timing
+  interphaseGap: number;        // μs (0-100)
+  frequency: number;            // Hz (10-100)
+
+  // Safety
+  chargePerPhase: number;       // μC (calculated)
+  chargeDensity: number;        // μC/cm² (< 35 recommended)
+}</code></pre>
+
+            <h3>Spatial Patterns</h3>
+            <p>Simultaneous or sequential electrode activation:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pattern Type</th>
+                        <th>Description</th>
+                        <th>Advantage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Sequential</td>
+                        <td>One electrode at a time</td>
+                        <td>Simple, safe, low power</td>
+                    </tr>
+                    <tr>
+                        <td>Simultaneous</td>
+                        <td>Multiple electrodes together</td>
+                        <td>Faster frame presentation</td>
+                    </tr>
+                    <tr>
+                        <td>Interleaved</td>
+                        <td>Groups activated in sequence</td>
+                        <td>Balance speed and safety</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Temporal Encoding</h3>
+            <p>Using pulse timing to encode additional information:</p>
+
+            <ul>
+                <li><strong>Pulse Frequency:</strong> Higher frequency = brighter perception</li>
+                <li><strong>Burst Duration:</strong> Sustained bursts for continuous stimuli</li>
+                <li><strong>Pulse Amplitude Modulation:</strong> Vary current for brightness</li>
+                <li><strong>Pulse Width Modulation:</strong> Alternative brightness encoding</li>
+            </ul>
+
+            <h2>4.5 Wireless Transmission Protocols</h2>
+
+            <h3>Bluetooth Low Energy (BLE 5.0)</h3>
+            <p>For external camera to processing unit communication:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Data Rate</td>
+                        <td>2 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>Range</td>
+                        <td>10-30 meters</td>
+                    </tr>
+                    <tr>
+                        <td>Latency</td>
+                        <td>5-15 ms</td>
+                    </tr>
+                    <tr>
+                        <td>Power</td>
+                        <td>Low (battery friendly)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Inductive Coupling</h3>
+            <p>For transcutaneous power and data transfer to implant:</p>
+
+            <ul>
+                <li><strong>Frequency:</strong> 13.56 MHz (ISM band)</li>
+                <li><strong>Power Transfer:</strong> 100-500 mW</li>
+                <li><strong>Data Rate:</strong> 100 kbps - 1 Mbps</li>
+                <li><strong>Efficiency:</strong> 40-70%</li>
+                <li><strong>Coil Separation:</strong> 1-10 mm</li>
+            </ul>
+
+            <h3>Custom RF Protocol</h3>
+            <p>Proprietary wireless protocol optimized for bionic eyes:</p>
+
+            <pre><code>interface RFProtocolConfig {
+  frequency: number;          // MHz (2400-2483.5)
+  channelBandwidth: number;   // MHz
+  modulation: 'FSK' | 'GFSK' | 'MSK';
+  errorCorrection: 'FEC' | 'ARQ' | 'hybrid';
+  encryptionAlgorithm: 'AES-128' | 'AES-256';
+  packetSize: number;         // bytes (16-256)
+  acknowledgment: boolean;
+  retryLimit: number;
+}</code></pre>
+
+            <h2>4.6 Packet Structure</h2>
+
+            <h3>Stimulation Command Packet</h3>
+            <pre><code>┌────────────────────────────────────────────┐
+│ Header (8 bytes)                           │
+├────────────────────────────────────────────┤
+│ - Packet Type: 0x01 (Stimulation)          │
+│ - Sequence Number: uint32                  │
+│ - Timestamp: uint32 (ms)                   │
+├────────────────────────────────────────────┤
+│ Electrode Data (N × 6 bytes)               │
+├────────────────────────────────────────────┤
+│ For each electrode:                        │
+│ - Electrode Index: uint8                   │
+│ - Current Amplitude: uint16 (μA × 10)      │
+│ - Pulse Width: uint16 (μs)                 │
+│ - Frequency: uint8 (Hz)                    │
+├────────────────────────────────────────────┤
+│ Safety Check (4 bytes)                     │
+├────────────────────────────────────────────┤
+│ - Total Current: uint16 (μA)               │
+│ - CRC16 Checksum: uint16                   │
+└────────────────────────────────────────────┘</code></pre>
+
+            <h3>Frame Data Packet</h3>
+            <pre><code>┌────────────────────────────────────────────┐
+│ Header (16 bytes)                          │
+├────────────────────────────────────────────┤
+│ - Packet Type: 0x02 (Frame Data)           │
+│ - Frame ID: uuid (16 bytes)                │
+│ - Timestamp: uint64 (μs)                   │
+│ - Width: uint16                            │
+│ - Height: uint16                           │
+│ - Format: uint8                            │
+│ - Compression: uint8                       │
+├────────────────────────────────────────────┤
+│ Image Data (Variable length)               │
+├────────────────────────────────────────────┤
+│ - Compressed image bytes                   │
+├────────────────────────────────────────────┤
+│ Footer (4 bytes)                           │
+├────────────────────────────────────────────┤
+│ - CRC32 Checksum: uint32                   │
+└────────────────────────────────────────────┘</code></pre>
+
+            <h2>4.7 Error Detection and Correction</h2>
+
+            <h3>CRC Checksums</h3>
+            <p>All packets include cyclic redundancy check for error detection:</p>
+
+            <ul>
+                <li><strong>CRC-16:</strong> Control and stimulation packets</li>
+                <li><strong>CRC-32:</strong> Frame data packets</li>
+                <li><strong>Polynomial:</strong> CRC-16-CCITT (0x1021)</li>
+            </ul>
+
+            <h3>Forward Error Correction (FEC)</h3>
+            <p>Reed-Solomon codes for critical data:</p>
+
+            <pre><code>interface FECConfig {
+  algorithmType: 'reed_solomon';
+  dataSymbols: number;        // k = 239
+  paritySymbols: number;      // n-k = 16
+  totalSymbols: number;       // n = 255
+  correctableErrors: number;  // t = 8 symbols
+}</code></pre>
+
+            <h3>Automatic Repeat Request (ARQ)</h3>
+            <p>Retransmission for failed packets:</p>
+
+            <ul>
+                <li>Acknowledgment within 10 ms</li>
+                <li>Maximum 3 retries</li>
+                <li>Exponential backoff</li>
+                <li>Timeout escalation to emergency stop</li>
+            </ul>
+
+            <h2>4.8 Synchronization</h2>
+
+            <h3>Time Synchronization</h3>
+            <p>Precise timing between components:</p>
+
+            <pre><code>interface TimeSyncProtocol {
+  method: 'PTP' | 'NTP' | 'custom';
+  accuracy: number;           // μs
+  syncInterval: number;       // ms
+  masterClock: 'camera' | 'processor' | 'implant';
+}</code></pre>
+
+            <h3>Frame Synchronization</h3>
+            <p>Ensuring stimulation matches captured frame:</p>
+
+            <ol>
+                <li>Camera captures frame with timestamp T₀</li>
+                <li>Processor receives and timestamps T₁</li>
+                <li>Processing completes at T₂</li>
+                <li>Stimulation begins at T₃</li>
+                <li>Total latency = T₃ - T₀ &lt; 100ms</li>
+            </ol>
+
+            <h2>4.9 Quality of Service (QoS)</h2>
+
+            <h3>Priority Levels</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Priority</th>
+                        <th>Packet Type</th>
+                        <th>Max Latency</th>
+                        <th>Reliability</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Critical</td>
+                        <td>Emergency Stop</td>
+                        <td>1 ms</td>
+                        <td>100%</td>
+                    </tr>
+                    <tr>
+                        <td>High</td>
+                        <td>Stimulation Commands</td>
+                        <td>10 ms</td>
+                        <td>99.9%</td>
+                    </tr>
+                    <tr>
+                        <td>Medium</td>
+                        <td>Frame Data</td>
+                        <td>100 ms</td>
+                        <td>95%</td>
+                    </tr>
+                    <tr>
+                        <td>Low</td>
+                        <td>Status/Telemetry</td>
+                        <td>1000 ms</td>
+                        <td>90%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Bandwidth Management</h3>
+            <p>Adaptive quality control based on network conditions:</p>
+
+            <pre><code>function adaptiveBandwidth(networkQuality: number) {
+  if (networkQuality > 0.9) {
+    return {
+      resolution: '640x480',
+      frameRate: 30,
+      compression: 'low'
+    };
+  } else if (networkQuality > 0.7) {
+    return {
+      resolution: '320x240',
+      frameRate: 20,
+      compression: 'medium'
+    };
+  } else {
+    return {
+      resolution: '160x120',
+      frameRate: 10,
+      compression: 'high'
+    };
+  }
+}</code></pre>
+
+            <h2>4.10 Security Protocols</h2>
+
+            <h3>Encryption</h3>
+            <p>All wireless communications encrypted:</p>
+
+            <ul>
+                <li><strong>Algorithm:</strong> AES-256-GCM</li>
+                <li><strong>Key Exchange:</strong> ECDH (Elliptic Curve Diffie-Hellman)</li>
+                <li><strong>Key Rotation:</strong> Every 24 hours</li>
+                <li><strong>Authentication:</strong> Certificate-based device pairing</li>
+            </ul>
+
+            <h3>Anti-Replay Protection</h3>
+            <p>Prevent malicious packet replay attacks:</p>
+
+            <pre><code>interface ReplayProtection {
+  sequenceNumber: number;     // Monotonically increasing
+  timestamp: number;          // Millisecond precision
+  nonce: Uint8Array;          // Random 16-byte value
+  maxTimeDrift: number;       // 5000 ms maximum
+}</code></pre>
+
+            <div class="warning">
+                <strong>Security Critical:</strong> Bionic eye systems are medical devices. Security vulnerabilities could allow attackers to cause patient discomfort or harm. Implement defense-in-depth security measures.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

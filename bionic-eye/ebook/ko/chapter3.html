@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: API 엔드포인트 - WIA 바이오닉 아이 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>제3장: API 엔드포인트</h1>
+        <p>장치 제어, 이미지 스트리밍, 보정</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>3.1 API 개요</h2>
+
+            <p>WIA 바이오닉 아이 API는 바이오닉 아이 장치 제어, 시각 데이터 스트리밍 및 시스템 구성 관리를 위한 RESTful 엔드포인트를 제공합니다. API는 데이터 교환을 위해 JSON을 사용하며 HTTP 및 WebSocket 연결을 모두 지원합니다.</p>
+
+            <h3>기본 URL</h3>
+            <pre><code>https://api.bionic-eye.wia.org/v1</code></pre>
+
+            <h3>인증</h3>
+            <p>모든 API 요청에는 Bearer 토큰을 사용한 인증이 필요합니다:</p>
+            <pre><code>Authorization: Bearer {access_token}</code></pre>
+
+            <div class="warning">
+                <strong>보안:</strong> API 토큰은 안전하게 보관해야 합니다. 모든 통신에 HTTPS를 사용하고 24시간마다 토큰 교체를 구현하십시오.
+            </div>
+
+            <h2>3.2 장치 관리</h2>
+
+            <h3>GET /devices</h3>
+            <p>인증된 사용자에 대해 등록된 모든 바이오닉 아이 장치를 나열합니다.</p>
+
+            <h4>요청</h4>
+            <pre><code>GET /devices
+Authorization: Bearer {token}</code></pre>
+
+            <h4>응답</h4>
+            <pre><code>{
+  "devices": [
+    {
+      "deviceId": "BIO-EYE-001",
+      "name": "왼쪽 눈 Argus II",
+      "type": "epiretinal",
+      "manufacturer": "Second Sight",
+      "model": "Argus II",
+      "status": "active",
+      "implantDate": "2024-03-15",
+      "electrodes": {
+        "total": 60,
+        "active": 58,
+        "failed": 2
+      },
+      "lastSync": "2025-12-20T10:30:00Z"
+    }
+  ]
+}</code></pre>
+
+            <h3>POST /camera/capture</h3>
+            <p>테스트 또는 보정을 위해 단일 프레임을 캡처합니다.</p>
+
+            <h4>요청 본문</h4>
+            <pre><code>{
+  "saveToStorage": true,
+  "includeMetadata": true
+}</code></pre>
+
+            <h2>3.3 이미지 스트리밍</h2>
+
+            <h3>WebSocket: /stream/video</h3>
+            <p>WebSocket 연결을 사용하여 카메라에서 클라이언트로 실시간 비디오 스트리밍합니다.</p>
+
+            <h4>연결</h4>
+            <pre><code>ws://api.bionic-eye.wia.org/v1/stream/video?deviceId=BIO-EYE-001&token={access_token}</code></pre>
+
+            <h4>메시지 형식</h4>
+            <pre><code>{
+  "type": "frame",
+  "frameId": "uuid",
+  "timestamp": 1703001234567,
+  "sequenceNumber": 12345,
+  "encoding": "jpeg",
+  "data": "base64_encoded_image"
+}</code></pre>
+
+            <h2>3.4 보정</h2>
+
+            <h3>POST /calibration/start</h3>
+            <p>전극 매핑을 위한 보정 세션을 시작합니다.</p>
+
+            <h4>요청 본문</h4>
+            <pre><code>{
+  "deviceId": "BIO-EYE-001",
+  "type": "phosphene_mapping" | "threshold_detection" | "impedance_check",
+  "electrodes": [0, 1, 2, 3, 4, 5],
+  "parameters": {
+    "startCurrent": 50,    // μA
+    "maxCurrent": 800,
+    "stepSize": 25
+  }
+}</code></pre>
+
+            <h4>응답</h4>
+            <pre><code>{
+  "sessionId": "cal-20251220-001",
+  "status": "started",
+  "estimatedDuration": 1800,  // 초
+  "nextElectrode": 0
+}</code></pre>
+
+            <h2>3.5 자극 제어</h2>
+
+            <h3>PUT /stimulation/parameters</h3>
+            <p>신경 인코딩을 위한 자극 매개변수를 업데이트합니다.</p>
+
+            <h4>요청 본문</h4>
+            <pre><code>{
+  "deviceId": "BIO-EYE-001",
+  "mode": "navigation" | "reading" | "face_detection",
+  "globalParameters": {
+    "pulseWidth": 450,          // μs
+    "frequency": 20,            // Hz
+    "maxCurrent": 800           // μA
+  }
+}</code></pre>
+
+            <h2>3.6 안전 및 비상</h2>
+
+            <h3>POST /emergency/stop</h3>
+            <p>모든 자극을 즉시 중지합니다.</p>
+
+            <h4>요청 본문</h4>
+            <pre><code>{
+  "deviceId": "BIO-EYE-001",
+  "reason": "환자 불편감",
+  "triggeredBy": "patient" | "caregiver" | "automatic"
+}</code></pre>
+
+            <h4>응답</h4>
+            <pre><code>{
+  "status": "stopped",
+  "stoppedAt": "2025-12-20T10:50:00Z",
+  "responseTime": 2.3,  // ms
+  "allElectrodesDisabled": true
+}</code></pre>
+
+            <h2>3.7 오류 처리</h2>
+
+            <h3>오류 응답 형식</h3>
+            <pre><code>{
+  "error": {
+    "code": "DEVICE_NOT_FOUND",
+    "message": "장치 BIO-EYE-999를 찾을 수 없음",
+    "status": 404,
+    "timestamp": "2025-12-20T10:55:00Z",
+    "requestId": "req-abc123"
+  }
+}</code></pre>
+
+            <h3>일반 오류 코드</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>코드</th>
+                        <th>상태</th>
+                        <th>설명</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>UNAUTHORIZED</td>
+                        <td>401</td>
+                        <td>잘못되거나 만료된 인증 토큰</td>
+                    </tr>
+                    <tr>
+                        <td>FORBIDDEN</td>
+                        <td>403</td>
+                        <td>작업에 대한 권한 부족</td>
+                    </tr>
+                    <tr>
+                        <td>DEVICE_NOT_FOUND</td>
+                        <td>404</td>
+                        <td>지정된 장치가 존재하지 않음</td>
+                    </tr>
+                    <tr>
+                        <td>DEVICE_OFFLINE</td>
+                        <td>503</td>
+                        <td>장치가 현재 연결되지 않음</td>
+                    </tr>
+                    <tr>
+                        <td>SAFETY_LIMIT_EXCEEDED</td>
+                        <td>400</td>
+                        <td>요청된 매개변수가 안전 제한을 초과함</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info">
+                <strong>모범 사례:</strong> 항상 오류 응답을 확인하고 클라이언트 응용 프로그램에서 적절한 오류 처리 및 사용자 피드백을 구현하십시오.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

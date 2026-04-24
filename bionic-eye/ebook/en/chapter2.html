@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Schema - WIA Bionic Eye Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 2: Data Schema</h1>
+        <p>Frame Data, Image Formats, Camera Parameters, and Sensor Data</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>2.1 Frame Data Specification</h2>
+
+            <p>The WIA Bionic Eye standard defines standardized data structures for capturing and transmitting visual information from cameras to processing units and ultimately to neural stimulation devices.</p>
+
+            <h3>Frame Metadata</h3>
+            <p>Every captured frame includes metadata for identification, synchronization, and tracking:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>frameId</td>
+                        <td>string</td>
+                        <td>Unique frame identifier (UUID)</td>
+                        <td>f47ac10b-58cc-4372-a567-0e02b2c3d479</td>
+                    </tr>
+                    <tr>
+                        <td>timestamp</td>
+                        <td>number</td>
+                        <td>Unix timestamp in milliseconds</td>
+                        <td>1703001234567</td>
+                    </tr>
+                    <tr>
+                        <td>sequenceNumber</td>
+                        <td>number</td>
+                        <td>Sequential frame counter</td>
+                        <td>12345</td>
+                    </tr>
+                    <tr>
+                        <td>deviceId</td>
+                        <td>string</td>
+                        <td>Camera device identifier</td>
+                        <td>CAM-WIA-001</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>TypeScript Interface</h3>
+            <pre><code>interface FrameMetadata {
+  frameId: string;
+  timestamp: number;
+  sequenceNumber: number;
+  deviceId: string;
+}</code></pre>
+
+            <h2>2.2 Image Data Formats</h2>
+
+            <h3>Supported Image Formats</h3>
+            <p>The standard supports multiple image formats optimized for different bionic eye applications:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Format</th>
+                        <th>Bits/Pixel</th>
+                        <th>Use Case</th>
+                        <th>Bandwidth</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>GRAY8</td>
+                        <td>8-bit</td>
+                        <td>Basic navigation, low bandwidth</td>
+                        <td>Low</td>
+                    </tr>
+                    <tr>
+                        <td>GRAY16</td>
+                        <td>16-bit</td>
+                        <td>High dynamic range scenes</td>
+                        <td>Medium</td>
+                    </tr>
+                    <tr>
+                        <td>RGB24</td>
+                        <td>24-bit</td>
+                        <td>Color vision research</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td>RGBD32</td>
+                        <td>32-bit</td>
+                        <td>RGB + depth information</td>
+                        <td>Very High</td>
+                    </tr>
+                    <tr>
+                        <td>DEPTH16</td>
+                        <td>16-bit</td>
+                        <td>Depth-only mapping</td>
+                        <td>Medium</td>
+                    </tr>
+                    <tr>
+                        <td>IR8</td>
+                        <td>8-bit</td>
+                        <td>Low-light navigation</td>
+                        <td>Low</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>ImageData Structure</h3>
+            <pre><code>interface ImageData {
+  width: number;              // Pixels (320-1920)
+  height: number;             // Pixels (240-1080)
+  format: ImageFormat;
+  data: Uint8Array;
+  encoding: 'raw' | 'jpeg' | 'h264' | 'h265';
+  compression?: number;       // Compression ratio (0-100)
+}
+
+enum ImageFormat {
+  GRAY8 = 'gray8',           // 8-bit grayscale
+  GRAY16 = 'gray16',         // 16-bit grayscale
+  RGB24 = 'rgb24',           // 24-bit RGB
+  RGBD32 = 'rgbd32',         // RGB + 8-bit Depth
+  DEPTH16 = 'depth16',       // 16-bit depth map
+  IR8 = 'ir8',               // 8-bit infrared
+}</code></pre>
+
+            <div class="note">
+                <strong>Performance Tip:</strong> For real-time bionic eye applications, GRAY8 format at 320x240 resolution provides the best balance between visual information and processing latency.
+            </div>
+
+            <h2>2.3 Camera Parameters</h2>
+
+            <h3>Optical Configuration</h3>
+            <p>Camera parameters define the optical characteristics of the image capture system:</p>
+
+            <pre><code>interface CameraParams {
+  fov: {
+    horizontal: number;       // degrees (60-120)
+    vertical: number;         // degrees (45-90)
+  };
+  exposure: number;           // ms (0.1-100)
+  gain: number;               // ISO equivalent (100-6400)
+  whiteBalance: number;       // Kelvin (2500-10000)
+  focusDistance: number;      // meters (0.1-infinity)
+  aperture?: number;          // f-stop (f/1.4 - f/16)
+}</code></pre>
+
+            <h3>Field of View (FOV)</h3>
+            <ul>
+                <li><strong>Wide FOV (100-120°):</strong> Better peripheral awareness for navigation</li>
+                <li><strong>Medium FOV (70-90°):</strong> Balanced view for general use</li>
+                <li><strong>Narrow FOV (30-60°):</strong> Focused view for reading or detail work</li>
+            </ul>
+
+            <div class="info">
+                <strong>Clinical Recommendation:</strong> A horizontal FOV of 80-90 degrees matches natural central vision and is suitable for most mobility tasks.
+            </div>
+
+            <h3>Exposure and Gain</h3>
+            <p>Automatic exposure and gain control help maintain consistent image brightness across varying lighting conditions:</p>
+            <ul>
+                <li><strong>Exposure:</strong> Duration the sensor collects light (0.1ms - 100ms)</li>
+                <li><strong>Gain:</strong> Amplification of sensor signal (ISO 100-6400)</li>
+                <li><strong>Auto Mode:</strong> Camera automatically adjusts for optimal brightness</li>
+            </ul>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Lighting Condition</th>
+                        <th>Recommended Exposure</th>
+                        <th>Recommended Gain</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Bright outdoor (100,000 lux)</td>
+                        <td>1-5 ms</td>
+                        <td>ISO 100-200</td>
+                    </tr>
+                    <tr>
+                        <td>Indoor office (500 lux)</td>
+                        <td>10-20 ms</td>
+                        <td>ISO 400-800</td>
+                    </tr>
+                    <tr>
+                        <td>Dim indoor (50 lux)</td>
+                        <td>30-50 ms</td>
+                        <td>ISO 1600-3200</td>
+                    </tr>
+                    <tr>
+                        <td>Night (1 lux)</td>
+                        <td>50-100 ms</td>
+                        <td>ISO 3200-6400</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>2.4 Sensor Data Integration</h2>
+
+            <h3>Inertial Measurement Unit (IMU)</h3>
+            <p>IMU sensors provide head orientation and motion data to stabilize images and assist with spatial awareness:</p>
+
+            <pre><code>interface SensorData {
+  ambientLight: number;       // lux (0-100000)
+  proximity: number;          // cm (0-500)
+  imu: {
+    accelerometer: [number, number, number];  // m/s² [x, y, z]
+    gyroscope: [number, number, number];      // rad/s [x, y, z]
+    magnetometer: [number, number, number];   // μT [x, y, z]
+    orientation: {
+      quaternion: [number, number, number, number];
+      euler: {
+        roll: number;         // degrees
+        pitch: number;        // degrees
+        yaw: number;          // degrees
+      };
+    };
+  };
+  timestamp: number;
+}</code></pre>
+
+            <h3>Ambient Light Sensor</h3>
+            <p>Measures environmental lighting to automatically adjust camera exposure and processing algorithms:</p>
+            <ul>
+                <li><strong>Range:</strong> 0 - 100,000 lux</li>
+                <li><strong>Resolution:</strong> 1 lux</li>
+                <li><strong>Update Rate:</strong> 10 Hz</li>
+            </ul>
+
+            <h3>Proximity Sensor</h3>
+            <p>Detects nearby objects to prevent collisions and trigger alerts:</p>
+            <ul>
+                <li><strong>Range:</strong> 0 - 500 cm</li>
+                <li><strong>Accuracy:</strong> ±2 cm</li>
+                <li><strong>Technology:</strong> Ultrasonic or time-of-flight</li>
+            </ul>
+
+            <h2>2.5 Frame Rate Requirements</h2>
+
+            <h3>Application-Specific Frame Rates</h3>
+            <p>Different bionic eye applications have different frame rate and latency requirements:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Use Case</th>
+                        <th>Min FPS</th>
+                        <th>Recommended FPS</th>
+                        <th>Max Latency</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Navigation</td>
+                        <td>10</td>
+                        <td>15-20</td>
+                        <td>100ms</td>
+                    </tr>
+                    <tr>
+                        <td>Object Detection</td>
+                        <td>5</td>
+                        <td>10</td>
+                        <td>200ms</td>
+                    </tr>
+                    <tr>
+                        <td>Reading</td>
+                        <td>1</td>
+                        <td>5</td>
+                        <td>500ms</td>
+                    </tr>
+                    <tr>
+                        <td>Face Recognition</td>
+                        <td>10</td>
+                        <td>15</td>
+                        <td>150ms</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="warning">
+                <strong>Latency Impact:</strong> Latency above 150ms can cause disorientation during head movements. Real-time navigation requires end-to-end latency under 100ms.
+            </div>
+
+            <h2>2.6 Complete Frame Data Structure</h2>
+
+            <h3>CapturedFrame Interface</h3>
+            <pre><code>interface CapturedFrame {
+  // Metadata
+  metadata: FrameMetadata;
+
+  // Image data
+  image: ImageData;
+
+  // Camera configuration
+  cameraParams: CameraParams;
+
+  // Sensor readings
+  sensorData: SensorData;
+
+  // Processing hints
+  processingHints?: {
+    priorityObjects: ObjectType[];
+    sceneType: 'indoor' | 'outdoor' | 'low_light' | 'high_contrast';
+    processingMode: 'navigation' | 'reading' | 'face_recognition';
+  };
+}</code></pre>
+
+            <h2>2.7 Data Flow Pipeline</h2>
+
+            <h3>Capture to Stimulation Pipeline</h3>
+            <pre><code>Camera Sensor
+     │
+     ▼
+┌─────────────┐
+│ Raw Capture │ → CapturedFrame
+└─────────────┘
+     │
+     ▼
+┌─────────────┐
+│ Processing  │ → ProcessedVisual
+└─────────────┘
+     │
+     ▼
+┌─────────────┐
+│ Stimulation │ → StimulationMap
+│   Mapping   │
+└─────────────┘
+     │
+     ▼
+  Electrode Array</code></pre>
+
+            <h3>Processing Stages</h3>
+            <ol>
+                <li><strong>Capture:</strong> Camera acquires raw frame with metadata</li>
+                <li><strong>Processing:</strong> Image analysis extracts features (edges, objects, faces)</li>
+                <li><strong>Encoding:</strong> Visual features mapped to neural stimulation patterns</li>
+                <li><strong>Transmission:</strong> Stimulation parameters sent to implant</li>
+                <li><strong>Stimulation:</strong> Electrodes activate to create phosphenes</li>
+            </ol>
+
+            <h2>2.8 Data Size and Bandwidth</h2>
+
+            <h3>Bandwidth Calculations</h3>
+            <p>Understanding data sizes is critical for wireless transmission:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Resolution</th>
+                        <th>Format</th>
+                        <th>Frame Size</th>
+                        <th>Bandwidth @ 20 FPS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>320x240</td>
+                        <td>GRAY8</td>
+                        <td>76.8 KB</td>
+                        <td>12.3 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>640x480</td>
+                        <td>GRAY8</td>
+                        <td>307 KB</td>
+                        <td>49.1 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>640x480</td>
+                        <td>RGB24</td>
+                        <td>922 KB</td>
+                        <td>147.5 Mbps</td>
+                    </tr>
+                    <tr>
+                        <td>1920x1080</td>
+                        <td>RGB24</td>
+                        <td>6.2 MB</td>
+                        <td>992 Mbps</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <strong>Compression:</strong> JPEG or H.264 compression can reduce bandwidth by 10-50x while maintaining sufficient quality for bionic eye processing.
+            </div>
+
+            <h2>2.9 Storage and Logging</h2>
+
+            <h3>Frame Logging</h3>
+            <p>For debugging, calibration, and research purposes, systems may log captured frames:</p>
+
+            <ul>
+                <li><strong>Continuous Recording:</strong> All frames saved for analysis</li>
+                <li><strong>Event-Triggered:</strong> Frames saved when specific events occur</li>
+                <li><strong>Sampled Recording:</strong> Every Nth frame saved to reduce storage</li>
+                <li><strong>Metadata-Only:</strong> Save parameters without full image data</li>
+            </ul>
+
+            <div class="warning">
+                <strong>Privacy Consideration:</strong> Frame logging captures what the user sees. Obtain explicit consent and implement secure storage with encryption.
+            </div>
+
+            <h2>2.10 Version Compatibility</h2>
+
+            <h3>Data Format Versioning</h3>
+            <p>Include version information in data structures for forward and backward compatibility:</p>
+
+            <pre><code>interface DataFormatVersion {
+  major: number;  // Breaking changes
+  minor: number;  // New features, backward compatible
+  patch: number;  // Bug fixes
+}
+
+const WIA_BIONIC_EYE_VERSION: DataFormatVersion = {
+  major: 1,
+  minor: 0,
+  patch: 0
+};</code></pre>
+
+            <div class="info">
+                <strong>Best Practice:</strong> Always include version information in transmitted data to ensure receiving systems can properly parse and process the information.
+            </div>
+        </section>
+    </main>
+</body>
+</html>

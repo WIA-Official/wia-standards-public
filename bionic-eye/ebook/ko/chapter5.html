@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 통합 가이드 - WIA 바이오닉 아이 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>제5장: 통합 가이드</h1>
+        <p>망막 임플란트, 피질 임플란트, 스마트 안경</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>5.1 시스템 통합 개요</h2>
+
+            <p>이 장은 WIA 바이오닉 아이 표준 구성 요소를 완전한 인공 시각 시스템에 통합하기 위한 실용적인 지침을 제공합니다. 세 가지 주요 구현 유형인 망막 임플란트, 피질 임플란트 및 스마트 안경을 다룹니다.</p>
+
+            <h3>통합 아키텍처</h3>
+            <pre><code>┌─────────────────────────────────────────────────┐
+│              환자 착용 구성 요소                │
+├─────────────────────────────────────────────────┤
+│  카메라 → 프로세서 → 송신기 → 임플란트        │
+└─────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────┐
+│           클라우드 서비스 (선택 사항)          │
+├─────────────────────────────────────────────────┤
+│  데이터 로깅 | ML 모델 | 원격 지원             │
+└─────────────────────────────────────────────────┘</code></pre>
+
+            <h2>5.2 망막 임플란트 통합</h2>
+
+            <h3>망막상 임플란트 시스템</h3>
+            <p>망막 표면의 신경절 세포를 자극하는 시스템:</p>
+
+            <h4>하드웨어 구성 요소</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>구성 요소</th>
+                        <th>사양</th>
+                        <th>예시</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>외부 카메라</td>
+                        <td>VGA 해상도, 20 FPS</td>
+                        <td>안경 장착 CMOS 센서</td>
+                    </tr>
+                    <tr>
+                        <td>비디오 처리 장치</td>
+                        <td>ARM Cortex, 1 GHz</td>
+                        <td>벨트 착용 프로세서</td>
+                    </tr>
+                    <tr>
+                        <td>송신기 코일</td>
+                        <td>13.56 MHz, 10 mm 직경</td>
+                        <td>템플 장착 코일</td>
+                    </tr>
+                    <tr>
+                        <td>수신기 임플란트</td>
+                        <td>유도 수신기 + 전자 장치</td>
+                        <td>공막 장착 수신기</td>
+                    </tr>
+                    <tr>
+                        <td>전극 어레이</td>
+                        <td>60 전극, 10×6 그리드</td>
+                        <td>폴리이미드 플렉스 어레이</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>통합 단계</h4>
+            <ol>
+                <li><strong>카메라 보정:</strong> 카메라 FOV를 환자의 자연스러운 시선 방향에 정렬</li>
+                <li><strong>코일 정렬:</strong> 최적의 결합을 위해 이식된 수신기 위에 외부 코일 배치</li>
+                <li><strong>임피던스 테스트:</strong> 정상 임피던스 범위(1-50 kΩ) 내의 모든 전극 확인</li>
+                <li><strong>임계값 매핑:</strong> 전극당 포스핀 지각을 위한 최소 전류 결정</li>
+                <li><strong>편안함 최적화:</strong> 환자 피드백에 따라 최대 전류 수준 조정</li>
+                <li><strong>이미지 처리 튜닝:</strong> 가장자리 감지 및 다운샘플링 알고리즘 구성</li>
+            </ol>
+
+            <h4>구성 예시</h4>
+            <pre><code>{
+  "deviceType": "epiretinal",
+  "electrodeArray": {
+    "totalElectrodes": 60,
+    "layout": "10x6",
+    "electrodeSpacing": 575,  // μm
+    "arraySize": {
+      "width": 6.0,   // mm
+      "height": 3.5   // mm
+    }
+  },
+  "stimulation": {
+    "pulseWidth": 460,         // μs
+    "frequency": 20,           // Hz
+    "returnElectrode": "case",
+    "waveform": "biphasic_symmetric"
+  },
+  "processing": {
+    "edgeDetection": true,
+    "edgeWeight": 0.7,
+    "dynamicRange": "high",
+    "gamma": 2.2
+  }
+}</code></pre>
+
+            <h3>망막하 임플란트 시스템</h3>
+            <p>양극 세포를 자극하기 위해 망막 아래에 이식된 시스템:</p>
+
+            <h4>망막상과의 주요 차이점</h4>
+            <ul>
+                <li><strong>더 높은 해상도:</strong> 1500+ 전극 가능</li>
+                <li><strong>자연스러운 경로:</strong> 광수용체 위치에 더 가까움</li>
+                <li><strong>더 작은 전극:</strong> 70-100 μm 직경</li>
+                <li><strong>더 낮은 전류:</strong> 표적 뉴런에 더 가까움</li>
+                <li><strong>광다이오드 전력:</strong> 일부 설계는 주변광을 전력으로 사용</li>
+            </ul>
+
+            <h2>5.3 피질 임플란트 통합</h2>
+
+            <h3>시각 피질 자극</h3>
+            <p>완전한 망막 손상이 있는 환자를 위한 일차 시각 피질(V1)의 직접 자극:</p>
+
+            <h4>수술 배치</h4>
+            <ul>
+                <li><strong>위치:</strong> 후두엽, 거리 열구 영역</li>
+                <li><strong>깊이:</strong> 표면 전극 또는 침투 어레이</li>
+                <li><strong>커버리지:</strong> 일반적으로 시야의 중앙 10-20°를 나타냄</li>
+                <li><strong>양측:</strong> 전체 시야를 위해 양쪽 반구에 이식할 수 있음</li>
+            </ul>
+
+            <h4>기술적 과제</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>과제</th>
+                        <th>완화 전략</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>망막 지형 매핑 복잡성</td>
+                        <td>광범위한 보정 및 포스핀 매핑</td>
+                    </tr>
+                    <tr>
+                        <td>두개골 내 뇌 움직임</td>
+                        <td>유연한 전극 어레이, 안전한 고정</td>
+                    </tr>
+                    <tr>
+                        <td>면역 반응</td>
+                        <td>생체 적합성 코팅, 항염증 프로토콜</td>
+                    </tr>
+                    <tr>
+                        <td>복잡한 포스핀</td>
+                        <td>최적의 자극 패턴을 위한 머신 러닝</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.4 스마트 안경 통합</h2>
+
+            <h3>비침습적 시각 보조</h3>
+            <p>스마트 안경은 수술 임플란트 없이 시각 보조를 제공합니다:</p>
+
+            <h4>사용 사례</h4>
+            <ul>
+                <li><strong>저시력 향상:</strong> 확대, 대비, 가장자리 향상</li>
+                <li><strong>객체 인식:</strong> 감지된 객체의 오디오 설명</li>
+                <li><strong>텍스트 읽기:</strong> 텍스트 음성 변환 출력을 사용한 OCR</li>
+                <li><strong>네비게이션:</strong> 장애물 감지 및 안내</li>
+                <li><strong>얼굴 인식:</strong> 친숙한 얼굴 식별 및 알림</li>
+            </ul>
+
+            <h4>하드웨어 아키텍처</h4>
+            <pre><code>┌──────────────────────────────────────┐
+│      스마트 안경 프레임              │
+├──────────────────────────────────────┤
+│  • 듀얼 HD 카메라 (스테레오 비전)   │
+│  • 깊이 센서 (ToF 또는 구조화)      │
+│  • IMU (방향 추적)                  │
+│  • 골전도 스피커                    │
+│  • 촉각 피드백 모터                 │
+│  • WiFi/BLE 연결                    │
+│  • 배터리 (8시간)                   │
+└──────────────────────────────────────┘</code></pre>
+
+            <h2>5.5 전력 관리</h2>
+
+            <h3>이식된 장치 전력</h3>
+            <p>이식된 구성 요소에 대한 중요한 전력 고려 사항:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>구성 요소</th>
+                        <th>전력 소비</th>
+                        <th>듀티 사이클</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>수신기 전자 장치</td>
+                        <td>10-50 mW</td>
+                        <td>연속</td>
+                    </tr>
+                    <tr>
+                        <td>자극 회로</td>
+                        <td>100-300 mW</td>
+                        <td>20-50%</td>
+                    </tr>
+                    <tr>
+                        <td>마이크로컨트롤러</td>
+                        <td>5-20 mW</td>
+                        <td>연속</td>
+                    </tr>
+                    <tr>
+                        <td>안전 모니터링</td>
+                        <td>5-10 mW</td>
+                        <td>연속</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.6 보정 절차</h2>
+
+            <h3>초기 시스템 보정</h3>
+            <p>새로운 설치를 위한 단계별 보정 프로세스:</p>
+
+            <h4>1. 임피던스 측정</h4>
+            <pre><code>async function measureImpedance(electrodeArray) {
+  const results = [];
+
+  for (let i = 0; i < electrodeArray.totalElectrodes; i++) {
+    const impedance = await measureElectrodeImpedance(i, {
+      frequency: 1000,  // Hz
+      testCurrent: 10   // μA
+    });
+
+    results.push({
+      electrode: i,
+      impedance: impedance.magnitude,
+      phase: impedance.phase,
+      status: classifyImpedance(impedance)
+    });
+  }
+
+  return results;
+}</code></pre>
+
+            <h4>2. 임계값 감지</h4>
+            <p>각 전극에 대해 지각 임계값을 결정하는 과정:</p>
+            <ul>
+                <li>낮은 전류(10 μA)에서 시작</li>
+                <li>환자가 포스핀을 지각할 때까지 증가</li>
+                <li>각 전극에 대한 임계값 기록</li>
+                <li>안전 마진을 가진 최대 전류 설정</li>
+            </ul>
+
+            <h3>지속적인 보정</h3>
+            <p>정기 재보정 일정:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>보정 유형</th>
+                        <th>빈도</th>
+                        <th>지속 시간</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>임피던스 검사</td>
+                        <td>매일 (자동)</td>
+                        <td>2분</td>
+                    </tr>
+                    <tr>
+                        <td>임계값 조정</td>
+                        <td>매주</td>
+                        <td>15분</td>
+                    </tr>
+                    <tr>
+                        <td>전체 포스핀 재매핑</td>
+                        <td>분기별</td>
+                        <td>60분</td>
+                    </tr>
+                    <tr>
+                        <td>이미지 처리 튜닝</td>
+                        <td>필요에 따라</td>
+                        <td>30분</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.7 비상 정지 통합</h2>
+
+            <h3>자동 안전 트리거</h3>
+            <pre><code>interface SafetyMonitor {
+  monitors: {
+    overCurrent: {
+      enabled: true,
+      singleElectrode: 1000,     // μA
+      totalCurrent: 50000,       // μA (50 mA)
+      responseTime: 0.1          // ms
+    },
+    thermal: {
+      enabled: true,
+      maxTemperature: 39.0,      // °C
+      maxDelta: 2.0              // °C 기준선 이상
+    }
+  };
+  emergencyResponse: {
+    disableStimulation: true,
+    alertPatient: true,
+    logEvent: true
+  };
+}</code></pre>
+
+            <h3>수동 정지 메커니즘</h3>
+            <ul>
+                <li><strong>안경 버튼:</strong> 한 번 누르면 즉시 정지</li>
+                <li><strong>음성 명령:</strong> "긴급 정지" 또는 "멈춰"</li>
+                <li><strong>모바일 앱:</strong> 눈에 띄는 정지 버튼</li>
+                <li><strong>보호자 리모컨:</strong> 무선 원격 제어</li>
+            </ul>
+
+            <div class="info">
+                <strong>통합 모범 사례:</strong> 다양한 하드웨어 구현 간의 호환성을 보장하고 향후 업그레이드를 단순화하려면 WIA SDK 추상화 계층을 사용하십시오.
+            </div>
+        </section>
+    </main>
+</body>
+</html>
