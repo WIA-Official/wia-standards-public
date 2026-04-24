@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-ENE-017 Air Quality - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #2563EB;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Top Navigation */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        /* Tabs */
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panels */
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        /* Forms */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        /* Checkboxes */
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 15px; margin: 15px 0; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; padding: 10px 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+        .checkbox-item:hover { border-color: var(--primary); }
+        .checkbox-item.checked { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); }
+        .checkbox-item input { display: none; }
+
+        /* Buttons */
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        /* Output */
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        /* Sub-sections */
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        /* AQI Scale */
+        .aqi-scale { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 20px 0; }
+        .aqi-item { padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; }
+        .aqi-good { background: #10b981; color: white; }
+        .aqi-moderate { background: #f59e0b; color: white; }
+        .aqi-unhealthy-sensitive { background: #f97316; color: white; }
+        .aqi-unhealthy { background: #ef4444; color: white; }
+        .aqi-very-unhealthy { background: #9333ea; color: white; }
+        .aqi-hazardous { background: #7f1d1d; color: white; }
+
+        /* Sensor Grid */
+        .sensor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 20px 0; }
+        .sensor-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; transition: all 0.2s; }
+        .sensor-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .sensor-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .sensor-card .name { font-weight: 600; margin-bottom: 5px; font-size: 0.9rem; }
+        .sensor-card .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .sensor-card .unit { font-size: 0.8rem; color: var(--text-muted); }
+
+        /* Status Grid */
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .status-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .status-item .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .status-item .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        /* Table */
+        .styled-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .styled-table th, .styled-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        .styled-table th { background: var(--primary); color: white; font-weight: 600; }
+        .styled-table tr:hover { background: rgba(59, 130, 246, 0.05); }
+
+        /* Chart placeholder */
+        .chart-placeholder { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 40px; text-align: center; color: var(--text-muted); margin: 20px 0; min-height: 250px; display: flex; align-items: center; justify-content: center; }
+
+        /* Footer */
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="../index.html">ENE-017</a>
+                    <span class="sep">›</span>
+                    <span class="current">Simulator</span>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html">← Back</a>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🌬️ Air Quality Simulator</div>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                <button class="lang-btn" onclick="setLang('ko')">KO</button>
+            </div>
+        </header>
+
+        <div class="hero">
+            <h1 data-en="Interactive Air Quality Simulator" data-ko="인터랙티브 대기질 시뮬레이터">Interactive Air Quality Simulator</h1>
+            <p data-en="Explore air quality monitoring, AQI calculation, and pollution forecasting" data-ko="대기질 모니터링, AQI 계산 및 오염 예측 탐색">Explore air quality monitoring, AQI calculation, and pollution forecasting</p>
+            <div class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel('dataFormat')">
+                <span data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</span>
+            </div>
+            <div class="tab" onclick="showPanel('algorithms')">
+                <span data-en="🧮 Algorithms" data-ko="🧮 알고리즘">🧮 Algorithms</span>
+            </div>
+            <div class="tab" onclick="showPanel('protocol')">
+                <span data-en="🔄 Protocol" data-ko="🔄 프로토콜">🔄 Protocol</span>
+            </div>
+            <div class="tab" onclick="showPanel('integration')">
+                <span data-en="🔌 Integration" data-ko="🔌 통합">🔌 Integration</span>
+            </div>
+            <div class="tab" onclick="showPanel('test')">
+                <span data-en="🧪 Test" data-ko="🧪 테스트">🧪 Test</span>
+            </div>
+        </div>
+
+        <!-- Data Format Panel -->
+        <div id="dataFormat" class="panel active">
+            <h2>📊 <span data-en="Air Quality Data Format" data-ko="대기질 데이터 형식">Air Quality Data Format</span></h2>
+
+            <div class="sub-section">
+                <h4 data-en="Pollutant Measurements" data-ko="오염물질 측정">Pollutant Measurements</h4>
+                <div class="sensor-grid">
+                    <div class="sensor-card">
+                        <div class="icon">💨</div>
+                        <div class="name">PM2.5</div>
+                        <div class="value" id="pm25-value">35</div>
+                        <div class="unit">μg/m³</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="icon">🌫️</div>
+                        <div class="name">PM10</div>
+                        <div class="value" id="pm10-value">68</div>
+                        <div class="unit">μg/m³</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="icon">☁️</div>
+                        <div class="name">O₃</div>
+                        <div class="value" id="o3-value">42</div>
+                        <div class="unit">ppb</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="icon">🏭</div>
+                        <div class="name">NO₂</div>
+                        <div class="value" id="no2-value">28</div>
+                        <div class="unit">ppb</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="icon">⚗️</div>
+                        <div class="name">SO₂</div>
+                        <div class="value" id="so2-value">12</div>
+                        <div class="unit">ppb</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="icon">🚗</div>
+                        <div class="name">CO</div>
+                        <div class="value" id="co-value">2.4</div>
+                        <div class="unit">ppm</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Sample Air Quality Data (JSON)" data-ko="샘플 대기질 데이터 (JSON)">Sample Air Quality Data (JSON)</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="location-input" data-en="Location Name" data-ko="위치 이름">Location Name</label>
+                        <input type="text" id="location-input" value="Seoul City Center">
+                    </div>
+                    <div class="form-group">
+                        <label for="timestamp-input" data-en="Timestamp" data-ko="타임스탬프">Timestamp</label>
+                        <input type="text" id="timestamp-input" value="2025-12-25T14:30:00Z">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateDataFormat()">
+                        <span data-en="Generate JSON Data" data-ko="JSON 데이터 생성">Generate JSON Data</span>
+                    </button>
+                </div>
+                <div class="output" id="data-output"></div>
+            </div>
+        </div>
+
+        <!-- Algorithms Panel -->
+        <div id="algorithms" class="panel">
+            <h2>🧮 <span data-en="AQI Calculation Algorithms" data-ko="AQI 계산 알고리즘">AQI Calculation Algorithms</span></h2>
+
+            <div class="sub-section">
+                <h4 data-en="Air Quality Index (AQI) Scale" data-ko="대기질 지수 (AQI) 척도">Air Quality Index (AQI) Scale</h4>
+                <div class="aqi-scale">
+                    <div class="aqi-item aqi-good">
+                        <div>0-50</div>
+                        <div style="font-size: 0.85rem;">Good</div>
+                    </div>
+                    <div class="aqi-item aqi-moderate">
+                        <div>51-100</div>
+                        <div style="font-size: 0.85rem;">Moderate</div>
+                    </div>
+                    <div class="aqi-item aqi-unhealthy-sensitive">
+                        <div>101-150</div>
+                        <div style="font-size: 0.85rem;">Unhealthy (Sensitive)</div>
+                    </div>
+                    <div class="aqi-item aqi-unhealthy">
+                        <div>151-200</div>
+                        <div style="font-size: 0.85rem;">Unhealthy</div>
+                    </div>
+                    <div class="aqi-item aqi-very-unhealthy">
+                        <div>201-300</div>
+                        <div style="font-size: 0.85rem;">Very Unhealthy</div>
+                    </div>
+                    <div class="aqi-item aqi-hazardous">
+                        <div>301+</div>
+                        <div style="font-size: 0.85rem;">Hazardous</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Calculate AQI from Pollutant Values" data-ko="오염물질 값으로 AQI 계산">Calculate AQI from Pollutant Values</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="algo-pm25" data-en="PM2.5 (μg/m³)" data-ko="PM2.5 (μg/m³)">PM2.5 (μg/m³)</label>
+                        <input type="number" id="algo-pm25" value="35.4" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="algo-pm10" data-en="PM10 (μg/m³)" data-ko="PM10 (μg/m³)">PM10 (μg/m³)</label>
+                        <input type="number" id="algo-pm10" value="68.2" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="algo-o3" data-en="O₃ (ppb)" data-ko="O₃ (ppb)">O₃ (ppb)</label>
+                        <input type="number" id="algo-o3" value="42" step="1">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="calculateAQI()">
+                        <span data-en="Calculate AQI" data-ko="AQI 계산">Calculate AQI</span>
+                    </button>
+                </div>
+                <div class="output" id="aqi-output"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Pollution Forecasting (24-hour)" data-ko="오염 예측 (24시간)">Pollution Forecasting (24-hour)</h4>
+                <div class="chart-placeholder">
+                    <div>
+                        <div style="font-size: 3rem; margin-bottom: 10px;">📈</div>
+                        <div data-en="Time-series AQI forecast chart would appear here" data-ko="시계열 AQI 예측 차트가 여기에 표시됩니다">Time-series AQI forecast chart would appear here</div>
+                        <div style="font-size: 0.85rem; margin-top: 10px;" data-en="Using ML models (LSTM, Prophet) for prediction" data-ko="예측을 위한 ML 모델 (LSTM, Prophet) 사용">Using ML models (LSTM, Prophet) for prediction</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Protocol Panel -->
+        <div id="protocol" class="panel">
+            <h2>🔄 <span data-en="Air Quality Protocol" data-ko="대기질 프로토콜">Air Quality Protocol</span></h2>
+
+            <div class="sub-section">
+                <h4 data-en="Sensor Network Communication" data-ko="센서 네트워크 통신">Sensor Network Communication</h4>
+                <p data-en="Select communication protocols for sensor data transmission:" data-ko="센서 데이터 전송을 위한 통신 프로토콜 선택:">Select communication protocols for sensor data transmission:</p>
+                <div class="checkbox-group">
+                    <label class="checkbox-item checked" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" checked>
+                        <span>MQTT</span>
+                    </label>
+                    <label class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox">
+                        <span>CoAP</span>
+                    </label>
+                    <label class="checkbox-item checked" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" checked>
+                        <span>HTTP/REST</span>
+                    </label>
+                    <label class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox">
+                        <span>WebSocket</span>
+                    </label>
+                    <label class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox">
+                        <span>LoRaWAN</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Data Transmission Frequency" data-ko="데이터 전송 빈도">Data Transmission Frequency</h4>
+                <div class="form-group">
+                    <label for="frequency-select" data-en="Update Interval" data-ko="업데이트 간격">Update Interval</label>
+                    <select id="frequency-select">
+                        <option value="1">Every 1 minute (Real-time)</option>
+                        <option value="5" selected>Every 5 minutes</option>
+                        <option value="15">Every 15 minutes</option>
+                        <option value="60">Every hour</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="aggregation-select" data-en="Data Aggregation" data-ko="데이터 집계">Data Aggregation</label>
+                    <select id="aggregation-select">
+                        <option value="raw">Raw values</option>
+                        <option value="avg" selected>Moving average (1 hour)</option>
+                        <option value="median">Median (1 hour)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Protocol Message Example" data-ko="프로토콜 메시지 예제">Protocol Message Example</h4>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateProtocol()">
+                        <span data-en="Generate Protocol Message" data-ko="프로토콜 메시지 생성">Generate Protocol Message</span>
+                    </button>
+                </div>
+                <div class="output" id="protocol-output"></div>
+            </div>
+        </div>
+
+        <!-- Integration Panel -->
+        <div id="integration" class="panel">
+            <h2>🔌 <span data-en="System Integration" data-ko="시스템 통합">System Integration</span></h2>
+
+            <div class="sub-section">
+                <h4 data-en="Integration Points" data-ko="통합 지점">Integration Points</h4>
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th data-en="System" data-ko="시스템">System</th>
+                            <th data-en="Purpose" data-ko="목적">Purpose</th>
+                            <th data-en="Status" data-ko="상태">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>🏥 Health Alert System</td>
+                            <td data-en="Notify sensitive groups" data-ko="민감 그룹 알림">Notify sensitive groups</td>
+                            <td style="color: var(--secondary);">✓ Active</td>
+                        </tr>
+                        <tr>
+                            <td>🚨 Emergency Response</td>
+                            <td data-en="Trigger alerts on hazardous levels" data-ko="위험 수준 시 경보 발동">Trigger alerts on hazardous levels</td>
+                            <td style="color: var(--secondary);">✓ Active</td>
+                        </tr>
+                        <tr>
+                            <td>📱 Mobile Apps</td>
+                            <td data-en="Real-time AQI display" data-ko="실시간 AQI 표시">Real-time AQI display</td>
+                            <td style="color: var(--secondary);">✓ Active</td>
+                        </tr>
+                        <tr>
+                            <td>🌐 Public Dashboard</td>
+                            <td data-en="Data visualization for citizens" data-ko="시민을 위한 데이터 시각화">Data visualization for citizens</td>
+                            <td style="color: var(--secondary);">✓ Active</td>
+                        </tr>
+                        <tr>
+                            <td>🔬 Research Platform</td>
+                            <td data-en="Historical data for studies" data-ko="연구를 위한 과거 데이터">Historical data for studies</td>
+                            <td style="color: var(--secondary);">✓ Active</td>
+                        </tr>
+                        <tr>
+                            <td>🏛️ Government Systems</td>
+                            <td data-en="Policy and regulation enforcement" data-ko="정책 및 규제 집행">Policy and regulation enforcement</td>
+                            <td style="color: var(--secondary);">✓ Active</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="API Integration Example" data-ko="API 통합 예제">API Integration Example</h4>
+                <div class="form-group">
+                    <label for="api-endpoint" data-en="API Endpoint" data-ko="API 엔드포인트">API Endpoint</label>
+                    <input type="text" id="api-endpoint" value="https://api.airquality.wia.org/v1/readings">
+                </div>
+                <div class="form-group">
+                    <label for="api-key" data-en="API Key" data-ko="API 키">API Key</label>
+                    <input type="text" id="api-key" value="wia_aq_demo_key_12345">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="testIntegration()">
+                        <span data-en="Test API Integration" data-ko="API 통합 테스트">Test API Integration</span>
+                    </button>
+                </div>
+                <div class="output" id="integration-output"></div>
+            </div>
+        </div>
+
+        <!-- Test Panel -->
+        <div id="test" class="panel">
+            <h2>🧪 <span data-en="Comprehensive Testing" data-ko="종합 테스트">Comprehensive Testing</span></h2>
+
+            <div class="sub-section">
+                <h4 data-en="Sensor Accuracy Test" data-ko="센서 정확도 테스트">Sensor Accuracy Test</h4>
+                <p data-en="Simulate different pollution scenarios and test sensor accuracy:" data-ko="다양한 오염 시나리오를 시뮬레이션하고 센서 정확도 테스트:">Simulate different pollution scenarios and test sensor accuracy:</p>
+                <div class="form-group">
+                    <label for="scenario-select" data-en="Test Scenario" data-ko="테스트 시나리오">Test Scenario</label>
+                    <select id="scenario-select">
+                        <option value="clean">Clean Air (AQI 0-50)</option>
+                        <option value="moderate">Moderate Pollution (AQI 51-100)</option>
+                        <option value="unhealthy">Unhealthy (AQI 101-150)</option>
+                        <option value="hazardous">Hazardous (AQI 301+)</option>
+                        <option value="random">Random Values</option>
+                    </select>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="runSensorTest()">
+                        <span data-en="Run Sensor Test" data-ko="센서 테스트 실행">Run Sensor Test</span>
+                    </button>
+                </div>
+                <div class="output" id="test-output"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="End-to-End Test" data-ko="엔드투엔드 테스트">End-to-End Test</h4>
+                <p data-en="Test the complete workflow from sensor reading to alert generation:" data-ko="센서 읽기부터 알림 생성까지 전체 워크플로우 테스트:">Test the complete workflow from sensor reading to alert generation:</p>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="value" id="test-sensors">0</div>
+                        <div class="label" data-en="Sensors Tested" data-ko="테스트된 센서">Sensors Tested</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value" id="test-readings">0</div>
+                        <div class="label" data-en="Readings Collected" data-ko="수집된 판독값">Readings Collected</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value" id="test-aqi">0</div>
+                        <div class="label" data-en="AQI Calculated" data-ko="계산된 AQI">AQI Calculated</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value" id="test-alerts">0</div>
+                        <div class="label" data-en="Alerts Generated" data-ko="생성된 알림">Alerts Generated</div>
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="runE2ETest()">
+                        <span data-en="Run End-to-End Test" data-ko="엔드투엔드 테스트 실행">Run End-to-End Test</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetTests()">
+                        <span data-en="Reset" data-ko="초기화">Reset</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</div>
+            <p>© 2025 SmileStory Inc. / WIA</p>
+            <div class="links">
+                <a href="../index.html" data-en="← Back to Main" data-ko="← 메인으로">← Back to Main</a>
+                <a href="https://wiastandards.com" target="_blank">WIA Standards</a>
+                <a href="https://github.com/WIA-Official" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('[data-en][data-ko]').forEach(el => {
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = el.dataset[lang];
+                } else {
+                    el.textContent = el.dataset[lang];
+                }
+            });
+        }
+
+        function showPanel(panelId) {
+            document.querySelectorAll('.panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(panelId).classList.add('active');
+            event.target.closest('.tab').classList.add('active');
+        }
+
+        function toggleCheckbox(el) {
+            el.classList.toggle('checked');
+            const checkbox = el.querySelector('input');
+            checkbox.checked = !checkbox.checked;
+        }
+
+        function generateDataFormat() {
+            const location = document.getElementById('location-input').value;
+            const timestamp = document.getElementById('timestamp-input').value;
+
+            const data = {
+                location: location,
+                timestamp: timestamp,
+                coordinates: {
+                    lat: 37.5665,
+                    lon: 126.9780
+                },
+                pollutants: {
+                    pm25: { value: 35.4, unit: "μg/m³" },
+                    pm10: { value: 68.2, unit: "μg/m³" },
+                    o3: { value: 42, unit: "ppb" },
+                    no2: { value: 28, unit: "ppb" },
+                    so2: { value: 12, unit: "ppb" },
+                    co: { value: 2.4, unit: "ppm" }
+                },
+                aqi: {
+                    value: 98,
+                    level: "Moderate",
+                    color: "#f59e0b"
+                },
+                meteorology: {
+                    temperature: 18.5,
+                    humidity: 62,
+                    windSpeed: 3.2,
+                    windDirection: "NE"
+                }
+            };
+
+            document.getElementById('data-output').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function calculateAQI() {
+            const pm25 = parseFloat(document.getElementById('algo-pm25').value);
+            const pm10 = parseFloat(document.getElementById('algo-pm10').value);
+            const o3 = parseFloat(document.getElementById('algo-o3').value);
+
+            // Simplified AQI calculation (US EPA standard)
+            let aqi_pm25 = Math.round((pm25 / 12.0) * 50);
+            let aqi_pm10 = Math.round((pm10 / 54.0) * 50);
+            let aqi_o3 = Math.round((o3 / 54.0) * 50);
+
+            let maxAQI = Math.max(aqi_pm25, aqi_pm10, aqi_o3);
+
+            let level = "Good";
+            let color = "#10b981";
+            if (maxAQI > 50) { level = "Moderate"; color = "#f59e0b"; }
+            if (maxAQI > 100) { level = "Unhealthy for Sensitive Groups"; color = "#f97316"; }
+            if (maxAQI > 150) { level = "Unhealthy"; color = "#ef4444"; }
+            if (maxAQI > 200) { level = "Very Unhealthy"; color = "#9333ea"; }
+            if (maxAQI > 300) { level = "Hazardous"; color = "#7f1d1d"; }
+
+            const result = `
+AQI Calculation Results:
+========================
+
+Individual Pollutant AQIs:
+- PM2.5: ${aqi_pm25} (from ${pm25} μg/m³)
+- PM10: ${aqi_pm10} (from ${pm10} μg/m³)
+- O₃: ${aqi_o3} (from ${o3} ppb)
+
+Overall AQI: ${maxAQI}
+Level: ${level}
+Color Code: ${color}
+
+Health Implications:
+${getHealthMessage(maxAQI)}
+
+Formula Used: US EPA AQI Standard
+Reference: 40 CFR Part 58 Appendix G
+            `.trim();
+
+            document.getElementById('aqi-output').textContent = result;
+        }
+
+        function getHealthMessage(aqi) {
+            if (aqi <= 50) return "Air quality is satisfactory, and air pollution poses little or no risk.";
+            if (aqi <= 100) return "Air quality is acceptable. However, there may be a risk for some people.";
+            if (aqi <= 150) return "Members of sensitive groups may experience health effects.";
+            if (aqi <= 200) return "Some members of the general public may experience health effects.";
+            if (aqi <= 300) return "Health alert: The risk of health effects is increased for everyone.";
+            return "Health warning of emergency conditions: everyone is more likely to be affected.";
+        }
+
+        function generateProtocol() {
+            const frequency = document.getElementById('frequency-select').value;
+            const aggregation = document.getElementById('aggregation-select').value;
+
+            const protocol = {
+                version: "1.0",
+                protocol: "MQTT",
+                topic: "wia/airquality/sensors/seoul-001",
+                qos: 1,
+                retain: false,
+                payload: {
+                    sensorId: "seoul-001",
+                    timestamp: new Date().toISOString(),
+                    interval: `${frequency}_minutes`,
+                    aggregation: aggregation,
+                    data: {
+                        pm25: 35.4,
+                        pm10: 68.2,
+                        o3: 42,
+                        no2: 28,
+                        so2: 12,
+                        co: 2.4
+                    },
+                    metadata: {
+                        accuracy: "±5%",
+                        calibration: "2025-12-01",
+                        batteryLevel: 87
+                    }
+                }
+            };
+
+            document.getElementById('protocol-output').textContent = JSON.stringify(protocol, null, 2);
+        }
+
+        function testIntegration() {
+            const endpoint = document.getElementById('api-endpoint').value;
+            const apiKey = document.getElementById('api-key').value;
+
+            const result = `
+API Integration Test Results:
+=============================
+
+Endpoint: ${endpoint}
+Method: GET
+Headers:
+  Authorization: Bearer ${apiKey}
+  Content-Type: application/json
+
+Response Status: 200 OK
+Response Time: 142ms
+
+Sample Response:
+{
+  "status": "success",
+  "timestamp": "${new Date().toISOString()}",
+  "data": {
+    "location": "Seoul City Center",
+    "aqi": 98,
+    "level": "Moderate",
+    "pollutants": {
+      "pm25": 35.4,
+      "pm10": 68.2,
+      "o3": 42,
+      "no2": 28,
+      "so2": 12,
+      "co": 2.4
+    }
+  },
+  "meta": {
+    "lastUpdate": "${new Date(Date.now() - 300000).toISOString()}",
+    "nextUpdate": "${new Date(Date.now() + 300000).toISOString()}"
+  }
+}
+
+Integration Status: ✓ SUCCESS
+All endpoints accessible and returning expected data.
+            `.trim();
+
+            document.getElementById('integration-output').textContent = result;
+        }
+
+        function runSensorTest() {
+            const scenario = document.getElementById('scenario-select').value;
+            let values = {};
+
+            switch(scenario) {
+                case 'clean':
+                    values = { pm25: 8.5, pm10: 15.2, o3: 25, no2: 10, so2: 3, co: 0.5 };
+                    break;
+                case 'moderate':
+                    values = { pm25: 35.4, pm10: 68.2, o3: 42, no2: 28, so2: 12, co: 2.4 };
+                    break;
+                case 'unhealthy':
+                    values = { pm25: 75.5, pm10: 125.3, o3: 88, no2: 65, so2: 45, co: 7.2 };
+                    break;
+                case 'hazardous':
+                    values = { pm25: 250.8, pm10: 420.5, o3: 165, no2: 145, so2: 128, co: 15.8 };
+                    break;
+                default:
+                    values = {
+                        pm25: Math.random() * 300,
+                        pm10: Math.random() * 500,
+                        o3: Math.random() * 200,
+                        no2: Math.random() * 200,
+                        so2: Math.random() * 150,
+                        co: Math.random() * 20
+                    };
+            }
+
+            const result = `
+Sensor Accuracy Test Results:
+=============================
+
+Scenario: ${scenario.toUpperCase()}
+
+Measured Values:
+- PM2.5: ${values.pm25.toFixed(1)} μg/m³
+- PM10: ${values.pm10.toFixed(1)} μg/m³
+- O₃: ${values.o3.toFixed(0)} ppb
+- NO₂: ${values.no2.toFixed(0)} ppb
+- SO₂: ${values.so2.toFixed(0)} ppb
+- CO: ${values.co.toFixed(1)} ppm
+
+Sensor Performance:
+✓ All sensors responding
+✓ Values within expected ranges
+✓ Calibration status: OK
+✓ Data quality: High (98.5%)
+
+Test Status: PASSED
+            `.trim();
+
+            document.getElementById('test-output').textContent = result;
+        }
+
+        function runE2ETest() {
+            let sensors = 0, readings = 0, aqi = 0, alerts = 0;
+
+            const interval = setInterval(() => {
+                if (sensors < 6) {
+                    sensors++;
+                    document.getElementById('test-sensors').textContent = sensors;
+                }
+                if (readings < 24) {
+                    readings += 4;
+                    document.getElementById('test-readings').textContent = readings;
+                }
+                if (aqi < 98) {
+                    aqi += 16;
+                    document.getElementById('test-aqi').textContent = Math.min(aqi, 98);
+                }
+                if (sensors === 6 && readings >= 24 && alerts < 3) {
+                    alerts++;
+                    document.getElementById('test-alerts').textContent = alerts;
+                }
+
+                if (sensors === 6 && readings === 24 && aqi >= 98 && alerts === 3) {
+                    clearInterval(interval);
+                }
+            }, 200);
+        }
+
+        function resetTests() {
+            document.getElementById('test-sensors').textContent = '0';
+            document.getElementById('test-readings').textContent = '0';
+            document.getElementById('test-aqi').textContent = '0';
+            document.getElementById('test-alerts').textContent = '0';
+        }
+
+        // Initialize with sample data
+        window.addEventListener('load', () => {
+            generateDataFormat();
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

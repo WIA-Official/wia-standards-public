@@ -1,296 +1,413 @@
 # WIA-ENE-017: Air Quality Monitoring Standard
 ## PHASE 3: PROTOCOL
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Status:** Active
-**Last Updated:** December 25, 2025
+**Last Updated:** April 25, 2026
 **Philosophy:** 弘益人間 (Hongik Ingan) · Benefit All Humanity
 
 ---
 
 ## 1. Introduction
 
-Phase 3 of the WIA-ENE-017 standard defines requirements and specifications for this critical component of air quality monitoring systems. Building on the data format defined in Phase 1, this phase ensures systems can effectively communicate, integrate, and scale.
+Phase 3 covers **how Phase 1 payloads move from the sensor to the application**: transport bindings, reliability semantics, payload compression for constrained radios, cryptographic signing of observations, and the bridge rules that keep MQTT, AMQP, CoAP, LoRaWAN, and NB-IoT telemetry mutually translatable.
 
-### 1.1 Objectives
+Phase 2 defined the query-side contract (REST, WebSocket, GraphQL). Phase 3 defines the **publish-side contract** and the server-to-server transports that feed the REST layer.
 
-- Define technical architecture and protocols
-- Ensure interoperability between diverse systems
-- Establish security and privacy requirements
-- Provide implementation guidelines and best practices
-- Enable scalable deployments from local to global networks
+### 1.1 Normative references
+
+- OASIS MQTT 5.0
+- OASIS AMQP 1.0 (ISO/IEC 19464)
+- RFC 7252 — Constrained Application Protocol (CoAP)
+- RFC 7959 — Block-Wise Transfers in CoAP
+- RFC 8323 — CoAP over TCP/TLS/WebSockets
+- LoRa Alliance TS001-1.0.4 — LoRaWAN Regional Parameters
+- 3GPP TS 23.401 — NB-IoT data transport
+- RFC 5280 — X.509 Public Key Infrastructure
+- RFC 7515 — JSON Web Signature (JWS)
+- RFC 8446 — TLS 1.3
+- RFC 3161 — Time-Stamp Protocol (optional for Tier 1 audit trails)
 
 ---
 
-## 2. Technical Architecture
+## 2. Transport selection matrix
 
-### 2.1 System Components
+Implementers SHOULD pick the minimum-power transport that meets latency and reliability targets:
 
-The WIA-ENE-017 architecture consists of four main layers:
+| Transport      | Typical sensor        | Uplink latency | Payload cap  | Net cost     | WIA QoS tier |
+|----------------|-----------------------|----------------|--------------|--------------|--------------|
+| HTTP/2 REST    | Mains-powered station | ≤ 1 s          | Megabytes    | High         | Tier 1–2     |
+| MQTT 5.0 / TLS | Rooftop reference     | ≤ 1 s          | 256 KiB      | Medium       | Tier 1–3     |
+| AMQP 1.0       | Broker federation     | ≤ 5 s          | Megabytes    | Medium-high  | Tier 1       |
+| CoAP / DTLS    | Solar / LPWAN         | ≤ 30 s         | 1 KiB / frag | Low          | Tier 3       |
+| LoRaWAN        | Remote, battery       | 10–60 s        | 51–222 B     | Very low     | Tier 3–4     |
+| NB-IoT UDP     | Urban low-power       | 5–15 s         | 1 KiB        | Very low     | Tier 3–4     |
 
-1. **Sensor Layer:** Physical monitoring devices and data acquisition
-2. **Communication Layer:** Data transmission and network protocols
-3. **Processing Layer:** Real-time analytics and data management
-4. **Application Layer:** User interfaces and integration endpoints
+Regardless of transport, the **wire-format identity** is preserved: the Phase 1 JSON object (or its CBOR/binary encoding per § 6) is recoverable at the first bridge node.
 
-### 2.2 Communication Protocols
+---
 
-#### MQTT v5.0 Configuration
+## 3. MQTT 5.0 binding (mandatory for Tier 1 ingest)
 
-Topic Structure:
+### 3.1 Topic structure
+
 ```
-wia/airquality/{country}/{city}/{station_id}/readings
-wia/airquality/{country}/{city}/{station_id}/status
-wia/airquality/{country}/{city}/{station_id}/alerts
-```
-
-QoS Levels:
-- QoS 0: Historical bulk data transfer
-- QoS 1: Real-time measurements (default)
-- QoS 2: Critical health alerts
-
-#### HTTP/REST API
-
-Base URL: `https://api.airquality.wia.org/v1`
-
-Key Endpoints:
-- `GET /stations` - List all monitoring stations
-- `GET /stations/{id}/current` - Current readings
-- `GET /stations/{id}/readings` - Historical data
-- `POST /readings` - Submit new measurements
-- `GET /aqi/calculate` - AQI conversion service
-
----
-
-## 3. Security Requirements
-
-### 3.1 Transport Security
-
-- TLS 1.3 minimum for all communications
-- Certificate pinning for critical infrastructure
-- Perfect forward secrecy (PFS) cipher suites only
-
-### 3.2 Authentication
-
-Two authentication methods supported:
-
-1. **OAuth 2.0** (recommended for interactive applications)
-   - Authorization Code flow for web applications
-   - Client Credentials flow for backend services
-   - Token expiration: 1 hour (access), 30 days (refresh)
-
-2. **API Keys** (for legacy systems)
-   - Rotation policy: Every 90 days
-   - Key format: `wia_aq_{32_character_hex}`
-   - Header: `Authorization: Bearer {api_key}`
-
-### 3.3 Authorization
-
-Role-Based Access Control (RBAC):
-
-| Role | Permissions |
-|------|-------------|
-| Public | Read current and historical data |
-| Contributor | Submit sensor readings |
-| Operator | Manage station metadata |
-| Administrator | Full system access |
-
----
-
-## 4. Data Quality Standards
-
-### 4.1 Quality Tiers
-
-Systems must declare their quality tier:
-
-- **Tier 1 (Regulatory):** ±5% precision, ±10% accuracy, ≥85% completeness
-- **Tier 2 (Research):** ±10% precision, ±15% accuracy, ≥75% completeness
-- **Tier 3 (Informational):** ±20% precision, ±30% accuracy, ≥60% completeness
-- **Tier 4 (Indicative):** ±40% precision, ±50% accuracy, ≥50% completeness
-
-### 4.2 Validation Rules
-
-```python
-# Range validation
-def validate_range(pollutant, value):
-    ranges = {
-        'pm25': (0, 1000), 'pm10': (0, 2000),
-        'o3': (0, 500), 'no2': (0, 500),
-        'so2': (0, 500), 'co': (0, 50)
-    }
-    min_val, max_val = ranges[pollutant]
-    return min_val <= value <= max_val
-
-# Spatial consistency
-def check_spatial_consistency(station_readings, max_distance_km=10):
-    nearby = get_stations_within(station_readings, max_distance_km)
-    median_value = calculate_median(nearby)
-    for reading in nearby:
-        deviation = abs(reading.value - median_value)
-        if deviation > 50:  # μg/m³ threshold
-            flag_for_review(reading)
+wia/airquality/{country}/{city}/{station_id}/readings       # QoS 1, non-retained
+wia/airquality/{country}/{city}/{station_id}/status         # QoS 1, retained
+wia/airquality/{country}/{city}/{station_id}/alerts         # QoS 2, non-retained
+wia/airquality/_cmd/{station_id}/calibrate                  # QoS 2 (downlink)
+wia/airquality/_sys/deadletter                              # broker-internal
 ```
 
----
+- `{country}` — ISO 3166-1 alpha-2 (e.g., `KR`, `US`)
+- `{city}` — UN/LOCODE second segment (e.g., `Seoul` → `SEL`)
+- `{station_id}` — Phase 1 regex `^WIA-AQ-[A-Z]{2}-[A-Za-z0-9-]+$`
 
-## 5. Performance Requirements
+Subscribers SHOULD use **shared subscriptions** (`$share/<group>/wia/airquality/#`) when horizontally scaling ingestion — this distributes one copy of each message to exactly one consumer in the group and is the only way to avoid duplicate writes at the datastore.
 
-### 5.1 System Metrics
+### 3.2 Required MQTT 5.0 properties
 
-| Metric | Tier 1 | Tier 2 | Tier 3-4 |
-|--------|--------|--------|----------|
-| Uptime | ≥99.5% | ≥99.0% | ≥95.0% |
-| Data Latency | <30s (95%ile) | <60s | <300s |
-| API Response Time | <200ms | <500ms | <1s |
-| Data Completeness | ≥85% | ≥75% | ≥60% |
+Every PUBLISH carrying a reading MUST include:
 
-### 5.2 Scalability
+| Property                      | Value                                 |
+|-------------------------------|---------------------------------------|
+| `Content-Type`                | `application/json` or `application/cbor` |
+| `Payload Format Indicator`    | `1` (UTF-8 text) or `0` (binary)      |
+| `Message Expiry Interval`     | ≤ 3600 s (stale readings are dropped) |
+| `Correlation Data`            | Idempotency key (UUIDv7 recommended)  |
+| `User Property: qc_flag`      | `valid` / `suspect` / `calibration`   |
+| `User Property: sensor_model` | Vendor/model string from Phase 1 metadata |
 
-Systems must support:
-- Minimum 1,000 concurrent API clients
-- 100,000 sensor readings per minute ingestion
-- 10 million historical records query
-- Geographic distribution across multiple regions
+### 3.3 Last Will and retained status
 
----
+On connect, every station MUST register:
 
-## 6. Integration Interfaces
-
-### 6.1 External System Integration
-
-**Health Systems:**
-- Real-time alerts when AQI exceeds thresholds
-- FHIR-compatible patient risk assessment
-- Hospital admission correlation data
-
-**Emergency Services:**
-- Automated notifications during pollution events
-- Integration with emergency alert systems
-- First responder dashboards
-
-**Public Information:**
-- Open data APIs for third-party applications
-- RSS/Atom feeds for news aggregation
-- Social media automation (Twitter, Facebook)
-
-**Smart City Platforms:**
-- Traffic signal optimization
-- Building HVAC control
-- Public transportation routing
-
-### 6.2 Data Exchange Formats
-
-Supported formats:
-- JSON (default, WIA-ENE-017 schema)
-- CSV (simplified for spreadsheets)
-- XML (legacy system compatibility)
-- NetCDF (scientific research datasets)
-
----
-
-## 7. Implementation Examples
-
-### 7.1 Sample API Request
-
-```http
-GET /api/v1/stations/WIA-AQ-KR-Seoul-001/readings?start=2025-12-25T00:00:00Z&end=2025-12-25T23:59:59Z&pollutant=pm25&interval=1h
-Authorization: Bearer wia_aq_abc123...
-Accept: application/json
-
-Response: 200 OK
-{
-  "status": "success",
-  "data": {
-    "station_id": "WIA-AQ-KR-Seoul-001",
-    "pollutant": "pm25",
-    "interval": "1hour",
-    "readings": [
-      {"timestamp": "2025-12-25T00:00:00Z", "value": 28.5, "qc_flag": "valid"},
-      {"timestamp": "2025-12-25T01:00:00Z", "value": 31.2, "qc_flag": "valid"}
-    ],
-    "metadata": {
-      "count": 24,
-      "average": 32.8,
-      "max": 45.2,
-      "min": 18.3
-    }
-  }
-}
+```
+Will Topic:   wia/airquality/KR/Seoul/001/status
+Will Payload: {"state":"offline","since":"2026-04-25T14:30:00Z","reason":"will"}
+Will QoS:     1
+Will Retain:  true
 ```
 
-### 7.2 MQTT Publish Example
+On graceful shutdown it MUST PUBLISH the same topic with `state=offline` and `reason=clean`. Monitors can therefore distinguish an LTE drop from a calibration window by inspecting the retained message.
+
+### 3.4 Session expiry and keepalive
+
+- `Session Expiry Interval`: 3600 s for mains-powered, 86 400 s for battery (matches sleep cycle).
+- `Keep Alive`: 60 s default; LPWAN bridges MAY negotiate up to 1200 s.
+
+### 3.5 Broker quotas
+
+Brokers SHOULD enforce: **Receive Maximum** = 64, **Maximum Packet Size** = 262 144, **Topic Alias Maximum** = 16. Clients exceeding these MUST receive `DISCONNECT` reason `0x95` (Packet too large) or `0x93` (Receive Maximum exceeded).
+
+---
+
+## 4. AMQP 1.0 binding (broker federation)
+
+Use case: exporting a national network's feed to a regional aggregator (e.g., Korea → East-Asia) where guaranteed-once semantics and durable queues matter more than minimal overhead.
+
+### 4.1 Address grammar
+
+```
+/exchange/wia.airquality/{country}.{city}.{station_id}.readings
+/queue/wia.airquality.{consumer}.inbox
+```
+
+### 4.2 Message properties
+
+- `message-id` (UUID) = Phase 1 idempotency key
+- `content-type` = `application/json` or `application/cbor`
+- `subject` = `reading.{pollutant}` — facilitates routing on body-less filters
+- `application-properties[qc_flag]` mirrors the MQTT user property
+- `absolute-expiry-time` enforces the stale-drop rule
+
+Delivery MUST use **settled=false, state=accepted** once the record is durable in the consumer's datastore.
+
+---
+
+## 5. CoAP / DTLS for constrained sensors
+
+### 5.1 URI template
+
+```
+coaps://{gateway}/wia/aq/r?s={station_id}
+```
+
+### 5.2 CBOR payload (RFC 8949)
+
+Instead of JSON, constrained nodes MAY transmit the CBOR encoding of the Phase 1 object. Field names are preserved (no dictionary substitution at Tier 1) so a gateway can decode without out-of-band state.
+
+```
+Header: POST
+Options:
+  Uri-Path: wia, aq, r
+  Content-Format: application/cbor (60)
+  Accept:         application/cbor
+  Proxy-Uri:      <set by gateway to REST endpoint>
+Payload: CBOR(<Phase-1 object>)
+```
+
+Observations larger than the 1 KiB MTU MUST use RFC 7959 block-wise transfer with `SZX=6` (1024 B blocks). Retries follow the CoAP exponential back-off (ACK_TIMEOUT=2 s, ACK_RANDOM_FACTOR=1.5, MAX_RETRANSMIT=4).
+
+---
+
+## 6. LoRaWAN payload codec
+
+LoRaWAN uplinks are too small for JSON; a deterministic 24-byte codec is defined so any decoder recovers the Phase 1 object.
+
+### 6.1 Binary layout (v1 codec)
+
+| Offset | Size | Field                           | Encoding                   |
+|-------:|-----:|---------------------------------|----------------------------|
+| 0      | 1    | `version` (high nibble) / `flags` (low nibble) | `0x1X`          |
+| 1      | 4    | `timestamp_epoch_seconds`       | Big-endian uint32          |
+| 5      | 2    | `pm25 × 10`                     | uint16, unit 0.1 μg/m³     |
+| 7      | 2    | `pm10 × 10`                     | uint16, unit 0.1 μg/m³     |
+| 9      | 2    | `o3_ppb`                        | uint16                     |
+| 11     | 2    | `no2_ppb`                       | uint16                     |
+| 13     | 2    | `so2_ppb`                       | uint16                     |
+| 15     | 2    | `co_ppm × 100`                  | uint16                     |
+| 17     | 1    | `temperature_C + 50`            | uint8 (range −50…205)      |
+| 18     | 1    | `humidity_pct`                  | uint8 (0–100)              |
+| 19     | 1    | `battery_pct`                   | uint8                      |
+| 20     | 1    | `qc_flags_bitmap`               | bit0=pm25 valid …          |
+| 21     | 3    | `station_id_lo24`               | last 3 bytes of station hash |
+
+A LoRaWAN Network Server SHALL decode using the reference JavaScript codec bundled in `cli/lorawan-codec.js`; the decoder re-emits canonical Phase 1 JSON with `qc_flag` derived from the bitmap.
+
+### 6.2 Downlink commands
+
+Calibration triggers and AQI threshold changes are framed as TLV blocks in downlink port 2; see `spec/PHASE-4-INTEGRATION.md` for the operational flow.
+
+---
+
+## 7. NB-IoT UDP framing
+
+Carriers that price per-byte (NB-IoT, LTE-M) SHOULD pack the CBOR encoding plus a 4-byte CRC32 into a single UDP datagram to the gateway:
+
+```
++----+------------------------+--------+
+| 0x | CBOR(<Phase-1 object>) | CRC32  |
++----+------------------------+--------+
+  1B          N bytes             4B
+```
+
+Leading byte `0xAQ` (ASCII mnemonic for *Air Quality*) lets multiplexed NB-IoT collectors route without a heavier header. Lost datagrams are recovered by the store-and-forward rule (§ 9).
+
+---
+
+## 8. Cryptographic envelope
+
+### 8.1 Transport security
+
+- TLS 1.3 for MQTT/AMQP/HTTP.
+- DTLS 1.3 (or 1.2 with PSK for legacy CoAP hardware).
+- Cipher suites restricted to: `TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`.
+- Perfect Forward Secrecy is REQUIRED (ECDHE only).
+
+### 8.2 mTLS certificate profile (Tier 1)
+
+Station certificates MUST include:
+
+```
+X.509 v3, ECDSA P-256
+SubjectAltName:
+  DNS: station-001.kr.wia-airquality.org
+  URI: urn:wia:airquality:station:WIA-AQ-KR-Seoul-001
+ExtendedKeyUsage: clientAuth
+Issued by:  "WIA AirQuality Station CA" (intermediate under WIA Root)
+Validity:   ≤ 1 year, auto-renewed 30 days before expiry (ACME EAB)
+```
+
+Certificate revocation is published both via CRL (`crl.airquality.wia.org/stations.crl`) and OCSP stapling.
+
+### 8.3 Payload signing (JWS) — recommended for regulatory evidence
+
+For Tier 1 compliance reports, observations SHOULD be wrapped in a **JWS compact** over the canonicalised Phase 1 JSON (JCS, RFC 8785). The resulting envelope is:
+
+```
+eyJhbGciOiJFUzI1NiIsImtpZCI6InN0bi0wMDEtMjAyNi0wNCJ9.<payload>.<sig>
+```
+
+Verifiers:
+1. fetch the station's current public key from `/stations/{id}/keys`;
+2. validate the JWS signature with `ES256`;
+3. compare the inner `station_id` and `timestamp` to the surrounding MQTT topic and `Message Expiry`.
+
+Any mismatch disqualifies the record from regulatory submission and SHOULD set the ingest `qc_flag` to `suspect`.
+
+### 8.4 Key rotation
+
+- Station private keys SHOULD be stored in a TPM 2.0 / secure element (`object-attributes=fixedTPM|sensitiveDataOrigin|userWithAuth`).
+- Rotation on failure or every 365 days, whichever is sooner.
+- Old keys remain valid for verification for the regulator-mandated archive period (typically 5 years) via `/keys?history=true`.
+
+---
+
+## 9. Reliability rules
+
+### 9.1 Store-and-forward
+
+Every station MUST maintain a local ring buffer sized to cover at least 72 h of its nominal reporting interval. On re-connection, buffered readings are republished in chronological order with their **original** `timestamp` (never backdated to the present).
+
+### 9.2 Duplicate detection
+
+Consumers MUST dedupe on the tuple `(station_id, timestamp, pollutant)`. Idempotency keys (MQTT `Correlation Data`, AMQP `message-id`) act as secondary index; clashes on the tuple with different payloads raise `409 duplicate_reading` at the REST bridge.
+
+### 9.3 Clock skew
+
+Stations MUST keep their clock within ±2 s of UTC (NTP/PPS/GNSS). Drift exceeding that threshold flags the device `status=clock_drift` and server-side timestamping is used as an advisory `received_at` field while `timestamp` remains the station's own best estimate.
+
+### 9.4 Dead-letter queue
+
+Malformed messages are routed to `wia/airquality/_sys/deadletter` with User Property `reason`. Operators MUST alert when DLQ growth exceeds 0.1 % of traffic.
+
+---
+
+## 10. Bridge normalization
+
+A bridge converts between transports without altering the Phase 1 payload. The canonical flow for a station publishing by MQTT and appearing in REST is:
+
+```
+Station  ──MQTT/TLS──▶  Broker  ──MQTT→HTTP bridge──▶  Ingest API
+                          │
+                          └──AMQP shovel──▶  Regional aggregator
+                          │
+                          └──Kafka sink──▶  Analytics lake (Phase 4)
+```
+
+Bridge requirements:
+- topic → REST path mapping is 1:1 (§ 3.1);
+- MQTT User Properties map to HTTP headers (`x-wia-qc-flag`, `x-wia-sensor-model`);
+- CBOR payloads are re-encoded to JSON by the bridge, **never** re-timestamped;
+- JWS envelopes pass through unchanged — verification happens at the REST boundary.
+
+---
+
+## 11. Worked examples
+
+### 11.1 Publishing to MQTT with QoS 1 and idempotency
 
 ```python
 import paho.mqtt.client as mqtt
-import json
+import json, uuid, ssl
 
-client = mqtt.Client()
-client.username_pw_set("station_001", "secure_password")
-client.connect("mqtt.airquality.wia.org", 8883, 60)
+client = mqtt.Client(protocol=mqtt.MQTTv5, client_id="station-001")
+client.tls_set("ca.pem", "station-001.crt", "station-001.key",
+               tls_version=ssl.PROTOCOL_TLSv1_3)
+client.will_set(
+    "wia/airquality/KR/Seoul/001/status",
+    json.dumps({"state": "offline", "reason": "will"}),
+    qos=1, retain=True,
+)
+client.connect("mqtt.airquality.wia.org", 8883, keepalive=60)
+
+props = mqtt.Properties(mqtt.PacketTypes.PUBLISH)
+props.ContentType = "application/json"
+props.MessageExpiryInterval = 3600
+props.CorrelationData = uuid.uuid4().bytes
+props.UserProperty = [("qc_flag", "valid"), ("sensor_model", "BAM-1020")]
 
 reading = {
     "station_id": "WIA-AQ-KR-Seoul-001",
-    "timestamp": "2025-12-25T14:30:00Z",
-    "measurements": {
-        "pm25": {"value": 35.4, "unit": "ug/m3", "qc_flag": "valid"}
-    }
+    "timestamp": "2026-04-25T14:30:00Z",
+    "measurements": {"pm25": {"value": 35.4, "unit": "ug/m3",
+                               "qc_flag": "valid"}}
 }
 
-client.publish(
-    "wia/airquality/KR/Seoul/001/readings",
-    json.dumps(reading),
-    qos=1
-)
+client.publish("wia/airquality/KR/Seoul/001/readings",
+               json.dumps(reading), qos=1, properties=props)
+```
+
+### 11.2 Verifying a JWS-signed reading (Node.js)
+
+```js
+import { importJWK, compactVerify } from "jose";
+
+const { payload, protectedHeader } = await compactVerify(jws, async (hdr) => {
+  const jwk = await fetch(`https://api.airquality.wia.org/v1/stations/` +
+                          `${extractSta(jws)}/keys/${hdr.kid}.jwk`)
+                .then(r => r.json());
+  return importJWK(jwk, "ES256");
+});
+
+const reading = JSON.parse(new TextDecoder().decode(payload));
+if (reading.station_id !== topicStation) throw new Error("station mismatch");
+```
+
+### 11.3 Decoding a LoRaWAN uplink in a Chirpstack codec
+
+```js
+function decodeUplink(input) {
+  const b = input.bytes;
+  if ((b[0] & 0xf0) !== 0x10) return { errors: ["bad version"] };
+  const ts = (b[1]<<24 | b[2]<<16 | b[3]<<8 | b[4]) >>> 0;
+  return {
+    data: {
+      station_id_hash: ((b[21]<<16)|(b[22]<<8)|b[23]).toString(16).padStart(6,"0"),
+      timestamp: new Date(ts * 1000).toISOString(),
+      measurements: {
+        pm25: { value: ((b[5]<<8)|b[6]) / 10, unit: "ug/m3",
+                qc_flag: (b[20] & 0x01) ? "valid" : "suspect" },
+        pm10: { value: ((b[7]<<8)|b[8]) / 10, unit: "ug/m3" },
+        o3:   { value: (b[9]<<8)|b[10], unit: "ppb" },
+        no2:  { value: (b[11]<<8)|b[12], unit: "ppb" },
+        so2:  { value: (b[13]<<8)|b[14], unit: "ppb" },
+        co:   { value: ((b[15]<<8)|b[16]) / 100, unit: "ppm" },
+      },
+      meteorology: { temperature: b[17] - 50, humidity: b[18] },
+      device_status: { battery_level: b[19] }
+    }
+  };
+}
 ```
 
 ---
 
-## 8. Compliance and Certification
+## 12. Operations and deployment guidance
 
-### 8.1 Certification Requirements
-
-To achieve Phase 3 certification:
-
-1. Technical documentation submitted
-2. Security audit completed
-3. Performance testing passed
-4. Interoperability demonstration
-5. Data quality validation (30-day co-location study for Tier 1)
-
-### 8.2 Ongoing Compliance
-
-- Quarterly performance reports
-- Annual security audits
-- Bi-annual calibration verification
-- Continuous uptime monitoring
+- **Firewall**: outbound TCP 8883 (MQTTS), 5671 (AMQPS), 443 (HTTPS); no inbound requirement at the station.
+- **Clock**: GNSS-backed NTP; fall-back to `time.cloudflare.com`/`time.google.com`.
+- **Out-of-band management**: the `_cmd` topic MUST be ACL-restricted to operator role (Phase 2 § 3.3).
+- **Observability**: MQTT brokers SHOULD emit per-topic rate, RTT, and DLQ counters to OpenTelemetry.
+- **Air-gapped deployments**: replace the public PKI with an offline WIA-compatible CA; CRL distribution via USB courier is explicitly permitted for Tier 3–4.
 
 ---
 
-## 9. Glossary
+## 13. Compliance checklist
 
-- **AQI:** Air Quality Index
-- **MQTT:** Message Queuing Telemetry Transport
-- **OAuth:** Open Authorization framework
-- **QC:** Quality Control
-- **QoS:** Quality of Service
-- **RBAC:** Role-Based Access Control
-- **TLS:** Transport Layer Security
+**Phase 3 conformance requires:**
+
+- [ ] TLS 1.3 (or DTLS 1.2 for LPWAN) on every transport
+- [ ] mTLS with the WIA X.509 profile for Tier 1 stations
+- [ ] MQTT 5.0 user properties set on every PUBLISH
+- [ ] Last Will message retained on status topic
+- [ ] Store-and-forward buffer ≥ 72 h
+- [ ] Duplicate detection on `(station_id, timestamp, pollutant)`
+- [ ] Clock kept within ±2 s of UTC; skew alerts emitted
+- [ ] LoRaWAN codec v1 matches reference for at least one sensor model
+- [ ] JWS signing available for all Tier 1 regulatory exports
+- [ ] DLQ present and monitored
 
 ---
 
-## 10. References
+## 14. References
 
-1. MQTT Version 5.0 (OASIS Standard)
-2. OAuth 2.0 Authorization Framework (RFC 6749)
-3. TLS 1.3 (RFC 8446)
-4. ISO/IEC 27001:2013 Information Security Management
-5. US EPA Air Quality System Technical Documentation
+1. OASIS MQTT 5.0 specification
+2. ISO/IEC 19464 — AMQP 1.0
+3. RFC 7252 / 8323 / 7959 — CoAP core, over TCP/TLS/WebSockets, and block-wise transfer
+4. LoRa Alliance TS001-1.0.4 — LoRaWAN Regional Parameters
+5. 3GPP TS 23.401 — NB-IoT user-plane optimisations
+6. RFC 5280 — X.509 v3 PKI profile
+7. RFC 7515 / 8785 — JWS and JSON Canonicalization
+8. RFC 8446 — TLS 1.3
+9. RFC 8949 — CBOR
 
 ---
 
 **Document Status:** ACTIVE
-**Effective Date:** December 25, 2025
-**Review Date:** December 25, 2027
+**Effective Date:** April 25, 2026
+**Review Date:** April 25, 2028
 
-© 2025 SmileStory Inc. / WIA
+© 2026 SmileStory Inc. / WIA
 弘益人間 (홍익인간) · Benefit All Humanity
