@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Companion and Health Monitoring | WIA-CAREBOT</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Companion and Health Monitoring Features</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong><br>
+        - Design effective companion robot interactions<br>
+        - Implement medication reminder and adherence systems<br>
+        - Build vital sign monitoring capabilities<br>
+        - Integrate health data into care workflows
+    </div>
+
+    <h2>4.1 The Science of Robotic Companionship</h2>
+
+    <p>Social isolation and loneliness are significant health risks for elderly individuals, comparable to smoking and obesity in their impact on mortality. Companion robots can address this crisis by providing consistent social interaction, cognitive stimulation, and emotional support when human companionship is unavailable.</p>
+
+    <p>Research demonstrates that well-designed companion robots can reduce depression, lower stress hormones, and increase social behavior in elderly users. The key is creating interactions that feel meaningful rather than mechanical, adapting to individual preferences and emotional states.</p>
+
+    <h3>Principles of Effective Companionship</h3>
+
+    <pre><code>// Companion Design Principles
+const CompanionDesignPrinciples = {
+    authenticity: "Interactions feel genuine through contextual awareness",
+    reciprocity: "Mutual conversation, not just questions",
+    continuity: "Remember past conversations and preferences",
+    adaptability: "Respond to emotional state and needs",
+    purposefulness: "Meaningful interactions with cognitive value"
+};</code></pre>
+
+    <h2>4.2 Conversational AI for Care Robots</h2>
+
+    <p>Modern companion robots leverage large language models (LLMs) to enable natural, contextual conversations. However, care settings require careful adaptation to ensure conversations are appropriate, safe, and beneficial for elderly users.</p>
+
+    <pre><code>// Care-Adapted Conversational System
+class CareConversationManager {
+    private llm: LargeLanguageModel;
+    private userProfile: UserProfile;
+    private safetyFilter: ContentSafetyFilter;
+
+    async generateResponse(userInput: string): Promise<ConversationResponse> {
+        const inputAnalysis = await this.safetyFilter.analyze(userInput);
+        if (inputAnalysis.requiresEscalation) {
+            return this.handleConcerningInput(userInput, inputAnalysis);
+        }
+
+        const response = await this.llm.generate({
+            system: this.buildSystemPrompt(),
+            userMessage: userInput,
+            parameters: {
+                style: this.userProfile.preferredConversationStyle,
+                complexity: this.userProfile.cognitiveLevel
+            }
+        });
+
+        const filteredResponse = await this.safetyFilter.filter(response);
+        await this.conversationHistory.add({ user: userInput, robot: filteredResponse });
+
+        return { text: filteredResponse, emotion: this.selectEmotion(filteredResponse) };
+    }
+}</code></pre>
+
+    <h2>4.3 Medication Management Systems</h2>
+
+    <p>Medication non-adherence is a critical health issue, with studies showing that 40-50% of patients with chronic conditions do not take medications as prescribed. Care robots can significantly improve adherence through reminders, dispensing assistance, and monitoring.</p>
+
+    <h3>Medication Reminder System</h3>
+
+    <pre><code>// Medication Management System
+class MedicationManager {
+    private schedule: MedicationSchedule;
+    private notificationSystem: NotificationSystem;
+    private adherenceTracker: AdherenceTracker;
+
+    async executeReminder(dose: ScheduledDose): Promise<void> {
+        await this.issueReminder(dose, 'initial');
+        const acknowledged = await this.waitForAcknowledgment(5 * 60 * 1000);
+
+        if (!acknowledged) {
+            await this.issueReminder(dose, 'urgent');
+            const secondAck = await this.waitForAcknowledgment(5 * 60 * 1000);
+            if (!secondAck) {
+                await this.issueReminder(dose, 'critical');
+                await this.notifyCaregiver(dose, 'missed_reminder');
+            }
+        }
+
+        const taken = await this.confirmMedicationTaken(dose);
+        await this.adherenceTracker.record(dose, taken);
+    }
+
+    private async issueReminder(dose: ScheduledDose, level: string): Promise<void> {
+        const messages = {
+            initial: `It's time for your ${dose.medication}.`,
+            urgent: `Reminder: Please take your ${dose.medication}.`,
+            critical: `Important: Should I contact your caregiver?`
+        };
+        await this.notificationSystem.speak(messages[level]);
+    }
+}</code></pre>
+
+    <h3>Smart Medication Dispensing</h3>
+
+    <pre><code># ROS 2 Service for Medication Dispensing
+# carebot_medication/srv/DispenseMedication.srv
+---
+# Request
+string medication_id
+string dose_id
+bool require_confirmation
+
+# Response
+bool success
+string medication_name
+string dose_amount
+string instructions
+string[] warnings
+uint32 pills_remaining
+bool refill_needed</code></pre>
+
+    <table>
+        <tr>
+            <th>Dispenser Feature</th>
+            <th>Purpose</th>
+            <th>Implementation</th>
+        </tr>
+        <tr>
+            <td>Pill Identification</td>
+            <td>Verify correct medication</td>
+            <td>Camera + ML classification</td>
+        </tr>
+        <tr>
+            <td>Dose Counting</td>
+            <td>Ensure correct quantity</td>
+            <td>Weight sensor, visual count</td>
+        </tr>
+        <tr>
+            <td>Tamper Detection</td>
+            <td>Security and safety</td>
+            <td>Lock mechanism, alerts</td>
+        </tr>
+        <tr>
+            <td>Inventory Tracking</td>
+            <td>Prevent running out</td>
+            <td>Automatic refill alerts</td>
+        </tr>
+        <tr>
+            <td>History Logging</td>
+            <td>Adherence documentation</td>
+            <td>Timestamped dispensing records</td>
+        </tr>
+    </table>
+
+    <h2>4.4 Vital Sign Monitoring</h2>
+
+    <p>Care robots can monitor vital signs through both contact sensors (when user interacts with robot) and contactless methods (ambient monitoring). This enables early detection of health changes without requiring users to actively measure themselves.</p>
+
+    <h3>Contactless Vital Monitoring</h3>
+
+    <pre><code>// Contactless Vital Sign Monitoring
+class ContactlessVitalMonitor {
+    private radarSensor: VitalRadar;
+    private thermalCamera: ThermalImager;
+
+    async monitorVitals(): Promise<VitalSigns> {
+        const radarSignal = await this.radarSensor.capture(10);
+        const radarVitals = this.signalProcessor.extractVitalsFromRadar(radarSignal);
+
+        const thermalFrame = await this.thermalCamera.capture();
+        const temperature = this.estimateBodyTemperature(thermalFrame);
+
+        return {
+            heartRate: { value: radarVitals.heartRate, method: 'radar' },
+            respiratoryRate: { value: radarVitals.respiratoryRate, method: 'radar' },
+            temperature: { value: temperature, method: 'thermal_imaging' },
+            timestamp: new Date()
+        };
+    }
+}</code></pre>
+
+    <h3>Contact-Based Monitoring</h3>
+
+    <p>When users interact with the robot (e.g., touching handles or screens), additional vital signs can be measured through direct contact.</p>
+
+    <pre><code>// Contact Vital Monitor
+class ContactVitalMonitor {
+    async measureWhenAvailable(): Promise<ContactVitals | null> {
+        const touchDetected = await this.detectUserTouch();
+        if (!touchDetected) return null;
+
+        const results: ContactVitals = {};
+        if (touchDetected.handles) {
+            const ecgSignal = await this.ecgSensor.record(10);
+            results.ecg = { heartRate: this.analyzeECG(ecgSignal).heartRate };
+        }
+        if (touchDetected.fingerRest) {
+            const spoSignal = await this.pulseOx.measure(15);
+            results.oxygenation = { spo2: spoSignal.spo2, pulseRate: spoSignal.pulseRate };
+        }
+        return results;
+    }
+}</code></pre>
+
+    <h2>4.5 Health Data Integration</h2>
+
+    <p>Collected health data must be integrated into the broader care ecosystem, including electronic health records, caregiver applications, and clinical decision support systems.</p>
+
+    <pre><code>// FHIR Health Data Export
+class HealthDataExporter {
+    private fhirClient: FHIRClient;
+
+    async exportVitalSigns(vitals: VitalSigns): Promise<Bundle> {
+        const observations: Observation[] = [];
+        if (vitals.heartRate) {
+            observations.push({
+                resourceType: "Observation",
+                status: "final",
+                code: { coding: [{ system: "http://loinc.org", code: "8867-4", display: "Heart rate" }] },
+                subject: { reference: `Patient/${this.patientId}` },
+                valueQuantity: { value: vitals.heartRate.value, unit: "beats/minute" }
+            });
+        }
+        return { resourceType: "Bundle", type: "transaction", entry: observations.map(obs => ({ resource: obs })) };
+    }
+}</code></pre>
+
+    <h2>4.6 Cognitive Stimulation and Activities</h2>
+
+    <p>Companion robots can provide cognitive stimulation through games, reminiscence therapy, and structured activities that maintain mental acuity and provide meaningful engagement.</p>
+
+    <div class="highlight">
+        <strong>Activity Categories:</strong><br>
+        - Memory games and puzzles<br>
+        - Reminiscence and life review<br>
+        - Music therapy and sing-alongs<br>
+        - News and current events discussions<br>
+        - Family photo viewing and stories<br>
+        - Guided relaxation and mindfulness
+    </div>
+
+    <pre><code>// Cognitive Activity Manager
+class CognitiveActivityManager {
+    async selectActivity(): Promise<Activity> {
+        const candidates = this.activities.filter(activity =>
+            activity.cognitiveLevel <= this.userProfile.level + 1 &&
+            activity.suitableTimes.includes(this.getTimeOfDay())
+        );
+        const scored = candidates.map(a => ({ activity: a, score: this.scoreActivity(a) }));
+        scored.sort((a, b) => b.score - a.score);
+        return scored[0].activity;
+    }
+
+    async conductReminiscenceSession(): Promise<void> {
+        const photos = await this.selectReminiscencePhotos();
+        for (const photo of photos) {
+            await this.display.showPhoto(photo);
+            await this.speech.say(`Can you tell me about this photo from ${photo.date}?`);
+            const response = await this.speech.listen(60);
+            await this.engageInReminiscence(response, photo);
+        }
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary:</strong> Companion and health monitoring features address both the emotional and physical health needs of care recipients. Effective companion robots provide authentic social interaction through conversational AI, while medication management systems improve adherence and safety. Vital sign monitoring enables early detection of health changes, and cognitive activities maintain mental engagement. These features combine to support comprehensive wellbeing in a dignified, respectful manner.
+    </div>
+</body>
+</html>

@@ -13,21 +13,17 @@ static UUID_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap()
 });
 
-static ISO8601_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$").unwrap()
-});
+static ISO8601_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$").unwrap());
 
-static SEMVER_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\d+\.\d+\.\d+$").unwrap());
+static SEMVER_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d+\.\d+\.\d+$").unwrap());
 
-static TACTIC_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^TA\d{4}$").unwrap());
+static TACTIC_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^TA\d{4}$").unwrap());
 
 static TECHNIQUE_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^T\d{4}(\.\d{3})?$").unwrap());
 
-static CVE_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^CVE-\d{4}-\d{4,}$").unwrap());
+static CVE_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^CVE-\d{4}-\d{4,}$").unwrap());
 
 // ============================================================================
 // Validation Result
@@ -110,7 +106,7 @@ pub fn validate_event(event: &WiaSecurityEvent) -> ValidationResult {
     // Validate meta
     if let Some(ref meta) = event.meta {
         if let Some(confidence) = meta.confidence {
-            if confidence < 0.0 || confidence > 1.0 {
+            if !(0.0..=1.0).contains(&confidence) {
                 result.add_error("meta.confidence must be between 0 and 1");
             }
         }
@@ -160,7 +156,13 @@ fn validate_alert_data(data: &serde_json::Value, result: &mut ValidationResult) 
         }
     }
 
-    let valid_statuses = ["new", "investigating", "resolved", "false_positive", "closed"];
+    let valid_statuses = [
+        "new",
+        "investigating",
+        "resolved",
+        "false_positive",
+        "closed",
+    ];
     if let Some(status) = data.get("status").and_then(|v| v.as_str()) {
         if !valid_statuses.contains(&status) {
             result.add_error(format!("Invalid alert status: {}", status));
@@ -172,11 +174,21 @@ fn validate_threat_intel_data(data: &serde_json::Value, result: &mut ValidationR
     let required = ["threat_type", "threat_name", "status"];
     for field in required {
         if data.get(field).is_none() {
-            result.add_error(format!("Missing required field in threat_intel data: {}", field));
+            result.add_error(format!(
+                "Missing required field in threat_intel data: {}",
+                field
+            ));
         }
     }
 
-    let valid_types = ["malware", "apt", "campaign", "botnet", "ransomware", "phishing"];
+    let valid_types = [
+        "malware",
+        "apt",
+        "campaign",
+        "botnet",
+        "ransomware",
+        "phishing",
+    ];
     if let Some(threat_type) = data.get("threat_type").and_then(|v| v.as_str()) {
         if !valid_types.contains(&threat_type) {
             result.add_error(format!("Invalid threat_type: {}", threat_type));
@@ -188,7 +200,10 @@ fn validate_vulnerability_data(data: &serde_json::Value, result: &mut Validation
     let required = ["vuln_id", "title", "cvss"];
     for field in required {
         if data.get(field).is_none() {
-            result.add_error(format!("Missing required field in vulnerability data: {}", field));
+            result.add_error(format!(
+                "Missing required field in vulnerability data: {}",
+                field
+            ));
         }
     }
 
@@ -203,7 +218,10 @@ fn validate_incident_data(data: &serde_json::Value, result: &mut ValidationResul
     let required = ["incident_id", "title", "category", "status", "priority"];
     for field in required {
         if data.get(field).is_none() {
-            result.add_error(format!("Missing required field in incident data: {}", field));
+            result.add_error(format!(
+                "Missing required field in incident data: {}",
+                field
+            ));
         }
     }
 }
@@ -212,7 +230,10 @@ fn validate_network_event_data(data: &serde_json::Value, result: &mut Validation
     let required = ["event_type", "protocol", "source", "destination"];
     for field in required {
         if data.get(field).is_none() {
-            result.add_error(format!("Missing required field in network_event data: {}", field));
+            result.add_error(format!(
+                "Missing required field in network_event data: {}",
+                field
+            ));
         }
     }
 }
@@ -221,7 +242,10 @@ fn validate_endpoint_event_data(data: &serde_json::Value, result: &mut Validatio
     let required = ["event_type", "host"];
     for field in required {
         if data.get(field).is_none() {
-            result.add_error(format!("Missing required field in endpoint_event data: {}", field));
+            result.add_error(format!(
+                "Missing required field in endpoint_event data: {}",
+                field
+            ));
         }
     }
 }
@@ -230,12 +254,15 @@ fn validate_auth_event_data(data: &serde_json::Value, result: &mut ValidationRes
     let required = ["event_type", "result", "user", "target"];
     for field in required {
         if data.get(field).is_none() {
-            result.add_error(format!("Missing required field in auth_event data: {}", field));
+            result.add_error(format!(
+                "Missing required field in auth_event data: {}",
+                field
+            ));
         }
     }
 
     if let Some(risk_score) = data.get("risk_score").and_then(|v| v.as_f64()) {
-        if risk_score < 0.0 || risk_score > 1.0 {
+        if !(0.0..=1.0).contains(&risk_score) {
             result.add_error("risk_score must be between 0 and 1");
         }
     }

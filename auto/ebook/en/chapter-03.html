@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Decision Making and Control | WIA-AUTO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        .highlight { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border); font-family: 'Consolas', monospace; font-size: 0.9rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: #1e3a5f; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Decision Making and Control</h1>
+
+    <div class="highlight">
+        <p>The decision-making and control systems transform environmental perception into safe, efficient vehicle motion. This chapter details WIA-AUTO requirements for path planning, behavior prediction, motion control, and AI integration in autonomous driving decisions.</p>
+    </div>
+
+    <h2>3.1 Decision Making Architecture</h2>
+    <p>Autonomous vehicle decision making operates across multiple hierarchical levels, from strategic route planning to tactical maneuver selection to operational trajectory execution.</p>
+
+    <pre>
+Decision Hierarchy
+==================
+┌─────────────────────────────────────────────────────────────┐
+│                    STRATEGIC LAYER                          │
+│    Route Planning | Time Horizon: Minutes to Hours          │
+│    - Origin to destination routing                          │
+│    - Traffic consideration, ETA optimization                │
+├─────────────────────────────────────────────────────────────┤
+│                    TACTICAL LAYER                           │
+│    Behavior Planning | Time Horizon: Seconds                │
+│    - Lane change decisions                                  │
+│    - Intersection negotiation                               │
+│    - Merge/yield decisions                                  │
+├─────────────────────────────────────────────────────────────┤
+│                   OPERATIONAL LAYER                         │
+│    Motion Planning | Time Horizon: Milliseconds             │
+│    - Trajectory generation                                  │
+│    - Collision avoidance                                    │
+│    - Vehicle dynamics control                               │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>3.2 Path Planning Algorithms</h2>
+    <p>Path planning algorithms generate feasible routes through the environment while respecting vehicle kinematic constraints, traffic rules, and safety margins.</p>
+
+    <h3>Planning Approaches</h3>
+    <ul>
+        <li><strong>Graph-Based Planning:</strong> A*, Dijkstra, D* operate on discretized representations</li>
+        <li><strong>Sampling-Based Planning:</strong> RRT and PRM explore continuous configuration spaces</li>
+        <li><strong>Optimization-Based Planning:</strong> Model Predictive Control formulates planning as constrained optimization</li>
+    </ul>
+
+    <pre>
+// Model Predictive Control Path Planning
+class MPCPlanner {
+    Trajectory plan(State current, Goal goal, Obstacles obstacles) {
+        problem = OptimizationProblem();
+        N = 50;  // Planning horizon
+        dt = 0.1;  // Time step
+
+        states = problem.addVariables("x", N+1, state_dim);
+        controls = problem.addVariables("u", N, control_dim);
+
+        // Objective: minimize distance to goal + control effort
+        cost = 0;
+        for (k = 0; k < N; k++) {
+            cost += (states[k] - goal).norm() * Q;
+            cost += controls[k].norm() * R;
+        }
+        problem.minimize(cost);
+
+        // Dynamics and obstacle constraints
+        for (k = 0; k < N; k++) {
+            problem.addConstraint(
+                states[k+1] == vehicleDynamics(states[k], controls[k], dt)
+            );
+        }
+        return Trajectory(problem.solve());
+    }
+}
+    </pre>
+
+    <h2>3.3 Behavior Prediction</h2>
+    <p>Predicting future behavior of other road users is essential for safe autonomous driving. WIA-AUTO requires prediction systems to generate multi-modal probability distributions over future trajectories.</p>
+
+    <div class="highlight">
+        <h3>Prediction Requirements</h3>
+        <ul>
+            <li>Prediction horizon: minimum 5 seconds for highway, 3 seconds for urban</li>
+            <li>Update rate: minimum 10 Hz</li>
+            <li>Multi-modal output: at least 3 trajectory hypotheses with probabilities</li>
+            <li>Uncertainty quantification: confidence bounds on predicted positions</li>
+        </ul>
+    </div>
+
+    <h2>3.4 Motion Control Systems</h2>
+    <p>Motion control translates planned trajectories into vehicle actuator commands, managing steering, throttle, and braking systems.</p>
+
+    <pre>
+Motion Control Stack
+====================
+┌─────────────────────────────────────────────────────────────┐
+│              TRAJECTORY TRACKING CONTROLLER                 │
+│    Input: Desired trajectory (x, y, θ, v, κ)               │
+│    Output: Curvature rate, acceleration commands            │
+├─────────────────────────────────────────────────────────────┤
+│              LATERAL CONTROLLER                             │
+│    Stanley / Pure Pursuit / MPC                            │
+│    Output: Steering angle command                           │
+├─────────────────────────────────────────────────────────────┤
+│              LONGITUDINAL CONTROLLER                        │
+│    PID / MPC / Adaptive Control                            │
+│    Output: Throttle/Brake commands                          │
+├─────────────────────────────────────────────────────────────┤
+│              LOW-LEVEL ACTUATOR CONTROL                     │
+│    Steer-by-wire, Brake-by-wire, Electronic throttle       │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>3.5 AI and Machine Learning Integration</h2>
+    <p>Modern autonomous vehicles extensively employ AI and machine learning across the decision-making stack. WIA-AUTO establishes requirements for responsible AI deployment:</p>
+
+    <table>
+        <tr><th>Function</th><th>AI Approach</th><th>Safety Consideration</th></tr>
+        <tr><td>Object Detection</td><td>Deep CNNs (YOLO, Faster R-CNN)</td><td>Redundancy, adversarial robustness</td></tr>
+        <tr><td>Behavior Prediction</td><td>Transformer, Graph Networks</td><td>Uncertainty quantification</td></tr>
+        <tr><td>Path Planning</td><td>Reinforcement Learning</td><td>Bounded action space, monitors</td></tr>
+        <tr><td>Scene Understanding</td><td>Semantic Segmentation</td><td>Out-of-distribution detection</td></tr>
+    </table>
+
+    <h2>3.6 Real-Time Processing Requirements</h2>
+    <pre>
+Timing Requirements
+===================
+Component                  | Max Latency | Update Rate
+---------------------------+-------------+------------
+Perception Pipeline        | 100ms       | 10 Hz
+Behavior Prediction        | 50ms        | 10 Hz
+Path Planning              | 100ms       | 10 Hz
+Motion Control             | 10ms        | 100 Hz
+Actuator Response          | 20ms        | 100 Hz
+---------------------------+-------------+------------
+Total End-to-End           | 200ms       | -
+
+Note: Emergency braking must execute within 50ms.
+    </pre>
+
+    <h2>3.7 Minimal Risk Condition</h2>
+    <p>When the autonomous driving system can no longer operate safely, it must transition to a minimal risk condition:</p>
+
+    <ul>
+        <li><strong>Controlled Stop:</strong> Gradual deceleration to standstill in current lane</li>
+        <li><strong>Roadside Pullover:</strong> Navigate to shoulder or safe parking area</li>
+        <li><strong>Maintain Lane:</strong> Continue at reduced speed while alerting driver</li>
+        <li><strong>Emergency Stop:</strong> Maximum braking when collision is imminent</li>
+    </ul>
+
+    <p style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: #94a3b8; font-size: 0.9rem;">
+        © 2025 World Industry Association (WIA). 弘益人間 - Benefit All Humanity
+    </p>
+</body>
+</html>

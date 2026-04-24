@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Mobility Assistance | WIA-CAREBOT</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Mobility Assistance Features</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong><br>
+        - Implement walking assistance and support systems<br>
+        - Design and deploy fall detection algorithms<br>
+        - Build safe physical support mechanisms<br>
+        - Create gait analysis and mobility monitoring systems
+    </div>
+
+    <h2>3.1 The Importance of Mobility</h2>
+
+    <p>Mobility is fundamental to independence and quality of life. For elderly individuals and those with disabilities, mobility limitations create a cascade of negative effects: reduced physical activity leads to muscle weakness, which increases fall risk, which leads to fear of falling and further reduced activity. Care robots can break this cycle by providing safe, reliable mobility assistance that encourages activity while preventing falls.</p>
+
+    <p>WIA-CAREBOT defines three levels of mobility assistance that robots can provide, each with specific technical requirements and safety considerations:</p>
+
+    <table>
+        <tr>
+            <th>Level</th>
+            <th>Description</th>
+            <th>Robot Capabilities</th>
+        </tr>
+        <tr>
+            <td>Monitoring</td>
+            <td>Passive observation and alerting</td>
+            <td>Fall detection, gait analysis, activity tracking</td>
+        </tr>
+        <tr>
+            <td>Guidance</td>
+            <td>Navigation and walking companion</td>
+            <td>Path guidance, obstacle warnings, pacing support</td>
+        </tr>
+        <tr>
+            <td>Physical Support</td>
+            <td>Direct physical assistance</td>
+            <td>Walking support, transfer assistance, fall prevention</td>
+        </tr>
+    </table>
+
+    <h2>3.2 Fall Detection Systems</h2>
+
+    <p>Falls are a leading cause of injury and death among elderly individuals. Rapid detection and response can significantly improve outcomes. WIA-CAREBOT specifies a multi-modal fall detection system that minimizes false negatives (missed falls) while maintaining acceptable false positive rates.</p>
+
+    <h3>Sensor Fusion for Fall Detection</h3>
+
+    <pre><code>// Multi-Modal Fall Detection System
+class FallDetectionSystem {
+    private radarSensor: MillimeterWaveRadar;
+    private cameras: RGBDCamera[];
+    private wearableSensor?: WearableIMU;
+    private mlModel: FallDetectionModel;
+
+    constructor(config: FallDetectionConfig) {
+        this.radarSensor = new MillimeterWaveRadar(config.radar);
+        this.cameras = config.cameraPositions.map(pos =>
+            new RGBDCamera(pos)
+        );
+        this.mlModel = new FallDetectionModel('fall_detector_v3');
+    }
+
+    async monitorContinuously(): Promise<void> {
+        while (true) {
+            const sensorData = await this.collectSensorData();
+            const prediction = await this.analyzeFallRisk(sensorData);
+
+            if (prediction.fallDetected) {
+                await this.handleFallEvent(prediction);
+            } else if (prediction.fallRisk > 0.7) {
+                await this.issuePreemptiveWarning(prediction);
+            }
+
+            await this.sleep(50);  // 20Hz monitoring rate
+        }
+    }
+
+    private async analyzeFallRisk(data: SensorData): Promise<FallPrediction> {
+        // Feature extraction from each sensor modality
+        const radarFeatures = this.extractRadarFeatures(data.radar);
+        const visualFeatures = this.extractVisualFeatures(data.cameras);
+        const wearableFeatures = data.wearable ?
+            this.extractWearableFeatures(data.wearable) : null;
+
+        // Fuse features for ML model
+        const fusedFeatures = this.fuseFeatures({
+            radar: radarFeatures,
+            visual: visualFeatures,
+            wearable: wearableFeatures
+        });
+
+        // Run inference
+        const prediction = await this.mlModel.predict(fusedFeatures);
+
+        return {
+            fallDetected: prediction.fallProbability > 0.85,
+            fallRisk: prediction.fallProbability,
+            fallType: prediction.fallType,  // forward, backward, side, collapse
+            position: prediction.estimatedPosition,
+            confidence: prediction.confidence,
+            timestamp: Date.now()
+        };
+    }
+}</code></pre>
+
+    <h3>Radar-Based Fall Detection</h3>
+
+    <p>Millimeter-wave radar provides privacy-preserving fall detection without cameras, detecting body position through clothing and bedding.</p>
+
+    <pre><code># ROS 2 Radar Fall Detection Node
+import rclpy
+from rclpy.node import Node
+from carebot_msgs.msg import FallAlert, PersonState
+
+class RadarFallDetector(Node):
+    def __init__(self):
+        super().__init__('radar_fall_detector')
+        self.declare_parameter('fall_height_threshold', 0.5)
+        self.declare_parameter('fall_velocity_threshold', 1.5)
+        self.radar_sub = self.create_subscription(
+            PointCloud2, '/sensors/radar/point_cloud',
+            self.radar_callback, 10)
+        self.fall_pub = self.create_publisher(FallAlert, '/safety/fall_alert', 10)
+        self.position_history = []
+
+    def analyze_fall_pattern(self):
+        if len(self.position_history) < 10:
+            return False, None
+        heights = [p['position'][2] for p in self.position_history[-10:]]
+        vertical_velocity = (heights[-1] - heights[0]) / 0.5
+        height_threshold = self.get_parameter('fall_height_threshold').value
+        is_fall = (heights[-1] < height_threshold and
+                   vertical_velocity < -self.get_parameter('fall_velocity_threshold').value)
+        return is_fall, {'height': heights[-1], 'velocity': vertical_velocity}</code></pre>
+
+    <h2>3.3 Walking Assistance Systems</h2>
+
+    <p>Walking assistance robots provide physical support and guidance to users with mobility impairments. These systems range from simple walking companions that set pace and provide obstacle warnings to active support systems that bear weight and stabilize gait.</p>
+
+    <h3>Passive Walking Companion</h3>
+
+    <p>A passive walking companion moves alongside the user, monitoring gait and providing verbal guidance without physical contact.</p>
+
+    <pre><code>// Walking Companion Controller
+class WalkingCompanion {
+    private navigation: NavigationSystem;
+    private personTracker: PersonTracker;
+    private gaitAnalyzer: GaitAnalyzer;
+
+    async accompanyWalk(userId: string): Promise<void> {
+        this.setState('accompanying');
+
+        while (this.state === 'accompanying') {
+            const userPose = await this.personTracker.getCurrentPose(userId);
+            const userGait = await this.gaitAnalyzer.analyze(userId);
+
+            const targetPose = this.calculateCompanionPose(userPose, {
+                lateralOffset: 0.6, longitudinalOffset: -0.2
+            });
+
+            await this.navigation.moveToward(targetPose, {
+                maxSpeed: Math.min(userGait.speed * 1.1, 0.8)
+            });
+
+            if (userGait.instabilityScore > 0.6) {
+                await this.suggestRest();
+            }
+            await this.sleep(100);
+        }
+    }
+}</code></pre>
+
+    <h3>Active Support Walker Robot</h3>
+
+    <p>Active support systems provide physical assistance through handles and active stabilization with sophisticated force control.</p>
+
+    <pre><code>// Active Walker Controller
+class ActiveWalkerController {
+    private handles: ForceControlledHandle[];
+    private baseController: MobileBaseController;
+
+    async provideWalkingSupport(): Promise<void> {
+        while (this.isActive) {
+            const handleForces = await Promise.all(
+                this.handles.map(h => h.readForce())
+            );
+            const intent = this.intentEstimator.estimate(handleForces);
+            const supportCommand = this.calculateSupport(handleForces, intent);
+            await this.applySupport(supportCommand);
+        }
+    }
+
+    private calculateSupport(forces: Force3D[], intent: UserIntent): SupportCommand {
+        if (intent.type === 'walking') {
+            return {
+                baseVelocity: { linear: this.admittanceGain * this.combineForwardForces(forces) },
+                handleForces: forces.map(f => ({ vertical: this.calculateVerticalSupport(f) }))
+            };
+        }
+        return this.applySafetyLimits({ baseVelocity: { linear: 0 }, handleForces: [] });
+    }
+}</code></pre>
+
+    <h2>3.4 Gait Analysis and Monitoring</h2>
+
+    <p>Continuous gait analysis provides valuable health insights and early warning of potential problems. Changes in gait patterns can indicate pain, weakness, medication effects, or disease progression.</p>
+
+    <pre><code>// Gait Analysis System
+interface GaitMetrics {
+    cadence: number;           // steps per minute
+    strideLength: number;      // meters
+    leftRightSymmetry: number; // 1.0 = perfect symmetry
+    gaitVariability: number;   // coefficient of variation
+    fallRiskScore: number;     // 0-100, higher = more risk
+}
+
+class GaitAnalyzer {
+    async analyzeGait(frames: VideoFrame[]): Promise<GaitMetrics> {
+        const poses = await Promise.all(
+            frames.map(f => this.poseEstimator.estimate(f))
+        );
+        const footTrajectories = this.extractFootTrajectories(poses);
+        const gaitEvents = this.detectGaitEvents(footTrajectories);
+        const metrics = this.computeMetrics(footTrajectories, gaitEvents);
+        metrics.fallRiskScore = this.calculateFallRisk(metrics);
+        return metrics;
+    }
+
+    private calculateFallRisk(metrics: GaitMetrics): number {
+        let risk = 0;
+        if (metrics.strideLength * metrics.cadence / 60 < 0.8) risk += 25;
+        if (metrics.gaitVariability > 0.05) risk += 20;
+        if (metrics.leftRightSymmetry < 0.9) risk += 15;
+        return Math.min(risk, 100);
+    }
+}</code></pre>
+
+    <h2>3.5 Transfer Assistance</h2>
+
+    <p>Transfers between sitting and standing positions, or between surfaces like beds and wheelchairs, are high-risk activities. Care robots can provide significant assistance while maintaining user safety and dignity.</p>
+
+    <div class="highlight">
+        <strong>Transfer Types:</strong><br>
+        - Sit-to-stand: Rising from chair, bed, or toilet<br>
+        - Stand-to-sit: Controlled lowering into seated position<br>
+        - Lateral transfer: Moving between adjacent surfaces<br>
+        - Pivot transfer: Rotating while supported
+    </div>
+
+    <pre><code># ROS 2 Transfer Assistance Server
+class TransferAssistServer:
+    def __init__(self, node):
+        self.node = node
+        self.force_limit = 150.0  # Newtons
+        self._action_server = ActionServer(node, TransferAssist, 'transfer_assist', self.execute_callback)
+
+    async def execute_sit_to_stand(self, goal_handle, user_weight):
+        await self.announce("Please hold the handles firmly")
+        await self.wait_for_grip_confirmation()
+        await self.announce("Lean forward slightly")
+        await self.announce("Now push with your legs as I help you rise")
+
+        current_height = 0.45
+        while current_height < 0.9:
+            user_force = await self.read_handle_forces()
+            support_force = self.calculate_support(user_force, user_weight)
+            if abs(support_force) > self.force_limit:
+                await self.pause_and_reassess()
+                continue
+            await self.apply_lift_force(support_force)
+            current_height = await self.get_user_height()
+
+        await self.stabilize_standing()
+        return TransferAssist.Result(success=True, final_position='standing')</code></pre>
+
+    <h2>3.6 Fall Prevention Interventions</h2>
+
+    <p>Beyond detecting falls, care robots can actively intervene to prevent falls when instability is detected. This requires rapid response and careful consideration of the intervention methods to avoid causing harm.</p>
+
+    <pre><code>// Fall Prevention System
+class FallPreventionSystem {
+    private balanceMonitor: BalanceMonitor;
+    private audioSystem: AudioSystem;
+
+    async monitorAndIntervene(): Promise<void> {
+        while (this.isActive) {
+            const balance = await this.balanceMonitor.assess();
+            if (balance.instabilityLevel > 0.8) {
+                await this.executeImmediateIntervention(balance);
+            } else if (balance.instabilityLevel > 0.5) {
+                await this.issueVerbalWarning(balance);
+            }
+            await this.sleep(20);  // 50Hz monitoring
+        }
+    }
+
+    private async executeImmediateIntervention(balance: BalanceAssessment): Promise<void> {
+        await Promise.all([
+            this.audioSystem.playAlert('stability_warning'),
+            this.baseController.moveToward(balance.userPosition, { speed: 0.5 })
+        ]);
+        await this.logInterventionEvent(balance);
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary:</strong> Mobility assistance is a core capability of care robots, encompassing fall detection through multi-modal sensing, walking assistance from passive companions to active support systems, gait analysis for health monitoring, transfer assistance, and proactive fall prevention. These systems must balance effectiveness with safety, always respecting user autonomy while providing reliable support. The next chapter explores companion features and health monitoring capabilities.
+    </div>
+</body>
+</html>

@@ -1,1306 +1,989 @@
-# WIA Battery Passport Integration Standard
-## Phase 4 Specification
+# WIA-BATTERY-PASSPORT: Phase 4 - Ecosystem Integration
+
+**EU 배터리 여권 생태계 통합**
+*EU compliance, automotive, energy grid, and recycling integrations*
+
+홍익인간 (弘益人間) - Benefit All Humanity
 
 ---
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #22C55E (Green)
+## 1. Overview
+
+This document specifies integrations with:
+1. EU Battery Passport Infrastructure
+2. WIA Ecosystem Standards
+3. Automotive Industry Systems
+4. Energy Grid Systems
+5. Recycling Industry Networks
+6. Supply Chain Platforms
 
 ---
 
-## Table of Contents
+## 2. EU Battery Passport Infrastructure
 
-1. [Overview](#overview)
-2. [Terminology](#terminology)
-3. [EU Battery Regulation Integration](#eu-battery-regulation-integration)
-4. [Recycling Systems Integration](#recycling-systems-integration)
-5. [Carbon Credit Integration](#carbon-credit-integration)
-6. [Supply Chain Platforms](#supply-chain-platforms)
-7. [Energy Management Systems](#energy-management-systems)
-8. [Vehicle Integration](#vehicle-integration)
-9. [Regulatory Compliance](#regulatory-compliance)
-10. [Circular Economy](#circular-economy)
-11. [Integration Patterns](#integration-patterns)
-12. [Certification Levels](#certification-levels)
-13. [Implementation Checklist](#implementation-checklist)
-14. [References](#references)
+### 2.1 EU Central Registry
 
----
+The EU Battery Passport requires registration with central infrastructure.
 
-## Overview
+```typescript
+interface EURegistration {
+  // EU-assigned unique identifier
+  eu_unique_identifier: string;      // Format: EU-BAT-YYYY-NNNNNNNNNN
 
-### 1.1 Purpose
+  // Economic operator
+  economic_operator_id: string;       // EORI number
+  eu_representative_id?: string;      // For non-EU manufacturers
 
-The WIA Battery Passport Integration Standard defines comprehensive integration patterns for connecting battery passport systems with EU regulatory frameworks, recycling infrastructure, carbon credit markets, and circular economy platforms. This Phase 4 specification completes the WIA Battery Passport standard by enabling seamless interoperability across the entire battery ecosystem.
+  // Registry status
+  registration_date: ISO8601;
+  status: "active" | "suspended" | "withdrawn";
 
-**Core Objectives**:
-- Ensure full compliance with EU Battery Regulation 2023/1542
-- Enable integration with recycling and material recovery systems
-- Facilitate carbon credit generation and trading from battery lifecycle
-- Connect with supply chain transparency platforms
-- Support circular economy business models
-- Enable regulatory reporting and compliance automation
-- Integrate with vehicle and energy management systems
-
-### 1.2 Scope
-
-This standard covers:
-
-| Domain | Description |
-|--------|-------------|
-| EU Compliance | Digital Product Passport (DPP), Battery Regulation 2023/1542 |
-| Recycling Integration | Collection, dismantling, material recovery systems |
-| Carbon Markets | Carbon footprint verification, credit generation, trading |
-| Supply Chain | ERP, blockchain, traceability platforms |
-| Energy Systems | Battery energy storage (BESS), grid integration |
-| Vehicle Systems | EV platforms, fleet management, telematics |
-| Circular Economy | Second-life marketplaces, sharing platforms |
-
-### 1.3 Integration Architecture
-
-```mermaid
-graph TB
-    subgraph "WIA Battery Passport Platform"
-        CORE[Passport Core]
-        API[Public API]
-        BC[Blockchain Layer]
-    end
-
-    subgraph "EU Regulatory"
-        DPP[Digital Product Passport]
-        EUDAC[EU Data Access]
-        CUSTOMS[Customs Systems]
-    end
-
-    subgraph "Recycling Ecosystem"
-        COLLECT[Collection Network]
-        DISMANTLE[Dismantling Facilities]
-        RECOVERY[Material Recovery]
-    end
-
-    subgraph "Carbon Markets"
-        VERIFY[Carbon Verifiers]
-        REGISTRY[Credit Registry]
-        EXCHANGE[Trading Platform]
-    end
-
-    subgraph "Supply Chain"
-        ERP[ERP Systems]
-        SCM[Supply Chain Management]
-        TRACE[Traceability Platforms]
-    end
-
-    subgraph "Energy & Vehicles"
-        BESS[Energy Storage Systems]
-        EV[Electric Vehicles]
-        FLEET[Fleet Management]
-    end
-
-    CORE --> API
-    CORE --> BC
-
-    API <-->|Compliance Data| DPP
-    API <-->|Reporting| EUDAC
-    API <-->|Import/Export| CUSTOMS
-
-    API <-->|EOL Notifications| COLLECT
-    API <-->|Recovery Data| DISMANTLE
-    API <-->|Material Results| RECOVERY
-
-    API <-->|Footprint Data| VERIFY
-    API <-->|Issue Credits| REGISTRY
-    API <-->|Trade Credits| EXCHANGE
-
-    API <-->|Manufacturing Data| ERP
-    API <-->|Logistics| SCM
-    API <-->|Traceability| TRACE
-
-    API <-->|Telemetry| BESS
-    API <-->|BMS Data| EV
-    API <-->|Analytics| FLEET
+  // Verification
+  notified_body: string;
+  certificate_of_conformity: string;
+}
 ```
 
----
+#### Integration Flow
 
-## Terminology
+```
+┌─────────────────┐     ┌──────────────────┐     ┌───────────────────┐
+│  WIA Battery    │────▶│  WIA Gateway     │────▶│  EU Central       │
+│  Passport API   │     │  (Translation)   │     │  Registry         │
+└─────────────────┘     └──────────────────┘     └───────────────────┘
+                               │
+                               ▼
+                        ┌──────────────────┐
+                        │  Catena-X        │
+                        │  Battery Pass    │
+                        └──────────────────┘
+```
 
-### 2.1 Core Terms
+### 2.2 Catena-X Battery Pass Integration
 
-| Term | Definition |
-|------|------------|
-| **DPP** | Digital Product Passport - EU-mandated digital record |
-| **EU Battery Regulation** | Regulation 2023/1542 on batteries and waste batteries |
-| **Extended Producer Responsibility (EPR)** | Manufacturer responsibility for end-of-life |
-| **Material Recovery Rate** | Percentage of materials recovered from recycling |
-| **Carbon Credit** | Tradable certificate representing CO2 reduction |
-| **Second-Life** | Repurposing batteries for new applications |
-| **Circular Economy** | Economic system eliminating waste through reuse |
+```python
+# Catena-X data model mapping
+def map_to_catena_x(passport: BatteryPassport) -> CatenaXBatteryPass:
+    """
+    Map WIA Battery Passport to Catena-X Battery Pass format.
+    """
+    return CatenaXBatteryPass(
+        # Identity
+        identification=Identification(
+            batteryIDDMCCode=passport.qr_code,
+            manufactureId=passport.manufacturer.registration_number
+        ),
 
-### 2.2 Regulatory Terms
+        # Technical data
+        technicalData=TechnicalData(
+            stateOfCertifiedEnergy=passport.specifications.rated_capacity_wh,
+            physicalDimensions=PhysicalDimensions(
+                length=passport.identity.dimensions.length_mm,
+                width=passport.identity.dimensions.width_mm,
+                height=passport.identity.dimensions.height_mm
+            )
+        ),
 
-| Term | Definition |
-|------|------------|
-| **CE Marking** | European conformity certification |
-| **REACH** | EU chemical regulation |
-| **RoHS** | Restriction of Hazardous Substances |
-| **WEEE** | Waste Electrical and Electronic Equipment Directive |
-| **Due Diligence** | Supply chain risk assessment requirement |
+        # Carbon footprint
+        carbonFootprint=CarbonFootprint(
+            productionCarbonFootprint=passport.carbon_footprint.total_kg_co2e,
+            preProductionCarbonFootprint=passport.carbon_footprint.raw_material_acquisition,
+            recycledCarbonFootprint=0
+        ),
 
----
+        # State
+        stateOfHealth=StateOfHealth(
+            stateOfHealthValue=passport.health.state_of_health_percent,
+            lastUpdate=passport.health.last_bms_sync
+        ),
 
-## EU Battery Regulation Integration
+        # Materials
+        batteryMaterialsAndComposition=MaterialsAndComposition(
+            criticalRawMaterials=[
+                CriticalRawMaterial(
+                    name="Cobalt",
+                    weight=passport.materials.cobalt.weight_kg,
+                    recycledContent=passport.materials.recycled_cobalt_percent
+                ),
+                CriticalRawMaterial(
+                    name="Lithium",
+                    weight=passport.materials.lithium.weight_kg,
+                    recycledContent=passport.materials.recycled_lithium_percent
+                )
+            ]
+        )
+    )
+```
 
-### 3.1 Digital Product Passport (DPP) Requirements
+### 2.3 Global Battery Alliance (GBA) Integration
 
-The EU Battery Regulation mandates a Digital Product Passport for all batteries >2kWh from 2027.
+```typescript
+interface GBAPassportMapping {
+  // GBA Battery Passport fields
+  gba_id: string;
+  provenance: GBAProvenance;
+  traceability: GBATraceability;
+  sustainability: GBASustainability;
+  circularity: GBACircularity;
+}
 
-**Required Information:**
-
-| Category | Data Elements |
-|----------|---------------|
-| **Identity** | Manufacturer, model, serial number, production date |
-| **Composition** | Chemistry, materials, hazardous substances |
-| **Performance** | Capacity, power, cycle life, SoH |
-| **Carbon Footprint** | Cradle-to-gate emissions, methodology |
-| **Supply Chain** | Material sourcing, due diligence results |
-| **Safety** | Safety instructions, hazard warnings |
-| **Recycling** | Dismantling instructions, material content |
-
-**DPP Data Mapping:**
-
-```json
-{
-  "dppVersion": "1.0",
-  "batteryIdentification": {
-    "batteryId": "BAT-2025-LI-001234",
-    "manufacturerIdentification": {
-      "name": "GreenCell Technologies",
-      "identifier": "MFG-2025-001",
-      "address": "Seoul, South Korea"
+// Export to GBA format
+async function exportToGBA(passport: BatteryPassport): Promise<GBAPassport> {
+  return {
+    version: "1.0",
+    battery_id: {
+      unique_identifier: passport.id,
+      manufacturer_code: passport.manufacturer.registration_number,
+      production_date: passport.identity.production_date
     },
-    "manufacturingDate": "2025-01-10",
-    "typeApprovalNumber": "TA-2025-0001"
-  },
-  "batteryComposition": {
-    "cathode": "NMC811",
-    "anode": "graphite",
-    "electrolyte": "liquid lithium salt",
-    "hazardousSubstances": [
-      {
-        "substance": "Cobalt compounds",
-        "casNumber": "7440-48-4",
-        "percentage": 10,
-        "reachCompliant": true
+    sustainability_metrics: {
+      carbon_footprint: {
+        total_co2e: passport.carbon_footprint.total_kg_co2e,
+        per_kwh: passport.carbon_footprint.per_kwh_kg_co2e
+      },
+      recycled_content: {
+        cobalt: passport.materials.recycled_cobalt_percent,
+        lithium: passport.materials.recycled_lithium_percent,
+        nickel: passport.materials.recycled_nickel_percent
       }
-    ]
-  },
-  "performanceAndDurability": {
-    "nominalCapacity": 250,
-    "capacityUnit": "Ah",
-    "powerCapability": 100,
-    "powerUnit": "kW",
-    "expectedLifetime": 3000,
-    "lifetimeUnit": "cycles",
-    "stateOfHealth": {
-      "current": 100.0,
-      "measurementDate": "2025-01-10"
     }
-  },
-  "carbonFootprint": {
-    "totalCarbonFootprint": 12580,
-    "unit": "kg CO2e",
-    "shareOfRenewableEnergy": 45,
-    "carbonFootprintPerformanceClass": "B"
-  },
-  "dueDiligenceInformation": {
-    "responsibleSourcingPolicies": "https://greencell.com/policies/sourcing.pdf",
-    "riskAssessmentResults": "Low risk",
-    "certifications": ["RMI", "IRMA", "Fair Cobalt Alliance"]
-  }
+  };
 }
-```
-
-### 3.2 EU Compliance Reporting API
-
-**Generate DPP Report:**
-
-```http
-POST /v1/eu-compliance/dpp/generate
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "reportType": "full_dpp",
-  "language": "en",
-  "includeQRCode": true
-}
-```
-
-**Response:**
-
-```json
-{
-  "dppId": "DPP-EU-2025-000001",
-  "batteryId": "BAT-2025-LI-001234",
-  "generatedAt": "2025-01-15T10:00:00Z",
-  "qrCode": "https://dpp.wia.live/DPP-EU-2025-000001",
-  "dataCarrier": {
-    "type": "qr_code",
-    "format": "2D matrix",
-    "content": "https://dpp.wia.live/DPP-EU-2025-000001"
-  },
-  "complianceStatus": {
-    "compliant": true,
-    "regulation": "EU 2023/1542",
-    "validFrom": "2027-01-01",
-    "checks": [
-      { "requirement": "carbon_footprint_declaration", "status": "pass" },
-      { "requirement": "material_composition", "status": "pass" },
-      { "requirement": "due_diligence", "status": "pass" },
-      { "requirement": "recycled_content", "status": "pass" }
-    ]
-  },
-  "downloadUrls": {
-    "pdf": "https://dpp.wia.live/DPP-EU-2025-000001.pdf",
-    "xml": "https://dpp.wia.live/DPP-EU-2025-000001.xml",
-    "json": "https://dpp.wia.live/DPP-EU-2025-000001.json"
-  }
-}
-```
-
-### 3.3 EU Data Access Requirements
-
-Authorized parties must have access to DPP data:
-
-**Access Control Matrix:**
-
-| Party | Access Level | Data Scope |
-|-------|--------------|------------|
-| **Consumers** | Public read | Identity, safety, recycling info |
-| **Repair Shops** | Authenticated read | Maintenance instructions, diagnostics |
-| **Recyclers** | Authenticated read | Dismantling, material content |
-| **Regulators** | Full read | Complete passport data |
-| **Researchers** | Anonymized read | Aggregated statistics |
-
-**Access Request Flow:**
-
-```mermaid
-sequenceDiagram
-    participant USER as Authorized User
-    participant AUTH as Auth Service
-    participant DPP as DPP Service
-    participant AUDIT as Audit Log
-
-    USER->>AUTH: Request access token
-    AUTH->>AUTH: Verify credentials & role
-    AUTH-->>USER: Return token with scopes
-
-    USER->>DPP: Request DPP data + token
-    DPP->>DPP: Validate token & scopes
-    DPP->>DPP: Filter data by access level
-    DPP->>AUDIT: Log access
-    DPP-->>USER: Return authorized data
 ```
 
 ---
 
-## Recycling Systems Integration
+## 3. WIA Ecosystem Integration
 
-### 4.1 Extended Producer Responsibility (EPR)
+### 3.1 WIA-INTENT Integration
 
-Manufacturers are responsible for battery collection and recycling.
+Natural language queries for battery information.
 
-**EPR Registration:**
-
-```http
-POST /v1/recycling/epr/register
-Authorization: Bearer <manufacturer_token>
-Content-Type: application/json
-
-{
-  "manufacturerId": "MFG-2025-001",
-  "eprScheme": "EU Battery Compliance Scheme",
-  "registrationNumber": "EPR-EU-2025-001",
-  "responsibleParty": {
-    "name": "GreenCell Technologies",
-    "country": "KR",
-    "email": "epr@greencell.com"
-  },
-  "collectionTargets": {
-    "year": 2025,
-    "targetPercentage": 65,
-    "projectedVolume": 50000,
-    "volumeUnit": "kg"
-  },
-  "recyclingPartners": [
-    {
-      "name": "EU Battery Recycling GmbH",
-      "country": "DE",
-      "facilities": ["Facility-Berlin", "Facility-Munich"]
+```typescript
+// INTENT query examples
+const intentQueries = [
+  {
+    query: "배터리 건강 상태 알려줘",
+    intent: "battery_health_status",
+    response: {
+      soh: 94.5,
+      soc: 78.2,
+      remaining_life_months: 72,
+      recommendation: "정상 상태입니다"
     }
-  ]
-}
-```
-
-### 4.2 End-of-Life Collection Workflow
-
-```mermaid
-sequenceDiagram
-    participant OWNER as Battery Owner
-    participant PASSPORT as Passport System
-    participant COLLECT as Collection Network
-    participant RECYCLER as Recycling Facility
-
-    OWNER->>PASSPORT: Declare end-of-life
-    PASSPORT->>PASSPORT: Validate SoH, check second-life
-
-    alt SoH > 70%
-        PASSPORT-->>OWNER: Recommend second-life
-    else SoH < 70%
-        PASSPORT->>COLLECT: Notify collection network
-        COLLECT->>OWNER: Schedule pickup
-        OWNER->>COLLECT: Transfer battery
-        COLLECT->>RECYCLER: Deliver battery
-        RECYCLER->>PASSPORT: Confirm receipt
-        RECYCLER->>RECYCLER: Process battery
-        RECYCLER->>PASSPORT: Report recovery results
-        PASSPORT->>OWNER: Update final status
-    end
-```
-
-**Declare End-of-Life:**
-
-```http
-POST /v1/batteries/{batteryId}/end-of-life
-Authorization: Bearer <owner_token>
-Content-Type: application/json
-
-{
-  "reason": "vehicle_retired",
-  "finalSoH": 68.5,
-  "finalCycleCount": 2950,
-  "ownerLocation": {
-    "country": "DE",
-    "postalCode": "10115",
-    "city": "Berlin"
   },
-  "preferredCollector": "EU Battery Recycling GmbH"
-}
-```
-
-**Response:**
-
-```json
-{
-  "eolId": "EOL-2025-0001",
-  "batteryId": "BAT-2025-LI-001234",
-  "status": "collection_scheduled",
-  "collectionSchedule": {
-    "collector": "EU Battery Recycling GmbH",
-    "scheduledDate": "2025-01-20",
-    "trackingNumber": "TRACK-2025-001",
-    "contactPhone": "+49-30-12345678"
+  {
+    query: "What's the carbon footprint of my EV battery?",
+    intent: "carbon_footprint_query",
+    response: {
+      total_kg_co2e: 5250.5,
+      class: "C",
+      comparison: "Industry average is Class D"
+    }
   },
-  "recyclingFacility": {
-    "name": "Berlin Battery Recycling Center",
-    "address": "Industrial Area, Berlin, Germany",
-    "certifications": ["ISO 14001", "R2"]
+  {
+    query: "Is my battery ready for recycling?",
+    intent: "recycling_readiness",
+    response: {
+      ready: false,
+      current_soh: 94.5,
+      recommendation: "Battery still has significant useful life"
+    }
   }
-}
+];
 ```
 
-### 4.3 Material Recovery Reporting
+### 3.2 WIA-OMNI-API Integration
 
-```http
-POST /v1/recycling/{batteryId}/recovery-results
-Authorization: Bearer <recycler_token>
-Content-Type: application/json
-
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "recyclingDate": "2025-01-25",
-  "facilityId": "RECYCLER-EU-001",
-  "processType": "pyrometallurgical",
-  "materialsRecovered": [
+```typescript
+// Register with OMNI-API
+const batteryCapabilities: OMNICapability = {
+  standard: "WIA-BATTERY-PASSPORT",
+  version: "1.0.0",
+  endpoints: [
     {
-      "material": "Nickel",
-      "originalWeight": 48.0,
-      "recoveredWeight": 46.5,
-      "recoveryRate": 96.9,
-      "purity": 98.5,
-      "unit": "kg"
+      path: "/passport",
+      methods: ["GET", "POST", "PUT"],
+      description: "Battery passport CRUD"
     },
     {
-      "material": "Cobalt",
-      "originalWeight": 6.0,
-      "recoveredWeight": 5.7,
-      "recoveryRate": 95.0,
-      "purity": 97.0,
-      "unit": "kg"
+      path: "/health",
+      methods: ["GET", "POST"],
+      description: "Health data management"
     },
     {
-      "material": "Lithium",
-      "originalWeight": 4.2,
-      "recoveredWeight": 3.9,
-      "recoveryRate": 92.9,
-      "purity": 99.5,
-      "unit": "kg"
-    },
-    {
-      "material": "Copper",
-      "originalWeight": 12.0,
-      "recoveredWeight": 11.8,
-      "recoveryRate": 98.3,
-      "purity": 99.9,
-      "unit": "kg"
+      path: "/soh/calculate",
+      methods: ["GET"],
+      description: "Calculate SOH"
     }
   ],
-  "totalRecoveryRate": 95.8,
-  "residualWaste": 10.5,
-  "residualWasteUnit": "kg",
-  "certifications": ["ISO 14001", "R2"],
-  "blockchainHash": "0xdef456..."
-}
-```
-
----
-
-## Carbon Credit Integration
-
-### 5.1 Battery Carbon Footprint Lifecycle
-
-```mermaid
-graph LR
-    A[Production CO2e] -->|Subtract| B[Recycling Credits]
-    B -->|Calculate| C[Net Carbon Impact]
-    C -->|Compare| D[Industry Baseline]
-    D -->|Generate| E[Carbon Credits]
-    E -->|Trade| F[Carbon Markets]
-```
-
-### 5.2 Carbon Credit Generation
-
-Batteries with lower carbon footprints than industry baselines can generate carbon credits.
-
-**Calculate Carbon Credit Eligibility:**
-
-```http
-POST /v1/carbon/credits/calculate
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "totalCO2e": 12580,
-  "industryBaseline": 15000,
-  "categoryBaseline": "EV_battery_100kWh",
-  "verificationMethod": "ISO 14067",
-  "includeRecyclingCredit": true
-}
-```
-
-**Response:**
-
-```json
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "eligible": true,
-  "creditCalculation": {
-    "batteryCO2e": 12580,
-    "industryBaseline": 15000,
-    "reduction": 2420,
-    "reductionPercentage": 16.1,
-    "recyclingCredit": 2500,
-    "netReduction": 4920,
-    "creditsGenerated": 4.92,
-    "creditsUnit": "tCO2e"
-  },
-  "verificationStatus": "verified",
-  "verifiedBy": "Carbon Trust International",
-  "verificationDate": "2025-01-15",
-  "creditTokens": [
-    {
-      "tokenId": "CC-BAT-2025-0001",
-      "amount": 4.92,
-      "unit": "tCO2e",
-      "vintageYear": 2025,
-      "standard": "Gold Standard",
-      "blockchainTx": "0xabc123..."
-    }
+  events: [
+    "health_update",
+    "soh_threshold",
+    "lifecycle_event"
   ]
-}
-```
-
-### 5.3 Carbon Credit Trading Integration
-
-**List Credits for Sale:**
-
-```http
-POST /v1/carbon/credits/list
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "creditTokenId": "CC-BAT-2025-0001",
-  "amount": 4.92,
-  "pricePerCredit": 35.00,
-  "currency": "EUR",
-  "minimumPurchase": 0.5,
-  "listingDuration": 90,
-  "marketplaces": ["EU ETS", "Carbon Trade Exchange"]
-}
-```
-
-**Integration with Carbon Registries:**
-
-| Registry | Integration Type | Support |
-|----------|-----------------|---------|
-| **Gold Standard** | API | ✓ Full |
-| **Verra (VCS)** | API | ✓ Full |
-| **EU ETS** | Portal | ✓ Manual |
-| **Carbon Trade Exchange** | API | ✓ Full |
-| **Climate Action Reserve** | API | ✓ Partial |
-
----
-
-## Supply Chain Platforms
-
-### 5.1 ERP System Integration
-
-**SAP S/4HANA Integration:**
-
-```http
-POST /v1/integrations/sap/sync
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "sapMaterialNumber": "MAT-100001",
-  "sapPlant": "1000",
-  "sapStorageLocation": "0001",
-  "syncDirection": "bidirectional",
-  "syncFields": [
-    "serialNumber",
-    "manufacturingDate",
-    "qualityStatus",
-    "stockLocation",
-    "ownership"
-  ]
-}
-```
-
-### 5.2 Blockchain Traceability
-
-**Hyperledger Fabric Integration:**
-
-```javascript
-const fabric = require('@hyperledger/fabric-gateway');
-
-// Connect to battery passport chaincode
-const contract = network.getContract('battery-passport');
-
-// Record lifecycle event
-await contract.submitTransaction('RecordEvent', JSON.stringify({
-  batteryId: 'BAT-2025-LI-001234',
-  eventType: 'ownership_transfer',
-  from: 'MFG-2025-001',
-  to: 'DIST-2025-050',
-  timestamp: '2025-01-11T14:00:00Z',
-  documentHash: 'sha256:abc123...'
-}));
-
-// Query complete history
-const history = await contract.evaluateTransaction('GetHistory', 'BAT-2025-LI-001234');
-console.log(JSON.parse(history.toString()));
-```
-
-### 5.3 Supply Chain Visibility Platforms
-
-**Integration with TradeLens (Blockchain Supply Chain):**
-
-```http
-POST /v1/integrations/tradelens/shipment
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "batteryIds": ["BAT-2025-LI-001234", "BAT-2025-LI-001235"],
-  "shipmentId": "SHIP-2025-001",
-  "origin": {
-    "port": "Busan, South Korea",
-    "facility": "GreenCell Factory A"
-  },
-  "destination": {
-    "port": "Rotterdam, Netherlands",
-    "facility": "EU Distribution Center"
-  },
-  "carrier": "Maersk",
-  "vesselName": "Maersk Seoul",
-  "containerNumber": "CONT-12345",
-  "estimatedArrival": "2025-02-01"
-}
-```
-
----
-
-## Energy Management Systems
-
-### 6.1 Battery Energy Storage System (BESS) Integration
-
-**Grid Connection Protocol:**
-
-```http
-POST /v1/integrations/bess/register
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "bessId": "BESS-2025-001",
-  "application": "grid_stabilization",
-  "gridConnection": {
-    "gridOperator": "TransnetBW",
-    "connectionPoint": "CP-12345",
-    "voltage": 400,
-    "voltageUnit": "kV",
-    "maxPower": 100,
-    "maxPowerUnit": "MW"
-  },
-  "controlSystem": {
-    "manufacturer": "ABB",
-    "model": "GridConnect-Pro",
-    "softwareVersion": "2.5.1"
-  },
-  "telemetryEndpoint": "mqtt://bess-2025-001.grid.com:8883"
-}
-```
-
-**Real-time Energy Dispatch:**
-
-```javascript
-// MQTT telemetry from BESS
-const telemetry = {
-  batteryId: 'BAT-2025-LI-001234',
-  timestamp: '2025-01-15T14:30:00Z',
-  stateOfCharge: 75.0,
-  powerOutput: 25.5,  // MW
-  gridFrequency: 50.02,  // Hz
-  activeServices: ['frequency_regulation', 'peak_shaving'],
-  revenue: {
-    daily: 1250.00,
-    currency: 'EUR'
-  }
 };
 ```
 
-### 6.2 Smart Grid Integration
+### 3.3 WIA-PQ-CRYPTO Integration
 
-**Virtual Power Plant (VPP) Coordination:**
+Post-quantum secure signatures for long-term validity.
 
-```mermaid
-graph TB
-    subgraph "Battery Fleet"
-        B1[Battery 1 - 80% SoC]
-        B2[Battery 2 - 65% SoC]
-        B3[Battery 3 - 90% SoC]
-    end
-
-    subgraph "VPP Controller"
-        VPP[VPP Orchestration]
-        OPT[Optimization Engine]
-    end
-
-    subgraph "Grid Services"
-        FREQ[Frequency Regulation]
-        PEAK[Peak Shaving]
-        RESERVE[Reserve Capacity]
-    end
-
-    B1 --> VPP
-    B2 --> VPP
-    B3 --> VPP
-
-    VPP --> OPT
-    OPT --> FREQ
-    OPT --> PEAK
-    OPT --> RESERVE
-```
-
----
-
-## Vehicle Integration
-
-### 7.1 Electric Vehicle Platform Integration
-
-**Tesla Fleet API Integration:**
-
-```http
-POST /v1/integrations/tesla/vehicle
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "vin": "5YJ3E1EA1JF000123",
-  "model": "Model 3 Long Range",
-  "productionDate": "2025-01",
-  "telemetryAccess": {
-    "apiKey": "tesla_api_key",
-    "dataFields": [
-      "battery_level",
-      "battery_range",
-      "charge_state",
-      "odometer",
-      "climate_state"
-    ],
-    "updateFrequency": 60
-  }
+```typescript
+interface PQSignature {
+  // Battery passports may exist for decades
+  // Quantum-resistant signatures ensure long-term validity
+  algorithm: "CRYSTALS-Dilithium" | "SPHINCS+";
+  public_key: string;
+  signature: string;
+  signed_at: ISO8601;
+  valid_until: ISO8601;  // e.g., 50 years
 }
-```
 
-**Vehicle Telemetry Sync:**
+// Sign passport with PQ crypto
+async function signWithPQ(passport: BatteryPassport): Promise<PQSignature> {
+  const { publicKey, privateKey } = await pqcrypto.generateKeyPair("CRYSTALS-Dilithium");
 
-```javascript
-// Sync Tesla telemetry to passport
-const vehicleData = await teslaAPI.getVehicleData(vin);
+  const dataToSign = JSON.stringify({
+    id: passport.id,
+    identity: passport.identity,
+    carbon_footprint: passport.carbon_footprint
+  });
 
-await passportAPI.updateTelemetry({
-  batteryId: 'BAT-2025-LI-001234',
-  stateOfCharge: vehicleData.charge_state.battery_level,
-  rangeRemaining: vehicleData.charge_state.battery_range,
-  odometer: vehicleData.vehicle_state.odometer,
-  location: {
-    latitude: vehicleData.drive_state.latitude,
-    longitude: vehicleData.drive_state.longitude
-  }
-});
-```
+  const signature = await pqcrypto.sign(dataToSign, privateKey);
 
-### 7.2 Fleet Management Integration
-
-**Geotab Fleet Integration:**
-
-```http
-POST /v1/integrations/geotab/fleet
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "fleetId": "FLEET-2025-001",
-  "fleetName": "Corporate EV Fleet",
-  "geotabDatabase": "database123",
-  "vehicles": [
-    {
-      "deviceId": "G9-12345",
-      "batteryId": "BAT-2025-LI-001234",
-      "vin": "VIN123456789ABCDEF"
-    }
-  ],
-  "dataSyncConfig": {
-    "syncInterval": 300,
-    "metrics": ["battery_voltage", "battery_current", "odometer", "engine_hours"]
-  }
+  return {
+    algorithm: "CRYSTALS-Dilithium",
+    public_key: publicKey,
+    signature: signature,
+    signed_at: new Date().toISOString(),
+    valid_until: new Date(Date.now() + 50 * 365 * 24 * 60 * 60 * 1000).toISOString()
+  };
 }
 ```
 
 ---
 
-## Regulatory Compliance
+## 4. Automotive Industry Integration
 
-### 8.1 Multi-Region Compliance Matrix
+### 4.1 Vehicle Integration
 
-| Region | Regulation | Requirements | Integration Status |
-|--------|------------|--------------|-------------------|
-| **EU** | Battery Regulation 2023/1542 | DPP, carbon footprint, recycling | ✓ Full |
-| **EU** | REACH | Substance registration | ✓ Full |
-| **EU** | RoHS | Hazardous substance limits | ✓ Full |
-| **USA** | EPA Battery Rule | Recycling, labeling | ✓ Partial |
-| **China** | GB Standards | Safety, performance | ✓ Partial |
-| **Korea** | K-Battery Standard | Safety, certification | ✓ Full |
-| **Japan** | Battery Safety Law | Safety standards | ✓ Partial |
+```typescript
+interface VehicleIntegration {
+  // Vehicle identification
+  vehicle_vin: string;
+  vehicle_manufacturer: string;
+  vehicle_model: string;
+  vehicle_year: number;
 
-### 8.2 Automated Compliance Checking
+  // Battery position
+  position: "main" | "auxiliary" | "hvac";
 
-```http
-POST /v1/compliance/validate
-Authorization: Bearer <token>
-Content-Type: application/json
+  // BMS connection
+  bms_protocol: "CAN" | "OBD-II" | "UDS";
+  bms_interface_id: string;
 
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "targetRegions": ["EU", "USA", "Korea"],
-  "regulationVersions": {
-    "EU": "2023/1542",
-    "USA": "EPA-2024",
-    "Korea": "K-BAT-2025"
-  }
+  // OTA update capability
+  ota_enabled: boolean;
 }
 ```
 
-**Response:**
+#### OBD-II Integration
 
-```json
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "validatedAt": "2025-01-15T10:00:00Z",
-  "complianceResults": {
-    "EU": {
-      "compliant": true,
-      "regulation": "2023/1542",
-      "score": 98,
-      "checks": [
-        { "requirement": "carbon_footprint", "status": "pass", "score": 100 },
-        { "requirement": "dpp_availability", "status": "pass", "score": 100 },
-        { "requirement": "recycled_content", "status": "pass", "score": 95 },
-        { "requirement": "due_diligence", "status": "pass", "score": 100 }
-      ],
-      "warnings": ["Recycled content below 2030 targets"]
-    },
-    "USA": {
-      "compliant": true,
-      "regulation": "EPA-2024",
-      "score": 92,
-      "checks": [
-        { "requirement": "recycling_info", "status": "pass", "score": 95 },
-        { "requirement": "labeling", "status": "pass", "score": 100 }
-      ]
-    },
-    "Korea": {
-      "compliant": true,
-      "regulation": "K-BAT-2025",
-      "score": 100,
-      "checks": [
-        { "requirement": "safety_certification", "status": "pass", "score": 100 },
-        { "requirement": "performance_standards", "status": "pass", "score": 100 }
-      ]
+```python
+# Read battery data via OBD-II
+def read_battery_obd2(connection: OBD2Connection) -> BatteryHealthData:
+    """
+    Read battery health data via OBD-II PIDs.
+    Standard EV battery PIDs (Mode 22).
+    """
+
+    # Manufacturer-specific PIDs (example: BMW i-series)
+    pids = {
+        'soc': 0x028C,           # State of Charge
+        'soh': 0x028D,           # State of Health
+        'pack_voltage': 0x028E,  # HV Battery Voltage
+        'pack_current': 0x028F,  # HV Battery Current
+        'temp_max': 0x0290,      # Max Cell Temperature
+        'temp_min': 0x0291,      # Min Cell Temperature
     }
+
+    data = {}
+    for name, pid in pids.items():
+        response = connection.query(0x22, pid)
+        data[name] = decode_response(response)
+
+    return BatteryHealthData(
+        soc_percent=data['soc'] / 100,
+        soh_percent=data['soh'] / 100,
+        pack_voltage_v=data['pack_voltage'] / 10,
+        pack_current_a=data['pack_current'] / 10 - 3276.8,  # signed
+        temp_max_c=data['temp_max'] - 40,
+        temp_min_c=data['temp_min'] - 40
+    )
+```
+
+### 4.2 Manufacturer System Integration
+
+```
+┌────────────────┐     ┌──────────────────┐     ┌────────────────┐
+│  BMW Connected │────▶│  WIA Battery     │◀────│  Tesla Fleet   │
+│  Drive API     │     │  Passport API    │     │  API           │
+└────────────────┘     └──────────────────┘     └────────────────┘
+                              ▲
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+     ┌────────┴────────┐             ┌────────┴────────┐
+     │  VW WeConnect   │             │  Mercedes me    │
+     │  API            │             │  API            │
+     └─────────────────┘             └─────────────────┘
+```
+
+#### Example: BMW Integration
+
+```typescript
+class BMWBatteryPassportIntegration {
+  private bmwApi: BMWConnectedDriveAPI;
+  private wiaApi: WIABatteryPassportAPI;
+
+  async syncBatteryData(vin: string): Promise<void> {
+    // Get data from BMW
+    const bmwData = await this.bmwApi.getBatteryStatus(vin);
+
+    // Map to WIA format
+    const healthUpdate = {
+      state_of_charge_percent: bmwData.chargingStatus.chargingLevelPercent,
+      state_of_health_percent: bmwData.batteryHealth?.stateOfHealth || null,
+      pack_voltage_v: bmwData.electricalSystemStatus?.voltage,
+      recorded_at: new Date().toISOString()
+    };
+
+    // Update WIA passport
+    await this.wiaApi.updateHealth(bmwData.passportId, healthUpdate);
   }
 }
 ```
 
 ---
 
-## Circular Economy
+## 5. Energy Grid Integration
 
-### 9.1 Second-Life Marketplace Integration
+### 5.1 Vehicle-to-Grid (V2G) Integration
 
-**Battery Second-Life Exchange:**
+```typescript
+interface V2GIntegration {
+  // Grid operator connection
+  grid_operator_id: string;
+  metering_point_id: string;
 
-```http
-POST /v1/marketplace/second-life/list
-Authorization: Bearer <token>
-Content-Type: application/json
+  // V2G capabilities
+  bidirectional_capable: boolean;
+  max_discharge_power_kw: number;
+  max_charge_power_kw: number;
 
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "currentSoH": 78.5,
-  "cycleCount": 2600,
-  "originalApplication": "electric_vehicle",
-  "recommendedApplications": ["stationary_storage", "marine", "industrial_equipment"],
-  "pricing": {
-    "askingPrice": 3500,
-    "currency": "EUR",
-    "pricePerKWh": 35
-  },
-  "warranty": {
-    "durationMonths": 36,
-    "minSoHGuarantee": 70
-  },
-  "location": {
-    "country": "DE",
-    "city": "Berlin"
-  }
+  // Energy trading
+  energy_contract_id: string;
+  current_tariff: Tariff;
+}
+
+// V2G session with battery passport data
+interface V2GSession {
+  session_id: string;
+  passport_id: string;
+  start_time: ISO8601;
+  end_time?: ISO8601;
+
+  // Energy flow
+  energy_imported_kwh: number;
+  energy_exported_kwh: number;
+
+  // Battery impact
+  soh_at_start: number;
+  soh_at_end: number;
+  cycles_added: number;
+
+  // Revenue
+  revenue_earned: Money;
 }
 ```
 
-**Marketplace Response:**
+### 5.2 Stationary Storage Integration
 
-```json
-{
-  "listingId": "SLM-2025-0001",
-  "batteryId": "BAT-2025-LI-001234",
-  "status": "active",
-  "matches": [
-    {
-      "buyerId": "BUYER-2025-100",
-      "buyerType": "stationary_storage_provider",
-      "matchScore": 95,
-      "offerPrice": 3400,
-      "intendedUse": "residential_storage",
-      "estimatedSecondLifeYears": 8
-    },
-    {
-      "buyerId": "BUYER-2025-101",
-      "buyerType": "marine_equipment",
-      "matchScore": 88,
-      "offerPrice": 3200,
-      "intendedUse": "electric_boat",
-      "estimatedSecondLifeYears": 6
-    }
-  ]
+For second-life batteries in grid storage:
+
+```typescript
+interface StationaryStorageIntegration {
+  // System identification
+  storage_system_id: string;
+  site_location: GeoLocation;
+  grid_connection_point: string;
+
+  // Battery configuration
+  batteries: BatteryInSystem[];
+  total_capacity_kwh: number;
+  total_power_kw: number;
+
+  // Aggregated health
+  system_soh_percent: number;
+  weakest_battery_soh: number;
+
+  // Operations
+  cycles_per_day: number;
+  revenue_per_kwh: Money;
+}
+
+interface BatteryInSystem {
+  passport_id: string;
+  position: string;               // e.g., "Rack-A-1"
+  original_application: string;   // e.g., "BMW i3"
+  installation_date: ISO8601;
+  current_soh: number;
 }
 ```
 
-### 9.2 Battery-as-a-Service (BaaS) Integration
+### 5.3 ISO 15118 Integration
 
-**Subscription Model:**
+Plug & Charge with battery passport:
 
-```http
-POST /v1/baas/subscription
-Authorization: Bearer <token>
-Content-Type: application/json
+```typescript
+// ISO 15118 Certificate with battery passport link
+interface ISO15118Certificate {
+  contract_id: string;
+  vehicle_certificate: X509Certificate;
+  battery_passport_url: string;
 
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "subscriptionModel": "performance_based",
-  "customer": "CUSTOMER-2025-001",
-  "terms": {
-    "monthlyFee": 150,
-    "currency": "EUR",
-    "includedServices": [
-      "battery_monitoring",
-      "maintenance",
-      "replacement_at_70_soh",
-      "recycling"
-    ],
-    "duration": 96,
-    "durationUnit": "months"
-  },
-  "performanceGuarantees": {
-    "minSoH": 80,
-    "maxDegradationPerYear": 5
-  }
+  // Authorization
+  emaid: string;                  // E-Mobility Account ID
+  contract_expiry: ISO8601;
 }
-```
 
-### 9.3 Material Passport Integration
+// Charging session with passport update
+async function chargingSession(
+  vehicleCert: ISO15118Certificate,
+  charger: EVSEInterface
+): Promise<ChargingSessionResult> {
 
-**Link to Raw Material Passports:**
+  // Authenticate
+  const auth = await charger.authorizeISO15118(vehicleCert);
 
-```json
-{
-  "batteryId": "BAT-2025-LI-001234",
-  "materialPassports": [
-    {
-      "material": "Cobalt",
-      "passportId": "MP-COBALT-2024-0001",
-      "weight": 6.0,
-      "source": {
-        "mine": "Ethical Cobalt Mine, AU",
-        "certification": "RMI Conformant"
-      },
-      "traceabilityChain": [
-        "Mine extraction",
-        "Primary refining",
-        "Secondary refining",
-        "Cathode production",
-        "Cell manufacturing",
-        "Battery assembly"
-      ]
-    },
-    {
-      "material": "Lithium",
-      "passportId": "MP-LITHIUM-2024-0002",
-      "weight": 4.2,
-      "source": {
-        "mine": "Chilean Lithium Mine",
-        "certification": "RMI Conformant"
-      }
-    }
-  ]
+  // Get current battery state
+  const passport = await getBatteryPassport(vehicleCert.battery_passport_url);
+
+  // Start charging
+  const session = await charger.startCharging({
+    targetSoc: 80,
+    maxPower: getOptimalChargePower(passport.health)
+  });
+
+  // Monitor and update passport
+  session.on('complete', async (result) => {
+    await updatePassportAfterCharging(passport.id, {
+      energy_added_kwh: result.energyDelivered,
+      charge_type: result.dcFastCharge ? 'fast' : 'slow',
+      duration_minutes: result.duration
+    });
+  });
+
+  return session;
 }
 ```
 
 ---
 
-## Integration Patterns
+## 6. Recycling Industry Integration
 
-### 10.1 API-Based Integration
+### 6.1 Recycler Network
 
-**Advantages:**
-- Real-time data exchange
-- Flexible and scalable
-- Standardized protocols
+```typescript
+interface RecyclerNetwork {
+  // Certified recyclers
+  recyclers: CertifiedRecycler[];
 
-**Example - REST API:**
+  // Material exchange
+  material_marketplace: MaterialExchange;
 
-```javascript
-const axios = require('axios');
+  // Traceability
+  recycling_chain: RecyclingChainEvent[];
+}
 
-// Register battery from manufacturing system
-const response = await axios.post(
-  'https://api.wia.live/battery-passport/v1/batteries/register',
+interface CertifiedRecycler {
+  id: string;
+  name: string;
+  license_number: string;
+  country: ISO3166Alpha2;
+
+  // Certifications
+  certifications: RecyclerCertification[];
+
+  // Capabilities
+  processes: RecyclingProcess[];
+  accepted_chemistries: BatteryChemistry[];
+  capacity_tons_per_year: number;
+
+  // Performance
+  avg_recovery_efficiency: MaterialRecoveryRates;
+}
+
+enum RecyclingProcess {
+  PYROMETALLURGICAL = "pyrometallurgical",
+  HYDROMETALLURGICAL = "hydrometallurgical",
+  DIRECT_RECYCLING = "direct_recycling",
+  MECHANICAL = "mechanical"
+}
+```
+
+### 6.2 End-of-Life Flow
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   EV Owner   │────▶│  Collection  │────▶│  Assessment  │
+│              │     │  Point       │     │  Center      │
+└──────────────┘     └──────────────┘     └──────────────┘
+                                                │
+                         ┌──────────────────────┼──────────────────────┐
+                         ▼                      ▼                      ▼
+                  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+                  │  Second-Life │     │   Repair/    │     │  Recycling   │
+                  │  Application │     │   Refurbish  │     │  Facility    │
+                  └──────────────┘     └──────────────┘     └──────────────┘
+                                                                  │
+                                                                  ▼
+                                                          ┌──────────────┐
+                                                          │  Material    │
+                                                          │  Recovery    │
+                                                          └──────────────┘
+                                                                  │
+                                                                  ▼
+                                                          ┌──────────────┐
+                                                          │  New Battery │
+                                                          │  Production  │
+                                                          └──────────────┘
+```
+
+### 6.3 Material Traceability
+
+```typescript
+interface MaterialTraceability {
+  // From mine to battery
+  origin: {
+    mine_id: string;
+    mine_name: string;
+    country: ISO3166Alpha2;
+    extraction_date: ISO8601;
+  };
+
+  // Processing chain
+  processing_chain: ProcessingStep[];
+
+  // To battery
+  battery_integration: {
+    passport_id: string;
+    integration_date: ISO8601;
+    component: string;            // e.g., "cathode"
+  };
+
+  // After recycling
+  recycled_into?: {
+    new_passport_id: string;
+    recycling_date: ISO8601;
+    recovery_rate: number;
+  };
+}
+```
+
+---
+
+## 7. Supply Chain Platforms
+
+### 7.1 SAP Integration
+
+```typescript
+// SAP S/4HANA Material Management integration
+interface SAPMaterialManagement {
+  // Material master
+  material_number: string;
+  plant: string;
+  storage_location: string;
+
+  // Batch management
+  batch_number: string;
+  production_date: Date;
+  expiry_date?: Date;
+
+  // Quality management
+  qm_inspection_lot: string;
+  quality_status: "unrestricted" | "blocked" | "quality_inspection";
+
+  // Link to passport
+  passport_id: string;
+}
+
+// Integration via SAP Business Technology Platform
+class SAPBatteryPassportIntegration {
+  async createMaterialWithPassport(passport: BatteryPassport): Promise<string> {
+    const materialDoc = {
+      MaterialNumber: generateMaterialNumber(passport),
+      Plant: passport.identity.production_facility_id,
+      BatchNumber: passport.identity.batch_number,
+      WIAPassportID: passport.id,
+      // ... additional SAP fields
+    };
+
+    return await this.sapApi.createMaterial(materialDoc);
+  }
+}
+```
+
+### 7.2 Oracle SCM Integration
+
+```typescript
+interface OracleSCMIntegration {
+  // Product Lifecycle Management
+  plm_item_number: string;
+  revision: string;
+
+  // Supply Chain Planning
+  planning_item: string;
+  supply_sources: SupplySource[];
+
+  // Quality Management
+  quality_inspection_id: string;
+}
+```
+
+---
+
+## 8. Mobile SDK
+
+### 8.1 iOS SDK
+
+```swift
+import WIABatteryPassport
+
+class BatteryPassportViewController: UIViewController {
+
+    let sdk = WIABatteryPassportSDK(apiKey: "your_api_key")
+
+    func scanQRCode() {
+        let scanner = sdk.createQRScanner()
+
+        scanner.scan { result in
+            switch result {
+            case .success(let passport):
+                self.displayPassport(passport)
+            case .failure(let error):
+                self.showError(error)
+            }
+        }
+    }
+
+    func displayPassport(_ passport: BatteryPassport) {
+        // Health summary
+        let health = passport.health
+        self.sohLabel.text = "\(health.stateOfHealthPercent)%"
+        self.socLabel.text = "\(health.stateOfChargePercent)%"
+
+        // Carbon footprint
+        let carbon = passport.carbonFootprint
+        self.carbonLabel.text = "\(carbon.totalKgCO2e) kg CO2e"
+        self.carbonClassView.setClass(carbon.performanceClass)
+
+        // RUL prediction
+        sdk.predictRUL(passportId: passport.id) { rul in
+            self.rulLabel.text = "\(rul.remainingMonths) months"
+        }
+    }
+
+    func checkSecondLife() {
+        sdk.assessSecondLife(passportId: currentPassportId) { result in
+            if result.eligible {
+                self.showSecondLifeOptions(result.suggestedApplications)
+            }
+        }
+    }
+}
+```
+
+### 8.2 Android SDK
+
+```kotlin
+import org.wia.batterypassport.sdk.*
+
+class BatteryPassportActivity : AppCompatActivity() {
+
+    private val sdk = WIABatteryPassportSDK.Builder()
+        .apiKey("your_api_key")
+        .build()
+
+    fun scanQRCode() {
+        val scanner = sdk.createQRScanner(this)
+
+        scanner.scan { result ->
+            when (result) {
+                is ScanResult.Success -> displayPassport(result.passport)
+                is ScanResult.Error -> showError(result.error)
+            }
+        }
+    }
+
+    fun displayPassport(passport: BatteryPassport) {
+        // Health summary
+        binding.sohText.text = "${passport.health.stateOfHealthPercent}%"
+        binding.socText.text = "${passport.health.stateOfChargePercent}%"
+
+        // Carbon footprint
+        binding.carbonText.text = "${passport.carbonFootprint.totalKgCO2e} kg CO2e"
+        binding.carbonClassBadge.setClass(passport.carbonFootprint.performanceClass)
+
+        // Lifecycle visualization
+        binding.lifecycleTimeline.setEvents(passport.lifecycle)
+    }
+
+    suspend fun getSupplyChainInfo() {
+        val verification = sdk.verifySupplyChain(currentPassportId)
+
+        binding.supplyChainRisk.text = when (verification.overallRiskScore) {
+            in 0..30 -> "Low Risk"
+            in 31..60 -> "Medium Risk"
+            else -> "High Risk"
+        }
+
+        binding.materialList.adapter = MaterialVerificationAdapter(
+            verification.materialVerifications
+        )
+    }
+}
+```
+
+### 8.3 Flutter SDK
+
+```dart
+import 'package:wia_battery_passport/wia_battery_passport.dart';
+
+class BatteryPassportScreen extends StatefulWidget {
+  @override
+  _BatteryPassportScreenState createState() => _BatteryPassportScreenState();
+}
+
+class _BatteryPassportScreenState extends State<BatteryPassportScreen> {
+  final sdk = WIABatteryPassportSDK(apiKey: 'your_api_key');
+  BatteryPassport? passport;
+
+  Future<void> scanQR() async {
+    final result = await sdk.scanQRCode();
+    setState(() {
+      passport = result;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Battery Passport')),
+      body: passport == null
+          ? Center(child: ElevatedButton(
+              onPressed: scanQR,
+              child: Text('Scan QR Code'),
+            ))
+          : BatteryPassportView(
+              passport: passport!,
+              onCheckSecondLife: () => _checkSecondLife(),
+              onViewCarbonDetails: () => _showCarbonDetails(),
+            ),
+    );
+  }
+
+  Widget BatteryPassportView({
+    required BatteryPassport passport,
+    required VoidCallback onCheckSecondLife,
+    required VoidCallback onViewCarbonDetails,
+  }) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Health Card
+          HealthSummaryCard(
+            soh: passport.health.stateOfHealthPercent,
+            soc: passport.health.stateOfChargePercent,
+            rul: passport.health.remainingUsefulLifeMonths,
+          ),
+
+          // Carbon Card
+          CarbonFootprintCard(
+            totalCO2e: passport.carbonFootprint.totalKgCO2e,
+            perKwh: passport.carbonFootprint.perKwhKgCO2e,
+            carbonClass: passport.carbonFootprint.performanceClass,
+          ),
+
+          // Lifecycle Timeline
+          LifecycleTimeline(events: passport.lifecycle),
+
+          // Actions
+          ActionButtons(
+            onCheckSecondLife: onCheckSecondLife,
+            onViewCarbonDetails: onViewCarbonDetails,
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+---
+
+## 9. IoT Device Integration
+
+### 9.1 BMS IoT Gateway
+
+```typescript
+interface BMSIoTGateway {
+  // Device identification
+  device_id: string;
+  firmware_version: string;
+
+  // Connectivity
+  connection_type: "cellular" | "wifi" | "lorawan";
+  mqtt_broker: string;
+  mqtt_topic: string;
+
+  // Data transmission
+  upload_interval_seconds: number;
+  batch_upload: boolean;
+
+  // Security
+  device_certificate: X509Certificate;
+  data_encryption: "AES-256-GCM";
+}
+
+// MQTT message format
+interface BMSMQTTMessage {
+  topic: "wia/battery/{passport_id}/health";
+  payload: {
+    timestamp: ISO8601;
+    soc: number;
+    soh: number;
+    voltage: number;
+    current: number;
+    temperature: number;
+    cell_voltages?: number[];
+  };
+  qos: 1;
+  retain: false;
+}
+```
+
+### 9.2 Edge Computing
+
+```python
+# Edge device for local processing
+class BatteryPassportEdgeDevice:
+    """
+    Edge device that processes BMS data locally
+    and syncs to cloud when connected.
+    """
+
+    def __init__(self, passport_id: str, bms_interface: BMSInterface):
+        self.passport_id = passport_id
+        self.bms = bms_interface
+        self.local_db = SQLiteDatabase("battery_data.db")
+        self.cloud_api = WIABatteryPassportAPI()
+
+    async def collect_data(self):
+        """Continuous data collection."""
+        while True:
+            data = await self.bms.read_data()
+
+            # Local processing
+            processed = self.process_locally(data)
+
+            # Store locally
+            await self.local_db.insert(processed)
+
+            # Sync if connected
+            if self.cloud_api.is_connected():
+                await self.sync_to_cloud()
+
+            await asyncio.sleep(60)  # Every minute
+
+    def process_locally(self, raw_data: BMSRawData) -> ProcessedData:
+        """Edge processing - anomaly detection, averaging."""
+        return ProcessedData(
+            timestamp=datetime.utcnow(),
+            soc=raw_data.soc,
+            soh=self.calculate_soh_locally(raw_data),
+            anomalies=self.detect_anomalies(raw_data)
+        )
+
+    async def sync_to_cloud(self):
+        """Batch sync to WIA cloud."""
+        pending = await self.local_db.get_unsynced()
+
+        for batch in chunks(pending, 100):
+            await self.cloud_api.batch_upload(self.passport_id, batch)
+            await self.local_db.mark_synced(batch)
+```
+
+---
+
+## 10. Compliance Dashboard
+
+### 10.1 EU Compliance Monitoring
+
+```typescript
+interface ComplianceDashboard {
+  // Overall compliance status
+  eu_battery_regulation_compliant: boolean;
+  compliance_score: number;  // 0-100
+
+  // Individual requirements
+  requirements: ComplianceRequirement[];
+
+  // Upcoming deadlines
+  deadlines: ComplianceDeadline[];
+
+  // Audit trail
+  audit_log: AuditEvent[];
+}
+
+interface ComplianceRequirement {
+  requirement_id: string;
+  description: string;
+  category: "mandatory" | "recommended";
+  status: "compliant" | "non_compliant" | "pending" | "not_applicable";
+  evidence_url?: string;
+  last_checked: ISO8601;
+}
+
+// Example requirements check
+const requirements: ComplianceRequirement[] = [
   {
-    identity: {
-      manufacturer: "GreenCell Technologies",
-      serialNumber: "SN-2025-001234"
-    },
-    chemistry: { type: "lithium-ion", cathode: "NMC811" },
-    specifications: { nominalVoltage: 400, nominalCapacity: 250 }
+    requirement_id: "EU-BR-2027-01",
+    description: "Digital battery passport required",
+    category: "mandatory",
+    status: "compliant",
+    evidence_url: "https://battery.wia.org/p/..."
   },
   {
-    headers: { 'Authorization': `Bearer ${apiKey}` }
+    requirement_id: "EU-BR-2027-02",
+    description: "Carbon footprint declared",
+    category: "mandatory",
+    status: "compliant",
+    evidence_url: "..."
+  },
+  {
+    requirement_id: "EU-BR-2031-01",
+    description: "Recycled content minimum (cobalt 16%)",
+    category: "mandatory",
+    status: "pending",  // Requirement starts 2031
   }
-);
-
-console.log(`Battery registered: ${response.data.batteryId}`);
-```
-
-### 10.2 Event-Driven Integration
-
-**Advantages:**
-- Asynchronous processing
-- Loose coupling
-- Scalable architecture
-
-**Example - Webhook Notifications:**
-
-```http
-POST /v1/webhooks/register
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "webhookUrl": "https://recycler.example.com/api/webhooks/battery-eol",
-  "events": ["battery.end_of_life", "battery.collection_scheduled"],
-  "filters": {
-    "region": "EU",
-    "minSoH": 0,
-    "maxSoH": 70
-  },
-  "secret": "webhook_secret_key"
-}
-```
-
-**Webhook Payload:**
-
-```json
-{
-  "eventId": "evt-2025-001",
-  "eventType": "battery.end_of_life",
-  "timestamp": "2025-01-15T10:00:00Z",
-  "data": {
-    "batteryId": "BAT-2025-LI-001234",
-    "finalSoH": 68.5,
-    "location": "Berlin, Germany",
-    "owner": "CUSTOMER-2025-001"
-  },
-  "signature": "sha256_hmac_signature"
-}
-```
-
-### 10.3 File-Based Integration
-
-**Advantages:**
-- Simple implementation
-- Batch processing
-- Legacy system compatibility
-
-**Example - CSV Export:**
-
-```http
-GET /v1/batteries/export?format=csv&startDate=2025-01-01&endDate=2025-01-31
-Authorization: Bearer <token>
+];
 ```
 
 ---
 
-## Certification Levels
-
-### 11.1 Integration Certification Tiers
-
-| Level | Requirements | Integrations |
-|-------|-------------|--------------|
-| **Bronze** | Basic data exchange | 2+ integrations |
-| **Silver** | EU compliance + recycling | 5+ integrations |
-| **Gold** | Full supply chain + carbon | 10+ integrations |
-| **Platinum** | Complete ecosystem | 15+ integrations |
-
-### 11.2 Bronze Certification (Basic Integration)
-
-**Required Integrations (2+):**
-- [ ] QR code / NFC digital access
-- [ ] Basic API for battery registration
-- [ ] PDF/JSON export functionality
-
-**Capabilities:**
-- Digital passport creation
-- Basic data sharing
-- Manual compliance reporting
-
-### 11.3 Silver Certification (EU Compliance)
-
-**Bronze + Additional (5+ total):**
-- [ ] EU DPP compliance
-- [ ] Recycling system integration
-- [ ] Carbon footprint calculation
-- [ ] Material traceability
-- [ ] Regulatory reporting API
-
-**Capabilities:**
-- Automated EU compliance
-- EPR management
-- End-of-life coordination
-- Supply chain transparency
-
-### 11.4 Gold Certification (Full Supply Chain)
-
-**Silver + Additional (10+ total):**
-- [ ] ERP system integration (SAP, Oracle)
-- [ ] Blockchain traceability
-- [ ] Carbon credit generation
-- [ ] Second-life marketplace
-- [ ] BESS/grid integration
-- [ ] Fleet management integration
-- [ ] IoT telemetry streaming
-- [ ] Multi-region compliance
-
-**Capabilities:**
-- Complete supply chain visibility
-- Automated carbon trading
-- Real-time energy optimization
-- Circular economy workflows
-
-### 11.5 Platinum Certification (Complete Ecosystem)
-
-**Gold + Additional (15+ total):**
-- [ ] Multi-blockchain support
-- [ ] AI predictive analytics
-- [ ] Global customs integration
-- [ ] Advanced BaaS models
-- [ ] Material passport linking
-- [ ] Virtual power plant coordination
-- [ ] Automated regulatory updates
-- [ ] White-label solutions
-
-**Capabilities:**
-- Global ecosystem leadership
-- Advanced AI/ML capabilities
-- Complete automation
-- Enterprise-grade scalability
-
----
-
-## Implementation Checklist
-
-### 12.1 EU Compliance Integration (Silver)
-
-- [ ] 1. Implement Digital Product Passport (DPP) generation
-- [ ] 2. Map battery data to EU regulation requirements
-- [ ] 3. Create QR code with DPP link
-- [ ] 4. Build public DPP access portal
-- [ ] 5. Implement carbon footprint declaration
-- [ ] 6. Add material composition disclosure
-- [ ] 7. Build due diligence reporting
-- [ ] 8. Create recycled content tracking
-- [ ] 9. Implement multi-language support (EN, DE, FR)
-- [ ] 10. Set up compliance validation API
-- [ ] 11. Build EU data access control
-- [ ] 12. Create audit logging for data access
-- [ ] 13. Implement GDPR compliance
-- [ ] 14. Set up automated compliance updates
-
-### 12.2 Recycling System Integration (Silver)
-
-- [ ] 15. Register with EPR schemes
-- [ ] 16. Integrate with collection networks
-- [ ] 17. Build end-of-life declaration workflow
-- [ ] 18. Create pickup scheduling system
-- [ ] 19. Implement recycler notification
-- [ ] 20. Build material recovery reporting
-- [ ] 21. Create recycling certificate generation
-- [ ] 22. Implement collection target tracking
-- [ ] 23. Build recycling performance analytics
-
-### 12.3 Carbon Market Integration (Gold)
-
-- [ ] 24. Implement carbon footprint verification
-- [ ] 25. Build credit eligibility calculator
-- [ ] 26. Integrate with carbon registries (Gold Standard, Verra)
-- [ ] 27. Create carbon token minting
-- [ ] 28. Build credit marketplace listing
-- [ ] 29. Implement carbon credit trading
-- [ ] 30. Create retirement mechanism
-- [ ] 31. Build carbon reporting dashboard
-
-### 12.4 Supply Chain Platforms (Gold)
-
-- [ ] 32. Integrate with ERP systems (SAP, Oracle)
-- [ ] 33. Build blockchain traceability
-- [ ] 34. Implement material passport linking
-- [ ] 35. Create supply chain visibility dashboard
-- [ ] 36. Build logistics tracking integration
-- [ ] 37. Implement customs integration
-- [ ] 38. Create stakeholder portal
-
-### 12.5 Energy & Vehicle Integration (Gold)
-
-- [ ] 39. Integrate with BESS control systems
-- [ ] 40. Build grid service coordination
-- [ ] 41. Implement virtual power plant (VPP) integration
-- [ ] 42. Create vehicle telematics integration (Tesla, Geotab)
-- [ ] 43. Build fleet management analytics
-- [ ] 44. Implement real-time telemetry streaming
-- [ ] 45. Create energy optimization algorithms
-
-### 12.6 Circular Economy (Platinum)
-
-- [ ] 46. Build second-life marketplace
-- [ ] 47. Implement Battery-as-a-Service (BaaS) platform
-- [ ] 48. Create AI-powered matching algorithms
-- [ ] 49. Build warranty and guarantee management
-- [ ] 50. Implement sharing economy features
-- [ ] 51. Create lifecycle cost optimization
-- [ ] 52. Build predictive maintenance
-- [ ] 53. Implement automated repurposing workflows
-
----
-
-## References
-
-### 13.1 Related Standards
-
-- **Phase 1**: [Data Format Specification](./PHASE-1-DATA-FORMAT.md)
-- **Phase 2**: [API Interface Specification](./PHASE-2-API-INTERFACE.md)
-- **Phase 3**: [Protocol Specification](./PHASE-3-PROTOCOL.md)
-
-### 13.2 Regulatory References
-
-- EU Battery Regulation 2023/1542
-- EU Digital Product Passport Framework
-- REACH Regulation (EC) 1907/2006
-- RoHS Directive 2011/65/EU
-- ISO 14067 (Carbon Footprint of Products)
-- IEC 62660 (Battery Performance and Safety)
-
-### 13.3 Integration Partners
-
-- Global Battery Alliance (GBA)
-- Catena-X Automotive Network
-- TradeLens (Blockchain Supply Chain)
-- Gold Standard / Verra (Carbon Credits)
-- SAP S/4HANA
-- Tesla Fleet API
-- Geotab Fleet Management
-
----
-
-<div align="center">
-
-**WIA Battery Passport Integration Standard v1.0.0**
-
-**弘益人間 (홍익인간)** - Benefit All Humanity
-
----
-
-**© 2025 WIA**
-
-**MIT License**
-
-</div>
+**Document ID**: WIA-BATTERY-PASSPORT-PHASE-4
+**Version**: 1.0.0
+**Date**: 2025-12-16
+**Status**: Draft

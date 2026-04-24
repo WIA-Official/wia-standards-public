@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Architecture | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: CI/CD Pipeline Architecture</h1>
+
+    <p>A well-designed CI/CD architecture is the foundation of reliable and efficient software delivery. This chapter explores pipeline design patterns, runner infrastructure, orchestration strategies, and artifact management practices that enable teams to build scalable and maintainable CI/CD systems.</p>
+
+    <h2>Pipeline Design Patterns</h2>
+
+    <p>Pipeline design patterns provide reusable solutions to common CI/CD challenges. Understanding these patterns enables architects to design systems that are both powerful and maintainable.</p>
+
+    <h3>The Linear Pipeline</h3>
+
+    <p>The simplest pipeline pattern where stages execute sequentially. Each stage must complete successfully before the next begins. This pattern is ideal for straightforward applications with linear dependencies.</p>
+
+    <pre><code># Linear Pipeline Pattern
+# GitHub Actions Implementation
+name: Linear Pipeline
+on: [push]
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy
+        run: npm run deploy
+        if: github.ref == 'refs/heads/main'</code></pre>
+
+    <h3>The Fan-Out/Fan-In Pattern</h3>
+
+    <p>This pattern parallelizes independent tasks to reduce overall pipeline duration, then converges at synchronization points. Essential for complex applications with multiple test suites or build targets.</p>
+
+    <pre><code># Fan-Out/Fan-In Pattern
+# GitLab CI Implementation
+stages:
+  - build
+  - test
+  - deploy
+
+build:
+  stage: build
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+
+# Fan-Out: Parallel test jobs
+unit-tests:
+  stage: test
+  needs: [build]
+  script:
+    - npm run test:unit
+
+integration-tests:
+  stage: test
+  needs: [build]
+  script:
+    - npm run test:integration
+
+e2e-tests:
+  stage: test
+  needs: [build]
+  script:
+    - npm run test:e2e
+
+security-scan:
+  stage: test
+  needs: [build]
+  script:
+    - npm audit
+
+# Fan-In: Deploy requires all tests
+deploy:
+  stage: deploy
+  needs: [unit-tests, integration-tests, e2e-tests, security-scan]
+  script:
+    - npm run deploy
+  only:
+    - main</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI Architecture Principle:</strong> Design pipelines with the "fail fast" mentality. Place quick-running checks (linting, formatting) early in the pipeline to provide rapid feedback, reserving longer-running tests for later stages.
+    </div>
+
+    <h3>The Matrix Strategy Pattern</h3>
+
+    <p>Matrix builds test code across multiple combinations of configurations, operating systems, or runtime versions. This pattern ensures compatibility across diverse environments.</p>
+
+    <pre><code># Matrix Strategy Pattern
+# GitHub Actions Implementation
+name: Matrix Build
+on: [push, pull_request]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [18, 20, 22]
+        exclude:
+          - os: windows-latest
+            node: 18
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install and Test
+        run: |
+          npm ci
+          npm test</code></pre>
+
+    <h2>Runner Infrastructure</h2>
+
+    <p>Runners are the execution environments where pipeline jobs run. Choosing the right runner infrastructure is critical for performance, cost, and security.</p>
+
+    <h3>Types of Runners</h3>
+
+    <table>
+        <tr>
+            <th>Runner Type</th>
+            <th>Pros</th>
+            <th>Cons</th>
+            <th>Use Cases</th>
+        </tr>
+        <tr>
+            <td>Hosted (Cloud)</td>
+            <td>Zero maintenance, scalable</td>
+            <td>Limited customization, cost at scale</td>
+            <td>Most projects, open source</td>
+        </tr>
+        <tr>
+            <td>Self-Hosted</td>
+            <td>Full control, cost-effective</td>
+            <td>Maintenance overhead</td>
+            <td>Enterprise, compliance needs</td>
+        </tr>
+        <tr>
+            <td>Container-Based</td>
+            <td>Consistent environments</td>
+            <td>Container image management</td>
+            <td>Microservices, reproducibility</td>
+        </tr>
+        <tr>
+            <td>Serverless</td>
+            <td>Pay-per-use, auto-scaling</td>
+            <td>Cold start latency</td>
+            <td>Sporadic builds, cost optimization</td>
+        </tr>
+    </table>
+
+    <h3>Self-Hosted Runner Configuration</h3>
+
+    <pre><code># Kubernetes-Based Self-Hosted Runner
+# GitHub Actions Runner Controller
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: wia-ci-runners
+  namespace: actions-runner-system
+spec:
+  replicas: 5
+  template:
+    spec:
+      repository: your-org/your-repo
+      labels:
+        - self-hosted
+        - linux
+        - x64
+        - wia-ci
+      resources:
+        limits:
+          cpu: "4"
+          memory: "8Gi"
+        requests:
+          cpu: "2"
+          memory: "4Gi"
+      volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock</code></pre>
+
+    <h2>Orchestration Strategies</h2>
+
+    <p>Orchestration defines how pipelines coordinate across multiple repositories, services, and environments. Effective orchestration enables complex deployment scenarios while maintaining reliability.</p>
+
+    <h3>Monorepo Orchestration</h3>
+
+    <p>In monorepo setups, changes to shared code may require rebuilding multiple dependent projects. Smart change detection minimizes unnecessary builds.</p>
+
+    <pre><code># Monorepo Change Detection
+# GitHub Actions with Path Filters
+name: Monorepo CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.changes.outputs.api }}
+      web: ${{ steps.changes.outputs.web }}
+      shared: ${{ steps.changes.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'packages/api/**'
+              - 'packages/shared/**'
+            web:
+              - 'packages/web/**'
+              - 'packages/shared/**'
+            shared:
+              - 'packages/shared/**'
+
+  build-api:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run build --workspace=packages/api
+
+  build-web:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run build --workspace=packages/web</code></pre>
+
+    <h3>Multi-Repository Orchestration</h3>
+
+    <p>When services span multiple repositories, coordination becomes more complex. Event-driven architectures and centralized orchestration help manage dependencies.</p>
+
+    <pre><code># Cross-Repository Trigger
+# GitHub Actions - Trigger Downstream Pipeline
+name: Trigger Downstream
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  trigger-downstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Consumer Repo
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.CROSS_REPO_TOKEN }}
+          repository: your-org/consumer-service
+          event-type: dependency-updated
+          client-payload: |
+            {
+              "version": "${{ github.ref_name }}",
+              "source": "${{ github.repository }}"
+            }</code></pre>
+
+    <div class="highlight">
+        <strong>Orchestration Best Practice:</strong> Implement idempotent pipelines that can be safely re-run without side effects. This enables automatic retries and manual re-triggering without fear of duplicate deployments or corrupted state.
+    </div>
+
+    <h2>Artifact Management</h2>
+
+    <p>Artifacts are the outputs of build processes - compiled binaries, container images, test reports, and documentation. Effective artifact management ensures traceability and enables reliable deployments.</p>
+
+    <h3>Artifact Types and Storage</h3>
+
+    <table>
+        <tr>
+            <th>Artifact Type</th>
+            <th>Storage Solution</th>
+            <th>Retention Policy</th>
+        </tr>
+        <tr>
+            <td>Build Outputs</td>
+            <td>CI Platform Storage</td>
+            <td>30-90 days</td>
+        </tr>
+        <tr>
+            <td>Container Images</td>
+            <td>Container Registry</td>
+            <td>Based on tags (latest, semver)</td>
+        </tr>
+        <tr>
+            <td>Package Libraries</td>
+            <td>Package Registry (npm, PyPI)</td>
+            <td>Permanent for releases</td>
+        </tr>
+        <tr>
+            <td>Test Reports</td>
+            <td>Object Storage (S3, GCS)</td>
+            <td>90-365 days</td>
+        </tr>
+        <tr>
+            <td>Documentation</td>
+            <td>Static Hosting</td>
+            <td>Permanent, versioned</td>
+        </tr>
+    </table>
+
+    <h3>Container Image Versioning</h3>
+
+    <pre><code># Container Image Build and Push
+# GitHub Actions with GHCR
+name: Build Container
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max</code></pre>
+
+    <h2>Architecture Decision Framework</h2>
+
+    <p>The WIA-CI standard provides a decision framework for architectural choices:</p>
+
+    <pre><code># WIA-CI Architecture Decision Framework
+
+1. SCALE ASSESSMENT
+   - Team size: < 10, 10-50, 50-200, 200+
+   - Build frequency: hourly, hundreds/day, thousands/day
+   - Repository strategy: monorepo, polyrepo, hybrid
+
+2. RUNNER SELECTION
+   if (compliance_requirements || specialized_hardware):
+       use self_hosted_runners
+   elif (cost_sensitive && predictable_load):
+       use reserved_capacity
+   else:
+       use hosted_runners
+
+3. PARALLELIZATION STRATEGY
+   if (independent_test_suites):
+       use fan_out_pattern
+   if (multiple_target_environments):
+       use matrix_strategy
+   if (long_running_tests):
+       split_and_parallelize
+
+4. ARTIFACT STRATEGY
+   - Immutable artifacts with semantic versioning
+   - Retention based on environment criticality
+   - Signed artifacts for production deployments</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI Maturity Model - Level 2 (Architecture):</strong>
+        <ul>
+            <li>Multi-stage pipeline with clear separation</li>
+            <li>Parallel job execution where applicable</li>
+            <li>Artifact versioning and storage</li>
+            <li>Branch-based pipeline variations</li>
+        </ul>
+    </div>
+
+    <p>A solid architectural foundation enables teams to iterate quickly while maintaining reliability. The patterns and practices in this chapter provide the building blocks for CI/CD systems that can grow with your organization.</p>
+
+</body>
+</html>

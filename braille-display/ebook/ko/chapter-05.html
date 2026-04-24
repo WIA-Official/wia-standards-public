@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제5장 - Phase 2: API 인터페이스 | WIA 점자 디스플레이 표준</title>
+</head>
+<body>
+
+<h1>제5장: Phase 2 - API 인터페이스</h1>
+
+<h2>5.1 핵심 API 설계 철학</h2>
+
+<p>WIA 점자 디스플레이 API는 개발자가 점자 디스플레이 하드웨어와 상호작용할 수 있는 일관되고 직관적인 인터페이스를 제공합니다. 이 API의 설계는 다음과 같은 핵심 원칙을 따릅니다:</p>
+
+<h3>5.1.1 설계 원칙</h3>
+
+<ul>
+    <li><strong>단순성</strong>: 복잡한 하드웨어 세부사항을 추상화하여 개발자가 쉽게 사용할 수 있도록 합니다.</li>
+    <li><strong>일관성</strong>: 모든 기능에서 일관된 명명 규칙과 패턴을 사용합니다.</li>
+    <li><strong>안전성</strong>: 타입 안전성과 오류 처리를 통해 런타임 오류를 최소화합니다.</li>
+    <li><strong>확장성</strong>: 미래의 기능 추가를 고려한 유연한 구조를 제공합니다.</li>
+    <li><strong>호환성</strong>: 다양한 플랫폼과 언어에서 사용할 수 있도록 설계되었습니다.</li>
+    <li><strong>弘益人間</strong>: 모든 사용자가 접근 가능한 기술을 통해 인류에게 이로움을 제공합니다.</li>
+</ul>
+
+<h3>5.1.2 API 계층 구조</h3>
+
+<p>WIA 점자 디스플레이 API는 다음과 같은 계층 구조로 설계되었습니다:</p>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>계층</th>
+            <th>설명</th>
+            <th>예시</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>고수준 API</td>
+            <td>일반적인 사용 사례를 위한 간단한 인터페이스</td>
+            <td>display.write("안녕하세요")</td>
+        </tr>
+        <tr>
+            <td>중간 수준 API</td>
+            <td>세밀한 제어를 위한 인터페이스</td>
+            <td>display.setCells(0, brailleCells)</td>
+        </tr>
+        <tr>
+            <td>저수준 API</td>
+            <td>하드웨어 직접 제어</td>
+            <td>display.sendCommand(0x01, data)</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>5.1.3 비동기 프로그래밍 모델</h3>
+
+<p>모든 I/O 작업은 비동기적으로 수행되어 애플리케이션의 응답성을 보장합니다:</p>
+
+<pre>
+// Promise 기반
+display.write("테스트").then(() =&gt; {
+    console.log("쓰기 완료");
+});
+
+// async/await 사용
+async function updateDisplay() {
+    await display.write("안녕하세요");
+    await display.scroll(1);
+}
+</pre>
+
+<h2>5.2 WiaBrailleDisplay 클래스</h2>
+
+<p>WiaBrailleDisplay는 점자 디스플레이와 상호작용하기 위한 메인 클래스입니다. 이 클래스는 기기 관리, 셀 제어, 이벤트 처리 등 모든 핵심 기능을 제공합니다.</p>
+
+<h3>5.2.1 클래스 정의</h3>
+
+<pre>
+/**
+ * WIA 점자 디스플레이를 제어하는 메인 클래스
+ * @class WiaBrailleDisplay
+ */
+class WiaBrailleDisplay extends EventEmitter {
+    /**
+     * 점자 디스플레이 인스턴스 생성
+     * @param {BrailleDisplayConfig} config - 설정 옵션
+     */
+    constructor(config?: BrailleDisplayConfig);
+
+    /**
+     * 디스플레이에 연결
+     * @returns {Promise&lt;void&gt;}
+     */
+    async connect(): Promise&lt;void&gt;;
+
+    /**
+     * 디스플레이 연결 해제
+     * @returns {Promise&lt;void&gt;}
+     */
+    async disconnect(): Promise&lt;void&gt;;
+
+    /**
+     * 연결 상태 확인
+     * @returns {boolean}
+     */
+    isConnected(): boolean;
+
+    /**
+     * 디스플레이 정보 가져오기
+     * @returns {BrailleDisplayInfo}
+     */
+    getInfo(): BrailleDisplayInfo;
+}
+</pre>
+
+<h3>5.2.2 설정 인터페이스</h3>
+
+<pre>
+interface BrailleDisplayConfig {
+    /**
+     * 자동 연결 시도 여부
+     * @default true
+     */
+    autoConnect?: boolean;
+
+    /**
+     * 연결 재시도 횟수
+     * @default 3
+     */
+    retryAttempts?: number;
+
+    /**
+     * 통신 프로토콜 (usb, bluetooth, serial)
+     * @default "usb"
+     */
+    protocol?: "usb" | "bluetooth" | "serial";
+
+    /**
+     * 디바이스 ID (특정 기기 연결 시)
+     */
+    deviceId?: string;
+
+    /**
+     * 로깅 레벨
+     * @default "info"
+     */
+    logLevel?: "debug" | "info" | "warn" | "error";
+}
+</pre>
+
+<h3>5.2.3 디바이스 정보 인터페이스</h3>
+
+<pre>
+interface BrailleDisplayInfo {
+    /**
+     * 제조사 이름
+     */
+    manufacturer: string;
+
+    /**
+     * 모델명
+     */
+    model: string;
+
+    /**
+     * 펌웨어 버전
+     */
+    firmwareVersion: string;
+
+    /**
+     * 셀 개수
+     */
+    cellCount: number;
+
+    /**
+     * 지원하는 점자 타입 (6점식, 8점식)
+     */
+    dotConfig: 6 | 8;
+
+    /**
+     * 라우팅 키 개수
+     */
+    routingKeyCount: number;
+
+    /**
+     * 물리적 버튼 개수
+     */
+    buttonCount: number;
+
+    /**
+     * 연결 방식
+     */
+    connectionType: "usb" | "bluetooth" | "serial";
+
+    /**
+     * 시리얼 번호
+     */
+    serialNumber: string;
+}
+</pre>
+
+<h2>5.3 기기 검색 및 열거</h2>
+
+<p>WIA 점자 디스플레이 API는 연결된 모든 점자 디스플레이를 검색하고 열거할 수 있는 기능을 제공합니다.</p>
+
+<h3>5.3.1 기기 검색</h3>
+
+<pre>
+/**
+ * 사용 가능한 모든 점자 디스플레이 검색
+ * @returns {Promise&lt;BrailleDisplayInfo[]&gt;}
+ */
+async function discoverDevices(): Promise&lt;BrailleDisplayInfo[]&gt; {
+    const devices = await WiaBrailleDisplay.discover();
+    return devices;
+}
+
+// 사용 예제
+const devices = await WiaBrailleDisplay.discover();
+console.log(`발견된 기기: ${devices.length}개`);
+
+devices.forEach((device, index) =&gt; {
+    console.log(`${index + 1}. ${device.manufacturer} ${device.model}`);
+    console.log(`   셀 개수: ${device.cellCount}`);
+    console.log(`   연결 방식: ${device.connectionType}`);
+});
+</pre>
+
+<h3>5.3.2 특정 기기 연결</h3>
+
+<pre>
+/**
+ * 특정 기기에 연결
+ */
+async function connectToDevice(deviceId: string): Promise&lt;WiaBrailleDisplay&gt; {
+    const display = new WiaBrailleDisplay({
+        deviceId: deviceId,
+        autoConnect: true
+    });
+
+    await display.connect();
+    return display;
+}
+
+// 사용 예제
+const devices = await WiaBrailleDisplay.discover();
+if (devices.length &gt; 0) {
+    const display = await connectToDevice(devices[0].serialNumber);
+    console.log("연결 성공!");
+}
+</pre>
+
+<h3>5.3.3 자동 연결</h3>
+
+<pre>
+/**
+ * 첫 번째로 발견된 기기에 자동 연결
+ */
+async function autoConnect(): Promise&lt;WiaBrailleDisplay&gt; {
+    const display = new WiaBrailleDisplay({
+        autoConnect: true
+    });
+
+    // 자동으로 첫 번째 기기에 연결 시도
+    await display.connect();
+
+    return display;
+}
+
+// 사용 예제
+try {
+    const display = await autoConnect();
+    console.log(`연결됨: ${display.getInfo().model}`);
+} catch (error) {
+    console.error("연결 실패:", error.message);
+}
+</pre>
+
+<h2>5.4 셀 관리</h2>
+
+<p>점자 셀 관리는 점자 디스플레이의 핵심 기능입니다. WIA API는 다양한 방법으로 셀을 제어할 수 있습니다.</p>
+
+<h3>5.4.1 텍스트 쓰기</h3>
+
+<pre>
+/**
+ * 텍스트를 점자로 변환하여 표시
+ * @param {string} text - 표시할 텍스트
+ * @param {number} position - 시작 위치 (0부터 시작)
+ * @returns {Promise&lt;void&gt;}
+ */
+async write(text: string, position: number = 0): Promise&lt;void&gt;;
+
+// 사용 예제
+await display.write("안녕하세요");
+await display.write("WIA", 10); // 10번 셀부터 시작
+</pre>
+
+<h3>5.4.2 점자 셀 직접 쓰기</h3>
+
+<pre>
+/**
+ * 점자 셀 패턴을 직접 설정
+ * @param {number} position - 시작 위치
+ * @param {Uint8Array} cells - 점자 셀 데이터
+ * @returns {Promise&lt;void&gt;}
+ */
+async setCells(position: number, cells: Uint8Array): Promise&lt;void&gt;;
+
+// 사용 예제 - 6점식 점자
+const cells = new Uint8Array([
+    0b00000001,  // ⠁ (점 1)
+    0b00000011,  // ⠃ (점 1,2)
+    0b00000111,  // ⠇ (점 1,2,3)
+]);
+await display.setCells(0, cells);
+
+// 8점식 점자
+const cells8 = new Uint8Array([
+    0b10000001,  // ⢁ (점 1,8)
+    0b11000011,  // ⢃ (점 1,2,7,8)
+]);
+await display.setCells(0, cells8);
+</pre>
+
+<h3>5.4.3 개별 셀 설정</h3>
+
+<pre>
+/**
+ * 개별 셀의 점 패턴 설정
+ * @param {number} cellIndex - 셀 인덱스
+ * @param {number} dotPattern - 점 패턴 (비트마스크)
+ * @returns {Promise&lt;void&gt;}
+ */
+async setCell(cellIndex: number, dotPattern: number): Promise&lt;void&gt;;
+
+// 사용 예제
+await display.setCell(0, 0b00000001);  // 첫 번째 셀을 ⠁로 설정
+await display.setCell(1, 0b00001001);  // 두 번째 셀을 ⠉로 설정
+</pre>
+
+<h3>5.4.4 셀 지우기</h3>
+
+<pre>
+/**
+ * 모든 셀 지우기
+ * @returns {Promise&lt;void&gt;}
+ */
+async clear(): Promise&lt;void&gt;;
+
+/**
+ * 특정 범위의 셀 지우기
+ * @param {number} start - 시작 위치
+ * @param {number} length - 지울 셀 개수
+ * @returns {Promise&lt;void&gt;}
+ */
+async clearRange(start: number, length: number): Promise&lt;void&gt;;
+
+// 사용 예제
+await display.clear();  // 모든 셀 지우기
+await display.clearRange(5, 10);  // 5번 셀부터 10개 지우기
+</pre>
+
+<h3>5.4.5 셀 스크롤</h3>
+
+<pre>
+/**
+ * 디스플레이 내용을 스크롤
+ * @param {number} delta - 스크롤 양 (양수: 오른쪽, 음수: 왼쪽)
+ * @returns {Promise&lt;void&gt;}
+ */
+async scroll(delta: number): Promise&lt;void&gt;;
+
+/**
+ * 긴 텍스트를 자동 스크롤하며 표시
+ * @param {string} text - 표시할 텍스트
+ * @param {ScrollOptions} options - 스크롤 옵션
+ * @returns {Promise&lt;void&gt;}
+ */
+async scrollText(text: string, options?: ScrollOptions): Promise&lt;void&gt;;
+
+interface ScrollOptions {
+    /**
+     * 스크롤 속도 (ms 단위)
+     * @default 500
+     */
+    speed?: number;
+
+    /**
+     * 반복 여부
+     * @default false
+     */
+    loop?: boolean;
+
+    /**
+     * 시작 전 지연 시간 (ms)
+     * @default 1000
+     */
+    initialDelay?: number;
+}
+
+// 사용 예제
+await display.scroll(1);  // 한 칸 오른쪽으로 스크롤
+
+// 긴 텍스트 자동 스크롤
+await display.scrollText(
+    "이것은 긴 텍스트입니다. 자동으로 스크롤됩니다.",
+    {
+        speed: 300,
+        loop: true,
+        initialDelay: 2000
+    }
+);
+</pre>
+
+<h3>5.4.6 점자 변환 유틸리티</h3>
+
+<pre>
+/**
+ * 텍스트를 점자 셀 배열로 변환
+ * @param {string} text - 변환할 텍스트
+ * @param {string} locale - 로케일 (ko, en, ja 등)
+ * @returns {Uint8Array}
+ */
+function textToBraille(text: string, locale: string = "ko"): Uint8Array;
+
+/**
+ * 점자 셀 배열을 텍스트로 변환
+ * @param {Uint8Array} cells - 점자 셀 데이터
+ * @param {string} locale - 로케일
+ * @returns {string}
+ */
+function brailleToText(cells: Uint8Array, locale: string = "ko"): string;
+
+// 사용 예제
+const brailleCells = textToBraille("안녕", "ko");
+await display.setCells(0, brailleCells);
+
+const text = brailleToText(brailleCells, "ko");
+console.log(text);  // "안녕"
+</pre>
+
+<h2>5.5 커서 라우팅</h2>
+
+<p>커서 라우팅은 사용자가 점자 셀 위의 버튼을 눌러 해당 위치로 커서를 이동시키는 기능입니다.</p>
+
+<h3>5.5.1 라우팅 키 이벤트</h3>
+
+<pre>
+/**
+ * 라우팅 키 이벤트 리스너 등록
+ */
+display.on("routingKey", (event: RoutingKeyEvent) =&gt; {
+    console.log(`라우팅 키 ${event.cellIndex} 눌림`);
+    // 해당 위치로 커서 이동 처리
+});
+
+interface RoutingKeyEvent {
+    /**
+     * 눌린 셀의 인덱스
+     */
+    cellIndex: number;
+
+    /**
+     * 이벤트 타입 (press, release, longPress)
+     */
+    type: "press" | "release" | "longPress";
+
+    /**
+     * 타임스탬프
+     */
+    timestamp: number;
+}
+</pre>
+
+<h3>5.5.2 라우팅 키 상태 조회</h3>
+
+<pre>
+/**
+ * 라우팅 키 상태 가져오기
+ * @param {number} cellIndex - 셀 인덱스
+ * @returns {boolean} - 눌림 상태
+ */
+getRoutingKeyState(cellIndex: number): boolean;
+
+/**
+ * 모든 라우팅 키 상태 가져오기
+ * @returns {boolean[]} - 각 키의 눌림 상태 배열
+ */
+getAllRoutingKeyStates(): boolean[];
+
+// 사용 예제
+if (display.getRoutingKeyState(5)) {
+    console.log("5번 라우팅 키가 눌려있습니다");
+}
+
+const states = display.getAllRoutingKeyStates();
+console.log(`눌린 키 개수: ${states.filter(s =&gt; s).length}`);
+</pre>
+
+<h3>5.5.3 커서 라우팅 통합</h3>
+
+<pre>
+/**
+ * 스크린 리더와 통합된 커서 라우팅 예제
+ */
+class BrailleNavigator {
+    private display: WiaBrailleDisplay;
+    private currentText: string = "";
+    private viewportStart: number = 0;
+
+    constructor(display: WiaBrailleDisplay) {
+        this.display = display;
+        this.setupRoutingKeys();
+    }
+
+    private setupRoutingKeys() {
+        this.display.on("routingKey", async (event) =&gt; {
+            if (event.type === "press") {
+                const absolutePosition = this.viewportStart + event.cellIndex;
+                await this.moveCursorTo(absolutePosition);
+            }
+        });
+    }
+
+    async displayText(text: string) {
+        this.currentText = text;
+        await this.updateDisplay();
+    }
+
+    private async updateDisplay() {
+        const cellCount = this.display.getInfo().cellCount;
+        const visibleText = this.currentText.substring(
+            this.viewportStart,
+            this.viewportStart + cellCount
+        );
+        await this.display.write(visibleText);
+    }
+
+    private async moveCursorTo(position: number) {
+        console.log(`커서를 ${position} 위치로 이동`);
+        // 스크린 리더 API를 통해 커서 이동
+        // screenReader.moveCursor(position);
+    }
+}
+
+// 사용
+const navigator = new BrailleNavigator(display);
+await navigator.displayText("안녕하세요. WIA 점자 디스플레이입니다.");
+</pre>
+
+<h2>5.6 키 이벤트 처리</h2>
+
+<p>점자 디스플레이에는 라우팅 키 외에도 다양한 물리적 버튼이 있습니다. 이러한 키 이벤트를 처리하는 방법을 설명합니다.</p>
+
+<h3>5.6.1 버튼 이벤트</h3>
+
+<pre>
+/**
+ * 버튼 이벤트 타입
+ */
+interface ButtonEvent {
+    /**
+     * 버튼 ID
+     */
+    buttonId: number;
+
+    /**
+     * 버튼 이름 (예: "space", "dot1", "dot2")
+     */
+    buttonName: string;
+
+    /**
+     * 이벤트 타입
+     */
+    type: "press" | "release" | "longPress";
+
+    /**
+     * 동시에 눌린 다른 버튼들
+     */
+    modifiers: string[];
+
+    /**
+     * 타임스탬프
+     */
+    timestamp: number;
+}
+
+/**
+ * 버튼 이벤트 리스너
+ */
+display.on("button", (event: ButtonEvent) =&gt; {
+    console.log(`버튼 ${event.buttonName} ${event.type}`);
+
+    // 조합키 처리
+    if (event.modifiers.includes("space")) {
+        console.log("스페이스 + " + event.buttonName);
+    }
+});
+</pre>
+
+<h3>5.6.2 점자 입력 처리</h3>
+
+<pre>
+/**
+ * 점자 입력 이벤트
+ */
+interface BrailleInputEvent {
+    /**
+     * 입력된 점자 패턴
+     */
+    dotPattern: number;
+
+    /**
+     * 변환된 문자 (가능한 경우)
+     */
+    character?: string;
+
+    /**
+     * 입력 모드 (직접 입력, 약자 등)
+     */
+    inputMode: "direct" | "contracted" | "computer";
+
+    /**
+     * 타임스탬프
+     */
+    timestamp: number;
+}
+
+/**
+ * 점자 입력 리스너
+ */
+display.on("brailleInput", (event: BrailleInputEvent) =&gt; {
+    console.log(`점자 입력: ${event.dotPattern.toString(2)}`);
+    if (event.character) {
+        console.log(`문자: ${event.character}`);
+    }
+});
+</pre>
+
+<h3>5.6.3 제스처 인식</h3>
+
+<pre>
+/**
+ * 제스처 이벤트
+ */
+interface GestureEvent {
+    /**
+     * 제스처 타입
+     */
+    type: "swipeLeft" | "swipeRight" | "swipeUp" | "swipeDown" |
+          "twoFingerTap" | "threeFingerTap";
+
+    /**
+     * 제스처 시작 위치
+     */
+    startPosition: number;
+
+    /**
+     * 제스처 종료 위치
+     */
+    endPosition: number;
+
+    /**
+     * 속도 (픽셀/초)
+     */
+    velocity: number;
+
+    /**
+     * 타임스탬프
+     */
+    timestamp: number;
+}
+
+/**
+ * 제스처 리스너
+ */
+display.on("gesture", (event: GestureEvent) =&gt; {
+    switch (event.type) {
+        case "swipeLeft":
+            display.scroll(-1);
+            break;
+        case "swipeRight":
+            display.scroll(1);
+            break;
+        case "twoFingerTap":
+            // 특수 기능 실행
+            break;
+    }
+});
+</pre>
+
+<h3>5.6.4 키 매핑 커스터마이징</h3>
+
+<pre>
+/**
+ * 키 매핑 설정
+ */
+interface KeyMapping {
+    /**
+     * 버튼 이름 또는 조합
+     */
+    key: string;
+
+    /**
+     * 액션 이름
+     */
+    action: string;
+
+    /**
+     * 액션 핸들러
+     */
+    handler: (event: ButtonEvent) =&gt; void;
+}
+
+/**
+ * 키 매핑 등록
+ */
+display.registerKeyMapping([
+    {
+        key: "space+dot1",
+        action: "previousLine",
+        handler: () =&gt; {
+            console.log("이전 줄로 이동");
+        }
+    },
+    {
+        key: "space+dot4",
+        action: "nextLine",
+        handler: () =&gt; {
+            console.log("다음 줄로 이동");
+        }
+    }
+]);
+</pre>
+
+<h2>5.7 오류 처리</h2>
+
+<p>견고한 애플리케이션을 위해서는 적절한 오류 처리가 필수적입니다.</p>
+
+<h3>5.7.1 오류 타입</h3>
+
+<pre>
+/**
+ * WIA 점자 디스플레이 오류 클래스
+ */
+class WiaBrailleError extends Error {
+    constructor(
+        message: string,
+        public code: string,
+        public recoverable: boolean = true
+    ) {
+        super(message);
+        this.name = "WiaBrailleError";
+    }
+}
+
+/**
+ * 오류 코드
+ */
+enum BrailleErrorCode {
+    // 연결 오류
+    DEVICE_NOT_FOUND = "DEVICE_NOT_FOUND",
+    CONNECTION_FAILED = "CONNECTION_FAILED",
+    CONNECTION_LOST = "CONNECTION_LOST",
+
+    // 통신 오류
+    TIMEOUT = "TIMEOUT",
+    PROTOCOL_ERROR = "PROTOCOL_ERROR",
+
+    // 하드웨어 오류
+    HARDWARE_ERROR = "HARDWARE_ERROR",
+    FIRMWARE_ERROR = "FIRMWARE_ERROR",
+
+    // API 사용 오류
+    INVALID_PARAMETER = "INVALID_PARAMETER",
+    INVALID_STATE = "INVALID_STATE",
+    NOT_CONNECTED = "NOT_CONNECTED",
+
+    // 리소스 오류
+    OUT_OF_MEMORY = "OUT_OF_MEMORY",
+    RESOURCE_BUSY = "RESOURCE_BUSY"
+}
+</pre>
+
+<h3>5.7.2 오류 처리 패턴</h3>
+
+<pre>
+/**
+ * Try-catch 패턴
+ */
+async function safeWrite(display: WiaBrailleDisplay, text: string) {
+    try {
+        await display.write(text);
+    } catch (error) {
+        if (error instanceof WiaBrailleError) {
+            switch (error.code) {
+                case BrailleErrorCode.NOT_CONNECTED:
+                    console.error("디스플레이가 연결되지 않았습니다");
+                    // 재연결 시도
+                    await display.connect();
+                    await display.write(text);
+                    break;
+
+                case BrailleErrorCode.TIMEOUT:
+                    console.error("통신 시간 초과");
+                    // 재시도
+                    await display.write(text);
+                    break;
+
+                default:
+                    console.error("알 수 없는 오류:", error.message);
+            }
+        } else {
+            throw error;
+        }
+    }
+}
+</pre>
+
+<h3>5.7.3 오류 이벤트</h3>
+
+<pre>
+/**
+ * 오류 이벤트 리스너
+ */
+display.on("error", (error: WiaBrailleError) =&gt; {
+    console.error(`오류 발생: ${error.code}`);
+    console.error(`메시지: ${error.message}`);
+    console.error(`복구 가능: ${error.recoverable}`);
+
+    if (error.recoverable) {
+        // 복구 시도
+        handleRecoverableError(error);
+    } else {
+        // 치명적 오류 처리
+        handleFatalError(error);
+    }
+});
+
+/**
+ * 복구 가능한 오류 처리
+ */
+async function handleRecoverableError(error: WiaBrailleError) {
+    switch (error.code) {
+        case BrailleErrorCode.CONNECTION_LOST:
+            await display.reconnect();
+            break;
+        case BrailleErrorCode.TIMEOUT:
+            await display.reset();
+            break;
+    }
+}
+
+/**
+ * 치명적 오류 처리
+ */
+function handleFatalError(error: WiaBrailleError) {
+    // 사용자에게 알림
+    alert(`점자 디스플레이 오류: ${error.message}`);
+    // 로그 기록
+    logger.error(error);
+    // 연결 종료
+    display.disconnect();
+}
+</pre>
+
+<h3>5.7.4 재시도 메커니즘</h3>
+
+<pre>
+/**
+ * 재시도 옵션
+ */
+interface RetryOptions {
+    /**
+     * 최대 재시도 횟수
+     */
+    maxRetries: number;
+
+    /**
+     * 재시도 간격 (ms)
+     */
+    retryDelay: number;
+
+    /**
+     * 지수 백오프 사용 여부
+     */
+    exponentialBackoff: boolean;
+}
+
+/**
+ * 재시도 래퍼 함수
+ */
+async function withRetry&lt;T&gt;(
+    fn: () =&gt; Promise&lt;T&gt;,
+    options: RetryOptions
+): Promise&lt;T&gt; {
+    let lastError: Error;
+
+    for (let i = 0; i &lt; options.maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+
+            const delay = options.exponentialBackoff
+                ? options.retryDelay * Math.pow(2, i)
+                : options.retryDelay;
+
+            console.log(`재시도 ${i + 1}/${options.maxRetries} (${delay}ms 후)`);
+            await sleep(delay);
+        }
+    }
+
+    throw lastError;
+}
+
+// 사용 예제
+const text = await withRetry(
+    () =&gt; display.write("안녕하세요"),
+    {
+        maxRetries: 3,
+        retryDelay: 1000,
+        exponentialBackoff: true
+    }
+);
+</pre>
+
+<h2>5.8 TypeScript/JavaScript 코드 예제</h2>
+
+<h3>5.8.1 기본 사용 예제</h3>
+
+<pre>
+import { WiaBrailleDisplay } from "@wia/braille-display";
+
+async function basicExample() {
+    // 1. 디스플레이 생성 및 연결
+    const display = new WiaBrailleDisplay({
+        autoConnect: true
+    });
+
+    await display.connect();
+    console.log("연결 완료!");
+
+    // 2. 디스플레이 정보 출력
+    const info = display.getInfo();
+    console.log(`모델: ${info.manufacturer} ${info.model}`);
+    console.log(`셀 개수: ${info.cellCount}`);
+
+    // 3. 텍스트 표시
+    await display.write("안녕하세요!");
+
+    // 4. 2초 후 지우기
+    await sleep(2000);
+    await display.clear();
+
+    // 5. 연결 해제
+    await display.disconnect();
+}
+
+basicExample().catch(console.error);
+</pre>
+
+<h3>5.8.2 이벤트 처리 예제</h3>
+
+<pre>
+import { WiaBrailleDisplay } from "@wia/braille-display";
+
+async function eventExample() {
+    const display = new WiaBrailleDisplay();
+    await display.connect();
+
+    // 라우팅 키 이벤트
+    display.on("routingKey", (event) =&gt; {
+        console.log(`셀 ${event.cellIndex} 눌림`);
+    });
+
+    // 버튼 이벤트
+    display.on("button", (event) =&gt; {
+        console.log(`버튼 ${event.buttonName} ${event.type}`);
+    });
+
+    // 제스처 이벤트
+    display.on("gesture", async (event) =&gt; {
+        if (event.type === "swipeLeft") {
+            await display.scroll(-1);
+        } else if (event.type === "swipeRight") {
+            await display.scroll(1);
+        }
+    });
+
+    // 오류 이벤트
+    display.on("error", (error) =&gt; {
+        console.error("오류:", error.message);
+    });
+
+    // 연결 해제 이벤트
+    display.on("disconnect", () =&gt; {
+        console.log("디스플레이 연결 해제됨");
+    });
+}
+
+eventExample().catch(console.error);
+</pre>
+
+<h3>5.8.3 스크롤 텍스트 예제</h3>
+
+<pre>
+import { WiaBrailleDisplay } from "@wia/braille-display";
+
+class BrailleScroller {
+    private display: WiaBrailleDisplay;
+    private text: string = "";
+    private position: number = 0;
+    private isScrolling: boolean = false;
+
+    constructor(display: WiaBrailleDisplay) {
+        this.display = display;
+    }
+
+    async start(text: string, speed: number = 500) {
+        this.text = text;
+        this.position = 0;
+        this.isScrolling = true;
+
+        const cellCount = this.display.getInfo().cellCount;
+
+        while (this.isScrolling) {
+            const visibleText = this.text.substring(
+                this.position,
+                this.position + cellCount
+            );
+
+            await this.display.write(visibleText);
+            await sleep(speed);
+
+            this.position++;
+            if (this.position + cellCount &gt; this.text.length) {
+                this.position = 0;  // 처음부터 다시
+            }
+        }
+    }
+
+    stop() {
+        this.isScrolling = false;
+    }
+}
+
+// 사용
+async function scrollExample() {
+    const display = new WiaBrailleDisplay();
+    await display.connect();
+
+    const scroller = new BrailleScroller(display);
+    await scroller.start(
+        "弘益人間 - 널리 인간을 이롭게 하라. WIA 점자 디스플레이 표준.",
+        300
+    );
+}
+
+scrollExample().catch(console.error);
+</pre>
+
+<h3>5.8.4 다중 디스플레이 관리 예제</h3>
+
+<pre>
+import { WiaBrailleDisplay } from "@wia/braille-display";
+
+class MultiDisplayManager {
+    private displays: Map&lt;string, WiaBrailleDisplay&gt; = new Map();
+
+    async discoverAndConnect() {
+        const devices = await WiaBrailleDisplay.discover();
+
+        for (const deviceInfo of devices) {
+            const display = new WiaBrailleDisplay({
+                deviceId: deviceInfo.serialNumber
+            });
+
+            await display.connect();
+            this.displays.set(deviceInfo.serialNumber, display);
+
+            console.log(`연결됨: ${deviceInfo.model}`);
+        }
+    }
+
+    async writeToAll(text: string) {
+        const promises = Array.from(this.displays.values()).map(
+            display =&gt; display.write(text)
+        );
+
+        await Promise.all(promises);
+    }
+
+    async disconnectAll() {
+        const promises = Array.from(this.displays.values()).map(
+            display =&gt; display.disconnect()
+        );
+
+        await Promise.all(promises);
+        this.displays.clear();
+    }
+}
+
+// 사용
+async function multiDisplayExample() {
+    const manager = new MultiDisplayManager();
+    await manager.discoverAndConnect();
+
+    await manager.writeToAll("모든 디스플레이에 표시");
+
+    await sleep(3000);
+    await manager.disconnectAll();
+}
+
+multiDisplayExample().catch(console.error);
+</pre>
+
+<h3>5.8.5 실시간 알림 시스템 예제</h3>
+
+<pre>
+import { WiaBrailleDisplay } from "@wia/braille-display";
+
+class BrailleNotificationSystem {
+    private display: WiaBrailleDisplay;
+    private queue: string[] = [];
+    private isProcessing: boolean = false;
+
+    constructor(display: WiaBrailleDisplay) {
+        this.display = display;
+    }
+
+    async notify(message: string, priority: "low" | "normal" | "high" = "normal") {
+        if (priority === "high") {
+            // 긴급 알림은 즉시 표시
+            await this.displayMessage(message);
+        } else {
+            // 일반 알림은 큐에 추가
+            this.queue.push(message);
+            if (!this.isProcessing) {
+                await this.processQueue();
+            }
+        }
+    }
+
+    private async processQueue() {
+        this.isProcessing = true;
+
+        while (this.queue.length &gt; 0) {
+            const message = this.queue.shift()!;
+            await this.displayMessage(message);
+            await sleep(3000);  // 각 메시지를 3초간 표시
+        }
+
+        this.isProcessing = false;
+    }
+
+    private async displayMessage(message: string) {
+        await this.display.clear();
+        await this.display.write(message);
+
+        // 진동 피드백 (지원되는 경우)
+        if (this.display.supportsVibration()) {
+            await this.display.vibrate(200);
+        }
+    }
+}
+
+// 사용
+async function notificationExample() {
+    const display = new WiaBrailleDisplay();
+    await display.connect();
+
+    const notifier = new BrailleNotificationSystem(display);
+
+    // 일반 알림
+    await notifier.notify("새 메시지가 도착했습니다");
+    await notifier.notify("회의가 10분 후 시작됩니다");
+
+    // 긴급 알림
+    await notifier.notify("긴급: 배터리 부족!", "high");
+}
+
+notificationExample().catch(console.error);
+</pre>
+
+<h2>5.9 장 요약</h2>
+
+<p>이 장에서는 WIA 점자 디스플레이 API의 핵심 기능을 다루었습니다:</p>
+
+<ul>
+    <li><strong>API 설계 철학</strong>: 단순성, 일관성, 안전성, 확장성을 기반으로 설계된 API</li>
+    <li><strong>WiaBrailleDisplay 클래스</strong>: 점자 디스플레이 제어를 위한 메인 클래스</li>
+    <li><strong>기기 검색 및 열거</strong>: 연결된 점자 디스플레이를 찾고 연결하는 방법</li>
+    <li><strong>셀 관리</strong>: 텍스트 쓰기, 점자 셀 직접 제어, 스크롤 기능</li>
+    <li><strong>커서 라우팅</strong>: 라우팅 키를 통한 커서 이동 처리</li>
+    <li><strong>키 이벤트 처리</strong>: 버튼, 제스처, 점자 입력 이벤트 처리</li>
+    <li><strong>오류 처리</strong>: 견고한 애플리케이션을 위한 오류 처리 패턴</li>
+    <li><strong>실전 예제</strong>: 다양한 사용 사례를 위한 TypeScript 코드 예제</li>
+</ul>
+
+<p>WIA 점자 디스플레이 API는 개발자가 복잡한 하드웨어 세부사항을 걱정하지 않고 점자 디스플레이 기능을 쉽게 통합할 수 있도록 설계되었습니다. 弘益人間의 정신에 따라, 이 API는 모든 개발자가 접근 가능한 기술을 만들 수 있도록 돕습니다.</p>
+
+<h2>5.10 복습 문제</h2>
+
+<ol>
+    <li>WIA 점자 디스플레이 API의 세 가지 계층 구조를 설명하고, 각각의 사용 사례를 제시하세요.</li>
+    <li>WiaBrailleDisplay 클래스의 주요 메서드 5가지를 나열하고 각각의 역할을 설명하세요.</li>
+    <li>기기 검색과 자동 연결의 차이점은 무엇인가요?</li>
+    <li>텍스트를 점자로 표시하는 두 가지 방법(write vs setCells)을 비교하세요.</li>
+    <li>커서 라우팅이 무엇이며, 어떻게 구현하는지 설명하세요.</li>
+    <li>점자 디스플레이에서 발생할 수 있는 주요 오류 타입 5가지를 나열하세요.</li>
+    <li>재시도 메커니즘에서 지수 백오프(exponential backoff)가 필요한 이유는 무엇인가요?</li>
+    <li>이벤트 기반 프로그래밍이 점자 디스플레이 API에서 중요한 이유를 설명하세요.</li>
+    <li>여러 점자 디스플레이를 동시에 관리할 때 고려해야 할 사항은 무엇인가요?</li>
+    <li>弘益人間 철학이 API 설계에 어떻게 반영되었는지 논하세요.</li>
+</ol>
+
+<h2>5.11 다음 장 미리보기</h2>
+
+<p>다음 장에서는 <strong>Phase 3: 통신 프로토콜</strong>을 다룹니다. 점자 디스플레이와 컴퓨터 간의 실제 통신이 어떻게 이루어지는지 깊이 있게 살펴볼 것입니다:</p>
+
+<ul>
+    <li>USB HID 프로토콜의 세부사항과 구현 방법</li>
+    <li>Bluetooth LE GATT 서비스 아키텍처</li>
+    <li>레거시 시스템을 위한 직렬 통신 지원</li>
+    <li>BRLTTY와의 통합 및 호환성</li>
+    <li>메시지 형식, 명령 구조, 데이터 인코딩</li>
+    <li>보안 고려사항 및 암호화</li>
+    <li>실시간 성능을 위한 지연 시간 최적화</li>
+</ul>
+
+<p>통신 프로토콜을 이해하면 점자 디스플레이 드라이버를 직접 개발하거나 기존 프로토콜과의 호환성을 보장할 수 있습니다.</p>
+</body>
+</html>

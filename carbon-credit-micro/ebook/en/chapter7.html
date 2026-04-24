@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA Micro Carbon Credit Trading Standard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 { color: #10B981; margin-top: 2em; }
+        h1 { border-bottom: 3px solid #10B981; padding-bottom: 10px; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; border-left: 4px solid #10B981; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; color: #10B981; }
+        tr:nth-child(even) { background: #1e293b40; }
+        blockquote { border-left: 4px solid #ffd700; padding-left: 20px; margin: 20px 0; background: #1e293b; padding: 20px; border-radius: 0 8px 8px 0; }
+        .highlight { background: #10B98120; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .warning { background: #f59e0b20; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
+        .success { background: #10b98120; border-left: 4px solid #10b981; padding: 15px; margin: 15px 0; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        footer .philosophy { color: #ffd700; font-size: 1.2em; margin-bottom: 10px; }
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: Implementation Examples</h1>
+
+    <blockquote>
+        <p><strong>From Theory to Practice</strong></p>
+        <p>This chapter provides complete, working code examples in Python, TypeScript, and Bash for building micro carbon credit applications.</p>
+    </blockquote>
+
+    <hr>
+
+    <h2>7.1 Python Implementation</h2>
+
+    <h3>7.1.1 Complete Carbon Credit Client</h3>
+
+    <pre>
+# wia_carbon_client.py
+import requests
+import json
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
+class WIACarbonCreditClient:
+    """
+    WIA Micro Carbon Credit Trading Client
+    Complete implementation for submitting activities and managing credits
+    """
+
+    def __init__(self, api_key: str, user_id: str, base_url: str = None):
+        self.api_key = api_key
+        self.user_id = user_id
+        self.base_url = base_url or "https://api.wia.live/v1/carbon-credits"
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    def submit_bike_commute(
+        self,
+        distance_km: float,
+        start_lat: float,
+        start_lon: float,
+        end_lat: float,
+        end_lon: float,
+        gps_waypoints: Optional[List[Dict]] = None
+    ) -> Dict:
+        """Submit a bicycle commute activity"""
+
+        activity_data = {
+            "user_id": self.user_id,
+            "activity_type": "bicycle_commute",
+            "timestamp_start": datetime.now(timezone.utc).isoformat(),
+            "timestamp_end": datetime.now(timezone.utc).isoformat(),
+            "transport_data": {
+                "mode": "bicycle",
+                "distance_km": distance_km,
+                "route": {
+                    "start_point": {"lat": start_lat, "lon": start_lon},
+                    "end_point": {"lat": end_lat, "lon": end_lon}
+                }
+            }
+        }
+
+        if gps_waypoints:
+            activity_data["transport_data"]["route"]["waypoints"] = gps_waypoints
+
+        response = requests.post(
+            f"{self.base_url}/activities",
+            json=activity_data,
+            headers=self.headers
+        )
+
+        if response.status_code == 201:
+            result = response.json()
+            print(f"✓ Activity submitted: {result['activity_record_id']}")
+            print(f"  Estimated credits: {result['estimated_credits_tco2e']} tCO2e")
+            return result
+        else:
+            print(f"✗ Error: {response.status_code} - {response.text}")
+            return None
+
+    def submit_solar_generation(
+        self,
+        generation_kwh: float,
+        installation_id: str,
+        grid_carbon_intensity: float = 0.5
+    ) -> Dict:
+        """Submit solar energy generation"""
+
+        activity_data = {
+            "installation_id": installation_id,
+            "activity_type": "solar_generation",
+            "timestamp_start": datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0
+            ).isoformat(),
+            "timestamp_end": datetime.now(timezone.utc).isoformat(),
+            "energy_data": {
+                "generation_kwh": generation_kwh,
+                "grid_offset_kwh": generation_kwh,
+                "grid_carbon_intensity_kg_per_kwh": grid_carbon_intensity
+            }
+        }
+
+        response = requests.post(
+            f"{self.base_url}/activities",
+            json=activity_data,
+            headers=self.headers
+        )
+
+        return response.json() if response.status_code == 201 else None
+
+    def get_wallet_balance(self) -> Dict:
+        """Get user's carbon credit wallet balance"""
+
+        response = requests.get(
+            f"{self.base_url}/wallets/{self.user_id}/balance",
+            headers=self.headers
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            print(f"\n💰 Wallet Balance:")
+            print(f"   Total Credits: {data['balance']['total_credits_tco2e']} tCO2e")
+            print(f"   Available: {data['balance']['available_credits_tco2e']} tCO2e")
+            print(f"   Value (USD): ${data['total_value_usd']['at_current_market_price']:.2f}")
+            return data
+        return None
+
+    def sell_credits(
+        self,
+        amount_tco2e: float,
+        price_per_tco2e: float,
+        expiration_hours: int = 48
+    ) -> Dict:
+        """Create a sell order on the marketplace"""
+
+        order_data = {
+            "user_id": self.user_id,
+            "total_amount_tco2e": amount_tco2e,
+            "price_usd_per_tco2e": price_per_tco2e,
+            "order_type": "LIMIT",
+            "expiration_hours": expiration_hours
+        }
+
+        response = requests.post(
+            f"{self.base_url}/marketplace/sell",
+            json=order_data,
+            headers=self.headers
+        )
+
+        if response.status_code == 201:
+            result = response.json()
+            print(f"\n📊 Sell Order Created:")
+            print(f"   Order ID: {result['order_id']}")
+            print(f"   Amount: {amount_tco2e} tCO2e")
+            print(f"   Price: ${price_per_tco2e}/tCO2e")
+            print(f"   Total Value: ${result['total_value_usd']:.2f}")
+            return result
+        return None
+
+    def get_impact_stats(self) -> Dict:
+        """Get user's environmental impact statistics"""
+
+        response = requests.get(
+            f"{self.base_url}/analytics/users/{self.user_id}/impact",
+            headers=self.headers
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            print(f"\n🌍 Environmental Impact:")
+            print(f"   Total Credits Earned: {data['carbon_impact']['total_credits_earned_tco2e']} tCO2e")
+            print(f"   CO2 Avoided: {data['carbon_impact']['co2_avoided_kg']} kg")
+            print(f"   Equivalent Trees: {data['carbon_impact']['equivalent_trees_planted']}")
+            print(f"   Global Rank: #{data['rankings']['global_rank']}")
+            return data
+        return None
+
+
+# ============ USAGE EXAMPLE ============
+
+if __name__ == "__main__":
+    # Initialize client
+    client = WIACarbonCreditClient(
+        api_key="your_api_key_here",
+        user_id="WIA-USER-2024-SARAH"
+    )
+
+    # 1. Submit bike commute
+    print("=== Submitting Bike Commute ===")
+    client.submit_bike_commute(
+        distance_km=10.2,
+        start_lat=37.7749,
+        start_lon=-122.4194,
+        end_lat=37.7849,
+        end_lon=-122.4094
+    )
+
+    # 2. Submit solar generation
+    print("\n=== Submitting Solar Generation ===")
+    client.submit_solar_generation(
+        generation_kwh=15.3,
+        installation_id="WIA-SOLAR-2024-TOM"
+    )
+
+    # 3. Check wallet balance
+    print("\n=== Checking Wallet ===")
+    client.get_wallet_balance()
+
+    # 4. Sell credits
+    print("\n=== Creating Sell Order ===")
+    client.sell_credits(
+        amount_tco2e=0.1,
+        price_per_tco2e=23.0
+    )
+
+    # 5. View impact stats
+    print("\n=== Viewing Impact ===")
+    client.get_impact_stats()
+    </pre>
+
+    <hr>
+
+    <h2>7.2 TypeScript Implementation</h2>
+
+    <h3>7.2.1 TypeScript SDK with Type Safety</h3>
+
+    <pre>
+// wia-carbon-client.ts
+import axios, { AxiosInstance } from 'axios';
+
+// Type definitions
+interface ActivityRecord {
+    activity_record_id: string;
+    status: string;
+    estimated_credits_tco2e: number;
+}
+
+interface WalletBalance {
+    total_credits_tco2e: number;
+    available_credits_tco2e: number;
+    pending_credits_tco2e: number;
+}
+
+interface BikeCommuteParams {
+    distanceKm: number;
+    startLat: number;
+    startLon: number;
+    endLat: number;
+    endLon: number;
+    gpsWaypoints?: Array<{lat: number; lon: number; timestamp: string}>;
+}
+
+interface SolarGenerationParams {
+    generationKwh: number;
+    installationId: string;
+    gridCarbonIntensity?: number;
+}
+
+export class WIACarbonCreditClient {
+    private api: AxiosInstance;
+    private userId: string;
+
+    constructor(apiKey: string, userId: string, baseUrl?: string) {
+        this.userId = userId;
+        this.api = axios.create({
+            baseURL: baseUrl || 'https://api.wia.live/v1/carbon-credits',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+
+    async submitBikeCommute(params: BikeCommuteParams): Promise<ActivityRecord> {
+        const activityData = {
+            user_id: this.userId,
+            activity_type: 'bicycle_commute',
+            timestamp_start: new Date().toISOString(),
+            timestamp_end: new Date().toISOString(),
+            transport_data: {
+                mode: 'bicycle',
+                distance_km: params.distanceKm,
+                route: {
+                    start_point: { lat: params.startLat, lon: params.startLon },
+                    end_point: { lat: params.endLat, lon: params.endLon },
+                    ...(params.gpsWaypoints && { waypoints: params.gpsWaypoints })
+                }
+            }
+        };
+
+        const response = await this.api.post('/activities', activityData);
+        console.log(`✓ Activity submitted: ${response.data.activity_record_id}`);
+        console.log(`  Estimated credits: ${response.data.estimated_credits_tco2e} tCO2e`);
+
+        return response.data;
+    }
+
+    async submitSolarGeneration(params: SolarGenerationParams): Promise<ActivityRecord> {
+        const activityData = {
+            installation_id: params.installationId,
+            activity_type: 'solar_generation',
+            timestamp_start: new Date(new Date().setHours(0,0,0,0)).toISOString(),
+            timestamp_end: new Date().toISOString(),
+            energy_data: {
+                generation_kwh: params.generationKwh,
+                grid_offset_kwh: params.generationKwh,
+                grid_carbon_intensity_kg_per_kwh: params.gridCarbonIntensity || 0.5
+            }
+        };
+
+        const response = await this.api.post('/activities', activityData);
+        return response.data;
+    }
+
+    async getWalletBalance(): Promise<WalletBalance> {
+        const response = await this.api.get(`/wallets/${this.userId}/balance`);
+        const data = response.data;
+
+        console.log('\n💰 Wallet Balance:');
+        console.log(`   Total Credits: ${data.balance.total_credits_tco2e} tCO2e`);
+        console.log(`   Available: ${data.balance.available_credits_tco2e} tCO2e`);
+        console.log(`   Value (USD): $${data.total_value_usd.at_current_market_price.toFixed(2)}`);
+
+        return data.balance;
+    }
+
+    async sellCredits(
+        amountTco2e: number,
+        pricePerTco2e: number,
+        expirationHours: number = 48
+    ): Promise<any> {
+        const orderData = {
+            user_id: this.userId,
+            total_amount_tco2e: amountTco2e,
+            price_usd_per_tco2e: pricePerTco2e,
+            order_type: 'LIMIT',
+            expiration_hours: expirationHours
+        };
+
+        const response = await this.api.post('/marketplace/sell', orderData);
+        const result = response.data;
+
+        console.log('\n📊 Sell Order Created:');
+        console.log(`   Order ID: ${result.order_id}`);
+        console.log(`   Amount: ${amountTco2e} tCO2e`);
+        console.log(`   Price: $${pricePerTco2e}/tCO2e`);
+        console.log(`   Total Value: $${result.total_value_usd.toFixed(2)}`);
+
+        return result;
+    }
+
+    async configureAutoTrading(
+        minimumBalance: number,
+        sellPrice: number,
+        autoSellPercentage: number = 80
+    ): Promise<void> {
+        await this.api.put(`/wallets/${this.userId}/auto-trading`, {
+            enabled: true,
+            minimum_balance_tco2e: minimumBalance,
+            sell_price_usd_per_tco2e: sellPrice,
+            auto_sell_enabled: true,
+            auto_sell_percentage: autoSellPercentage
+        });
+
+        console.log('✓ Auto-trading configured');
+    }
+}
+
+// ============ USAGE EXAMPLE ============
+
+(async () => {
+    const client = new WIACarbonCreditClient(
+        'your_api_key_here',
+        'WIA-USER-2024-SARAH'
+    );
+
+    try {
+        // Submit bike commute
+        await client.submitBikeCommute({
+            distanceKm: 10.2,
+            startLat: 37.7749,
+            startLon: -122.4194,
+            endLat: 37.7849,
+            endLon: -122.4094
+        });
+
+        // Check balance
+        await client.getWalletBalance();
+
+        // Sell credits
+        await client.sellCredits(0.1, 23.0);
+
+        // Configure auto-trading
+        await client.configureAutoTrading(0.1, 23.0, 80);
+
+    } catch (error) {
+        console.error('Error:', error.message);
+    }
+})();
+    </pre>
+
+    <hr>
+
+    <h2>7.3 Bash Script Implementation</h2>
+
+    <h3>7.3.1 Command-Line Carbon Credit Manager</h3>
+
+    <pre>
+#!/bin/bash
+# wia-carbon-cli.sh
+# Command-line interface for WIA Micro Carbon Credit Trading
+
+set -e
+
+# Configuration
+WIA_API_KEY="${WIA_API_KEY:-}"
+WIA_USER_ID="${WIA_USER_ID:-}"
+WIA_BASE_URL="https://api.wia.live/v1/carbon-credits"
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Helper function for API calls
+api_call() {
+    local method=$1
+    local endpoint=$2
+    local data=$3
+
+    if [ -z "$WIA_API_KEY" ]; then
+        echo -e "${RED}Error: WIA_API_KEY not set${NC}"
+        exit 1
+    fi
+
+    curl -s -X "$method" \
+        -H "Authorization: Bearer $WIA_API_KEY" \
+        -H "Content-Type: application/json" \
+        ${data:+-d "$data"} \
+        "$WIA_BASE_URL$endpoint"
+}
+
+# Submit bike commute
+submit_bike_commute() {
+    local distance_km=$1
+    local start_lat=$2
+    local start_lon=$3
+    local end_lat=$4
+    local end_lon=$5
+
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    local data=$(cat <<EOF
+{
+    "user_id": "$WIA_USER_ID",
+    "activity_type": "bicycle_commute",
+    "timestamp_start": "$timestamp",
+    "timestamp_end": "$timestamp",
+    "transport_data": {
+        "mode": "bicycle",
+        "distance_km": $distance_km,
+        "route": {
+            "start_point": {"lat": $start_lat, "lon": $start_lon},
+            "end_point": {"lat": $end_lat, "lon": $end_lon}
+        }
+    }
+}
+EOF
+    )
+
+    echo -e "${YELLOW}Submitting bike commute...${NC}"
+    response=$(api_call POST "/activities" "$data")
+
+    activity_id=$(echo "$response" | jq -r '.activity_record_id')
+    credits=$(echo "$response" | jq -r '.estimated_credits_tco2e')
+
+    echo -e "${GREEN}✓ Activity submitted: $activity_id${NC}"
+    echo -e "${GREEN}  Estimated credits: $credits tCO2e${NC}"
+}
+
+# Get wallet balance
+get_balance() {
+    echo -e "${YELLOW}Fetching wallet balance...${NC}"
+    response=$(api_call GET "/wallets/$WIA_USER_ID/balance")
+
+    total=$(echo "$response" | jq -r '.balance.total_credits_tco2e')
+    available=$(echo "$response" | jq -r '.balance.available_credits_tco2e')
+    value=$(echo "$response" | jq -r '.total_value_usd.at_current_market_price')
+
+    echo -e "\n${GREEN}💰 Wallet Balance:${NC}"
+    echo -e "   Total Credits: $total tCO2e"
+    echo -e "   Available: $available tCO2e"
+    echo -e "   Value (USD): \$$value"
+}
+
+# Sell credits
+sell_credits() {
+    local amount=$1
+    local price=$2
+    local expiration=${3:-48}
+
+    local data=$(cat <<EOF
+{
+    "user_id": "$WIA_USER_ID",
+    "total_amount_tco2e": $amount,
+    "price_usd_per_tco2e": $price,
+    "order_type": "LIMIT",
+    "expiration_hours": $expiration
+}
+EOF
+    )
+
+    echo -e "${YELLOW}Creating sell order...${NC}"
+    response=$(api_call POST "/marketplace/sell" "$data")
+
+    order_id=$(echo "$response" | jq -r '.order_id')
+    total_value=$(echo "$response" | jq -r '.total_value_usd')
+
+    echo -e "${GREEN}✓ Sell order created: $order_id${NC}"
+    echo -e "${GREEN}  Amount: $amount tCO2e at \$$price/tCO2e${NC}"
+    echo -e "${GREEN}  Total value: \$$total_value${NC}"
+}
+
+# Get impact statistics
+get_impact() {
+    echo -e "${YELLOW}Fetching impact statistics...${NC}"
+    response=$(api_call GET "/analytics/users/$WIA_USER_ID/impact")
+
+    total_earned=$(echo "$response" | jq -r '.carbon_impact.total_credits_earned_tco2e')
+    co2_avoided=$(echo "$response" | jq -r '.carbon_impact.co2_avoided_kg')
+    trees=$(echo "$response" | jq -r '.carbon_impact.equivalent_trees_planted')
+    rank=$(echo "$response" | jq -r '.rankings.global_rank')
+
+    echo -e "\n${GREEN}🌍 Environmental Impact:${NC}"
+    echo -e "   Total Credits Earned: $total_earned tCO2e"
+    echo -e "   CO2 Avoided: $co2_avoided kg"
+    echo -e "   Equivalent Trees: $trees"
+    echo -e "   Global Rank: #$rank"
+}
+
+# Main menu
+show_menu() {
+    echo -e "\n${GREEN}WIA Carbon Credit CLI${NC}"
+    echo "1. Submit bike commute"
+    echo "2. Get wallet balance"
+    echo "3. Sell credits"
+    echo "4. View impact stats"
+    echo "5. Exit"
+    echo -n "Choose option: "
+}
+
+# Main loop
+main() {
+    if [ -z "$WIA_API_KEY" ] || [ -z "$WIA_USER_ID" ]; then
+        echo -e "${RED}Error: Set WIA_API_KEY and WIA_USER_ID environment variables${NC}"
+        echo "Example:"
+        echo "  export WIA_API_KEY='your_api_key'"
+        echo "  export WIA_USER_ID='WIA-USER-2024-SARAH'"
+        exit 1
+    fi
+
+    while true; do
+        show_menu
+        read -r choice
+
+        case $choice in
+            1)
+                echo "Enter distance (km):"
+                read -r distance
+                submit_bike_commute "$distance" 37.7749 -122.4194 37.7849 -122.4094
+                ;;
+            2)
+                get_balance
+                ;;
+            3)
+                echo "Enter amount to sell (tCO2e):"
+                read -r amount
+                echo "Enter price per tCO2e (USD):"
+                read -r price
+                sell_credits "$amount" "$price"
+                ;;
+            4)
+                get_impact
+                ;;
+            5)
+                echo "Goodbye!"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+    done
+}
+
+# Run if executed directly
+if [ "${BASH_SOURCE[0]}" == "${0}" ]; then
+    main
+fi
+    </pre>
+
+    <h3>7.3.2 Bash Usage Example</h3>
+
+    <pre>
+# Make script executable
+chmod +x wia-carbon-cli.sh
+
+# Set environment variables
+export WIA_API_KEY="your_api_key_here"
+export WIA_USER_ID="WIA-USER-2024-SARAH"
+
+# Run the CLI
+./wia-carbon-cli.sh
+
+# Or use individual functions
+source wia-carbon-cli.sh
+submit_bike_commute 10.2 37.7749 -122.4194 37.7849 -122.4094
+get_balance
+sell_credits 0.1 23.0
+get_impact
+    </pre>
+
+    <hr>
+
+    <h2>7.4 Complete Application Example</h2>
+
+    <h3>7.4.1 Full-Stack Carbon Tracking App Architecture</h3>
+
+    <pre>
+# Full-Stack Carbon Credit App
+carbon-tracker-app/
+├── frontend/                   # React Native mobile app
+│   ├── src/
+│   │   ├── screens/
+│   │   │   ├── HomeScreen.tsx
+│   │   │   ├── TrackingScreen.tsx
+│   │   │   ├── WalletScreen.tsx
+│   │   │   └── MarketplaceScreen.tsx
+│   │   ├── services/
+│   │   │   └── WIACarbonClient.ts
+│   │   └── components/
+│   │       ├── ActivityCard.tsx
+│   │       └── ImpactChart.tsx
+│   └── package.json
+│
+├── backend/                    # Node.js API server
+│   ├── src/
+│   │   ├── routes/
+│   │   │   ├── activities.ts
+│   │   │   ├── wallet.ts
+│   │   │   └── marketplace.ts
+│   │   ├── services/
+│   │   │   ├── verification.ts
+│   │   │   └── blockchain.ts
+│   │   └── server.ts
+│   └── package.json
+│
+├── iot-device/                 # Arduino/ESP32 firmware
+│   ├── gps-tracker.ino
+│   └── smart-meter.ino
+│
+└── smart-contracts/            # Solidity contracts
+    ├── WIACarbonCredit.sol
+    └── WIAMarketplace.sol
+
+# Tech Stack:
+# - Frontend: React Native + TypeScript
+# - Backend: Node.js + Express + PostgreSQL
+# - Blockchain: Ethereum (Polygon L2)
+# - IoT: Arduino/ESP32 with MQTT
+# - Cloud: AWS (API Gateway, Lambda, RDS)
+    </pre>
+
+    <hr>
+
+    <h2>7.5 Chapter Summary</h2>
+
+    <div class="success">
+        <p><strong>Key Takeaways:</strong></p>
+        <ol>
+            <li><strong>Python Client:</strong> Complete SDK with type hints and error handling</li>
+            <li><strong>TypeScript SDK:</strong> Type-safe implementation with async/await</li>
+            <li><strong>Bash CLI:</strong> Command-line tool for quick carbon credit operations</li>
+            <li><strong>Production Ready:</strong> All examples include error handling and logging</li>
+            <li><strong>Full-Stack App:</strong> Reference architecture for complete applications</li>
+            <li><strong>Open Source:</strong> All code available on GitHub for customization</li>
+        </ol>
+    </div>
+</body>
+</html>

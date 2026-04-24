@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 API Interface Standard - WIA AAC Standard Ebook</title>
+</head>
+<body>
+
+<p><a href="index.html">[AAC] WIA AAC Standard Ebook</a> | Chapter 5 of 8</p>
+
+<hr>
+
+<h1>[AAC] Chapter 5: Phase 2 - API Interface Standard</h1>
+
+<blockquote>
+<p><strong>Hongik Ingan (弘益人間)</strong></p>
+<p>"One API to connect them all."</p>
+<p>Phase 2 creates the programming interface that makes sensor integration simple for every developer.</p>
+</blockquote>
+
+<hr>
+
+<h2>5.1 Overview of Phase 2</h2>
+
+<h3>5.1.1 Purpose</h3>
+
+<p>Phase 2 defines the API Interface Standard - a unified programming interface that software developers use to interact with any WIA AAC compliant sensor. This layer abstracts the complexity of different sensor types behind a consistent API.</p>
+
+<h3>5.1.2 Deliverables</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Deliverable</th>
+            <th>Description</th>
+            <th>Language</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>API Specification</td>
+            <td>Complete interface documentation</td>
+            <td>Language-agnostic</td>
+        </tr>
+        <tr>
+            <td>Reference Implementation</td>
+            <td>Official implementation</td>
+            <td>Rust</td>
+        </tr>
+        <tr>
+            <td>TypeScript SDK</td>
+            <td>Web/Node.js SDK</td>
+            <td>TypeScript</td>
+        </tr>
+        <tr>
+            <td>Python SDK</td>
+            <td>Python SDK</td>
+            <td>Python 3.9+</td>
+        </tr>
+        <tr>
+            <td>Developer Guide</td>
+            <td>Integration tutorials</td>
+            <td>Markdown</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>5.2 Core API Design</h2>
+
+<h3>5.2.1 Design Principles</h3>
+
+<ol>
+    <li><strong>Simplicity First</strong>
+        <p>Common operations should require minimal code. Complex operations should be possible but not required.</p>
+    </li>
+    <li><strong>Event-Driven Architecture</strong>
+        <p>All sensor input is handled through events, enabling reactive programming patterns.</p>
+    </li>
+    <li><strong>Type Safety</strong>
+        <p>Strong typing prevents common errors and enables IDE support.</p>
+    </li>
+    <li><strong>Async by Default</strong>
+        <p>All I/O operations are asynchronous to prevent blocking.</p>
+    </li>
+    <li><strong>Graceful Error Handling</strong>
+        <p>Clear error types and recovery mechanisms.</p>
+    </li>
+</ol>
+
+<h3>5.2.2 Core Classes</h3>
+
+<pre>
+WIA AAC API Class Hierarchy:
+
+WiaAAC (Main Entry Point)
+  |
+  +-- DeviceManager
+  |     +-- Device
+  |     +-- DeviceInfo
+  |     +-- ConnectionOptions
+  |
+  +-- SignalProcessor
+  |     +-- SignalValidator
+  |     +-- SignalTransformer
+  |
+  +-- EventEmitter
+  |     +-- Signal Events
+  |     +-- Device Events
+  |     +-- Error Events
+  |
+  +-- ConfigManager
+  |     +-- UserProfile
+  |     +-- CalibrationData
+  |
+  +-- OutputManager
+        +-- TextOutput
+        +-- IntegrationAdapters
+</pre>
+
+<hr>
+
+<h2>5.3 WiaAAC Class</h2>
+
+<h3>5.3.1 Constructor and Initialization</h3>
+
+<pre>
+// TypeScript Example
+
+import { WiaAAC, WiaAACConfig } from 'wia-aac';
+
+// Basic initialization
+const aac = new WiaAAC();
+
+// With configuration
+const aac = new WiaAAC({
+    autoConnect: false,
+    signalValidation: true,
+    logLevel: 'info',
+    userProfile: 'profile-001'
+});
+
+// Configuration interface
+interface WiaAACConfig {
+    autoConnect?: boolean;        // Auto-connect to discovered devices
+    signalValidation?: boolean;   // Validate all incoming signals
+    logLevel?: 'debug' | 'info' | 'warn' | 'error';
+    userProfile?: string;         // User profile identifier
+    calibrationId?: string;       // Calibration data identifier
+    locale?: string;              // Language preference
+}
+</pre>
+
+<h3>5.3.2 Connection Methods</h3>
+
+<pre>
+// Connect to a specific device type
+await aac.connect({
+    type: 'eye_tracker',
+    deviceId: 'TOBII-ET5-A1B2C3D4'  // Optional: specific device
+});
+
+// Connect to any available device
+await aac.connect({ type: 'switch' });
+
+// Connect with transport specification
+await aac.connect({
+    type: 'emg',
+    transport: 'bluetooth',
+    connectionTimeout: 10000
+});
+
+// Connection options interface
+interface ConnectionOptions {
+    type: SensorType;
+    deviceId?: string;
+    transport?: 'bluetooth' | 'usb' | 'wifi' | 'serial';
+    connectionTimeout?: number;
+    autoReconnect?: boolean;
+    reconnectAttempts?: number;
+}
+
+// Check connection status
+const isConnected = aac.isConnected();
+const deviceInfo = aac.getConnectedDevice();
+
+// Disconnect
+await aac.disconnect();
+</pre>
+
+<h3>5.3.3 Event Handling</h3>
+
+<pre>
+// Signal events
+aac.on('signal', (signal: AACSignal) =&gt; {
+    console.log('Received signal:', signal.type);
+    console.log('Data:', signal.data);
+    console.log('Confidence:', signal.confidence);
+});
+
+// Specific sensor type events
+aac.on('eye_tracker', (signal: EyeTrackerSignal) =&gt; {
+    console.log(`Gaze: (${signal.data.gaze_x}, ${signal.data.gaze_y})`);
+    if (signal.data.fixation) {
+        console.log(`Dwell time: ${signal.data.dwell_time_ms}ms`);
+    }
+});
+
+aac.on('switch', (signal: SwitchSignal) =&gt; {
+    console.log(`Switch ${signal.data.switch_id}: ${signal.data.state}`);
+});
+
+// Selection events (abstracted)
+aac.on('selection', (event: SelectionEvent) =&gt; {
+    console.log('Selection made:', event.target);
+    console.log('Selection method:', event.method);  // dwell, switch, blink, etc.
+});
+
+// Text output events
+aac.on('text', (text: string) =&gt; {
+    console.log('User typed:', text);
+    // Forward to TTS, sign language, braille...
+});
+
+// Device events
+aac.on('connected', (device: DeviceInfo) =&gt; {
+    console.log('Connected to:', device.model);
+});
+
+aac.on('disconnected', (reason: string) =&gt; {
+    console.log('Disconnected:', reason);
+});
+
+// Error events
+aac.on('error', (error: AACError) =&gt; {
+    console.error('Error:', error.code, error.message);
+});
+</pre>
+
+<hr>
+
+<h2>5.4 Device Discovery and Management</h2>
+
+<h3>5.4.1 Device Discovery</h3>
+
+<pre>
+// Discover all available devices
+const devices = await aac.discoverDevices();
+
+// Output example:
+// [
+//   {
+//     deviceId: 'TOBII-ET5-A1B2C3D4',
+//     type: 'eye_tracker',
+//     manufacturer: 'Tobii',
+//     model: 'Eye Tracker 5',
+//     transport: 'usb',
+//     status: 'available'
+//   },
+//   {
+//     deviceId: 'ABLENET-BLUE2-X1Y2Z3',
+//     type: 'switch',
+//     manufacturer: 'AbleNet',
+//     model: 'Blue2 Bluetooth',
+//     transport: 'bluetooth',
+//     status: 'available'
+//   }
+// ]
+
+// Discover specific type
+const eyeTrackers = await aac.discoverDevices({ type: 'eye_tracker' });
+
+// Discover with timeout
+const devices = await aac.discoverDevices({
+    timeout: 5000,
+    transport: 'bluetooth'
+});
+
+// Device info interface
+interface DeviceInfo {
+    deviceId: string;
+    type: SensorType;
+    manufacturer: string;
+    model: string;
+    transport: TransportType;
+    status: 'available' | 'connected' | 'busy' | 'error';
+    firmwareVersion?: string;
+    batteryLevel?: number;
+    signalQuality?: number;
+}
+</pre>
+
+<h3>5.4.2 Multi-Device Support</h3>
+
+<pre>
+// Connect multiple devices simultaneously
+await aac.connect({ type: 'eye_tracker' });
+await aac.connect({ type: 'switch' });
+
+// Check all connected devices
+const connectedDevices = aac.getConnectedDevices();
+
+// Handle signals from specific device
+aac.on('signal', (signal, deviceInfo) =&gt; {
+    if (deviceInfo.type === 'eye_tracker') {
+        handleEyeTracking(signal);
+    } else if (deviceInfo.type === 'switch') {
+        handleSwitch(signal);
+    }
+});
+
+// Disconnect specific device
+await aac.disconnect({ deviceId: 'TOBII-ET5-A1B2C3D4' });
+
+// Disconnect all
+await aac.disconnectAll();
+</pre>
+
+<hr>
+
+<h2>5.5 Signal Processing</h2>
+
+<h3>5.5.1 Signal Validation</h3>
+
+<pre>
+import { SignalValidator } from 'wia-aac';
+
+const validator = new SignalValidator();
+
+// Validate a signal
+const result = validator.validate(incomingSignal);
+
+if (result.valid) {
+    processSignal(incomingSignal);
+} else {
+    console.error('Invalid signal:', result.errors);
+}
+
+// Validation result interface
+interface ValidationResult {
+    valid: boolean;
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+}
+
+interface ValidationError {
+    field: string;
+    message: string;
+    code: string;
+}
+</pre>
+
+<h3>5.5.2 Signal Transformation</h3>
+
+<pre>
+import { SignalTransformer } from 'wia-aac';
+
+const transformer = new SignalTransformer();
+
+// Normalize coordinates to screen pixels
+const screenSignal = transformer.toScreenCoordinates(signal, {
+    screenWidth: 1920,
+    screenHeight: 1080
+});
+
+// Apply smoothing filter
+const smoothedSignal = transformer.smooth(signal, {
+    algorithm: 'exponential',
+    factor: 0.3
+});
+
+// Convert to different format
+const protobufSignal = transformer.toProtobuf(signal);
+const jsonSignal = transformer.toJSON(signal);
+
+// Aggregate multiple signals
+const aggregated = transformer.aggregate([signal1, signal2, signal3], {
+    method: 'average',
+    windowMs: 100
+});
+</pre>
+
+<h3>5.5.3 Dwell Detection</h3>
+
+<pre>
+import { DwellDetector } from 'wia-aac';
+
+const dwellDetector = new DwellDetector({
+    dwellTime: 800,           // ms to trigger
+    tolerance: 50,            // pixels of movement allowed
+    cooldown: 200             // ms between activations
+});
+
+// Process eye tracking signal
+dwellDetector.process(eyeTrackerSignal);
+
+// Dwell events
+dwellDetector.on('dwellStart', (position) =&gt; {
+    highlightTarget(position);
+});
+
+dwellDetector.on('dwellProgress', (position, progress) =&gt; {
+    updateProgressIndicator(position, progress);  // 0-100%
+});
+
+dwellDetector.on('dwellComplete', (position) =&gt; {
+    activateTarget(position);
+});
+
+dwellDetector.on('dwellCancel', (position) =&gt; {
+    clearHighlight(position);
+});
+</pre>
+
+<hr>
+
+<h2>5.6 User Profiles and Calibration</h2>
+
+<h3>5.6.1 User Profiles</h3>
+
+<pre>
+// Create user profile
+const profile = await aac.createProfile({
+    name: 'John',
+    preferences: {
+        dwellTime: 1000,
+        scanSpeed: 'medium',
+        fontSize: 'large',
+        voice: 'en-US-Neural'
+    },
+    sensorSettings: {
+        eye_tracker: {
+            sensitivity: 0.8,
+            smoothing: 0.3
+        },
+        switch: {
+            debounce: 50,
+            longPressTime: 800
+        }
+    }
+});
+
+// Load profile
+await aac.loadProfile('profile-john-001');
+
+// Update profile
+await aac.updateProfile({
+    preferences: {
+        dwellTime: 900  // Adjusted
+    }
+});
+
+// Export profile (for backup/transfer)
+const exportedProfile = await aac.exportProfile('profile-john-001');
+
+// Import profile
+await aac.importProfile(exportedProfile);
+</pre>
+
+<h3>5.6.2 Calibration</h3>
+
+<pre>
+// Start calibration for eye tracker
+const calibration = await aac.startCalibration({
+    type: 'eye_tracker',
+    points: 9,              // 5, 9, or 16 point calibration
+    pointDuration: 2000,    // ms per point
+    animatePoints: true
+});
+
+// Calibration events
+calibration.on('pointStart', (point, index) =&gt; {
+    showCalibrationPoint(point.x, point.y);
+});
+
+calibration.on('pointComplete', (point, quality) =&gt; {
+    console.log(`Point ${point.index} quality: ${quality}`);
+});
+
+calibration.on('complete', (result) =&gt; {
+    console.log('Calibration complete');
+    console.log('Overall quality:', result.quality);
+    console.log('Points:', result.pointResults);
+});
+
+// Recalibrate specific point
+await calibration.recalibratePoint(3);
+
+// Save calibration
+await aac.saveCalibration('calibration-john-001');
+
+// Load calibration
+await aac.loadCalibration('calibration-john-001');
+</pre>
+
+<hr>
+
+<h2>5.7 Rust Reference Implementation</h2>
+
+<h3>5.7.1 Core Structure</h3>
+
+<pre>
+// Rust Implementation Structure
+
+use wia_aac::{WiaAAC, Config, Signal, SensorType};
+use tokio;
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    // Initialize
+    let config = Config::builder()
+        .signal_validation(true)
+        .log_level("info")
+        .build();
+
+    let aac = WiaAAC::new(config)?;
+
+    // Discover devices
+    let devices = aac.discover_devices().await?;
+    println!("Found {} devices", devices.len());
+
+    // Connect
+    aac.connect(SensorType::EyeTracker, None).await?;
+
+    // Handle signals
+    let mut rx = aac.subscribe();
+    while let Some(signal) = rx.recv().await {
+        match signal.sensor_type {
+            SensorType::EyeTracker =&gt; {
+                let data = signal.as_eye_tracker()?;
+                println!("Gaze: ({}, {})", data.gaze_x, data.gaze_y);
+            }
+            SensorType::Switch =&gt; {
+                let data = signal.as_switch()?;
+                println!("Switch {}: {}", data.switch_id, data.state);
+            }
+            _ =&gt; {}
+        }
+    }
+
+    Ok(())
+}
+</pre>
+
+<h3>5.7.2 Signal Types</h3>
+
+<pre>
+// Rust Signal Type Definitions
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Signal {
+    pub signal_type: SensorType,
+    pub version: String,
+    pub timestamp: u64,
+    pub data: SignalData,
+    pub confidence: f64,
+    pub device: Option&lt;DeviceInfo&gt;,
+    pub session: Option&lt;SessionInfo&gt;,
+    pub metadata: Option&lt;serde_json::Value&gt;,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum SignalData {
+    EyeTracker(EyeTrackerData),
+    Switch(SwitchData),
+    Emg(EmgData),
+    EegBci(EegBciData),
+    Breath(BreathData),
+    HeadMovement(HeadMovementData),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EyeTrackerData {
+    pub gaze_x: f64,
+    pub gaze_y: f64,
+    pub fixation: bool,
+    pub dwell_time_ms: Option&lt;u32&gt;,
+    pub pupil_diameter_mm: Option&lt;f64&gt;,
+    pub blink_detected: Option&lt;bool&gt;,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwitchData {
+    pub switch_id: u8,
+    pub state: SwitchState,
+    pub duration_ms: Option&lt;u32&gt;,
+    pub press_count: Option&lt;u8&gt;,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SwitchState {
+    Pressed,
+    Released,
+    Held,
+}
+</pre>
+
+<h3>5.7.3 Axum Web Server Integration</h3>
+
+<pre>
+// Rust Axum API Server
+
+use axum::{
+    routing::{get, post},
+    Router, Json, extract::State,
+};
+use wia_aac::{WiaAAC, Signal};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+type AppState = Arc&lt;RwLock&lt;WiaAAC&gt;&gt;;
+
+#[tokio::main]
+async fn main() {
+    let aac = Arc::new(RwLock::new(WiaAAC::new_default().unwrap()));
+
+    let app = Router::new()
+        .route("/devices", get(list_devices))
+        .route("/connect", post(connect_device))
+        .route("/disconnect", post(disconnect_device))
+        .route("/signal", get(get_latest_signal))
+        .route("/profile", post(create_profile))
+        .with_state(aac);
+
+    axum::Server::bind(&amp;"0.0.0.0:3000".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+async fn list_devices(
+    State(aac): State&lt;AppState&gt;
+) -&gt; Json&lt;Vec&lt;DeviceInfo&gt;&gt; {
+    let aac = aac.read().await;
+    Json(aac.discover_devices().await.unwrap_or_default())
+}
+
+async fn connect_device(
+    State(aac): State&lt;AppState&gt;,
+    Json(options): Json&lt;ConnectionOptions&gt;
+) -&gt; Result&lt;Json&lt;DeviceInfo&gt;, StatusCode&gt; {
+    let mut aac = aac.write().await;
+    match aac.connect(options.sensor_type, options.device_id).await {
+        Ok(info) =&gt; Ok(Json(info)),
+        Err(_) =&gt; Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+</pre>
+
+<hr>
+
+<h2>5.8 Error Handling</h2>
+
+<h3>5.8.1 Error Types</h3>
+
+<pre>
+// Error type enumeration
+enum AACErrorCode {
+    // Connection errors
+    CONNECTION_TIMEOUT = 'E001',
+    DEVICE_NOT_FOUND = 'E002',
+    DEVICE_BUSY = 'E003',
+    CONNECTION_LOST = 'E004',
+
+    // Signal errors
+    INVALID_SIGNAL = 'E101',
+    VALIDATION_FAILED = 'E102',
+    SIGNAL_TIMEOUT = 'E103',
+
+    // Calibration errors
+    CALIBRATION_FAILED = 'E201',
+    CALIBRATION_INCOMPLETE = 'E202',
+
+    // Profile errors
+    PROFILE_NOT_FOUND = 'E301',
+    PROFILE_CORRUPT = 'E302',
+
+    // System errors
+    PERMISSION_DENIED = 'E401',
+    RESOURCE_UNAVAILABLE = 'E402',
+    INTERNAL_ERROR = 'E500'
+}
+
+// Error handling
+try {
+    await aac.connect({ type: 'eye_tracker' });
+} catch (error) {
+    if (error instanceof AACError) {
+        switch (error.code) {
+            case 'E001':
+                console.log('Connection timed out. Check device is powered on.');
+                break;
+            case 'E002':
+                console.log('Device not found. Run discovery first.');
+                break;
+            case 'E003':
+                console.log('Device is in use by another application.');
+                break;
+            default:
+                console.log('Error:', error.message);
+        }
+    }
+}
+</pre>
+
+<h3>5.8.2 Recovery Strategies</h3>
+
+<pre>
+// Auto-reconnect configuration
+const aac = new WiaAAC({
+    autoReconnect: true,
+    reconnectAttempts: 5,
+    reconnectDelay: 1000,       // Initial delay
+    reconnectBackoff: 'exponential'  // 1s, 2s, 4s, 8s, 16s
+});
+
+// Manual reconnection
+aac.on('disconnected', async (reason) =&gt; {
+    console.log('Disconnected:', reason);
+
+    // Attempt reconnection
+    for (let i = 0; i &lt; 3; i++) {
+        try {
+            await aac.reconnect();
+            console.log('Reconnected successfully');
+            break;
+        } catch (error) {
+            console.log(`Reconnection attempt ${i + 1} failed`);
+            await sleep(2000 * (i + 1));
+        }
+    }
+});
+
+// Fallback to different sensor
+aac.on('error', async (error) =&gt; {
+    if (error.code === 'E002' &amp;&amp; currentSensor === 'eye_tracker') {
+        console.log('Eye tracker unavailable, trying switch input');
+        await aac.connect({ type: 'switch' });
+    }
+});
+</pre>
+
+<hr>
+
+<h2>5.9 Chapter Summary</h2>
+
+<p>[OK] <strong>Key Takeaways:</strong></p>
+
+<ol>
+    <li><strong>Main Class:</strong> WiaAAC provides unified access to all sensor types</li>
+    <li><strong>Event-Driven:</strong> All sensor input handled through event callbacks</li>
+    <li><strong>Device Management:</strong> Discovery, connection, multi-device support</li>
+    <li><strong>Signal Processing:</strong> Validation, transformation, dwell detection</li>
+    <li><strong>User Profiles:</strong> Preferences, settings, calibration data</li>
+    <li><strong>Rust Reference:</strong> Official implementation with Axum web server</li>
+    <li><strong>Error Handling:</strong> Comprehensive error types and recovery</li>
+</ol>
+
+<hr>
+
+<h2>5.10 Review Questions</h2>
+
+<ol>
+    <li>What are the five design principles of the WIA AAC API?</li>
+    <li>How do you connect to a specific device type using the API?</li>
+    <li>What events are emitted during dwell detection?</li>
+    <li>Explain the purpose of user profiles in the API.</li>
+    <li>What is the reference implementation language and why?</li>
+    <li>Describe three error recovery strategies provided by the API.</li>
+</ol>
+
+<hr>
+
+<p><strong>Chapter 5 Complete</strong> | Approximate pages: 14</p>
+
+<hr>
+
+<p><strong>WIA - World Certification Industry Association</strong></p>
+<p>Hongik Ingan - Benefit All Humanity</p>
+<p><a href="https://wia.live">https://wia.live</a></p>
+</body>
+</html>

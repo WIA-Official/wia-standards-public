@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제7장 - Phase 4: 통합 | WIA 점자 디스플레이 표준</title>
+</head>
+<body>
+
+<h1>제7장: Phase 4 - 통합</h1>
+
+<h2>7.1 스크린 리더 통합 개요</h2>
+
+<p>점자 디스플레이의 진정한 가치는 스크린 리더와의 통합에서 나타납니다. 이 장에서는 주요 스크린 리더와 플랫폼에서 WIA 점자 디스플레이를 통합하는 방법을 다룹니다.</p>
+
+<h3>7.1.1 통합 아키텍처</h3>
+
+<pre>
+┌─────────────────────────────────────────────────┐
+│              애플리케이션                          │
+└─────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│           접근성 API (MSAA, UIAutomation)        │
+└─────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│              스크린 리더                          │
+│  ┌──────────┬──────────┬──────────┬──────────┐  │
+│  │  NVDA    │  JAWS    │VoiceOver │ TalkBack │  │
+│  └──────────┴──────────┴──────────┴──────────┘  │
+└─────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│           WIA 점자 드라이버 계층                   │
+└─────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│            점자 디스플레이 하드웨어                │
+└─────────────────────────────────────────────────┘
+</pre>
+
+<h3>7.1.2 공통 통합 패턴</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>패턴</th>
+            <th>설명</th>
+            <th>장점</th>
+            <th>단점</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>드라이버 모델</td>
+            <td>스크린 리더가 드라이버를 통해 하드웨어 제어</td>
+            <td>높은 성능, 직접 제어</td>
+            <td>각 스크린 리더마다 별도 드라이버 필요</td>
+        </tr>
+        <tr>
+            <td>프록시 모델</td>
+            <td>중간 프록시 서비스를 통한 간접 제어</td>
+            <td>여러 스크린 리더 동시 지원</td>
+            <td>약간의 지연 시간</td>
+        </tr>
+        <tr>
+            <td>플러그인 모델</td>
+            <td>스크린 리더의 플러그인으로 통합</td>
+            <td>쉬운 배포, 업데이트</td>
+            <td>스크린 리더 API 의존</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>7.2 NVDA 드라이버 개발</h2>
+
+<p>NVDA (NonVisual Desktop Access)는 Windows에서 가장 널리 사용되는 오픈소스 스크린 리더입니다.</p>
+
+<h3>7.2.1 NVDA 드라이버 구조</h3>
+
+<pre>
+# NVDA 점자 드라이버 템플릿
+# brailleDisplayDrivers/wia.py
+
+import braille
+import inputCore
+import hwPortUtils
+from logHandler import log
+
+class BrailleDisplayDriver(braille.BrailleDisplayDriver):
+    """WIA 점자 디스플레이 드라이버"""
+
+    name = "wia"
+    description = "WIA Braille Display"
+
+    @classmethod
+    def check(cls):
+        """드라이버 사용 가능 여부 확인"""
+        return True
+
+    def __init__(self):
+        """드라이버 초기화"""
+        super(BrailleDisplayDriver, self).__init__()
+
+        # USB를 통한 자동 검색
+        for portInfo in hwPortUtils.listComPorts():
+            if portInfo.get("bluetoothName", "").startswith("WIA"):
+                self._dev = self._openPort(portInfo["port"])
+                break
+        else:
+            raise RuntimeError("WIA 점자 디스플레이를 찾을 수 없습니다")
+
+        # 기기 정보 읽기
+        self._getDeviceInfo()
+
+    def _openPort(self, port):
+        """포트 열기"""
+        import serial
+        return serial.Serial(
+            port,
+            baudrate=9600,
+            timeout=0.2,
+            writeTimeout=0.2
+        )
+
+    def _getDeviceInfo(self):
+        """기기 정보 가져오기"""
+        # 정보 요청 명령 전송
+        self._dev.write(b'\xFF\x20\x00\x20\xFE')
+
+        # 응답 읽기
+        response = self._dev.read(64)
+        if response:
+            # 응답 파싱
+            self.numCells = response[35]
+            log.info(f"WIA 점자 디스플레이 연결됨: {self.numCells}셀")
+
+    def display(self, cells):
+        """점자 셀 표시"""
+        # NVDA의 셀 데이터를 WIA 프로토콜로 변환
+        cellBytes = bytes(cells)
+
+        # Output Report 구성
+        data = b'\x01' + bytes([0, len(cellBytes)]) + cellBytes
+
+        # 전송
+        self._dev.write(data)
+
+    def terminate(self):
+        """드라이버 종료"""
+        super(BrailleDisplayDriver, self).terminate()
+        if hasattr(self, '_dev'):
+            self._dev.close()
+</pre>
+
+<h3>7.2.2 키 입력 처리</h3>
+
+<pre>
+class BrailleDisplayDriver(braille.BrailleDisplayDriver):
+    # ... (이전 코드)
+
+    def _handleKeyPress(self):
+        """키 입력 처리"""
+        # 키 이벤트 읽기
+        data = self._dev.read(8)
+        if not data or len(data) &lt; 2:
+            return
+
+        reportId = data[0]
+
+        if reportId == 0x02:  # 라우팅 키
+            self._handleRoutingKey(data)
+        elif reportId == 0x04:  # 버튼
+            self._handleButton(data)
+
+    def _handleRoutingKey(self, data):
+        """라우팅 키 처리"""
+        # 비트맵에서 눌린 키 찾기
+        for cellIndex in range(self.numCells):
+            byteIndex = 2 + cellIndex // 8
+            bitIndex = cellIndex % 8
+
+            if data[byteIndex] &amp; (1 &lt;&lt; bitIndex):
+                # 라우팅 키 이벤트 전송
+                try:
+                    inputCore.manager.executeGesture(
+                        InputGesture(self, "routing", cellIndex)
+                    )
+                except inputCore.NoInputGestureAction:
+                    pass
+
+    def _handleButton(self, data):
+        """버튼 처리"""
+        buttonId = data[1]
+        eventType = data[2]
+
+        if eventType == 1:  # Press
+            try:
+                inputCore.manager.executeGesture(
+                    InputGesture(self, "button", buttonId)
+                )
+            except inputCore.NoInputGestureAction:
+                pass
+
+class InputGesture(braille.BrailleDisplayGesture):
+    """WIA 점자 디스플레이 제스처"""
+
+    source = BrailleDisplayDriver.name
+
+    def __init__(self, display, gestureType, value):
+        super(InputGesture, self).__init__()
+
+        self.display = display
+        self.id = f"{gestureType}_{value}"
+</pre>
+
+<h3>7.2.3 제스처 매핑</h3>
+
+<pre>
+# gesture map
+# WIA 점자 디스플레이의 제스처를 NVDA 명령에 매핑
+
+gestureMap = inputCore.GlobalGestureMap({
+    "globalCommands.GlobalCommands": {
+        "braille(wia):button_1": ("kb:upArrow",),
+        "braille(wia):button_2": ("kb:downArrow",),
+        "braille(wia):button_3": ("kb:leftArrow",),
+        "braille(wia):button_4": ("kb:rightArrow",),
+        "braille(wia):button_5+button_6": ("kb:enter",),
+    },
+})
+</pre>
+
+<h3>7.2.4 NVDA 애드온 패키징</h3>
+
+<pre>
+# buildVars.py
+# NVDA 애드온 빌드 변수
+
+addon_info = {
+    "addon_name": "wia-braille",
+    "addon_version": "1.0.0",
+    "addon_author": "WIA / SmileStory Inc.",
+    "addon_description": "WIA 점자 디스플레이 드라이버",
+    "addon_url": "https://github.com/WIA-Official/wia-standards",
+    "addon_minimumNVDAVersion": "2020.1.0",
+    "addon_lastTestedNVDAVersion": "2024.1.0",
+}
+</pre>
+
+<h2>7.3 JAWS 호환성</h2>
+
+<p>JAWS (Job Access With Speech)는 Windows에서 널리 사용되는 상용 스크린 리더입니다.</p>
+
+<h3>7.3.1 JAWS 스크립트 구조</h3>
+
+<pre>
+; WIA 점자 디스플레이 JAWS 스크립트
+; wia.jss
+
+; 전역 변수
+Globals
+    int ghDisplay,
+    int gnCells
+EndGlobals
+
+; 초기화
+Script DisplayInit()
+    ; 점자 디스플레이 초기화
+    let ghDisplay = BrailleDisplayOpen("WIA")
+
+    if ghDisplay then
+        let gnCells = BrailleDisplayGetCellCount(ghDisplay)
+        SayString("WIA 점자 디스플레이 연결됨: " + IntToString(gnCells) + "셀")
+    else
+        SayString("WIA 점자 디스플레이를 찾을 수 없습니다")
+    endif
+EndScript
+
+; 종료
+Script DisplayShutdown()
+    if ghDisplay then
+        BrailleDisplayClose(ghDisplay)
+        let ghDisplay = 0
+    endif
+EndScript
+
+; 점자 표시
+void Function DisplayBraille(string sText)
+    if ghDisplay then
+        ; 텍스트를 점자로 변환
+        string sBraille = TextToBraille(sText)
+
+        ; 디스플레이에 쓰기
+        BrailleDisplayWrite(ghDisplay, sBraille)
+    endif
+EndFunction
+
+; 라우팅 키 핸들러
+Script RoutingKey(int nCell)
+    ; 해당 위치로 커서 이동
+    RouteJAWSCursor(nCell)
+    SayString("셀 " + IntToString(nCell))
+EndScript
+</pre>
+
+<h3>7.3.2 JAWS 설정 파일</h3>
+
+<pre>
+; wia.jcf
+; WIA 점자 디스플레이 설정
+
+[Options]
+BrailleDisplayName=WIA Braille Display
+AutoConnect=1
+CellCount=40
+DotConfiguration=8
+
+[SerialPort]
+Port=AUTO
+BaudRate=9600
+DataBits=8
+Parity=N
+StopBits=1
+
+[USB]
+VendorID=0x1234
+ProductID=0x5678
+
+[Bluetooth]
+DeviceName=WIA*
+AutoPair=1
+
+[Keys]
+; 키 매핑
+Button1=SayPriorLine
+Button2=SayNextLine
+Button3=SayPriorWord
+Button4=SayNextWord
+RoutingKey=RouteJAWSCursor
+</pre>
+
+<h3>7.3.3 JAWS 브레일 드라이버 DLL</h3>
+
+<pre>
+// wia_braille.cpp
+// JAWS용 WIA 점자 디스플레이 드라이버
+
+#include &lt;windows.h&gt;
+#include "jaws_braille_api.h"
+
+// DLL 진입점
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved) {
+    return TRUE;
+}
+
+// JAWS 브레일 API 구현
+extern "C" {
+
+// 디스플레이 열기
+__declspec(dllexport)
+HANDLE WINAPI BrailleOpen(LPCTSTR lpszDeviceName) {
+    WiaBrailleDisplay* display = new WiaBrailleDisplay();
+
+    if (display-&gt;Open(lpszDeviceName)) {
+        return (HANDLE)display;
+    } else {
+        delete display;
+        return NULL;
+    }
+}
+
+// 디스플레이 닫기
+__declspec(dllexport)
+BOOL WINAPI BrailleClose(HANDLE hDisplay) {
+    WiaBrailleDisplay* display = (WiaBrailleDisplay*)hDisplay;
+    if (display) {
+        display-&gt;Close();
+        delete display;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+// 셀 개수 가져오기
+__declspec(dllexport)
+int WINAPI BrailleGetCellCount(HANDLE hDisplay) {
+    WiaBrailleDisplay* display = (WiaBrailleDisplay*)hDisplay;
+    return display ? display-&gt;GetCellCount() : 0;
+}
+
+// 점자 쓰기
+__declspec(dllexport)
+BOOL WINAPI BrailleWrite(HANDLE hDisplay, const BYTE* pCells, int nCount) {
+    WiaBrailleDisplay* display = (WiaBrailleDisplay*)hDisplay;
+    return display ? display-&gt;WriteCells(0, pCells, nCount) : FALSE;
+}
+
+// 키 읽기
+__declspec(dllexport)
+BOOL WINAPI BrailleReadKey(HANDLE hDisplay, DWORD* pdwKey, DWORD dwTimeout) {
+    WiaBrailleDisplay* display = (WiaBrailleDisplay*)hDisplay;
+    if (!display) return FALSE;
+
+    BrailleKeyEvent event;
+    if (display-&gt;ReadKey(&amp;event, dwTimeout)) {
+        *pdwKey = MAKELONG(event.keyCode, event.keyType);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+} // extern "C"
+</pre>
+
+<h2>7.4 VoiceOver/iOS 통합</h2>
+
+<p>VoiceOver는 Apple의 내장 스크린 리더로, iOS와 macOS에서 사용됩니다.</p>
+
+<h3>7.4.1 iOS 외부 액세서리 프레임워크</h3>
+
+<pre>
+// WIABrailleDisplay.swift
+// iOS용 WIA 점자 디스플레이 통합
+
+import UIKit
+import ExternalAccessory
+
+class WIABrailleDisplay: NSObject {
+    private var session: EASession?
+    private var accessory: EAAccessory?
+
+    // 지원하는 프로토콜
+    static let protocolString = "com.wia.braille"
+
+    // 초기화
+    override init() {
+        super.init()
+
+        // 액세서리 연결 알림 등록
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(accessoryConnected(_:)),
+            name: .EAAccessoryDidConnect,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(accessoryDisconnected(_:)),
+            name: .EAAccessoryDidDisconnect,
+            object: nil
+        )
+
+        // 이미 연결된 액세서리 확인
+        connectToAccessory()
+    }
+
+    // 액세서리 연결
+    private func connectToAccessory() {
+        let manager = EAAccessoryManager.shared()
+
+        for accessory in manager.connectedAccessories {
+            if accessory.protocolStrings.contains(WIABrailleDisplay.protocolString) {
+                self.accessory = accessory
+                openSession()
+                break
+            }
+        }
+    }
+
+    // 세션 열기
+    private func openSession() {
+        guard let accessory = self.accessory else { return }
+
+        session = EASession(
+            accessory: accessory,
+            forProtocol: WIABrailleDisplay.protocolString
+        )
+
+        if let session = session {
+            // 입력 스트림 설정
+            session.inputStream?.delegate = self
+            session.inputStream?.schedule(in: .main, forMode: .default)
+            session.inputStream?.open()
+
+            // 출력 스트림 설정
+            session.outputStream?.schedule(in: .main, forMode: .default)
+            session.outputStream?.open()
+
+            print("WIA 점자 디스플레이 연결됨")
+        }
+    }
+
+    // 점자 쓰기
+    func write(brailleCells: [UInt8]) {
+        guard let outputStream = session?.outputStream else { return }
+
+        var packet = Data()
+        packet.append(0x01)  // Report ID
+        packet.append(0x00)  // Start cell
+        packet.append(contentsOf: brailleCells)
+
+        let written = packet.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -&gt; Int in
+            return outputStream.write(
+                bytes.bindMemory(to: UInt8.self).baseAddress!,
+                maxLength: packet.count
+            )
+        }
+
+        if written != packet.count {
+            print("쓰기 오류: \(written)/\(packet.count) 바이트")
+        }
+    }
+
+    // 액세서리 연결 알림
+    @objc private func accessoryConnected(_ notification: Notification) {
+        if let accessory = notification.userInfo?[EAAccessoryKey] as? EAAccessory {
+            if accessory.protocolStrings.contains(WIABrailleDisplay.protocolString) {
+                self.accessory = accessory
+                openSession()
+            }
+        }
+    }
+
+    // 액세서리 연결 해제 알림
+    @objc private func accessoryDisconnected(_ notification: Notification) {
+        session?.inputStream?.close()
+        session?.outputStream?.close()
+        session = nil
+        accessory = nil
+        print("WIA 점자 디스플레이 연결 해제됨")
+    }
+}
+
+// 스트림 델리게이트
+extension WIABrailleDisplay: StreamDelegate {
+    func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
+        switch eventCode {
+        case .hasBytesAvailable:
+            if let inputStream = aStream as? InputStream {
+                handleInput(stream: inputStream)
+            }
+
+        case .errorOccurred:
+            print("스트림 오류: \(aStream.streamError?.localizedDescription ?? "알 수 없음")")
+
+        default:
+            break
+        }
+    }
+
+    private func handleInput(stream: InputStream) {
+        var buffer = [UInt8](repeating: 0, count: 64)
+        let bytesRead = stream.read(&amp;buffer, maxLength: buffer.count)
+
+        if bytesRead &gt; 0 {
+            let data = Data(buffer[0..&lt;bytesRead])
+            processInputData(data)
+        }
+    }
+
+    private func processInputData(_ data: Data) {
+        guard data.count &gt;= 2 else { return }
+
+        let reportId = data[0]
+
+        switch reportId {
+        case 0x02:  // 라우팅 키
+            handleRoutingKey(data)
+
+        case 0x04:  // 버튼
+            handleButton(data)
+
+        default:
+            break
+        }
+    }
+
+    private func handleRoutingKey(_ data: Data) {
+        // VoiceOver에 라우팅 이벤트 전달
+        // (VoiceOver API 사용)
+    }
+
+    private func handleButton(_ data: Data) {
+        // 버튼 이벤트 처리
+    }
+}
+</pre>
+
+<h3>7.4.2 Info.plist 설정</h3>
+
+<pre>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+    &lt;!-- 외부 액세서리 프로토콜 --&gt;
+    &lt;key&gt;UISupportedExternalAccessoryProtocols&lt;/key&gt;
+    &lt;array&gt;
+        &lt;string&gt;com.wia.braille&lt;/string&gt;
+    &lt;/array&gt;
+
+    &lt;!-- Bluetooth LE 사용 권한 --&gt;
+    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;
+    &lt;string&gt;이 앱은 WIA 점자 디스플레이에 연결하기 위해 Bluetooth를 사용합니다.&lt;/string&gt;
+
+    &lt;key&gt;NSBluetoothPeripheralUsageDescription&lt;/key&gt;
+    &lt;string&gt;이 앱은 WIA 점자 디스플레이에 연결하기 위해 Bluetooth를 사용합니다.&lt;/string&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+</pre>
+
+<h2>7.5 TalkBack/Android 지원</h2>
+
+<p>TalkBack은 Android의 내장 스크린 리더입니다.</p>
+
+<h3>7.5.1 Android Accessibility Service</h3>
+
+<pre>
+// WiaBrailleService.kt
+// Android TalkBack 통합
+
+package com.wia.braille
+
+import android.accessibilityservice.AccessibilityService
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
+import android.view.accessibility.AccessibilityEvent
+import java.util.UUID
+
+class WiaBrailleService : AccessibilityService() {
+
+    companion object {
+        // GATT 서비스 및 특성 UUID
+        val SERVICE_UUID: UUID = UUID.fromString("0000FE60-0000-1000-8000-00805F9B34FB")
+        val CELL_DATA_UUID: UUID = UUID.fromString("0000FE61-0000-1000-8000-00805F9B34FB")
+        val ROUTING_KEY_UUID: UUID = UUID.fromString("0000FE62-0000-1000-8000-00805F9B34FB")
+    }
+
+    private var bluetoothGatt: BluetoothGatt? = null
+    private var cellDataCharacteristic: BluetoothGattCharacteristic? = null
+    private var routingKeyCharacteristic: BluetoothGattCharacteristic? = null
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+
+        // 점자 디스플레이 연결
+        connectToBrailleDisplay()
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        event?.let {
+            // 접근성 이벤트를 점자로 변환하여 표시
+            val text = getEventText(it)
+            displayBraille(text)
+        }
+    }
+
+    override fun onInterrupt() {
+        // 서비스 중단 처리
+    }
+
+    private fun connectToBrailleDisplay() {
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        val pairedDevices = bluetoothAdapter.bondedDevices
+
+        // WIA 점자 디스플레이 찾기
+        val wiaDevice = pairedDevices.find { device -&gt;
+            device.name?.startsWith("WIA") == true
+        }
+
+        wiaDevice?.let { device -&gt;
+            bluetoothGatt = device.connectGatt(
+                this,
+                false,
+                gattCallback
+            )
+        }
+    }
+
+    private val gattCallback = object : BluetoothGattCallback() {
+        override fun onConnectionStateChange(
+            gatt: BluetoothGatt?,
+            status: Int,
+            newState: Int
+        ) {
+            if (newState == BluetoothGatt.STATE_CONNECTED) {
+                gatt?.discoverServices()
+            }
+        }
+
+        override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                val service = gatt?.getService(SERVICE_UUID)
+
+                cellDataCharacteristic = service?.getCharacteristic(CELL_DATA_UUID)
+                routingKeyCharacteristic = service?.getCharacteristic(ROUTING_KEY_UUID)
+
+                // 라우팅 키 알림 활성화
+                routingKeyCharacteristic?.let { characteristic -&gt;
+                    gatt?.setCharacteristicNotification(characteristic, true)
+                }
+            }
+        }
+
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?
+        ) {
+            if (characteristic?.uuid == ROUTING_KEY_UUID) {
+                val data = characteristic.value
+                handleRoutingKey(data)
+            }
+        }
+    }
+
+    private fun displayBraille(text: String) {
+        cellDataCharacteristic?.let { characteristic -&gt;
+            // 텍스트를 점자로 변환
+            val brailleCells = textToBraille(text)
+
+            // 데이터 패킷 구성
+            val packet = ByteArray(brailleCells.size + 2)
+            packet[0] = 0  // Start cell
+            packet[1] = brailleCells.size.toByte()
+            System.arraycopy(brailleCells, 0, packet, 2, brailleCells.size)
+
+            characteristic.value = packet
+            bluetoothGatt?.writeCharacteristic(characteristic)
+        }
+    }
+
+    private fun handleRoutingKey(data: ByteArray) {
+        if (data.size &gt;= 2) {
+            val eventType = data[0]
+            val cellIndex = data[1]
+
+            if (eventType.toInt() == 1) {  // Press
+                // TalkBack에 라우팅 이벤트 전달
+                performGlobalAction(GLOBAL_ACTION_ACCESSIBILITY_BUTTON)
+            }
+        }
+    }
+
+    private fun getEventText(event: AccessibilityEvent): String {
+        return event.text.joinToString(" ")
+    }
+
+    private fun textToBraille(text: String): ByteArray {
+        // 텍스트를 점자로 변환 (간단한 구현)
+        // 실제로는 더 복잡한 변환 로직 필요
+        return text.toByteArray()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        bluetoothGatt?.close()
+    }
+}
+</pre>
+
+<h3>7.5.2 Accessibility Service 설정</h3>
+
+<pre>
+&lt;!-- res/xml/accessibility_service_config.xml --&gt;
+&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/service_description"
+    android:packageNames="@null"
+    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityFlags="flagDefault"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="true"
+    android:settingsActivity="com.wia.braille.SettingsActivity"
+/&gt;
+</pre>
+
+<h2>7.6 Linux Orca 통합</h2>
+
+<p>Orca는 Linux의 주요 스크린 리더입니다. BRLTTY를 통해 점자 디스플레이를 지원합니다.</p>
+
+<h3>7.6.1 Orca 점자 설정</h3>
+
+<pre>
+# ~/.local/share/orca/user-settings.conf
+# Orca 사용자 설정
+
+# 점자 디스플레이 활성화
+enableBraille = True
+
+# WIA 드라이버 사용
+braille.driver = "wia"
+
+# 점자 테이블 (한국어)
+braille.translationTable = "ko-g1.ctb"
+
+# 점자 디스플레이 설정
+braille.verbosityLevel = 1
+braille.enableBrailleMonitor = False
+braille.enableFlashMessages = True
+braille.flashDuration = 5000
+braille.enableBrailleContext = True
+</pre>
+
+<h3>7.6.2 Orca 사용자 정의 스크립트</h3>
+
+<pre>
+# orca-customizations.py
+# Orca 사용자 정의 스크립트
+
+import orca.braille as braille
+import orca.orca_state as orca_state
+
+# WIA 점자 디스플레이 초기화 후크
+def wia_braille_init():
+    """WIA 점자 디스플레이 초기화"""
+
+    # 기본 초기화
+    braille.init()
+
+    # 사용자 정의 설정
+    if braille.brlAPI:
+        # 환영 메시지 표시
+        braille.displayMessage("WIA 점자 디스플레이 준비 완료")
+
+        # 키 바인딩 설정
+        setupKeyBindings()
+
+def setupKeyBindings():
+    """키 바인딩 설정"""
+
+    # 라우팅 키 핸들러
+    def routingKeyHandler(inputEvent):
+        """라우팅 키 핸들러"""
+        cellIndex = inputEvent.event_arg
+
+        # 해당 위치로 이동
+        orca_state.locusOfFocus.setCaretOffset(cellIndex)
+        return True
+
+    # 키 바인딩 등록
+    braille.setupKeyRanges({
+        "routing": (0, 40, routingKeyHandler)
+    })
+
+# Orca 시작 시 초기화
+orca.braille.init = wia_braille_init
+</pre>
+
+<h2>7.7 웹 접근성 (ARIA)</h2>
+
+<p>웹 애플리케이션에서도 점자 디스플레이를 활용할 수 있습니다.</p>
+
+<h3>7.7.1 ARIA 라이브 리전</h3>
+
+<pre>
+&lt;!-- 점자 디스플레이 친화적 웹 페이지 --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="ko"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;WIA 접근 가능한 웹 페이지&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+    &lt;!-- 메인 콘텐츠 --&gt;
+    &lt;main role="main"&gt;
+        &lt;h1&gt;환영합니다&lt;/h1&gt;
+
+        &lt;!-- 라이브 리전 (점자 디스플레이에 실시간 표시) --&gt;
+        &lt;div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            id="braille-status"&gt;
+            준비 완료
+        &lt;/div&gt;
+
+        &lt;!-- 알림 리전 --&gt;
+        &lt;div
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+            id="braille-alert"&gt;
+        &lt;/div&gt;
+
+        &lt;!-- 폼 --&gt;
+        &lt;form&gt;
+            &lt;label for="name"&gt;이름:&lt;/label&gt;
+            &lt;input
+                type="text"
+                id="name"
+                aria-describedby="name-help"
+                aria-required="true"
+            /&gt;
+            &lt;span id="name-help"&gt;이름을 입력하세요&lt;/span&gt;
+
+            &lt;button type="submit"&gt;제출&lt;/button&gt;
+        &lt;/form&gt;
+    &lt;/main&gt;
+
+    &lt;script&gt;
+        // 점자 디스플레이 업데이트 함수
+        function updateBrailleStatus(message) {
+            const statusElement = document.getElementById('braille-status');
+            statusElement.textContent = message;
+        }
+
+        function showBrailleAlert(message) {
+            const alertElement = document.getElementById('braille-alert');
+            alertElement.textContent = message;
+
+            // 3초 후 알림 지우기
+            setTimeout(() =&gt; {
+                alertElement.textContent = '';
+            }, 3000);
+        }
+
+        // 예제: 폼 제출 시 알림
+        document.querySelector('form').addEventListener('submit', (e) =&gt; {
+            e.preventDefault();
+            showBrailleAlert('폼이 제출되었습니다');
+        });
+    &lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<h3>7.7.2 Web Bluetooth API 통합</h3>
+
+<pre>
+// web-braille.js
+// 웹에서 직접 점자 디스플레이 제어
+
+class WebBrailleDisplay {
+    constructor() {
+        this.device = null;
+        this.server = null;
+        this.service = null;
+        this.cellDataCharacteristic = null;
+    }
+
+    async connect() {
+        try {
+            // 블루투스 기기 요청
+            this.device = await navigator.bluetooth.requestDevice({
+                filters: [{
+                    services: ['0000fe60-0000-1000-8000-00805f9b34fb']
+                }]
+            });
+
+            // GATT 서버 연결
+            this.server = await this.device.gatt.connect();
+
+            // 서비스 가져오기
+            this.service = await this.server.getPrimaryService(
+                '0000fe60-0000-1000-8000-00805f9b34fb'
+            );
+
+            // 특성 가져오기
+            this.cellDataCharacteristic = await this.service.getCharacteristic(
+                '0000fe61-0000-1000-8000-00805f9b34fb'
+            );
+
+            console.log('WIA 점자 디스플레이 연결됨');
+            return true;
+
+        } catch (error) {
+            console.error('연결 실패:', error);
+            return false;
+        }
+    }
+
+    async write(text) {
+        if (!this.cellDataCharacteristic) {
+            throw new Error('디스플레이가 연결되지 않았습니다');
+        }
+
+        // 텍스트를 점자로 변환
+        const brailleCells = this.textToBraille(text);
+
+        // 데이터 패킷 구성
+        const data = new Uint8Array(brailleCells.length + 2);
+        data[0] = 0;  // Start cell
+        data[1] = brailleCells.length;
+        data.set(brailleCells, 2);
+
+        // 쓰기
+        await this.cellDataCharacteristic.writeValue(data);
+    }
+
+    textToBraille(text) {
+        // 간단한 ASCII to Braille 변환
+        // 실제로는 더 복잡한 변환 로직 필요
+        const encoder = new TextEncoder();
+        return encoder.encode(text);
+    }
+
+    async disconnect() {
+        if (this.device &amp;&amp; this.device.gatt.connected) {
+            await this.device.gatt.disconnect();
+        }
+    }
+}
+
+// 사용 예제
+const brailleDisplay = new WebBrailleDisplay();
+
+document.getElementById('connect-btn').addEventListener('click', async () =&gt; {
+    await brailleDisplay.connect();
+});
+
+document.getElementById('write-btn').addEventListener('click', async () =&gt; {
+    const text = document.getElementById('text-input').value;
+    await brailleDisplay.write(text);
+});
+</pre>
+
+<h2>7.8 弘益人間 철학 반영</h2>
+
+<p>WIA 점자 디스플레이 표준은 弘益人間 (널리 인간을 이롭게 하라)의 정신을 실천합니다.</p>
+
+<h3>7.8.1 포용적 설계 원칙</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>원칙</th>
+            <th>설명</th>
+            <th>구현</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>보편적 접근성</td>
+            <td>모든 플랫폼에서 동일한 경험</td>
+            <td>Windows, macOS, Linux, iOS, Android 모두 지원</td>
+        </tr>
+        <tr>
+            <td>언어 포용성</td>
+            <td>다양한 언어 지원</td>
+            <td>한국어, 영어, 일본어 등 다국어 점자 변환</td>
+        </tr>
+        <tr>
+            <td>경제적 접근성</td>
+            <td>비용 부담 최소화</td>
+            <td>오픈소스 드라이버, 무료 SDK</td>
+        </tr>
+        <tr>
+            <td>기술적 포용성</td>
+            <td>레거시 시스템도 지원</td>
+            <td>USB, Bluetooth, 직렬 통신 모두 지원</td>
+        </tr>
+        <tr>
+            <td>교육적 접근성</td>
+            <td>배우기 쉬운 API</td>
+            <td>명확한 문서, 풍부한 예제</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>7.8.2 커뮤니티 기여</h3>
+
+<pre>
+/*
+ * 弘益人間 정신의 실천
+ *
+ * WIA 점자 디스플레이 표준은 다음과 같은 방식으로
+ * 인류에게 이로움을 제공합니다:
+ *
+ * 1. 오픈소스: 모든 코드와 문서를 공개하여 누구나 사용하고 개선할 수 있습니다
+ * 2. 표준화: 통일된 인터페이스로 개발자와 사용자의 부담을 줄입니다
+ * 3. 접근성: 시각 장애인의 디지털 접근성을 향상시킵니다
+ * 4. 교육: 풍부한 문서와 예제로 학습을 돕습니다
+ * 5. 협력: 글로벌 커뮤니티와 함께 발전시킵니다
+ *
+ * "기술은 모든 사람을 위한 것입니다"
+ */
+
+// 기여 방법
+const contribution = {
+    github: "https://github.com/WIA-Official/wia-standards",
+    issues: "https://github.com/WIA-Official/wia-standards/issues",
+    discussions: "https://github.com/WIA-Official/wia-standards/discussions",
+    email: "contact@wia-official.org"
+};
+</pre>
+
+<h2>7.9 장 요약</h2>
+
+<p>이 장에서는 WIA 점자 디스플레이를 다양한 스크린 리더 및 플랫폼과 통합하는 방법을 다루었습니다:</p>
+
+<ul>
+    <li><strong>NVDA</strong>: Python 기반 드라이버 개발, 제스처 매핑, 애드온 패키징</li>
+    <li><strong>JAWS</strong>: 스크립트 작성, 설정 파일, DLL 드라이버 구현</li>
+    <li><strong>VoiceOver/iOS</strong>: 외부 액세서리 프레임워크, Swift 통합</li>
+    <li><strong>TalkBack/Android</strong>: Accessibility Service, Bluetooth GATT 연결</li>
+    <li><strong>Orca/Linux</strong>: BRLTTY 통합, 사용자 정의 스크립트</li>
+    <li><strong>웹 접근성</strong>: ARIA 라이브 리전, Web Bluetooth API</li>
+    <li><strong>弘益人間</strong>: 포용적 설계, 오픈소스 기여, 커뮤니티 협력</li>
+</ul>
+
+<p>이러한 통합을 통해 WIA 점자 디스플레이는 모든 플랫폼에서 시각 장애인의 디지털 접근성을 향상시킵니다. 弘益人間의 정신에 따라, 우리는 기술이 모든 사람에게 이로움을 주도록 노력합니다.</p>
+
+<h2>7.10 복습 문제</h2>
+
+<ol>
+    <li>드라이버 모델, 프록시 모델, 플러그인 모델의 차이점과 각각의 장단점을 설명하세요.</li>
+    <li>NVDA 점자 디스플레이 드라이버에서 반드시 구현해야 하는 메서드는 무엇인가요?</li>
+    <li>JAWS 스크립트에서 라우팅 키 이벤트를 처리하는 방법을 설명하세요.</li>
+    <li>iOS에서 외부 액세서리 프레임워크를 사용하려면 Info.plist에 어떤 설정이 필요한가요?</li>
+    <li>Android Accessibility Service의 주요 콜백 메서드를 나열하세요.</li>
+    <li>Orca가 BRLTTY를 통해 점자 디스플레이를 제어하는 과정을 설명하세요.</li>
+    <li>웹 페이지에서 ARIA 라이브 리전을 사용하는 이유는 무엇인가요?</li>
+    <li>Web Bluetooth API의 보안 제약사항은 무엇인가요?</li>
+    <li>弘익人間 정신이 WIA 표준에 어떻게 반영되었는지 구체적인 예를 들어 설명하세요.</li>
+    <li>크로스 플랫폼 점자 디스플레이 라이브러리를 개발할 때 고려해야 할 주요 사항은 무엇인가요?</li>
+</ol>
+
+<h2>7.11 다음 장 미리보기</h2>
+
+<p>다음 장에서는 <strong>구현 및 인증</strong>을 다룹니다. WIA 점자 디스플레이 표준을 실제로 구현하고 인증받는 과정을 살펴볼 것입니다:</p>
+
+<ul>
+    <li>구현 로드맵: 단계별 구현 가이드</li>
+    <li>개발자 빠른 시작: 30분 안에 첫 번째 애플리케이션 만들기</li>
+    <li>테스트 절차: 기능, 성능, 호환성 테스트</li>
+    <li>WIA 인증 프로세스: 인증 레벨과 기준</li>
+    <li>모범 사례: 실전에서 검증된 팁과 기법</li>
+    <li>문제 해결: 일반적인 문제와 해결 방법</li>
+    <li>향후 로드맵: WIA 표준의 미래 방향</li>
+    <li>리소스 및 커뮤니티: 추가 학습 자료와 지원</li>
+</ul>
+
+<p>이 책의 마지막 장을 통해 여러분은 WIA 점자 디스플레이 표준을 완전히 이해하고 실무에 적용할 수 있게 될 것입니다.</p>
+</body>
+</html>

@@ -3,14 +3,12 @@
 //! Imports threat intelligence from TAXII 2.1 servers and STIX 2.1 bundles.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use super::{ImportResult, ImportError};
 
 // Re-export TAXII types from protocol module
 pub use crate::protocol::taxii::{
-    TaxiiDiscovery, TaxiiApiRoot, TaxiiCollection, TaxiiCollections,
-    StixBundle, StixObject, StixObjectType, StixIndicator, StixThreatActor,
-    KillChainPhase, ExternalReference, TaxiiObjectsResponse,
+    ExternalReference, KillChainPhase, StixBundle, StixIndicator, StixObject, StixObjectType,
+    StixThreatActor, TaxiiApiRoot, TaxiiCollection, TaxiiCollections, TaxiiDiscovery,
+    TaxiiObjectsResponse,
 };
 
 /// TAXII client configuration
@@ -32,7 +30,11 @@ pub struct TaxiiClientConfig {
 
 impl TaxiiClientConfig {
     /// Create with basic auth
-    pub fn basic_auth(api_root: impl Into<String>, username: impl Into<String>, password: impl Into<String>) -> Self {
+    pub fn basic_auth(
+        api_root: impl Into<String>,
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
         Self {
             api_root: api_root.into(),
             username: Some(username.into()),
@@ -80,7 +82,10 @@ impl TaxiiClient {
 
     /// Build collections URL
     pub fn collections_url(&self) -> String {
-        format!("{}/collections/", self.config.api_root.trim_end_matches('/'))
+        format!(
+            "{}/collections/",
+            self.config.api_root.trim_end_matches('/')
+        )
     }
 
     /// Build objects URL for a collection
@@ -228,11 +233,15 @@ impl StixConverter {
         let mut results = Vec::new();
 
         // Group related objects
-        let indicators: Vec<&serde_json::Value> = bundle.objects.iter()
+        let indicators: Vec<&serde_json::Value> = bundle
+            .objects
+            .iter()
             .filter(|o| o.get("type").and_then(|t| t.as_str()) == Some("indicator"))
             .collect();
 
-        let threat_actors: Vec<&serde_json::Value> = bundle.objects.iter()
+        let threat_actors: Vec<&serde_json::Value> = bundle
+            .objects
+            .iter()
             .filter(|o| o.get("type").and_then(|t| t.as_str()) == Some("threat-actor"))
             .collect();
 
@@ -256,12 +265,14 @@ impl StixConverter {
     /// Convert STIX indicator to WIA format
     fn convert_indicator(obj: &serde_json::Value) -> Option<WiaThreatIntel> {
         let id = obj.get("id")?.as_str()?.to_string();
-        let name = obj.get("name")
+        let name = obj
+            .get("name")
             .and_then(|n| n.as_str())
             .unwrap_or("Unknown Indicator")
             .to_string();
         let pattern = obj.get("pattern")?.as_str()?.to_string();
-        let pattern_type = obj.get("pattern_type")
+        let pattern_type = obj
+            .get("pattern_type")
             .and_then(|p| p.as_str())
             .unwrap_or("stix")
             .to_string();
@@ -272,25 +283,34 @@ impl StixConverter {
             id: id.clone(),
             pattern: pattern.clone(),
             pattern_type,
-            indicator_types: obj.get("indicator_types")
+            indicator_types: obj
+                .get("indicator_types")
                 .and_then(|t| t.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default(),
-            valid_from: obj.get("valid_from")
+            valid_from: obj
+                .get("valid_from")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            valid_until: obj.get("valid_until")
+            valid_until: obj
+                .get("valid_until")
                 .and_then(|v| v.as_str())
                 .map(String::from),
-            confidence: obj.get("confidence")
+            confidence: obj
+                .get("confidence")
                 .and_then(|c| c.as_u64())
                 .map(|c| c as u32),
             ioc_type,
             ioc_value,
         };
 
-        let kill_chain = obj.get("kill_chain_phases")
+        let kill_chain = obj
+            .get("kill_chain_phases")
             .and_then(|k| k.as_array())
             .map(|arr| {
                 arr.iter()
@@ -308,17 +328,36 @@ impl StixConverter {
             id,
             intel_type: "indicator".to_string(),
             name,
-            description: obj.get("description").and_then(|d| d.as_str()).map(String::from),
-            confidence: obj.get("confidence").and_then(|c| c.as_u64()).map(|c| c as u32),
-            created: obj.get("created").and_then(|c| c.as_str()).unwrap_or("").to_string(),
-            modified: obj.get("modified").and_then(|m| m.as_str()).unwrap_or("").to_string(),
+            description: obj
+                .get("description")
+                .and_then(|d| d.as_str())
+                .map(String::from),
+            confidence: obj
+                .get("confidence")
+                .and_then(|c| c.as_u64())
+                .map(|c| c as u32),
+            created: obj
+                .get("created")
+                .and_then(|c| c.as_str())
+                .unwrap_or("")
+                .to_string(),
+            modified: obj
+                .get("modified")
+                .and_then(|m| m.as_str())
+                .unwrap_or("")
+                .to_string(),
             indicators: vec![indicator],
             threat_actors: vec![],
             kill_chain,
             references: Self::extract_references(obj),
-            labels: obj.get("labels")
+            labels: obj
+                .get("labels")
                 .and_then(|l| l.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default(),
         })
     }
@@ -331,30 +370,60 @@ impl StixConverter {
         let actor_info = WiaThreatActorInfo {
             id: id.clone(),
             name: name.clone(),
-            aliases: obj.get("aliases")
+            aliases: obj
+                .get("aliases")
                 .and_then(|a| a.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default(),
-            sophistication: obj.get("sophistication").and_then(|s| s.as_str()).map(String::from),
-            resource_level: obj.get("resource_level").and_then(|r| r.as_str()).map(String::from),
-            motivation: obj.get("primary_motivation").and_then(|m| m.as_str()).map(String::from),
+            sophistication: obj
+                .get("sophistication")
+                .and_then(|s| s.as_str())
+                .map(String::from),
+            resource_level: obj
+                .get("resource_level")
+                .and_then(|r| r.as_str())
+                .map(String::from),
+            motivation: obj
+                .get("primary_motivation")
+                .and_then(|m| m.as_str())
+                .map(String::from),
         };
 
         Some(WiaThreatIntel {
             id,
             intel_type: "threat_actor".to_string(),
             name,
-            description: obj.get("description").and_then(|d| d.as_str()).map(String::from),
+            description: obj
+                .get("description")
+                .and_then(|d| d.as_str())
+                .map(String::from),
             confidence: None,
-            created: obj.get("created").and_then(|c| c.as_str()).unwrap_or("").to_string(),
-            modified: obj.get("modified").and_then(|m| m.as_str()).unwrap_or("").to_string(),
+            created: obj
+                .get("created")
+                .and_then(|c| c.as_str())
+                .unwrap_or("")
+                .to_string(),
+            modified: obj
+                .get("modified")
+                .and_then(|m| m.as_str())
+                .unwrap_or("")
+                .to_string(),
             indicators: vec![],
             threat_actors: vec![actor_info],
             kill_chain: vec![],
             references: Self::extract_references(obj),
-            labels: obj.get("labels")
+            labels: obj
+                .get("labels")
                 .and_then(|l| l.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default(),
         })
     }
@@ -428,7 +497,8 @@ impl StixConverter {
 // Helper function for base64 encoding (simplified)
 fn base64_encode(input: &str) -> String {
     use std::io::Write;
-    let mut encoder = base64::write::EncoderStringWriter::new(&base64::engine::general_purpose::STANDARD);
+    let mut encoder =
+        base64::write::EncoderStringWriter::new(&base64::engine::general_purpose::STANDARD);
     encoder.write_all(input.as_bytes()).unwrap();
     encoder.into_inner()
 }
@@ -444,13 +514,15 @@ mod base64 {
 
         impl EncoderStringWriter {
             pub fn new(_engine: &super::engine::general_purpose::GeneralPurpose) -> Self {
-                Self { buffer: String::new() }
+                Self {
+                    buffer: String::new(),
+                }
             }
 
             pub fn into_inner(self) -> String {
                 // Simple base64 encoding
-                use std::io::Read;
-                base64_simple(&self.buffer.as_bytes())
+
+                base64_simple(self.buffer.as_bytes())
             }
         }
 
@@ -466,7 +538,8 @@ mod base64 {
         }
 
         fn base64_simple(input: &[u8]) -> String {
-            const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            const ALPHABET: &[u8] =
+                b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
             let mut result = String::new();
 
             for chunk in input.chunks(3) {
@@ -513,7 +586,7 @@ mod tests {
     fn test_taxii_client_urls() {
         let config = TaxiiClientConfig::bearer_token(
             "https://taxii.example.com/taxii2/api/v1",
-            "test-token"
+            "test-token",
         );
         let client = TaxiiClient::new(config);
 
@@ -529,7 +602,8 @@ mod tests {
         assert_eq!(ioc_type, "ipv4");
         assert_eq!(value, "192.168.1.100");
 
-        let (ioc_type2, value2) = StixConverter::parse_pattern("[domain-name:value = 'malware.example.com']");
+        let (ioc_type2, value2) =
+            StixConverter::parse_pattern("[domain-name:value = 'malware.example.com']");
         assert_eq!(ioc_type2, "domain");
         assert_eq!(value2, "malware.example.com");
     }
@@ -541,7 +615,10 @@ mod tests {
             .limit(100)
             .indicators_only();
 
-        assert_eq!(filters.added_after, Some("2024-12-01T00:00:00Z".to_string()));
+        assert_eq!(
+            filters.added_after,
+            Some("2024-12-01T00:00:00Z".to_string())
+        );
         assert_eq!(filters.limit, Some(100));
         assert_eq!(filters.types, Some(vec!["indicator".to_string()]));
     }

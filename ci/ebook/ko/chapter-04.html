@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 4: 테스팅 통합 | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 4: 테스팅 통합과 코드 품질</h1>
+
+    <p>테스팅은 지속적 통합의 핵심입니다. 포괄적인 자동화 테스트 없이 CI는 단순한 컴파일 검증에 불과합니다. 이 챕터에서는 다양한 테스팅 방법론을 파이프라인에 통합하고, 코드 품질 게이트를 구현하며, 유지보수 가능한 소프트웨어를 위한 정적 분석 도구를 활용하는 방법을 탐구합니다.</p>
+
+    <h2>테스팅 피라미드</h2>
+
+    <p>테스팅 피라미드는 다양한 유형의 테스트를 균형 있게 배치하기 위한 프레임워크를 제공합니다. 건강한 테스트 스위트는 많은 빠른 단위 테스트, 더 적은 통합 테스트, 그리고 더욱 적은 엔드투엔드 테스트를 가집니다.</p>
+
+    <pre><code># 테스팅 피라미드
+
+           /\
+          /  \      E2E 테스트 (적음, 느림, 높은 신뢰도)
+         /----\
+        /      \    통합 테스트 (일부, 중간 속도)
+       /--------\
+      /          \  단위 테스트 (많음, 빠름, 낮은 신뢰도)
+     /------------\
+
+WIA-CI 권장 비율:
+- 단위 테스트: 테스트 스위트의 70%
+- 통합 테스트: 테스트 스위트의 20%
+- E2E 테스트: 테스트 스위트의 10%</code></pre>
+
+    <h2>CI에서의 단위 테스팅</h2>
+
+    <p>단위 테스트는 개별 컴포넌트를 격리하여 검증합니다. 빠르고, 결정론적이며, 외부 리소스와 독립적이어야 합니다.</p>
+
+    <h3>CI 최적화를 위한 Jest 구성</h3>
+
+    <pre><code>// jest.config.js - CI 최적화 구성
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/src'],
+  testMatch: ['**/*.test.ts', '**/*.spec.ts'],
+
+  // CI 전용 설정
+  ci: true,
+  maxWorkers: '50%',  // 사용 가능한 코어의 절반 사용
+
+  // 커버리지 구성
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'cobertura'],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80
+    }
+  },
+
+  // CI용 리포터
+  reporters: [
+    'default',
+    ['jest-junit', {
+      outputDirectory: 'reports',
+      outputName: 'junit.xml'
+    }]
+  ],
+
+  // CI에서 빠른 실패
+  bail: process.env.CI ? 1 : 0,
+
+  // 느린 CI 러너를 위한 타임아웃
+  testTimeout: 30000
+};</code></pre>
+
+    <pre><code># GitHub Actions - 단위 테스트 통합
+name: 단위 테스트
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 단위 테스트 실행
+        run: npm test
+
+      - name: Codecov에 커버리지 업로드
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
+
+      - name: 테스트 결과 업로드
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: reports/junit.xml</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI 테스팅 표준:</strong> 단위 테스트는 5분 이내에 완료되어야 합니다. 이 임계값을 초과하는 테스트는 별도의 "느린 테스트" 작업으로 이동하여 병렬로 실행하거나 스케줄에 따라 실행해야 합니다.
+    </div>
+
+    <h2>통합 테스팅</h2>
+
+    <p>통합 테스트는 컴포넌트가 함께 올바르게 작동하는지 검증합니다. 일반적으로 데이터베이스, 메시지 큐, API와 같은 외부 의존성이 필요합니다.</p>
+
+    <h3>데이터베이스 테스팅을 위한 Testcontainers</h3>
+
+    <pre><code>// Testcontainers를 사용한 통합 테스트
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import { Pool } from 'pg';
+
+describe('UserRepository 통합', () => {
+  let container;
+  let pool;
+
+  beforeAll(async () => {
+    container = await new PostgreSqlContainer()
+      .withDatabase('testdb')
+      .withUsername('test')
+      .withPassword('test')
+      .start();
+
+    pool = new Pool({
+      connectionString: container.getConnectionUri()
+    });
+
+    // 마이그레이션 실행
+    await runMigrations(pool);
+  }, 60000);
+
+  afterAll(async () => {
+    await pool.end();
+    await container.stop();
+  });
+
+  it('사용자를 생성하고 조회해야 함', async () => {
+    const repo = new UserRepository(pool);
+
+    const user = await repo.create({
+      email: 'test@example.com',
+      name: '테스트 사용자'
+    });
+
+    const retrieved = await repo.findById(user.id);
+    expect(retrieved.email).toBe('test@example.com');
+  });
+});</code></pre>
+
+    <pre><code># GitLab CI - 서비스를 사용한 통합 테스트
+integration-tests:
+  stage: test
+  image: node:20
+  services:
+    - name: postgres:15
+      alias: db
+    - name: redis:7
+      alias: cache
+  variables:
+    DATABASE_URL: postgres://postgres:postgres@db:5432/test
+    REDIS_URL: redis://cache:6379
+  script:
+    - npm ci
+    - npm run test:integration
+  artifacts:
+    reports:
+      junit: reports/integration-junit.xml</code></pre>
+
+    <h2>엔드투엔드 테스팅</h2>
+
+    <p>E2E 테스트는 전체 애플리케이션 스택을 통한 완전한 사용자 워크플로우를 검증합니다. 느리고 더 취약하지만 시스템이 올바르게 작동한다는 가장 높은 신뢰도를 제공합니다.</p>
+
+    <h3>Playwright E2E 구성</h3>
+
+    <pre><code>// playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [
+    ['html', { outputFolder: 'playwright-report' }],
+    ['junit', { outputFile: 'reports/e2e-junit.xml' }]
+  ],
+
+  use: {
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure'
+  },
+
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'mobile', use: { ...devices['iPhone 14'] } }
+  ],
+
+  webServer: {
+    command: 'npm run start',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000
+  }
+});</code></pre>
+
+    <pre><code># GitHub Actions - E2E 테스트
+name: E2E 테스트
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: Playwright 브라우저 설치
+        run: npx playwright install --with-deps
+
+      - name: E2E 테스트 실행
+        run: npx playwright test
+
+      - name: 테스트 리포트 업로드
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30</code></pre>
+
+    <h2>코드 품질 게이트</h2>
+
+    <p>품질 게이트는 코드가 병합되기 전에 충족해야 하는 최소 표준을 강제합니다. 기술 부채 축적을 방지하고 코드베이스 건강을 유지합니다.</p>
+
+    <h3>품질 게이트 구성</h3>
+
+    <table>
+        <tr>
+            <th>메트릭</th>
+            <th>임계값</th>
+            <th>도구</th>
+        </tr>
+        <tr>
+            <td>코드 커버리지</td>
+            <td>>= 80%</td>
+            <td>Jest, Istanbul</td>
+        </tr>
+        <tr>
+            <td>중복</td>
+            <td><= 3%</td>
+            <td>SonarQube, jscpd</td>
+        </tr>
+        <tr>
+            <td>복잡도</td>
+            <td>함수당 <= 15</td>
+            <td>ESLint, SonarQube</td>
+        </tr>
+        <tr>
+            <td>보안 핫스팟</td>
+            <td>치명적 0개</td>
+            <td>SonarQube, Snyk</td>
+        </tr>
+        <tr>
+            <td>기술 부채</td>
+            <td><= 5%</td>
+            <td>SonarQube</td>
+        </tr>
+    </table>
+
+    <pre><code># SonarQube 품질 게이트
+# sonar-project.properties
+sonar.projectKey=wia-ci-demo
+sonar.sources=src
+sonar.tests=tests
+sonar.javascript.lcov.reportPaths=coverage/lcov.info
+sonar.testExecutionReportPaths=reports/test-report.xml
+
+sonar.qualitygate.wait=true
+sonar.qualitygate.timeout=300</code></pre>
+
+    <h2>정적 분석 도구</h2>
+
+    <p>정적 분석은 코드를 실행하지 않고 검사하여 개발 주기 초기에 버그, 보안 문제, 스타일 위반을 발견합니다.</p>
+
+    <h3>ESLint 구성</h3>
+
+    <pre><code>// eslint.config.js - Flat 구성 (ESLint 9+)
+import eslint from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import security from 'eslint-plugin-security';
+
+export default tseslint.config(
+  eslint.configs.recommended,
+  ...tseslint.configs.strictTypeChecked,
+  {
+    plugins: { security },
+    rules: {
+      // TypeScript 전용
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/explicit-function-return-type': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_'
+      }],
+
+      // 보안 규칙
+      'security/detect-object-injection': 'warn',
+      'security/detect-non-literal-regexp': 'warn',
+
+      // 코드 품질
+      'complexity': ['error', 15],
+      'max-lines-per-function': ['warn', 50],
+      'max-depth': ['error', 4]
+    }
+  },
+  {
+    ignores: ['dist/', 'coverage/', 'node_modules/']
+  }
+);</code></pre>
+
+    <h3>다중 도구 정적 분석 파이프라인</h3>
+
+    <pre><code># GitHub Actions - 종합 정적 분석
+name: 정적 분석
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint -- --format @microsoft/eslint-formatter-sarif --output-file eslint.sarif
+        continue-on-error: true
+
+      - name: ESLint 결과 업로드
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: eslint.sarif
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: TypeScript 타입 체크
+        run: npx tsc --noEmit</code></pre>
+
+    <div class="highlight">
+        <strong>시프트-레프트 테스팅:</strong> 개발 주기에서 문제를 더 일찍 발견할수록 수정 비용이 저렴합니다. 정적 분석은 코드가 실행되기 전에 문제를 발견하여 가장 비용 효율적인 품질 보증 방법 중 하나입니다.
+    </div>
+
+    <h2>테스트 최적화 전략</h2>
+
+    <p>테스트 스위트가 성장함에 따라 빠른 피드백을 유지하는 것이 어려워집니다. 이러한 전략들은 테스트 시간을 관리 가능하게 유지하는 데 도움이 됩니다:</p>
+
+    <h3>테스트 분할 및 병렬화</h3>
+
+    <pre><code># GitHub Actions - 병렬 테스트 샤드
+name: 병렬 테스트
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 테스트 실행 (샤드 ${{ matrix.shard }}/4)
+        run: npm test -- --shard=${{ matrix.shard }}/4</code></pre>
+
+    <h3>선택적 테스트 실행</h3>
+
+    <pre><code># 변경된 파일에 대해서만 테스트 실행
+# jest.config.js
+module.exports = {
+  // 변경된 파일과 관련된 테스트만 실행
+  onlyChanged: process.env.CI === 'true',
+
+  // 또는 Jest의 --findRelatedTests 플래그 사용
+  // npm test -- --findRelatedTests src/user/service.ts
+};</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI 성숙도 모델 - 레벨 4 (테스팅 우수성):</strong>
+        <ul>
+            <li>포괄적인 테스트 커버리지 (80%+ 의미있는 커버리지)</li>
+            <li>병렬화로 10분 이내 테스트 실행</li>
+            <li>모든 풀 리퀘스트에 품질 게이트 적용</li>
+            <li>플레이키 테스트 감지 및 격리 프로세스</li>
+        </ul>
+    </div>
+
+    <p>효과적인 테스팅 통합은 CI를 단순한 빌드 검증 시스템에서 포괄적인 품질 보증 플랫폼으로 변환합니다. 이 챕터의 실천들은 모든 코드 변경이 프로덕션에 도달하기 전에 조직의 품질 표준을 충족하도록 보장합니다.</p>
+
+</body>
+</html>

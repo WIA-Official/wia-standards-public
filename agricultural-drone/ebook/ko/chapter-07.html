@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 통합과 상호운용성 | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>7장: 통합과 상호운용성</h1>
+
+    <p>효과적인 농업 드론 운용은 농장관리시스템과의 원활한 통합, 데이터 교환 표준, 다중 드론 운용을 위한 조정 기능이 필요합니다. 이 장에서는 통합 아키텍처, 데이터 교환 프로토콜, 플릿 관리, 드론 데이터가 정밀농업 워크플로우와 의사결정 시스템으로 흐를 수 있게 하는 상호운용성 표준을 다룹니다.</p>
+
+    <h2>7.1 농장관리시스템(FMIS) 통합</h2>
+
+    <pre>
+// FMIS 통합 아키텍처
+interface FMISIntegration {
+  // 연결 방법
+  connections: {
+    api: {
+      type: 'REST' | 'GraphQL';
+      authentication: 'OAuth2' | 'API_Key';
+      endpoints: string[];
+    };
+    fileExchange: {
+      formats: ['shapefile', 'geojson', 'isoxml', 'geotiff'];
+      protocols: ['SFTP', 'cloud_storage', 'direct_upload'];
+    };
+    realTime: {
+      protocol: 'websocket' | 'mqtt';
+      events: ['flight_start', 'flight_end', 'data_ready'];
+    };
+  };
+
+  // 데이터 흐름
+  dataFlows: {
+    // FMIS에서 드론으로
+    toDrone: {
+      fieldBoundaries: GeoJSON.Polygon;
+      prescriptionMaps: GeoJSON.FeatureCollection;
+      obstacles: GeoJSON.Point[];
+      noFlyZones: GeoJSON.Polygon[];
+    };
+    // 드론에서 FMIS로
+    fromDrone: {
+      flightLogs: FlightLog[];
+      imagery: ImageryMetadata[];
+      processedMaps: RasterMetadata[];
+      applicationRecords: ApplicationRecord[];
+    };
+  };
+
+  // 동기화 전략
+  syncStrategy: {
+    frequency: 'realtime' | 'batch' | 'on_demand';
+    conflictResolution: 'latest_wins' | 'manual';
+    offlineSupport: boolean;
+  };
+}
+
+// 통합 예시
+const fmisIntegration = {
+  platform: 'AgLeader',
+  connectionType: 'api',
+  capabilities: {
+    importFields: true,
+    importPrescriptions: true,
+    exportImagery: true,
+    exportApplicationLogs: true,
+    syncOperations: true
+  },
+  dataMapping: {
+    fieldId: 'external_id',
+    cropType: 'commodity_code',
+    applicationRate: 'rate_liters_per_hectare'
+  }
+};
+    </pre>
+
+    <h2>7.2 데이터 교환 표준</h2>
+
+    <table>
+        <tr>
+            <th>표준</th>
+            <th>목적</th>
+            <th>형식</th>
+            <th>드론 적용</th>
+        </tr>
+        <tr>
+            <td>ISOXML (ISO 11783)</td>
+            <td>작업 데이터 교환</td>
+            <td>XML</td>
+            <td>처방, 살포 기록</td>
+        </tr>
+        <tr>
+            <td>ADAPT</td>
+            <td>플러그인 프레임워크</td>
+            <td>다양</td>
+            <td>FMIS 통합</td>
+        </tr>
+        <tr>
+            <td>GeoJSON</td>
+            <td>공간 데이터</td>
+            <td>JSON</td>
+            <td>경계, 포인트</td>
+        </tr>
+        <tr>
+            <td>GeoTIFF</td>
+            <td>래스터 이미지</td>
+            <td>TIFF</td>
+            <td>지도, 지수</td>
+        </tr>
+        <tr>
+            <td>MAVLink</td>
+            <td>드론 텔레메트리</td>
+            <td>바이너리</td>
+            <td>비행 데이터</td>
+        </tr>
+    </table>
+
+    <pre>
+// 데이터 교환 형식 인터페이스
+interface DataExchangeFormats {
+  // 공간 데이터
+  spatial: {
+    boundaries: {
+      input: ['shapefile', 'kml', 'geojson'];
+      output: ['geojson', 'shapefile'];
+      crs: 'EPSG:4326';
+    };
+    prescriptions: {
+      input: ['isoxml', 'shapefile', 'geojson'];
+      output: ['isoxml', 'shapefile'];
+      rateField: 'configurable';
+    };
+  };
+
+  // 래스터 데이터
+  raster: {
+    orthomosaic: {
+      format: 'GeoTIFF';
+      compression: 'LZW' | 'JPEG' | 'none';
+      tiling: 'COG';             // 클라우드 최적화 GeoTIFF
+      crs: 'EPSG:4326' | 'UTM';
+    };
+    indexMaps: {
+      format: 'GeoTIFF';
+      dataType: 'Float32';
+      noDataValue: -9999;
+      metadata: 'GDAL_tags';
+    };
+  };
+
+  // 텔레메트리 데이터
+  telemetry: {
+    flightLog: {
+      format: 'csv' | 'json' | 'mavlink_log';
+      fields: ['timestamp', 'lat', 'lng', 'alt', 'speed', 'battery'];
+    };
+    sprayLog: {
+      format: 'csv' | 'isoxml';
+      fields: ['timestamp', 'position', 'rate', 'flow', 'pressure'];
+    };
+  };
+}
+    </pre>
+
+    <h2>7.3 클라우드 플랫폼 통합</h2>
+
+    <div class="highlight">
+        <h3>클라우드 통합의 이점</h3>
+        <ul>
+            <li><strong>처리 능력:</strong> 컴퓨팅 집약적 작업 오프로드</li>
+            <li><strong>저장 공간:</strong> 무제한 이미지 및 데이터 저장</li>
+            <li><strong>협업:</strong> 팀 간 데이터 공유</li>
+            <li><strong>AI 서비스:</strong> 고급 분석 접근</li>
+            <li><strong>접근성:</strong> 어디서든 접근 가능</li>
+        </ul>
+    </div>
+
+    <pre>
+// 클라우드 플랫폼 아키텍처
+interface CloudPlatform {
+  // 데이터 수집
+  ingestion: {
+    upload: {
+      method: 'direct' | 'sdk' | 'sync_client';
+      resumable: boolean;
+      compression: boolean;
+      encryption: 'TLS' | 'client_side';
+    };
+    validation: {
+      formatCheck: boolean;
+      geolocationVerify: boolean;
+      qualityAssessment: boolean;
+    };
+  };
+
+  // 처리
+  processing: {
+    orthomosaicGeneration: {
+      engine: string;
+      options: ProcessingOptions;
+      outputFormats: string[];
+    };
+    indexCalculation: {
+      indices: string[];
+      customFormulas: boolean;
+    };
+    analytics: {
+      plantCounting: boolean;
+      anomalyDetection: boolean;
+      prescriptionGeneration: boolean;
+    };
+  };
+
+  // 저장
+  storage: {
+    rawImagery: {
+      retention: string;
+      tier: 'hot' | 'cool' | 'archive';
+    };
+    processedData: {
+      retention: string;
+      formats: string[];
+    };
+    timeSeries: {
+      aggregation: boolean;
+      queryInterface: string;
+    };
+  };
+
+  // 배포
+  delivery: {
+    mapServices: {
+      wmts: boolean;
+      xyz: boolean;
+      cog: boolean;
+    };
+    api: {
+      rest: boolean;
+      graphql: boolean;
+      webhooks: boolean;
+    };
+    exports: {
+      formats: string[];
+      scheduling: boolean;
+    };
+  };
+}
+    </pre>
+
+    <h2>7.4 플릿 관리</h2>
+
+    <pre>
+// 플릿 관리 시스템
+interface FleetManagement {
+  // 플릿 인벤토리
+  inventory: {
+    drones: {
+      id: string;
+      model: string;
+      serialNumber: string;
+      status: 'available' | 'in_flight' | 'maintenance' | 'retired';
+      location: GeoJSON.Point;
+      flightHours: number;
+      batteryCount: number;
+    }[];
+    batteries: {
+      id: string;
+      droneCompatibility: string[];
+      cycles: number;
+      health: number;
+      status: 'available' | 'in_use' | 'charging' | 'retired';
+    }[];
+    sensors: {
+      id: string;
+      type: string;
+      calibrationDate: ISO8601Date;
+      nextCalibration: ISO8601Date;
+    }[];
+  };
+
+  // 미션 스케줄링
+  scheduling: {
+    missions: {
+      id: string;
+      field: string;
+      type: string;
+      scheduledDate: ISO8601DateTime;
+      assignedDrone: string;
+      assignedPilot: string;
+      status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+    }[];
+    optimization: {
+      algorithm: 'shortest_path' | 'minimize_batteries' | 'coverage_priority';
+      constraints: {
+        maxFlightsPerDay: number;
+        maxDistanceFromBase: number;
+        pilotAvailability: boolean[];
+      };
+    };
+  };
+
+  // 정비 추적
+  maintenance: {
+    schedule: {
+      item: string;
+      interval: string;          // 시간 또는 일
+      lastPerformed: ISO8601Date;
+      nextDue: ISO8601Date;
+    }[];
+    workOrders: {
+      id: string;
+      asset: string;
+      issue: string;
+      status: 'open' | 'in_progress' | 'completed';
+      parts: string[];
+    }[];
+  };
+}
+    </pre>
+
+    <h2>7.5 다중 드론 조정</h2>
+
+    <pre>
+// 다중 드론 운용
+interface MultiDroneCoordination {
+  // 스웜 구성
+  swarm: {
+    droneCount: number;
+    formation: 'line' | 'echelon' | 'grid' | 'independent';
+    spacing: number;             // 미터
+    communication: 'mesh' | 'hub_spoke' | 'independent';
+  };
+
+  // 미션 분할
+  missionDivision: {
+    method: 'area_split' | 'waypoint_distribution' | 'dynamic';
+    overlapHandling: 'avoid' | 'coverage_redundancy';
+    loadBalancing: boolean;
+  };
+
+  // 충돌 회피
+  collisionAvoidance: {
+    method: 'geofencing' | 'cooperative' | 'detect_and_avoid';
+    minSeparation: number;       // 미터 수평
+    verticalSeparation: number;  // 미터
+    priorityRules: 'lower_battery_first' | 'nearest_base' | 'mission_critical';
+  };
+
+  // 조정 프로토콜
+  coordination: {
+    statusBroadcast: {
+      frequency: number;         // Hz
+      data: ['position', 'heading', 'battery', 'mission_progress'];
+    };
+    commandStructure: {
+      type: 'centralized' | 'distributed';
+      leader: string | 'rotating';
+    };
+    contingency: {
+      droneFailure: 'redistribute_mission' | 'abort_swarm';
+      communicationLoss: 'continue_independent' | 'return_to_base';
+    };
+  };
+}
+
+// 예시: 3대 드론 살포 운용
+const swarmMission = {
+  field: { area: 100, boundary: 'polygon' },
+  drones: ['drone-001', 'drone-002', 'drone-003'],
+  division: {
+    method: 'area_split',
+    sections: [
+      { drone: 'drone-001', area: 33, startPoint: 'northwest' },
+      { drone: 'drone-002', area: 33, startPoint: 'center' },
+      { drone: 'drone-003', area: 34, startPoint: 'southeast' }
+    ]
+  },
+  timing: {
+    simultaneousStart: true,
+    batteryRotation: 'staggered'
+  }
+};
+    </pre>
+
+    <h2>7.6 지상제어장치(GCS)</h2>
+
+    <table>
+        <tr>
+            <th>구성 요소</th>
+            <th>기능</th>
+            <th>요구사항</th>
+        </tr>
+        <tr>
+            <td>미션 계획 소프트웨어</td>
+            <td>비행 계획 설계</td>
+            <td>GIS 통합, 가져오기/내보내기</td>
+        </tr>
+        <tr>
+            <td>비행 제어</td>
+            <td>실시간 모니터링</td>
+            <td>텔레메트리 표시, 명령 인터페이스</td>
+        </tr>
+        <tr>
+            <td>통신 링크</td>
+            <td>데이터 교환</td>
+            <td>라디오, 셀룰러, 위성 백업</td>
+        </tr>
+        <tr>
+            <td>디스플레이 시스템</td>
+            <td>조종사 인터페이스</td>
+            <td>햇빛 가독성, 비디오 피드</td>
+        </tr>
+        <tr>
+            <td>비상 제어</td>
+            <td>안전 오버라이드</td>
+            <td>RTH, 비상 착륙, 킬 스위치</td>
+        </tr>
+    </table>
+
+    <h2>7.7 통신 프로토콜</h2>
+
+    <pre>
+// 통신 아키텍처
+interface CommunicationSystem {
+  // 주 링크
+  primaryLink: {
+    type: '2.4GHz' | '5.8GHz' | '900MHz' | 'cellular';
+    protocol: 'proprietary' | 'MAVLink' | 'DJI';
+    range: number;               // km
+    latency: number;             // ms
+    dataRate: number;            // kbps
+  };
+
+  // 비디오 링크
+  videoLink: {
+    frequency: '2.4GHz' | '5.8GHz';
+    resolution: '720p' | '1080p' | '4K';
+    latency: number;             // ms
+    encryption: boolean;
+  };
+
+  // 백업 시스템
+  backup: {
+    cellular: {
+      provider: string;
+      coverage: boolean;
+      latency: number;
+    };
+    satellite: {
+      service: string;
+      coverage: 'global';
+      latency: number;
+    };
+  };
+
+  // 데이터 프로토콜
+  protocols: {
+    telemetry: {
+      format: 'MAVLink';
+      version: '2.0';
+      frequency: number;         // Hz
+    };
+    commands: {
+      format: 'MAVLink';
+      acknowledgement: boolean;
+      timeout: number;           // ms
+    };
+    payload: {
+      format: 'custom';
+      integration: 'serial' | 'can' | 'ethernet';
+    };
+  };
+}
+    </pre>
+
+    <h2>7.8 API 사양</h2>
+
+    <div class="highlight">
+        <h3>표준 API 엔드포인트</h3>
+        <pre>
+// WIA 농업 드론 API
+interface DroneAPI {
+  // 인증
+  'POST /auth/token': AuthToken;
+
+  // 미션
+  'GET /missions': Mission[];
+  'POST /missions': Mission;
+  'GET /missions/{id}': Mission;
+  'PUT /missions/{id}': Mission;
+  'POST /missions/{id}/execute': FlightSession;
+
+  // 비행
+  'GET /flights': FlightLog[];
+  'GET /flights/{id}': FlightLog;
+  'GET /flights/{id}/telemetry': Telemetry[];
+  'GET /flights/{id}/imagery': Image[];
+
+  // 처리
+  'POST /processing/orthomosaic': ProcessingJob;
+  'GET /processing/{jobId}': ProcessingStatus;
+  'GET /processing/{jobId}/results': ProcessingResults;
+
+  // 플릿
+  'GET /fleet/drones': Drone[];
+  'GET /fleet/drones/{id}/status': DroneStatus;
+  'POST /fleet/drones/{id}/command': CommandResponse;
+
+  // 데이터 내보내기
+  'GET /exports/shapefile': Binary;
+  'GET /exports/geotiff': Binary;
+  'GET /exports/isoxml': Binary;
+}
+        </pre>
+    </div>
+
+    <div class="highlight">
+        <h3>장 요약</h3>
+        <p>이 장에서는 FMIS 통합, 데이터 교환 표준, 클라우드 플랫폼, 플릿 관리, 다중 드론 조정, 지상제어장치, 통신 프로토콜, API 사양을 포함한 통합과 상호운용성을 다루었습니다. 이러한 통합 기능은 WIA-AGRICULTURAL_DRONE 표준에 따라 드론 시스템이 정밀농업 생태계 내에서 원활하게 작동하도록 보장합니다.</p>
+    </div>
+</body>
+</html>

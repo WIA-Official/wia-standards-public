@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 5: Storage and Monitoring Systems</title>
+</head>
+<body>
+<pre>
+================================================================================
+CHAPTER 5: STORAGE AND MONITORING SYSTEMS
+================================================================================
+
+<a href="index.html">[BACK TO TABLE OF CONTENTS]</a>
+
+--------------------------------------------------------------------------------
+5.1 STORAGE CONTAINER SPECIFICATIONS
+--------------------------------------------------------------------------------
+
+Long-term cryogenic storage requires specialized containers designed for
+decades or centuries of reliable operation at liquid nitrogen temperatures.
+
+[CRYO] CONTAINER TYPES:
+
+    +------------------------------------------------------------------------+
+    | Type              | Volume    | Capacity        | Use Case             |
+    +------------------------------------------------------------------------+
+    | DEWAR_SMALL       | 35 L      | 1-2 subjects    | Tissue, organs       |
+    | DEWAR_MEDIUM      | 160 L     | 4 whole body    | Standard facility    |
+    | DEWAR_LARGE       | 450 L     | 8 whole body    | High volume          |
+    | DEWAR_INDUSTRIAL  | 1000+ L   | 20+ subjects    | Research facilities  |
+    +------------------------------------------------------------------------+
+
+[CRYO] CONTAINER SCHEMA:
+
+    StorageContainer
+    {
+      "containerId": "DEWAR-A-001",
+      "containerType": "DEWAR_LARGE",
+
+      "specifications": {
+        "manufacturer": "MVE/Chart Industries",
+        "model": "Cryogenic Dewar 450",
+        "capacity": 450,
+        "capacityUnit": "LITERS",
+        "maxSubjects": 8,
+        "insulationType": "VACUUM_SUPERINSULATION",
+        "staticEvaporationRate": 1.2,
+        "evaporationUnit": "LITERS_PER_DAY"
+      },
+
+      "location": {
+        "facilityId": "FAC-001",
+        "building": "STORAGE_A",
+        "room": "CRYO_VAULT_1",
+        "position": "A-01",
+        "coordinates": {
+          "latitude": 37.7749,
+          "longitude": -122.4194
+        }
+      },
+
+      "currentStatus": {
+        "operationalState": "ACTIVE",
+        "ln2Level": 85,
+        "temperature": -196,
+        "lastRefill": "2025-03-14T10:00:00Z",
+        "nextScheduledRefill": "2025-03-21T10:00:00Z",
+        "subjectsStored": 6
+      }
+    }
+
+[i] DEWAR CONSTRUCTION:
+
+    Cross-section view:
+
+    +------------------------------------------+
+    |  Outer shell (stainless steel)           |
+    |  +------------------------------------+  |
+    |  |  Vacuum space (superinsulation)   |  |
+    |  |  +------------------------------+  |  |
+    |  |  |  Inner vessel (aluminum)     |  |  |
+    |  |  |  +--------------------------+|  |  |
+    |  |  |  |  Liquid Nitrogen         ||  |  |
+    |  |  |  |     [ Subject pods ]     ||  |  |
+    |  |  |  |     [ Subject pods ]     ||  |  |
+    |  |  |  |     [ Subject pods ]     ||  |  |
+    |  |  |  +--------------------------+|  |  |
+    |  |  +------------------------------+  |  |
+    |  +------------------------------------+  |
+    +------------------------------------------+
+
+
+--------------------------------------------------------------------------------
+5.2 LIQUID NITROGEN MANAGEMENT
+--------------------------------------------------------------------------------
+
+LN2 level management is the most critical aspect of long-term storage.
+Evaporation is constant; monitoring must be continuous.
+
+[CRYO] LN2 LEVEL ZONES:
+
+    100% |============| Full capacity
+         |            |
+     80% |============| OPTIMAL - Normal operating range
+         |            |
+     60% |============| ATTENTION - Schedule refill
+         |            |
+     40% |============| WARNING - Urgent refill needed
+         |            |
+     20% |============| CRITICAL - Emergency protocol
+         |            |
+      0% |____________| CATASTROPHIC - Subjects at risk
+
+[!] ALERT THRESHOLDS:
+
+    +------------------------------------------------------------------------+
+    | Level     | Status       | Action Required                            |
+    +------------------------------------------------------------------------+
+    | > 80%     | OPTIMAL      | Normal monitoring                          |
+    | 60-80%    | ATTENTION    | Schedule refill within 48 hours            |
+    | 40-60%    | WARNING      | Immediate refill scheduling                |
+    | 20-40%    | CRITICAL     | Emergency refill, activate backup          |
+    | < 20%     | EMERGENCY    | Evacuate subjects, full emergency protocol |
+    +------------------------------------------------------------------------+
+
+[CRYO] LN2 CONSUMPTION PREDICTION:
+
+    class LN2Predictor:
+        def __init__(self, container):
+            self.container = container
+            self.base_rate = container.specs.static_evaporation_rate
+            self.history = []
+
+        def predict_depletion(self, current_level_pct):
+            """Predict time until critical level (20%)"""
+            current_volume = self.container.capacity * (current_level_pct / 100)
+            critical_volume = self.container.capacity * 0.20
+
+            available = current_volume - critical_volume
+
+            # Adjust for environmental factors
+            adjusted_rate = self.base_rate * self.get_rate_multiplier()
+
+            days_until_critical = available / adjusted_rate
+
+            return {
+                'current_level_pct': current_level_pct,
+                'current_volume_L': current_volume,
+                'daily_consumption_L': adjusted_rate,
+                'days_until_critical': days_until_critical,
+                'recommended_refill_date': self.calculate_refill_date(
+                    days_until_critical
+                )
+            }
+
+        def get_rate_multiplier(self):
+            """Environmental adjustment factors"""
+            multiplier = 1.0
+
+            # Ambient temperature adjustment
+            ambient_temp = self.get_ambient_temp()
+            if ambient_temp > 25:
+                multiplier += 0.1 * (ambient_temp - 25) / 5
+
+            # Access frequency adjustment
+            daily_accesses = self.get_access_frequency()
+            multiplier += 0.05 * daily_accesses
+
+            # Age of dewar adjustment
+            years_old = self.container.age_years
+            if years_old > 10:
+                multiplier += 0.02 * (years_old - 10)
+
+            return multiplier
+
+
+--------------------------------------------------------------------------------
+5.3 CONTINUOUS MONITORING REQUIREMENTS
+--------------------------------------------------------------------------------
+
+Automated monitoring systems must operate 24/7 with multiple redundancy
+layers to ensure no failure mode can go undetected.
+
+[CRYO] MONITORING PARAMETERS:
+
+    +------------------------------------------------------------------------+
+    | Parameter        | Frequency      | Method               | Redundancy |
+    +------------------------------------------------------------------------+
+    | LN2 Level        | 15 minutes     | Capacitance probe    | 2 sensors  |
+    | Temperature      | 1 minute       | PT100 RTD            | 3 sensors  |
+    | Vacuum pressure  | 1 hour         | Ion gauge            | 1 sensor   |
+    | Ambient temp     | 5 minutes      | Thermocouple         | 2 sensors  |
+    | Power status     | Continuous     | UPS monitoring       | Automatic  |
+    | Access events    | On occurrence  | Door/lid sensors     | Logged     |
+    +------------------------------------------------------------------------+
+
+[CRYO] MONITORING SYSTEM ARCHITECTURE:
+
+    +------------------+     +------------------+     +------------------+
+    |  SENSOR LAYER    |     |  AGGREGATION     |     |  ANALYSIS        |
+    +------------------+     +------------------+     +------------------+
+    | PT100 Temp (x3)  | --> | Local Controller | --> | Trend Analysis   |
+    | LN2 Level (x2)   | --> | Data Logging     | --> | Anomaly Detection|
+    | Vacuum Gauge     | --> | Alert Generation | --> | Prediction       |
+    | Door Sensors     | --> | Communication    | --> | Reporting        |
+    +------------------+     +------------------+     +------------------+
+            |                        |                        |
+            v                        v                        v
+    +------------------+     +------------------+     +------------------+
+    |  POWER BACKUP    |     |  COMMUNICATION   |     |  ALERTING        |
+    +------------------+     +------------------+     +------------------+
+    | UPS (4 hours)    |     | Primary: Ethernet|     | SMS/Phone        |
+    | Generator backup |     | Backup: Cellular |     | Email            |
+    | Solar (optional) |     | Failover: Radio  |     | On-site alarms   |
+    +------------------+     +------------------+     +------------------+
+
+[i] DATA RETENTION REQUIREMENTS:
+
+    Real-time data (1-minute resolution):    30 days
+    Hourly aggregated data:                  1 year
+    Daily summary data:                      10 years
+    Event/alert logs:                        Indefinitely
+    Access logs:                             Indefinitely
+
+
+--------------------------------------------------------------------------------
+5.4 SLOT ASSIGNMENT AND TRACKING
+--------------------------------------------------------------------------------
+
+Each subject must be assigned to a specific slot within a container,
+with precise tracking of position throughout storage.
+
+[CRYO] SLOT ADDRESSING SCHEMA:
+
+    Format: [DEWAR_ID]-[LEVEL]-[POSITION]
+
+    Example: DEWAR-A-001-L3-P05
+      |-- DEWAR-A-001: Container identifier
+      |-- L3: Level 3 (vertical position)
+      +-- P05: Position 5 (radial position)
+
+    Visual representation of container slots:
+
+    Top View (per level):
+
+              P01
+           P08    P02
+        P07    *    P03
+           P06    P04
+              P05
+
+    * = Central core (if applicable)
+
+    Side View (levels):
+
+    +------ Lid ------+
+    |   L1: Top       |
+    |   L2            |
+    |   L3            |
+    |   L4            |
+    |   L5: Bottom    |
+    +-----------------+
+
+[CRYO] SLOT ASSIGNMENT RECORD:
+
+    SlotAssignment
+    {
+      "assignmentId": "ASGN-2025-0156",
+      "containerId": "DEWAR-A-001",
+      "slotAddress": "DEWAR-A-001-L3-P05",
+      "subjectId": "CRYO-2025-001-WB-001",
+
+      "assignment": {
+        "assignedDate": "2025-03-15T18:00:00Z",
+        "assignedBy": "OP-2025-0042",
+        "previousSlot": null,
+        "reason": "INITIAL_STORAGE"
+      },
+
+      "conditions": {
+        "immersionType": "FULL_IMMERSION",
+        "orientation": "HEAD_UP",
+        "protectivePod": "POD-WB-2025-0089"
+      }
+    }
+
+[!] SLOT MANAGEMENT RULES:
+
+    1. No double assignment - one subject per slot
+    2. Record all slot changes with full audit trail
+    3. Verify slot compatibility with subject type
+    4. Consider thermal gradients in slot selection
+    5. Balance container loading for stability
+
+
+--------------------------------------------------------------------------------
+5.5 FACILITY INFRASTRUCTURE
+--------------------------------------------------------------------------------
+
+Cryopreservation facilities require robust infrastructure to support
+continuous operation over decades.
+
+[CRYO] FACILITY REQUIREMENTS BY LEVEL:
+
+    LEVEL 1 (L1) - Basic
+    +------------------------------------------------------------------+
+    | Subjects: Research, animal, cell culture                         |
+    | Requirements:                                                    |
+    |   - Single LN2 supply                                           |
+    |   - Basic monitoring                                            |
+    |   - 8-hour backup power                                         |
+    |   - Manual alerting                                             |
+    +------------------------------------------------------------------+
+
+    LEVEL 2 (L2) - Standard
+    +------------------------------------------------------------------+
+    | Subjects: Human tissue, organ preservation                       |
+    | Requirements:                                                    |
+    |   - Redundant LN2 supply                                        |
+    |   - Automated monitoring with 2x redundancy                     |
+    |   - 24-hour backup power + generator                            |
+    |   - Automated alerting (SMS, phone)                             |
+    |   - 24/7 on-call staff                                          |
+    +------------------------------------------------------------------+
+
+    LEVEL 3 (L3) - Advanced
+    +------------------------------------------------------------------+
+    | Subjects: Whole body, neuropreservation                         |
+    | Requirements:                                                    |
+    |   - Triple redundant LN2 supply                                 |
+    |   - Full sensor redundancy (3x minimum)                         |
+    |   - 72-hour backup power + dual generators                      |
+    |   - Multi-channel alerting + automatic escalation               |
+    |   - 24/7 on-site staff                                          |
+    |   - Seismic protection (where applicable)                       |
+    |   - Fire suppression (inert gas)                                |
+    +------------------------------------------------------------------+
+
+    LEVEL 4 (L4) - Research
+    +------------------------------------------------------------------+
+    | Subjects: Experimental protocols, revival research               |
+    | Requirements:                                                    |
+    |   - All L3 requirements                                         |
+    |   - Advanced imaging capabilities                               |
+    |   - Revival preparation equipment                               |
+    |   - Research laboratory integration                             |
+    +------------------------------------------------------------------+
+
+[CRYO] LN2 SUPPLY CHAIN:
+
+    PRIMARY SUPPLY
+    +------------------------------------------------------------------+
+    | Bulk tank on-site (10,000-50,000 L)                             |
+    | Automatic refill from supplier                                   |
+    | Minimum 2-week reserve at all times                             |
+    +------------------------------------------------------------------+
+           |
+           v
+    SECONDARY SUPPLY
+    +------------------------------------------------------------------+
+    | Contract with secondary supplier                                 |
+    | Emergency delivery guaranteed within 4 hours                     |
+    | Portable dewars for immediate backup                            |
+    +------------------------------------------------------------------+
+           |
+           v
+    TERTIARY SUPPLY
+    +------------------------------------------------------------------+
+    | Mutual aid agreements with nearby facilities                     |
+    | Emergency transport capabilities                                 |
+    | Coordination with regional cryogenics network                   |
+    +------------------------------------------------------------------+
+
+
+--------------------------------------------------------------------------------
+5.6 SECURITY AND ACCESS CONTROL
+--------------------------------------------------------------------------------
+
+Physical and digital security protects subjects from unauthorized access,
+tampering, and environmental threats.
+
+[CRYO] ACCESS CONTROL LAYERS:
+
+    LAYER 1: Facility Perimeter
+    +------------------------------------------------------------------+
+    | - Fenced compound with controlled entry points                   |
+    | - 24/7 security monitoring                                       |
+    | - Vehicle barriers at entry                                      |
+    +------------------------------------------------------------------+
+
+    LAYER 2: Building Access
+    +------------------------------------------------------------------+
+    | - Biometric + badge authentication                               |
+    | - Mantrap entry (dual door system)                              |
+    | - Visitor logging and escort requirements                        |
+    +------------------------------------------------------------------+
+
+    LAYER 3: Storage Vault Access
+    +------------------------------------------------------------------+
+    | - Two-person rule for vault entry                               |
+    | - Additional biometric verification                              |
+    | - Real-time video monitoring                                     |
+    | - All access logged with credential verification                 |
+    +------------------------------------------------------------------+
+
+    LAYER 4: Container Access
+    +------------------------------------------------------------------+
+    | - Individual container alarms                                    |
+    | - Lid opening triggers immediate alert                          |
+    | - Access requires work order authorization                       |
+    | - Photo/video documentation of all access                        |
+    +------------------------------------------------------------------+
+
+[i] DIGITAL SECURITY:
+
+    - Encrypted data transmission (TLS 1.3 minimum)
+    - Air-gapped backup systems
+    - Regular security audits
+    - Intrusion detection systems
+    - Blockchain-anchored audit logs
+
+
+--------------------------------------------------------------------------------
+CHAPTER SUMMARY
+--------------------------------------------------------------------------------
+
+Key concepts covered:
+  [OK] Storage container types and specifications
+  [OK] Liquid nitrogen management and prediction
+  [OK] Continuous monitoring system requirements
+  [OK] Slot assignment and tracking schema
+  [OK] Facility infrastructure levels
+  [OK] Security and access control layers
+
+Next chapter: Quality Assessment and VQI
+
+--------------------------------------------------------------------------------
+
+<a href="chapter-04.html">[PREVIOUS: CHAPTER 4]</a>
+<a href="chapter-06.html">[NEXT: CHAPTER 6 - QUALITY ASSESSMENT]</a>
+<a href="index.html">[TABLE OF CONTENTS]</a>
+
+================================================================================
+</pre>
+</body>
+</html>

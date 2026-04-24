@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 2: 아키텍처 | WIA-CAREBOT</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 2: 로봇 아키텍처 및 시스템</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong><br>
+        - 케어 로봇 애플리케이션을 위한 하드웨어 아키텍처 설계<br>
+        - 적절한 센서 시스템 선택 및 통합<br>
+        - 안전하고 효과적인 액추에이터 제어 구현<br>
+        - 신뢰성 있는 내비게이션 및 위치 파악 시스템 구축
+    </div>
+
+    <h2>2.1 시스템 아키텍처 개요</h2>
+
+    <p>WIA-CAREBOT 준수 케어 로봇은 환경을 인식하고, 결정을 내리고, 행동을 취하기 위해 함께 작동하는 여러 상호 연결된 서브시스템으로 구성됩니다. 아키텍처는 시스템 신뢰성과 안전을 유지하면서 사용자 정의 및 업그레이드를 허용하는 모듈식이어야 합니다.</p>
+
+    <pre><code>// WIA-CAREBOT 시스템 아키텍처 계층
+interface CareRobotArchitecture {
+    hardwareLayer: {
+        mechanicalPlatform: MobilePlatform | StationaryPlatform;
+        powerSystem: BatterySystem;
+        computeUnits: ProcessingHardware[];
+        peripherals: Peripheral[];
+    };
+
+    sensorLayer: {
+        perceptionSensors: PerceptionSensor[];
+        proximitySensors: SafetySensor[];
+        internalSensors: DiagnosticSensor[];
+    };
+
+    controlLayer: {
+        lowLevelControl: MotorController[];
+        trajectoryPlanning: MotionPlanner;
+        safetyMonitor: SafetySystem;
+    };
+
+    cognitionLayer: {
+        perception: PerceptionPipeline;
+        planning: TaskPlanner;
+        decision: DecisionEngine;
+        learning: AdaptationModule;
+    };
+
+    interactionLayer: {
+        speechInterface: SpeechSystem;
+        displayInterface: VisualDisplay;
+        gestureRecognition: GestureSystem;
+        hapticFeedback: HapticSystem;
+    };
+}</code></pre>
+
+    <h2>2.2 기계적 플랫폼 설계</h2>
+
+    <p>기계적 플랫폼은 케어 로봇의 물리적 기반을 형성합니다. 설계 선택은 인간 생활 공간의 도전적인 환경에서 이동성, 안정성, 적재 용량 및 안전성의 균형을 맞추어야 합니다.</p>
+
+    <h3>이동 플랫폼 옵션</h3>
+
+    <table>
+        <tr>
+            <th>플랫폼 유형</th>
+            <th>장점</th>
+            <th>과제</th>
+            <th>최적 용도</th>
+        </tr>
+        <tr>
+            <td>차동 구동</td>
+            <td>단순함, 신뢰성, 제자리 회전</td>
+            <td>제한된 속도 안정성</td>
+            <td>실내 이동</td>
+        </tr>
+        <tr>
+            <td>전방향</td>
+            <td>홀로노믹 움직임, 정밀 위치</td>
+            <td>복잡한 기계, 높은 비용</td>
+            <td>좁은 공간, 동반자 로봇</td>
+        </tr>
+        <tr>
+            <td>애커먼(자동차형)</td>
+            <td>속도에서 안정적, 자연스러운 움직임</td>
+            <td>큰 회전 반경</td>
+            <td>실외 이동 보조</td>
+        </tr>
+        <tr>
+            <td>다리형</td>
+            <td>계단, 불균일 지형 처리</td>
+            <td>복잡한 제어, 높은 비용</td>
+            <td>다층 건물 운영</td>
+        </tr>
+    </table>
+
+    <pre><code># ROS 2 차동 구동 케어 로봇 런치 파일
+# carebot_bringup/launch/carebot.launch.py
+
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    return LaunchDescription([
+        # 베이스 컨트롤러
+        Node(
+            package='carebot_base',
+            executable='differential_drive_controller',
+            name='base_controller',
+            parameters=[{
+                'wheel_radius': 0.08,
+                'wheel_separation': 0.45,
+                'max_linear_velocity': 0.5,  # 안전한 실내 속도
+                'max_angular_velocity': 1.0,
+                'acceleration_limit': 0.3,
+                'safety_margin': 0.15
+            }]
+        ),
+
+        # 안전 모니터
+        Node(
+            package='carebot_safety',
+            executable='collision_avoidance',
+            name='safety_monitor',
+            parameters=[{
+                'emergency_stop_distance': 0.2,
+                'slow_zone_distance': 0.5,
+                'human_detection_enabled': True
+            }]
+        )
+    ])</code></pre>
+
+    <h2>2.3 센서 시스템</h2>
+
+    <p>케어 로봇은 환경을 인식하고, 인간을 감지하고, 사용자 건강을 모니터링하고, 안전한 운영을 보장하기 위한 포괄적인 감지 기능이 필요합니다. 센서 선택 시 정확도, 신뢰성, 환경 견고성 및 비용을 고려해야 합니다.</p>
+
+    <h3>인식 센서</h3>
+
+    <ul>
+        <li><strong>RGB-D 카메라:</strong> 사람 감지, 제스처 인식 및 공간 매핑을 위한 깊이 정보가 포함된 컬러 이미지 제공</li>
+        <li><strong>라이다:</strong> 내비게이션, 장애물 감지 및 환경 매핑을 위한 정확한 거리 측정</li>
+        <li><strong>마이크 어레이:</strong> 음성 명령 인식, 화자 위치 파악 및 음향 이벤트 감지 가능</li>
+        <li><strong>열화상 카메라:</strong> 비접촉 방식으로 인간 존재 감지 및 체온 평가</li>
+    </ul>
+
+    <pre><code>// 사람 감지를 위한 센서 융합 파이프라인
+class PersonDetectionPipeline {
+    private rgbdCamera: RGBDCamera;
+    private thermalCamera: ThermalCamera;
+    private lidar: LiDAR;
+    private fusionAlgorithm: SensorFusion;
+
+    async detectPersons(): Promise&lt;DetectedPerson[]&gt; {
+        // 병렬 센서 획득
+        const [rgbdData, thermalData, lidarData] = await Promise.all([
+            this.rgbdCamera.capture(),
+            this.thermalCamera.capture(),
+            this.lidar.scan()
+        ]);
+
+        // 개별 감지 파이프라인
+        const rgbdDetections = this.processRGBD(rgbdData);
+        const thermalDetections = this.processThermal(thermalData);
+        const lidarDetections = this.processLidar(lidarData);
+
+        // 강건한 감지를 위한 다중 센서 융합
+        const fusedDetections = this.fusionAlgorithm.fuse({
+            rgbd: rgbdDetections,
+            thermal: thermalDetections,
+            lidar: lidarDetections
+        }, {
+            confidenceThreshold: 0.85,
+            spatialToleranceMeters: 0.3,
+            requireMultipleSources: true  // 더 높은 신뢰성
+        });
+
+        return fusedDetections;
+    }
+}</code></pre>
+
+    <h3>안전 센서</h3>
+
+    <p>안전 센서는 충돌을 방지하고 사용자를 위험으로부터 보호하는 데 필요한 중요한 데이터를 제공합니다. 이 센서들은 적절한 중복성을 갖춘 높은 신뢰성이 필요합니다.</p>
+
+    <pre><code># ROS 2 안전 센서 구성
+# carebot_safety/config/safety_sensors.yaml
+
+bumpers:
+  front_bumper:
+    type: "contact_sensor"
+    topic: "/sensors/bumper/front"
+    response: "emergency_stop"
+    recovery_action: "reverse_0.1m"
+
+proximity_sensors:
+  ultrasonic_array:
+    sensors: 8
+    fov_degrees: 30
+    range_min: 0.02
+    range_max: 4.0
+    update_rate: 20  # Hz
+
+force_torque:
+  wrist_sensor:
+    type: "6_axis_ft"
+    overload_protection: true
+    collision_threshold_n: 50
+    response: "compliant_stop"</code></pre>
+
+    <h2>2.4 액추에이터 시스템</h2>
+
+    <p>액추에이터는 전자 명령을 물리적 움직임으로 변환합니다. 케어 로봇의 경우 액추에이터 선택은 인간-로봇 상호작용 중 부상을 방지하기 위한 안전, 정밀도 및 적절한 힘 제한을 강조합니다.</p>
+
+    <h3>직렬 탄성 액추에이터</h3>
+
+    <p>직렬 탄성 액추에이터(SEA)는 모터와 출력 사이에 탄성 요소를 통합하여 힘 제한을 통한 고유한 안전성과 정확한 힘 제어를 가능하게 합니다. 이는 케어 로봇 팔과 조작 시스템에 이상적입니다.</p>
+
+    <pre><code>// 직렬 탄성 액추에이터 컨트롤러
+class SEAController {
+    private motor: BrushlessMotor;
+    private encoder: AbsoluteEncoder;
+    private springConstant: number;  // N/m
+    private maxForce: number;        // 안전 한계
+
+    // 안전한 인간 상호작용을 위한 임피던스 제어
+    async setImpedance(
+        desiredPosition: number,
+        stiffness: number,
+        damping: number
+    ): Promise&lt;void&gt; {
+        const currentPosition = await this.encoder.read();
+        const currentVelocity = await this.encoder.readVelocity();
+
+        // 임피던스 모델로 원하는 힘 계산
+        const positionError = desiredPosition - currentPosition;
+        const desiredForce = stiffness * positionError - damping * currentVelocity;
+
+        // 안전 한계 적용
+        const safeForce = Math.min(
+            Math.max(desiredForce, -this.maxForce),
+            this.maxForce
+        );
+
+        // 스프링 모델을 통해 힘을 모터 명령으로 변환
+        const springDeflection = safeForce / this.springConstant;
+        const motorPosition = desiredPosition + springDeflection;
+
+        await this.motor.setPosition(motorPosition);
+    }
+}</code></pre>
+
+    <h2>2.5 내비게이션 시스템</h2>
+
+    <p>내비게이션은 이동형 케어 로봇이 생활 공간을 안전하게 이동하고, 장애물을 피하고, 필요할 때 사용자에게 도달하는 데 필수적입니다. WIA-CAREBOT은 가정 및 케어 시설 환경의 고유한 과제를 처리하는 내비게이션 기능을 지정합니다.</p>
+
+    <h3>동시 위치 추정 및 매핑(SLAM)</h3>
+
+    <pre><code># ROS 2 케어 로봇 SLAM 구성
+# carebot_navigation/config/slam_params.yaml
+
+slam_toolbox:
+  ros__parameters:
+    mode: mapping  # 또는 localization
+    scan_topic: /sensors/lidar/scan
+    odom_topic: /odom
+    base_frame: base_footprint
+    resolution: 0.05  # 가정 세부사항을 위한 5cm 해상도
+    max_laser_range: 12.0
+    do_loop_closing: true
+    map_update_interval: 2.0</code></pre>
+
+    <h2>2.6 컴퓨팅 아키텍처</h2>
+
+    <p>케어 로봇은 안전에 중요한 작업에 대한 낮은 지연 시간을 유지하면서 인식, 계획 및 AI 추론을 위한 상당한 계산 리소스가 필요합니다. 분산 컴퓨팅 아키텍처는 일반적으로 성능과 신뢰성의 최상의 균형을 제공합니다.</p>
+
+    <div class="highlight">
+        <strong>컴퓨팅 요구사항:</strong><br>
+        - 실시간 제어: RTOS가 있는 ARM/x86 MCU, 밀리초 미만 지연<br>
+        - 인식 처리: GPU(NVIDIA Jetson), 30+ FPS 객체 감지<br>
+        - AI 추론: 음성 인식 및 LLM 응답을 위한 NPU/TPU<br>
+        - 클라우드 연결: 업데이트, 분석 및 원격 모니터링용
+    </div>
+
+    <h2>2.7 전원 시스템 설계</h2>
+
+    <p>신뢰할 수 있는 전원은 지속적으로 작동하거나 필요 시 사용 가능해야 하는 케어 로봇에 중요합니다. 전원 시스템은 용량, 충전 편의성 및 안전의 균형을 맞추어야 합니다.</p>
+
+    <table>
+        <tr>
+            <th>요구사항</th>
+            <th>사양</th>
+            <th>근거</th>
+        </tr>
+        <tr>
+            <td>작동 시간</td>
+            <td>8시간 이상</td>
+            <td>충전 없이 하루 종일 운영</td>
+        </tr>
+        <tr>
+            <td>충전 시간</td>
+            <td>4시간 미만</td>
+            <td>야간 재충전 가능</td>
+        </tr>
+        <tr>
+            <td>자동 도킹</td>
+            <td>필수</td>
+            <td>사용자 개입 없이 자율 재충전</td>
+        </tr>
+        <tr>
+            <td>저전력 경고</td>
+            <td>30분</td>
+            <td>충전 스테이션 도달 시간</td>
+        </tr>
+        <tr>
+            <td>비상 예비</td>
+            <td>10분</td>
+            <td>중요 작업 완료 및 안전 종료</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>챕터 요약:</strong> 케어 로봇 아키텍처는 가정 환경에 최적화된 기계적 플랫폼, 인식 및 안전을 위한 포괄적인 센서 시스템, 안전한 인간 상호작용을 위해 설계된 액추에이터, 지능형 내비게이션, 분산 컴퓨팅 및 신뢰성 있는 전원 시스템을 포함합니다. 이러한 구성요소는 안전하고 유능하며 사용자 친화적인 케어 로봇을 만들기 위해 신중하게 통합되어야 합니다. 다음 챕터에서는 이러한 시스템이 특정 케어 기능을 제공하기 위해 어떻게 결합되는지 탐구합니다.
+    </div>
+</body>
+</html>

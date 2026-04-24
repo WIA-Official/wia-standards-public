@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6장: 보안 및 프라이버시 - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI 표준</h1>
+    <p class="subtitle">6장: 보안 및 프라이버시</p>
+  </header>
+
+  <main class="container">
+    <h1>6장: 보안 및 프라이버시</h1>
+
+    <h2>6.1 보안 개요</h2>
+    <p>WIA-CI는 환자 데이터를 보호하고, 장치 무결성을 보장하며, 무단 액세스를 방지하기 위한 포괄적인 보안 조치를 구현합니다.</p>
+
+    <div class="warning-box">
+      <h3>보안 원칙</h3>
+      <ul>
+        <li><strong>심층 방어:</strong> 여러 보안 계층</li>
+        <li><strong>최소 권한:</strong> 필요한 최소 액세스</li>
+        <li><strong>제로 트러스트:</strong> 항상 확인, 절대 신뢰하지 않음</li>
+        <li><strong>설계에 의한 프라이버시:</strong> 처음부터 내장</li>
+      </ul>
+    </div>
+
+    <h2>6.2 인증 및 권한 부여</h2>
+
+    <h3>장치 페어링</h3>
+    <pre><code>interface DevicePairing {
+  method: 'secure_simple' | 'oob' | 'passkey';
+  bondingRequired: true;
+
+  ssp: {
+    ioCap: 'display_yes_no';
+    mitm: true;              // 중간자 공격 방지
+    bonding: true;
+  };
+}
+
+// 페어링 프로세스
+async function pairDevice(deviceId: string) {
+  const request = generatePairingRequest(deviceId);
+  const code = displayPairingCode();  // e.g., "123456"
+  const confirmed = await waitForUserConfirmation();
+
+  if (confirmed) {
+    const bond = await completePairing(deviceId);
+    storeBond(deviceId, bond);
+  }
+}</code></pre>
+
+    <h2>6.3 암호화</h2>
+
+    <h3>저장된 데이터 암호화</h3>
+    <pre><code>interface EncryptionAtRest {
+  // 설정 데이터
+  config: {
+    algorithm: 'AES-256-GCM';
+    keyDerivation: 'PBKDF2';
+    iterations: 100000;
+  };
+
+  // 환자 데이터 (HIPAA 준수)
+  patientData: {
+    algorithm: 'AES-256-GCM';
+    keyRotation: true;
+    rotationPeriod: 2592000;  // 30일
+  };
+}
+
+// 민감한 데이터 암호화
+async function encryptData(data: Uint8Array, key: CryptoKey) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+
+  return {
+    ciphertext: new Uint8Array(encrypted),
+    iv: iv,
+    algorithm: 'AES-256-GCM'
+  };
+}</code></pre>
+
+    <h3>전송 중 데이터 암호화</h3>
+    <pre><code>interface EncryptionInTransit {
+  // BLE 암호화
+  ble: {
+    mode: 'AES-128-CCM';
+    keyExchange: 'ECDH';
+    perfectForwardSecrecy: true;
+  };
+
+  // HTTPS/TLS
+  https: {
+    version: 'TLS-1.3';
+    cipherSuites: [
+      'TLS_AES_256_GCM_SHA384',
+      'TLS_CHACHA20_POLY1305_SHA256'
+    ];
+    certificatePinning: true;
+  };
+}</code></pre>
+
+    <h2>6.4 오디오 데이터 보호</h2>
+    <p>민감한 정보를 포함할 수 있는 오디오 데이터 보호를 위한 특별 고려사항.</p>
+
+    <h3>오디오 데이터 처리</h3>
+    <pre><code>interface AudioDataProtection {
+  // 저장 정책
+  storage: {
+    neverStorePermanent: true;
+    bufferOnly: true;
+    maxBufferTime: 5000;      // ms
+    clearOnDisconnect: true;
+  };
+
+  // 전송
+  transmission: {
+    encrypted: true;
+    compression: 'opus';
+    streamOnly: true;         // 녹음 안함
+  };
+
+  // 처리
+  processing: {
+    onDeviceOnly: boolean;
+    cloudProcessing: 'opt-in';
+    anonymizeBeforeCloud: true;
+  };
+}</code></pre>
+
+    <h2>6.5 프라이버시 규정 준수</h2>
+
+    <h3>HIPAA 준수</h3>
+    <pre><code>interface HIPAACompliance {
+  phi: {
+    encryption: 'AES-256-GCM';
+    accessControl: 'role-based';
+    auditLogging: true;
+    breachNotification: true;
+  };
+
+  security: {
+    administrativeSafeguards: true;
+    physicalSafeguards: true;
+    technicalSafeguards: true;
+  };
+}</code></pre>
+
+    <h3>GDPR 준수</h3>
+    <pre><code>interface GDPRCompliance {
+  rights: {
+    rightToAccess: true;
+    rightToErasure: true;        // "잊혀질 권리"
+    rightToPortability: true;
+    rightToRectification: true;
+  };
+
+  principles: {
+    dataMinimization: true;
+    purposeLimitation: true;
+    storageMinimization: true;
+    accuracyMaintenance: true;
+  };
+}</code></pre>
+
+    <h3>한국 개인정보보호법(PIPA) 준수</h3>
+    <pre><code>interface PIPACompliance {
+  requirements: {
+    consentRequired: true;
+    purposeLimitation: true;
+    dataRetentionLimit: 365;     // 일
+    crossBorderTransfer: 'restricted';
+  };
+
+  security: {
+    accessControl: true;
+    encryptionMandatory: true;
+    auditTrail: true;
+    incidentResponse: true;
+  };
+}</code></pre>
+
+    <h2>6.6 역할 기반 액세스 제어</h2>
+
+    <pre><code>interface RBACRoles {
+  patient: {
+    permissions: [
+      'view_own_data',
+      'update_config',
+      'view_analytics',
+      'export_data'
+    ];
+  };
+
+  clinician: {
+    permissions: [
+      'view_patient_data',
+      'update_patient_config',
+      'view_telemetry',
+      'run_diagnostics'
+    ];
+  };
+
+  researcher: {
+    permissions: [
+      'view_anonymized_stats',
+      'export_aggregated_data'
+    ];
+  };
+}</code></pre>
+
+    <div class="success-box">
+      <h3>보안 체크리스트</h3>
+      <ul>
+        <li>✓ 중간자 공격 방지를 통한 장치 페어링</li>
+        <li>✓ AES-256-GCM 저장 암호화</li>
+        <li>✓ 전송을 위한 TLS 1.3</li>
+        <li>✓ 오디오 데이터 영구 저장 안함</li>
+        <li>✓ 서명된 펌웨어 업데이트만</li>
+        <li>✓ HIPAA/GDPR/PIPA 준수</li>
+        <li>✓ 역할 기반 액세스 제어</li>
+        <li>✓ 포괄적인 감사 로깅</li>
+        <li>✓ 사고 대응 계획</li>
+      </ul>
+    </div>
+
+    </main>
+</body>
+</html>

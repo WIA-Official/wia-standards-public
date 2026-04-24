@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 6: 통합 | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 6: 통합 및 배포 대상</h1>
+
+    <p>현대 CI/CD 시스템은 독립적으로 존재하지 않습니다. 버전 관리 시스템, 컨테이너 레지스트리, 클라우드 플랫폼, 그리고 수많은 서드파티 서비스와 통합됩니다. 이 챕터에서는 다양한 배포 대상에 걸쳐 원활한 소프트웨어 배포를 가능하게 하는 강력한 통합을 구축하는 방법을 탐구합니다.</p>
+
+    <h2>버전 관리 시스템 통합</h2>
+
+    <p>VCS 통합은 CI/CD의 기반입니다. 파이프라인은 적절한 작업으로 코드 변경, 브랜치 이벤트, 풀 리퀘스트에 응답해야 합니다.</p>
+
+    <h3>프리커밋 검증을 위한 Git 훅</h3>
+
+    <pre><code># .husky/pre-commit - 클라이언트 측 검증
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# 스테이징된 파일만 린트
+npx lint-staged
+
+# 타입 체크
+npm run type-check
+
+# 영향받은 테스트 실행
+npm test -- --onlyChanged --passWithNoTests</code></pre>
+
+    <pre><code>// package.json - lint-staged 구성
+{
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml}": [
+      "prettier --write"
+    ],
+    "*.{css,scss}": [
+      "stylelint --fix",
+      "prettier --write"
+    ]
+  }
+}</code></pre>
+
+    <h3>웹훅 구성</h3>
+
+    <pre><code># CI 트리거를 위한 GitHub 웹훅 이벤트
+웹훅 이벤트:
+├── push                    # 푸시 시 빌드 트리거
+├── pull_request
+│   ├── opened             # 새 PR 생성
+│   ├── synchronize        # 새 커밋으로 PR 업데이트
+│   ├── reopened           # PR 다시 열림
+│   └── closed             # PR 병합 또는 닫힘
+├── release
+│   ├── published          # 새 릴리스 발행
+│   └── created            # 릴리스 생성
+├── workflow_dispatch      # 수동 트리거
+└── schedule               # 크론 기반 트리거</code></pre>
+
+    <pre><code># GitHub Actions - 종합 이벤트 처리
+name: CI/CD 파이프라인
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+    types: [opened, synchronize, reopened]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '배포 환경'
+        required: true
+        default: 'staging'
+        type: choice
+        options: [development, staging, production]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npm run build
+
+  deploy:
+    needs: build
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - run: echo "${{ github.event.inputs.environment }}에 배포 중"</code></pre>
+
+    <div class="highlight">
+        <strong>브랜치 보호 규칙:</strong> 병합 전에 CI 검사 통과를 요구하도록 브랜치 보호를 구성하세요. 이는 손상된 코드가 메인 브랜치에 들어가는 것을 방지하고 팀 전체에 품질 표준을 적용합니다.
+    </div>
+
+    <h2>컨테이너 레지스트리 통합</h2>
+
+    <p>컨테이너 레지스트리는 Docker 이미지를 저장하고 배포합니다. 레지스트리와의 통합은 환경 전반에 걸쳐 일관된 배포를 가능하게 합니다.</p>
+
+    <h3>다중 레지스트리 푸시 전략</h3>
+
+    <pre><code># GitHub Actions - 다중 레지스트리 푸시
+name: 컨테이너 빌드 및 푸시
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+env:
+  IMAGE_NAME: wia-ci-app
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      # 다중 레지스트리 로그인
+      - name: GitHub 컨테이너 레지스트리 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Hub 로그인
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: AWS ECR 로그인
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 모든 레지스트리에 빌드 및 푸시
+      - name: 빌드 및 푸시
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max</code></pre>
+
+    <h2>클라우드 플랫폼 배포</h2>
+
+    <h3>쿠버네티스 배포</h3>
+
+    <pre><code># GitHub Actions - 쿠버네티스 배포
+name: 쿠버네티스 배포
+on:
+  workflow_run:
+    workflows: ["컨테이너 빌드 및 푸시"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: AWS 자격 증명 구성
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: kubeconfig 업데이트
+        run: aws eks update-kubeconfig --name production-cluster
+
+      - name: 쿠버네티스에 배포
+        run: |
+          # 배포에서 이미지 태그 업데이트
+          kubectl set image deployment/wia-ci-app \
+            wia-ci-app=${{ secrets.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -n production
+
+          # 롤아웃 대기
+          kubectl rollout status deployment/wia-ci-app -n production --timeout=300s
+
+      - name: 배포 확인
+        run: |
+          kubectl get pods -n production -l app=wia-ci-app
+          kubectl get services -n production -l app=wia-ci-app</code></pre>
+
+    <h3>서버리스 배포</h3>
+
+    <pre><code># GitHub Actions - AWS Lambda 배포
+name: Lambda 함수 배포
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 의존성 설치
+        run: npm ci
+        working-directory: functions
+
+      - name: 함수 빌드
+        run: npm run build
+        working-directory: functions
+
+      - name: AWS 자격 증명 구성
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Serverless Framework로 배포
+        run: npx serverless deploy --stage production
+        working-directory: functions
+        env:
+          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}</code></pre>
+
+    <h3>PaaS 배포</h3>
+
+    <pre><code># GitHub Actions - Vercel 배포
+name: Vercel 배포
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vercel에 배포
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          # PR은 미리보기, main은 프로덕션
+          vercel-args: ${{ github.event_name == 'push' && '--prod' || '' }}
+
+      - name: PR에 미리보기 URL 댓글
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `미리보기 배포됨: ${{ steps.deploy.outputs.preview-url }}`
+            })</code></pre>
+
+    <div class="highlight">
+        <strong>배포 전략 선택:</strong>
+        <ul>
+            <li><strong>롤링:</strong> 점진적 교체, 무상태 앱에 적합</li>
+            <li><strong>블루-그린:</strong> 즉시 전환, 쉬운 롤백</li>
+            <li><strong>카나리:</strong> 위험 완화, 점진적 트래픽 전환</li>
+            <li><strong>피처 플래그:</strong> 배포와 릴리스 분리</li>
+        </ul>
+    </div>
+
+    <h2>인프라 코드 통합</h2>
+
+    <pre><code># GitHub Actions - Terraform 통합
+name: 인프라 배포
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+  pull_request:
+    paths:
+      - 'terraform/**'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform 설정
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform 초기화
+        run: terraform init
+
+      - name: Terraform 포맷 검사
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: PR에 계획 댓글
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = `${{ steps.plan.outputs.stdout }}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Terraform Plan\n\`\`\`\n${plan}\n\`\`\``
+            });
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan</code></pre>
+
+    <h2>서드파티 서비스 통합</h2>
+
+    <h3>알림 시스템</h3>
+
+    <pre><code># GitHub Actions - 다중 채널 알림
+name: 빌드 알림
+on:
+  workflow_run:
+    workflows: ["CI 파이프라인"]
+    types: [completed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      # Slack 알림
+      - name: Slack 알림
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ github.event.workflow_run.conclusion }}
+          channel: '#deployments'
+          fields: repo,message,commit,author,action,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      # Microsoft Teams 알림
+      - name: Teams 알림
+        uses: jdcargile/ms-teams-notification@v1.4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK }}
+          notification-summary: "빌드 ${{ github.event.workflow_run.conclusion }}"
+
+      # Discord 알림
+      - name: Discord 알림
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ github.event.workflow_run.conclusion }}</code></pre>
+
+    <h3>이슈 트래킹 통합</h3>
+
+    <pre><code># GitHub Actions - Jira 통합
+name: Jira 통합
+on:
+  pull_request:
+    types: [opened, closed]
+
+jobs:
+  jira:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Jira 로그인
+        uses: atlassian/gajira-login@v3
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+      - name: Jira 이슈 키 추출
+        id: jira-key
+        run: |
+          KEY=$(echo "${{ github.head_ref }}" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+          echo "key=$KEY" >> $GITHUB_OUTPUT
+
+      - name: 이슈를 검토 중으로 전환
+        if: github.event.action == 'opened' && steps.jira-key.outputs.key
+        uses: atlassian/gajira-transition@v3
+        with:
+          issue: ${{ steps.jira-key.outputs.key }}
+          transition: "검토 중"
+
+      - name: 이슈를 완료로 전환
+        if: github.event.pull_request.merged && steps.jira-key.outputs.key
+        uses: atlassian/gajira-transition@v3
+        with:
+          issue: ${{ steps.jira-key.outputs.key }}
+          transition: "완료"</code></pre>
+
+    <h2>API 및 웹훅 모범 사례</h2>
+
+    <table>
+        <tr>
+            <th>사례</th>
+            <th>설명</th>
+            <th>구현</th>
+        </tr>
+        <tr>
+            <td>멱등성</td>
+            <td>중복 웹훅 전달 처리</td>
+            <td>처리된 이벤트 ID 추적</td>
+        </tr>
+        <tr>
+            <td>서명 검증</td>
+            <td>웹훅 진위 확인</td>
+            <td>HMAC 서명 확인</td>
+        </tr>
+        <tr>
+            <td>재시도 로직</td>
+            <td>일시적 실패 처리</td>
+            <td>지수 백오프</td>
+        </tr>
+        <tr>
+            <td>속도 제한</td>
+            <td>API 제한 준수</td>
+            <td>토큰 버킷, 큐잉</td>
+        </tr>
+        <tr>
+            <td>타임아웃 처리</td>
+            <td>중단된 요청 방지</td>
+            <td>구성 가능한 타임아웃</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>WIA-CI 통합 성숙도:</strong>
+        <ul>
+            <li>레벨 1: 기본 VCS 트리거, 단일 배포 대상</li>
+            <li>레벨 2: 컨테이너 레지스트리 통합, IaC 배포</li>
+            <li>레벨 3: 다중 클라우드 배포, 피처 플래그 통합</li>
+            <li>레벨 4: GitOps, 코드로서의 정책, 완전한 관찰성</li>
+        </ul>
+    </div>
+
+    <p>강력한 통합은 CI/CD를 고립된 자동화에서 전체 소프트웨어 배포 생명주기를 간소화하는 연결된 에코시스템으로 변환합니다. 이 챕터의 패턴과 실천을 통해 유연하고 유지보수 가능한 통합 아키텍처를 구축할 수 있습니다.</p>
+
+</body>
+</html>

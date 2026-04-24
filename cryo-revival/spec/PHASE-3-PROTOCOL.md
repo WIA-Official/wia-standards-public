@@ -1,995 +1,1897 @@
-# WIA Cryo-Revival Communication Protocol
-## Phase 3 Specification
-
----
-
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Protocol Architecture](#protocol-architecture)
-3. [Transport Layer](#transport-layer)
-4. [Message Format](#message-format)
-5. [Connection Lifecycle](#connection-lifecycle)
-6. [Message Types](#message-types)
-7. [Security](#security)
-8. [Error Handling](#error-handling)
-9. [Examples](#examples)
-
----
+# CRYO-REVIVAL Phase 3: Protocol Specification
 
 ## Overview
 
-### 1.1 Purpose
+This document defines the REST API protocol for revival procedure management, stage control, monitoring, and re-preservation decisions.
 
-The WIA Cryo-Revival Communication Protocol defines real-time communication standards for monitoring vital signs during revival procedures, coordinating medical teams, delivering critical alerts, and streaming patient data to integrated healthcare systems.
+## OpenAPI Specification
 
-**Core Objectives**:
-- Real-time vital signs monitoring during revival procedures
-- Instant critical alert notification to medical teams
-- Secure bi-directional communication between medical devices and monitoring systems
-- Reliable message delivery with acknowledgment and retry mechanisms
-- Integration with hospital monitoring and alerting infrastructure
+```yaml
+openapi: 3.0.3
+info:
+  title: CRYO-REVIVAL Protocol API
+  description: |
+    WIA Standard API for cryopreservation revival procedures.
+    Manages the complete revival workflow from preparation through post-revival care.
+  version: 1.0.0
+  contact:
+    name: WIA Technical Committee
+    url: https://wia.org/standards/cryo-revival
+  license:
+    name: WIA Open Standard License
+    url: https://wia.org/licenses/open-standard
 
-### 1.2 Protocol Selection
+servers:
+  - url: https://api.wia-revival.org/v1
+    description: Production server
+  - url: https://staging-api.wia-revival.org/v1
+    description: Staging server
+  - url: https://sandbox-api.wia-revival.org/v1
+    description: Sandbox for testing
 
-| Use Case | Recommended Protocol | Rationale |
-|----------|---------------------|-----------|
-| Real-time vital signs | WebSocket | Low latency, bidirectional |
-| Medical device data | MQTT | IoT-optimized, QoS support |
-| Inter-facility sync | gRPC | High throughput, type-safe |
-| Alert notifications | Server-Sent Events (SSE) | One-way push, simple |
-| Emergency broadcasts | WebSocket + Redis PubSub | Multi-recipient, instant |
+tags:
+  - name: procedures
+    description: Revival procedure management
+  - name: stages
+    description: Stage control and transitions
+  - name: monitoring
+    description: Vital signs and monitoring data
+  - name: team
+    description: Revival team management
+  - name: alerts
+    description: Alert management
+  - name: re-preservation
+    description: Re-preservation decisions
 
-### 1.3 Design Principles
+paths:
+  /procedures:
+    post:
+      tags: [procedures]
+      summary: Initialize a new revival procedure
+      operationId: createProcedure
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProcedureRequest'
+      responses:
+        '201':
+          description: Procedure created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevivalProcedure'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Consent or preparation requirements not met
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-1. **Medical-Grade Reliability**: At-least-once delivery with acknowledgment
-2. **Ultra-Low Latency**: Sub-100ms message delivery for critical alerts
-3. **HIPAA Compliance**: End-to-end encryption and audit logging
-4. **Fault Tolerance**: Automatic reconnection and message buffering
-5. **Scalability**: Support for multiple simultaneous revival procedures
+    get:
+      tags: [procedures]
+      summary: List revival procedures
+      operationId: listProcedures
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RevivalStatus'
+        - name: facility_id
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: List of procedures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  procedures:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProcedureSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
 
----
+  /procedures/{procedureId}:
+    get:
+      tags: [procedures]
+      summary: Get procedure details
+      operationId: getProcedure
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Procedure details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevivalProcedure'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
-## Protocol Architecture
+    patch:
+      tags: [procedures]
+      summary: Update procedure status
+      operationId: updateProcedure
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProcedureRequest'
+      responses:
+        '200':
+          description: Procedure updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevivalProcedure'
 
-### 2.1 Layer Model
+  /procedures/{procedureId}/stages:
+    get:
+      tags: [stages]
+      summary: Get all stage records for a procedure
+      operationId: getStages
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Stage records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_stage:
+                    $ref: '#/components/schemas/RevivalStage'
+                  stages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StageRecord'
 
+  /procedures/{procedureId}/stages/current:
+    get:
+      tags: [stages]
+      summary: Get current stage details
+      operationId: getCurrentStage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Current stage details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StageRecord'
+
+  /procedures/{procedureId}/stages/transition:
+    post:
+      tags: [stages]
+      summary: Request transition to next stage
+      operationId: requestStageTransition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionRequest'
+      responses:
+        '200':
+          description: Transition result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransitionResult'
+        '400':
+          description: Transition criteria not met
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransitionDenied'
+
+  /procedures/{procedureId}/warming:
+    get:
+      tags: [stages]
+      summary: Get warming stage status
+      operationId: getWarmingStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Warming status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarmingStatus'
+
+    post:
+      tags: [stages]
+      summary: Record warming temperature
+      operationId: recordWarmingTemp
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemperatureReading'
+      responses:
+        '201':
+          description: Temperature recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemperatureRecordResult'
+
+  /procedures/{procedureId}/warming/profile:
+    get:
+      tags: [stages]
+      summary: Get optimal warming profile
+      operationId: getWarmingProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Warming profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarmingProfile'
+
+  /procedures/{procedureId}/cardiovascular:
+    get:
+      tags: [stages]
+      summary: Get cardiovascular restart status
+      operationId: getCardiovascularStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Cardiovascular status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardiovascularStatus'
+
+    post:
+      tags: [stages]
+      summary: Update cardiovascular status
+      operationId: updateCardiovascularStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardiovascularUpdate'
+      responses:
+        '200':
+          description: Status updated with recommendations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardiovascularUpdateResult'
+
+  /procedures/{procedureId}/cardiovascular/defibrillation:
+    post:
+      tags: [stages]
+      summary: Record defibrillation attempt
+      operationId: recordDefibrillation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefibrillationRecord'
+      responses:
+        '201':
+          description: Defibrillation recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefibrillationResult'
+
+  /procedures/{procedureId}/neurological:
+    get:
+      tags: [stages]
+      summary: Get neurological status
+      operationId: getNeurologicalStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Neurological status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NeurologicalStatus'
+
+  /procedures/{procedureId}/neurological/eeg:
+    post:
+      tags: [stages]
+      summary: Record EEG reading
+      operationId: recordEEG
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EEGReading'
+      responses:
+        '201':
+          description: EEG recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EEGRecordResult'
+
+  /procedures/{procedureId}/neurological/consciousness:
+    post:
+      tags: [stages]
+      summary: Record consciousness assessment
+      operationId: recordConsciousness
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsciousnessAssessment'
+      responses:
+        '201':
+          description: Assessment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsciousnessResult'
+
+  /procedures/{procedureId}/monitoring/vitals:
+    post:
+      tags: [monitoring]
+      summary: Record vital signs
+      operationId: recordVitals
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VitalSigns'
+      responses:
+        '201':
+          description: Vitals recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VitalsRecordResult'
+
+    get:
+      tags: [monitoring]
+      summary: Get vital signs history
+      operationId: getVitalsHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Vital signs history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vitals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VitalSigns'
+                  trends:
+                    $ref: '#/components/schemas/VitalsTrends'
+
+  /procedures/{procedureId}/monitoring/labs:
+    post:
+      tags: [monitoring]
+      summary: Record laboratory results
+      operationId: recordLabs
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabResults'
+      responses:
+        '201':
+          description: Labs recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabRecordResult'
+
+  /procedures/{procedureId}/complications:
+    post:
+      tags: [monitoring]
+      summary: Record complication
+      operationId: recordComplication
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplicationRecord'
+      responses:
+        '201':
+          description: Complication recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complication'
+
+    get:
+      tags: [monitoring]
+      summary: Get all complications
+      operationId: getComplications
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Complications list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Complication'
+
+  /procedures/{procedureId}/interventions:
+    post:
+      tags: [monitoring]
+      summary: Record intervention
+      operationId: recordIntervention
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterventionRecord'
+      responses:
+        '201':
+          description: Intervention recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Intervention'
+
+  /procedures/{procedureId}/team:
+    get:
+      tags: [team]
+      summary: Get revival team
+      operationId: getTeam
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Team information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevivalTeam'
+
+    post:
+      tags: [team]
+      summary: Assign team member
+      operationId: assignTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamMemberAssignment'
+      responses:
+        '201':
+          description: Member assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+
+  /procedures/{procedureId}/team/shifts:
+    post:
+      tags: [team]
+      summary: Create shift schedule
+      operationId: createShift
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShiftSchedule'
+      responses:
+        '201':
+          description: Shift created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShiftSchedule'
+
+  /procedures/{procedureId}/team/handover:
+    post:
+      tags: [team]
+      summary: Record shift handover
+      operationId: recordHandover
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HandoverRecord'
+      responses:
+        '201':
+          description: Handover recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandoverRecord'
+
+  /procedures/{procedureId}/alerts:
+    get:
+      tags: [alerts]
+      summary: Get active alerts
+      operationId: getAlerts
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/AlertSeverity'
+        - name: acknowledged
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Active alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Alert'
+                  summary:
+                    $ref: '#/components/schemas/AlertSummary'
+
+  /procedures/{procedureId}/alerts/{alertId}/acknowledge:
+    post:
+      tags: [alerts]
+      summary: Acknowledge alert
+      operationId: acknowledgeAlert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acknowledged_by]
+              properties:
+                acknowledged_by:
+                  type: string
+      responses:
+        '200':
+          description: Alert acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+
+  /procedures/{procedureId}/alerts/{alertId}/resolve:
+    post:
+      tags: [alerts]
+      summary: Resolve alert
+      operationId: resolveAlert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolved_by, resolution]
+              properties:
+                resolved_by:
+                  type: string
+                resolution:
+                  type: string
+      responses:
+        '200':
+          description: Alert resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+
+  /procedures/{procedureId}/re-preservation:
+    get:
+      tags: [re-preservation]
+      summary: Get re-preservation status
+      operationId: getRePreservationStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Re-preservation status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RePreservationStatus'
+
+    post:
+      tags: [re-preservation]
+      summary: Initialize re-preservation consideration
+      operationId: initializeRePreservation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RePreservationInit'
+      responses:
+        '201':
+          description: Re-preservation initialized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RePreservationStatus'
+
+  /procedures/{procedureId}/re-preservation/criteria:
+    post:
+      tags: [re-preservation]
+      summary: Evaluate re-preservation criterion
+      operationId: evaluateCriterion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriterionEvaluation'
+      responses:
+        '200':
+          description: Criterion evaluated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CriterionResult'
+
+  /procedures/{procedureId}/re-preservation/votes:
+    post:
+      tags: [re-preservation]
+      summary: Record team vote
+      operationId: recordVote
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamVote'
+      responses:
+        '201':
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteResult'
+
+  /procedures/{procedureId}/re-preservation/decision:
+    post:
+      tags: [re-preservation]
+      summary: Make re-preservation decision
+      operationId: makeRePreservationDecision
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Decision made
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RePreservationDecision'
+        '400':
+          description: Cannot make decision yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionBlocked'
+
+  /procedures/{procedureId}/outcome:
+    get:
+      tags: [procedures]
+      summary: Get procedure outcome
+      operationId: getOutcome
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: Procedure outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevivalOutcome'
+
+    post:
+      tags: [procedures]
+      summary: Record procedure outcome
+      operationId: recordOutcome
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutcomeRecord'
+      responses:
+        '201':
+          description: Outcome recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevivalOutcome'
+
+  /procedures/{procedureId}/stream:
+    get:
+      tags: [monitoring]
+      summary: Stream real-time updates
+      operationId: streamUpdates
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/procedureId'
+      responses:
+        '200':
+          description: SSE stream of updates
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    procedureId:
+      name: procedureId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^REVIVAL-[0-9]{4}-[0-9]{3}$'
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    RevivalStatus:
+      type: string
+      enum:
+        - SCHEDULED
+        - PREPARING
+        - IN_PROGRESS
+        - PAUSED
+        - COMPLETED
+        - FAILED
+        - ABORTED
+        - RE_PRESERVED
+
+    RevivalStage:
+      type: string
+      enum:
+        - PRE_REVIVAL
+        - WARMING
+        - CRYOPROTECTANT_REMOVAL
+        - REHYDRATION
+        - CARDIOVASCULAR_RESTART
+        - RESPIRATORY_ACTIVATION
+        - NEUROLOGICAL_RESTORATION
+        - STABILIZATION
+        - POST_REVIVAL_CARE
+
+    CreateProcedureRequest:
+      type: object
+      required:
+        - subject_id
+        - identity_id
+        - consent_id
+        - facility_id
+        - scheduled_date
+      properties:
+        subject_id:
+          type: string
+        identity_id:
+          type: string
+          description: CRYO-IDENTITY reference
+        consent_id:
+          type: string
+          description: CRYO-CONSENT reference
+        facility_id:
+          type: string
+        scheduled_date:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    RevivalProcedure:
+      type: object
+      properties:
+        procedure_id:
+          type: string
+        subject_id:
+          type: string
+        identity_id:
+          type: string
+        consent_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/RevivalStatus'
+        current_stage:
+          $ref: '#/components/schemas/RevivalStage'
+        preparation:
+          $ref: '#/components/schemas/RevivalPreparation'
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/StageRecord'
+        team:
+          $ref: '#/components/schemas/RevivalTeam'
+        facility:
+          $ref: '#/components/schemas/FacilityInfo'
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        last_updated:
+          type: string
+          format: date-time
+
+    ProcedureSummary:
+      type: object
+      properties:
+        procedure_id:
+          type: string
+        subject_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/RevivalStatus'
+        current_stage:
+          $ref: '#/components/schemas/RevivalStage'
+        started_at:
+          type: string
+          format: date-time
+
+    UpdateProcedureRequest:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/RevivalStatus'
+        notes:
+          type: string
+
+    StageRecord:
+      type: object
+      properties:
+        stage:
+          $ref: '#/components/schemas/RevivalStage'
+        stage_number:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, IN_PROGRESS, COMPLETED, FAILED, SKIPPED]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        duration:
+          type: string
+        parameters:
+          type: object
+        complications_count:
+          type: integer
+        interventions_count:
+          type: integer
+
+    TransitionRequest:
+      type: object
+      required:
+        - current_vitals
+        - approvals
+      properties:
+        current_vitals:
+          $ref: '#/components/schemas/VitalSigns'
+        current_labs:
+          $ref: '#/components/schemas/LabResults'
+        approvals:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              member_id:
+                type: string
+              approved_at:
+                type: string
+                format: date-time
+
+    TransitionResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        previous_stage:
+          $ref: '#/components/schemas/RevivalStage'
+        new_stage:
+          $ref: '#/components/schemas/RevivalStage'
+        transitioned_at:
+          type: string
+          format: date-time
+
+    TransitionDenied:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        current_stage:
+          $ref: '#/components/schemas/RevivalStage'
+        issues:
+          type: array
+          items:
+            type: string
+
+    WarmingStatus:
+      type: object
+      properties:
+        current_temperature:
+          type: number
+        target_temperature:
+          type: number
+        phase:
+          type: string
+        optimal_rate:
+          type: number
+        is_complete:
+          type: boolean
+        alerts:
+          type: array
+          items:
+            type: string
+
+    WarmingProfile:
+      type: object
+      properties:
+        phases:
+          type: array
+          items:
+            type: object
+            properties:
+              start_temp:
+                type: number
+              end_temp:
+                type: number
+              warming_rate:
+                type: number
+              duration_minutes:
+                type: number
+              phase_name:
+                type: string
+
+    TemperatureReading:
+      type: object
+      required:
+        - temperature
+        - location
+      properties:
+        temperature:
+          type: number
+        location:
+          type: string
+          enum: [CORE, BRAIN, PERIPHERAL]
+        source:
+          type: string
+
+    TemperatureRecordResult:
+      type: object
+      properties:
+        recorded:
+          type: boolean
+        alert:
+          type: string
+        current_status:
+          $ref: '#/components/schemas/WarmingStatus'
+
+    CardiovascularStatus:
+      type: object
+      properties:
+        heart_rate:
+          type: integer
+        rhythm:
+          type: string
+        systolic_bp:
+          type: integer
+        diastolic_bp:
+          type: integer
+        mean_arterial_pressure:
+          type: integer
+        cardiac_output:
+          type: number
+        restart_successful:
+          type: boolean
+        defibrillation_attempts:
+          type: integer
+
+    CardiovascularUpdate:
+      type: object
+      properties:
+        heart_rate:
+          type: integer
+        rhythm:
+          type: string
+        systolic_bp:
+          type: integer
+        diastolic_bp:
+          type: integer
+        cardiac_output:
+          type: number
+        cvp:
+          type: integer
+
+    CardiovascularUpdateResult:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/CardiovascularStatus'
+        in_target:
+          type: object
+          additionalProperties:
+            type: boolean
+        recommendations:
+          type: object
+          properties:
+            action:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+            medications:
+              type: array
+              items:
+                type: string
+
+    DefibrillationRecord:
+      type: object
+      required:
+        - energy_joules
+        - rhythm_before
+        - rhythm_after
+      properties:
+        energy_joules:
+          type: integer
+        rhythm_before:
+          type: string
+        rhythm_after:
+          type: string
+
+    DefibrillationResult:
+      type: object
+      properties:
+        attempt_number:
+          type: integer
+        success:
+          type: boolean
+        rhythm_achieved:
+          type: string
+        next_action:
+          type: object
+
+    NeurologicalStatus:
+      type: object
+      properties:
+        consciousness_level:
+          type: string
+        gcs_score:
+          type: integer
+        eeg_pattern:
+          type: string
+        pupil_response:
+          type: object
+        reflexes_present:
+          type: integer
+        icp:
+          type: number
+        alerts:
+          type: array
+          items:
+            type: string
+        restoration_successful:
+          type: boolean
+
+    EEGReading:
+      type: object
+      required:
+        - pattern
+      properties:
+        pattern:
+          type: string
+          enum: [FLAT, BURST_SUPPRESSION, SLOW_WAVE, NORMAL]
+        frequency_hz:
+          type: number
+        amplitude_uv:
+          type: number
+        seizure_activity:
+          type: boolean
+
+    EEGRecordResult:
+      type: object
+      properties:
+        recorded:
+          type: boolean
+        pattern:
+          type: string
+        progression:
+          type: string
+        alert:
+          type: string
+
+    ConsciousnessAssessment:
+      type: object
+      required:
+        - eye_response
+        - verbal_response
+        - motor_response
+      properties:
+        eye_response:
+          type: integer
+          minimum: 1
+          maximum: 4
+        verbal_response:
+          type: integer
+          minimum: 1
+          maximum: 5
+        motor_response:
+          type: integer
+          minimum: 1
+          maximum: 6
+
+    ConsciousnessResult:
+      type: object
+      properties:
+        gcs_score:
+          type: integer
+        consciousness_level:
+          type: string
+        trend:
+          type: string
+
+    VitalSigns:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        temperature:
+          type: number
+        heart_rate:
+          type: integer
+        systolic_bp:
+          type: integer
+        diastolic_bp:
+          type: integer
+        respiratory_rate:
+          type: integer
+        oxygen_saturation:
+          type: number
+        end_tidal_co2:
+          type: number
+        cvp:
+          type: integer
+
+    VitalsRecordResult:
+      type: object
+      properties:
+        recorded:
+          type: boolean
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+
+    VitalsTrends:
+      type: object
+      properties:
+        temperature_trend:
+          type: string
+        heart_rate_trend:
+          type: string
+        blood_pressure_trend:
+          type: string
+
+    LabResults:
+      type: object
+      properties:
+        category:
+          type: string
+        tests:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: number
+              unit:
+                type: string
+              reference_range:
+                type: string
+              flag:
+                type: string
+
+    LabRecordResult:
+      type: object
+      properties:
+        recorded:
+          type: boolean
+        critical_values:
+          type: array
+          items:
+            type: string
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+
+    ComplicationRecord:
+      type: object
+      required:
+        - type
+        - severity
+        - description
+      properties:
+        type:
+          type: string
+        severity:
+          type: string
+          enum: [MILD, MODERATE, SEVERE, LIFE_THREATENING]
+        description:
+          type: string
+        detected_by:
+          type: string
+
+    Complication:
+      type: object
+      properties:
+        complication_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        stage:
+          $ref: '#/components/schemas/RevivalStage'
+        type:
+          type: string
+        severity:
+          type: string
+        description:
+          type: string
+        resolved:
+          type: boolean
+
+    InterventionRecord:
+      type: object
+      required:
+        - type
+        - indication
+        - description
+        - performed_by
+      properties:
+        type:
+          type: string
+        indication:
+          type: string
+        description:
+          type: string
+        performed_by:
+          type: string
+        assisted_by:
+          type: array
+          items:
+            type: string
+
+    Intervention:
+      type: object
+      properties:
+        intervention_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        stage:
+          $ref: '#/components/schemas/RevivalStage'
+        type:
+          type: string
+        indication:
+          type: string
+        description:
+          type: string
+        outcome:
+          type: string
+
+    RevivalTeam:
+      type: object
+      properties:
+        team_id:
+          type: string
+        director:
+          $ref: '#/components/schemas/TeamMember'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        current_shift:
+          type: string
+
+    TeamMember:
+      type: object
+      properties:
+        member_id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        specialization:
+          type: string
+        on_site:
+          type: boolean
+        current_assignment:
+          type: string
+
+    TeamMemberAssignment:
+      type: object
+      required:
+        - member_id
+        - role
+      properties:
+        member_id:
+          type: string
+        role:
+          type: string
+        responsibilities:
+          type: array
+          items:
+            type: string
+
+    ShiftSchedule:
+      type: object
+      properties:
+        shift_id:
+          type: string
+        shift_number:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        team_on_duty:
+          type: array
+          items:
+            type: object
+            properties:
+              member_id:
+                type: string
+              role:
+                type: string
+
+    HandoverRecord:
+      type: object
+      required:
+        - from_shift
+        - to_shift
+        - notes
+      properties:
+        from_shift:
+          type: string
+        to_shift:
+          type: string
+        notes:
+          type: string
+        pending_issues:
+          type: array
+          items:
+            type: string
+        handover_time:
+          type: string
+          format: date-time
+
+    AlertSeverity:
+      type: string
+      enum: [INFO, WARNING, CRITICAL, EMERGENCY]
+
+    Alert:
+      type: object
+      properties:
+        alert_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        category:
+          type: string
+        source:
+          type: string
+        message:
+          type: string
+        acknowledged:
+          type: boolean
+        acknowledged_by:
+          type: string
+        resolved:
+          type: boolean
+        resolution:
+          type: string
+
+    AlertSummary:
+      type: object
+      properties:
+        total_alerts:
+          type: integer
+        active_alerts:
+          type: integer
+        emergency_count:
+          type: integer
+        critical_count:
+          type: integer
+
+    RePreservationStatus:
+      type: object
+      properties:
+        initialized:
+          type: boolean
+        trigger:
+          type: string
+        criteria:
+          type: array
+          items:
+            type: object
+            properties:
+              criterion_id:
+                type: string
+              description:
+                type: string
+              met:
+                type: boolean
+              evidence:
+                type: string
+        criteria_score:
+          type: number
+        votes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamVote'
+        decision:
+          type: string
+
+    RePreservationInit:
+      type: object
+      required:
+        - trigger
+      properties:
+        trigger:
+          type: string
+          enum:
+            - IRREVERSIBLE_CARDIAC_FAILURE
+            - IRREVERSIBLE_BRAIN_DAMAGE
+            - MULTIPLE_ORGAN_FAILURE
+            - SUBJECT_REQUEST
+            - GUARDIAN_REQUEST
+            - PROTOCOL_THRESHOLD
+
+    CriterionEvaluation:
+      type: object
+      required:
+        - criterion_id
+        - met
+        - evidence
+      properties:
+        criterion_id:
+          type: string
+        met:
+          type: boolean
+        evidence:
+          type: string
+
+    CriterionResult:
+      type: object
+      properties:
+        criterion_id:
+          type: string
+        met:
+          type: boolean
+        current_score:
+          type: number
+
+    TeamVote:
+      type: object
+      required:
+        - member_id
+        - role
+        - vote
+        - rationale
+      properties:
+        member_id:
+          type: string
+        role:
+          type: string
+        vote:
+          type: string
+          enum: [PROCEED, OPPOSE, ABSTAIN]
+        rationale:
+          type: string
+
+    VoteResult:
+      type: object
+      properties:
+        recorded:
+          type: boolean
+        total_votes:
+          type: integer
+        vote_summary:
+          type: object
+          properties:
+            PROCEED:
+              type: integer
+            OPPOSE:
+              type: integer
+            ABSTAIN:
+              type: integer
+
+    RePreservationDecision:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [REPRESERVE, CONTINUE, REVIEW]
+        rationale:
+          type: string
+        criteria_score:
+          type: number
+        vote_summary:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    DecisionBlocked:
+      type: object
+      properties:
+        can_decide:
+          type: boolean
+          example: false
+        issues:
+          type: array
+          items:
+            type: string
+
+    RevivalOutcome:
+      type: object
+      properties:
+        outcome_id:
+          type: string
+        procedure_id:
+          type: string
+        result:
+          type: string
+          enum:
+            - FULL_SUCCESS
+            - PARTIAL_SUCCESS
+            - SURVIVAL_WITH_DEFICITS
+            - FAILURE_REPRESERVED
+            - FAILURE_DEATH
+            - ABORTED
+        survival_status:
+          type: string
+        functional_assessment:
+          type: object
+        complications_summary:
+          type: array
+          items:
+            type: object
+        recovery_prognosis:
+          type: object
+        quality_metrics:
+          type: object
+        documented_at:
+          type: string
+          format: date-time
+
+    OutcomeRecord:
+      type: object
+      required:
+        - result
+        - survival_status
+      properties:
+        result:
+          type: string
+        survival_status:
+          type: string
+        functional_assessment:
+          type: object
+        recovery_prognosis:
+          type: object
+        documented_by:
+          type: string
+
+    RevivalPreparation:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+        scheduled_date:
+          type: string
+          format: date-time
+        readiness_score:
+          type: number
+        ready_for_revival:
+          type: boolean
+
+    FacilityInfo:
+      type: object
+      properties:
+        facility_id:
+          type: string
+        facility_name:
+          type: string
+        location:
+          type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    Application Layer                          │
-│         (Revival Monitoring, Team Coordination)               │
-├──────────────────────────────────────────────────────────────┤
-│                    Protocol Layer                             │
-│        (Message Format, Handlers, Acknowledgments)            │
-├──────────────────────────────────────────────────────────────┤
-│                    Security Layer                             │
-│         (TLS 1.3, JWT Auth, Message Encryption)              │
-├──────────────────────────────────────────────────────────────┤
-│                    Transport Layer                            │
-│           (WebSocket / MQTT / gRPC / SSE)                    │
-├──────────────────────────────────────────────────────────────┤
-│                    Network Layer                              │
-│                     (TCP/IP)                                  │
-└──────────────────────────────────────────────────────────────┘
-```
 
-### 2.2 Component Architecture
+## WebSocket Protocol
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Vital Signs    │     │  Medical Team   │     │  Alert System   │
-│    Monitors     │     │   Dashboard     │     │   (Mobile)      │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         │ MQTT                  │ WebSocket             │ WebSocket
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│              Message Broker / Gateway (Redis PubSub)             │
-│       (Authentication, Routing, Buffering, Fan-out)              │
-└──────────────────────────────────────────────────────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Vitals Data    │     │  Alert Service  │     │  Audit Log      │
-│    Service      │     │  (Emergency)    │     │   Service       │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-         │                                               │
-         ▼                                               ▼
-┌─────────────────┐                             ┌─────────────────┐
-│  EHR/FHIR       │                             │  Compliance     │
-│  Integration    │                             │  Storage        │
-└─────────────────┘                             └─────────────────┘
-```
+### Real-time Monitoring Connection
 
----
-
-## Transport Layer
-
-### 3.1 WebSocket (Primary)
-
-**Connection URL:**
-```
-wss://ws.wia.live/cryo-revival/v1
-```
-
-**Default Port:** 443 (WSS)
-
-**Subprotocol:** `wia-revival-v1`
-
-**Connection Example:**
 ```javascript
-const ws = new WebSocket(
-  'wss://ws.wia.live/cryo-revival/v1',
-  'wia-revival-v1',
-  {
-    headers: {
-      'Authorization': `Bearer ${jwt_token}`,
-      'X-Facility-ID': 'FAC-KR-REVIVAL-001'
-    }
-  }
-);
-```
+// WebSocket connection for real-time monitoring
+const ws = new WebSocket('wss://api.wia-revival.org/v1/procedures/{procedureId}/ws');
 
-**Use Cases:**
-- Real-time vital signs streaming
-- Medical team chat and coordination
-- Emergency alert broadcasting
-- Procedure status updates
-
-### 3.2 MQTT (Medical Devices)
-
-**Broker URL:**
-```
-mqtts://mqtt.wia.live:8883
-```
-
-**Topic Structure:**
-```
-wia/revival/{facility_id}/{revival_id}/{data_type}
-
-Examples:
-wia/revival/FAC-KR-REVIVAL-001/REV-2025-001/vitals
-wia/revival/FAC-KR-REVIVAL-001/REV-2025-001/heart_rate
-wia/revival/FAC-KR-REVIVAL-001/REV-2025-001/temperature
-wia/revival/FAC-KR-REVIVAL-001/REV-2025-001/alerts
-wia/revival/FAC-KR-REVIVAL-001/+/critical_alerts
-```
-
-**QoS Levels:**
-| QoS | Use Case | Example |
-|-----|----------|---------|
-| 0 | Routine vital signs (high frequency) | Temperature readings every 5 sec |
-| 1 | Important status updates | Phase transitions |
-| 2 | Critical alerts and medical decisions | Cardiac arrest, severe vitals |
-
-**MQTT Message Format:**
-```json
-{
-  "deviceId": "MONITOR-001",
-  "revivalId": "REV-2025-001",
-  "timestamp": "2025-01-15T19:00:00.123Z",
-  "data": {
-    "heart_rate": 72,
-    "source": "cardiac_monitor",
-    "quality": "good"
-  }
-}
-```
-
-### 3.3 gRPC (Service-to-Service)
-
-**Proto Definition:**
-```protobuf
-syntax = "proto3";
-
-package wia.revival.v1;
-
-service RevivalMonitoring {
-  // Stream vital signs for a revival procedure
-  rpc StreamVitals(RevivalRequest) returns (stream VitalSigns);
-
-  // Send critical alert
-  rpc SendCriticalAlert(Alert) returns (AlertAck);
-
-  // Get current revival status
-  rpc GetRevivalStatus(StatusRequest) returns (RevivalStatus);
-
-  // Bidirectional team coordination
-  rpc CoordinateTeam(stream TeamMessage) returns (stream TeamMessage);
-}
-
-message VitalSigns {
-  string revival_id = 1;
-  int64 timestamp = 2;
-  int32 heart_rate = 3;
-  BloodPressure blood_pressure = 4;
-  double body_temperature = 5;
-  int32 oxygen_saturation = 6;
-  int32 respiratory_rate = 7;
-  NeurologicalStatus neurological_status = 8;
-}
-
-message BloodPressure {
-  int32 systolic = 1;
-  int32 diastolic = 2;
-}
-
-message NeurologicalStatus {
-  int32 glasgow_coma_scale = 1;
-  string pupil_response = 2;
-  string eeg_activity = 3;
-}
-
-message Alert {
-  string revival_id = 1;
-  string alert_type = 2;
-  string severity = 3;
-  string message = 4;
-  int64 timestamp = 5;
-  map<string, string> metadata = 6;
-}
-
-message AlertAck {
-  string alert_id = 1;
-  bool acknowledged = 2;
-  int64 ack_timestamp = 3;
-}
-```
-
-**gRPC Usage Example:**
-```go
-import (
-    pb "wia.live/cryo-revival/v1"
-    "google.golang.org/grpc"
-)
-
-conn, _ := grpc.Dial("grpc.wia.live:443", grpc.WithTransportCredentials(...))
-client := pb.NewRevivalMonitoringClient(conn)
-
-stream, _ := client.StreamVitals(context.Background(), &pb.RevivalRequest{
-    RevivalId: "REV-2025-001",
-})
-
-for {
-    vitals, err := stream.Recv()
-    if err != nil {
-        break
-    }
-
-    fmt.Printf("Heart rate: %d\n", vitals.HeartRate)
-
-    if vitals.HeartRate > 150 {
-        client.SendCriticalAlert(context.Background(), &pb.Alert{
-            RevivalId: vitals.RevivalId,
-            AlertType: "tachycardia",
-            Severity: "critical",
-            Message: "Heart rate above threshold",
-        })
-    }
-}
-```
-
-### 3.4 Server-Sent Events (Alerts)
-
-**Endpoint:**
-```
-GET /api/v1/revivals/{revivalId}/events/stream
-Accept: text/event-stream
-Authorization: Bearer <token>
-```
-
-**Event Format:**
-```
-event: vital_signs_update
-data: {"revivalId":"REV-2025-001","heart_rate":72,"timestamp":"2025-01-15T19:00:00Z"}
-
-event: critical_alert
-data: {"revivalId":"REV-2025-001","type":"tachycardia","severity":"critical"}
-
-event: status_change
-data: {"revivalId":"REV-2025-001","previousStatus":"warming","newStatus":"perfusion_reversal"}
-
-event: heartbeat
-data: {"timestamp":1704067200}
-```
-
-**SSE Client Example:**
-```javascript
-const eventSource = new EventSource(
-  'https://api.wia.live/cryo-revival/v1/revivals/REV-2025-001/events/stream',
-  {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  }
-);
-
-eventSource.addEventListener('critical_alert', (event) => {
-  const alert = JSON.parse(event.data);
-  displayEmergencyAlert(alert);
-  notifyMedicalTeam(alert);
-});
-
-eventSource.addEventListener('vital_signs_update', (event) => {
-  const vitals = JSON.parse(event.data);
-  updateDashboard(vitals);
-});
-```
-
----
-
-## Message Format
-
-### 4.1 Base Message Structure
-
-All WIA Revival protocol messages follow this structure:
-
-```json
-{
-  "protocol": "wia-revival",
-  "version": "1.0.0",
-  "messageId": "msg-uuid-v4",
-  "messageType": "vital_signs_update",
-  "timestamp": "2025-01-15T19:00:00.123Z",
-  "revivalId": "REV-2025-001",
-  "facilityId": "FAC-KR-REVIVAL-001",
-  "priority": "normal",
-  "requiresAck": true,
-  "payload": {
-    // Message-specific data
-  },
-  "meta": {
-    "deviceId": "MONITOR-001",
-    "sequenceNumber": 12345
-  }
-}
-```
-
-### 4.2 Message Types
-
-#### Vital Signs Update
-
-```json
-{
-  "messageType": "vital_signs_update",
-  "priority": "normal",
-  "requiresAck": false,
-  "payload": {
-    "heart_rate": 72,
-    "blood_pressure": {
-      "systolic": 120,
-      "diastolic": 80
-    },
-    "respiratory_rate": 16,
-    "body_temperature": 37.0,
-    "oxygen_saturation": 98,
-    "timestamp": "2025-01-15T19:00:00.123Z"
-  }
-}
-```
-
-#### Critical Alert
-
-```json
-{
-  "messageType": "critical_alert",
-  "priority": "critical",
-  "requiresAck": true,
-  "payload": {
-    "alertType": "cardiac_arrest",
-    "severity": "critical",
-    "message": "Cardiac activity ceased",
-    "vitalSigns": {
-      "heart_rate": 0,
-      "blood_pressure": { "systolic": 0, "diastolic": 0 }
-    },
-    "recommendedAction": "Initiate emergency cardiac support",
-    "autoEscalated": true
-  }
-}
-```
-
-#### Status Change
-
-```json
-{
-  "messageType": "status_change",
-  "priority": "high",
-  "requiresAck": true,
-  "payload": {
-    "previousStatus": "warming",
-    "newStatus": "perfusion_reversal",
-    "changedBy": "DR-001",
-    "reason": "Warming protocol completed successfully",
-    "timestamp": "2025-01-15T14:00:00Z"
-  }
-}
-```
-
-#### Team Coordination
-
-```json
-{
-  "messageType": "team_message",
-  "priority": "normal",
-  "requiresAck": false,
-  "payload": {
-    "sender": "DR-001",
-    "recipients": ["DR-002", "RN-001", "RN-002"],
-    "messageContent": "Preparing to begin perfusion reversal. Team standby.",
-    "messageType": "announcement"
-  }
-}
-```
-
-#### Acknowledgment
-
-```json
-{
-  "messageType": "acknowledgment",
-  "priority": "normal",
-  "requiresAck": false,
-  "payload": {
-    "originalMessageId": "msg-550e8400-e29b-41d4",
-    "acknowledged": true,
-    "acknowledgedBy": "system",
-    "acknowledgedAt": "2025-01-15T19:00:00.150Z",
-    "processingStatus": "received_and_stored"
-  }
-}
-```
-
----
-
-## Connection Lifecycle
-
-### 5.1 WebSocket Connection Flow
-
-```
-┌────────────┐                                    ┌────────────┐
-│   Client   │                                    │   Server   │
-└─────┬──────┘                                    └─────┬──────┘
-      │                                                 │
-      │  1. WebSocket Handshake + JWT                   │
-      │  ──────────────────────────────────────────►   │
-      │                                                 │
-      │  2. 101 Switching Protocols                     │
-      │  ◄──────────────────────────────────────────   │
-      │                                                 │
-      │  3. Authentication Success                      │
-      │  ◄──────────────────────────────────────────   │
-      │                                                 │
-      │  4. Subscribe to Revival Stream                 │
-      │  ──────────────────────────────────────────►   │
-      │                                                 │
-      │  5. Subscription Confirmed                      │
-      │  ◄──────────────────────────────────────────   │
-      │                                                 │
-      │  6. Stream Vital Signs (continuous)             │
-      │  ◄──────────────────────────────────────────   │
-      │  ◄──────────────────────────────────────────   │
-      │                                                 │
-      │  7. Heartbeat (every 30s)                       │
-      │  ──────────────────────────────────────────►   │
-      │  ◄──────────────────────────────────────────   │
-      │                                                 │
-      │  8. Critical Alert                              │
-      │  ◄──────────────────────────────────────────   │
-      │                                                 │
-      │  9. Acknowledge Alert                           │
-      │  ──────────────────────────────────────────►   │
-      │                                                 │
-```
-
-### 5.2 Connection Establishment
-
-**Client Request:**
-```javascript
-const ws = new WebSocket('wss://ws.wia.live/cryo-revival/v1');
-
+// Authentication
 ws.onopen = () => {
   ws.send(JSON.stringify({
-    type: 'authenticate',
-    token: 'eyJhbGciOiJSUzI1NiIs...',
-    facilityId: 'FAC-KR-REVIVAL-001'
+    type: 'AUTH',
+    token: 'Bearer <jwt_token>'
   }));
 };
-```
 
-**Server Response:**
-```json
-{
-  "type": "auth_success",
-  "sessionId": "session-550e8400",
-  "userId": "DR-001",
-  "permissions": ["revival:read", "revival:write", "monitoring:stream"],
-  "heartbeatInterval": 30000
-}
-```
+// Subscribe to updates
+ws.send(JSON.stringify({
+  type: 'SUBSCRIBE',
+  channels: ['vitals', 'alerts', 'stages']
+}));
 
-### 5.3 Subscription Management
-
-**Subscribe to Revival Stream:**
-```json
-{
-  "type": "subscribe",
-  "revivalId": "REV-2025-001",
-  "streams": ["vital_signs", "alerts", "status_changes"],
-  "updateInterval": 1000
-}
-```
-
-**Subscription Confirmed:**
-```json
-{
-  "type": "subscribed",
-  "revivalId": "REV-2025-001",
-  "subscriptionId": "sub-550e8400",
-  "activeStreams": ["vital_signs", "alerts", "status_changes"]
-}
-```
-
-### 5.4 Heartbeat and Keepalive
-
-**Client Heartbeat (every 30 seconds):**
-```json
-{
-  "type": "ping",
-  "timestamp": "2025-01-15T19:00:00Z"
-}
-```
-
-**Server Response:**
-```json
-{
-  "type": "pong",
-  "timestamp": "2025-01-15T19:00:00.005Z",
-  "serverTime": "2025-01-15T19:00:00.005Z"
-}
-```
-
-### 5.5 Reconnection Strategy
-
-```javascript
-class RevivalStreamClient {
-  constructor(revivalId, token) {
-    this.revivalId = revivalId;
-    this.token = token;
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 10;
-    this.reconnectDelay = 1000; // Start with 1 second
-  }
-
-  connect() {
-    this.ws = new WebSocket('wss://ws.wia.live/cryo-revival/v1');
-
-    this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
-      this.reconnectDelay = 1000;
-      this.authenticate();
-    };
-
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    this.ws.onclose = () => {
-      this.handleReconnect();
-    };
-  }
-
-  handleReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      const delay = Math.min(
-        this.reconnectDelay * Math.pow(2, this.reconnectAttempts),
-        30000 // Max 30 seconds
-      );
-
-      console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-      setTimeout(() => this.connect(), delay);
-    } else {
-      console.error('Max reconnection attempts reached');
-      this.notifyConnectionFailure();
-    }
-  }
-}
+// Message types
+// VITALS_UPDATE - New vital signs
+// ALERT_NEW - New alert generated
+// ALERT_ACKNOWLEDGED - Alert acknowledged
+// STAGE_TRANSITION - Stage changed
+// INTERVENTION - New intervention recorded
+// COMPLICATION - New complication recorded
 ```
 
 ---
 
-## Message Types
-
-### 6.1 Vital Signs Stream
-
-**Message Flow:**
-```
-Device → MQTT → Broker → WebSocket → Dashboard
-```
-
-**MQTT Publish:**
-```json
-{
-  "protocol": "wia-revival",
-  "version": "1.0.0",
-  "messageId": "msg-001",
-  "messageType": "vital_signs_update",
-  "timestamp": "2025-01-15T19:00:00.123Z",
-  "revivalId": "REV-2025-001",
-  "payload": {
-    "heart_rate": 72,
-    "ecg_rhythm": "normal_sinus",
-    "blood_pressure": { "systolic": 120, "diastolic": 80 },
-    "respiratory_rate": 16,
-    "body_temperature": 37.0,
-    "oxygen_saturation": 98,
-    "capnography": 38
-  },
-  "meta": {
-    "deviceId": "CARDIAC-MONITOR-001",
-    "deviceType": "multi_parameter_monitor",
-    "calibrationDate": "2025-01-10"
-  }
-}
-```
-
-### 6.2 Alert Priority Levels
-
-| Priority | Response Time | Use Case | Example |
-|----------|---------------|----------|---------|
-| `critical` | Immediate | Life-threatening | Cardiac arrest, severe hemorrhage |
-| `high` | < 30 seconds | Urgent medical attention | Abnormal vitals, consciousness change |
-| `medium` | < 2 minutes | Important but not urgent | Protocol deviation |
-| `low` | < 10 minutes | Informational | Routine status updates |
-| `info` | No requirement | General information | Procedure milestones |
-
-### 6.3 Medical Alert Types
-
-```typescript
-enum AlertType {
-  // Cardiac
-  CARDIAC_ARREST = 'cardiac_arrest',
-  VENTRICULAR_FIBRILLATION = 'ventricular_fibrillation',
-  TACHYCARDIA = 'tachycardia',
-  BRADYCARDIA = 'bradycardia',
-
-  // Respiratory
-  APNEA = 'apnea',
-  HYPOXIA = 'hypoxia',
-  RESPIRATORY_FAILURE = 'respiratory_failure',
-
-  // Neurological
-  SEIZURE = 'seizure',
-  DECREASED_CONSCIOUSNESS = 'decreased_consciousness',
-  INTRACRANIAL_PRESSURE = 'intracranial_pressure',
-
-  // Hemodynamic
-  HYPOTENSION = 'hypotension',
-  HYPERTENSION = 'hypertension',
-  HEMORRHAGE = 'hemorrhage',
-
-  // Temperature
-  HYPERTHERMIA = 'hyperthermia',
-  HYPOTHERMIA = 'hypothermia',
-
-  // Equipment
-  DEVICE_MALFUNCTION = 'device_malfunction',
-  POWER_FAILURE = 'power_failure',
-
-  // Protocol
-  PROTOCOL_DEVIATION = 'protocol_deviation',
-  TIMEFRAME_EXCEEDED = 'timeframe_exceeded'
-}
-```
-
----
-
-## Security
-
-### 7.1 Transport Layer Security
-
-**TLS Configuration:**
-```
-Protocol: TLS 1.3
-Cipher Suites:
-  - TLS_AES_256_GCM_SHA384
-  - TLS_CHACHA20_POLY1305_SHA256
-  - TLS_AES_128_GCM_SHA256
-
-Certificate Pinning: Enabled
-HSTS: max-age=31536000; includeSubDomains
-```
-
-### 7.2 Message-Level Encryption
-
-**Sensitive Data Encryption:**
-```json
-{
-  "messageType": "vital_signs_update",
-  "payload": {
-    "heart_rate": 72,
-    "patient_identifiers": {
-      "encrypted": true,
-      "algorithm": "AES-256-GCM",
-      "ciphertext": "8f7a9b2c3d4e5f6a7b8c9d0e1f2a3b4c...",
-      "iv": "a1b2c3d4e5f6a7b8",
-      "tag": "f1e2d3c4b5a69788"
-    }
-  }
-}
-```
-
-### 7.3 Audit Logging
-
-Every message is logged with:
-
-```json
-{
-  "auditId": "audit-550e8400",
-  "timestamp": "2025-01-15T19:00:00.123Z",
-  "messageId": "msg-001",
-  "messageType": "vital_signs_update",
-  "sender": {
-    "type": "device",
-    "id": "CARDIAC-MONITOR-001"
-  },
-  "recipients": ["DR-001", "RN-001"],
-  "revivalId": "REV-2025-001",
-  "facilityId": "FAC-KR-REVIVAL-001",
-  "dataClassification": "PHI",
-  "accessJustification": "active_medical_care",
-  "ipAddress": "192.168.1.100",
-  "userAgent": "WiaRevivalClient/1.0.0"
-}
-```
-
----
-
-## Error Handling
-
-### 8.1 Error Message Format
-
-```json
-{
-  "type": "error",
-  "errorCode": "ERR_INVALID_MESSAGE_FORMAT",
-  "errorMessage": "Invalid vital signs data format",
-  "severity": "warning",
-  "timestamp": "2025-01-15T19:00:00Z",
-  "originalMessageId": "msg-001",
-  "details": {
-    "field": "payload.heart_rate",
-    "expectedType": "integer",
-    "receivedType": "string",
-    "receivedValue": "seventy-two"
-  },
-  "suggestedAction": "Correct data type and resend"
-}
-```
-
-### 8.2 Error Codes
-
-| Code | Description | Action |
-|------|-------------|--------|
-| `ERR_AUTH_FAILED` | Authentication failed | Re-authenticate |
-| `ERR_INVALID_MESSAGE_FORMAT` | Malformed message | Fix format and resend |
-| `ERR_REVIVAL_NOT_FOUND` | Revival ID not found | Verify revival ID |
-| `ERR_PERMISSION_DENIED` | Insufficient permissions | Request elevated access |
-| `ERR_RATE_LIMIT_EXCEEDED` | Too many messages | Reduce frequency |
-| `ERR_DEVICE_OFFLINE` | Medical device offline | Check device connection |
-| `ERR_CRITICAL_THRESHOLD` | Vital signs critical | Medical intervention required |
-
----
-
-## Examples
-
-### 9.1 Complete Real-Time Monitoring Session
-
-```javascript
-// Initialize client
-const client = new WiaRevivalStreamClient({
-  revivalId: 'REV-2025-001',
-  token: 'eyJhbGciOiJSUzI1NiIs...',
-  facilityId: 'FAC-KR-REVIVAL-001'
-});
-
-// Connect and subscribe
-await client.connect();
-await client.subscribe(['vital_signs', 'alerts', 'status_changes']);
-
-// Handle vital signs updates
-client.on('vital_signs_update', (data) => {
-  console.log('Heart Rate:', data.heart_rate);
-  console.log('Temperature:', data.body_temperature);
-
-  updateDashboard({
-    heartRate: data.heart_rate,
-    bloodPressure: data.blood_pressure,
-    temperature: data.body_temperature,
-    oxygenSaturation: data.oxygen_saturation
-  });
-
-  // Check thresholds
-  if (data.heart_rate > 150) {
-    triggerAlert('Tachycardia detected');
-  }
-});
-
-// Handle critical alerts
-client.on('critical_alert', (alert) => {
-  console.error('CRITICAL ALERT:', alert.message);
-
-  // Display emergency notification
-  showEmergencyModal({
-    title: alert.alertType,
-    message: alert.message,
-    severity: alert.severity,
-    recommendedAction: alert.recommendedAction
-  });
-
-  // Notify medical team
-  notifyMedicalTeam({
-    revivalId: alert.revivalId,
-    alertType: alert.alertType,
-    urgency: 'immediate'
-  });
-
-  // Acknowledge receipt
-  client.acknowledgeAlert(alert.messageId);
-});
-
-// Handle status changes
-client.on('status_change', (change) => {
-  console.log(`Status changed: ${change.previousStatus} → ${change.newStatus}`);
-  updateProcedureStatus(change.newStatus);
-});
-
-// Handle disconnection
-client.on('disconnect', () => {
-  console.warn('Connection lost. Reconnecting...');
-  showConnectionWarning();
-});
-
-client.on('reconnect', () => {
-  console.log('Reconnected successfully');
-  hideConnectionWarning();
-});
-```
-
-### 9.2 MQTT Medical Device Integration
-
-```python
-import paho.mqtt.client as mqtt
-import json
-import time
-
-class MedicalDeviceMQTT:
-    def __init__(self, device_id, revival_id, facility_id):
-        self.device_id = device_id
-        self.revival_id = revival_id
-        self.facility_id = facility_id
-        self.client = mqtt.Client()
-
-        self.client.on_connect = self.on_connect
-        self.client.on_publish = self.on_publish
-
-        # TLS configuration
-        self.client.tls_set(
-            ca_certs="/path/to/ca.crt",
-            certfile="/path/to/client.crt",
-            keyfile="/path/to/client.key"
-        )
-
-        self.client.username_pw_set("device_id", "device_secret")
-        self.client.connect("mqtt.wia.live", 8883, 60)
-
-    def on_connect(self, client, userdata, flags, rc):
-        print(f"Connected with result code {rc}")
-
-    def publish_vitals(self, vitals_data):
-        topic = f"wia/revival/{self.facility_id}/{self.revival_id}/vitals"
-
-        message = {
-            "protocol": "wia-revival",
-            "version": "1.0.0",
-            "messageId": f"msg-{int(time.time()*1000)}",
-            "messageType": "vital_signs_update",
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
-            "revivalId": self.revival_id,
-            "payload": vitals_data,
-            "meta": {
-                "deviceId": self.device_id
-            }
-        }
-
-        # QoS 1 for vital signs
-        result = self.client.publish(
-            topic,
-            json.dumps(message),
-            qos=1
-        )
-
-        return result
-
-    def publish_critical_alert(self, alert_data):
-        topic = f"wia/revival/{self.facility_id}/{self.revival_id}/alerts"
-
-        message = {
-            "protocol": "wia-revival",
-            "version": "1.0.0",
-            "messageId": f"msg-alert-{int(time.time()*1000)}",
-            "messageType": "critical_alert",
-            "priority": "critical",
-            "requiresAck": True,
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
-            "revivalId": self.revival_id,
-            "payload": alert_data,
-            "meta": {
-                "deviceId": self.device_id
-            }
-        }
-
-        # QoS 2 for critical alerts
-        result = self.client.publish(
-            topic,
-            json.dumps(message),
-            qos=2
-        )
-
-        return result
-
-# Usage
-device = MedicalDeviceMQTT(
-    device_id="CARDIAC-MONITOR-001",
-    revival_id="REV-2025-001",
-    facility_id="FAC-KR-REVIVAL-001"
-)
-
-# Publish vital signs every second
-while True:
-    vitals = {
-        "heart_rate": get_heart_rate(),
-        "blood_pressure": get_blood_pressure(),
-        "body_temperature": get_temperature(),
-        "oxygen_saturation": get_spo2()
-    }
-
-    device.publish_vitals(vitals)
-
-    # Check for critical conditions
-    if vitals["heart_rate"] == 0:
-        device.publish_critical_alert({
-            "alertType": "cardiac_arrest",
-            "severity": "critical",
-            "message": "Cardiac activity ceased",
-            "vitalSigns": vitals
-        })
-
-    time.sleep(1)
-```
-
----
-
-<div align="center">
-
-**WIA Cryo-Revival Communication Protocol v1.0.0**
-
-**弘益人間 (홍익인간)** - Benefit All Humanity
-
----
-
-**© 2025 WIA Standards Committee**
-
-**MIT License**
-
-</div>
+*WIA Technical Committee - Cryopreservation Working Group*

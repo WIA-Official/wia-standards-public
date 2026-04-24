@@ -237,11 +237,11 @@ export interface TTP {
   technique_name?: string;
 }
 
-export interface ThreatIndicator extends Indicator {
+export interface ThreatIndicator extends Omit<Indicator, 'context'> {
   context?: {
     description?: string;
     kill_chain_phase?: string;
-  };
+  } | string;
 }
 
 export interface ThreatIntelData {

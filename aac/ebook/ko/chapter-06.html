@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 통합과 상호운용성 | WIA-AAC</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>6장: 통합과 상호운용성</h1>
+
+    <h2>6.1 연결된 AAC 생태계</h2>
+    <p>현대 AAC 시스템은 독립적으로 작동하지 않습니다. 스마트 기기, 의사소통 플랫폼, 생산성 도구 및 환경 제어 시스템을 포함한 더 넓은 기술 생태계와 원활하게 통합되어야 합니다. WIA-AAC 표준은 보안과 사용자 제어를 유지하면서 이러한 통합을 가능하게 하는 프로토콜과 API를 정의합니다.</p>
+
+    <p>통합은 여러 목적을 수행합니다: AAC 사용자의 의사소통 범위를 확장하고, 디지털 생활에 참여할 수 있게 하며, 환경 제어를 통해 독립성을 제공하고, 사용자의 요구가 변화함에 따라 AAC 데이터가 시스템 간에 자유롭게 이동할 수 있도록 보장합니다.</p>
+
+    <div class="highlight">
+        <strong>상호운용성 의무:</strong> WIA-AAC 호환 시스템은 표준화된 데이터 교환 형식과 API를 지원해야 합니다. 사용자는 단일 벤더의 생태계에 종속되어서는 안 됩니다. 데이터 이동성은 기본권입니다.
+    </div>
+
+    <h2>6.2 사용자 프로필 이동성</h2>
+    <p>사용자 프로필에는 상당한 시간 투자를 나타내는 개인화된 설정이 포함됩니다. 이는 이동 가능해야 합니다:</p>
+
+    <h3>6.2.1 프로필 내보내기 형식</h3>
+    <pre><code>// WIA-AAC 사용자 프로필 교환 형식
+interface UserProfileExport {
+    format: 'wia-aac-profile';
+    version: '1.0';
+    exportDate: string;
+    exportedBy: string;  // 애플리케이션 식별자
+
+    // 핵심 사용자 데이터
+    user: {
+        id: string;
+        displayName: string;
+        languages: string[];
+    };
+
+    // 접근 구성
+    access: {
+        methods: AccessMethodConfig[];
+        activeMethod: string;
+        calibrationData: Map&lt;string, CalibrationData&gt;;
+    };
+
+    // 음성 선호도
+    voice: {
+        selectedVoice: string;
+        settings: VoiceSettings;
+        pronunciationDictionary: PronunciationEntry[];
+        bankedVoice?: VoiceBankReference;
+    };
+
+    // 어휘 사용자화
+    vocabulary: {
+        baseVocabulary: string;
+        customPages: VocabularyPage[];
+        customSymbols: Symbol[];
+        hiddenItems: string[];
+        buttonCustomizations: ButtonCustomization[];
+    };
+
+    // 사용 데이터 (선택사항, 개인정보 제어)
+    usage?: {
+        frequencyData: WordFrequency[];
+        predictionModel?: PredictionModelData;
+        communicationStats?: UsageStatistics;
+    };
+
+    // 무결성을 위한 디지털 서명
+    signature?: string;
+}</code></pre>
+
+    <h3>6.2.2 프로필 가져오기/내보내기 API</h3>
+    <pre><code>// 프로필 이동성 작업
+interface ProfilePortability {
+    // 사용자 프로필 내보내기
+    exportProfile(userId: string, options: ExportOptions): Promise&lt;ProfileExport&gt;;
+
+    // 시스템에 프로필 가져오기
+    importProfile(profile: ProfileExport, options: ImportOptions): Promise&lt;ImportResult&gt;;
+
+    // 프로필 병합 (예: 여러 기기에서 결합)
+    mergeProfiles(primary: ProfileExport, secondary: ProfileExport): Promise&lt;MergeResult&gt;;
+
+    // 가져오기 전 프로필 유효성 검사
+    validateProfile(profile: ProfileExport): ValidationResult;
+}
+
+interface ExportOptions {
+    includeUsageData: boolean;
+    includeVoiceBank: boolean;
+    includeCalibration: boolean;
+    encryptionKey?: string;  // 민감한 데이터 보호용
+}
+
+interface ImportOptions {
+    conflictResolution: 'keep-existing' | 'use-imported' | 'merge' | 'ask';
+    recalibrationRequired: boolean;
+    verifySignature: boolean;
+}</code></pre>
+
+    <h2>6.3 의사소통 플랫폼 통합</h2>
+    <p>AAC 시스템은 현대 의사소통 플랫폼과 통합되어야 합니다:</p>
+
+    <h3>6.3.1 메시징 통합</h3>
+    <table>
+        <tr>
+            <th>플랫폼</th>
+            <th>통합 유형</th>
+            <th>기능</th>
+        </tr>
+        <tr>
+            <td>SMS/MMS</td>
+            <td>시스템 통합</td>
+            <td>AAC 인터페이스에서 텍스트, 사진 송수신</td>
+        </tr>
+        <tr>
+            <td>이메일</td>
+            <td>IMAP/SMTP 또는 API</td>
+            <td>이메일 작성 및 읽기</td>
+        </tr>
+        <tr>
+            <td>화상 통화</td>
+            <td>WebRTC 또는 앱 통합</td>
+            <td>통화 참여, 수어를 위한 카메라 지원</td>
+        </tr>
+        <tr>
+            <td>소셜 미디어</td>
+            <td>플랫폼 API</td>
+            <td>업데이트 게시, 메시지 보내기</td>
+        </tr>
+        <tr>
+            <td>채팅 앱</td>
+            <td>딥 링킹 또는 API</td>
+            <td>WhatsApp, Messenger 등</td>
+        </tr>
+    </table>
+
+    <h3>6.3.2 통합 메시징 API</h3>
+    <pre><code>// AAC용 통합 메시징 인터페이스
+interface AACMessaging {
+    // 연결된 모든 플랫폼을 통해 메시지 보내기
+    sendMessage(message: OutgoingMessage): Promise&lt;SendResult&gt;;
+
+    // 플랫폼 간 메시지 수신
+    onMessage(callback: (message: IncomingMessage) =&gt; void): void;
+
+    // 플랫폼 관리
+    getConnectedPlatforms(): Platform[];
+    connectPlatform(platform: Platform, credentials: AuthCredentials): Promise&lt;void&gt;;
+    disconnectPlatform(platformId: string): void;
+}
+
+interface OutgoingMessage {
+    platform: string;
+    recipient: Contact;
+    content: {
+        text: string;
+        attachments?: Attachment[];
+    };
+    speakOnSend: boolean;  // 메시지를 소리내어 말하기도
+}
+
+// 예: 메시지 보내기
+const messaging = aacSystem.getMessaging();
+await messaging.sendMessage({
+    platform: 'sms',
+    recipient: { name: '엄마', address: '+821012345678' },
+    content: { text: '5시에 집에 도착할게요' },
+    speakOnSend: true
+});</code></pre>
+
+    <div class="highlight">
+        <strong>의사소통 형평성:</strong> AAC 사용자는 다른 모든 사람과 동일하게 디지털 의사소통에 접근할 수 있어야 합니다. 주류 플랫폼과의 통합은 현대 의사소통의 전체 범위에 참여를 보장합니다.
+    </div>
+
+    <h2>6.4 환경 제어 통합</h2>
+    <p>AAC 기기는 종종 사용자 환경을 위한 제어 센터 역할을 합니다:</p>
+
+    <h3>6.4.1 스마트 홈 프로토콜</h3>
+    <ul>
+        <li><strong>Matter:</strong> 새롭게 부상하는 범용 스마트 홈 표준</li>
+        <li><strong>HomeKit:</strong> Apple의 홈 자동화 프레임워크</li>
+        <li><strong>Google Home:</strong> Google의 스마트 홈 생태계</li>
+        <li><strong>Alexa Smart Home:</strong> Amazon의 음성 우선 플랫폼</li>
+        <li><strong>Z-Wave/Zigbee:</strong> 저전력 메시 네트워크</li>
+        <li><strong>IR 제어:</strong> 레거시 적외선 기기 제어</li>
+    </ul>
+
+    <h3>6.4.2 환경 제어 API</h3>
+    <pre><code>// 환경 제어 통합
+interface EnvironmentControl {
+    // 기기 검색
+    discoverDevices(): Promise&lt;SmartDevice[]&gt;;
+
+    // 기기 제어
+    controlDevice(deviceId: string, command: DeviceCommand): Promise&lt;void&gt;;
+
+    // 방/장면 관리
+    activateScene(sceneId: string): Promise&lt;void&gt;;
+
+    // 상태 모니터링
+    getDeviceStatus(deviceId: string): Promise&lt;DeviceStatus&gt;;
+    onStatusChange(callback: (device: SmartDevice, status: DeviceStatus) =&gt; void): void;
+}
+
+interface SmartDevice {
+    id: string;
+    name: string;
+    room: string;
+    type: DeviceType;
+    capabilities: DeviceCapability[];
+    currentStatus: DeviceStatus;
+}
+
+type DeviceType = 'light' | 'thermostat' | 'door-lock' | 'tv' | 'blinds' |
+                   'fan' | 'outlet' | 'speaker' | 'camera' | 'bed' | 'phone';
+
+// AAC 어휘 통합
+interface ECUVocabularyPage {
+    generateControlButtons(devices: SmartDevice[]): VocabularyPage {
+        const page: VocabularyPage = {
+            id: 'ecu-controls',
+            name: '집 제어',
+            type: 'ecu',
+            rows: 4,
+            columns: 6,
+            cells: []
+        };
+
+        for (const device of devices) {
+            page.cells.push({
+                symbol: this.getDeviceSymbol(device.type),
+                label: device.name,
+                action: {
+                    type: 'ecu-control',
+                    deviceId: device.id,
+                    showSubmenu: device.capabilities.length &gt; 2
+                }
+            });
+        }
+
+        return page;
+    }
+}</code></pre>
+
+    <h2>6.5 클라우드 동기화</h2>
+    <p>클라우드 서비스는 기기 간 동기화 및 백업 보호를 가능하게 합니다:</p>
+
+    <h3>6.5.1 동기화 아키텍처</h3>
+    <pre><code>// 클라우드 동기화 서비스
+interface CloudSyncService {
+    // 연결 관리
+    connect(credentials: CloudCredentials): Promise&lt;void&gt;;
+    getConnectionStatus(): ConnectionStatus;
+
+    // 동기화
+    syncProfile(): Promise&lt;SyncResult&gt;;
+    syncVocabulary(): Promise&lt;SyncResult&gt;;
+    syncSettings(): Promise&lt;SyncResult&gt;;
+
+    // 충돌 해결
+    resolveConflict(conflict: SyncConflict, resolution: ConflictResolution): Promise&lt;void&gt;;
+
+    // 백업 및 복원
+    createBackup(name: string): Promise&lt;BackupInfo&gt;;
+    listBackups(): Promise&lt;BackupInfo[]&gt;;
+    restoreBackup(backupId: string): Promise&lt;RestoreResult&gt;;
+
+    // 실시간 동기화 (다중 기기 시나리오용)
+    enableRealtimeSync(options: RealtimeSyncOptions): void;
+    onRemoteChange(callback: (change: RemoteChange) =&gt; void): void;
+}
+
+interface SyncResult {
+    success: boolean;
+    itemsSynced: number;
+    conflicts: SyncConflict[];
+    timestamp: Date;
+}</code></pre>
+
+    <h3>6.5.2 오프라인 우선 아키텍처</h3>
+    <p>AAC 시스템은 오프라인에서 완전히 작동해야 하며 연결이 복원되면 동기화해야 합니다:</p>
+    <ul>
+        <li>오프라인에서 모든 핵심 기능 사용 가능</li>
+        <li>오프라인 기간 동안 변경사항 대기열</li>
+        <li>연결 복원 시 자동 동기화</li>
+        <li>동시 편집을 위한 충돌 해결</li>
+        <li>대역폭 효율적인 델타 동기화</li>
+    </ul>
+
+    <div class="highlight">
+        <strong>신뢰성 요구사항:</strong> 의사소통은 인터넷 연결을 기다릴 수 없습니다. WIA-AAC 시스템은 오프라인에서 전체 기능을 유지해야 하며, 클라우드 기능은 핵심 의사소통 기능을 활성화하는 것이 아니라 향상시켜야 합니다.
+    </div>
+
+    <h2>6.6 API 표준</h2>
+    <p>WIA-AAC는 타사 통합을 위한 표준 API를 정의합니다:</p>
+
+    <h3>6.6.1 REST API 사양</h3>
+    <pre><code>// WIA-AAC REST API 엔드포인트
+// 기본 URL: https://api.aac-device.local/v1
+
+// 메시지 작업
+POST   /messages/speak           // 메시지 말하기
+POST   /messages/queue           // 말하기 위한 메시지 대기열
+DELETE /messages/queue           // 메시지 대기열 지우기
+
+// 어휘 작업
+GET    /vocabulary/pages         // 어휘 페이지 목록
+GET    /vocabulary/pages/{id}    // 특정 페이지 가져오기
+POST   /vocabulary/pages         // 사용자 정의 페이지 생성
+PUT    /vocabulary/pages/{id}    // 페이지 업데이트
+GET    /vocabulary/symbols       // 상징 검색
+
+// 접근 제어
+GET    /access/methods           // 사용 가능한 방법 목록
+PUT    /access/active            // 접근 방법 전환
+GET    /access/calibration       // 보정 상태 가져오기
+
+// 프로필 관리
+GET    /profile                  // 사용자 프로필 가져오기
+PUT    /profile                  // 프로필 업데이트
+POST   /profile/export           // 프로필 내보내기
+POST   /profile/import           // 프로필 가져오기
+
+// 환경 제어
+GET    /ecu/devices              // 연결된 기기 목록
+POST   /ecu/devices/{id}/command // 기기 명령 보내기</code></pre>
+
+    <h3>6.6.2 WebSocket 이벤트</h3>
+    <pre><code>// 통합을 위한 실시간 이벤트 스트림
+// 연결: wss://api.aac-device.local/v1/events
+
+interface AACEvent {
+    type: EventType;
+    timestamp: string;
+    data: EventData;
+}
+
+type EventType =
+    | 'message.spoken'        // 메시지가 말해짐
+    | 'message.queued'        // 대기열에 메시지 추가됨
+    | 'selection.made'        // 사용자가 선택함
+    | 'page.changed'          // 어휘 페이지 변경됨
+    | 'access.changed'        // 접근 방법 변경됨
+    | 'profile.updated'       // 프로필 수정됨
+    | 'ecu.device.status';    // 스마트 기기 상태 변경됨
+
+// 이벤트 구독
+const ws = new WebSocket('wss://api.aac-device.local/v1/events');
+ws.onmessage = (event) => {
+    const aacEvent = JSON.parse(event.data);
+    if (aacEvent.type === 'message.spoken') {
+        console.log('사용자가 말함:', aacEvent.data.text);
+    }
+};</code></pre>
+
+    <h2>6.7 데이터 교환 형식</h2>
+    <p>AAC 관련 데이터 교환을 위한 표준 형식:</p>
+
+    <h3>6.7.1 OBZ/OBF 형식</h3>
+    <p>어휘 교환을 위한 Open Board 형식:</p>
+    <ul>
+        <li>의사소통 보드를 위한 JSON 기반 사양</li>
+        <li>AAC 애플리케이션 전반에 널리 채택됨</li>
+        <li>상징, 페이지 및 탐색 지원</li>
+        <li>WIA-AAC는 추가 메타데이터로 OBZ를 확장</li>
+    </ul>
+
+    <h3>6.7.2 상징 교환 형식</h3>
+    <pre><code>// 상징 패키지 교환 형식
+interface SymbolExchange {
+    format: 'wia-symbol-pack';
+    version: '1.0';
+
+    metadata: {
+        name: string;
+        symbolSet: string;
+        symbolCount: number;
+        languages: string[];
+        license: string;
+    };
+
+    symbols: ExportedSymbol[];
+
+    // 관계 및 카테고리
+    categories: Category[];
+    conceptMappings: ConceptMapping[];
+}</code></pre>
+
+    <h2>6.8 보조기술 호환성</h2>
+    <p>AAC 시스템은 다른 보조기술과 함께 작동해야 합니다:</p>
+
+    <table>
+        <tr>
+            <th>기술</th>
+            <th>통합 접근법</th>
+        </tr>
+        <tr>
+            <td>화면 판독기</td>
+            <td>ARIA 레이블, 시맨틱 HTML, 포커스 관리</td>
+        </tr>
+        <tr>
+            <td>스위치 인터페이스</td>
+            <td>HID 호환성, 구성 가능한 매핑</td>
+        </tr>
+        <tr>
+            <td>전동 휠체어</td>
+            <td>장착 통합, 공유 제어</td>
+        </tr>
+        <tr>
+            <td>시선 추적기</td>
+            <td>Tobii, Irisbond 및 기타 트래커 API</td>
+        </tr>
+        <tr>
+            <td>보청기</td>
+            <td>Bluetooth LE Audio, 히어링 루프</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>범용 설계:</strong> AAC 시스템은 더 큰 보조기술 생태계의 일부입니다. 다른 AT 기기와의 원활한 통합은 독립성을 극대화하고 사용자의 기술 부담을 최소화합니다.
+    </div>
+
+    <h2>6.9 통합 보안</h2>
+    <p>통합 시스템에 대한 보안 고려사항:</p>
+    <ul>
+        <li><strong>인증:</strong> 타사 앱 접근을 위한 OAuth 2.0</li>
+        <li><strong>권한 부여:</strong> 세분화된 권한 범위</li>
+        <li><strong>암호화:</strong> 모든 네트워크 통신에 TLS</li>
+        <li><strong>로컬 API 보안:</strong> 로컬 통합을 위한 토큰 기반 접근</li>
+        <li><strong>감사 로깅:</strong> 통합 접근 및 작업 추적</li>
+    </ul>
+
+    <pre><code>// 타사 접근을 위한 권한 범위
+const permissionScopes = {
+    'speak': '말할 메시지 보내기',
+    'vocabulary.read': '어휘 구성 읽기',
+    'vocabulary.write': '어휘 수정',
+    'profile.read': '사용자 프로필 읽기',
+    'profile.write': '사용자 프로필 수정',
+    'ecu.control': '스마트 홈 기기 제어',
+    'messages.history': '메시지 기록 접근'
+};
+
+// 사용자가 앱을 승인할 때 특정 범위 승인</code></pre>
+</body>
+</html>

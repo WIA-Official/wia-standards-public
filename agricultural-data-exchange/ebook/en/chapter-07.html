@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Security and Privacy | WIA-AGRICULTURAL_DATA_EXCHANGE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: Security and Privacy</h1>
+
+    <p>Agricultural data contains sensitive information about farming operations, land assets, and business practices that require robust protection. This chapter covers data ownership principles, consent management frameworks, access control mechanisms, privacy-preserving techniques, and compliance requirements. Establishing trust through strong security and privacy controls is essential for widespread adoption of agricultural data exchange.</p>
+
+    <h2>7.1 Data Ownership Principles</h2>
+
+    <div class="highlight">
+        <h3>Core Ownership Principles</h3>
+        <ul>
+            <li><strong>Farmer-Centric:</strong> Farmers own data generated on their operations</li>
+            <li><strong>Transparency:</strong> Clear understanding of data collection and use</li>
+            <li><strong>Control:</strong> Ability to grant, revoke, and audit access</li>
+            <li><strong>Portability:</strong> Right to export and move data between systems</li>
+            <li><strong>Value Share:</strong> Fair compensation when data creates value</li>
+            <li><strong>Security:</strong> Protection from unauthorized access and misuse</li>
+        </ul>
+    </div>
+
+    <pre>
+// Data Ownership Model
+interface DataOwnership {
+  // Primary Owner
+  owner: {
+    entityId: string;
+    entityType: 'farmer' | 'farm_business' | 'landowner';
+    rights: [
+      'access',        // View own data
+      'export',        // Download in standard formats
+      'delete',        // Request deletion
+      'share',         // Grant access to others
+      'revoke',        // Remove previously granted access
+      'audit'          // Review access history
+    ];
+  };
+
+  // Data Asset
+  dataAsset: {
+    id: string;
+    type: 'field_boundary' | 'yield_data' | 'input_records' | 'imagery';
+    source: string;              // System that generated data
+    generatedAt: ISO8601DateTime;
+    location?: GeoJSON.Geometry;
+  };
+
+  // Ownership Determination
+  ownershipRules: {
+    farmOperationalData: 'operator_controls';
+    landownerData: 'landowner_has_access_rights';
+    aggregatedData: 'contributing_parties_share';
+    derivedInsights: 'per_contract_terms';
+    equipmentData: 'operator_owns_use_data';
+  };
+
+  // Disputes
+  disputeResolution: {
+    mechanism: 'arbitration' | 'mediation' | 'court';
+    governing_law: string;
+  };
+}
+    </pre>
+
+    <h2>7.2 Consent Management</h2>
+
+    <pre>
+// Consent Management Framework
+interface ConsentManagement {
+  // Consent Record
+  consent: {
+    id: string;
+    consentGiver: string;        // Who is consenting
+    consentReceiver: string;     // Who receives permission
+    dataScope: {
+      dataTypes: string[];       // What data is covered
+      fields?: string[];         // Specific fields (optional)
+      dateRange?: DateRange;     // Time period
+      purpose: string[];         // How data will be used
+    };
+    permissions: {
+      read: boolean;
+      write: boolean;
+      share: boolean;
+      aggregate: boolean;
+      derive: boolean;
+    };
+    validity: {
+      startDate: ISO8601Date;
+      endDate?: ISO8601Date;     // Null = indefinite
+      autoRenew: boolean;
+    };
+    status: 'active' | 'revoked' | 'expired';
+  };
+
+  // Consent Collection
+  collection: {
+    method: 'explicit_opt_in' | 'terms_acceptance' | 'granular_settings';
+    ui: {
+      plainLanguage: true;
+      layeredNotice: true;
+      easyRevocation: true;
+    };
+    record: {
+      timestamp: ISO8601DateTime;
+      version: string;           // Terms version
+      channel: string;           // How consent was given
+      evidence: string;          // Proof of consent
+    };
+  };
+
+  // Purpose Limitation
+  purposes: {
+    operational: 'Providing requested services';
+    analytics: 'Improving products and services';
+    research: 'Agricultural research (anonymized)';
+    marketing: 'Promotional communications';
+    thirdParty: 'Sharing with specified partners';
+  };
+}
+
+// Consent API
+interface ConsentAPI {
+  // Grant consent
+  'POST /consents': {
+    body: ConsentRequest;
+    response: ConsentRecord;
+  };
+
+  // View consents
+  'GET /consents': {
+    query: { status?: string; dataType?: string };
+    response: ConsentRecord[];
+  };
+
+  // Revoke consent
+  'DELETE /consents/{consentId}': {
+    response: { success: boolean; revokedAt: ISO8601DateTime };
+  };
+
+  // Audit access
+  'GET /consents/{consentId}/audit': {
+    response: AccessAuditLog[];
+  };
+}
+    </pre>
+
+    <h2>7.3 Access Control</h2>
+
+    <table>
+        <tr>
+            <th>Model</th>
+            <th>Description</th>
+            <th>Use Case</th>
+            <th>Example</th>
+        </tr>
+        <tr>
+            <td>RBAC</td>
+            <td>Role-Based Access Control</td>
+            <td>Organization hierarchy</td>
+            <td>Farm Manager, Agronomist, Viewer</td>
+        </tr>
+        <tr>
+            <td>ABAC</td>
+            <td>Attribute-Based Access Control</td>
+            <td>Fine-grained policies</td>
+            <td>Access based on field, time, purpose</td>
+        </tr>
+        <tr>
+            <td>ReBAC</td>
+            <td>Relationship-Based Access Control</td>
+            <td>Data sharing relationships</td>
+            <td>Advisor can access advised farms</td>
+        </tr>
+        <tr>
+            <td>PBAC</td>
+            <td>Purpose-Based Access Control</td>
+            <td>Consent enforcement</td>
+            <td>Analytics vs. marketing use</td>
+        </tr>
+    </table>
+
+    <pre>
+// Access Control Implementation
+interface AccessControl {
+  // Roles
+  roles: {
+    farm_owner: {
+      permissions: ['*'];        // Full access to own data
+      scope: 'owned_farms';
+    };
+    farm_manager: {
+      permissions: ['read', 'write', 'share'];
+      scope: 'managed_farms';
+    };
+    agronomist: {
+      permissions: ['read', 'write:recommendations'];
+      scope: 'advised_farms';
+      expiry: 'contract_end';
+    };
+    equipment_provider: {
+      permissions: ['read:telematics', 'write:diagnostics'];
+      scope: 'contracted_equipment';
+    };
+    researcher: {
+      permissions: ['read:anonymized'];
+      scope: 'consented_data';
+      purpose: 'research_only';
+    };
+  };
+
+  // Policy Language (example using OPA/Rego-style)
+  policies: {
+    allowFieldAccess: `
+      allow {
+        input.user.role == "agronomist"
+        input.resource.type == "field_data"
+        input.resource.farmId in input.user.advisedFarms
+        input.action == "read"
+      }
+    `;
+  };
+
+  // Access Decision
+  accessDecision: {
+    request: {
+      subject: { id: string; roles: string[]; attributes: Record<string, any> };
+      resource: { id: string; type: string; owner: string };
+      action: 'read' | 'write' | 'delete' | 'share';
+      context: { purpose: string; timestamp: ISO8601DateTime };
+    };
+    response: {
+      decision: 'permit' | 'deny';
+      obligations?: string[];    // Required actions (e.g., log, notify)
+      advice?: string[];         // Recommendations
+    };
+  };
+}
+    </pre>
+
+    <h2>7.4 Data Security Controls</h2>
+
+    <pre>
+// Security Control Framework
+interface SecurityControls {
+  // Encryption
+  encryption: {
+    atRest: {
+      algorithm: 'AES-256-GCM';
+      keyManagement: 'HSM' | 'KMS';
+      scope: 'database, file_storage, backups';
+    };
+    inTransit: {
+      protocol: 'TLS 1.3';
+      certificates: 'PKI_managed';
+      pinning: 'optional_for_mobile';
+    };
+    fieldLevel: {
+      algorithm: 'AES-256-GCM';
+      useCase: 'PII, sensitive_business_data';
+      keyPerTenant: true;
+    };
+  };
+
+  // Authentication
+  authentication: {
+    methods: ['password', 'MFA', 'SSO', 'certificate'];
+    mfa: {
+      factors: ['TOTP', 'SMS', 'hardware_key'];
+      required: 'administrative_access';
+    };
+    session: {
+      timeout: '8h';
+      refresh: 'sliding_window';
+      concurrent: 'limited';
+    };
+  };
+
+  // Audit Logging
+  auditLogging: {
+    events: [
+      'authentication',
+      'authorization_decision',
+      'data_access',
+      'data_modification',
+      'consent_change',
+      'export',
+      'admin_action'
+    ];
+    retention: '7_years';
+    tamperProof: 'append_only_with_integrity';
+    fields: {
+      timestamp: ISO8601DateTime;
+      actor: string;
+      action: string;
+      resource: string;
+      outcome: string;
+      ipAddress: string;
+      userAgent: string;
+    };
+  };
+
+  // Network Security
+  network: {
+    firewall: 'WAF_and_network';
+    ddos: 'protection_service';
+    segmentation: 'VPC_isolation';
+    monitoring: 'IDS/IPS';
+  };
+}
+    </pre>
+
+    <h2>7.5 Privacy-Preserving Techniques</h2>
+
+    <div class="highlight">
+        <h3>Enabling Data Use While Protecting Privacy</h3>
+        <p>Agricultural data often needs to be aggregated or analyzed across multiple farms for research, benchmarking, or market insights. Privacy-preserving techniques enable these use cases while protecting individual farm confidentiality.</p>
+    </div>
+
+    <pre>
+// Privacy-Preserving Techniques
+interface PrivacyTechniques {
+  // Anonymization
+  anonymization: {
+    methods: {
+      suppression: 'Remove identifying fields';
+      generalization: 'Replace precise values with ranges';
+      masking: 'Partial redaction of values';
+      pseudonymization: 'Replace identifiers with tokens';
+    };
+    kAnonymity: {
+      description: 'Each record indistinguishable from k-1 others';
+      threshold: 5;
+    };
+    lDiversity: {
+      description: 'Sensitive attributes have l distinct values';
+      threshold: 3;
+    };
+  };
+
+  // Aggregation
+  aggregation: {
+    minimumGroupSize: 5;         // Don't report groups smaller than this
+    noisyAggregation: true;      // Add statistical noise
+    suppressOutliers: true;      // Extreme values may identify farms
+  };
+
+  // Differential Privacy
+  differentialPrivacy: {
+    epsilon: 1.0;                // Privacy budget
+    mechanism: 'Laplace' | 'Gaussian';
+    useCase: 'Statistical queries on sensitive data';
+  };
+
+  // Secure Computation
+  secureComputation: {
+    federatedLearning: {
+      description: 'Train models without centralizing data';
+      useCase: 'Yield prediction across farms';
+    };
+    secureMPC: {
+      description: 'Compute on encrypted data';
+      useCase: 'Benchmark without revealing individual values';
+    };
+    homomorphicEncryption: {
+      description: 'Compute on ciphertext';
+      useCase: 'Cloud analytics on sensitive data';
+    };
+  };
+}
+
+// De-identification Pipeline
+const deidentificationPipeline = {
+  steps: [
+    { field: 'farmId', method: 'pseudonymize', salt: 'per_use_case' },
+    { field: 'farmerName', method: 'suppress' },
+    { field: 'location', method: 'generalize', precision: 'county' },
+    { field: 'area', method: 'round', nearest: 10 },
+    { field: 'yield', method: 'noise', epsilon: 0.5 }
+  ],
+  verification: 'k_anonymity_check'
+};
+    </pre>
+
+    <h2>7.6 Regulatory Compliance</h2>
+
+    <pre>
+// Compliance Framework
+interface ComplianceFramework {
+  regulations: {
+    GDPR: {
+      scope: 'EU personal data';
+      requirements: [
+        'lawful_basis',
+        'data_minimization',
+        'purpose_limitation',
+        'storage_limitation',
+        'data_subject_rights',
+        'breach_notification'
+      ];
+      dataSubjectRights: [
+        'access', 'rectification', 'erasure', 'restriction',
+        'portability', 'objection'
+      ];
+    };
+
+    CCPA: {
+      scope: 'California residents';
+      requirements: [
+        'disclosure_of_practices',
+        'opt_out_of_sale',
+        'deletion_rights',
+        'non_discrimination'
+      ];
+    };
+
+    sectorSpecific: {
+      FSMA: 'Food safety traceability requirements';
+      USDA: 'Agricultural program data protection';
+      stateAgPrivacy: 'State-level ag data protection laws';
+    };
+  };
+
+  // Data Processing Agreement
+  dpa: {
+    parties: ['controller', 'processor'];
+    terms: [
+      'processing_purpose',
+      'data_categories',
+      'security_measures',
+      'subprocessor_requirements',
+      'audit_rights',
+      'breach_notification',
+      'data_return_deletion'
+    ];
+  };
+
+  // Cross-Border Transfer
+  crossBorder: {
+    mechanisms: [
+      'adequacy_decision',
+      'standard_contractual_clauses',
+      'binding_corporate_rules',
+      'explicit_consent'
+    ];
+    restrictions: 'Some jurisdictions limit agricultural data export';
+  };
+}
+    </pre>
+
+    <h2>7.7 Data Portability</h2>
+
+    <pre>
+// Data Portability Standards
+interface DataPortability {
+  // Export Formats
+  formats: {
+    fieldBoundaries: ['GeoJSON', 'Shapefile', 'KML'];
+    operationalData: ['CSV', 'JSON', 'ISOXML'];
+    imagery: ['GeoTIFF', 'JPEG2000'];
+    complete: 'ZIP archive with manifest';
+  };
+
+  // Export API
+  exportAPI: {
+    'POST /exports': {
+      body: {
+        dataTypes: string[];
+        dateRange: DateRange;
+        format: string;
+        destination?: 'download' | 'transfer';
+      };
+      response: {
+        exportId: string;
+        status: 'queued';
+        estimatedTime: string;
+      };
+    };
+    'GET /exports/{exportId}': {
+      response: {
+        status: 'processing' | 'ready' | 'expired';
+        downloadUrl?: string;
+        expiresAt?: ISO8601DateTime;
+      };
+    };
+  };
+
+  // Direct Transfer
+  directTransfer: {
+    protocol: 'OAuth2 + API';
+    steps: [
+      '1. User authorizes source system',
+      '2. User authorizes destination system',
+      '3. Destination requests data from source',
+      '4. Source validates authorization',
+      '5. Data transferred directly'
+    ];
+    standards: ['ADAPT', 'AgGateway SPADE'];
+  };
+
+  // Manifest
+  manifest: {
+    version: string;
+    exportDate: ISO8601DateTime;
+    source: string;
+    contents: {
+      file: string;
+      dataType: string;
+      recordCount: number;
+      checksum: string;
+    }[];
+  };
+}
+    </pre>
+
+    <h2>7.8 Incident Response</h2>
+
+    <div class="highlight">
+        <h3>Security Incident Handling</h3>
+        <p>Despite best efforts, security incidents can occur. A well-defined incident response plan ensures rapid detection, containment, and recovery while meeting regulatory notification requirements.</p>
+    </div>
+
+    <pre>
+// Incident Response Plan
+interface IncidentResponse {
+  // Detection
+  detection: {
+    sources: [
+      'security_monitoring',
+      'user_reports',
+      'automated_alerts',
+      'third_party_notification'
+    ];
+    indicators: [
+      'unauthorized_access_attempts',
+      'unusual_data_export',
+      'privilege_escalation',
+      'malware_detection'
+    ];
+  };
+
+  // Classification
+  classification: {
+    severity: {
+      critical: 'Active breach, sensitive data exposed';
+      high: 'Confirmed intrusion, potential data access';
+      medium: 'Security control failure, no confirmed access';
+      low: 'Policy violation, no security impact';
+    };
+  };
+
+  // Response Steps
+  response: {
+    immediate: [
+      'contain_threat',
+      'preserve_evidence',
+      'assess_scope',
+      'notify_incident_team'
+    ];
+    shortTerm: [
+      'investigate_root_cause',
+      'remediate_vulnerabilities',
+      'determine_data_affected',
+      'prepare_notifications'
+    ];
+    longTerm: [
+      'implement_preventive_measures',
+      'update_policies',
+      'conduct_lessons_learned',
+      'report_to_stakeholders'
+    ];
+  };
+
+  // Notification
+  notification: {
+    regulators: {
+      GDPR: '72 hours for personal data breaches';
+      stateBreachLaws: 'Varies by jurisdiction';
+    };
+    affectedParties: {
+      timing: 'Without unreasonable delay';
+      content: [
+        'nature_of_breach',
+        'data_involved',
+        'likely_consequences',
+        'measures_taken',
+        'contact_information'
+      ];
+    };
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>This chapter covered security and privacy for agricultural data exchange including ownership principles, consent management, access control, security controls, privacy-preserving techniques, regulatory compliance, data portability, and incident response. These frameworks establish the trust foundation required for widespread adoption of the WIA-AGRICULTURAL_DATA_EXCHANGE standard.</p>
+    </div>
+</body>
+</html>

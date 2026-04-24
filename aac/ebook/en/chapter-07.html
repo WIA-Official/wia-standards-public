@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Security, Privacy, and Data Management | WIA-AAC</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: Security, Privacy, and Data Management</h1>
+
+    <h2>7.1 The Sensitivity of AAC Data</h2>
+    <p>AAC systems handle some of the most sensitive data imaginable: they capture every word a person communicates. This data reveals intimate details about users' lives, relationships, health, and thoughts. The WIA-AAC standard recognizes the profound responsibility this entails and establishes comprehensive security and privacy requirements.</p>
+
+    <p>Beyond message content, AAC systems store voice banking recordings, calibration data that may reveal medical conditions, location data, and detailed usage patterns. All of this information requires the highest levels of protection.</p>
+
+    <div class="highlight">
+        <strong>Privacy First Principle:</strong> AAC users must have complete control over their communication data. The default state must always be maximum privacy. Data collection should be minimal, transparent, and user-controlled.
+    </div>
+
+    <h2>7.2 Data Classification</h2>
+    <p>WIA-AAC defines data sensitivity levels to guide protection requirements:</p>
+
+    <table>
+        <tr>
+            <th>Level</th>
+            <th>Data Types</th>
+            <th>Protection Requirements</th>
+        </tr>
+        <tr>
+            <td>Critical</td>
+            <td>Message content, voice recordings, health-related vocabulary usage</td>
+            <td>Encryption at rest and in transit, access logging, user consent required</td>
+        </tr>
+        <tr>
+            <td>High</td>
+            <td>User profile, calibration data, personal symbols, contacts</td>
+            <td>Encryption at rest, authentication required</td>
+        </tr>
+        <tr>
+            <td>Medium</td>
+            <td>General settings, vocabulary structure, usage statistics</td>
+            <td>Authentication required, optional encryption</td>
+        </tr>
+        <tr>
+            <td>Low</td>
+            <td>Application preferences, display settings, general documentation</td>
+            <td>Standard protection</td>
+        </tr>
+    </table>
+
+    <h2>7.3 Encryption Standards</h2>
+    <p>All sensitive AAC data must be protected with strong encryption:</p>
+
+    <h3>7.3.1 Encryption Requirements</h3>
+    <pre><code>// WIA-AAC Encryption Standards
+const encryptionRequirements = {
+    // Data at rest
+    atRest: {
+        algorithm: 'AES-256-GCM',
+        keyDerivation: 'PBKDF2',
+        keyIterations: 100000,
+        saltLength: 16
+    },
+
+    // Data in transit
+    inTransit: {
+        protocol: 'TLS 1.3',
+        minimumProtocol: 'TLS 1.2',
+        cipherSuites: [
+            'TLS_AES_256_GCM_SHA384',
+            'TLS_CHACHA20_POLY1305_SHA256'
+        ],
+        certificateValidation: 'required'
+    },
+
+    // Cloud synchronization
+    cloudSync: {
+        endToEndEncryption: 'required',
+        keyManagement: 'client-side',
+        zeroKnowledge: 'recommended'
+    }
+};
+
+// Implementation example
+class SecureStorage {
+    private encryptionKey: CryptoKey;
+
+    async encryptData(data: any): Promise&lt;EncryptedData&gt; {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encoded = new TextEncoder().encode(JSON.stringify(data));
+
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            this.encryptionKey,
+            encoded
+        );
+
+        return {
+            iv: this.arrayToBase64(iv),
+            data: this.arrayToBase64(new Uint8Array(encrypted)),
+            algorithm: 'AES-256-GCM'
+        };
+    }
+
+    async decryptData(encrypted: EncryptedData): Promise&lt;any&gt; {
+        const iv = this.base64ToArray(encrypted.iv);
+        const data = this.base64ToArray(encrypted.data);
+
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            this.encryptionKey,
+            data
+        );
+
+        return JSON.parse(new TextDecoder().decode(decrypted));
+    }
+}</code></pre>
+
+    <h3>7.3.2 Key Management</h3>
+    <ul>
+        <li>Encryption keys derived from user-controlled credentials</li>
+        <li>Key rotation supported without data loss</li>
+        <li>Secure key storage using platform capabilities (Keychain, Keystore)</li>
+        <li>Recovery mechanisms that do not compromise security</li>
+    </ul>
+
+    <div class="highlight">
+        <strong>Zero Knowledge Design:</strong> Cloud service providers should not have access to unencrypted user data. End-to-end encryption with client-side key management ensures that even if servers are compromised, message content remains protected.
+    </div>
+
+    <h2>7.4 Authentication and Access Control</h2>
+    <p>Controlling access to AAC systems and data:</p>
+
+    <h3>7.4.1 User Authentication</h3>
+    <pre><code>// Authentication options for AAC systems
+interface AuthenticationConfig {
+    // Primary authentication
+    primary: AuthMethod;
+
+    // Fallback methods (accessibility considerations)
+    fallbacks: AuthMethod[];
+
+    // Timeout settings
+    lockTimeout: number;  // Minutes before requiring re-auth
+    requireAuthForSettings: boolean;
+
+    // Delegate access
+    delegateAccess: DelegateConfig[];
+}
+
+type AuthMethod =
+    | { type: 'pin'; length: number }
+    | { type: 'pattern'; gridSize: number }
+    | { type: 'biometric'; modality: 'fingerprint' | 'face' }
+    | { type: 'switch-pattern'; sequence: string }
+    | { type: 'voice'; passphrase: string }
+    | { type: 'device-trust'; deviceId: string };
+
+// Accessible authentication example
+const accessibleAuth: AuthenticationConfig = {
+    primary: { type: 'pin', length: 4 },
+    fallbacks: [
+        { type: 'switch-pattern', sequence: 'long-short-long' },
+        { type: 'device-trust', deviceId: 'trusted-ipad' }
+    ],
+    lockTimeout: 30,
+    requireAuthForSettings: true,
+    delegateAccess: [
+        {
+            name: 'Parent',
+            permissions: ['settings', 'vocabulary-edit'],
+            authMethod: { type: 'pin', length: 6 }
+        }
+    ]
+};</code></pre>
+
+    <h3>7.4.2 Caregiver and Support Access</h3>
+    <p>AAC users often need support from caregivers, therapists, and educators:</p>
+
+    <table>
+        <tr>
+            <th>Role</th>
+            <th>Typical Permissions</th>
+        </tr>
+        <tr>
+            <td>Primary User</td>
+            <td>Full access to all functions and data</td>
+        </tr>
+        <tr>
+            <td>Parent/Guardian</td>
+            <td>Settings, vocabulary editing, usage reports</td>
+        </tr>
+        <tr>
+            <td>Speech Therapist</td>
+            <td>Vocabulary editing, assessment tools, progress data</td>
+        </tr>
+        <tr>
+            <td>Teacher</td>
+            <td>Limited vocabulary editing, activity logs</td>
+        </tr>
+        <tr>
+            <td>Support Staff</td>
+            <td>Basic settings, charging status, troubleshooting</td>
+        </tr>
+    </table>
+
+    <h2>7.5 Privacy Controls</h2>
+    <p>User control over data collection and sharing:</p>
+
+    <h3>7.5.1 Privacy Settings</h3>
+    <pre><code>// Privacy configuration interface
+interface PrivacySettings {
+    // Message history
+    messageHistory: {
+        enabled: boolean;
+        retentionDays: number;  // 0 = no retention
+        includeInBackup: boolean;
+    };
+
+    // Usage analytics
+    analytics: {
+        enabled: boolean;
+        level: 'none' | 'basic' | 'detailed';
+        includeVocabularyStats: boolean;
+    };
+
+    // Cloud features
+    cloud: {
+        syncEnabled: boolean;
+        backupEnabled: boolean;
+        voiceBankStorage: boolean;
+    };
+
+    // Sharing
+    sharing: {
+        allowProfileExport: boolean;
+        allowRemoteSupport: boolean;
+        sharePredictionData: boolean;  // For improving AI models
+    };
+
+    // Research participation
+    research: {
+        participateInResearch: boolean;
+        anonymizeData: boolean;
+    };
+}
+
+// Default privacy-first settings
+const defaultPrivacy: PrivacySettings = {
+    messageHistory: { enabled: false, retentionDays: 0, includeInBackup: false },
+    analytics: { enabled: false, level: 'none', includeVocabularyStats: false },
+    cloud: { syncEnabled: false, backupEnabled: false, voiceBankStorage: false },
+    sharing: { allowProfileExport: true, allowRemoteSupport: false, sharePredictionData: false },
+    research: { participateInResearch: false, anonymizeData: true }
+};</code></pre>
+
+    <h3>7.5.2 Data Subject Rights</h3>
+    <p>WIA-AAC systems must support user rights under privacy regulations:</p>
+    <ul>
+        <li><strong>Right to Access:</strong> Users can view all data collected about them</li>
+        <li><strong>Right to Portability:</strong> Export personal data in standard formats</li>
+        <li><strong>Right to Correction:</strong> Modify inaccurate data</li>
+        <li><strong>Right to Deletion:</strong> Request complete data removal</li>
+        <li><strong>Right to Restriction:</strong> Limit data processing</li>
+    </ul>
+
+    <pre><code>// Data rights implementation
+interface DataRights {
+    // Access all personal data
+    exportAllData(): Promise&lt;PersonalDataExport&gt;;
+
+    // Delete specific data categories
+    deleteData(categories: DataCategory[]): Promise&lt;DeletionResult&gt;;
+
+    // Complete account deletion
+    deleteAccount(): Promise&lt;void&gt;;
+
+    // View data processing activities
+    getProcessingActivities(): ProcessingActivity[];
+
+    // Manage consent
+    getConsents(): ConsentRecord[];
+    updateConsent(consentId: string, granted: boolean): Promise&lt;void&gt;;
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Regulatory Compliance:</strong> WIA-AAC systems must comply with applicable privacy regulations including GDPR, CCPA, HIPAA (when applicable), and accessibility regulations. The standard provides a framework that meets or exceeds these requirements.
+    </div>
+
+    <h2>7.6 Secure Communication Channels</h2>
+    <p>Protecting data during transmission:</p>
+
+    <h3>7.6.1 Transport Security</h3>
+    <pre><code>// Network security configuration
+interface NetworkSecurity {
+    // TLS configuration
+    tls: {
+        minimumVersion: 'TLS1.2' | 'TLS1.3';
+        certificatePinning: boolean;
+        pinnedCertificates?: string[];
+    };
+
+    // API security
+    api: {
+        authentication: 'oauth2' | 'api-key';
+        rateLimit: number;  // requests per minute
+        requestSigning: boolean;
+    };
+
+    // Local network
+    localNetwork: {
+        discoveryProtocol: 'mDNS' | 'SSDP';
+        requireAuthentication: boolean;
+        allowedClients: string[];  // MAC addresses or device IDs
+    };
+}
+
+// Certificate pinning implementation
+class SecureHttpClient {
+    private pinnedCerts: Set&lt;string&gt;;
+
+    async fetch(url: string, options?: RequestInit): Promise&lt;Response&gt; {
+        const response = await fetch(url, {
+            ...options,
+            // Custom certificate validation
+            // (implementation varies by platform)
+        });
+
+        if (!this.validateCertificate(response)) {
+            throw new SecurityError('Certificate validation failed');
+        }
+
+        return response;
+    }
+}</code></pre>
+
+    <h2>7.7 Backup and Recovery</h2>
+    <p>Protecting user data through secure backup systems:</p>
+
+    <h3>7.7.1 Backup Strategy</h3>
+    <pre><code>// Backup configuration
+interface BackupConfig {
+    // Automatic backup
+    automatic: {
+        enabled: boolean;
+        frequency: 'daily' | 'weekly' | 'monthly';
+        time: string;  // Preferred backup time
+        requireWifi: boolean;
+        requireCharging: boolean;
+    };
+
+    // Backup content
+    content: {
+        vocabulary: boolean;
+        settings: boolean;
+        messageHistory: boolean;
+        voiceBank: boolean;
+        calibrationData: boolean;
+    };
+
+    // Storage
+    storage: {
+        local: boolean;
+        cloud: boolean;
+        cloudProvider?: string;
+    };
+
+    // Retention
+    retention: {
+        keepCount: number;  // Number of backups to keep
+        keepDays: number;   // Days to retain backups
+    };
+}
+
+// Backup operations
+interface BackupService {
+    createBackup(name?: string): Promise&lt;BackupInfo&gt;;
+    listBackups(): Promise&lt;BackupInfo[]&gt;;
+    restoreBackup(backupId: string): Promise&lt;RestoreResult&gt;;
+    deleteBackup(backupId: string): Promise&lt;void&gt;;
+    verifyBackup(backupId: string): Promise&lt;VerificationResult&gt;;
+}</code></pre>
+
+    <h3>7.7.2 Recovery Procedures</h3>
+    <ul>
+        <li>Device replacement recovery from cloud backup</li>
+        <li>Factory reset recovery from local backup</li>
+        <li>Partial restoration (vocabulary only, settings only)</li>
+        <li>Cross-platform migration</li>
+    </ul>
+
+    <h2>7.8 Audit Logging</h2>
+    <p>Tracking access and changes for security and accountability:</p>
+
+    <pre><code>// Audit log configuration
+interface AuditConfig {
+    enabled: boolean;
+    events: AuditEventType[];
+    retention: number;  // Days to retain logs
+    exportable: boolean;
+}
+
+type AuditEventType =
+    | 'login'
+    | 'logout'
+    | 'failed-login'
+    | 'settings-change'
+    | 'vocabulary-edit'
+    | 'profile-export'
+    | 'profile-import'
+    | 'delegate-access'
+    | 'backup-created'
+    | 'backup-restored'
+    | 'data-deleted';
+
+interface AuditEntry {
+    timestamp: Date;
+    event: AuditEventType;
+    actor: string;  // User or delegate identifier
+    details: Record&lt;string, any&gt;;
+    ipAddress?: string;
+    deviceId?: string;
+}
+
+// Audit log access
+interface AuditService {
+    log(event: AuditEventType, details: Record&lt;string, any&gt;): void;
+    query(filter: AuditFilter): Promise&lt;AuditEntry[]&gt;;
+    export(format: 'json' | 'csv'): Promise&lt;Blob&gt;;
+}</code></pre>
+
+    <h2>7.9 Incident Response</h2>
+    <p>Procedures for handling security incidents:</p>
+
+    <h3>7.9.1 Incident Categories</h3>
+    <table>
+        <tr>
+            <th>Category</th>
+            <th>Examples</th>
+            <th>Response</th>
+        </tr>
+        <tr>
+            <td>Data Breach</td>
+            <td>Unauthorized access to user data</td>
+            <td>User notification, password reset, investigation</td>
+        </tr>
+        <tr>
+            <td>Device Theft</td>
+            <td>AAC device lost or stolen</td>
+            <td>Remote wipe, account lockout, backup restore</td>
+        </tr>
+        <tr>
+            <td>Malware</td>
+            <td>Malicious software on device</td>
+            <td>Isolation, clean reinstall, credential change</td>
+        </tr>
+        <tr>
+            <td>Unauthorized Access</td>
+            <td>Unknown person accessing system</td>
+            <td>Session termination, audit review, access change</td>
+        </tr>
+    </table>
+
+    <h3>7.9.2 Remote Security Commands</h3>
+    <pre><code>// Emergency security commands (require strong authentication)
+interface RemoteSecurity {
+    // Lock device immediately
+    remoteLock(deviceId: string): Promise&lt;void&gt;;
+
+    // Wipe sensitive data
+    remoteWipe(deviceId: string, level: WipeLevel): Promise&lt;void&gt;;
+
+    // Revoke all sessions
+    revokeAllSessions(userId: string): Promise&lt;void&gt;;
+
+    // Disable cloud access
+    disableCloudAccess(userId: string): Promise&lt;void&gt;;
+}
+
+type WipeLevel = 'messages-only' | 'user-data' | 'complete';</code></pre>
+
+    <div class="highlight">
+        <strong>User Empowerment:</strong> Users or their authorized representatives must have the ability to remotely secure or wipe a lost device. These capabilities must be accessible even if the primary AAC device is unavailable.
+    </div>
+
+    <h2>7.10 Compliance and Certification</h2>
+    <p>WIA-AAC security requirements align with major frameworks:</p>
+    <ul>
+        <li>GDPR (General Data Protection Regulation)</li>
+        <li>HIPAA (for healthcare contexts)</li>
+        <li>COPPA (for child users)</li>
+        <li>SOC 2 Type II (for cloud services)</li>
+        <li>ISO 27001 (information security management)</li>
+    </ul>
+
+    <p>Vendors seeking WIA-AAC compliance must demonstrate adherence to these security and privacy requirements through third-party audit or self-certification with documentation.</p>
+</body>
+</html>

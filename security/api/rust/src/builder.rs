@@ -1,6 +1,5 @@
 //! WIA Security Event Builder
 
-use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -149,8 +148,7 @@ impl AlertBuilder {
         if let Some(v) = version {
             rule["version"] = json!(v);
         }
-        self.alert_data
-            .insert("detection_rule".to_string(), rule);
+        self.alert_data.insert("detection_rule".to_string(), rule);
         self
     }
 

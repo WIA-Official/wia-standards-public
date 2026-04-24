@@ -2,9 +2,9 @@
 //!
 //! Generates PDF security reports from WIA Security data.
 
+use super::{ExportError, ExportResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{ExportResult, ExportError};
 
 /// PDF report configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,11 +90,23 @@ pub struct ReportSection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum SectionContent {
-    Text { paragraphs: Vec<String> },
-    Table { headers: Vec<String>, rows: Vec<Vec<String>> },
-    Chart { chart_type: ChartType, data: ChartData },
-    FindingsList { findings: Vec<ReportFinding> },
-    Summary { stats: ReportStats },
+    Text {
+        paragraphs: Vec<String>,
+    },
+    Table {
+        headers: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
+    Chart {
+        chart_type: ChartType,
+        data: ChartData,
+    },
+    FindingsList {
+        findings: Vec<ReportFinding>,
+    },
+    Summary {
+        stats: ReportStats,
+    },
 }
 
 /// Chart types
@@ -211,8 +223,11 @@ impl PdfGenerator {
     }
 
     /// Generate executive summary section
-    fn generate_executive_summary(&self, summary: &super::super::importers::WiaScanSummary) -> ReportSection {
-        let risk_level = if summary.critical > 0 {
+    fn generate_executive_summary(
+        &self,
+        summary: &super::super::importers::WiaScanSummary,
+    ) -> ReportSection {
+        let _risk_level = if summary.critical > 0 {
             "CRITICAL"
         } else if summary.high > 0 {
             "HIGH"
@@ -242,7 +257,10 @@ impl PdfGenerator {
     }
 
     /// Generate severity distribution chart
-    fn generate_severity_chart(&self, summary: &super::super::importers::WiaScanSummary) -> ReportSection {
+    fn generate_severity_chart(
+        &self,
+        summary: &super::super::importers::WiaScanSummary,
+    ) -> ReportSection {
         ReportSection {
             title: "Severity Distribution".to_string(),
             content: SectionContent::Chart {
@@ -275,7 +293,10 @@ impl PdfGenerator {
     }
 
     /// Generate hosts summary table
-    fn generate_hosts_summary(&self, scan: &super::super::importers::WiaScanResult) -> ReportSection {
+    fn generate_hosts_summary(
+        &self,
+        scan: &super::super::importers::WiaScanResult,
+    ) -> ReportSection {
         let mut rows = Vec::new();
 
         for target in &scan.targets {
@@ -323,7 +344,10 @@ impl PdfGenerator {
     }
 
     /// Generate detailed findings section
-    fn generate_detailed_findings(&self, scan: &super::super::importers::WiaScanResult) -> ReportSection {
+    fn generate_detailed_findings(
+        &self,
+        scan: &super::super::importers::WiaScanResult,
+    ) -> ReportSection {
         let mut findings = Vec::new();
 
         for target in &scan.targets {
@@ -361,7 +385,10 @@ impl PdfGenerator {
     }
 
     /// Generate recommendations section
-    fn generate_recommendations(&self, scan: &super::super::importers::WiaScanResult) -> ReportSection {
+    fn generate_recommendations(
+        &self,
+        scan: &super::super::importers::WiaScanResult,
+    ) -> ReportSection {
         let mut paragraphs = Vec::new();
 
         // Collect unique solutions
@@ -371,13 +398,16 @@ impl PdfGenerator {
                 if let Some(ref solution) = finding.solution {
                     solutions
                         .entry(solution.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(finding.id.clone());
                 }
             }
         }
 
-        paragraphs.push("Based on the assessment findings, the following remediation actions are recommended:".to_string());
+        paragraphs.push(
+            "Based on the assessment findings, the following remediation actions are recommended:"
+                .to_string(),
+        );
 
         let mut priority = 1;
         for (solution, finding_ids) in solutions.iter().take(10) {
@@ -391,7 +421,9 @@ impl PdfGenerator {
         }
 
         if solutions.is_empty() {
-            paragraphs.push("No specific remediation actions required based on current findings.".to_string());
+            paragraphs.push(
+                "No specific remediation actions required based on current findings.".to_string(),
+            );
         }
 
         ReportSection {
@@ -402,11 +434,10 @@ impl PdfGenerator {
 
     /// Calculate overall risk score (0-100)
     fn calculate_risk_score(&self, summary: &super::super::importers::WiaScanSummary) -> f64 {
-        let weighted_score =
-            (summary.critical as f64 * 10.0) +
-            (summary.high as f64 * 7.0) +
-            (summary.medium as f64 * 4.0) +
-            (summary.low as f64 * 1.0);
+        let weighted_score = (summary.critical as f64 * 10.0)
+            + (summary.high as f64 * 7.0)
+            + (summary.medium as f64 * 4.0)
+            + (summary.low as f64 * 1.0);
 
         // Normalize to 0-100 scale
         let max_possible = (summary.total_findings as f64) * 10.0;
@@ -439,10 +470,9 @@ impl PdfGenerator {
         if let Some(ref subtitle) = report.metadata.subtitle {
             html.push_str(&format!("<h2>{}</h2>\n", subtitle));
         }
-        html.push_str(&format!("<p class=\"meta\">Organization: {} | Date: {} | Version: {}</p>\n",
-            report.metadata.organization,
-            report.metadata.date,
-            report.metadata.version
+        html.push_str(&format!(
+            "<p class=\"meta\">Organization: {} | Date: {} | Version: {}</p>\n",
+            report.metadata.organization, report.metadata.date, report.metadata.version
         ));
         html.push_str("</header>\n");
 
@@ -457,7 +487,8 @@ impl PdfGenerator {
 
     /// Generate CSS styles
     fn generate_css(&self) -> String {
-        format!(r#"
+        format!(
+            r#"
             body {{ font-family: Arial, sans-serif; margin: 40px; color: {}; }}
             header {{ border-bottom: 2px solid {}; padding-bottom: 20px; margin-bottom: 30px; }}
             h1 {{ color: {}; }}
@@ -541,7 +572,10 @@ impl PdfGenerator {
                     ));
                     html.push_str(&format!("<p><strong>ID:</strong> {}</p>\n", f.id));
                     if let Some(score) = f.cvss_score {
-                        html.push_str(&format!("<p><strong>CVSS Score:</strong> {:.1}</p>\n", score));
+                        html.push_str(&format!(
+                            "<p><strong>CVSS Score:</strong> {:.1}</p>\n",
+                            score
+                        ));
                     }
                     html.push_str(&format!("<p>{}</p>\n", f.description));
                     if let Some(ref sol) = f.solution {
@@ -563,40 +597,36 @@ impl PdfGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::integration::importers::{WiaScanResult, WiaScanTarget, WiaFinding, WiaScanSummary};
+    use crate::integration::importers::{WiaFinding, WiaScanResult, WiaScanSummary, WiaScanTarget};
 
     fn sample_scan_result() -> WiaScanResult {
         WiaScanResult {
             scan_id: "test-001".to_string(),
             scan_name: "Test Security Scan".to_string(),
             scan_time: "2024-01-15T10:00:00Z".to_string(),
-            targets: vec![
-                WiaScanTarget {
-                    host: "server1.example.com".to_string(),
-                    ip: Some("192.168.1.10".to_string()),
-                    os: Some("Linux".to_string()),
-                    findings: vec![
-                        WiaFinding {
-                            id: "VULN-001".to_string(),
-                            title: "Critical SSL Vulnerability".to_string(),
-                            description: "SSL certificate has expired".to_string(),
-                            severity: "critical".to_string(),
-                            cvss_score: Some(9.8),
-                            cvss_vector: None,
-                            port: Some(443),
-                            protocol: Some("tcp".to_string()),
-                            service: Some("https".to_string()),
-                            cve: vec!["CVE-2024-1234".to_string()],
-                            cwe: vec![],
-                            solution: Some("Renew SSL certificate".to_string()),
-                            references: vec![],
-                            exploit_available: false,
-                            patch_available: true,
-                            plugin_output: None,
-                        },
-                    ],
-                },
-            ],
+            targets: vec![WiaScanTarget {
+                host: "server1.example.com".to_string(),
+                ip: Some("192.168.1.10".to_string()),
+                os: Some("Linux".to_string()),
+                findings: vec![WiaFinding {
+                    id: "VULN-001".to_string(),
+                    title: "Critical SSL Vulnerability".to_string(),
+                    description: "SSL certificate has expired".to_string(),
+                    severity: "critical".to_string(),
+                    cvss_score: Some(9.8),
+                    cvss_vector: None,
+                    port: Some(443),
+                    protocol: Some("tcp".to_string()),
+                    service: Some("https".to_string()),
+                    cve: vec!["CVE-2024-1234".to_string()],
+                    cwe: vec![],
+                    solution: Some("Renew SSL certificate".to_string()),
+                    references: vec![],
+                    exploit_available: false,
+                    patch_available: true,
+                    plugin_output: None,
+                }],
+            }],
             summary: WiaScanSummary {
                 total_hosts: 1,
                 total_findings: 1,

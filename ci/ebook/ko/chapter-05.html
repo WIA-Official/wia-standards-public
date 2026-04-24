@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 5: 보안 | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 5: CI/CD 파이프라인 보안</h1>
+
+    <p>보안은 CI/CD 파이프라인의 마지막에 덧붙이는 것이 아니라 전체에 걸쳐 통합되어야 합니다. 이 챕터에서는 시크릿 관리, 정적 및 동적 애플리케이션 보안 테스팅(SAST/DAST), 공급망 보안, 그리고 소프트웨어 배포의 모든 단계에 보안을 내장하는 실천들을 다룹니다.</p>
+
+    <h2>데브섹옵스(DevSecOps) 접근법</h2>
+
+    <p>데브섹옵스는 보안을 공유 책임으로 포함하도록 데브옵스 원칙을 확장합니다. 보안을 개발의 끝에 있는 관문으로 취급하는 대신, 모든 단계의 필수적인 부분이 됩니다.</p>
+
+    <pre><code># 데브섹옵스 파이프라인 단계
+┌──────────────────────────────────────────────────────────────┐
+│                    보안 CI/CD 파이프라인                       │
+├──────────┬──────────┬──────────┬──────────┬─────────────────┤
+│   계획   │   코드   │   빌드   │  테스트  │      배포       │
+├──────────┼──────────┼──────────┼──────────┼─────────────────┤
+│ 위협     │ 프리     │ SAST     │ DAST     │ 컨테이너        │
+│ 모델링   │ 커밋훅   │ SCA      │ 침투     │ 스캐닝          │
+│          │          │ 시크릿   │ 테스트   │ 런타임          │
+│ 보안     │ IDE      │ 스캔     │ API      │ 보호            │
+│ 스토리   │ 린터     │          │ 보안     │                 │
+└──────────┴──────────┴──────────┴──────────┴─────────────────┘</code></pre>
+
+    <div class="highlight">
+        <strong>시프트-레프트 보안:</strong> 보안 취약점을 수정하는 비용은 개발 생명주기가 진행됨에 따라 기하급수적으로 증가합니다. 코딩 단계에서 문제를 찾으면 테스팅 단계보다 6배, 프로덕션보다 15배 더 적은 비용이 듭니다.
+    </div>
+
+    <h2>시크릿 관리</h2>
+
+    <p>시크릿 - API 키, 자격 증명, 인증서 - 은 CI/CD 운영에 필수적이지만 잘못 처리하면 심각한 보안 위험을 나타냅니다. 절대로 시크릿을 코드 저장소에 저장하지 마세요.</p>
+
+    <h3>시크릿 관리 모범 사례</h3>
+
+    <ul>
+        <li><strong>외부 시크릿 저장소:</strong> 전용 시크릿 관리 서비스 사용 (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault)</li>
+        <li><strong>환경별 시크릿:</strong> 개발, 스테이징, 프로덕션에 대해 별도의 시크릿 유지</li>
+        <li><strong>순환 정책:</strong> 정기적인 일정에 따라 자동 시크릿 순환 구현</li>
+        <li><strong>감사 로깅:</strong> 규정 준수 및 사고 대응을 위해 모든 시크릿 접근 기록</li>
+        <li><strong>최소 권한:</strong> 시크릿에 대한 최소한의 필요한 접근 권한만 부여</li>
+    </ul>
+
+    <h3>GitHub Actions 시크릿 구성</h3>
+
+    <pre><code># GitHub Actions - 안전한 시크릿 사용
+name: 보안 배포
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production  # 프로덕션 시크릿에 승인 필요
+
+    permissions:
+      contents: read
+      id-token: write  # OIDC에 필요
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 클라우드 인증을 위해 OIDC 사용 (장기 자격 증명 없음)
+      - name: AWS 자격 증명 구성
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789:role/github-actions
+          aws-region: ap-northeast-2
+
+      # 환경을 통해 시크릿 접근
+      - name: 애플리케이션 배포
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          # 시크릿은 로그에서 마스킹됨
+          npm run deploy</code></pre>
+
+    <h3>시크릿 스캐닝</h3>
+
+    <pre><code># GitHub Actions - 시크릿 탐지
+name: 시크릿 스캐닝
+on: [push, pull_request]
+
+jobs:
+  detect-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Gitleaks - 코드에서 시크릿 탐지
+      - name: Gitleaks 스캔
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # TruffleHog - 고신뢰도 시크릿 탐지
+      - name: TruffleHog 스캔
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          extra_args: --only-verified</code></pre>
+
+    <pre><code># .gitleaks.toml - 사용자 정의 규칙
+[extend]
+useDefault = true
+
+[[rules]]
+id = "wia-api-key"
+description = "WIA API 키"
+regex = '''wia_[a-zA-Z0-9]{32}'''
+tags = ["key", "wia"]
+
+[allowlist]
+paths = [
+  '''(.*?)(jpg|gif|doc|pdf|bin|svg)$''',
+  '''\.gitleaks\.toml$'''
+]</code></pre>
+
+    <h2>정적 애플리케이션 보안 테스팅 (SAST)</h2>
+
+    <p>SAST 도구는 애플리케이션을 실행하지 않고 소스 코드를 분석하여 보안 취약점을 식별합니다. SQL 인젝션, XSS, 안전하지 않은 암호화와 같은 문제를 개발 초기에 포착합니다.</p>
+
+    <h3>CodeQL 분석</h3>
+
+    <pre><code># GitHub Actions - CodeQL SAST
+name: CodeQL 분석
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'  # 주간 심층 스캔
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript, python]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CodeQL 초기화
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: 자동 빌드
+        uses: github/codeql-action/autobuild@v3
+
+      - name: CodeQL 분석 수행
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"</code></pre>
+
+    <h3>Semgrep 사용자 정의 규칙</h3>
+
+    <pre><code># .semgrep.yml - 사용자 정의 보안 규칙
+rules:
+  - id: wia-no-eval
+    patterns:
+      - pattern: eval(...)
+    message: "eval()은 위험하며 사용해서는 안 됩니다"
+    severity: ERROR
+    languages: [javascript, typescript]
+
+  - id: wia-sql-injection
+    patterns:
+      - pattern: |
+          $QUERY = "..." + $USER_INPUT + "..."
+          $DB.query($QUERY)
+    message: "잠재적 SQL 인젝션 취약점"
+    severity: ERROR
+    languages: [javascript, typescript]
+
+  - id: wia-hardcoded-secret
+    patterns:
+      - pattern-regex: '(password|secret|api_key)\s*=\s*["\'][^"\']{8,}["\']'
+    message: "하드코딩된 시크릿 감지됨"
+    severity: ERROR
+    languages: [javascript, typescript, python]</code></pre>
+
+    <div class="highlight">
+        <strong>SAST 도구 선택:</strong> 서로 다른 강점을 가지므로 여러 SAST 도구를 사용하세요. CodeQL은 데이터 흐름 분석에 뛰어나고, Semgrep은 빠르고 사용자 정의가 가능하며, 언어별 도구는 종종 미묘한 문제를 포착합니다.
+    </div>
+
+    <h2>동적 애플리케이션 보안 테스팅 (DAST)</h2>
+
+    <p>DAST 도구는 공격을 시뮬레이션하여 실행 중인 애플리케이션을 테스트합니다. SAST가 감지할 수 없는 인증 결함 및 서버 구성 오류와 같은 런타임 취약점을 찾습니다.</p>
+
+    <h3>OWASP ZAP 통합</h3>
+
+    <pre><code># GitHub Actions - OWASP ZAP DAST
+name: DAST 보안 스캔
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # 야간 보안 스캔
+
+jobs:
+  zap-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 애플리케이션 빌드 및 시작
+        run: |
+          docker-compose up -d
+          sleep 30  # 앱 준비 대기
+
+      - name: OWASP ZAP 기준선 스캔
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+      - name: ZAP 보고서 업로드
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: report_html.html</code></pre>
+
+    <h2>소프트웨어 구성 분석 (SCA)</h2>
+
+    <p>SCA 도구는 알려진 취약점에 대해 서드파티 의존성을 분석합니다. 수백 개의 의존성을 사용하는 현대 애플리케이션에서 SCA는 공급망 보안에 필수적입니다.</p>
+
+    <h3>의존성 취약점 스캐닝</h3>
+
+    <pre><code># GitHub Actions - 종합 SCA
+name: 의존성 보안
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub 내장 의존성 스캐닝
+      - name: 의존성 검토
+        uses: actions/dependency-review-action@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0
+
+      # Snyk 심층 취약점 분석
+      - name: Snyk 취약점 스캔
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk.sarif
+
+      - name: Snyk 결과 업로드
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk.sarif</code></pre>
+
+    <h3>SBOM 생성</h3>
+
+    <pre><code># 소프트웨어 자재 명세서 생성
+name: SBOM 생성
+on:
+  release:
+    types: [published]
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SBOM 생성 (CycloneDX)
+        uses: CycloneDX/gh-node-module-generatebom@v1
+        with:
+          output: sbom.json
+
+      - name: SBOM 생성 (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom-spdx.json
+
+      - name: 릴리스에 SBOM 첨부
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sbom.json
+            sbom-spdx.json</code></pre>
+
+    <h2>컨테이너 보안</h2>
+
+    <p>컨테이너 이미지는 애플리케이션 코드와 시스템 의존성을 모두 패키징하므로 특별한 보안 관심이 필요합니다.</p>
+
+    <pre><code># GitHub Actions - 컨테이너 보안
+name: 컨테이너 보안
+on:
+  push:
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 이미지 빌드
+        run: docker build -t myapp:${{ github.sha }} .
+
+      # Trivy 취약점 스캐너
+      - name: Trivy 스캔
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'myapp:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Trivy 결과 업로드
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+      # Dockerfile 모범 사례
+      - name: Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI 보안 성숙도 모델:</strong>
+        <ul>
+            <li>레벨 1: 시크릿 스캐닝, 기본 SAST</li>
+            <li>레벨 2: SCA, 컨테이너 스캐닝, SBOM</li>
+            <li>레벨 3: DAST, 사용자 정의 보안 규칙</li>
+            <li>레벨 4: 위협 모델링 통합, 코드로서의 보안</li>
+        </ul>
+    </div>
+
+    <h2>보안 컴플라이언스 자동화</h2>
+
+    <pre><code># 코드로서의 컴플라이언스
+name: 컴플라이언스 검사
+on:
+  push:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OWASP Top 10 컴플라이언스 확인
+        run: |
+          echo "OWASP Top 10 제어 확인 중..."
+          # A01 - 취약한 접근 제어
+          grep -r "authorize" src/ || echo "::warning::권한 확인이 발견되지 않음"
+          # A02 - 암호화 실패
+          ! grep -r "md5\|sha1" src/ || echo "::warning::취약한 암호화 감지됨"
+          # A03 - 인젝션
+          npm audit --audit-level=moderate
+
+      - name: 컴플라이언스 보고서 생성
+        run: |
+          node scripts/generate-compliance-report.js > compliance-report.json
+
+      - name: 컴플라이언스 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-report.json</code></pre>
+
+    <p>CI/CD의 보안은 일회성 설정이 아니라 지속적인 실천입니다. 보안 규칙의 정기적인 업데이트, 새로운 취약점에 대한 지속적인 모니터링, 그리고 개발자를 위한 보안 교육은 안전한 소프트웨어 배포 파이프라인을 유지하는 데 필수적입니다.</p>
+
+</body>
+</html>

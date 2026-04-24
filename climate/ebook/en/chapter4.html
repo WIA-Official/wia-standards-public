@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Climate Data Format Standard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 { color: #10B981; margin-top: 2em; }
+        h1 { border-bottom: 3px solid #10B981; padding-bottom: 10px; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; border-left: 4px solid #10B981; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; color: #10B981; }
+        tr:nth-child(even) { background: #1e293b40; }
+        blockquote { border-left: 4px solid #ffd700; padding-left: 20px; margin: 20px 0; background: #1e293b; padding: 20px; border-radius: 0 8px 8px 0; }
+        .highlight { background: #10B98120; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .warning { background: #f59e0b20; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        footer .philosophy { color: #ffd700; font-size: 1.2em; margin-bottom: 10px; }
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Protocol Specification</h1>
+
+    <blockquote>
+        <p>"Protocols are the universal language of machines. The WIA Climate Protocol enables sensors in Iceland to speak seamlessly with dashboards in Tokyo."</p>
+    </blockquote>
+
+    <h2>4.1 Protocol Architecture</h2>
+
+    <p>The WIA Climate Protocol is an application-level protocol that sits above transport layers (WebSocket, MQTT, HTTP), providing standardized message formats and semantics for climate data exchange.</p>
+
+    <h3>4.1.1 Layer Architecture</h3>
+
+    <pre><code>┌─────────────────────────────────────────────┐
+│         Application Layer                    │
+│    (Climate Monitoring Applications)         │
+├─────────────────────────────────────────────┤
+│       WIA Climate Protocol                   │
+│   (Message Format & Semantics)               │
+├─────────────────────────────────────────────┤
+│    Phase 1 Data Format (Payload)            │
+│   (ClimateMessage with typed data)           │
+├──────────┬───────────┬───────────┬───────────┤
+│WebSocket │   MQTT    │   HTTP    │  Serial   │
+│Transport │ Transport │ Transport │ Transport │
+├──────────┴───────────┴───────────┴───────────┤
+│         Network Layer (TCP/UDP)              │
+└─────────────────────────────────────────────┘</code></pre>
+
+    <h2>4.2 Protocol Message Format</h2>
+
+    <h3>4.2.1 Message Structure</h3>
+
+    <pre><code>{
+  "protocol": "wia-climate",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": 1702483200000,
+  "type": "data",
+  "payload": { ... },
+  "meta": { ... }
+}</code></pre>
+
+    <h3>4.2.2 Message Types</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Direction</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>connect</code></td>
+                <td>Client → Server</td>
+                <td>Initiate connection</td>
+            </tr>
+            <tr>
+                <td><code>connect_ack</code></td>
+                <td>Server → Client</td>
+                <td>Acknowledge connection</td>
+            </tr>
+            <tr>
+                <td><code>disconnect</code></td>
+                <td>Both</td>
+                <td>Terminate connection</td>
+            </tr>
+            <tr>
+                <td><code>data</code></td>
+                <td>Sensor → Server</td>
+                <td>Climate data message</td>
+            </tr>
+            <tr>
+                <td><code>command</code></td>
+                <td>Client → Device</td>
+                <td>Control command</td>
+            </tr>
+            <tr>
+                <td><code>command_ack</code></td>
+                <td>Device → Client</td>
+                <td>Command response</td>
+            </tr>
+            <tr>
+                <td><code>subscribe</code></td>
+                <td>Client → Server</td>
+                <td>Subscribe to data stream</td>
+            </tr>
+            <tr>
+                <td><code>subscribe_ack</code></td>
+                <td>Server → Client</td>
+                <td>Subscription confirmation</td>
+            </tr>
+            <tr>
+                <td><code>ping</code> / <code>pong</code></td>
+                <td>Both</td>
+                <td>Keep-alive heartbeat</td>
+            </tr>
+            <tr>
+                <td><code>error</code></td>
+                <td>Both</td>
+                <td>Error notification</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.3 Connection Lifecycle</h2>
+
+    <h3>4.3.1 Connection Sequence</h3>
+
+    <pre><code>Client                                Server
+  │                                     │
+  ├─────── TCP/WebSocket Connect ─────→│
+  │                                     │
+  ├────────── connect message ─────────→│
+  │           (auth, capabilities)      │
+  │                                     │
+  │←───────── connect_ack ──────────────┤
+  │         (session_id, config)        │
+  │                                     │
+  ├═══════ CONNECTED STATE ════════════┤
+  │                                     │
+  ├────────── data messages ───────────→│
+  │←────────── commands ────────────────┤
+  │                                     │
+  ├──────────── ping ──────────────────→│
+  │←──────────── pong ──────────────────┤
+  │                                     │
+  ├────────── disconnect ──────────────→│
+  │                                     │
+  └─────────────────────────────────────┘</code></pre>
+
+    <h3>4.3.2 Connect Message</h3>
+
+    <pre><code>{
+  "protocol": "wia-climate",
+  "version": "1.0.0",
+  "messageId": "...",
+  "timestamp": 1702483200000,
+  "type": "connect",
+  "payload": {
+    "clientId": "sensor-orca-001",
+    "clientType": "sensor",
+    "capabilities": ["carbon_capture"],
+    "auth": {
+      "method": "api_key",
+      "token": "wia_climate_..."
+    }
+  }
+}</code></pre>
+
+    <h3>4.3.3 Connect Acknowledgment</h3>
+
+    <pre><code>{
+  "protocol": "wia-climate",
+  "version": "1.0.0",
+  "messageId": "...",
+  "timestamp": 1702483200100,
+  "type": "connect_ack",
+  "payload": {
+    "success": true,
+    "sessionId": "session-12345",
+    "keepAliveInterval": 30000,
+    "serverInfo": {
+      "name": "WIA Climate Server",
+      "version": "1.0.0"
+    }
+  }
+}</code></pre>
+
+    <h2>4.4 Transport Layer Support</h2>
+
+    <h3>4.4.1 WebSocket Transport</h3>
+
+    <div class="highlight">
+        <p><strong>URL:</strong> <code>wss://api.wia.live/climate/v1/ws</code></p>
+        <p><strong>Subprotocol:</strong> <code>wia-climate-v1</code></p>
+        <p><strong>Message Format:</strong> JSON text frames</p>
+        <p><strong>Keep-Alive:</strong> ping/pong messages every 30 seconds</p>
+    </div>
+
+    <pre><code>const ws = new WebSocket(
+  'wss://api.wia.live/climate/v1/ws',
+  'wia-climate-v1'
+);
+
+ws.onopen = () => {
+  // Send connect message
+  ws.send(JSON.stringify({
+    protocol: "wia-climate",
+    version: "1.0.0",
+    messageId: crypto.randomUUID(),
+    timestamp: Date.now(),
+    type: "connect",
+    payload: { ... }
+  }));
+};</code></pre>
+
+    <h3>4.4.2 MQTT Transport</h3>
+
+    <div class="highlight">
+        <p><strong>Broker:</strong> <code>mqtts://mqtt.wia.live:8883</code></p>
+        <p><strong>Topic Pattern:</strong> <code>wia/climate/v1/{clientId}/{messageType}</code></p>
+        <p><strong>QoS Levels:</strong> 0 (data streaming), 1 (commands), 2 (critical)</p>
+    </div>
+
+    <p><strong>Topic Examples:</strong></p>
+    <ul>
+        <li><code>wia/climate/v1/sensor-orca-001/data/carbon_capture</code></li>
+        <li><code>wia/climate/v1/sensor-orca-001/command</code></li>
+        <li><code>wia/climate/v1/broadcast/alerts</code></li>
+    </ul>
+
+    <h3>4.4.3 HTTP Transport</h3>
+
+    <div class="highlight">
+        <p><strong>Base URL:</strong> <code>https://api.wia.live/climate/v1</code></p>
+        <p><strong>Method:</strong> POST /messages (for sending), GET /stream (for long-polling)</p>
+        <p><strong>Content-Type:</strong> <code>application/json</code></p>
+    </div>
+
+    <h3>4.4.4 Serial Transport (IoT Devices)</h3>
+
+    <div class="highlight">
+        <p><strong>Baud Rate:</strong> 115200</p>
+        <p><strong>Frame Format:</strong> <code>[STX] [LENGTH] [JSON] [CRC16] [ETX]</code></p>
+        <p><strong>Flow Control:</strong> Hardware (RTS/CTS)</p>
+    </div>
+
+    <h2>4.5 Data Streaming Protocol</h2>
+
+    <h3>4.5.1 Subscribe to Data Stream</h3>
+
+    <pre><code>{
+  "protocol": "wia-climate",
+  "version": "1.0.0",
+  "messageId": "...",
+  "timestamp": 1702483200000,
+  "type": "subscribe",
+  "payload": {
+    "topics": [
+      {
+        "pattern": "carbon_capture/*",
+        "filter": {
+          "location.latitude": { "gte": 60.0 }
+        }
+      }
+    ],
+    "qos": 1
+  }
+}</code></pre>
+
+    <h3>4.5.2 Data Message</h3>
+
+    <pre><code>{
+  "protocol": "wia-climate",
+  "version": "1.0.0",
+  "messageId": "...",
+  "timestamp": 1702483200000,
+  "type": "data",
+  "payload": {
+    // Full ClimateMessage from Phase 1
+    "version": "1.0.0",
+    "type": "carbon_capture",
+    "timestamp": { ... },
+    "location": { ... },
+    "device": { ... },
+    "data": { ... }
+  }
+}</code></pre>
+
+    <h2>4.6 Quality of Service</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>QoS Level</th>
+                <th>Guarantee</th>
+                <th>Use Case</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>0 - At most once</td>
+                <td>Fire and forget</td>
+                <td>High-frequency sensor streams</td>
+            </tr>
+            <tr>
+                <td>1 - At least once</td>
+                <td>Acknowledged delivery</td>
+                <td>Important events, commands</td>
+            </tr>
+            <tr>
+                <td>2 - Exactly once</td>
+                <td>Guaranteed unique delivery</td>
+                <td>Critical control commands</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.7 Error Handling</h2>
+
+    <h3>4.7.1 Error Message Format</h3>
+
+    <pre><code>{
+  "protocol": "wia-climate",
+  "version": "1.0.0",
+  "messageId": "...",
+  "timestamp": 1702483200000,
+  "type": "error",
+  "payload": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid latitude value",
+    "details": {
+      "field": "payload.location.latitude",
+      "value": 100.0
+    },
+    "relatedMessageId": "original-msg-id",
+    "retryable": false
+  }
+}</code></pre>
+
+    <h3>4.7.2 Error Codes</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>PROTOCOL_ERROR</td>
+                <td>Invalid protocol format</td>
+                <td>Fix message structure</td>
+            </tr>
+            <tr>
+                <td>VERSION_MISMATCH</td>
+                <td>Unsupported protocol version</td>
+                <td>Upgrade client</td>
+            </tr>
+            <tr>
+                <td>AUTH_FAILED</td>
+                <td>Authentication failure</td>
+                <td>Check credentials</td>
+            </tr>
+            <tr>
+                <td>VALIDATION_ERROR</td>
+                <td>Data validation failed</td>
+                <td>Correct data values</td>
+            </tr>
+            <tr>
+                <td>RATE_LIMITED</td>
+                <td>Too many requests</td>
+                <td>Back off and retry</td>
+            </tr>
+            <tr>
+                <td>TIMEOUT</td>
+                <td>Operation timeout</td>
+                <td>Retry with longer timeout</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.8 Keep-Alive & Reconnection</h2>
+
+    <h3>4.8.1 Keep-Alive Strategy</h3>
+
+    <p>Clients must send <code>ping</code> messages at intervals specified in <code>connect_ack.keepAliveInterval</code> (default 30 seconds). Server responds with <code>pong</code>.</p>
+
+    <h3>4.8.2 Reconnection Policy</h3>
+
+    <div class="highlight">
+        <p><strong>Exponential Backoff:</strong></p>
+        <ul>
+            <li>Initial delay: 1000ms</li>
+            <li>Max delay: 30000ms</li>
+            <li>Multiplier: 2x</li>
+            <li>Jitter: ±20%</li>
+        </ul>
+    </div>
+
+    <pre><code>Retry Sequence:
+  Attempt 1: ~1000ms delay
+  Attempt 2: ~2000ms delay
+  Attempt 3: ~4000ms delay
+  Attempt 4: ~8000ms delay
+  Attempt 5: ~16000ms delay
+  Attempt 6+: ~30000ms delay</code></pre>
+
+    <h2>4.9 Message Ordering & Timestamps</h2>
+
+    <div class="warning">
+        <p><strong>Important:</strong> Messages may arrive out of order in distributed systems. Always use the <code>timestamp</code> field in the payload (not the protocol timestamp) to determine the actual measurement time.</p>
+    </div>
+</body>
+</html>

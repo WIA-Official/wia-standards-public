@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Precision Application Systems | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Precision Application Systems</h1>
+
+    <p>Drone-based precision application systems enable targeted delivery of pesticides, fertilizers, and seeds with unprecedented accuracy. This chapter covers spray system design, variable rate technology, drift management, seeding systems, and the operational considerations for effective aerial application. These systems represent the active intervention capability of agricultural drones, complementing passive sensing applications.</p>
+
+    <h2>6.1 Spray System Components</h2>
+
+    <pre>
+// Agricultural Drone Spray System
+interface SpraySystem {
+  // Tank System
+  tank: {
+    capacity: number;            // liters
+    material: 'HDPE' | 'fiberglass' | 'stainless';
+    agitation: boolean;
+    levelSensor: 'ultrasonic' | 'pressure' | 'float';
+    quickFill: boolean;
+  };
+
+  // Pump System
+  pump: {
+    type: 'diaphragm' | 'centrifugal' | 'peristaltic';
+    flowRate: number;            // L/min
+    pressure: number;            // bar
+    pwmControl: boolean;
+    selfPriming: boolean;
+  };
+
+  // Nozzles
+  nozzles: {
+    type: 'flat_fan' | 'hollow_cone' | 'rotary_atomizer' | 'centrifugal';
+    count: number;
+    spacing: number;             // cm
+    dropletSize: 'fine' | 'medium' | 'coarse' | 'very_coarse';
+    flowRate: number;            // L/min each
+    pressureRange: { min: number; max: number };
+  };
+
+  // Control System
+  control: {
+    flowMeter: boolean;
+    pressureSensor: boolean;
+    sectionControl: boolean;
+    variableRate: boolean;
+    autoCalibration: boolean;
+  };
+
+  // Performance
+  performance: {
+    swathWidth: number;          // meters
+    applicationRate: { min: number; max: number }; // L/ha
+    groundSpeed: { min: number; max: number };     // m/s
+    tankLoadsPerHectare: number;
+  };
+}
+
+// Example: Agricultural Spray Drone System
+const spraySystemSpec: SpraySystem = {
+  tank: {
+    capacity: 20,
+    material: 'HDPE',
+    agitation: true,
+    levelSensor: 'ultrasonic',
+    quickFill: true
+  },
+  pump: {
+    type: 'diaphragm',
+    flowRate: 8,
+    pressure: 4,
+    pwmControl: true,
+    selfPriming: true
+  },
+  nozzles: {
+    type: 'centrifugal',
+    count: 4,
+    spacing: 80,
+    dropletSize: 'medium',
+    flowRate: 2,
+    pressureRange: { min: 1, max: 5 }
+  },
+  control: {
+    flowMeter: true,
+    pressureSensor: true,
+    sectionControl: true,
+    variableRate: true,
+    autoCalibration: true
+  },
+  performance: {
+    swathWidth: 5,
+    applicationRate: { min: 10, max: 75 },
+    groundSpeed: { min: 3, max: 8 },
+    tankLoadsPerHectare: 0.5
+  }
+};
+    </pre>
+
+    <h2>6.2 Variable Rate Application</h2>
+
+    <table>
+        <tr>
+            <th>Parameter</th>
+            <th>Control Method</th>
+            <th>Range</th>
+            <th>Response Time</th>
+        </tr>
+        <tr>
+            <td>Application Rate</td>
+            <td>Pump speed + ground speed</td>
+            <td>±50% of target</td>
+            <td>&lt;1 second</td>
+        </tr>
+        <tr>
+            <td>Droplet Size</td>
+            <td>Atomizer speed / pressure</td>
+            <td>50-500 μm VMD</td>
+            <td>&lt;0.5 second</td>
+        </tr>
+        <tr>
+            <td>Spray On/Off</td>
+            <td>Section valves</td>
+            <td>Binary</td>
+            <td>&lt;100 ms</td>
+        </tr>
+        <tr>
+            <td>Swath Width</td>
+            <td>Nozzle selection</td>
+            <td>2-8 meters</td>
+            <td>Pre-mission</td>
+        </tr>
+    </table>
+
+    <pre>
+// Variable Rate Control System
+interface VariableRateControl {
+  // Prescription Input
+  prescription: {
+    source: 'onboard_map' | 'realtime_streaming' | 'sensor_based';
+    format: 'shapefile' | 'geojson' | 'isoxml' | 'raster';
+    rateField: string;           // Field name containing rate
+    units: 'L/ha' | 'gal/ac' | 'ml/m²';
+  };
+
+  // Rate Calculation
+  rateCalculation: {
+    method: 'lookup' | 'interpolation';
+    updateFrequency: number;     // Hz
+    positionLookahead: number;   // meters
+    smoothing: boolean;
+  };
+
+  // Actuator Control
+  actuatorControl: {
+    pumpControl: {
+      type: 'PWM';
+      frequency: number;         // Hz
+      minDutyCycle: number;
+      maxDutyCycle: number;
+    };
+    speedCompensation: {
+      enabled: boolean;
+      minSpeed: number;
+      maxSpeed: number;
+    };
+  };
+
+  // Feedback Control
+  feedback: {
+    flowMeasurement: boolean;
+    closedLoop: boolean;
+    errorCorrection: boolean;
+    logging: boolean;
+  };
+}
+
+// Real-time Rate Adjustment
+const rateAdjustment = {
+  currentPosition: { lat: 37.1234, lng: 127.5678 },
+  targetRate: 25,                // L/ha
+  groundSpeed: 5,                // m/s
+  swathWidth: 5,                 // m
+  requiredFlow: 0.0174,          // L/s = rate * speed * width / 10000
+  pumpDutyCycle: 0.65,
+  actualFlow: 0.0172,
+  error: -1.1                    // percent
+};
+    </pre>
+
+    <h2>6.3 Droplet Technology</h2>
+
+    <div class="highlight">
+        <h3>Droplet Size Importance</h3>
+        <ul>
+            <li><strong>Coverage:</strong> Smaller droplets provide better coverage</li>
+            <li><strong>Drift:</strong> Larger droplets reduce drift potential</li>
+            <li><strong>Penetration:</strong> Medium droplets penetrate crop canopy</li>
+            <li><strong>Efficacy:</strong> Optimal size depends on target and product</li>
+        </ul>
+    </div>
+
+    <pre>
+// Droplet Specifications
+interface DropletSpecs {
+  // Classification (ASABE S572.1)
+  classification: {
+    veryFine: { vmd: '< 145 μm', drift: 'extreme' };
+    fine: { vmd: '145-225 μm', drift: 'high' };
+    medium: { vmd: '225-325 μm', drift: 'moderate' };
+    coarse: { vmd: '325-400 μm', drift: 'low' };
+    veryCoarse: { vmd: '400-500 μm', drift: 'very_low' };
+    extremelyCoarse: { vmd: '> 500 μm', drift: 'minimal' };
+  };
+
+  // Measurement
+  measurement: {
+    vmd: number;                 // Volume Median Diameter
+    dv10: number;                // 10% of volume below this size
+    dv90: number;                // 90% of volume below this size
+    relativeSpan: number;        // (Dv90 - Dv10) / Dv50
+    percentFines: number;        // % < 150 μm
+  };
+
+  // Application Matching
+  applicationGuide: {
+    contact_insecticides: 'fine_to_medium';
+    systemic_herbicides: 'medium_to_coarse';
+    fungicides: 'fine_to_medium';
+    fertilizers: 'coarse_to_very_coarse';
+    growth_regulators: 'medium';
+  };
+}
+
+// Centrifugal Atomizer Control
+const atomizer = {
+  type: 'rotary_cage',
+  speedRange: { min: 3000, max: 12000 }, // RPM
+  dropletControl: {
+    fine: { rpm: 10000, vmd: 150 },
+    medium: { rpm: 7000, vmd: 250 },
+    coarse: { rpm: 5000, vmd: 350 }
+  },
+  flowRateImpact: 'Higher flow → larger droplets'
+};
+    </pre>
+
+    <h2>6.4 Drift Management</h2>
+
+    <pre>
+// Drift Mitigation Strategies
+interface DriftManagement {
+  // Environmental Limits
+  environmentalLimits: {
+    maxWindSpeed: number;        // m/s
+    minWindSpeed: number;        // m/s (inversion risk)
+    maxTemperature: number;      // Celsius
+    minHumidity: number;         // percent
+    deltaT: { min: number; max: number }; // inversion indicator
+  };
+
+  // Operational Mitigation
+  operational: {
+    flightAltitude: {
+      recommended: number;       // meters
+      maximum: number;
+      reason: 'Lower altitude reduces drift';
+    };
+    groundSpeed: {
+      impact: 'Higher speed → more turbulence';
+      recommendation: 'Match to conditions';
+    };
+    sprayTiming: {
+      preferredTime: 'Early morning or late evening';
+      avoidTime: 'Midday heat, gusty conditions';
+    };
+  };
+
+  // Equipment Mitigation
+  equipment: {
+    dropletSize: 'Increase to coarse/very coarse';
+    nozzleSelection: 'Air induction, low drift types';
+    pressure: 'Lower pressure = larger droplets';
+    adjuvants: 'Drift reduction agents';
+  };
+
+  // Buffer Zones
+  bufferZones: {
+    sensitiveAreas: number;      // meters
+    waterways: number;
+    dwellings: number;
+    roads: number;
+    beehives: number;
+  };
+
+  // Monitoring
+  monitoring: {
+    weatherStation: boolean;
+    realTimeAlerts: boolean;
+    driftCards: boolean;
+    applicationRecords: boolean;
+  };
+}
+
+// Weather Suitability Assessment
+const weatherAssessment = {
+  windSpeed: 3.5,                // m/s
+  windDirection: 270,            // degrees
+  temperature: 22,               // Celsius
+  humidity: 65,                  // percent
+  deltaT: 4,                     // Celsius
+  assessment: 'SUITABLE',
+  warnings: ['Wind increasing - monitor'],
+  bufferDirection: 'East'        // Sensitive area direction
+};
+    </pre>
+
+    <h2>6.5 Seeding and Spreading Systems</h2>
+
+    <table>
+        <tr>
+            <th>System Type</th>
+            <th>Materials</th>
+            <th>Capacity</th>
+            <th>Rate Range</th>
+        </tr>
+        <tr>
+            <td>Broadcast Spreader</td>
+            <td>Granular fertilizer, seed</td>
+            <td>10-25 kg</td>
+            <td>5-100 kg/ha</td>
+        </tr>
+        <tr>
+            <td>Seed Ball Dropper</td>
+            <td>Coated seeds</td>
+            <td>5-15 kg</td>
+            <td>1-50 kg/ha</td>
+        </tr>
+        <tr>
+            <td>Cover Crop Seeder</td>
+            <td>Various seeds</td>
+            <td>10-20 kg</td>
+            <td>10-50 kg/ha</td>
+        </tr>
+        <tr>
+            <td>Precision Planter</td>
+            <td>Individual seeds</td>
+            <td>5-10 kg</td>
+            <td>Specific spacing</td>
+        </tr>
+    </table>
+
+    <pre>
+// Seeding System Specifications
+interface SeedingSystem {
+  // Hopper System
+  hopper: {
+    capacity: number;            // kg
+    material: string;
+    agitation: boolean;
+    sealedEnvironment: boolean;
+  };
+
+  // Metering System
+  metering: {
+    type: 'auger' | 'wheel' | 'air_assist' | 'drop';
+    variableRate: boolean;
+    accuracy: number;            // percent deviation
+    seedSizeRange: { min: number; max: number }; // mm
+  };
+
+  // Distribution
+  distribution: {
+    method: 'broadcast' | 'rows' | 'precision_drop';
+    swathWidth: number;          // meters
+    uniformity: number;          // CV percent
+  };
+
+  // Control
+  control: {
+    rateControl: 'ground_speed_compensated' | 'fixed';
+    sectionControl: boolean;
+    calibration: 'weight_based' | 'count_based';
+  };
+
+  // Applications
+  applications: {
+    coverCrops: { rate: '10-40 kg/ha', timing: 'post_harvest' };
+    reseeding: { rate: 'varies', timing: 'early_season' };
+    forestry: { rate: '50-200 seeds/ha', timing: 'varies' };
+    grassland: { rate: '15-30 kg/ha', timing: 'spring_fall' };
+  };
+}
+    </pre>
+
+    <h2>6.6 Calibration and Testing</h2>
+
+    <div class="highlight">
+        <h3>Calibration Requirements</h3>
+        <ul>
+            <li><strong>Flow Rate:</strong> Verify actual vs. indicated flow</li>
+            <li><strong>Pattern Uniformity:</strong> Ensure even distribution</li>
+            <li><strong>Droplet Size:</strong> Confirm atomizer performance</li>
+            <li><strong>GPS Accuracy:</strong> Validate position for VRA</li>
+            <li><strong>Rate Response:</strong> Test variable rate changes</li>
+        </ul>
+    </div>
+
+    <pre>
+// Calibration Procedures
+interface CalibrationProcedures {
+  // Flow Calibration
+  flowCalibration: {
+    method: 'catch_test' | 'flow_meter_verification';
+    procedure: [
+      '1. Fill tank with measured water',
+      '2. Run system at target pressure/speed',
+      '3. Collect output for measured time',
+      '4. Calculate actual flow rate',
+      '5. Adjust calibration factor'
+    ];
+    acceptableTolerance: 5;      // percent
+  };
+
+  // Pattern Testing
+  patternTesting: {
+    method: 'patternator' | 'string_collection' | 'WSP_cards';
+    setup: {
+      testHeight: number;        // meters (match flight height)
+      collectorSpacing: number;  // cm
+      passes: number;            // minimum 3
+    };
+    metrics: {
+      cv: number;                // Coefficient of Variation
+      acceptable: '< 15%';
+    };
+  };
+
+  // Swath Verification
+  swathVerification: {
+    method: 'WSP_cards' | 'dye_test';
+    positions: ['center', 'edges', 'overlap_zone'];
+    analysis: 'visual' | 'scanner';
+  };
+
+  // Record Keeping
+  records: {
+    date: ISO8601Date;
+    technician: string;
+    results: object;
+    adjustments: string[];
+    nextCalibrationDue: ISO8601Date;
+  };
+}
+    </pre>
+
+    <h2>6.7 Application Records</h2>
+
+    <pre>
+// Spray Application Record
+interface ApplicationRecord {
+  // Mission Identity
+  missionId: string;
+  fieldId: string;
+  date: ISO8601DateTime;
+  operator: string;
+
+  // Product Information
+  product: {
+    name: string;
+    epaNumber: string;
+    activeIngredient: string;
+    concentration: number;
+    mixRate: number;             // per tank
+  };
+
+  // Application Parameters
+  parameters: {
+    targetRate: number;          // L/ha
+    actualRate: number;
+    totalApplied: number;        // liters
+    areaTreated: number;         // hectares
+    swathWidth: number;
+    altitude: number;
+    speed: number;
+  };
+
+  // Coverage
+  coverage: {
+    areaPlanned: GeoJSON.Polygon;
+    areaActual: GeoJSON.MultiPolygon;
+    completionPercent: number;
+    skippedAreas: GeoJSON.Polygon[];
+  };
+
+  // Conditions
+  conditions: {
+    temperature: { start: number; end: number };
+    humidity: { start: number; end: number };
+    windSpeed: { start: number; end: number };
+    windDirection: { start: number; end: number };
+  };
+
+  // Compliance
+  compliance: {
+    labelCompliance: boolean;
+    bufferMaintained: boolean;
+    rei: number;                 // Re-entry interval hours
+    phi: number;                 // Pre-harvest interval days
+    applicatorLicense: string;
+  };
+}
+    </pre>
+
+    <h2>6.8 Safety Considerations</h2>
+
+    <pre>
+// Spray Operation Safety
+interface SpraySafety {
+  // PPE Requirements
+  ppe: {
+    mixing: ['chemical_resistant_gloves', 'goggles', 'apron', 'respirator'];
+    loading: ['gloves', 'goggles'];
+    monitoring: ['basic_protection'];
+    cleanup: ['chemical_resistant_gloves', 'goggles'];
+  };
+
+  // Exclusion Zones
+  exclusionZones: {
+    activeSpray: 30;             // meters from drone
+    reEntryInterval: 'Per label';
+    bystanders: 50;              // meters minimum
+    livestock: 100;              // meters
+  };
+
+  // Emergency Procedures
+  emergency: {
+    spill: [
+      'Stop operation',
+      'Contain spill',
+      'Notify appropriate parties',
+      'Clean per label instructions'
+    ];
+    exposure: [
+      'Remove contaminated clothing',
+      'Wash affected area',
+      'Seek medical attention',
+      'Provide SDS to medical personnel'
+    ];
+    malfunction: [
+      'Land immediately',
+      'Secure aircraft',
+      'Assess contamination',
+      'Clean/decontaminate'
+    ];
+  };
+
+  // Decontamination
+  decontamination: {
+    equipment: 'Triple rinse procedure';
+    rinsate: 'Dispose per regulations';
+    containers: 'Triple rinse, recycle';
+    aircraft: 'Wash after each chemical change';
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>This chapter covered precision application systems including spray components, variable rate technology, droplet management, drift mitigation, seeding systems, calibration, record keeping, and safety. These active intervention capabilities complement sensing operations to deliver complete precision agriculture solutions as specified by the WIA-AGRICULTURAL_DRONE standard.</p>
+    </div>
+</body>
+</html>

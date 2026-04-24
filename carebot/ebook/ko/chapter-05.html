@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 5: 보안 | WIA-CAREBOT</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 5: 보안 - 사용자 프라이버시, 데이터 보호, 안전 프로토콜</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong><br>
+        - 포괄적인 데이터 프라이버시 보호 구현<br>
+        - 효과적인 비상 대응 프로토콜 설계<br>
+        - ISO 13482에 따른 물리적 안전 메커니즘 구축<br>
+        - 안전한 인증 및 접근 제어 생성
+    </div>
+
+    <h2>5.1 케어 로보틱스에서의 보안 필수성</h2>
+
+    <p>케어 로봇은 개인적인 공간에서 작동하며 민감한 건강 데이터를 처리하므로 보안과 프라이버시가 가장 중요한 관심사입니다. 통제된 환경에서 작동하는 산업용 로봇과 달리 케어 로봇은 취약한 인구의 집에서 상호작용하므로 돌봄 제공을 방해하지 않으면서 보호하는 보안 아키텍처가 필요합니다.</p>
+
+    <p>WIA-CAREBOT 보안 프레임워크는 네 가지 중요한 영역을 다룹니다: 데이터 프라이버시, 사이버보안, 물리적 안전 및 비상 대응. 각 영역은 포괄적인 보호를 보장하기 위한 특정 기술 조치와 조직 정책이 필요합니다.</p>
+
+    <h3>보안 위협 환경</h3>
+
+    <table>
+        <tr>
+            <th>위협 카테고리</th>
+            <th>예시</th>
+            <th>잠재적 영향</th>
+        </tr>
+        <tr>
+            <td>데이터 유출</td>
+            <td>건강 기록, 비디오 피드에 대한 무단 접근</td>
+            <td>프라이버시 침해, 신원 도용</td>
+        </tr>
+        <tr>
+            <td>원격 탈취</td>
+            <td>해커가 로봇 움직임이나 음성 제어</td>
+            <td>물리적 해, 심리적 고통</td>
+        </tr>
+        <tr>
+            <td>서비스 거부</td>
+            <td>비상시 로봇 작동 불가</td>
+            <td>비상 대응 지연</td>
+        </tr>
+        <tr>
+            <td>감시 악용</td>
+            <td>가족이나 직원에 의한 무단 모니터링</td>
+            <td>프라이버시 침해, 노인 학대</td>
+        </tr>
+        <tr>
+            <td>물리적 오작동</td>
+            <td>충돌, 끼임, 낙상 유발</td>
+            <td>부상 또는 사망</td>
+        </tr>
+    </table>
+
+    <h2>5.2 데이터 프라이버시 아키텍처</h2>
+
+    <p>건강 데이터 프라이버시는 개인정보보호법을 포함한 규정의 적용을 받습니다. WIA-CAREBOT은 사용자 신뢰를 구축하고 글로벌 배포를 가능하게 하기 위해 규제 최소 기준을 초과하는 프라이버시 우선 설계 원칙을 구현합니다.</p>
+
+    <h3>데이터 분류 및 처리</h3>
+
+    <pre><code>// 데이터 분류 시스템
+enum DataSensitivityLevel {
+    PUBLIC = 0,        // 로봇 상태, 일반 정보
+    INTERNAL = 1,      // 운영 데이터, 집계 통계
+    CONFIDENTIAL = 2,  // 사용자 선호도, 활동 패턴
+    RESTRICTED = 3,    // 건강 데이터, 투약 기록
+    CRITICAL = 4       // 생체 인식 데이터, 비디오 녹화
+}
+
+interface DataHandlingPolicy {
+    classification: DataSensitivityLevel;
+    encryption: {
+        atRest: EncryptionStandard;
+        inTransit: EncryptionStandard;
+    };
+    retention: {
+        duration: number;  // 일
+        automaticDeletion: boolean;
+    };
+    access: {
+        authorizedRoles: Role[];
+        requiresConsent: boolean;
+        auditLogging: boolean;
+    };
+    processing: {
+        localOnly: boolean;
+        anonymizationRequired: boolean;
+    };
+}
+
+const DataPolicies: Record&lt;string, DataHandlingPolicy&gt; = {
+    vitalSigns: {
+        classification: DataSensitivityLevel.RESTRICTED,
+        encryption: {
+            atRest: 'AES-256-GCM',
+            inTransit: 'TLS-1.3'
+        },
+        retention: { duration: 365, automaticDeletion: true },
+        access: {
+            authorizedRoles: ['user', 'caregiver', 'healthcare_provider'],
+            requiresConsent: true,
+            auditLogging: true
+        },
+        processing: { localOnly: false, anonymizationRequired: false }
+    },
+
+    videoRecording: {
+        classification: DataSensitivityLevel.CRITICAL,
+        encryption: {
+            atRest: 'AES-256-GCM',
+            inTransit: 'TLS-1.3'
+        },
+        retention: { duration: 7, automaticDeletion: true },
+        access: {
+            authorizedRoles: ['user'],  // 매우 제한적
+            requiresConsent: true,
+            auditLogging: true
+        },
+        processing: { localOnly: true, anonymizationRequired: true }
+    }
+};</code></pre>
+
+    <h3>프라이버시 보존 처리</h3>
+
+    <p>케어 로봇은 가능한 한 민감한 데이터를 로컬에서 처리하고 필요한 정보만 전송해야 합니다. 엣지 AI 기능을 통해 원시 데이터를 노출하지 않고도 정교한 분석이 가능합니다.</p>
+
+    <pre><code>// 프라이버시 보존 비전 처리
+class PrivacyPreservingVision {
+    private localModel: EdgeAIModel;
+
+    async processFrame(frame: VideoFrame): Promise&lt;ProcessedResult&gt; {
+        // 1단계: 로컬에서 필요한 특성만 추출
+        const features = await this.localModel.extractFeatures(frame);
+
+        // 2단계: 프라이버시 안전 표현 생성
+        const safeRepresentation = {
+            // 이미지 대신 자세 스켈레톤
+            bodyPose: features.poseKeypoints,
+            // 비디오 대신 활동 분류
+            activity: features.activityLabel,
+            // 얼굴 인식 대신 존재 감지
+            personPresent: features.personDetected,
+            // 정확한 위치 대신 구역 점유
+            occupiedZones: features.zoneIds,
+            // 원시 비디오 대신 파생 건강 지표
+            fallDetected: features.fallEvent,
+            mobilityScore: features.mobilityAssessment
+        };
+
+        // 3단계: 원본 프레임 즉시 삭제
+        frame.dispose();
+
+        return safeRepresentation;
+    }
+}</code></pre>
+
+    <h2>5.3 사이버보안 조치</h2>
+
+    <p>케어 로봇은 사용자 안전, 프라이버시 또는 로봇 기능을 손상시킬 수 있는 사이버 공격에 저항해야 합니다. 심층 방어 전략은 네트워크 보안, 애플리케이션 강화 및 지속적인 모니터링을 결합합니다.</p>
+
+    <h3>보안 통신 아키텍처</h3>
+
+    <pre><code># ROS 2 보안 구성
+# carebot_security/config/security_config.yaml
+
+security:
+  enable_security: true
+
+  authentication:
+    plugin: "dds_security_authentication_plugin"
+    identity_ca: "/etc/carebot/certs/identity_ca.pem"
+    certificate: "/etc/carebot/certs/robot_cert.pem"
+    private_key: "/etc/carebot/certs/robot_key.pem"
+
+  access_control:
+    plugin: "dds_security_access_control_plugin"
+    governance: "/etc/carebot/security/governance.xml"
+    permissions: "/etc/carebot/security/permissions.xml"
+
+  cryptography:
+    plugin: "dds_security_cryptography_plugin"
+    protection_kind: "ENCRYPT"
+
+network_security:
+  allowed_ports:
+    - 7400-7500  # DDS 검색
+    - 443        # 클라우드 HTTPS
+    - 8883       # TLS 상의 MQTT
+
+  vlan_id: 100  # 전용 IoT VLAN
+  internet_access: "restricted"
+  ids_enabled: true</code></pre>
+
+    <h3>인증 및 접근 제어</h3>
+
+    <pre><code>// 다단계 인증 시스템
+class CareRobotAuth {
+    async authenticateUser(userId: string, context: AuthContext): Promise&lt;AuthResult&gt; {
+        const requiredLevel = this.getRequiredAuthLevel(context.action);
+        const methods = this.selectAuthMethods(requiredLevel, context);
+
+        let confidence = 0;
+
+        for (const method of methods) {
+            const result = await method.authenticate(userId, context);
+            confidence += result.confidence * method.weight;
+
+            if (result.failed) {
+                await this.handleAuthFailure(userId, method, context);
+                return { success: false, reason: result.reason };
+            }
+        }
+
+        if (confidence >= requiredLevel.threshold) {
+            return {
+                success: true,
+                permissions: await this.getPermissions(userId, context),
+                sessionToken: await this.createSession(userId)
+            };
+        }
+
+        return { success: false, reason: 'insufficient_confidence' };
+    }
+
+    private getRequiredAuthLevel(action: string): AuthLevel {
+        const levels: Record&lt;string, AuthLevel&gt; = {
+            'view_status': { threshold: 0.5, methods: ['voice'] },
+            'change_settings': { threshold: 0.7, methods: ['voice', 'pin'] },
+            'view_health_data': { threshold: 0.8, methods: ['voice', 'pin'] },
+            'emergency_override': { threshold: 0.9, methods: ['voice', 'pin', 'biometric'] }
+        };
+        return levels[action] || levels['view_status'];
+    }
+}</code></pre>
+
+    <h2>5.4 물리적 안전 시스템</h2>
+
+    <p>ISO 13482는 개인 케어 로봇의 안전 요구사항을 수립합니다. WIA-CAREBOT은 설계, 감지 및 대응 메커니즘을 통해 해를 방지하는 다층 안전 아키텍처로 이러한 요구사항을 구현합니다.</p>
+
+    <pre><code>// ISO 13482 준수 안전 시스템
+class SafetySystem {
+    private safetyController: SafetyPLC;
+
+    async monitorContinuously(): Promise&lt;void&gt; {
+        while (true) {
+            const sensorReadings = await this.readSafetySensors();
+            const safetyState = this.evaluateSafetyState(sensorReadings);
+            await this.executeSafetyResponse(safetyState);
+            await this.safetyController.heartbeat();
+            await this.sleep(10);  // 100Hz 안전 루프
+        }
+    }
+
+    private evaluateSafetyState(readings: SensorReadings): SafetyState {
+        let state: SafetyState = 'normal';
+
+        if (readings.minHumanDistance < 0.2) {
+            state = 'emergency_stop';
+        } else if (readings.minHumanDistance < 0.5) {
+            state = 'reduced_speed';
+        }
+
+        if (readings.maxContactForce > 150) {
+            state = 'emergency_stop';
+        } else if (readings.maxContactForce > 50) {
+            state = 'compliant_stop';
+        }
+
+        if (!readings.allSensorsOperational) {
+            state = 'safe_hold';
+        }
+
+        return state;
+    }
+}</code></pre>
+
+    <h3>힘 및 충돌 한계</h3>
+
+    <table>
+        <tr>
+            <th>신체 부위</th>
+            <th>최대 준정적 힘</th>
+            <th>최대 과도 힘</th>
+        </tr>
+        <tr>
+            <td>머리/두개골</td>
+            <td>75 N</td>
+            <td>145 N</td>
+        </tr>
+        <tr>
+            <td>얼굴</td>
+            <td>65 N</td>
+            <td>130 N</td>
+        </tr>
+        <tr>
+            <td>목</td>
+            <td>145 N</td>
+            <td>290 N</td>
+        </tr>
+        <tr>
+            <td>가슴/등</td>
+            <td>140 N</td>
+            <td>280 N</td>
+        </tr>
+        <tr>
+            <td>팔/다리</td>
+            <td>210 N</td>
+            <td>420 N</td>
+        </tr>
+    </table>
+
+    <h2>5.5 비상 대응 프로토콜</h2>
+
+    <p>케어 로봇은 낙상, 의료 사건, 화재 및 보안 위협을 포함한 비상 상황에 적절하게 대응해야 합니다. 비상 대응 시스템은 대응 속도와 평가 정확도의 균형을 맞춥니다.</p>
+
+    <pre><code>// 비상 대응 조정자
+class EmergencyResponseCoordinator {
+    async executeFallResponse(event: FallEmergencyEvent): Promise&lt;void&gt; {
+        // 1단계: 음성 확인
+        await this.robot.speak("넘어지신 것 같아요. 괜찮으세요?");
+        const response = await this.robot.listenWithTimeout(15000);
+
+        if (this.isPositiveResponse(response)) {
+            await this.offerAssistance();
+            await this.notifyCaregiver('fall_detected_user_ok', event);
+            return;
+        }
+
+        // 2단계: 응답 없음 또는 부정 응답
+        await this.robot.speak("도움을 요청할게요. 필요 없으시면 '취소'라고 말씀해주세요.");
+        const cancelResponse = await this.robot.listenWithTimeout(10000);
+
+        if (this.isCancelRequest(cancelResponse)) {
+            await this.offerAssistance();
+            return;
+        }
+
+        // 3단계: 비상 연락 캐스케이드 시작
+        const contacts = await this.getEmergencyContacts();
+
+        for (const contact of contacts) {
+            const reached = await this.contactEmergency(contact, event);
+            if (reached) {
+                await this.robot.speak(`${contact.name}님께 연락했어요. 도움이 오고 있어요.`);
+                break;
+            }
+        }
+
+        // 4단계: 연락이 안 되면 응급 서비스 호출
+        if (!this.helpContacted) {
+            await this.callEmergencyServices(event);
+        }
+
+        // 5단계: 대기 중 지원 제공
+        await this.provideEmergencySupport(event);
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>챕터 요약:</strong> 케어 로보틱스의 보안과 안전은 데이터 프라이버시, 사이버보안, 물리적 안전 및 비상 대응을 포괄하는 종합적인 접근이 필요합니다. 프라이버시 우선 설계 원칙은 유익한 서비스를 제공하면서 민감한 건강 데이터를 보호합니다. 사이버보안 조치는 로봇 운영이나 사용자 프라이버시를 손상시킬 수 있는 공격을 방어합니다. ISO 13482에 따른 물리적 안전 시스템은 힘 제한과 충돌 회피를 통해 부상을 방지합니다. 비상 대응 프로토콜은 중요한 사건이 발생할 때 적절한 조치를 보장합니다.
+    </div>
+</body>
+</html>

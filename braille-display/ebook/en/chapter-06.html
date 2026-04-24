@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Chapter 6: Phase 3 - Communication Protocol | WIA Braille Display</title>
+</head>
+<body>
+
+<h1>⠿ Chapter 6: Phase 3 - Communication Protocol</h1>
+
+<p><em>Part III: Technical Specification</em></p>
+
+<hr>
+
+<h2>Introduction</h2>
+
+<p>Phase 3 defines the low-level communication protocols that enable the API (Phase 2) to interact with physical Braille display hardware. This chapter covers the technical details of data transmission over USB HID, Bluetooth LE, and serial connections, as well as integration with existing systems like BRLTTY.</p>
+
+<p>Understanding these protocols is essential for device manufacturers, driver developers, and those implementing the WIA standard at the system level. Application developers using the high-level API typically don't need this knowledge, but it provides valuable insight into how the system works under the hood.</p>
+
+<blockquote>
+<p><strong>Protocol Goal:</strong> Achieve sub-100ms latency for display updates with robust error recovery, while maintaining compatibility with diverse hardware and operating systems.</p>
+</blockquote>
+
+<hr>
+
+<h2>6.1 Protocol Architecture Overview</h2>
+
+<h3>6.1.1 Layered Protocol Stack</h3>
+
+<p>The WIA Braille Display protocol uses a layered architecture:</p>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Layer</th>
+<th>Purpose</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Application Layer</strong></td>
+<td>High-level API calls</td>
+<td>display.write(), display.clear()</td>
+</tr>
+<tr>
+<td><strong>Command Layer</strong></td>
+<td>Protocol messages</td>
+<td>WRITE_CELLS, READ_KEYS, GET_INFO</td>
+</tr>
+<tr>
+<td><strong>Transport Layer</strong></td>
+<td>Data framing and sequencing</td>
+<td>Packet assembly, checksums, ACK/NAK</td>
+</tr>
+<tr>
+<td><strong>Physical Layer</strong></td>
+<td>Hardware communication</td>
+<td>USB HID, Bluetooth LE GATT, Serial UART</td>
+</tr>
+</tbody>
+</table>
+
+<h3>6.1.2 Transport Options</h3>
+
+<p>WIA supports three primary transport mechanisms:</p>
+
+<ol>
+<li><strong>USB HID</strong> - Universal Serial Bus Human Interface Device (preferred for desktop/laptop)</li>
+<li><strong>Bluetooth LE</strong> - Bluetooth Low Energy with GATT services (preferred for mobile/wireless)</li>
+<li><strong>Serial</strong> - RS-232/UART for legacy devices and embedded systems</li>
+</ol>
+
+<p>All transports use the same command layer protocol, ensuring consistent behavior regardless of connection type.</p>
+
+<h3>6.1.3 Design Requirements</h3>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Target</th>
+<th>Critical?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Update Latency</td>
+<td>&lt; 100ms</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Key Event Latency</td>
+<td>&lt; 50ms</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Packet Loss Recovery</td>
+<td>&lt; 200ms</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Connection Establishment</td>
+<td>&lt; 2s</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Battery Life (Bluetooth)</td>
+<td>&gt; 8 hours</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Concurrent Connections</td>
+<td>1 device</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>6.2 USB HID Protocol</h2>
+
+<h3>6.2.1 HID Overview</h3>
+
+<p>USB HID (Human Interface Device) is the preferred protocol for wired connections. Benefits include:</p>
+
+<ul>
+<li>No driver installation required (OS provides generic HID driver)</li>
+<li>Low latency (~1-10ms)</li>
+<li>High reliability (USB error correction)</li>
+<li>Power delivery (bus-powered devices possible)</li>
+<li>Plug-and-play device discovery</li>
+</ul>
+
+<h3>6.2.2 HID Device Descriptor</h3>
+
+<p>WIA Braille displays identify themselves with specific USB descriptors:</p>
+
+<pre>
+USB Device Descriptor:
+  bcdUSB:             2.00
+  bDeviceClass:       0x00  (Interface-specific)
+  bDeviceSubClass:    0x00
+  bDeviceProtocol:    0x00
+  idVendor:           0x####  (Manufacturer assigned)
+  idProduct:          0x####  (Product specific)
+  bcdDevice:          1.00
+  iManufacturer:      1  "Manufacturer Name"
+  iProduct:           2  "WIA Braille Display Model"
+  iSerialNumber:      3  "SERIAL123456"
+  bNumConfigurations: 1
+
+USB HID Report Descriptor:
+  Usage Page:         0x41  (Braille Display)
+  Usage:              0x01  (Braille Display)
+  Collection:         0x01  (Application)
+    Report ID:        0x01
+    Input (Data):     64 bytes  (keys, routing)
+    Output (Data):    64 bytes  (cell patterns)
+    Feature (Data):   64 bytes  (device info, config)
+</pre>
+
+<h3>6.2.3 HID Report Structure</h3>
+
+<p>WIA uses three types of HID reports:</p>
+
+<h4>Input Report (Device → Host)</h4>
+
+<pre>
+Byte 0:     Report ID (0x01 = keys, 0x02 = routing)
+Byte 1:     Sequence number (0-255, wraps)
+Byte 2-3:   Timestamp (milliseconds, low/high byte)
+Byte 4-63:  Payload (key states, routing button states)
+
+Example - Key Press Report:
+[01] [42] [A3 12] [15 00 00 00 ...]
+ |    |    |  |    └─ Key bitmap (bit 0 = key 0, etc.)
+ |    |    └──┴─ Timestamp: 0x12A3 = 4771ms
+ |    └─ Sequence: 66
+ └─ Report ID: 0x01 (key event)
+</pre>
+
+<h4>Output Report (Host → Device)</h4>
+
+<pre>
+Byte 0:     Report ID (0x10 = write cells, 0x11 = set cursor)
+Byte 1:     Sequence number
+Byte 2:     Command flags
+Byte 3:     Payload length
+Byte 4-63:  Payload (cell patterns, configuration)
+
+Example - Write Cells:
+[10] [55] [00] [28] [00 00 20 10 08 04 02 01 ...]
+ |    |    |    |    └─ Cell patterns (8-bit dot patterns)
+ |    |    |    └─ Length: 40 cells
+ |    |    └─ Flags: 0x00 (normal write)
+ |    └─ Sequence: 85
+ └─ Report ID: 0x10 (write cells)
+</pre>
+
+<h4>Feature Report (Bidirectional)</h4>
+
+<pre>
+Byte 0:     Report ID (0x20 = device info, 0x21 = config)
+Byte 1:     Request/Response code
+Byte 2-63:  Data
+
+Example - Device Info Request:
+[20] [01] [00 00 00 ...]
+ |    └─ Request: 0x01 (get device info)
+ └─ Report ID: 0x20 (device info)
+
+Example - Device Info Response:
+[20] [81] [28 00 08 01 ...]
+ |    |    |  |  |  └─ Feature flags
+ |    |    |  |  └─ Dot format: 0x08 (8-dot)
+ |    |    |  └─ Reserved
+ |    |    └─ Cell count: 40
+ |    └─ Response: 0x81 (device info response)
+ └─ Report ID: 0x20
+</pre>
+
+<h3>6.2.4 Command Set</h3>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Report ID</th>
+<th>Command</th>
+<th>Direction</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0x10</td>
+<td>WRITE_CELLS</td>
+<td>Host → Device</td>
+<td>Update Braille cell patterns</td>
+</tr>
+<tr>
+<td>0x11</td>
+<td>SET_CURSOR</td>
+<td>Host → Device</td>
+<td>Set cursor position and state</td>
+</tr>
+<tr>
+<td>0x12</td>
+<td>CLEAR_DISPLAY</td>
+<td>Host → Device</td>
+<td>Clear all cells</td>
+</tr>
+<tr>
+<td>0x13</td>
+<td>SET_CONFIG</td>
+<td>Host → Device</td>
+<td>Configure device settings</td>
+</tr>
+<tr>
+<td>0x01</td>
+<td>KEY_EVENT</td>
+<td>Device → Host</td>
+<td>Navigation/function key press</td>
+</tr>
+<tr>
+<td>0x02</td>
+<td>ROUTING_EVENT</td>
+<td>Device → Host</td>
+<td>Routing button press</td>
+</tr>
+<tr>
+<td>0x03</td>
+<td>PERKIN_EVENT</td>
+<td>Device → Host</td>
+<td>Perkin key (Braille input)</td>
+</tr>
+<tr>
+<td>0x20</td>
+<td>DEVICE_INFO</td>
+<td>Bidirectional</td>
+<td>Request/response device capabilities</td>
+</tr>
+<tr>
+<td>0x21</td>
+<td>FIRMWARE_UPDATE</td>
+<td>Host → Device</td>
+<td>Firmware update packets</td>
+</tr>
+</tbody>
+</table>
+
+<h3>6.2.5 Error Handling</h3>
+
+<p>USB HID provides built-in error detection (CRC), but the protocol adds additional checks:</p>
+
+<pre>
+// Sequence number validation
+if (report.sequence != (lastSequence + 1) % 256) {
+    // Packet lost or out of order
+    requestRetransmit(lastSequence + 1);
+}
+
+// Timestamp validation (detect stale packets)
+const age = currentTime - report.timestamp;
+if (age > 1000) {  // More than 1 second old
+    logWarning('Stale packet received');
+    discard();
+}
+
+// Length validation
+if (report.payloadLength > MAX_PAYLOAD) {
+    sendError(ERROR_INVALID_LENGTH);
+    discard();
+}
+</pre>
+
+<h3>6.2.6 Performance Optimization</h3>
+
+<p>USB HID polling interval affects latency:</p>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Polling Interval</th>
+<th>Latency</th>
+<th>CPU Usage</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1ms</td>
+<td>~1-2ms</td>
+<td>High</td>
+<td>High-performance systems</td>
+</tr>
+<tr>
+<td>8ms</td>
+<td>~8-16ms</td>
+<td>Medium</td>
+<td>Recommended default</td>
+</tr>
+<tr>
+<td>16ms</td>
+<td>~16-32ms</td>
+<td>Low</td>
+<td>Battery-powered hosts</td>
+</tr>
+</tbody>
+</table>
+
+<p>WIA recommends 8ms polling (125Hz) as optimal balance between latency and efficiency.</p>
+
+<hr>
+
+<h2>6.3 Bluetooth LE Protocol</h2>
+
+<h3>6.3.1 Bluetooth LE Overview</h3>
+
+<p>Bluetooth Low Energy provides wireless connectivity optimized for low power consumption:</p>
+
+<ul>
+<li>Range: 10-50 meters (depending on environment)</li>
+<li>Power: &lt; 15mA average current (8+ hours on 400mAh battery)</li>
+<li>Latency: 7.5ms - 4000ms (connection interval dependent)</li>
+<li>Throughput: ~5-10 KB/s typical</li>
+</ul>
+
+<h3>6.3.2 GATT Service Definition</h3>
+
+<p>WIA Braille displays expose a custom GATT (Generic Attribute Profile) service:</p>
+
+<pre>
+Service: WIA Braille Display Service
+UUID: 0000FEB0-0000-1000-8000-00805F9B34FB
+
+Characteristics:
+
+1. Device Information (Read)
+   UUID: 0000FEB1-0000-1000-8000-00805F9B34FB
+   Properties: Read
+   Value: Device capabilities (cell count, features, etc.)
+
+2. Cell Data (Write, Notify)
+   UUID: 0000FEB2-0000-1000-8000-00805F9B34FB
+   Properties: Write, Notify
+   Value: Braille cell patterns (up to 244 bytes per packet)
+
+3. Key Events (Notify)
+   UUID: 0000FEB3-0000-1000-8000-00805F9B34FB
+   Properties: Notify
+   Value: Key press events
+
+4. Routing Events (Notify)
+   UUID: 0000FEB4-0000-1000-8000-00805F9B34FB
+   Properties: Notify
+   Value: Routing button events
+
+5. Control (Write, Read, Notify)
+   UUID: 0000FEB5-0000-1000-8000-00805F9B34FB
+   Properties: Write, Read, Notify
+   Value: Commands and status
+
+6. Configuration (Write, Read)
+   UUID: 0000FEB6-0000-1000-8000-00805F9B34FB
+   Properties: Write, Read
+   Value: Device configuration
+</pre>
+
+<h3>6.3.3 Connection Parameters</h3>
+
+<p>Optimized connection parameters for Braille displays:</p>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Connection Interval</td>
+<td>15ms (12 units)</td>
+<td>Balance latency/power</td>
+</tr>
+<tr>
+<td>Slave Latency</td>
+<td>0</td>
+<td>Minimize key event delay</td>
+</tr>
+<tr>
+<td>Supervision Timeout</td>
+<td>2000ms</td>
+<td>Detect disconnection quickly</td>
+</tr>
+<tr>
+<td>MTU Size</td>
+<td>247 bytes</td>
+<td>Support 40+ cells in one packet</td>
+</tr>
+</tbody>
+</table>
+
+<h3>6.3.4 Data Transmission</h3>
+
+<h4>Writing Cells</h4>
+
+<pre>
+// Write to Cell Data characteristic
+const packet = new Uint8Array([
+    0x10,              // Packet type: WRITE_CELLS
+    0x00,              // Start cell index
+    0x28,              // Cell count (40)
+    0x00,              // Flags
+    // 40 cell patterns (8-bit each)
+    0x00, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, ...
+]);
+
+await cellDataCharacteristic.writeValue(packet);
+</pre>
+
+<h4>Receiving Key Events</h4>
+
+<pre>
+// Subscribe to Key Events characteristic
+keyEventsCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+    const data = new Uint8Array(event.target.value.buffer);
+
+    const packetType = data[0];  // 0x01 = key event
+    const keyCode = data[1];     // Key identifier
+    const eventType = data[2];   // 0 = up, 1 = down
+    const modifiers = data[3];   // Modifier key bitmap
+
+    handleKeyEvent(keyCode, eventType, modifiers);
+});
+
+await keyEventsCharacteristic.startNotifications();
+</pre>
+
+<h3>6.3.5 Power Management</h3>
+
+<p>Bluetooth LE power optimization strategies:</p>
+
+<pre>
+// Connection interval adjustment based on activity
+function adjustConnectionInterval(activity) {
+    if (activity === 'active_reading') {
+        // User actively reading - prioritize responsiveness
+        requestConnectionInterval(7.5);  // 7.5ms = high performance
+    } else if (activity === 'idle') {
+        // No user input for 30 seconds - save power
+        requestConnectionInterval(100);  // 100ms = power saving
+    } else {
+        // Default balanced mode
+        requestConnectionInterval(15);   // 15ms = balanced
+    }
+}
+
+// Peripheral sleep mode
+function enterSleepMode() {
+    // Disconnect Bluetooth (wake on button press)
+    // OR
+    // Use very long connection interval (1000ms+)
+    // Device wakes on any key press and requests faster interval
+}
+</pre>
+
+<h3>6.3.6 Security</h3>
+
+<p>Bluetooth LE security measures:</p>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Feature</th>
+<th>Implementation</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pairing</td>
+<td>Just Works or Passkey</td>
+<td>Prevent unauthorized access</td>
+</tr>
+<tr>
+<td>Bonding</td>
+<td>Store long-term keys</td>
+<td>Automatic reconnection</td>
+</tr>
+<tr>
+<td>Encryption</td>
+<td>AES-128 CCM</td>
+<td>Protect data in transit</td>
+</tr>
+<tr>
+<td>Authentication</td>
+<td>MITM protection</td>
+<td>Prevent eavesdropping</td>
+</tr>
+</tbody>
+</table>
+
+<pre>
+// Pairing with passkey
+async function pairDevice(device) {
+    // Device displays 6-digit passkey on Braille cells
+    const passkey = await device.getPasskey();
+
+    // User enters passkey on host
+    const userPasskey = await promptUserForPasskey();
+
+    if (passkey === userPasskey) {
+        await device.completePairing();
+        // Store bond for future connections
+    } else {
+        throw new Error('Passkey mismatch');
+    }
+}
+</pre>
+
+<hr>
+
+<h2>6.4 Serial Communication</h2>
+
+<h3>6.4.1 Serial Overview</h3>
+
+<p>Serial communication (RS-232/UART) supports legacy devices and embedded systems:</p>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Baud Rate</td>
+<td>115200 bps (default), 9600-921600 supported</td>
+</tr>
+<tr>
+<td>Data Bits</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Parity</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Stop Bits</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Flow Control</td>
+<td>RTS/CTS (hardware) or XON/XOFF (software)</td>
+</tr>
+</tbody>
+</table>
+
+<h3>6.4.2 Packet Framing</h3>
+
+<p>Serial communication requires explicit framing (unlike USB/Bluetooth):</p>
+
+<pre>
+Packet Structure:
+┌────────┬──────────┬─────────┬─────────┬──────────┬─────────┐
+│ SYNC   │ LENGTH   │ SEQ     │ COMMAND │ PAYLOAD  │ CHECKSUM│
+│ 2 bytes│ 1 byte   │ 1 byte  │ 1 byte  │ 0-255 B  │ 2 bytes │
+└────────┴──────────┴─────────┴─────────┴──────────┴─────────┘
+
+SYNC:      0xAA 0x55 (packet start marker)
+LENGTH:    Payload length (0-255)
+SEQ:       Sequence number (0-255, wraps)
+COMMAND:   Command code
+PAYLOAD:   Command-specific data
+CHECKSUM:  CRC-16/CCITT
+
+Example - Write Cells Command:
+AA 55 2A 00 10 00 28 [40 cell patterns...] [CRC-16]
+└─┬─┘ |  |  |  └─┬─┘
+SYNC  |  |  |    └─ Start cell: 0, Count: 40
+      |  |  └─ Command: 0x10 (WRITE_CELLS)
+      |  └─ Sequence: 0
+      └─ Length: 42 bytes (2 header + 40 cells)
+</pre>
+
+<h3>6.4.3 Error Detection</h3>
+
+<pre>
+// CRC-16/CCITT implementation
+function calculateCRC16(data) {
+    let crc = 0xFFFF;
+
+    for (let byte of data) {
+        crc ^= byte << 8;
+        for (let bit = 0; bit < 8; bit++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc = crc << 1;
+            }
+        }
+    }
+
+    return crc & 0xFFFF;
+}
+
+// Verify received packet
+function verifyPacket(packet) {
+    const receivedCRC = (packet[packet.length - 2] << 8) |
+                        packet[packet.length - 1];
+    const calculatedCRC = calculateCRC16(packet.slice(0, -2));
+
+    return receivedCRC === calculatedCRC;
+}
+</pre>
+
+<h3>6.4.4 Flow Control</h3>
+
+<p>Hardware flow control prevents buffer overruns:</p>
+
+<pre>
+// RTS/CTS flow control
+void configureSerial() {
+    serial.setBaudRate(115200);
+    serial.setFlowControl(FLOW_CONTROL_RTS_CTS);
+
+    // Device asserts CTS when ready to receive
+    // Device deasserts CTS when buffer nearly full
+    // Host monitors CTS and stops sending when deasserted
+}
+
+// Software flow control (if hardware unavailable)
+void handleXonXoff() {
+    if (receivedByte == XON) {   // 0x11
+        resumeTransmission();
+    }
+    if (receivedByte == XOFF) {  // 0x13
+        pauseTransmission();
+    }
+}
+</pre>
+
+<hr>
+
+<h2>6.5 BRLTTY Integration</h2>
+
+<h3>6.5.1 BRLTTY Overview</h3>
+
+<p>BRLTTY (Braille TTY) is a widely-used daemon for Linux that provides Braille display support. WIA integrates with BRLTTY for maximum compatibility.</p>
+
+<h3>6.5.2 WIA BRLTTY Driver</h3>
+
+<p>The WIA BRLTTY driver implements the BRLTTY driver API:</p>
+
+<pre>
+// brltty-driver-wia.c
+#include "brltty.h"
+
+static const ProtocolEntry protocolTable[] = {
+    { .name = "USB HID",
+      .open = openUsbHidConnection,
+      .close = closeUsbHidConnection },
+    { .name = "Bluetooth LE",
+      .open = openBluetoothConnection,
+      .close = closeBluetoothConnection },
+    { .name = NULL }
+};
+
+static int brl_construct(BrailleDisplay *brl, char **parameters) {
+    // Initialize WIA SDK
+    WiaBrailleDisplay *display = wia_braille_display_new();
+
+    // Discover and connect
+    if (!wia_braille_display_connect(display)) {
+        return 0;  // Failure
+    }
+
+    // Get device info
+    WiaDeviceInfo *info = wia_braille_display_get_info(display);
+    brl->textColumns = info->cellCount;
+    brl->textRows = 1;
+
+    // Store display handle
+    brl->data = display;
+
+    return 1;  // Success
+}
+
+static void brl_destruct(BrailleDisplay *brl) {
+    WiaBrailleDisplay *display = brl->data;
+    wia_braille_display_disconnect(display);
+    wia_braille_display_free(display);
+}
+
+static int brl_writeWindow(BrailleDisplay *brl, const wchar_t *text) {
+    WiaBrailleDisplay *display = brl->data;
+
+    // Convert text to Braille
+    uint8_t cells[brl->textColumns];
+    for (int i = 0; i < brl->textColumns; i++) {
+        cells[i] = convertToBraille(text[i]);
+    }
+
+    // Write to display
+    return wia_braille_display_write_cells(display, cells, brl->textColumns);
+}
+
+static int brl_readCommand(BrailleDisplay *brl, KeyTableCommandContext context) {
+    WiaBrailleDisplay *display = brl->data;
+
+    // Poll for key events
+    WiaKeyEvent *event = wia_braille_display_read_key(display, 100);  // 100ms timeout
+    if (!event) {
+        return EOF;  // No key pressed
+    }
+
+    // Map WIA key to BRLTTY command
+    return mapKeyToCommand(event);
+}
+</pre>
+
+<h3>6.5.3 Configuration</h3>
+
+<p>BRLTTY configuration for WIA devices:</p>
+
+<pre>
+# /etc/brltty.conf
+braille-driver wia
+braille-device usb:      # Auto-detect USB devices
+# braille-device bluetooth:XX:XX:XX:XX:XX:XX  # Specific Bluetooth device
+
+# Text table (translation)
+text-table en-us-g2      # English Grade 2 Braille
+
+# Attributes table (formatting)
+attributes-table left_right
+
+# Auto-start
+api-parameters Server=yes
+</pre>
+
+<h3>6.5.4 Hot-Plug Support</h3>
+
+<pre>
+// udev rule for automatic device detection
+// /etc/udev/rules.d/90-wia-braille.rules
+ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:03:*", \
+    ENV{ID_VENDOR_ID}=="####", \
+    RUN+="/usr/bin/brltty -b wia -d usb:"
+
+// Systemd service
+[Unit]
+Description=BRLTTY - WIA Braille Display Service
+After=systemd-udev-settle.service
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/brltty -b wia
+
+[Install]
+WantedBy=multi-user.target
+</pre>
+
+<hr>
+
+<h2>6.6 Message Formats and Commands</h2>
+
+<h3>6.6.1 Command Reference</h3>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Command</th>
+<th>Code</th>
+<th>Request Format</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET_INFO</td>
+<td>0x00</td>
+<td>[code]</td>
+<td>[cell_count][dot_format][features...]</td>
+</tr>
+<tr>
+<td>WRITE_CELLS</td>
+<td>0x10</td>
+<td>[code][start][count][cells...]</td>
+<td>[ack]</td>
+</tr>
+<tr>
+<td>READ_CELLS</td>
+<td>0x11</td>
+<td>[code][start][count]</td>
+<td>[cells...]</td>
+</tr>
+<tr>
+<td>CLEAR_CELLS</td>
+<td>0x12</td>
+<td>[code][start][count]</td>
+<td>[ack]</td>
+</tr>
+<tr>
+<td>SET_CURSOR</td>
+<td>0x13</td>
+<td>[code][position][visible]</td>
+<td>[ack]</td>
+</tr>
+<tr>
+<td>GET_KEYS</td>
+<td>0x20</td>
+<td>[code]</td>
+<td>[key_states...]</td>
+</tr>
+<tr>
+<td>SET_CONFIG</td>
+<td>0x30</td>
+<td>[code][config_id][value]</td>
+<td>[ack]</td>
+</tr>
+<tr>
+<td>GET_CONFIG</td>
+<td>0x31</td>
+<td>[code][config_id]</td>
+<td>[value]</td>
+</tr>
+<tr>
+<td>RESET</td>
+<td>0xF0</td>
+<td>[code]</td>
+<td>[ack]</td>
+</tr>
+<tr>
+<td>FIRMWARE_UPDATE</td>
+<td>0xF1</td>
+<td>[code][offset][data...]</td>
+<td>[ack][progress]</td>
+</tr>
+</tbody>
+</table>
+
+<h3>6.6.2 Device Info Structure</h3>
+
+<pre>
+GET_INFO Response (32 bytes):
+┌──────────────────────────────────────────────────────────┐
+│ Offset │ Size │ Field              │ Description        │
+├────────┼──────┼────────────────────┼────────────────────┤
+│ 0      │ 2    │ Protocol Version   │ 0x0100 = v1.0      │
+│ 2      │ 1    │ Cell Count         │ 1-255              │
+│ 3      │ 1    │ Dot Format         │ 6 or 8             │
+│ 4      │ 4    │ Feature Flags      │ Bit field          │
+│ 8      │ 2    │ Firmware Version   │ Major.Minor        │
+│ 10     │ 2    │ Hardware Version   │ Major.Minor        │
+│ 12     │ 16   │ Serial Number      │ ASCII string       │
+│ 28     │ 4    │ Reserved           │ Future use         │
+└────────┴──────┴────────────────────┴────────────────────┘
+
+Feature Flags (32-bit):
+Bit 0:  Routing keys
+Bit 1:  Navigation keys
+Bit 2:  Perkin keys
+Bit 3:  Vibration motor
+Bit 4:  Multi-line (rows > 1)
+Bit 5:  Cursor routing
+Bit 6:  Pan buttons
+Bit 7:  Function keys
+Bit 8-31: Reserved
+</pre>
+
+<h3>6.6.3 Acknowledgment Protocol</h3>
+
+<pre>
+// Request-Response pattern
+Host:   [WRITE_CELLS][seq=5][data...]
+Device: [ACK][seq=5][status=OK]
+
+// Or with error:
+Host:   [WRITE_CELLS][seq=6][invalid_data...]
+Device: [NAK][seq=6][error=INVALID_LENGTH]
+
+// Timeout handling
+Host:   [WRITE_CELLS][seq=7][data...]
+        ... wait 200ms ...
+        No response received
+        [RETRANSMIT][seq=7][data...]
+Device: [ACK][seq=7][status=OK]
+</pre>
+
+<hr>
+
+<h2>6.7 Security Considerations</h2>
+
+<h3>6.7.1 Threat Model</h3>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Threat</th>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Eavesdropping</td>
+<td>Medium</td>
+<td>Bluetooth encryption, USB physical security</td>
+</tr>
+<tr>
+<td>Unauthorized Control</td>
+<td>Low</td>
+<td>Pairing required, OS permissions</td>
+</tr>
+<tr>
+<td>Malicious Firmware</td>
+<td>High</td>
+<td>Signed firmware updates, secure boot</td>
+</tr>
+<tr>
+<td>Denial of Service</td>
+<td>Low</td>
+<td>Rate limiting, watchdog timers</td>
+</tr>
+<tr>
+<td>Privacy Leakage</td>
+<td>Medium</td>
+<td>No logging of displayed content</td>
+</tr>
+</tbody>
+</table>
+
+<h3>6.7.2 Firmware Update Security</h3>
+
+<pre>
+// Signed firmware update process
+1. Host verifies firmware signature
+   - RSA-2048 or ECDSA-256
+   - Signed by manufacturer
+
+2. Device enters bootloader mode
+   - Only accepts signed updates
+   - Validates signature before flashing
+
+3. Cryptographic hash verification
+   - SHA-256 of firmware image
+   - Prevents corrupted updates
+
+4. Rollback protection
+   - Version number must increase
+   - Prevent downgrade attacks
+
+Example:
+{
+    "firmwareVersion": "2.1.0",
+    "signatureAlgorithm": "RSA-2048",
+    "signature": "base64_encoded_signature",
+    "sha256": "abcdef123456...",
+    "minBootloaderVersion": "1.0.0"
+}
+</pre>
+
+<h3>6.7.3 Privacy Protection</h3>
+
+<pre>
+// Privacy-preserving guidelines
+
+1. No content logging
+   - Devices MUST NOT log displayed content
+   - Temporary buffer only (cleared on disconnect)
+
+2. Anonymous telemetry only
+   - Usage statistics: session duration, key presses (count only)
+   - NO content of what was displayed
+   - User opt-in required
+
+3. Secure disposal
+   - Clear all buffers on power-off
+   - Factory reset clears Bluetooth bonding keys
+</pre>
+
+<hr>
+
+<h2>6.8 Latency Requirements</h2>
+
+<h3>6.8.1 Latency Budget</h3>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Operation</th>
+<th>Target</th>
+<th>Maximum</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Display Update</td>
+<td>50ms</td>
+<td>100ms</td>
+<td>User-perceptible threshold</td>
+</tr>
+<tr>
+<td>Key Event</td>
+<td>20ms</td>
+<td>50ms</td>
+<td>Typing feedback</td>
+</tr>
+<tr>
+<td>Routing Event</td>
+<td>20ms</td>
+<td>50ms</td>
+<td>Touch feedback</td>
+</tr>
+<tr>
+<td>Connection Establish</td>
+<td>1000ms</td>
+<td>2000ms</td>
+<td>User tolerance</td>
+</tr>
+<tr>
+<td>Device Discovery</td>
+<td>500ms</td>
+<td>1000ms</td>
+<td>Per device</td>
+</tr>
+</tbody>
+</table>
+
+<h3>6.8.2 Latency Breakdown (USB HID)</h3>
+
+<pre>
+Total Latency: API call → Cell update
+
+1. API Processing:        ~1-5ms
+   - Input validation
+   - Format conversion
+
+2. USB Transfer:          ~1-8ms
+   - Polling interval dependent
+   - 8ms interval = worst case 8ms
+
+3. Device Processing:     ~5-20ms
+   - Firmware parsing
+   - Piezo actuator control
+
+4. Physical Update:       ~20-50ms
+   - Mechanical pin movement
+   - Varies by hardware
+
+Total: 27-83ms (well under 100ms target)
+</pre>
+
+<h3>6.8.3 Latency Optimization Techniques</h3>
+
+<pre>
+// Batch updates
+function optimizedUpdate() {
+    // Bad: Multiple individual updates
+    for (let i = 0; i < 40; i++) {
+        await display.writeCell(i, pattern[i]);  // 40 round trips!
+    }
+
+    // Good: Single batched update
+    await display.writeCells(pattern);  // 1 round trip
+}
+
+// Differential updates
+function updateOnlyChanged(oldCells, newCells) {
+    const changes = [];
+    for (let i = 0; i < newCells.length; i++) {
+        if (oldCells[i] !== newCells[i]) {
+            changes.push({ index: i, value: newCells[i] });
+        }
+    }
+
+    // Only send changed cells
+    await display.writeCellsPartial(changes);
+}
+
+// Predictive pre-loading
+function preloadNextPage(content, currentPage) {
+    // While user reads current page, prepare next
+    const nextPage = content.getPage(currentPage + 1);
+    // Buffer but don't display yet
+    display.bufferCells(nextPage);
+
+    // On "next" key, instant display (already buffered)
+}
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<p>Phase 3 of the WIA Braille Display Standard defines the communication protocols that bridge the API layer with physical hardware. Key points:</p>
+
+<ul>
+<li><strong>USB HID</strong> - Preferred wired protocol with low latency, no driver installation, and robust error handling</li>
+<li><strong>Bluetooth LE</strong> - Wireless protocol optimized for low power with GATT services and secure pairing</li>
+<li><strong>Serial</strong> - Legacy support for older devices with explicit packet framing and flow control</li>
+<li><strong>BRLTTY Integration</strong> - Seamless compatibility with Linux systems through driver implementation</li>
+<li><strong>Message Formats</strong> - Comprehensive command set for device control and status reporting</li>
+<li><strong>Security</strong> - Encryption, signed firmware updates, and privacy protection measures</li>
+<li><strong>Latency</strong> - Sub-100ms update targets with optimization techniques for real-time responsiveness</li>
+</ul>
+
+<p>Understanding these protocols enables manufacturers to build compliant devices and developers to troubleshoot low-level issues.</p>
+
+<hr>
+
+<h2>Review Questions</h2>
+
+<ol>
+<li>What are the three transport mechanisms supported by WIA, and when should each be used?</li>
+<li>Explain the structure of a USB HID report for the WIA Braille Display.</li>
+<li>Why is Bluetooth LE preferred over classic Bluetooth for Braille displays?</li>
+<li>What GATT characteristics does the WIA Bluetooth service expose?</li>
+<li>How does serial communication implement packet framing, and why is it necessary?</li>
+<li>What is BRLTTY, and why is WIA integration important for Linux users?</li>
+<li>Describe the acknowledgment protocol for reliable command execution.</li>
+<li>What security measures protect against malicious firmware updates?</li>
+<li>What is the target latency for display updates, and why?</li>
+<li>How can differential updates reduce latency and bandwidth?</li>
+</ol>
+
+<hr>
+
+<h2>Looking Ahead: Chapter 7</h2>
+
+<p>With the communication protocol established, Chapter 7 explores Phase 4: Ecosystem Integration. We'll examine how WIA Braille displays integrate with major screen readers including NVDA, JAWS, VoiceOver, and TalkBack. You'll learn integration patterns, driver development techniques, and best practices for providing consistent Braille output across platforms and accessibility tools.</p>
+
+<hr>
+
+<h2>Navigation</h2>
+
+<p>
+<a href="chapter-05.html">← Previous: Chapter 5 - Phase 2: API Interface Standard</a> |
+<a href="index.html">Table of Contents</a> |
+<a href="chapter-07.html">Next: Chapter 7 - Phase 4: Ecosystem Integration →</a>
+</p>
+
+<hr>
+
+<p><strong>弘益人間 (Hongik Ingan) - Benefit All Humanity</strong></p>
+
+<p><em>Copyright 2025 SmileStory Inc. / WIA - Released under MIT License</em></p>
+</body>
+</html>

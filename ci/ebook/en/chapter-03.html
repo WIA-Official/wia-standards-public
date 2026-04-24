@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Build Systems | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Build Systems and Dependency Management</h1>
+
+    <p>Build systems form the engine of any CI pipeline, transforming source code into deployable artifacts. This chapter covers build automation across technology stacks, dependency management strategies, and caching techniques that dramatically improve build performance.</p>
+
+    <h2>Build System Fundamentals</h2>
+
+    <p>A build system orchestrates the compilation, transformation, and packaging of source code. Modern build systems must handle complex dependency graphs, support incremental builds, and integrate seamlessly with CI platforms.</p>
+
+    <h3>Build System Characteristics</h3>
+
+    <table>
+        <tr>
+            <th>Characteristic</th>
+            <th>Description</th>
+            <th>Impact</th>
+        </tr>
+        <tr>
+            <td>Deterministic</td>
+            <td>Same inputs produce identical outputs</td>
+            <td>Reproducible builds</td>
+        </tr>
+        <tr>
+            <td>Incremental</td>
+            <td>Only rebuild changed components</td>
+            <td>Faster iteration</td>
+        </tr>
+        <tr>
+            <td>Parallel</td>
+            <td>Execute independent tasks concurrently</td>
+            <td>Reduced build time</td>
+        </tr>
+        <tr>
+            <td>Cacheable</td>
+            <td>Store and reuse previous build outputs</td>
+            <td>Dramatic speedups</td>
+        </tr>
+        <tr>
+            <td>Hermetic</td>
+            <td>Isolated from external environment</td>
+            <td>Consistent results</td>
+        </tr>
+    </table>
+
+    <h2>Language-Specific Build Systems</h2>
+
+    <h3>JavaScript/TypeScript with npm/pnpm</h3>
+
+    <pre><code># package.json - Build Configuration
+{
+  "name": "wia-ci-demo",
+  "version": "1.0.0",
+  "scripts": {
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean",
+    "build": "tsc && npm run build:assets",
+    "build:assets": "copyfiles -u 1 src/**/*.json dist/",
+    "build:prod": "NODE_ENV=production npm run build",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "rimraf": "^5.0.0",
+    "copyfiles": "^2.0.0"
+  }
+}</code></pre>
+
+    <pre><code># GitHub Actions - Node.js Build
+name: Node.js CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build:prod
+
+      - name: Test
+        run: pnpm test:coverage</code></pre>
+
+    <h3>Java/Kotlin with Gradle</h3>
+
+    <pre><code>// build.gradle.kts - Gradle Build Configuration
+plugins {
+    kotlin("jvm") version "1.9.0"
+    id("org.springframework.boot") version "3.2.0"
+    id("io.spring.dependency-management") version "1.1.0"
+}
+
+group = "com.wia.ci"
+version = "1.0.0"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
+tasks.named<Jar>("jar") {
+    manifest {
+        attributes["Main-Class"] = "com.wia.ci.ApplicationKt"
+    }
+}</code></pre>
+
+    <pre><code># GitHub Actions - Gradle Build
+name: Java CI with Gradle
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Run tests
+        run: ./gradlew test
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: build/reports/tests/</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI Build Standard:</strong> All build configurations must be declarative and version-controlled. Avoid imperative build scripts that rely on specific execution environments or manual setup steps.
+    </div>
+
+    <h3>Go Build System</h3>
+
+    <pre><code># Makefile - Go Build Configuration
+.PHONY: all build test lint clean
+
+VERSION := $(shell git describe --tags --always)
+BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}"
+
+all: lint test build
+
+build:
+	CGO_ENABLED=0 go build ${LDFLAGS} -o bin/app ./cmd/app
+
+test:
+	go test -v -race -coverprofile=coverage.out ./...
+
+lint:
+	golangci-lint run ./...
+
+clean:
+	rm -rf bin/ coverage.out</code></pre>
+
+    <pre><code># GitHub Actions - Go Build
+name: Go CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test</code></pre>
+
+    <h2>Dependency Management</h2>
+
+    <p>Dependencies are external libraries and packages that your code relies on. Effective dependency management ensures reproducible builds while minimizing security risks.</p>
+
+    <h3>Dependency Management Principles</h3>
+
+    <ul>
+        <li><strong>Lock Files:</strong> Always commit lock files (package-lock.json, pnpm-lock.yaml, Cargo.lock) to ensure reproducible builds</li>
+        <li><strong>Semantic Versioning:</strong> Understand and use semver ranges appropriately for dependencies</li>
+        <li><strong>Minimal Dependencies:</strong> Regularly audit and remove unused dependencies</li>
+        <li><strong>Security Scanning:</strong> Integrate dependency vulnerability scanning into CI</li>
+        <li><strong>Private Registries:</strong> Use private registries for internal packages and to proxy public registries</li>
+    </ul>
+
+    <pre><code># Dependency Audit Integration
+# GitHub Actions
+name: Dependency Security
+on:
+  push:
+  schedule:
+    - cron: '0 0 * * *'  # Daily scan
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+
+      - name: Check for outdated packages
+        run: npm outdated || true
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high</code></pre>
+
+    <h3>Dependency Caching Strategies</h3>
+
+    <pre><code># Multi-layer Caching Strategy
+# GitHub Actions
+name: Build with Caching
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cache node_modules based on lock file
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      # Cache build outputs
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist
+            .next/cache
+          key: ${{ runner.os }}-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build</code></pre>
+
+    <h2>Advanced Caching Strategies</h2>
+
+    <p>Effective caching can reduce build times by 50-90%. The WIA-CI standard recommends implementing multiple caching layers for optimal performance.</p>
+
+    <h3>Caching Layers</h3>
+
+    <table>
+        <tr>
+            <th>Layer</th>
+            <th>Contents</th>
+            <th>Key Strategy</th>
+            <th>Typical Savings</th>
+        </tr>
+        <tr>
+            <td>Dependencies</td>
+            <td>node_modules, .m2, vendor</td>
+            <td>Lock file hash</td>
+            <td>30-60 seconds</td>
+        </tr>
+        <tr>
+            <td>Build Cache</td>
+            <td>Compiled outputs, intermediates</td>
+            <td>Source hash + config</td>
+            <td>1-5 minutes</td>
+        </tr>
+        <tr>
+            <td>Docker Layers</td>
+            <td>Image layers</td>
+            <td>Layer content hash</td>
+            <td>2-10 minutes</td>
+        </tr>
+        <tr>
+            <td>Test Cache</td>
+            <td>Test results, snapshots</td>
+            <td>Test file hash</td>
+            <td>30-120 seconds</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>Cache Invalidation Strategy:</strong> Design cache keys with appropriate granularity. Too specific keys result in cache misses; too broad keys may restore stale artifacts. Include OS, tool versions, and relevant config hashes in cache keys.
+    </div>
+
+    <h3>Remote Build Caching</h3>
+
+    <pre><code># Turborepo Remote Caching
+# turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**"],
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"],
+      "cache": true
+    },
+    "lint": {
+      "outputs": [],
+      "cache": true
+    }
+  },
+  "remoteCache": {
+    "signature": true
+  }
+}</code></pre>
+
+    <pre><code># GitHub Actions with Turborepo
+name: Monorepo CI
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build all packages
+        run: pnpm turbo build
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}</code></pre>
+
+    <h2>Build Optimization Techniques</h2>
+
+    <p>Beyond caching, several techniques can significantly improve build performance:</p>
+
+    <h3>Incremental Builds</h3>
+
+    <pre><code># TypeScript Incremental Build
+# tsconfig.json
+{
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true
+  }
+}
+
+# Project references for monorepo
+{
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/api" },
+    { "path": "./packages/web" }
+  ]
+}</code></pre>
+
+    <h3>Parallel Compilation</h3>
+
+    <pre><code># esbuild - Ultra-fast JavaScript bundler
+# build.js
+import * as esbuild from 'esbuild';
+
+await esbuild.build({
+  entryPoints: ['src/index.ts'],
+  bundle: true,
+  minify: true,
+  sourcemap: true,
+  platform: 'node',
+  target: 'node20',
+  outfile: 'dist/index.js',
+});
+
+// Build time: ~50ms vs ~5s with traditional bundlers</code></pre>
+
+    <pre><code># Gradle Parallel Execution
+# gradle.properties
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.configureondemand=true
+org.gradle.jvmargs=-Xmx4g -XX:+UseParallelGC</code></pre>
+
+    <h2>Build Reproducibility</h2>
+
+    <p>Reproducible builds ensure that the same source code always produces identical binaries. This is crucial for security audits and debugging production issues.</p>
+
+    <pre><code># Dockerfile for Reproducible Builds
+FROM node:20-alpine AS builder
+
+# Set deterministic environment
+ENV NODE_ENV=production
+ENV SOURCE_DATE_EPOCH=0
+
+WORKDIR /app
+
+# Copy dependency files first (better caching)
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies with exact versions
+RUN corepack enable && pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build with deterministic output
+RUN pnpm build
+
+# Production image
+FROM node:20-alpine AS runner
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+CMD ["node", "dist/index.js"]</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI Maturity Model - Level 3 (Build Excellence):</strong>
+        <ul>
+            <li>Reproducible builds across environments</li>
+            <li>Multi-layer caching with 70%+ cache hit rate</li>
+            <li>Build times under 5 minutes for most changes</li>
+            <li>Automated dependency updates with security scanning</li>
+        </ul>
+    </div>
+
+    <p>Mastering build systems and dependency management is essential for efficient CI pipelines. The techniques in this chapter will help you achieve faster, more reliable builds that scale with your team and codebase.</p>
+
+</body>
+</html>

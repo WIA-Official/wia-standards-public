@@ -1,713 +1,798 @@
-# WIA Cryo-Preservation Data Format Standard
-## Phase 1 Specification
+# Phase 1: Data Format Specification
+
+## WIA-CRYO-PRESERVATION Data Structures
+
+> Standardized data formats for cryopreservation records and monitoring.
 
 ---
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
+## 1. Core Data Types
 
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Terminology](#terminology)
-3. [Base Structure](#base-structure)
-4. [Data Schema](#data-schema)
-5. [Field Specifications](#field-specifications)
-6. [Data Types](#data-types)
-7. [Validation Rules](#validation-rules)
-8. [Examples](#examples)
-9. [Version History](#version-history)
-
----
-
-## Overview
-
-### 1.1 Purpose
-
-The WIA Cryo-Preservation Data Format Standard defines a unified JSON-based format for recording, transmitting, and managing cryopreservation data across healthcare facilities, research institutions, and cryonics organizations worldwide.
-
-**Core Objectives**:
-- Standardize cryopreservation records across all facilities
-- Enable interoperability between different cryonics providers
-- Ensure data integrity and traceability throughout the preservation lifecycle
-- Support regulatory compliance and audit requirements
-
-### 1.2 Scope
-
-This standard covers the following data domains:
-
-| Domain | Description |
-|--------|-------------|
-| Patient Records | Personal and medical information of cryopreserved individuals |
-| Preservation Procedures | Details of vitrification and cooling processes |
-| Storage Conditions | Environmental monitoring and maintenance data |
-| Chain of Custody | Transfer and handling records |
-| Quality Metrics | Preservation quality indicators |
-
-### 1.3 Design Principles
-
-1. **Immutability**: Once created, records cannot be modified, only appended
-2. **Traceability**: Complete audit trail for all operations
-3. **Interoperability**: Compatible with existing healthcare standards (HL7, FHIR)
-4. **Security**: End-to-end encryption for sensitive data
-5. **Validation**: JSON Schema enforcement for data integrity
-
----
-
-## Terminology
-
-### 2.1 Core Terms
-
-| Term | Definition |
-|------|------------|
-| **Subject** | The individual undergoing cryopreservation |
-| **Vitrification** | Glass-like solidification without ice crystal formation |
-| **Perfusion** | Process of replacing blood with cryoprotectant |
-| **Dewar** | Vacuum-insulated container for liquid nitrogen storage |
-| **CPA** | Cryoprotective Agent - chemicals preventing ice damage |
-| **Cool-down** | Controlled temperature reduction process |
-| **Long-term Storage** | Maintenance at cryogenic temperatures (-196°C) |
-
-### 2.2 Data Types
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `string` | UTF-8 encoded text | `"WIA-CRYO-001"` |
-| `number` | IEEE 754 double precision | `-196.0`, `3.14159` |
-| `integer` | Signed 64-bit integer | `1`, `-273` |
-| `boolean` | Boolean value | `true`, `false` |
-| `timestamp` | ISO 8601 datetime | `"2025-01-15T10:30:00Z"` |
-| `uuid` | UUID v4 identifier | `"550e8400-e29b-41d4-a716-446655440000"` |
-
-### 2.3 Field Requirements
-
-| Marker | Meaning |
-|--------|---------|
-| **REQUIRED** | Field must be present |
-| **OPTIONAL** | Field may be omitted |
-| **CONDITIONAL** | Required under specific conditions |
-
----
-
-## Base Structure
-
-### 3.1 Message Format
-
-All WIA Cryo-Preservation messages follow this base structure:
-
-```json
-{
-  "$schema": "https://wia.live/cryo-preservation/v1/schema.json",
-  "version": "1.0.0",
-  "messageId": "uuid-v4-string",
-  "messageType": "preservation_record",
-  "timestamp": {
-    "created": "2025-01-15T10:30:00Z",
-    "modified": "2025-01-15T10:30:00Z"
-  },
-  "facility": {
-    "id": "FAC-001",
-    "name": "WIA Cryonics Institute",
-    "location": {
-      "country": "KR",
-      "city": "Seoul"
-    }
-  },
-  "subject": {
-    "id": "SUBJ-001",
-    "anonymizedId": "ANON-550e8400"
-  },
-  "data": {
-    // Domain-specific data
-  },
-  "meta": {
-    "hash": "sha256-hash",
-    "signature": "digital-signature",
-    "previousHash": "previous-record-hash"
-  }
-}
-```
-
-### 3.2 Field Details
-
-#### 3.2.1 `$schema` (OPTIONAL)
-
-```
-Type: string
-Format: URI
-Description: JSON Schema location for validation
-Example: "https://wia.live/cryo-preservation/v1/schema.json"
-```
-
-#### 3.2.2 `version` (REQUIRED)
-
-```
-Type: string
-Format: Semantic Versioning (MAJOR.MINOR.PATCH)
-Description: Specification version
-Example: "1.0.0"
-```
-
-#### 3.2.3 `messageId` (REQUIRED)
-
-```
-Type: string
-Format: UUID v4
-Description: Unique identifier for this message
-Example: "550e8400-e29b-41d4-a716-446655440000"
-```
-
-#### 3.2.4 `messageType` (REQUIRED)
-
-```
-Type: string
-Description: Type of message
-Valid values:
-  - "preservation_record"  : Main preservation data
-  - "status_update"        : Status change notification
-  - "quality_report"       : Quality assessment
-  - "transfer_record"      : Custody transfer
-  - "maintenance_log"      : Facility maintenance
-```
-
----
-
-## Data Schema
-
-### 4.1 Complete JSON Schema
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wia.live/cryo-preservation/v1/schema.json",
-  "title": "WIA Cryo-Preservation Record",
-  "type": "object",
-  "required": ["version", "messageId", "messageType", "timestamp", "facility", "subject", "data"],
-  "properties": {
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "messageId": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "messageType": {
-      "type": "string",
-      "enum": ["preservation_record", "status_update", "quality_report", "transfer_record", "maintenance_log"]
-    },
-    "timestamp": {
-      "type": "object",
-      "required": ["created"],
-      "properties": {
-        "created": { "type": "string", "format": "date-time" },
-        "modified": { "type": "string", "format": "date-time" }
-      }
-    },
-    "facility": {
-      "type": "object",
-      "required": ["id", "name"],
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "country": { "type": "string", "pattern": "^[A-Z]{2}$" },
-            "city": { "type": "string" },
-            "address": { "type": "string" },
-            "coordinates": {
-              "type": "object",
-              "properties": {
-                "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
-                "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
-              }
-            }
-          }
-        },
-        "certification": {
-          "type": "array",
-          "items": { "type": "string" }
-        }
-      }
-    },
-    "subject": {
-      "type": "object",
-      "required": ["id"],
-      "properties": {
-        "id": { "type": "string" },
-        "anonymizedId": { "type": "string" },
-        "consentId": { "type": "string" },
-        "demographics": {
-          "type": "object",
-          "properties": {
-            "birthYear": { "type": "integer" },
-            "biologicalSex": { "type": "string", "enum": ["male", "female", "other"] },
-            "bloodType": { "type": "string" }
-          }
-        }
-      }
-    },
-    "data": {
-      "type": "object"
-    },
-    "meta": {
-      "type": "object",
-      "properties": {
-        "hash": { "type": "string" },
-        "signature": { "type": "string" },
-        "previousHash": { "type": "string" },
-        "version": { "type": "integer" }
-      }
-    }
-  }
-}
-```
-
-### 4.2 Preservation Data Schema
-
-```json
-{
-  "data": {
-    "preservationType": "whole_body",
-    "status": "long_term_storage",
-    "timeline": {
-      "pronouncement": "2025-01-15T08:00:00Z",
-      "stabilization_start": "2025-01-15T08:15:00Z",
-      "perfusion_start": "2025-01-15T10:00:00Z",
-      "perfusion_complete": "2025-01-15T14:00:00Z",
-      "cooldown_start": "2025-01-15T14:30:00Z",
-      "cooldown_complete": "2025-01-16T02:30:00Z",
-      "storage_start": "2025-01-16T03:00:00Z"
-    },
-    "perfusion": {
-      "cryoprotectant": "M22",
-      "concentration": 0.7,
-      "volume_liters": 15.5,
-      "duration_minutes": 240,
-      "temperature_celsius": 0
-    },
-    "cooldown": {
-      "method": "controlled_rate",
-      "rate_celsius_per_minute": -1.0,
-      "intermediate_holds": [
-        { "temperature": -40, "duration_minutes": 30 },
-        { "temperature": -80, "duration_minutes": 60 }
-      ],
-      "final_temperature": -196
-    },
-    "storage": {
-      "container_type": "dewar",
-      "container_id": "DEW-001",
-      "position": "A1-05",
-      "medium": "liquid_nitrogen",
-      "temperature_celsius": -196
-    },
-    "quality": {
-      "vitrification_score": 0.92,
-      "tissue_integrity": 0.88,
-      "cpa_distribution": 0.95,
-      "assessment_date": "2025-01-16T06:00:00Z"
-    }
-  }
-}
-```
-
----
-
-## Field Specifications
-
-### 5.1 Preservation Type
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `preservationType` | string | REQUIRED | Type of preservation | `"whole_body"` |
-| `status` | string | REQUIRED | Current preservation status | `"long_term_storage"` |
-
-**Valid preservationType values:**
-
-| Value | Description |
-|-------|-------------|
-| `whole_body` | Complete body preservation |
-| `neuro` | Head/brain only preservation |
-| `tissue_sample` | Individual tissue samples |
-| `organ` | Specific organ preservation |
-
-**Valid status values:**
-
-| Value | Description |
-|-------|-------------|
-| `pending` | Awaiting preservation |
-| `stabilization` | Initial stabilization in progress |
-| `perfusion` | Cryoprotectant perfusion in progress |
-| `cooldown` | Temperature reduction in progress |
-| `long_term_storage` | Maintained at storage temperature |
-| `transferred` | Moved to another facility |
-| `revived` | Successfully reanimated |
-
-### 5.2 Timeline Fields
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `pronouncement` | timestamp | REQUIRED | Legal time of death | `"2025-01-15T08:00:00Z"` |
-| `stabilization_start` | timestamp | REQUIRED | Start of stabilization | `"2025-01-15T08:15:00Z"` |
-| `perfusion_start` | timestamp | CONDITIONAL | Start of perfusion | `"2025-01-15T10:00:00Z"` |
-| `perfusion_complete` | timestamp | CONDITIONAL | End of perfusion | `"2025-01-15T14:00:00Z"` |
-| `cooldown_start` | timestamp | REQUIRED | Start of cooling | `"2025-01-15T14:30:00Z"` |
-| `cooldown_complete` | timestamp | REQUIRED | End of cooling | `"2025-01-16T02:30:00Z"` |
-| `storage_start` | timestamp | REQUIRED | Start of long-term storage | `"2025-01-16T03:00:00Z"` |
-
-### 5.3 Perfusion Fields
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `cryoprotectant` | string | REQUIRED | CPA compound name | `"M22"` |
-| `concentration` | number | REQUIRED | Final concentration (0.0-1.0) | `0.7` |
-| `volume_liters` | number | REQUIRED | Total volume used | `15.5` |
-| `duration_minutes` | integer | REQUIRED | Total perfusion time | `240` |
-| `temperature_celsius` | number | REQUIRED | Perfusion temperature | `0` |
-
-### 5.4 Quality Metrics
-
-| Field | Type | Required | Description | Range |
-|-------|------|----------|-------------|-------|
-| `vitrification_score` | number | OPTIONAL | Quality of vitrification | 0.0-1.0 |
-| `tissue_integrity` | number | OPTIONAL | Tissue preservation quality | 0.0-1.0 |
-| `cpa_distribution` | number | OPTIONAL | CPA penetration uniformity | 0.0-1.0 |
-| `assessment_date` | timestamp | CONDITIONAL | Date of quality assessment | ISO 8601 |
-
----
-
-## Data Types
-
-### 6.1 Custom Types
-
-#### PreservationType
+### 1.1 Temperature Units
 
 ```typescript
-type PreservationType =
-  | 'whole_body'
-  | 'neuro'
-  | 'tissue_sample'
-  | 'organ';
-```
+type TemperatureUnit = "CELSIUS" | "KELVIN" | "FAHRENHEIT";
 
-#### PreservationStatus
-
-```typescript
-type PreservationStatus =
-  | 'pending'
-  | 'stabilization'
-  | 'perfusion'
-  | 'cooldown'
-  | 'long_term_storage'
-  | 'transferred'
-  | 'revived';
-```
-
-#### Temperature
-
-```typescript
 interface Temperature {
-  value: number;      // Celsius
-  unit: 'celsius';
-  precision?: number; // Decimal places
+    value: number;
+    unit: TemperatureUnit;
+    precision: number;  // decimal places
+    timestamp: ISO8601DateTime;
+    sensorId: string;
+}
+
+// Standard: Always store in Kelvin internally
+// Display: Convert to user preference
+// Precision: Minimum 0.1°C for cryogenic ranges
+```
+
+### 1.2 Pressure Units
+
+```typescript
+type PressureUnit = "ATM" | "BAR" | "PSI" | "KPA" | "MMHG";
+
+interface Pressure {
+    value: number;
+    unit: PressureUnit;
+    timestamp: ISO8601DateTime;
+    sensorId: string;
 }
 ```
 
-### 6.2 Enum Values
+### 1.3 Time Formats
 
-#### Cryoprotectant Types
+```typescript
+type ISO8601DateTime = string;  // "2024-01-15T10:30:00Z"
+type Duration = string;         // ISO 8601 duration "P1Y2M3DT4H5M6S"
 
-| Code | Name | Description |
-|------|------|-------------|
-| `M22` | M22 Vitrification Solution | Most advanced, lowest toxicity |
-| `VM1` | Vitrification Mixture 1 | Standard solution |
-| `DMSO` | Dimethyl Sulfoxide | Basic CPA |
-| `glycerol` | Glycerol | Traditional CPA |
-| `EG` | Ethylene Glycol | Common component |
-| `custom` | Custom Mixture | Proprietary formulation |
-
-#### Container Types
-
-| Code | Description |
-|------|-------------|
-| `dewar` | Vacuum-insulated Dewar flask |
-| `cryostat` | Temperature-controlled storage |
-| `transport_container` | Portable cryogenic vessel |
-| `sample_vial` | Small sample container |
-
----
-
-## Validation Rules
-
-### 7.1 Required Field Validation
-
-| Rule ID | Field | Validation |
-|---------|-------|------------|
-| VAL-001 | `version` | Must match `^\d+\.\d+\.\d+$` |
-| VAL-002 | `messageId` | Must be valid UUID v4 |
-| VAL-003 | `timestamp.created` | Must be valid ISO 8601 |
-| VAL-004 | `facility.id` | Must not be empty |
-| VAL-005 | `subject.id` | Must not be empty |
-
-### 7.2 Business Logic Validation
-
-| Rule ID | Description | Error Code |
-|---------|-------------|------------|
-| BUS-001 | `cooldown_start` must be after `perfusion_complete` | `ERR_TIMELINE_ORDER` |
-| BUS-002 | `storage_start` must be after `cooldown_complete` | `ERR_TIMELINE_ORDER` |
-| BUS-003 | `concentration` must be between 0.0 and 1.0 | `ERR_INVALID_RANGE` |
-| BUS-004 | `final_temperature` must be ≤ -196°C | `ERR_INVALID_TEMPERATURE` |
-| BUS-005 | Quality scores must be between 0.0 and 1.0 | `ERR_INVALID_SCORE` |
-
-### 7.3 Error Codes
-
-| Code | Message | Description |
-|------|---------|-------------|
-| `ERR_INVALID_FORMAT` | Invalid data format | JSON parsing failed |
-| `ERR_MISSING_FIELD` | Required field missing | Required field not present |
-| `ERR_INVALID_TYPE` | Invalid field type | Type mismatch |
-| `ERR_TIMELINE_ORDER` | Invalid timeline sequence | Events out of order |
-| `ERR_INVALID_RANGE` | Value out of range | Value exceeds limits |
-| `ERR_INVALID_TEMPERATURE` | Invalid temperature | Temperature constraint violated |
-| `ERR_INVALID_SCORE` | Invalid quality score | Score outside 0.0-1.0 |
-
----
-
-## Examples
-
-### 8.1 Valid Preservation Record
-
-```json
-{
-  "$schema": "https://wia.live/cryo-preservation/v1/schema.json",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440001",
-  "messageType": "preservation_record",
-  "timestamp": {
-    "created": "2025-01-15T10:30:00Z",
-    "modified": "2025-01-15T10:30:00Z"
-  },
-  "facility": {
-    "id": "FAC-KR-001",
-    "name": "WIA Cryonics Institute Seoul",
-    "location": {
-      "country": "KR",
-      "city": "Seoul",
-      "coordinates": {
-        "latitude": 37.5665,
-        "longitude": 126.9780
-      }
-    },
-    "certification": ["ISO-9001", "WIA-CRYO-CERTIFIED"]
-  },
-  "subject": {
-    "id": "SUBJ-2025-001",
-    "anonymizedId": "ANON-550e8400",
-    "consentId": "CONSENT-2024-1234",
-    "demographics": {
-      "birthYear": 1950,
-      "biologicalSex": "male",
-      "bloodType": "A+"
-    }
-  },
-  "data": {
-    "preservationType": "whole_body",
-    "status": "long_term_storage",
-    "timeline": {
-      "pronouncement": "2025-01-15T08:00:00Z",
-      "stabilization_start": "2025-01-15T08:15:00Z",
-      "perfusion_start": "2025-01-15T10:00:00Z",
-      "perfusion_complete": "2025-01-15T14:00:00Z",
-      "cooldown_start": "2025-01-15T14:30:00Z",
-      "cooldown_complete": "2025-01-16T02:30:00Z",
-      "storage_start": "2025-01-16T03:00:00Z"
-    },
-    "perfusion": {
-      "cryoprotectant": "M22",
-      "concentration": 0.7,
-      "volume_liters": 15.5,
-      "duration_minutes": 240,
-      "temperature_celsius": 0
-    },
-    "cooldown": {
-      "method": "controlled_rate",
-      "rate_celsius_per_minute": -1.0,
-      "intermediate_holds": [
-        { "temperature": -40, "duration_minutes": 30 },
-        { "temperature": -80, "duration_minutes": 60 }
-      ],
-      "final_temperature": -196
-    },
-    "storage": {
-      "container_type": "dewar",
-      "container_id": "DEW-KR-001",
-      "position": "A1-05",
-      "medium": "liquid_nitrogen",
-      "temperature_celsius": -196
-    },
-    "quality": {
-      "vitrification_score": 0.92,
-      "tissue_integrity": 0.88,
-      "cpa_distribution": 0.95,
-      "assessment_date": "2025-01-16T06:00:00Z"
-    }
-  },
-  "meta": {
-    "hash": "sha256:a5b9c3d4e5f6...",
-    "signature": "eyJhbGciOiJFUzI1NiIs...",
-    "version": 1
-  }
+interface TimeRange {
+    start: ISO8601DateTime;
+    end: ISO8601DateTime;
+    duration: Duration;
 }
 ```
 
-### 8.2 Valid Status Update
+---
 
-```json
-{
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440002",
-  "messageType": "status_update",
-  "timestamp": {
-    "created": "2025-01-20T09:00:00Z"
-  },
-  "facility": {
-    "id": "FAC-KR-001",
-    "name": "WIA Cryonics Institute Seoul"
-  },
-  "subject": {
-    "id": "SUBJ-2025-001"
-  },
-  "data": {
-    "previousStatus": "cooldown",
-    "newStatus": "long_term_storage",
-    "reason": "Cooldown process completed successfully",
-    "verifiedBy": "STAFF-001",
-    "notes": "All quality metrics within acceptable range"
-  },
-  "meta": {
-    "previousHash": "sha256:a5b9c3d4e5f6..."
-  }
+## 2. Subject Identification
+
+### 2.1 Subject Document
+
+```typescript
+interface SubjectDocument {
+    // Identity
+    id: SubjectId;
+    did: DID;  // "did:wia:cryo:subject:{uuid}"
+    type: SubjectType;
+
+    // Biological Information
+    species: SpeciesCode;
+    biologicalAge: number;  // years at preservation
+    chronologicalAge: number;
+    sex: BiologicalSex;
+    bloodType: BloodType;
+
+    // Biometrics (pre-preservation)
+    biometrics: BiometricData;
+
+    // Medical History
+    medicalHistory: MedicalRecord[];
+    allergies: Allergy[];
+    medications: Medication[];
+
+    // Preservation Details
+    preservationDate: ISO8601DateTime;
+    preservationFacility: FacilityId;
+    preservationMethod: PreservationMethod;
+    preservationTeam: TeamMember[];
+
+    // Legal
+    consentDocument: ConsentReference;
+    legalStatus: LegalStatus;
+
+    // Metadata
+    createdAt: ISO8601DateTime;
+    updatedAt: ISO8601DateTime;
+    version: string;
+}
+
+type SubjectType =
+    | "WHOLE_BODY"
+    | "NEURO"  // Head/brain only
+    | "ORGAN"
+    | "TISSUE"
+    | "CELL_CULTURE"
+    | "EMBRYO"
+    | "GAMETE";
+
+type SpeciesCode = "HUMAN" | "CANINE" | "FELINE" | "OTHER";
+
+type BiologicalSex = "MALE" | "FEMALE" | "INTERSEX" | "UNKNOWN";
+
+interface BloodType {
+    abo: "A" | "B" | "AB" | "O";
+    rh: "POSITIVE" | "NEGATIVE";
+    additional?: string[];  // Kell, Duffy, etc.
 }
 ```
 
-### 8.3 Valid Quality Report
+### 2.2 Biometric Data
 
-```json
-{
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440003",
-  "messageType": "quality_report",
-  "timestamp": {
-    "created": "2025-02-15T10:00:00Z"
-  },
-  "facility": {
-    "id": "FAC-KR-001",
-    "name": "WIA Cryonics Institute Seoul"
-  },
-  "subject": {
-    "id": "SUBJ-2025-001"
-  },
-  "data": {
-    "assessmentType": "monthly_review",
-    "storageConditions": {
-      "temperature_celsius": -196.2,
-      "temperature_variance": 0.3,
-      "liquid_nitrogen_level": 0.85
-    },
-    "quality": {
-      "vitrification_score": 0.92,
-      "tissue_integrity": 0.88,
-      "overall_status": "excellent"
-    },
-    "inspector": "STAFF-002",
-    "nextReviewDate": "2025-03-15"
-  }
+```typescript
+interface BiometricData {
+    // Physical Measurements
+    height: Measurement;  // cm
+    weight: Measurement;  // kg
+    bmi: number;
+
+    // DNA
+    dnaProfile: DNAProfile;
+
+    // Fingerprints
+    fingerprints?: FingerprintSet;
+
+    // Facial
+    facialGeometry?: FacialData;
+
+    // Iris
+    irisPatterns?: IrisData;
+
+    // Dental
+    dentalRecords?: DentalData;
+
+    // Medical Imaging
+    scans?: MedicalScan[];
+}
+
+interface DNAProfile {
+    sampleId: string;
+    collectionDate: ISO8601DateTime;
+    sequenceType: "FULL_GENOME" | "EXOME" | "SNP_PANEL" | "STR_PROFILE";
+    dataReference: DataReference;
+    hash: string;  // SHA-256 of sequence data
+}
+
+interface Measurement {
+    value: number;
+    unit: string;
+    timestamp: ISO8601DateTime;
+    method: string;
+    operator?: string;
 }
 ```
 
-### 8.4 Invalid Example - Missing Required Field
+---
 
-```json
-{
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440004",
-  "messageType": "preservation_record",
-  "timestamp": {
-    "created": "2025-01-15T10:30:00Z"
-  },
-  "facility": {
-    "name": "WIA Cryonics Institute Seoul"
-  },
-  "data": {}
+## 3. Preservation Protocol Data
+
+### 3.1 Protocol Document
+
+```typescript
+interface PreservationProtocol {
+    id: ProtocolId;
+    version: string;
+    name: string;
+    description: string;
+
+    // Target specifications
+    targetSubjectType: SubjectType[];
+    targetSpecies: SpeciesCode[];
+
+    // Phases
+    phases: ProtocolPhase[];
+
+    // Cryoprotectants
+    cpaProtocol: CPAProtocol;
+
+    // Temperature profile
+    coolingProfile: CoolingProfile;
+
+    // Quality requirements
+    qualityRequirements: QualityRequirements;
+
+    // Safety
+    safetyChecklist: SafetyCheck[];
+
+    // Validation
+    validatedBy: Certification[];
+    lastValidation: ISO8601DateTime;
+}
+
+interface ProtocolPhase {
+    id: string;
+    name: string;
+    order: number;
+
+    // Timing
+    startCondition: PhaseCondition;
+    duration: Duration;
+    endCondition: PhaseCondition;
+
+    // Parameters
+    targetTemperature: TemperatureRange;
+    targetPressure?: PressureRange;
+    cpaConcentration?: ConcentrationRange;
+
+    // Actions
+    actions: ProtocolAction[];
+
+    // Monitoring
+    monitoringInterval: Duration;
+    criticalParameters: string[];
+
+    // Alerts
+    alertThresholds: AlertThreshold[];
+}
+
+interface PhaseCondition {
+    type: "TIME" | "TEMPERATURE" | "CPA_LEVEL" | "MANUAL" | "SENSOR";
+    parameter?: string;
+    operator?: "EQ" | "LT" | "GT" | "LTE" | "GTE";
+    value?: number;
+    unit?: string;
 }
 ```
 
-**Error**: `ERR_MISSING_FIELD` - Missing required fields: `facility.id`, `subject`
+### 3.2 Cryoprotectant Protocol
 
-### 8.5 Invalid Example - Timeline Order Violation
+```typescript
+interface CPAProtocol {
+    // Solution composition
+    solutions: CPASolution[];
 
-```json
-{
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440005",
-  "messageType": "preservation_record",
-  "timestamp": { "created": "2025-01-15T10:30:00Z" },
-  "facility": { "id": "FAC-001", "name": "Test" },
-  "subject": { "id": "SUBJ-001" },
-  "data": {
-    "preservationType": "whole_body",
-    "status": "long_term_storage",
-    "timeline": {
-      "pronouncement": "2025-01-15T08:00:00Z",
-      "cooldown_start": "2025-01-15T10:00:00Z",
-      "perfusion_start": "2025-01-15T14:00:00Z"
-    }
-  }
+    // Loading sequence
+    loadingSteps: CPALoadingStep[];
+
+    // Timing
+    totalLoadingTime: Duration;
+
+    // Temperature during loading
+    loadingTemperature: Temperature;
+
+    // Perfusion parameters
+    perfusionPressure?: Pressure;
+    perfusionRate?: number;  // mL/min
+}
+
+interface CPASolution {
+    id: string;
+    name: string;
+
+    // Components
+    components: CPAComponent[];
+
+    // Properties
+    osmolality: number;  // mOsm/kg
+    viscosity: number;   // cP at loading temp
+    glassTransitionTemp: Temperature;  // Tg
+
+    // Preparation
+    preparationSteps: string[];
+    storageConditions: StorageCondition;
+    shelfLife: Duration;
+}
+
+interface CPAComponent {
+    name: string;
+    type: CPAType;
+    concentration: number;
+    unit: ConcentrationUnit;
+
+    // Properties
+    molecularWeight: number;
+    penetrating: boolean;
+    toxicityIndex: number;  // 0-10 scale
+}
+
+type CPAType =
+    | "DMSO"
+    | "GLYCEROL"
+    | "ETHYLENE_GLYCOL"
+    | "PROPYLENE_GLYCOL"
+    | "FORMAMIDE"
+    | "TREHALOSE"
+    | "SUCROSE"
+    | "PVP"
+    | "HES"
+    | "OTHER";
+
+type ConcentrationUnit = "PERCENT_V" | "PERCENT_W" | "MOLAR" | "MILLIMOLAR";
+```
+
+### 3.3 Cooling Profile
+
+```typescript
+interface CoolingProfile {
+    // Overall parameters
+    startTemperature: Temperature;
+    targetTemperature: Temperature;
+    totalDuration: Duration;
+
+    // Segments
+    segments: CoolingSegment[];
+
+    // Critical points
+    criticalPoints: CriticalPoint[];
+
+    // Monitoring
+    monitoringFrequency: Duration;
+    tolerances: CoolingTolerance;
+}
+
+interface CoolingSegment {
+    id: string;
+    order: number;
+
+    // Temperature range
+    startTemp: Temperature;
+    endTemp: Temperature;
+
+    // Rate
+    coolingRate: number;  // °C/min (negative for cooling)
+    rateType: "LINEAR" | "EXPONENTIAL" | "STEP" | "CONTROLLED";
+
+    // Duration
+    duration: Duration;
+
+    // Control
+    controlMethod: "PROGRAMMED" | "PASSIVE" | "MANUAL";
+    controllerSettings?: ControllerSettings;
+}
+
+interface CriticalPoint {
+    name: string;
+    temperature: Temperature;
+    description: string;
+    action: string;
+
+    // Ice nucleation
+    nucleationRisk?: boolean;
+
+    // Glass transition
+    glassTransition?: boolean;
+}
+
+// Common critical points:
+// - 0°C: Freezing point (avoid slow crossing)
+// - -40°C: Homogeneous nucleation temperature
+// - -130°C: Glass transition (Tg) for most CPA solutions
+// - -196°C: Liquid nitrogen temperature
+```
+
+---
+
+## 4. Storage Records
+
+### 4.1 Storage Container
+
+```typescript
+interface StorageContainer {
+    id: ContainerId;
+    type: ContainerType;
+
+    // Physical location
+    facility: FacilityId;
+    location: StorageLocation;
+
+    // Specifications
+    capacity: number;  // liters LN2
+    dimensions: Dimensions;
+    material: string;
+    manufacturer: string;
+    model: string;
+    serialNumber: string;
+
+    // Current state
+    currentLN2Level: number;  // percentage
+    currentTemperature: Temperature;
+    currentPressure?: Pressure;
+
+    // Contents
+    contents: StorageSlot[];
+
+    // Maintenance
+    installationDate: ISO8601DateTime;
+    lastMaintenance: ISO8601DateTime;
+    nextMaintenance: ISO8601DateTime;
+
+    // Monitoring
+    sensors: SensorConfiguration[];
+    alarmSettings: AlarmSettings;
+}
+
+type ContainerType =
+    | "DEWAR_SMALL"      // < 50L
+    | "DEWAR_MEDIUM"     // 50-200L
+    | "DEWAR_LARGE"      // 200-500L
+    | "DEWAR_INDUSTRIAL" // > 500L
+    | "MVE_CRYOSYSTEM"
+    | "CUSTOM";
+
+interface StorageLocation {
+    building: string;
+    room: string;
+    row?: string;
+    position?: string;
+    gpsCoordinates?: GPSCoordinates;
+}
+
+interface StorageSlot {
+    slotId: string;
+    position: SlotPosition;
+
+    // Content
+    subjectId?: SubjectId;
+    subjectType?: SubjectType;
+
+    // Container within dewar
+    innerContainer?: InnerContainer;
+
+    // Status
+    occupied: boolean;
+    reservedFor?: SubjectId;
+
+    // History
+    occupancyHistory: OccupancyRecord[];
+}
+
+interface SlotPosition {
+    canister?: number;
+    level?: number;
+    position?: number;
+    customId?: string;
 }
 ```
 
-**Error**: `ERR_TIMELINE_ORDER` - `perfusion_start` must be before `cooldown_start`
+### 4.2 Monitoring Data
+
+```typescript
+interface MonitoringRecord {
+    containerId: ContainerId;
+    timestamp: ISO8601DateTime;
+
+    // Measurements
+    temperature: Temperature;
+    ln2Level: number;  // percentage
+    pressure?: Pressure;
+    humidity?: number;
+
+    // Sensor health
+    sensorStatus: SensorStatus[];
+
+    // Calculated metrics
+    estimatedHoldTime: Duration;  // time until LN2 exhaustion
+    evaporationRate: number;      // liters/day
+
+    // Alerts
+    activeAlerts: Alert[];
+
+    // Quality
+    dataQuality: DataQuality;
+}
+
+interface SensorStatus {
+    sensorId: string;
+    type: SensorType;
+    status: "ONLINE" | "OFFLINE" | "ERROR" | "CALIBRATING";
+    lastReading: ISO8601DateTime;
+    batteryLevel?: number;
+    calibrationDate?: ISO8601DateTime;
+}
+
+type SensorType =
+    | "TEMPERATURE_PT100"
+    | "TEMPERATURE_THERMOCOUPLE"
+    | "LN2_LEVEL_CAPACITIVE"
+    | "LN2_LEVEL_RESISTIVE"
+    | "LN2_LEVEL_WEIGHT"
+    | "PRESSURE"
+    | "HUMIDITY"
+    | "VIBRATION"
+    | "DOOR_SENSOR";
+```
 
 ---
 
-## Version History
+## 5. Quality Assessment
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial release |
+### 5.1 Vitrification Quality Index
+
+```typescript
+interface VQIAssessment {
+    subjectId: SubjectId;
+    assessmentDate: ISO8601DateTime;
+    assessor: PersonId;
+
+    // Component scores (0.0 - 1.0)
+    iceFraction: number;
+    cpaDistribution: number;
+    coolingRateScore: number;
+    integrityScore: number;
+
+    // Calculated VQI
+    vqi: number;
+    vqiGrade: VQIGrade;
+
+    // Detailed findings
+    findings: Finding[];
+
+    // Recommendations
+    recommendations: string[];
+
+    // Supporting data
+    imagingData?: ImagingReference[];
+    sampleAnalysis?: SampleAnalysis[];
+}
+
+type VQIGrade =
+    | "EXCELLENT"    // VQI >= 0.95
+    | "GOOD"         // VQI >= 0.85
+    | "ACCEPTABLE"   // VQI >= 0.70
+    | "MARGINAL"     // VQI >= 0.50
+    | "POOR"         // VQI >= 0.30
+    | "CRITICAL";    // VQI < 0.30
+
+interface Finding {
+    category: FindingCategory;
+    severity: Severity;
+    location?: string;
+    description: string;
+    evidence?: string;
+    impactOnRevival: string;
+}
+
+type FindingCategory =
+    | "ICE_DAMAGE"
+    | "CPA_TOXICITY"
+    | "THERMAL_STRESS"
+    | "STRUCTURAL_DAMAGE"
+    | "PERFUSION_ISSUE"
+    | "EQUIPMENT_FAILURE"
+    | "PROTOCOL_DEVIATION"
+    | "OTHER";
+
+type Severity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+```
+
+### 5.2 Sample Analysis
+
+```typescript
+interface SampleAnalysis {
+    sampleId: string;
+    subjectId: SubjectId;
+    sampleType: SampleType;
+    collectionTime: ISO8601DateTime;
+    analysisTime: ISO8601DateTime;
+
+    // Analysis results
+    cellViability?: CellViabilityResult;
+    iceContent?: IceContentResult;
+    cpaConcentration?: CPAConcentrationResult;
+    structuralIntegrity?: StructuralResult;
+
+    // Method details
+    analysisMethod: string;
+    equipment: string[];
+    operator: PersonId;
+
+    // Raw data reference
+    rawDataRef: DataReference;
+}
+
+type SampleType =
+    | "TISSUE_BIOPSY"
+    | "PERFUSATE"
+    | "SURFACE_SWAB"
+    | "IMAGING"
+    | "OTHER";
+
+interface CellViabilityResult {
+    method: "TRYPAN_BLUE" | "MTT" | "FLOW_CYTOMETRY" | "OTHER";
+    viabilityPercent: number;
+    cellCount?: number;
+    confidence: number;
+}
+
+interface IceContentResult {
+    method: "DSC" | "CRYO_SEM" | "X_RAY" | "MRI" | "OTHER";
+    iceVolumePercent: number;
+    iceCrystalSize?: number;  // micrometers
+    distribution: "UNIFORM" | "LOCALIZED" | "NONE_DETECTED";
+}
+```
 
 ---
 
-## Appendix A: Related Standards
+## 6. Event Logging
 
-| Standard | Relationship |
-|----------|--------------|
-| WIA Cryo-Identity | Subject identification linking |
-| WIA Cryo-Consent | Consent record references |
-| WIA Cryo-Facility | Facility certification data |
-| HL7 FHIR | Healthcare data interoperability |
-| ISO 27001 | Information security management |
+### 6.1 Preservation Event
+
+```typescript
+interface PreservationEvent {
+    eventId: string;
+    subjectId: SubjectId;
+    timestamp: ISO8601DateTime;
+
+    eventType: PreservationEventType;
+    phase: ProtocolPhase;
+
+    // Details
+    description: string;
+    parameters: Record<string, any>;
+
+    // Personnel
+    performedBy: PersonId[];
+    witnessedBy?: PersonId[];
+
+    // Outcome
+    outcome: EventOutcome;
+    deviations?: Deviation[];
+
+    // Documentation
+    notes?: string;
+    attachments?: AttachmentReference[];
+}
+
+type PreservationEventType =
+    | "CONSENT_OBTAINED"
+    | "STANDBY_INITIATED"
+    | "LEGAL_DEATH_DECLARED"
+    | "STABILIZATION_START"
+    | "BLOOD_WASHOUT"
+    | "CPA_PERFUSION_START"
+    | "CPA_PERFUSION_COMPLETE"
+    | "COOLING_START"
+    | "GLASS_TRANSITION_REACHED"
+    | "TARGET_TEMP_REACHED"
+    | "TRANSFER_TO_STORAGE"
+    | "STORAGE_CONFIRMED"
+    | "MONITORING_CHECK"
+    | "MAINTENANCE"
+    | "INCIDENT"
+    | "TRANSFER_OUT"
+    | "TRANSFER_IN";
+
+type EventOutcome = "SUCCESS" | "PARTIAL" | "FAILED" | "ABORTED";
+
+interface Deviation {
+    deviationId: string;
+    severity: Severity;
+    description: string;
+    rootCause?: string;
+    correctiveAction?: string;
+    impact: string;
+}
+```
 
 ---
 
-<div align="center">
+## 7. Data Exchange Formats
 
-**WIA Cryo-Preservation Data Format Standard v1.0.0**
+### 7.1 Standard Document Container
 
-**弘益人間 (홍익인간)** - Benefit All Humanity
+```typescript
+interface CryoDocument {
+    "@context": "https://wia.org/contexts/cryo-preservation/v1";
+    id: string;
+    type: CryoDocumentType;
+    version: string;
+
+    // Content
+    payload: SubjectDocument | PreservationProtocol | MonitoringRecord | VQIAssessment;
+
+    // Metadata
+    createdAt: ISO8601DateTime;
+    createdBy: DID;
+    facility: FacilityId;
+
+    // Integrity
+    hash: string;
+    signature: DigitalSignature;
+
+    // Chain of custody
+    custody: CustodyRecord[];
+}
+
+type CryoDocumentType =
+    | "SUBJECT_RECORD"
+    | "PROTOCOL"
+    | "MONITORING"
+    | "QUALITY_ASSESSMENT"
+    | "EVENT_LOG"
+    | "TRANSFER_MANIFEST"
+    | "FACILITY_CERTIFICATION";
+```
+
+### 7.2 Transfer Manifest
+
+```typescript
+interface TransferManifest {
+    manifestId: string;
+    type: "TRANSFER_MANIFEST";
+
+    // Transfer details
+    transferId: string;
+    transferType: "FACILITY_TO_FACILITY" | "INTERNAL" | "EMERGENCY";
+
+    // Subjects being transferred
+    subjects: SubjectTransferRecord[];
+
+    // Origin
+    originFacility: FacilityId;
+    originContainer: ContainerId;
+    departureTime: ISO8601DateTime;
+    departureConditions: EnvironmentalConditions;
+
+    // Destination
+    destinationFacility: FacilityId;
+    destinationContainer: ContainerId;
+    expectedArrival: ISO8601DateTime;
+
+    // Transport
+    transportMethod: TransportMethod;
+    transportContainer: TransportContainerSpec;
+    route?: TransportRoute;
+
+    // Chain of custody
+    custodyTransfers: CustodyTransfer[];
+
+    // Monitoring during transport
+    transitMonitoring: TransitMonitoringConfig;
+
+    // Authorization
+    authorizedBy: PersonId;
+    authorization: AuthorizationDocument;
+
+    // Signatures
+    originSignature: DigitalSignature;
+    destinationSignature?: DigitalSignature;
+}
+
+interface TransportContainerSpec {
+    type: "DRY_SHIPPER" | "LN2_DEWAR" | "CONTROLLED_RATE";
+    model: string;
+    serialNumber: string;
+    capacity: number;
+    holdTime: Duration;  // Guaranteed hold time
+    currentCharge: number;  // LN2 level or hours remaining
+}
+```
 
 ---
 
-**© 2025 WIA Standards Committee**
+## 8. Enumerations Reference
 
-**MIT License**
+### 8.1 Status Codes
 
-</div>
+```typescript
+enum PreservationStatus {
+    STANDBY = "STANDBY",
+    IN_PROGRESS = "IN_PROGRESS",
+    COMPLETED = "COMPLETED",
+    STORED = "STORED",
+    IN_TRANSIT = "IN_TRANSIT",
+    REVIVING = "REVIVING",
+    REVIVED = "REVIVED",
+    TERMINATED = "TERMINATED"
+}
+
+enum AlertLevel {
+    INFO = "INFO",
+    WARNING = "WARNING",
+    CRITICAL = "CRITICAL",
+    EMERGENCY = "EMERGENCY"
+}
+
+enum FacilityStatus {
+    OPERATIONAL = "OPERATIONAL",
+    MAINTENANCE = "MAINTENANCE",
+    LIMITED = "LIMITED",
+    EMERGENCY = "EMERGENCY",
+    OFFLINE = "OFFLINE"
+}
+```
+
+---
+
+**Phase 1 Data Format Specification**
+**WIA-CRYO-PRESERVATION v1.0.0**

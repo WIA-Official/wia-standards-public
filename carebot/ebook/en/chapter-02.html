@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Architecture | WIA-CAREBOT</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: Robot Architecture and Systems</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong><br>
+        - Design hardware architectures for care robot applications<br>
+        - Select and integrate appropriate sensor systems<br>
+        - Implement safe and effective actuator control<br>
+        - Build reliable navigation and localization systems
+    </div>
+
+    <h2>2.1 System Architecture Overview</h2>
+
+    <p>A WIA-CAREBOT compliant care robot consists of several interconnected subsystems that work together to perceive the environment, make decisions, and take actions. The architecture must be modular, allowing for customization and upgrades while maintaining system reliability and safety.</p>
+
+    <pre><code>// WIA-CAREBOT System Architecture Layers
+interface CareRobotArchitecture {
+    hardwareLayer: {
+        mechanicalPlatform: MobilePlatform | StationaryPlatform;
+        powerSystem: BatterySystem;
+        computeUnits: ProcessingHardware[];
+        peripherals: Peripheral[];
+    };
+
+    sensorLayer: {
+        perceptionSensors: PerceptionSensor[];
+        proximitySensors: SafetySensor[];
+        internalSensors: DiagnosticSensor[];
+    };
+
+    controlLayer: {
+        lowLevelControl: MotorController[];
+        trajectoryPlanning: MotionPlanner;
+        safetyMonitor: SafetySystem;
+    };
+
+    cognitionLayer: {
+        perception: PerceptionPipeline;
+        planning: TaskPlanner;
+        decision: DecisionEngine;
+        learning: AdaptationModule;
+    };
+
+    interactionLayer: {
+        speechInterface: SpeechSystem;
+        displayInterface: VisualDisplay;
+        gestureRecognition: GestureSystem;
+        hapticFeedback: HapticSystem;
+    };
+
+    communicationLayer: {
+        localNetwork: WiFiModule;
+        cloudConnection: CloudConnector;
+        medicalSystems: HealthcareIntegration;
+    };
+}</code></pre>
+
+    <h2>2.2 Mechanical Platform Design</h2>
+
+    <p>The mechanical platform forms the physical foundation of the care robot. Design choices must balance mobility, stability, payload capacity, and safety in the challenging environment of human living spaces.</p>
+
+    <h3>Mobile Platform Options</h3>
+
+    <table>
+        <tr>
+            <th>Platform Type</th>
+            <th>Advantages</th>
+            <th>Challenges</th>
+            <th>Best For</th>
+        </tr>
+        <tr>
+            <td>Differential Drive</td>
+            <td>Simple, reliable, zero-turn radius</td>
+            <td>Limited speed stability</td>
+            <td>Indoor navigation</td>
+        </tr>
+        <tr>
+            <td>Omnidirectional</td>
+            <td>Holonomic motion, precise positioning</td>
+            <td>Complex mechanics, higher cost</td>
+            <td>Tight spaces, companion robots</td>
+        </tr>
+        <tr>
+            <td>Ackermann (Car-like)</td>
+            <td>Stable at speed, natural motion</td>
+            <td>Large turning radius</td>
+            <td>Outdoor mobility assistance</td>
+        </tr>
+        <tr>
+            <td>Legged</td>
+            <td>Handles stairs, uneven terrain</td>
+            <td>Complex control, high cost</td>
+            <td>Multi-floor operation</td>
+        </tr>
+    </table>
+
+    <pre><code># ROS 2 Launch File for Differential Drive Care Robot
+# carebot_bringup/launch/carebot.launch.py
+
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    return LaunchDescription([
+        # Base controller
+        Node(
+            package='carebot_base',
+            executable='differential_drive_controller',
+            name='base_controller',
+            parameters=[{
+                'wheel_radius': 0.08,
+                'wheel_separation': 0.45,
+                'max_linear_velocity': 0.5,  # Safe indoor speed
+                'max_angular_velocity': 1.0,
+                'acceleration_limit': 0.3,
+                'safety_margin': 0.15
+            }]
+        ),
+
+        # Safety monitor
+        Node(
+            package='carebot_safety',
+            executable='collision_avoidance',
+            name='safety_monitor',
+            parameters=[{
+                'emergency_stop_distance': 0.2,
+                'slow_zone_distance': 0.5,
+                'human_detection_enabled': True
+            }]
+        ),
+
+        # Localization
+        Node(
+            package='carebot_navigation',
+            executable='amcl_localization',
+            name='localization',
+            parameters=['config/localization_params.yaml']
+        )
+    ])</code></pre>
+
+    <h2>2.3 Sensor Systems</h2>
+
+    <p>Care robots require comprehensive sensing capabilities to perceive their environment, detect humans, monitor user health, and ensure safe operation. Sensor selection must consider accuracy, reliability, environmental robustness, and cost.</p>
+
+    <h3>Perception Sensors</h3>
+
+    <ul>
+        <li><strong>RGB-D Cameras:</strong> Provide color images with depth information for person detection, gesture recognition, and spatial mapping</li>
+        <li><strong>LiDAR:</strong> Accurate distance measurements for navigation, obstacle detection, and environment mapping</li>
+        <li><strong>Microphone Arrays:</strong> Enable voice command recognition, speaker localization, and acoustic event detection</li>
+        <li><strong>Thermal Cameras:</strong> Detect human presence and assess body temperature without contact</li>
+    </ul>
+
+    <pre><code>// Sensor Fusion Pipeline for Person Detection
+class PersonDetectionPipeline {
+    private rgbdCamera: RGBDCamera;
+    private thermalCamera: ThermalCamera;
+    private lidar: LiDAR;
+    private fusionAlgorithm: SensorFusion;
+
+    async detectPersons(): Promise<DetectedPerson[]> {
+        // Parallel sensor acquisition
+        const [rgbdData, thermalData, lidarData] = await Promise.all([
+            this.rgbdCamera.capture(),
+            this.thermalCamera.capture(),
+            this.lidar.scan()
+        ]);
+
+        // Individual detection pipelines
+        const rgbdDetections = this.processRGBD(rgbdData);
+        const thermalDetections = this.processThermal(thermalData);
+        const lidarDetections = this.processLidar(lidarData);
+
+        // Multi-sensor fusion for robust detection
+        const fusedDetections = this.fusionAlgorithm.fuse({
+            rgbd: rgbdDetections,
+            thermal: thermalDetections,
+            lidar: lidarDetections
+        }, {
+            confidenceThreshold: 0.85,
+            spatialToleranceMeters: 0.3,
+            requireMultipleSources: true  // Higher reliability
+        });
+
+        return fusedDetections;
+    }
+
+    private processRGBD(data: RGBDFrame): Detection[] {
+        // Deep learning based person detection
+        const detections = this.personDetector.detect(data.rgb);
+
+        // Add depth information
+        return detections.map(det => ({
+            ...det,
+            distance: this.calculateDistance(det.boundingBox, data.depth),
+            pose3D: this.estimatePose3D(det, data.depth)
+        }));
+    }
+}</code></pre>
+
+    <h3>Safety Sensors</h3>
+
+    <p>Safety sensors provide the critical data needed to prevent collisions and protect users from harm. These sensors must be highly reliable with appropriate redundancy.</p>
+
+    <pre><code># ROS 2 Safety Sensor Configuration
+# carebot_safety/config/safety_sensors.yaml
+
+bumpers:
+  front_bumper:
+    type: "contact_sensor"
+    topic: "/sensors/bumper/front"
+    response: "emergency_stop"
+    recovery_action: "reverse_0.1m"
+
+  rear_bumper:
+    type: "contact_sensor"
+    topic: "/sensors/bumper/rear"
+    response: "emergency_stop"
+    recovery_action: "forward_0.1m"
+
+proximity_sensors:
+  ultrasonic_array:
+    sensors: 8
+    fov_degrees: 30
+    range_min: 0.02
+    range_max: 4.0
+    update_rate: 20  # Hz
+
+  ir_cliff_detectors:
+    sensors: 4
+    threshold_distance: 0.05
+    response: "stop_and_alert"
+
+force_torque:
+  wrist_sensor:
+    type: "6_axis_ft"
+    overload_protection: true
+    collision_threshold_n: 50
+    response: "compliant_stop"</code></pre>
+
+    <h2>2.4 Actuator Systems</h2>
+
+    <p>Actuators convert electronic commands into physical motion. For care robots, actuator selection emphasizes safety, precision, and appropriate force limits to prevent injury during human-robot interaction.</p>
+
+    <h3>Series Elastic Actuators</h3>
+
+    <p>Series Elastic Actuators (SEAs) incorporate a compliant element between the motor and output, providing inherent safety through force limiting and enabling accurate force control. This makes them ideal for care robot arms and manipulation systems.</p>
+
+    <pre><code>// Series Elastic Actuator Controller
+class SEAController {
+    private motor: BrushlessMotor;
+    private encoder: AbsoluteEncoder;
+    private springConstant: number;  // N/m
+    private maxForce: number;        // Safety limit
+
+    constructor(config: SEAConfig) {
+        this.motor = new BrushlessMotor(config.motorId);
+        this.encoder = new AbsoluteEncoder(config.encoderId);
+        this.springConstant = config.springConstant;
+        this.maxForce = config.safetyForceLimit;
+    }
+
+    // Impedance control for safe human interaction
+    async setImpedance(
+        desiredPosition: number,
+        stiffness: number,
+        damping: number
+    ): Promise<void> {
+        const currentPosition = await this.encoder.read();
+        const currentVelocity = await this.encoder.readVelocity();
+
+        // Calculate desired force with impedance model
+        const positionError = desiredPosition - currentPosition;
+        const desiredForce = stiffness * positionError - damping * currentVelocity;
+
+        // Apply safety limit
+        const safeForce = Math.min(
+            Math.max(desiredForce, -this.maxForce),
+            this.maxForce
+        );
+
+        // Convert force to motor command through spring model
+        const springDeflection = safeForce / this.springConstant;
+        const motorPosition = desiredPosition + springDeflection;
+
+        await this.motor.setPosition(motorPosition);
+    }
+
+    // Read actual interaction force
+    async readForce(): Promise<number> {
+        const motorPos = await this.motor.getPosition();
+        const outputPos = await this.encoder.read();
+        const springDeflection = motorPos - outputPos;
+        return springDeflection * this.springConstant;
+    }
+}</code></pre>
+
+    <h2>2.5 Navigation Systems</h2>
+
+    <p>Navigation is essential for mobile care robots to move safely through living spaces, avoid obstacles, and reach users when needed. WIA-CAREBOT specifies navigation capabilities that handle the unique challenges of home and care facility environments.</p>
+
+    <h3>Simultaneous Localization and Mapping (SLAM)</h3>
+
+    <pre><code># ROS 2 SLAM Configuration for Care Robot
+# carebot_navigation/config/slam_params.yaml
+
+slam_toolbox:
+  ros__parameters:
+    # SLAM mode
+    mode: mapping  # or localization
+
+    # Sensor parameters
+    scan_topic: /sensors/lidar/scan
+    odom_topic: /odom
+    base_frame: base_footprint
+    odom_frame: odom
+    map_frame: map
+
+    # Resolution and range
+    resolution: 0.05  # 5cm resolution for home detail
+    max_laser_range: 12.0
+
+    # Loop closure
+    do_loop_closing: true
+    loop_match_minimum_chain_size: 10
+
+    # Update parameters
+    map_update_interval: 2.0
+    transform_publish_period: 0.02
+
+    # Care-specific settings
+    minimum_travel_distance: 0.3
+    minimum_travel_heading: 0.3
+    scan_buffer_size: 10</code></pre>
+
+    <h3>Path Planning and Obstacle Avoidance</h3>
+
+    <p>Care robots must navigate smoothly and predictably, avoiding obstacles while respecting social norms like maintaining appropriate distances from humans and not blocking doorways.</p>
+
+    <pre><code>// Social-Aware Path Planner for Care Robots
+class SocialPathPlanner {
+    private costmap: Costmap2D;
+    private humanTracker: HumanTracker;
+
+    async planPath(
+        start: Pose2D,
+        goal: Pose2D,
+        socialConstraints: SocialConstraints
+    ): Promise<Path> {
+        // Update costmap with dynamic obstacles
+        const humans = await this.humanTracker.getTrackedHumans();
+
+        // Add social cost layers
+        for (const human of humans) {
+            // Personal space bubble (higher cost)
+            this.costmap.addGaussianCost(
+                human.position,
+                socialConstraints.personalSpaceRadius,  // ~1.2m
+                socialConstraints.personalSpaceCost
+            );
+
+            // Movement prediction zone
+            if (human.velocity.magnitude > 0.1) {
+                const predictedPath = this.predictHumanPath(human, 3.0);
+                this.costmap.addPathCost(
+                    predictedPath,
+                    socialConstraints.crossingCost
+                );
+            }
+        }
+
+        // Add furniture and doorway costs
+        this.addEnvironmentalSocialCosts();
+
+        // Plan with social-aware A* or RRT*
+        const path = this.hybridAStarPlanner.plan(
+            start,
+            goal,
+            this.costmap,
+            {
+                allowReverse: true,
+                smoothness: 0.8,
+                maxCurvature: 2.0  // Comfortable for following humans
+            }
+        );
+
+        return this.smoothPath(path);
+    }
+}</code></pre>
+
+    <h2>2.6 Computing Architecture</h2>
+
+    <p>Care robots require substantial computational resources for perception, planning, and AI inference while maintaining low latency for safety-critical operations. A distributed computing architecture typically provides the best balance of performance and reliability.</p>
+
+    <div class="highlight">
+        <strong>Computing Requirements:</strong><br>
+        - Real-time control: ARM/x86 MCU with RTOS, sub-millisecond latency<br>
+        - Perception processing: GPU (NVIDIA Jetson), 30+ FPS object detection<br>
+        - AI inference: NPU/TPU for voice recognition and LLM responses<br>
+        - Cloud connectivity: For updates, analytics, and remote monitoring
+    </div>
+
+    <pre><code>// Distributed Computing Architecture
+interface CareBotComputeArchitecture {
+    realTimeController: {
+        hardware: "STM32H7" | "Cortex-R5";
+        os: "FreeRTOS" | "Zephyr";
+        latency: "<1ms";
+    };
+    mainComputer: {
+        hardware: "NVIDIA Jetson Orin" | "Intel NUC";
+        os: "Ubuntu 22.04 + ROS 2 Humble";
+        latency: "<100ms";
+    };
+    aiAccelerator: {
+        hardware: "Google Coral" | "Intel Movidius";
+        latency: "<50ms";
+    };
+    cloudServices: {
+        connectivity: "WiFi + LTE fallback";
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary:</strong> Care robot architecture encompasses mechanical platforms optimized for home environments, comprehensive sensor systems for perception and safety, actuators designed for safe human interaction, intelligent navigation, distributed computing, and reliable power systems. These components must be carefully integrated to create a safe, capable, and user-friendly care robot. The next chapters explore how these systems combine to deliver specific care functionalities.
+    </div>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>7장: 구현 예제 - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI 표준</h1>
+    <p class="subtitle">7장: 구현 예제</p>
+  </header>
+
+  <main class="container">
+    <h1>7장: 구현 예제</h1>
+
+    <h2>7.1 Python 구현</h2>
+    <p>옥타브 감지를 포함한 WIA-CI 오디오 처리의 완전한 Python 구현.</p>
+
+    <h3>설치</h3>
+    <pre><code>pip install wia-ci numpy scipy librosa</code></pre>
+
+    <h3>기본 CI 프로세서</h3>
+    <pre><code>import numpy as np
+from scipy import signal
+from wia_ci import WIACI, OctaveDetector
+
+class CIProcessor:
+    def __init__(self, sample_rate=16000, electrodes=22):
+        self.sample_rate = sample_rate
+        self.electrodes = electrodes
+
+        # WIA-CI 엔진 초기화
+        self.ci = WIACI(
+            electrodes=electrodes,
+            strategy='WIA-OCTAVE',
+            sample_rate=sample_rate
+        )
+
+        # 옥타브 감지기
+        self.octave_detector = OctaveDetector()
+
+    def process_frame(self, audio_frame):
+        """단일 오디오 프레임 처리"""
+
+        # 1. F0 추정
+        f0_result = self.octave_detector.estimate_f0(
+            audio_frame,
+            self.sample_rate
+        )
+
+        # 2. 옥타브 분류
+        octave_info = self.octave_detector.classify_octave(f0_result['f0'])
+
+        # 3. 22채널 엔벨로프 추출
+        envelopes = self.extract_envelopes(audio_frame)
+
+        # 4. 옥타브 정보로 향상
+        enhanced = self.enhance_with_octave(envelopes, octave_info)
+
+        # 5. 채널 선택 (ACE 전략)
+        selected = self.select_channels(enhanced, n=10)
+
+        # 6. 자극 명령 생성
+        stim_commands = self.generate_stimulation(selected)
+
+        return {
+            'f0': f0_result['f0'],
+            'octave': octave_info,
+            'envelopes': enhanced,
+            'stimulation': stim_commands
+        }</code></pre>
+
+    <h3>옥타브 감지 모듈</h3>
+    <pre><code>class OctaveDetector:
+    def estimate_f0(self, signal, sample_rate, min_f0=80, max_f0=600):
+        """F0 추정을 위한 YIN 알고리즘"""
+
+        min_period = int(sample_rate / max_f0)
+        max_period = int(sample_rate / min_f0)
+
+        # 차이 함수
+        diff = self._difference_function(signal, max_period)
+
+        # 누적 평균 정규화 차이
+        cmndf = self._cmnd_function(diff)
+
+        # 주기 찾기
+        period = self._find_period(cmndf, min_period, max_period)
+
+        f0 = sample_rate / period
+        confidence = 1 - cmndf[int(period)]
+
+        return {
+            'f0': f0,
+            'confidence': confidence,
+            'period': period
+        }
+
+    def classify_octave(self, f0):
+        """F0를 옥타브와 음표로 분류"""
+
+        A0 = 27.5  # A0 = 27.5 Hz
+
+        # 옥타브 계산: O = log2(f / A0)
+        octave_float = np.log2(f0 / A0)
+        octave_num = int(octave_float)
+
+        # 음표 계산
+        note_float = (octave_float - octave_num) * 12
+        note_num = int(round(note_float)) % 12
+
+        # C 기준으로 변환
+        note_from_c = (note_num + 3) % 12
+        notes = ['C', 'C#', 'D', 'D#', 'E', 'F',
+                 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+        return {
+            'octave_number': octave_num,
+            'note_name': notes[note_from_c],
+            'confidence': 0.95
+        }</code></pre>
+
+    <h2>7.2 TypeScript 구현</h2>
+    <p>웹 및 Node.js 애플리케이션을 위한 TypeScript 구현.</p>
+
+    <pre><code>import { FFT } from 'dsp.js';
+
+export class CIProcessor {
+  private config: WIACIConfig;
+  private fft: FFT;
+
+  constructor(config: WIACIConfig) {
+    this.config = config;
+    this.fft = new FFT(config.frameSize, config.sampleRate);
+  }
+
+  async processFrame(audioFrame: Float32Array): Promise<ProcessedFrame> {
+    // 1. F0 추정
+    const f0Result = await this.estimateF0(audioFrame);
+
+    // 2. 옥타브 분류
+    const octaveInfo = this.classifyOctave(f0Result.f0);
+
+    // 3. 엔벨로프 추출
+    const envelopes = this.extractEnvelopes(audioFrame);
+
+    // 4. 채널 선택
+    const selected = this.selectChannels(envelopes, octaveInfo);
+
+    // 5. 자극 생성
+    const stimulation = this.generateStimulation(selected);
+
+    return {
+      f0: f0Result.f0,
+      octave: octaveInfo,
+      envelopes,
+      selectedChannels: selected,
+      stimulation
+    };
+  }
+}</code></pre>
+
+    <h2>7.3 Bash 구현</h2>
+    <p>CI 시스템 관리 및 테스트를 위한 셸 스크립트.</p>
+
+    <h3>CI 장치 관리 스크립트</h3>
+    <pre><code>#!/bin/bash
+
+# WIA-CI 장치 관리 스크립트
+# 사용법: ./ci-manage.sh [명령] [옵션]
+
+set -e
+
+API_BASE="https://api.wia.ci/v1"
+AUTH_TOKEN="${WIA_CI_TOKEN}"
+
+# 장치 목록
+list_devices() {
+    echo "[정보] 장치 가져오는 중..."
+
+    response=$(curl -s -X GET \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        "$API_BASE/processors")
+
+    echo "$response" | jq -r '.devices[] | "\(.id)\t\(.name)\t\(.status)"'
+}
+
+# 옥타브 향상 활성화
+enable_octave() {
+    local device_id=$1
+
+    echo "[정보] 옥타브 향상 활성화: $device_id"
+
+    data='{"enabled": true, "musicMode": "auto", "tfsEncoding": true}'
+
+    response=$(curl -s -X PUT \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$data" \
+        "$API_BASE/processors/$device_id/wia/octave")
+
+    echo "$response" | jq '.'
+}
+
+# 임피던스 확인
+check_impedances() {
+    local device_id=$1
+
+    echo "[정보] 전극 임피던스 확인 중..."
+
+    response=$(curl -s -X GET \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        "$API_BASE/processors/$device_id/electrodes/impedances")
+
+    echo "$response" | jq '.summary'
+}
+
+# 명령 처리
+case "${1:-help}" in
+    list)
+        list_devices
+        ;;
+    octave-on)
+        enable_octave "$2"
+        ;;
+    impedance)
+        check_impedances "$2"
+        ;;
+    *)
+        echo "WIA-CI 장치 관리"
+        echo "사용법: $0 [명령] [옵션]"
+        echo "명령:"
+        echo "  list                 모든 장치 목록"
+        echo "  octave-on <id>       옥타브 향상 활성화"
+        echo "  impedance <id>       전극 임피던스 확인"
+        ;;
+esac</code></pre>
+
+    <div class="success-box">
+      <h3>코드 예제 요약</h3>
+      <ul>
+        <li><strong>Python:</strong> 옥타브 감지를 포함한 완전한 오디오 처리 파이프라인</li>
+        <li><strong>TypeScript:</strong> 실시간 처리를 위한 웹/Node.js 구현</li>
+        <li><strong>Bash:</strong> 장치 관리 및 테스트 자동화</li>
+      </ul>
+      <p>모든 예제는 다음에서 확인: <a href="https://github.com/WIA-Official/wia-ci">github.com/WIA-Official/wia-ci</a></p>
+    </div>
+
+    </main>
+</body>
+</html>

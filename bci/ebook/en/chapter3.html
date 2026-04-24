@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Endpoints - WIA BCI Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 3: API Endpoints</h1>
+        <p class="subtitle">Device Management, Data Streaming, and Session Control</p>
+        <p class="version">WIA BCI Standard v1.0.0</p>
+    </header>
+
+    <main>
+        <section>
+            <h1>3.1 Overview</h1>
+            <p>The WIA BCI API provides a device-agnostic programming interface for brain-computer interface applications. It abstracts hardware differences, allowing developers to write code that works with any BCI device.</p>
+
+            <div class="info-box">
+                <h3>Design Goals</h3>
+                <ul>
+                    <li><strong>Device Agnostic:</strong> Same API for all BCI devices</li>
+                    <li><strong>Event-Driven:</strong> Asynchronous event handling</li>
+                    <li><strong>Type-Safe:</strong> Strong typing in TypeScript</li>
+                    <li><strong>Cross-Platform:</strong> TypeScript and Python implementations</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
+            <h1>3.2 Core API: WiaBci Class</h1>
+            <p>The main entry point for all BCI operations:</p>
+
+            <h2>TypeScript Interface</h2>
+            <pre><code>class WiaBci {
+  // Constructor
+  constructor(options?: WiaBciOptions);
+
+  // Connection Management
+  connect(config: DeviceConfig): Promise&lt;void&gt;;
+  disconnect(): Promise&lt;void&gt;;
+  isConnected(): boolean;
+
+  // Device Discovery
+  listDevices(): Promise&lt;DeviceInfo[]&gt;;
+  getDeviceInfo(): DeviceInfo | null;
+
+  // Data Streaming
+  startStream(): Promise&lt;void&gt;;
+  stopStream(): Promise&lt;void&gt;;
+  isStreaming(): boolean;
+
+  // Event Handling
+  on&lt;T extends EventType&gt;(event: T, handler: EventHandler&lt;T&gt;): void;
+  off&lt;T extends EventType&gt;(event: T, handler: EventHandler&lt;T&gt;): void;
+  once&lt;T extends EventType&gt;(event: T, handler: EventHandler&lt;T&gt;): void;
+  emit&lt;T extends EventType&gt;(event: T, data: EventData&lt;T&gt;): void;
+
+  // State Management
+  getState(): BciState;
+  getChannels(): ChannelInfo[];
+
+  // Resource Cleanup
+  dispose(): void;
+}</code></pre>
+
+            <h2>Python Interface</h2>
+            <pre><code>class WiaBci:
+    def __init__(self, options: Optional[WiaBciOptions] = None):
+        pass
+
+    async def connect(self, config: DeviceConfig) -> None:
+        pass
+
+    async def disconnect(self) -> None:
+        pass
+
+    def is_connected(self) -> bool:
+        pass
+
+    async def list_devices(self) -> List[DeviceInfo]:
+        pass
+
+    def get_device_info(self) -> Optional[DeviceInfo]:
+        pass
+
+    async def start_stream(self) -> None:
+        pass
+
+    async def stop_stream(self) -> None:
+        pass
+
+    def is_streaming(self) -> bool:
+        pass
+
+    def on(self, event: str, handler: Callable) -> None:
+        pass
+
+    def off(self, event: str, handler: Callable) -> None:
+        pass
+
+    def dispose(self) -> None:
+        pass</code></pre>
+        </section>
+
+        <section>
+            <h1>3.3 Configuration Types</h1>
+
+            <h2>Device Configuration</h2>
+            <pre><code>interface DeviceConfig {
+  type: DeviceType;
+  device?: {
+    manufacturer?: string;
+    model?: string;
+    serialNumber?: string;
+  };
+  connection?: {
+    protocol?: ConnectionProtocol;
+    address?: string;
+    port?: number;
+  };
+  acquisition?: {
+    samplingRate?: number;
+    channels?: string[];
+    filters?: FilterConfig[];
+  };
+}
+
+type DeviceType =
+  | 'eeg_headset'
+  | 'eeg_cap'
+  | 'implant_cortical'
+  | 'implant_endovascular'
+  | 'fnirs'
+  | 'hybrid'
+  | 'simulator';
+
+type ConnectionProtocol =
+  | 'usb'
+  | 'bluetooth'
+  | 'bluetooth_le'
+  | 'wifi'
+  | 'serial'
+  | 'lsl';</code></pre>
+
+            <h2>Filter Configuration</h2>
+            <pre><code>interface FilterConfig {
+  type: 'highpass' | 'lowpass' | 'bandpass' | 'notch';
+  frequency: number | [number, number];
+  order?: number;
+}
+
+// Example: Motor imagery filtering
+const filters: FilterConfig[] = [
+  { type: 'highpass', frequency: 0.5, order: 4 },
+  { type: 'lowpass', frequency: 50, order: 4 },
+  { type: 'notch', frequency: 60 }  // Remove power line noise
+];</code></pre>
+        </section>
+
+        <section>
+            <h1>3.4 Event System</h1>
+
+            <h2>Event Types</h2>
+            <pre><code>type EventType =
+  // Connection Events
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'connection_error'
+
+  // Streaming Events
+  | 'stream_started'
+  | 'stream_stopped'
+  | 'data'
+  | 'signal'
+
+  // Marker Events
+  | 'marker'
+  | 'trigger'
+
+  // Classification Events
+  | 'classification'
+  | 'prediction'
+
+  // Device Events
+  | 'battery'
+  | 'impedance'
+  | 'quality'
+
+  // Error Events
+  | 'error'
+  | 'warning';</code></pre>
+
+            <h2>Event Data Structures</h2>
+            <pre><code>// Signal Data Event
+interface SignalEvent {
+  timestamp: number;
+  sampleIndex: number;
+  channels: number[];
+  data: Float32Array;
+}
+
+// Marker Event
+interface MarkerEvent {
+  timestamp: number;
+  sampleIndex: number;
+  code: number;
+  label?: string;
+  value?: any;
+}
+
+// Classification Result
+interface ClassificationEvent {
+  timestamp: number;
+  classId: number;
+  className: string;
+  confidence: number;
+  probabilities?: Record&lt;string, number&gt;;
+}
+
+// Quality Event
+interface QualityEvent {
+  timestamp: number;
+  channelQualities: ChannelQuality[];
+  overallQuality: number;
+}
+
+interface ChannelQuality {
+  channel: number;
+  label: string;
+  impedance?: number;
+  signalQuality: number;
+  artifacts: string[];
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>3.5 Device Adapters</h1>
+
+            <h2>Base Adapter Interface</h2>
+            <pre><code>interface IBciAdapter {
+  // Basic Information
+  readonly type: DeviceType;
+  readonly name: string;
+
+  // Connection Management
+  connect(config: DeviceConfig): Promise&lt;void&gt;;
+  disconnect(): Promise&lt;void&gt;;
+  isConnected(): boolean;
+
+  // Streaming
+  startStream(): Promise&lt;void&gt;;
+  stopStream(): Promise&lt;void&gt;;
+  isStreaming(): boolean;
+
+  // Device Information
+  getDeviceInfo(): DeviceInfo | null;
+  getChannels(): ChannelInfo[];
+
+  // Events
+  onData(handler: (data: SignalEvent) => void): void;
+  onError(handler: (error: ErrorEvent) => void): void;
+
+  // Resource Cleanup
+  dispose(): void;
+}</code></pre>
+
+            <h2>Available Adapters</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Adapter</th>
+                        <th>Device Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>OpenBciAdapter</code></td>
+                        <td>eeg_headset</td>
+                        <td>OpenBCI Cyton/Ganglion</td>
+                    </tr>
+                    <tr>
+                        <td><code>EmotivAdapter</code></td>
+                        <td>eeg_headset</td>
+                        <td>Emotiv EPOC/Insight</td>
+                    </tr>
+                    <tr>
+                        <td><code>MuseAdapter</code></td>
+                        <td>eeg_headset</td>
+                        <td>InteraXon Muse</td>
+                    </tr>
+                    <tr>
+                        <td><code>NeurableAdapter</code></td>
+                        <td>eeg_headset</td>
+                        <td>Neurable devices</td>
+                    </tr>
+                    <tr>
+                        <td><code>LslAdapter</code></td>
+                        <td>any</td>
+                        <td>Lab Streaming Layer</td>
+                    </tr>
+                    <tr>
+                        <td><code>SimulatorAdapter</code></td>
+                        <td>simulator</td>
+                        <td>Test/Development</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h1>3.6 Signal Processing Utilities</h1>
+
+            <h2>SignalProcessor Class</h2>
+            <pre><code>class SignalProcessor {
+  // Filtering
+  static highpass(data: Float32Array, cutoff: number, fs: number): Float32Array;
+  static lowpass(data: Float32Array, cutoff: number, fs: number): Float32Array;
+  static bandpass(data: Float32Array, low: number, high: number, fs: number): Float32Array;
+  static notch(data: Float32Array, freq: number, fs: number, Q?: number): Float32Array;
+
+  // FFT Analysis
+  static fft(data: Float32Array): ComplexArray;
+  static ifft(data: ComplexArray): Float32Array;
+  static psd(data: Float32Array, fs: number): PowerSpectrum;
+
+  // Band Power Extraction
+  static bandpower(data: Float32Array, fs: number, band: FrequencyBand): number;
+  static allBandPowers(data: Float32Array, fs: number): BandPowers;
+
+  // Artifact Detection
+  static detectBlinks(eog: Float32Array, threshold?: number): number[];
+  static detectMotion(accel: Float32Array, threshold?: number): number[];
+
+  // Windowing
+  static epoch(data: Float32Array, start: number, end: number): Float32Array;
+  static sliding(data: Float32Array, windowSize: number, step: number): Float32Array[];
+}
+
+interface BandPowers {
+  delta: number;   // 0.5-4 Hz
+  theta: number;   // 4-8 Hz
+  alpha: number;   // 8-13 Hz
+  beta: number;    // 13-30 Hz
+  gamma: number;   // 30-100 Hz
+}</code></pre>
+
+            <h2>Feature Extraction</h2>
+            <pre><code>class FeatureExtractor {
+  // Time Domain Features
+  static mean(data: Float32Array): number;
+  static variance(data: Float32Array): number;
+  static rms(data: Float32Array): number;
+  static zeroCrossings(data: Float32Array): number;
+  static hjorthParameters(data: Float32Array): HjorthParams;
+
+  // Frequency Domain Features
+  static spectralEntropy(psd: PowerSpectrum): number;
+  static spectralEdge(psd: PowerSpectrum, percent?: number): number;
+  static peakFrequency(psd: PowerSpectrum): number;
+
+  // Connectivity
+  static coherence(ch1: Float32Array, ch2: Float32Array, fs: number): number;
+  static correlation(ch1: Float32Array, ch2: Float32Array): number;
+
+  // Combined Extraction
+  static extractAll(data: Float32Array, fs: number): FeatureVector;
+}
+
+interface HjorthParams {
+  activity: number;
+  mobility: number;
+  complexity: number;
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>3.7 Usage Examples</h1>
+
+            <h2>Basic Connection (TypeScript)</h2>
+            <pre><code>import { WiaBci } from 'wia-bci';
+
+async function main() {
+  const bci = new WiaBci({ logLevel: 'info' });
+
+  // List available devices
+  const devices = await bci.listDevices();
+  console.log('Available devices:', devices);
+
+  // Connect to device
+  await bci.connect({
+    type: 'eeg_headset',
+    device: { manufacturer: 'OpenBCI' },
+    acquisition: {
+      samplingRate: 250,
+      channels: ['Fp1', 'Fp2', 'C3', 'C4', 'O1', 'O2']
+    }
+  });
+
+  console.log('Connected:', bci.isConnected());
+
+  // Receive data
+  bci.on('signal', (event) => {
+    console.log(`Sample ${event.sampleIndex}:`, event.data);
+  });
+
+  // Start streaming
+  await bci.startStream();
+
+  // Stop after 10 seconds
+  setTimeout(async () => {
+    await bci.stopStream();
+    await bci.disconnect();
+    bci.dispose();
+  }, 10000);
+}
+
+main();</code></pre>
+
+            <h2>Motor Imagery Classification</h2>
+            <pre><code>import { WiaBci, SignalProcessor, FeatureExtractor } from 'wia-bci';
+
+const bci = new WiaBci();
+const buffer: Float32Array[] = [];
+const EPOCH_SIZE = 250; // 1 second @ 250Hz
+
+await bci.connect({ type: 'eeg_headset' });
+
+bci.on('signal', (event) => {
+  buffer.push(event.data);
+
+  if (buffer.length >= EPOCH_SIZE) {
+    // Create 1-second epoch
+    const epoch = concatenateBuffers(buffer.splice(0, EPOCH_SIZE));
+
+    // Preprocessing
+    const filtered = SignalProcessor.bandpass(epoch, 8, 30, 250);
+
+    // Feature extraction
+    const features = FeatureExtractor.extractAll(filtered, 250);
+    const bandPowers = SignalProcessor.allBandPowers(filtered, 250);
+
+    // Classify (using pre-trained model)
+    const prediction = classifier.predict({ ...features, ...bandPowers });
+
+    // Emit classification event
+    bci.emit('classification', {
+      timestamp: Date.now(),
+      classId: prediction.class,
+      className: ['rest', 'left', 'right', 'feet'][prediction.class],
+      confidence: prediction.confidence
+    });
+  }
+});
+
+await bci.startStream();</code></pre>
+
+            <h2>Python Example</h2>
+            <pre><code>import asyncio
+from wia_bci import WiaBci
+
+async def main():
+    bci = WiaBci(log_level='info')
+
+    # List devices
+    devices = await bci.list_devices()
+    print(f"Available devices: {devices}")
+
+    # Connect
+    await bci.connect(
+        type='eeg_headset',
+        device={'manufacturer': 'OpenBCI'},
+        acquisition={
+            'sampling_rate': 250,
+            'channels': ['Fp1', 'Fp2', 'C3', 'C4', 'O1', 'O2']
+        }
+    )
+
+    print(f"Connected: {bci.is_connected()}")
+
+    # Data handler (decorator style)
+    @bci.on('signal')
+    def on_signal(event):
+        print(f"Sample {event.sample_index}: {event.data}")
+
+    # Start streaming
+    await bci.start_stream()
+
+    # Wait 10 seconds
+    await asyncio.sleep(10)
+
+    # Cleanup
+    await bci.stop_stream()
+    await bci.disconnect()
+    bci.dispose()
+
+asyncio.run(main())</code></pre>
+        </section>
+
+        <section>
+            <h1>3.8 Error Handling</h1>
+
+            <h2>Error Codes</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>E001</code></td>
+                        <td>CONNECTION_FAILED</td>
+                        <td>Device connection failed</td>
+                    </tr>
+                    <tr>
+                        <td><code>E002</code></td>
+                        <td>DEVICE_NOT_FOUND</td>
+                        <td>Device not found</td>
+                    </tr>
+                    <tr>
+                        <td><code>E003</code></td>
+                        <td>PERMISSION_DENIED</td>
+                        <td>Access permission denied</td>
+                    </tr>
+                    <tr>
+                        <td><code>E004</code></td>
+                        <td>STREAM_ERROR</td>
+                        <td>Streaming error</td>
+                    </tr>
+                    <tr>
+                        <td><code>E005</code></td>
+                        <td>INVALID_CONFIG</td>
+                        <td>Invalid configuration</td>
+                    </tr>
+                    <tr>
+                        <td><code>E006</code></td>
+                        <td>ADAPTER_ERROR</td>
+                        <td>Adapter error</td>
+                    </tr>
+                    <tr>
+                        <td><code>E007</code></td>
+                        <td>TIMEOUT</td>
+                        <td>Operation timeout</td>
+                    </tr>
+                    <tr>
+                        <td><code>E008</code></td>
+                        <td>DISCONNECTED</td>
+                        <td>Connection lost</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Error Handling Pattern</h2>
+            <pre><code>import { WiaBci, BciError } from 'wia-bci';
+
+const bci = new WiaBci();
+
+try {
+  await bci.connect({ type: 'eeg_headset' });
+} catch (error) {
+  if (error instanceof BciError) {
+    switch (error.code) {
+      case 'E001':
+        console.error('Connection failed:', error.message);
+        break;
+      case 'E002':
+        console.error('Device not found');
+        break;
+      default:
+        console.error('BCI Error:', error);
+    }
+  }
+}
+
+// Event-based error handling
+bci.on('error', (error) => {
+  console.error(`[${error.code}] ${error.message}`);
+
+  if (!error.recoverable) {
+    bci.disconnect();
+  }
+});</code></pre>
+        </section>
+
+        <section>
+            <h1>3.9 Best Practices</h1>
+
+            <h2>Resource Management</h2>
+            <ul>
+                <li>Always call <code>dispose()</code> when finished</li>
+                <li>Use <code>try-finally</code> blocks to ensure cleanup</li>
+                <li>Remove event listeners when no longer needed</li>
+                <li>Disconnect devices before page unload</li>
+            </ul>
+
+            <h2>Performance</h2>
+            <ul>
+                <li>Process signal data in chunks/epochs</li>
+                <li>Use Web Workers for heavy processing</li>
+                <li>Limit console logging in production</li>
+                <li>Cache feature extraction results</li>
+            </ul>
+
+            <h2>Reliability</h2>
+            <ul>
+                <li>Implement automatic reconnection</li>
+                <li>Validate signal quality continuously</li>
+                <li>Handle network interruptions gracefully</li>
+                <li>Save data periodically to prevent loss</li>
+            </ul>
+        </section>
+
+        <div class="navigation">
+            <a href="chapter2.html">← Previous: Chapter 2</a>
+            <a href="chapter4.html">Next: Chapter 4 (Protocol) →</a>
+        </div>
+    </main>
+</body>
+</html>

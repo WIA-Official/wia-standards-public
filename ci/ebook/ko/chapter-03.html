@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 3: 빌드 시스템 | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 3: 빌드 시스템과 의존성 관리</h1>
+
+    <p>빌드 시스템은 모든 CI 파이프라인의 엔진을 형성하며 소스 코드를 배포 가능한 아티팩트로 변환합니다. 이 챕터에서는 기술 스택 전반의 빌드 자동화, 의존성 관리 전략, 그리고 빌드 성능을 극적으로 향상시키는 캐싱 기법을 다룹니다.</p>
+
+    <h2>빌드 시스템 기초</h2>
+
+    <p>빌드 시스템은 소스 코드의 컴파일, 변환, 패키징을 조율합니다. 현대 빌드 시스템은 복잡한 의존성 그래프를 처리하고, 증분 빌드를 지원하며, CI 플랫폼과 원활하게 통합되어야 합니다.</p>
+
+    <h3>빌드 시스템 특성</h3>
+
+    <table>
+        <tr>
+            <th>특성</th>
+            <th>설명</th>
+            <th>영향</th>
+        </tr>
+        <tr>
+            <td>결정론적</td>
+            <td>동일한 입력이 동일한 출력을 생성</td>
+            <td>재현 가능한 빌드</td>
+        </tr>
+        <tr>
+            <td>증분적</td>
+            <td>변경된 컴포넌트만 재빌드</td>
+            <td>더 빠른 반복</td>
+        </tr>
+        <tr>
+            <td>병렬</td>
+            <td>독립적인 작업을 동시에 실행</td>
+            <td>빌드 시간 단축</td>
+        </tr>
+        <tr>
+            <td>캐시 가능</td>
+            <td>이전 빌드 출력을 저장하고 재사용</td>
+            <td>극적인 속도 향상</td>
+        </tr>
+        <tr>
+            <td>격리됨</td>
+            <td>외부 환경으로부터 격리</td>
+            <td>일관된 결과</td>
+        </tr>
+    </table>
+
+    <h2>언어별 빌드 시스템</h2>
+
+    <h3>JavaScript/TypeScript with npm/pnpm</h3>
+
+    <pre><code># package.json - 빌드 구성
+{
+  "name": "wia-ci-demo",
+  "version": "1.0.0",
+  "scripts": {
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean",
+    "build": "tsc && npm run build:assets",
+    "build:assets": "copyfiles -u 1 src/**/*.json dist/",
+    "build:prod": "NODE_ENV=production npm run build",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "rimraf": "^5.0.0",
+    "copyfiles": "^2.0.0"
+  }
+}</code></pre>
+
+    <pre><code># GitHub Actions - Node.js 빌드
+name: Node.js CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pnpm 설정
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: 린트
+        run: pnpm lint
+
+      - name: 빌드
+        run: pnpm build:prod
+
+      - name: 테스트
+        run: pnpm test:coverage</code></pre>
+
+    <h3>Java/Kotlin with Gradle</h3>
+
+    <pre><code>// build.gradle.kts - Gradle 빌드 구성
+plugins {
+    kotlin("jvm") version "1.9.0"
+    id("org.springframework.boot") version "3.2.0"
+    id("io.spring.dependency-management") version "1.1.0"
+}
+
+group = "com.wia.ci"
+version = "1.0.0"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
+tasks.named<Jar>("jar") {
+    manifest {
+        attributes["Main-Class"] = "com.wia.ci.ApplicationKt"
+    }
+}</code></pre>
+
+    <pre><code># GitHub Actions - Gradle 빌드
+name: Java CI with Gradle
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21 설정
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: 실행 권한 부여
+        run: chmod +x gradlew
+
+      - name: Gradle로 빌드
+        run: ./gradlew build
+
+      - name: 테스트 실행
+        run: ./gradlew test
+
+      - name: 테스트 리포트 업로드
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: build/reports/tests/</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI 빌드 표준:</strong> 모든 빌드 구성은 선언적이고 버전 관리되어야 합니다. 특정 실행 환경이나 수동 설정 단계에 의존하는 명령형 빌드 스크립트는 피하세요.
+    </div>
+
+    <h3>Go 빌드 시스템</h3>
+
+    <pre><code># Makefile - Go 빌드 구성
+.PHONY: all build test lint clean
+
+VERSION := $(shell git describe --tags --always)
+BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}"
+
+all: lint test build
+
+build:
+	CGO_ENABLED=0 go build ${LDFLAGS} -o bin/app ./cmd/app
+
+test:
+	go test -v -race -coverprofile=coverage.out ./...
+
+lint:
+	golangci-lint run ./...
+
+clean:
+	rm -rf bin/ coverage.out</code></pre>
+
+    <h2>의존성 관리</h2>
+
+    <p>의존성은 코드가 의존하는 외부 라이브러리와 패키지입니다. 효과적인 의존성 관리는 보안 위험을 최소화하면서 재현 가능한 빌드를 보장합니다.</p>
+
+    <h3>의존성 관리 원칙</h3>
+
+    <ul>
+        <li><strong>락 파일:</strong> 재현 가능한 빌드를 보장하기 위해 항상 락 파일(package-lock.json, pnpm-lock.yaml, Cargo.lock)을 커밋하세요</li>
+        <li><strong>시맨틱 버전 관리:</strong> 의존성에 대한 semver 범위를 이해하고 적절히 사용하세요</li>
+        <li><strong>최소 의존성:</strong> 정기적으로 감사하고 사용하지 않는 의존성을 제거하세요</li>
+        <li><strong>보안 스캐닝:</strong> 의존성 취약점 스캐닝을 CI에 통합하세요</li>
+        <li><strong>프라이빗 레지스트리:</strong> 내부 패키지와 퍼블릭 레지스트리 프록시를 위해 프라이빗 레지스트리를 사용하세요</li>
+    </ul>
+
+    <pre><code># 의존성 감사 통합
+# GitHub Actions
+name: 의존성 보안
+on:
+  push:
+  schedule:
+    - cron: '0 0 * * *'  # 일일 스캔
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: npm audit 실행
+        run: npm audit --audit-level=moderate
+
+      - name: 오래된 패키지 확인
+        run: npm outdated || true
+
+      - name: Snyk 보안 스캔 실행
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high</code></pre>
+
+    <h3>의존성 캐싱 전략</h3>
+
+    <pre><code># 다층 캐싱 전략
+# GitHub Actions
+name: 캐싱을 통한 빌드
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 락 파일 기반 node_modules 캐시
+      - name: node_modules 캐시
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      # 빌드 출력물 캐시
+      - name: 빌드 캐시
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist
+            .next/cache
+          key: ${{ runner.os }}-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: 빌드
+        run: pnpm build</code></pre>
+
+    <h2>고급 캐싱 전략</h2>
+
+    <p>효과적인 캐싱은 빌드 시간을 50-90% 줄일 수 있습니다. WIA-CI 표준은 최적의 성능을 위해 여러 캐싱 레이어를 구현할 것을 권장합니다.</p>
+
+    <h3>캐싱 레이어</h3>
+
+    <table>
+        <tr>
+            <th>레이어</th>
+            <th>내용</th>
+            <th>키 전략</th>
+            <th>일반적인 절감</th>
+        </tr>
+        <tr>
+            <td>의존성</td>
+            <td>node_modules, .m2, vendor</td>
+            <td>락 파일 해시</td>
+            <td>30-60초</td>
+        </tr>
+        <tr>
+            <td>빌드 캐시</td>
+            <td>컴파일 출력, 중간물</td>
+            <td>소스 해시 + 구성</td>
+            <td>1-5분</td>
+        </tr>
+        <tr>
+            <td>Docker 레이어</td>
+            <td>이미지 레이어</td>
+            <td>레이어 콘텐츠 해시</td>
+            <td>2-10분</td>
+        </tr>
+        <tr>
+            <td>테스트 캐시</td>
+            <td>테스트 결과, 스냅샷</td>
+            <td>테스트 파일 해시</td>
+            <td>30-120초</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>캐시 무효화 전략:</strong> 적절한 세분성으로 캐시 키를 설계하세요. 너무 구체적인 키는 캐시 미스를 초래하고, 너무 광범위한 키는 오래된 아티팩트를 복원할 수 있습니다. 캐시 키에 OS, 도구 버전, 관련 구성 해시를 포함하세요.
+    </div>
+
+    <h3>원격 빌드 캐싱</h3>
+
+    <pre><code># Turborepo 원격 캐싱
+# turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**"],
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"],
+      "cache": true
+    },
+    "lint": {
+      "outputs": [],
+      "cache": true
+    }
+  },
+  "remoteCache": {
+    "signature": true
+  }
+}</code></pre>
+
+    <h2>빌드 최적화 기법</h2>
+
+    <p>캐싱 외에도 여러 기법이 빌드 성능을 크게 향상시킬 수 있습니다:</p>
+
+    <h3>증분 빌드</h3>
+
+    <pre><code># TypeScript 증분 빌드
+# tsconfig.json
+{
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true
+  }
+}
+
+# 모노레포를 위한 프로젝트 참조
+{
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/api" },
+    { "path": "./packages/web" }
+  ]
+}</code></pre>
+
+    <h3>병렬 컴파일</h3>
+
+    <pre><code># esbuild - 초고속 JavaScript 번들러
+# build.js
+import * as esbuild from 'esbuild';
+
+await esbuild.build({
+  entryPoints: ['src/index.ts'],
+  bundle: true,
+  minify: true,
+  sourcemap: true,
+  platform: 'node',
+  target: 'node20',
+  outfile: 'dist/index.js',
+});
+
+// 빌드 시간: ~50ms vs 전통적인 번들러의 ~5s</code></pre>
+
+    <pre><code># Gradle 병렬 실행
+# gradle.properties
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.configureondemand=true
+org.gradle.jvmargs=-Xmx4g -XX:+UseParallelGC</code></pre>
+
+    <h2>빌드 재현성</h2>
+
+    <p>재현 가능한 빌드는 동일한 소스 코드가 항상 동일한 바이너리를 생성하도록 보장합니다. 이는 보안 감사와 프로덕션 문제 디버깅에 매우 중요합니다.</p>
+
+    <pre><code># 재현 가능한 빌드를 위한 Dockerfile
+FROM node:20-alpine AS builder
+
+# 결정론적 환경 설정
+ENV NODE_ENV=production
+ENV SOURCE_DATE_EPOCH=0
+
+WORKDIR /app
+
+# 의존성 파일 먼저 복사 (더 나은 캐싱)
+COPY package.json pnpm-lock.yaml ./
+
+# 정확한 버전으로 의존성 설치
+RUN corepack enable && pnpm install --frozen-lockfile
+
+# 소스 코드 복사
+COPY . .
+
+# 결정론적 출력으로 빌드
+RUN pnpm build
+
+# 프로덕션 이미지
+FROM node:20-alpine AS runner
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+CMD ["node", "dist/index.js"]</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI 성숙도 모델 - 레벨 3 (빌드 우수성):</strong>
+        <ul>
+            <li>환경 전반에 걸친 재현 가능한 빌드</li>
+            <li>70%+ 캐시 히트율의 다층 캐싱</li>
+            <li>대부분의 변경에 대해 5분 이내의 빌드 시간</li>
+            <li>보안 스캐닝을 통한 자동화된 의존성 업데이트</li>
+        </ul>
+    </div>
+
+    <p>빌드 시스템과 의존성 관리를 마스터하는 것은 효율적인 CI 파이프라인에 필수적입니다. 이 챕터의 기법들은 팀과 코드베이스에 맞게 확장되는 더 빠르고 더 신뢰할 수 있는 빌드를 달성하는 데 도움이 될 것입니다.</p>
+
+</body>
+</html>

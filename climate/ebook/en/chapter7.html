@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA Climate Data Format Standard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 { color: #10B981; margin-top: 2em; }
+        h1 { border-bottom: 3px solid #10B981; padding-bottom: 10px; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; border-left: 4px solid #10B981; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; color: #10B981; }
+        tr:nth-child(even) { background: #1e293b40; }
+        blockquote { border-left: 4px solid #ffd700; padding-left: 20px; margin: 20px 0; background: #1e293b; padding: 20px; border-radius: 0 8px 8px 0; }
+        .highlight { background: #10B98120; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        footer .philosophy { color: #ffd700; font-size: 1.2em; margin-bottom: 10px; }
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: Implementation Examples</h1>
+
+    <blockquote>
+        <p>"Code speaks louder than specifications. These examples demonstrate WIA Climate in action across Python, TypeScript, and Bash."</p>
+    </blockquote>
+
+    <h2>7.1 Python Examples</h2>
+
+    <h3>7.1.1 Complete Carbon Capture Sensor Client</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+WIA Climate - Carbon Capture Sensor Client
+Reads data from DAC facility and publishes to WIA Climate API
+"""
+
+import time
+import json
+import requests
+from datetime import datetime, timezone
+from typing import Dict, Any
+
+class WIAClimateClient:
+    def __init__(self, api_key: str, base_url: str = "https://api.wia.live/climate/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    def create_carbon_capture_message(
+        self,
+        latitude: float,
+        longitude: float,
+        manufacturer: str,
+        model: str,
+        serial: str,
+        technology: str,
+        capture_rate: float,
+        purity: float,
+        energy_kwh: float
+    ) -> Dict[str, Any]:
+        """Create a WIA Climate carbon capture message"""
+        now_ms = int(time.time() * 1000)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        return {
+            "version": "1.0.0",
+            "type": "carbon_capture",
+            "timestamp": {
+                "unix_ms": now_ms,
+                "iso8601": now_iso
+            },
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude,
+                "altitude_m": 100,
+                "crs": "EPSG:4326"
+            },
+            "device": {
+                "manufacturer": manufacturer,
+                "model": model,
+                "serial": serial
+            },
+            "data": {
+                "technology": technology,
+                "capture_rate_kg_per_hour": capture_rate,
+                "co2_purity_percentage": purity,
+                "energy_consumption_kwh": energy_kwh
+            },
+            "meta": {
+                "quality_score": 0.98,
+                "source": "sensor"
+            }
+        }
+
+    def submit_data(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Submit climate data to WIA API"""
+        response = requests.post(
+            f"{self.base_url}/data",
+            json=message,
+            headers=self.headers,
+            timeout=10
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def query_data(
+        self,
+        data_type: str,
+        start_time: str,
+        end_time: str,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """Query historical climate data"""
+        params = {
+            "type": data_type,
+            "start_time": start_time,
+            "end_time": end_time,
+            "limit": limit
+        }
+        response = requests.get(
+            f"{self.base_url}/data",
+            params=params,
+            headers=self.headers,
+            timeout=10
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+# Example usage
+if __name__ == "__main__":
+    client = WIAClimateClient(api_key="your_api_key_here")
+
+    # Simulate sensor readings
+    message = client.create_carbon_capture_message(
+        latitude=64.0,
+        longitude=-21.0,
+        manufacturer="Climeworks",
+        model="Orca DAC",
+        serial="ORCA-2024-001",
+        technology="dac",
+        capture_rate=125.5,
+        purity=99.2,
+        energy_kwh=2500.0
+    )
+
+    # Submit to API
+    result = client.submit_data(message)
+    print(f"✓ Message submitted: {result['data']['message_id']}")
+
+    # Query recent data
+    recent = client.query_data(
+        data_type="carbon_capture",
+        start_time="2024-12-01T00:00:00Z",
+        end_time="2024-12-14T23:59:59Z",
+        limit=10
+    )
+    print(f"✓ Retrieved {len(recent['data']['messages'])} messages")
+</code></pre>
+
+    <h3>7.1.2 Vertical Farming Data Pipeline</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+Vertical Farm - Multi-Zone Environmental Monitoring
+"""
+
+import asyncio
+import json
+from dataclasses import dataclass, asdict
+from typing import List
+from datetime import datetime, timezone
+
+@dataclass
+class EnvironmentSensors:
+    temperature_celsius: float
+    humidity_percentage: float
+    co2_ppm: float
+    vpd_kpa: float
+
+@dataclass
+class LightingSensors:
+    ppfd_umol_per_m2_s: float
+    photoperiod_hours: int
+    spectrum: str = "full_spectrum"
+
+@dataclass
+class NutrientSensors:
+    ph: float
+    ec_ms_per_cm: float
+    temperature_celsius: float
+    dissolved_oxygen_mg_per_l: float
+
+class VerticalFarmMonitor:
+    def __init__(self, wia_client, farm_id: str):
+        self.client = wia_client
+        self.farm_id = farm_id
+
+    async def read_zone_sensors(self, zone_id: int):
+        """Read all sensors from a farm zone"""
+        # In reality, this would interface with actual I2C/SPI sensors
+        # For demo, return simulated data
+        return {
+            "environment": EnvironmentSensors(22.5, 65.0, 800.0, 0.85),
+            "lighting": LightingSensors(450.0, 16),
+            "nutrients": NutrientSensors(6.0, 1.8, 20.0, 8.0)
+        }
+
+    async def publish_zone_data(self, zone_id: int):
+        """Publish data from one zone"""
+        sensors = await self.read_zone_sensors(zone_id)
+
+        message = {
+            "version": "1.0.0",
+            "type": "vertical_farming",
+            "timestamp": {
+                "unix_ms": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "iso8601": datetime.now(timezone.utc).isoformat()
+            },
+            "location": {
+                "latitude": 1.3521,
+                "longitude": 103.8198,
+                "altitude_m": 50
+            },
+            "device": {
+                "manufacturer": "SmartFarm Inc",
+                "model": f"Zone-{zone_id}",
+                "serial": f"{self.farm_id}-Z{zone_id}"
+            },
+            "data": {
+                "system_type": "hydroponics",
+                "environment": asdict(sensors["environment"]),
+                "lighting": asdict(sensors["lighting"]),
+                "nutrient_solution": asdict(sensors["nutrients"]),
+                "crop": {
+                    "species": "lactuca_sativa",
+                    "variety": "butterhead",
+                    "growth_stage": "vegetative",
+                    "days_after_planting": 21
+                }
+            }
+        }
+
+        result = self.client.submit_data(message)
+        print(f"Zone {zone_id}: {result['data']['message_id']}")
+
+    async def monitor_all_zones(self, num_zones: int = 10, interval_seconds: int = 300):
+        """Monitor all zones continuously"""
+        while True:
+            tasks = [self.publish_zone_data(i) for i in range(1, num_zones + 1)]
+            await asyncio.gather(*tasks)
+            await asyncio.sleep(interval_seconds)
+
+# Run monitor
+# asyncio.run(VerticalFarmMonitor(client, "FARM-SG-001").monitor_all_zones())
+</code></pre>
+
+    <h2>7.2 TypeScript Examples</h2>
+
+    <h3>7.2.1 Real-time Ocean Cleanup Dashboard</h3>
+
+    <pre><code>// ocean-cleanup-dashboard.ts
+import WebSocket from 'ws';
+
+interface ClimateMessage {
+  version: string;
+  type: string;
+  timestamp: {
+    unix_ms: number;
+    iso8601: string;
+  };
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  device: {
+    manufacturer: string;
+    model: string;
+    serial: string;
+  };
+  data: any;
+}
+
+interface OceanCleanupData {
+  operation_type: string;
+  collection: {
+    total_mass_kg: number;
+    plastic_mass_kg: number;
+    microplastic_count: number;
+  };
+  area: {
+    swept_km2: number;
+    duration_hours: number;
+  };
+}
+
+class OceanCleanupDashboard {
+  private ws: WebSocket;
+  private totalPlasticCollected: number = 0;
+  private vesselsActive: Set&lt;string&gt; = new Set();
+
+  constructor(apiUrl: string, authToken: string) {
+    this.ws = new WebSocket(`${apiUrl}/stream?auth=${authToken}`);
+
+    this.ws.on('open', () => {
+      console.log('✓ Connected to WIA Climate stream');
+      this.subscribe();
+    });
+
+    this.ws.on('message', (data: string) => {
+      this.handleMessage(JSON.parse(data));
+    });
+
+    this.ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
+  }
+
+  private subscribe() {
+    this.ws.send(JSON.stringify({
+      action: 'subscribe',
+      filters: {
+        type: 'ocean_cleanup',
+        // Optional: filter by region
+        // bbox: '120,0,140,20'  // Pacific region
+      }
+    }));
+  }
+
+  private handleMessage(msg: any) {
+    if (msg.type === 'data' && msg.payload.type === 'ocean_cleanup') {
+      const climateMsg: ClimateMessage = msg.payload;
+      const oceanData: OceanCleanupData = climateMsg.data;
+
+      // Update statistics
+      this.totalPlasticCollected += oceanData.collection.plastic_mass_kg;
+      this.vesselsActive.add(climateMsg.device.serial);
+
+      // Render update
+      this.renderStats();
+
+      // Alert on large collection
+      if (oceanData.collection.total_mass_kg > 500) {
+        this.showAlert(
+          `Major collection: ${oceanData.collection.total_mass_kg.toFixed(1)} kg ` +
+          `by ${climateMsg.device.model}`
+        );
+      }
+    }
+  }
+
+  private renderStats() {
+    console.clear();
+    console.log('🌊 Ocean Cleanup Dashboard');
+    console.log('═'.repeat(50));
+    console.log(`Total Plastic Collected: ${this.totalPlasticCollected.toFixed(1)} kg`);
+    console.log(`Active Vessels: ${this.vesselsActive.size}`);
+    console.log(`Global Impact: ${(this.totalPlasticCollected / 1000).toFixed(2)} tonnes`);
+  }
+
+  private showAlert(message: string) {
+    console.log(`\n🚨 ALERT: ${message}\n`);
+  }
+}
+
+// Usage
+const dashboard = new OceanCleanupDashboard(
+  'wss://api.wia.live/climate/v1',
+  process.env.WIA_API_KEY!
+);
+</code></pre>
+
+    <h3>7.2.2 Climate Model Data Fetcher</h3>
+
+    <pre><code>// climate-model-fetcher.ts
+import axios from 'axios';
+
+interface CMIPQueryParams {
+  sourceId: string;
+  experimentId: string;
+  variable: string;
+  startDate: string;
+  endDate: string;
+}
+
+class ClimateModelAPI {
+  private baseUrl: string;
+  private apiKey: string;
+
+  constructor(baseUrl: string, apiKey: string) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+  }
+
+  async queryModelData(params: CMIPQueryParams): Promise&lt;any[]&gt; {
+    const response = await axios.get(`${this.baseUrl}/data`, {
+      params: {
+        type: 'climate_model',
+        'data.model.source_id': params.sourceId,
+        'data.model.experiment_id': params.experimentId,
+        'data.variable.name': params.variable,
+        start_time: params.startDate,
+        end_time: params.endDate,
+        limit: 1000
+      },
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`
+      }
+    });
+
+    return response.data.data.messages;
+  }
+
+  async getTemperatureAnomaly(
+    startYear: number,
+    endYear: number,
+    scenario: string = 'ssp245'
+  ): Promise&lt;{year: number, anomaly: number}[]&gt; {
+    const messages = await this.queryModelData({
+      sourceId: 'CESM2',
+      experimentId: scenario,
+      variable: 'tas',
+      startDate: `${startYear}-01-01T00:00:00Z`,
+      endDate: `${endYear}-12-31T23:59:59Z`
+    });
+
+    return messages.map(msg => ({
+      year: new Date(msg.timestamp.iso8601).getFullYear(),
+      anomaly: msg.data.value.anomaly
+    }));
+  }
+}
+
+// Usage
+const api = new ClimateModelAPI(
+  'https://api.wia.live/climate/v1',
+  process.env.WIA_API_KEY!
+);
+
+api.getTemperatureAnomaly(2025, 2100, 'ssp245')
+  .then(data => {
+    console.log('Temperature anomaly projections (SSP2-4.5):');
+    data.forEach(point => {
+      console.log(`${point.year}: +${point.anomaly.toFixed(2)}°C`);
+    });
+  });
+</code></pre>
+
+    <h2>7.3 Bash Examples</h2>
+
+    <h3>7.3.1 Simple Data Submission Script</h3>
+
+    <pre><code>#!/bin/bash
+# submit_climate_data.sh - Submit climate data via curl
+
+API_URL="https://api.wia.live/climate/v1/data"
+API_KEY="${WIA_API_KEY}"
+
+# Read sensor data (example: from local file or sensor command)
+CAPTURE_RATE=$(cat /sys/class/sensors/capture_rate)
+PURITY=$(cat /sys/class/sensors/purity)
+POWER=$(cat /sys/class/sensors/power_kwh)
+
+# Create JSON payload
+PAYLOAD=$(cat <<EOF
+{
+  "version": "1.0.0",
+  "type": "carbon_capture",
+  "timestamp": {
+    "unix_ms": $(date +%s%3N),
+    "iso8601": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+  },
+  "location": {
+    "latitude": 64.0,
+    "longitude": -21.0,
+    "altitude_m": 100
+  },
+  "device": {
+    "manufacturer": "Climeworks",
+    "model": "Orca DAC",
+    "serial": "ORCA-2024-001"
+  },
+  "data": {
+    "technology": "dac",
+    "capture_rate_kg_per_hour": ${CAPTURE_RATE},
+    "co2_purity_percentage": ${PURITY},
+    "energy_consumption_kwh": ${POWER}
+  },
+  "meta": {
+    "quality_score": 0.98,
+    "source": "sensor"
+  }
+}
+EOF
+)
+
+# Submit to API
+RESPONSE=$(curl -s -X POST "${API_URL}" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "${PAYLOAD}")
+
+# Check result
+MESSAGE_ID=$(echo "$RESPONSE" | jq -r '.data.message_id')
+
+if [ "$MESSAGE_ID" != "null" ]; then
+  echo "✓ Data submitted successfully: ${MESSAGE_ID}"
+else
+  echo "✗ Submission failed:"
+  echo "$RESPONSE" | jq .
+  exit 1
+fi
+</code></pre>
+
+    <h3>7.3.2 Batch Data Export</h3>
+
+    <pre><code>#!/bin/bash
+# export_climate_data.sh - Export climate data to JSON files
+
+API_URL="https://api.wia.live/climate/v1/data"
+API_KEY="${WIA_API_KEY}"
+OUTPUT_DIR="./climate_data_export"
+
+mkdir -p "${OUTPUT_DIR}"
+
+# Export data by month
+for MONTH in {01..12}; do
+  echo "Exporting 2024-${MONTH}..."
+
+  FILENAME="${OUTPUT_DIR}/climate_2024-${MONTH}.json"
+
+  curl -s "${API_URL}" \
+    -H "Authorization: Bearer ${API_KEY}" \
+    -G \
+    --data-urlencode "type=carbon_capture" \
+    --data-urlencode "start_time=2024-${MONTH}-01T00:00:00Z" \
+    --data-urlencode "end_time=2024-${MONTH}-31T23:59:59Z" \
+    --data-urlencode "limit=1000" \
+    | jq '.data.messages' > "${FILENAME}"
+
+  COUNT=$(jq 'length' "${FILENAME}")
+  echo "  → ${COUNT} messages saved to ${FILENAME}"
+done
+
+echo "✓ Export complete"
+</code></pre>
+</body>
+</html>

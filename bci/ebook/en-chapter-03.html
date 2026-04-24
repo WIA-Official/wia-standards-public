@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Signal Processing Algorithms - WIA-BCI Standard</title>
+    <style>
+        :root {
+            --primary: #06B6D4;
+            --primary-dark: #0891B2;
+            --primary-light: #22D3EE;
+            --background: #0F172A;
+            --surface: #1E293B;
+            --surface-light: #334155;
+            --text: #E2E8F0;
+            --text-dim: #94A3B8;
+            --border: #475569;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --neural: #8B5CF6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--background);
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--neural) 100%);
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.3);
+        }
+        h1 { font-size: 2.5em; margin-bottom: 10px; color: white; }
+        h2 {
+            color: var(--primary-light);
+            margin: 30px 0 15px 0;
+            font-size: 1.8em;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+        h3 { color: var(--primary-light); margin: 25px 0 12px 0; font-size: 1.4em; }
+        p { margin-bottom: 15px; text-align: justify; }
+        .subtitle { color: rgba(255,255,255,0.9); font-size: 1.2em; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th { background: var(--primary); color: white; padding: 15px; text-align: left; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); }
+        tr:hover { background: var(--surface-light); }
+        pre {
+            background: var(--surface);
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .highlight {
+            background: linear-gradient(120deg, var(--primary) 0%, transparent 100%);
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: white;
+        }
+        .info-box {
+            background: var(--surface);
+            border-left: 4px solid var(--neural);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        strong { color: var(--primary-light); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Chapter 3: Signal Processing Algorithms</h1>
+        <p class="subtitle">EEG, ECoG, and Neural Signal Processing Techniques</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>3.1 Signal Processing Pipeline Overview</h2>
+            <p>
+                Signal processing transforms raw neural signals into meaningful features that can be classified to generate BCI commands. The <span class="highlight">WIA-BCI standard</span> defines a comprehensive signal processing pipeline that ensures consistent, reliable BCI performance across different implementations. Each stage of the pipeline has specific requirements and performance benchmarks that must be met for WIA-BCI certification.
+            </p>
+            <p>
+                The signal processing pipeline consists of five main stages: preprocessing, artifact removal, feature extraction, feature selection, and classification. Each stage builds upon the previous one, and errors or noise introduced at early stages propagate through the entire system, making quality control at each step critical for overall performance.
+            </p>
+
+<pre>
+WIA-BCI Signal Processing Pipeline:
+
+RAW SIGNAL INPUT
+       |
+       v
++------------------+
+| 1. PREPROCESSING |  - Filtering (bandpass, notch)
+|    (Required)    |  - Re-referencing
++------------------+  - Downsampling
+       |
+       v
++------------------+
+| 2. ARTIFACT      |  - Detection algorithms
+|    REMOVAL       |  - Rejection or correction
++------------------+  - Quality metrics
+       |
+       v
++------------------+
+| 3. FEATURE       |  - Time domain features
+|    EXTRACTION    |  - Frequency domain features
++------------------+  - Spatial domain features
+       |
+       v
++------------------+
+| 4. FEATURE       |  - Dimensionality reduction
+|    SELECTION     |  - Relevance analysis
++------------------+  - Redundancy removal
+       |
+       v
++------------------+
+| 5. CLASSIFICATION|  - Model training
+|                  |  - Real-time prediction
++------------------+  - Adaptive updating
+       |
+       v
+BCI COMMAND OUTPUT
+</pre>
+
+            <h2>3.2 Preprocessing Techniques</h2>
+            <p>
+                Preprocessing prepares raw neural signals for feature extraction by removing unwanted frequency components and establishing consistent reference frames. The WIA-BCI standard specifies preprocessing requirements based on the signal type and intended application.
+            </p>
+
+            <h3>3.2.1 Filtering Requirements</h3>
+<pre>
+// WIA-BCI Filtering Specifications
+
+class SignalFilter {
+    // Bandpass filter configuration by application
+    static FILTER_CONFIGS = {
+        "MOTOR_IMAGERY": {
+            lowCut: 8,      // Hz - mu rhythm lower bound
+            highCut: 30,    // Hz - beta rhythm upper bound
+            order: 4,
+            type: "butterworth"
+        },
+        "P300": {
+            lowCut: 0.1,    // Hz - preserve slow waves
+            highCut: 20,    // Hz - P300 bandwidth
+            order: 4,
+            type: "butterworth"
+        },
+        "SSVEP": {
+            lowCut: 5,      // Hz - below fundamental
+            highCut: 50,    // Hz - include harmonics
+            order: 6,
+            type: "butterworth"
+        },
+        "ECOG_MOTOR": {
+            lowCut: 1,      // Hz
+            highCut: 200,   // Hz - high gamma
+            order: 4,
+            type: "butterworth"
+        },
+        "SPIKE_SORTING": {
+            lowCut: 300,    // Hz - action potentials
+            highCut: 5000,  // Hz
+            order: 2,
+            type: "butterworth"
+        }
+    }
+
+    // Notch filter for power line interference
+    static notchFilter(signal, frequency, Q) {
+        // frequency: 50 or 60 Hz depending on region
+        // Q: quality factor (typically 30-50)
+        w0 = 2 * PI * frequency / samplingRate
+        bandwidth = w0 / Q
+        // IIR notch filter implementation
+        return filteredSignal
+    }
+
+    // Zero-phase filtering (offline processing)
+    static filtfilt(b, a, signal) {
+        // Forward-backward filtering
+        // Eliminates phase distortion
+        forward = filter(b, a, signal)
+        backward = filter(b, a, reverse(forward))
+        return reverse(backward)
+    }
+}
+</pre>
+
+            <h3>3.2.2 Spatial Filtering and Re-referencing</h3>
+            <p>
+                Spatial filtering enhances signals from specific brain regions while suppressing noise and activity from other areas. The WIA-BCI standard requires support for multiple re-referencing schemes and spatial filtering methods.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Description</th>
+                        <th>Use Case</th>
+                        <th>Advantages</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Common Average</td>
+                        <td>Subtract mean of all channels</td>
+                        <td>General EEG</td>
+                        <td>Simple, effective</td>
+                    </tr>
+                    <tr>
+                        <td>Laplacian</td>
+                        <td>Subtract weighted neighbors</td>
+                        <td>Localized activity</td>
+                        <td>Better localization</td>
+                    </tr>
+                    <tr>
+                        <td>Bipolar</td>
+                        <td>Difference between adjacent</td>
+                        <td>Clinical EEG</td>
+                        <td>Artifact reduction</td>
+                    </tr>
+                    <tr>
+                        <td>CSP</td>
+                        <td>Data-driven optimization</td>
+                        <td>Motor imagery</td>
+                        <td>Maximum discrimination</td>
+                    </tr>
+                    <tr>
+                        <td>ICA</td>
+                        <td>Independent components</td>
+                        <td>Source separation</td>
+                        <td>Artifact isolation</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3.3 Artifact Removal Algorithms</h2>
+            <p>
+                Artifacts from eye movements, muscle activity, and other sources can overwhelm neural signals. The WIA-BCI standard requires robust artifact detection and removal capabilities to ensure reliable BCI operation in real-world conditions.
+            </p>
+
+<pre>
+// WIA-BCI Artifact Removal Implementation
+
+class ArtifactRemoval {
+    // Independent Component Analysis for artifact removal
+    static ICA_ArtifactRemoval(data, numComponents) {
+        // 1. Perform ICA decomposition
+        ica = fastica(data, numComponents)
+        components = ica.components
+        mixingMatrix = ica.mixing
+
+        // 2. Identify artifact components
+        artifactIndices = []
+        for (i = 0; i &lt; numComponents; i++) {
+            component = components[i]
+
+            // EOG artifact detection
+            if (hasEOGCharacteristics(component)) {
+                artifactIndices.push(i)
+                continue
+            }
+
+            // EMG artifact detection
+            if (hasEMGCharacteristics(component)) {
+                artifactIndices.push(i)
+                continue
+            }
+
+            // ECG artifact detection
+            if (hasECGCharacteristics(component)) {
+                artifactIndices.push(i)
+            }
+        }
+
+        // 3. Remove artifact components
+        cleanComponents = components.copy()
+        for (idx in artifactIndices) {
+            cleanComponents[idx] = zeros(component.length)
+        }
+
+        // 4. Reconstruct clean signal
+        cleanData = mixingMatrix.dot(cleanComponents)
+        return cleanData
+    }
+
+    // Automatic EOG detection criteria
+    static hasEOGCharacteristics(component) {
+        // High frontal electrode loading
+        frontalLoading = abs(component.spatialPattern[Fp1, Fp2]).mean()
+        overallLoading = abs(component.spatialPattern).mean()
+
+        // Low frequency dominance
+        lowFreqPower = bandpower(component.timeSeries, 0.5, 4)
+        totalPower = bandpower(component.timeSeries, 0.5, 40)
+
+        return (frontalLoading / overallLoading > 2.0) &&
+               (lowFreqPower / totalPower > 0.6)
+    }
+
+    // Automatic EMG detection criteria
+    static hasEMGCharacteristics(component) {
+        // High frequency content
+        highFreqPower = bandpower(component.timeSeries, 20, 100)
+        totalPower = bandpower(component.timeSeries, 0.5, 100)
+
+        // Peripheral electrode loading
+        peripheralLoading = abs(component.spatialPattern[T7, T8, F7, F8]).mean()
+
+        return (highFreqPower / totalPower > 0.4) &&
+               (peripheralLoading > threshold)
+    }
+}
+</pre>
+
+            <div class="info-box">
+                <h3>Artifact Handling Strategies</h3>
+                <ul>
+                    <li><strong>Rejection:</strong> Discard contaminated segments entirely (simplest, loses data)</li>
+                    <li><strong>Correction:</strong> Remove artifact component while preserving neural signal</li>
+                    <li><strong>Regression:</strong> Subtract estimated artifact using reference channels</li>
+                    <li><strong>Adaptive filtering:</strong> Real-time artifact tracking and removal</li>
+                    <li><strong>Deep learning:</strong> Neural network-based artifact detection and removal</li>
+                </ul>
+            </div>
+
+            <h2>3.4 Feature Extraction Methods</h2>
+            <p>
+                Feature extraction transforms preprocessed signals into numerical features that capture discriminative information for classification. The WIA-BCI standard specifies recommended features for each BCI paradigm and defines minimum performance requirements.
+            </p>
+
+            <h3>3.4.1 Time Domain Features</h3>
+<pre>
+Time Domain Features (WIA-BCI-F-001):
+
+class TimeDomainFeatures {
+    // Basic statistical features
+    static extractBasicFeatures(signal) {
+        return {
+            mean: mean(signal),
+            variance: variance(signal),
+            standardDeviation: std(signal),
+            skewness: skewness(signal),
+            kurtosis: kurtosis(signal),
+            rms: sqrt(mean(signal.^2)),
+            zeroCrossings: countZeroCrossings(signal),
+            peakToPeak: max(signal) - min(signal)
+        }
+    }
+
+    // Hjorth parameters (activity, mobility, complexity)
+    static hjorthParameters(signal) {
+        activity = variance(signal)
+        derivative1 = diff(signal)
+        derivative2 = diff(derivative1)
+
+        mobility = sqrt(variance(derivative1) / activity)
+        complexity = sqrt(variance(derivative2) / variance(derivative1)) / mobility
+
+        return {activity, mobility, complexity}
+    }
+
+    // Autoregressive model coefficients
+    static arCoefficients(signal, order) {
+        // Yule-Walker or Burg method
+        coefficients = arburg(signal, order)
+        return coefficients
+    }
+
+    // Sample entropy (complexity measure)
+    static sampleEntropy(signal, m, r) {
+        // m: embedding dimension (typically 2)
+        // r: tolerance (typically 0.2 * std)
+        N = signal.length
+        templates_m = countTemplates(signal, m, r)
+        templates_m1 = countTemplates(signal, m+1, r)
+        return -log(templates_m1 / templates_m)
+    }
+}
+</pre>
+
+            <h3>3.4.2 Frequency Domain Features</h3>
+            <p>
+                Frequency domain features capture the oscillatory patterns that are fundamental to many BCI paradigms. The WIA-BCI standard defines standard frequency bands and feature extraction methods for spectral analysis.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Frequency Band</th>
+                        <th>Range (Hz)</th>
+                        <th>Neural Correlate</th>
+                        <th>BCI Application</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Delta</td>
+                        <td>0.5-4</td>
+                        <td>Deep sleep, injury</td>
+                        <td>State monitoring</td>
+                    </tr>
+                    <tr>
+                        <td>Theta</td>
+                        <td>4-8</td>
+                        <td>Memory, drowsiness</td>
+                        <td>Cognitive load</td>
+                    </tr>
+                    <tr>
+                        <td>Alpha/Mu</td>
+                        <td>8-13</td>
+                        <td>Relaxation, motor idle</td>
+                        <td>Motor imagery</td>
+                    </tr>
+                    <tr>
+                        <td>Beta</td>
+                        <td>13-30</td>
+                        <td>Active thinking, motor</td>
+                        <td>Motor imagery</td>
+                    </tr>
+                    <tr>
+                        <td>Gamma</td>
+                        <td>30-100</td>
+                        <td>Cognitive processing</td>
+                        <td>ECoG motor</td>
+                    </tr>
+                    <tr>
+                        <td>High Gamma</td>
+                        <td>100-200</td>
+                        <td>Local processing</td>
+                        <td>ECoG decoding</td>
+                    </tr>
+                </tbody>
+            </table>
+
+<pre>
+Frequency Domain Features (WIA-BCI-F-002):
+
+class FrequencyDomainFeatures {
+    // Power Spectral Density estimation
+    static welchPSD(signal, windowSize, overlap, nfft) {
+        // Welch method for robust PSD estimation
+        windows = segmentWithOverlap(signal, windowSize, overlap)
+        psds = []
+        for (window in windows) {
+            windowed = window * hamming(windowSize)
+            fft_result = fft(windowed, nfft)
+            psd = abs(fft_result).^2 / windowSize
+            psds.push(psd)
+        }
+        return mean(psds, axis=0)
+    }
+
+    // Band power calculation
+    static bandPower(psd, freqs, lowFreq, highFreq) {
+        indices = where((freqs >= lowFreq) & (freqs <= highFreq))
+        return sum(psd[indices]) * (freqs[1] - freqs[0])
+    }
+
+    // Standard band power features
+    static extractBandPowers(signal, fs) {
+        psd, freqs = welchPSD(signal, fs, fs/2, fs*2)
+        return {
+            delta: bandPower(psd, freqs, 0.5, 4),
+            theta: bandPower(psd, freqs, 4, 8),
+            alpha: bandPower(psd, freqs, 8, 13),
+            beta: bandPower(psd, freqs, 13, 30),
+            gamma: bandPower(psd, freqs, 30, 100),
+            totalPower: bandPower(psd, freqs, 0.5, 100)
+        }
+    }
+
+    // Relative band power (normalized)
+    static relativeBandPower(bandPowers) {
+        total = bandPowers.totalPower
+        return {
+            relDelta: bandPowers.delta / total,
+            relTheta: bandPowers.theta / total,
+            relAlpha: bandPowers.alpha / total,
+            relBeta: bandPowers.beta / total,
+            relGamma: bandPowers.gamma / total
+        }
+    }
+
+    // Band power ratios (useful for cognitive state)
+    static bandPowerRatios(bandPowers) {
+        return {
+            thetaAlpha: bandPowers.theta / bandPowers.alpha,
+            alphaBeta: bandPowers.alpha / bandPowers.beta,
+            thetaBeta: bandPowers.theta / bandPowers.beta
+        }
+    }
+}
+</pre>
+
+            <h2>3.5 Common Spatial Patterns (CSP)</h2>
+            <p>
+                Common Spatial Patterns is a powerful feature extraction method specifically designed for motor imagery BCI. CSP finds spatial filters that maximize the variance difference between two classes, making it highly effective for distinguishing between different motor imagery tasks.
+            </p>
+
+<pre>
+// Common Spatial Patterns Implementation
+
+class CSP {
+    // Training phase: compute spatial filters
+    static train(class1Data, class2Data, numFilters) {
+        // Compute covariance matrices for each class
+        cov1 = computeAverageCovariance(class1Data)
+        cov2 = computeAverageCovariance(class2Data)
+
+        // Composite covariance
+        covComposite = cov1 + cov2
+
+        // Whitening transformation
+        eigenvalues, eigenvectors = eig(covComposite)
+        P = eigenvectors * diag(1.0 / sqrt(eigenvalues))
+
+        // Apply whitening to class 1 covariance
+        S1 = P.T * cov1 * P
+
+        // Eigendecomposition of whitened covariance
+        eigenvalues1, B = eig(S1)
+
+        // Sort by eigenvalue (variance ratio)
+        sortedIndices = argsort(eigenvalues1)[::-1]
+
+        // Select top and bottom filters
+        topIndices = sortedIndices[:numFilters/2]
+        bottomIndices = sortedIndices[-numFilters/2:]
+        selectedIndices = concat(topIndices, bottomIndices)
+
+        // Final spatial filter matrix
+        W = P * B[:, selectedIndices]
+
+        return W
+    }
+
+    // Apply CSP filters to extract features
+    static extractFeatures(data, W) {
+        // Project data through spatial filters
+        projected = W.T * data
+
+        // Compute log-variance features
+        features = []
+        for (i = 0; i &lt; W.shape[1]; i++) {
+            variance = var(projected[i, :])
+            features.push(log(variance))
+        }
+
+        // Normalize features
+        totalVariance = sum(exp(features))
+        features = features - log(totalVariance)
+
+        return features
+    }
+
+    // Regularized CSP for small sample sizes
+    static trainRegularized(class1Data, class2Data, numFilters, shrinkage) {
+        cov1 = computeShrinkageCovariance(class1Data, shrinkage)
+        cov2 = computeShrinkageCovariance(class2Data, shrinkage)
+        // Continue with standard CSP algorithm...
+    }
+}
+</pre>
+
+            <h2>3.6 Classification Algorithms</h2>
+            <p>
+                The final stage of the signal processing pipeline converts extracted features into BCI commands using machine learning classifiers. The WIA-BCI standard specifies requirements for classifier performance, real-time operation, and adaptive updating.
+            </p>
+
+            <div class="info-box">
+                <h3>WIA-BCI Approved Classifiers</h3>
+                <ul>
+                    <li><strong>Linear Discriminant Analysis (LDA):</strong> Standard choice for simplicity and robustness</li>
+                    <li><strong>Support Vector Machine (SVM):</strong> Effective for high-dimensional feature spaces</li>
+                    <li><strong>Random Forest:</strong> Handles non-linear relationships, resistant to overfitting</li>
+                    <li><strong>Neural Networks:</strong> Deep learning for complex patterns (requires more data)</li>
+                    <li><strong>Riemannian Classifiers:</strong> Geometry-aware methods for covariance features</li>
+                </ul>
+            </div>
+
+<pre>
+// WIA-BCI Classification Framework
+
+class BCIClassifier {
+    // Linear Discriminant Analysis
+    static trainLDA(features, labels) {
+        // Compute class means and covariance
+        classes = unique(labels)
+        means = {}
+        for (c in classes) {
+            means[c] = mean(features[labels == c], axis=0)
+        }
+
+        // Pooled within-class covariance
+        Sw = zeros(features.shape[1], features.shape[1])
+        for (c in classes) {
+            classFeatures = features[labels == c]
+            centered = classFeatures - means[c]
+            Sw += centered.T * centered
+        }
+        Sw /= features.shape[0]
+
+        // Regularization for numerical stability
+        Sw += 0.01 * eye(Sw.shape[0])
+
+        // Compute projection vector (2-class case)
+        w = inv(Sw) * (means[0] - means[1])
+
+        return {weights: w, means: means, threshold: 0}
+    }
+
+    // Real-time classification
+    static classify(features, model) {
+        projection = dot(features, model.weights)
+        probability = sigmoid(projection - model.threshold)
+        prediction = projection > model.threshold ? 1 : 0
+        confidence = abs(probability - 0.5) * 2
+
+        return {prediction, probability, confidence}
+    }
+
+    // Adaptive classifier updating
+    static updateOnline(model, newFeature, trueLabel, learningRate) {
+        // Compute prediction error
+        prediction = classify(newFeature, model)
+        error = trueLabel - prediction.probability
+
+        // Update model parameters
+        model.weights += learningRate * error * newFeature
+        model.threshold -= learningRate * error
+
+        return model
+    }
+}
+</pre>
+
+            <p>
+                This chapter has covered the essential signal processing algorithms required for WIA-BCI compliant systems. The combination of robust preprocessing, effective artifact removal, discriminative feature extraction, and accurate classification forms the computational foundation for reliable brain-computer interfaces. The next chapter will address device classification and certification requirements.
+            </p>
+        </section>
+    </main>
+</body>
+</html>

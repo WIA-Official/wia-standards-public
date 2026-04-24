@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 드론 플랫폼과 하드웨어 | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>2장: 드론 플랫폼과 하드웨어</h1>
+
+    <p>농업용 드론 시스템의 하드웨어 기반은 시스템의 역량, 신뢰성 및 운용 범위를 결정합니다. 이 장에서는 드론 플랫폼 아키텍처, 추진 시스템, 전원 시스템, 기체 설계 고려사항, 농업용 무인항공시스템을 정의하는 하드웨어 사양을 다룹니다. 이러한 기초를 이해하면 적절한 플랫폼 선택과 최적의 시스템 구성이 가능합니다.</p>
+
+    <h2>2.1 멀티로터 아키텍처</h2>
+
+    <pre>
+// 멀티로터 플랫폼 사양
+interface MultiRotorPlatform {
+  // 구성
+  configuration: {
+    type: 'quadcopter' | 'hexacopter' | 'octocopter' | 'coaxial';
+    rotorCount: 4 | 6 | 8 | 12;
+    armConfiguration: 'X' | '+' | 'H' | 'Y' | 'coaxial';
+    motorTilt?: number;          // 효율을 위한 기울기 각도
+  };
+
+  // 물리적 사양
+  dimensions: {
+    diagonal: number;            // mm (모터 간 대각선)
+    foldedSize?: { l: number; w: number; h: number };
+    propellerDiameter: number;   // 인치
+    armLength: number;           // mm
+  };
+
+  // 중량 사양
+  weight: {
+    emptyWeight: number;         // kg
+    maxTakeoffWeight: number;    // kg (MTOW)
+    maxPayload: number;          // kg
+    batteryWeight: number;       // kg
+  };
+
+  // 성능
+  performance: {
+    maxFlightTime: number;       // 분 (일반 페이로드 기준)
+    maxRange: number;            // km
+    maxSpeed: number;            // m/s
+    maxAltitude: number;         // m AGL
+    windResistance: number;      // m/s
+  };
+}
+
+// 예시: 농업용 살포 드론
+const sprayDrone: MultiRotorPlatform = {
+  configuration: {
+    type: 'hexacopter',
+    rotorCount: 6,
+    armConfiguration: 'X',
+    motorTilt: 5
+  },
+  dimensions: {
+    diagonal: 1800,
+    foldedSize: { l: 700, w: 700, h: 500 },
+    propellerDiameter: 28,
+    armLength: 450
+  },
+  weight: {
+    emptyWeight: 12,
+    maxTakeoffWeight: 42,
+    maxPayload: 20,              // 20L 살포 탱크
+    batteryWeight: 10
+  },
+  performance: {
+    maxFlightTime: 15,
+    maxRange: 3,
+    maxSpeed: 10,
+    maxAltitude: 30,
+    windResistance: 6
+  }
+};
+    </pre>
+
+    <h2>2.2 고정익 플랫폼</h2>
+
+    <table>
+        <tr>
+            <th>사양</th>
+            <th>소형 매핑</th>
+            <th>대형 조사</th>
+            <th>VTOL 하이브리드</th>
+        </tr>
+        <tr>
+            <td>날개폭</td>
+            <td>1.0-1.5m</td>
+            <td>2.0-3.0m</td>
+            <td>2.0-2.5m</td>
+        </tr>
+        <tr>
+            <td>최대이륙중량</td>
+            <td>1-2 kg</td>
+            <td>5-15 kg</td>
+            <td>8-20 kg</td>
+        </tr>
+        <tr>
+            <td>페이로드</td>
+            <td>200-500g</td>
+            <td>1-3 kg</td>
+            <td>1-4 kg</td>
+        </tr>
+        <tr>
+            <td>비행시간</td>
+            <td>45-60분</td>
+            <td>90-180분</td>
+            <td>60-120분</td>
+        </tr>
+        <tr>
+            <td>커버리지</td>
+            <td>100-200 ha</td>
+            <td>500-2000 ha</td>
+            <td>300-800 ha</td>
+        </tr>
+        <tr>
+            <td>발사 방식</td>
+            <td>수동 투척</td>
+            <td>캐터펄트/활주로</td>
+            <td>VTOL</td>
+        </tr>
+    </table>
+
+    <h2>2.3 추진 시스템</h2>
+
+    <pre>
+// 추진 시스템 사양
+interface PropulsionSystem {
+  // 모터 사양
+  motor: {
+    type: 'brushless_dc';
+    kv: number;                  // 볼트당 RPM
+    maxPower: number;            // 와트
+    maxThrust: number;           // 모터당 kg
+    efficiency: number;          // 호버링시 g/W
+    coolingType: 'air' | 'liquid';
+  };
+
+  // 프로펠러 사양
+  propeller: {
+    diameter: number;            // 인치
+    pitch: number;               // 인치
+    bladeCount: 2 | 3 | 4;
+    material: 'carbon' | 'nylon' | 'wood';
+    foldable: boolean;
+  };
+
+  // ESC(변속기) 사양
+  esc: {
+    maxCurrent: number;          // 암페어
+    voltage: string;             // 예: '6S-12S'
+    protocol: 'PWM' | 'DShot' | 'ProShot';
+    features: string[];          // 예: ['BEC', 'telemetry']
+  };
+
+  // 시스템 이중화
+  redundancy: {
+    motorRedundancy: boolean;    // 모터 고장시 비행 가능
+    escRedundancy: boolean;
+    propRedundancy: boolean;
+  };
+}
+
+// 추력 대 중량비 고려사항
+const thrustRequirements = {
+  minimum: 2.0,                  // 안정적 비행을 위한 T/W 비율
+  recommended: 2.5,              // 기민성과 내풍성을 위해
+  spray_operations: 2.2,         // 페이로드 고려
+  emergency_margin: 1.5          // 단일 모터 고장 대응
+};
+    </pre>
+
+    <h2>2.4 전원 시스템</h2>
+
+    <div class="highlight">
+        <h3>농업용 드론 배터리 기술</h3>
+        <ul>
+            <li><strong>LiPo (리튬 폴리머):</strong> 높은 에너지 밀도, 일반적인 표준</li>
+            <li><strong>Li-ion (리튬 이온):</strong> 우수한 사이클 수명, 낮은 방전율</li>
+            <li><strong>LiHV (고전압):</strong> 셀당 더 높은 전압, 증가된 항속거리</li>
+            <li><strong>전고체:</strong> 신기술, 향상된 안전성</li>
+        </ul>
+    </div>
+
+    <pre>
+// 배터리 시스템 사양
+interface BatterySystem {
+  chemistry: 'LiPo' | 'Li-ion' | 'LiHV' | 'LiFePO4';
+  configuration: {
+    cells: number;               // S 카운트 (직렬)
+    parallel: number;            // P 카운트
+    nominalVoltage: number;      // V
+    capacity: number;            // mAh
+  };
+  performance: {
+    energyDensity: number;       // Wh/kg
+    maxDischarge: number;        // C 레이팅
+    cycleLife: number;           // 충전 사이클
+    operatingTemp: { min: number; max: number }; // 섭씨
+  };
+  management: {
+    bms: boolean;                // 배터리 관리 시스템
+    cellBalancing: boolean;
+    overchargeProtection: boolean;
+    undervoltageCutoff: number;  // 셀당 V
+    temperatureMonitoring: boolean;
+  };
+}
+
+// 예시: 살포 드론 배터리 팩
+const sprayDroneBattery: BatterySystem = {
+  chemistry: 'LiPo',
+  configuration: {
+    cells: 12,                   // 12S
+    parallel: 2,                 // 2P
+    nominalVoltage: 44.4,
+    capacity: 22000              // 22Ah
+  },
+  performance: {
+    energyDensity: 200,
+    maxDischarge: 25,
+    cycleLife: 300,
+    operatingTemp: { min: 0, max: 45 }
+  },
+  management: {
+    bms: true,
+    cellBalancing: true,
+    overchargeProtection: true,
+    undervoltageCutoff: 3.3,
+    temperatureMonitoring: true
+  }
+};
+    </pre>
+
+    <h2>2.5 비행제어 시스템</h2>
+
+    <pre>
+// 비행 제어기 사양
+interface FlightController {
+  // 핵심 하드웨어
+  processor: {
+    type: string;                // 예: 'STM32H7', 'ARM Cortex-M7'
+    clockSpeed: number;          // MHz
+    cores: number;
+  };
+
+  // 센서
+  imu: {
+    accelerometer: { axes: 3; range: number };  // g
+    gyroscope: { axes: 3; range: number };      // deg/s
+    redundancy: number;          // IMU 개수
+  };
+  barometer: {
+    resolution: number;          // cm
+    redundancy: number;
+  };
+  compass: {
+    axes: 3;
+    redundancy: number;
+    externalSupport: boolean;
+  };
+
+  // GNSS
+  gnss: {
+    receivers: number;
+    constellations: ('GPS' | 'GLONASS' | 'Galileo' | 'BeiDou')[];
+    rtk: boolean;
+    accuracy: { standard: number; rtk: number }; // cm
+  };
+
+  // 인터페이스
+  interfaces: {
+    pwmOutputs: number;
+    serialPorts: number;
+    canBus: boolean;
+    i2c: boolean;
+    spi: boolean;
+    ethernet: boolean;
+  };
+
+  // 안전 기능
+  safety: {
+    returnToHome: boolean;
+    geofencing: boolean;
+    motorFailureResponse: string;
+    lowBatteryRTH: boolean;
+    signalLossRTH: boolean;
+  };
+}
+    </pre>
+
+    <h2>2.6 기체 설계</h2>
+
+    <table>
+        <tr>
+            <th>재료</th>
+            <th>특성</th>
+            <th>사용 부위</th>
+            <th>고려사항</th>
+        </tr>
+        <tr>
+            <td>탄소섬유</td>
+            <td>높은 강도 대비 중량비, 강성</td>
+            <td>암, 프레임, 플레이트</td>
+            <td>비용, RF 투과성</td>
+        </tr>
+        <tr>
+            <td>알루미늄</td>
+            <td>강함, 가공성, 전도성</td>
+            <td>모터 마운트, 브라켓</td>
+            <td>중량, 부식</td>
+        </tr>
+        <tr>
+            <td>엔지니어링 플라스틱</td>
+            <td>가벼움, 충격 저항</td>
+            <td>외피, 커버, 착륙장치</td>
+            <td>UV 열화</td>
+        </tr>
+        <tr>
+            <td>폼 복합재</td>
+            <td>경량, 부력</td>
+            <td>고정익 구조</td>
+            <td>내구성</td>
+        </tr>
+    </table>
+
+    <h2>2.7 환경 보호</h2>
+
+    <pre>
+// 환경 보호 등급
+interface EnvironmentalRating {
+  // IP 등급
+  ipRating: {
+    solidProtection: 5 | 6;      // 5=먼지 보호, 6=완전 밀폐
+    liquidProtection: 3 | 4 | 5 | 6 | 7;  // 노출도에 따라 다름
+    fullRating: string;          // 예: 'IP54', 'IP67'
+  };
+
+  // 운용 조건
+  operatingConditions: {
+    temperature: { min: number; max: number };  // 섭씨
+    humidity: { max: number };   // % 상대습도
+    altitude: { max: number };   // 해발 미터
+    windSpeed: { max: number };  // m/s
+    precipitation: 'none' | 'light_rain' | 'moderate_rain';
+  };
+
+  // 농업용 특수 보호
+  agriculturalProtection: {
+    chemicalResistance: boolean; // 농약/비료 노출
+    dustSealing: boolean;        // 현장 먼지 보호
+    washable: boolean;           // 물 세척 가능
+    uvResistance: boolean;       // 자외선 보호
+  };
+}
+
+// 농업용 등급 요구사항
+const agGradeRequirements: EnvironmentalRating = {
+  ipRating: {
+    solidProtection: 5,
+    liquidProtection: 4,
+    fullRating: 'IP54'
+  },
+  operatingConditions: {
+    temperature: { min: 0, max: 45 },
+    humidity: { max: 95 },
+    altitude: { max: 4000 },
+    windSpeed: { max: 8 },
+    precipitation: 'light_rain'
+  },
+  agriculturalProtection: {
+    chemicalResistance: true,
+    dustSealing: true,
+    washable: true,
+    uvResistance: true
+  }
+};
+    </pre>
+
+    <h2>2.8 플랫폼 선택 기준</h2>
+
+    <div class="highlight">
+        <h3>선택 의사결정 프레임워크</h3>
+        <ul>
+            <li><strong>미션 유형:</strong> 조사 vs 살포가 플랫폼 아키텍처 결정</li>
+            <li><strong>필드 크기:</strong> 소규모는 멀티로터, 대규모는 고정익 선호</li>
+            <li><strong>페이로드 요구:</strong> 센서 중량 및 살포 용량 필요성</li>
+            <li><strong>비행 빈도:</strong> 일일 운용 시 대규모 투자 정당화</li>
+            <li><strong>지형:</strong> 장애물과 지형이 VTOL 요구 영향</li>
+            <li><strong>규제:</strong> 중량 등급이 인증 요구사항 결정</li>
+        </ul>
+    </div>
+
+    <div class="highlight">
+        <h3>장 요약</h3>
+        <p>이 장에서는 멀티로터 및 고정익 아키텍처, 추진 시스템, 전원, 비행제어기, 기체 설계, 환경 보호를 포함한 드론 플랫폼 하드웨어 기초를 다루었습니다. 이러한 하드웨어 사양은 WIA-AGRICULTURAL_DRONE 표준에 정의된 신뢰할 수 있는 농업용 드론 운용의 기반을 형성합니다.</p>
+    </div>
+</body>
+</html>

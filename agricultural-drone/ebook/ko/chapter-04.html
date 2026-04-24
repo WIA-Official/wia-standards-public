@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 비행 운용 | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>4장: 비행 운용</h1>
+
+    <p>비행 운용은 안전하고 효율적인 농업 드론 미션의 핵심입니다. 이 장에서는 미션 계획, 자율 비행 시스템, 안전 프로토콜, 비상 절차를 다룹니다. 적절한 비행 운용 프레임워크는 데이터 품질을 보장하고, 장비 수명을 연장하며, 규제 준수를 달성하고, 운용 안전을 유지하는 데 필수적입니다.</p>
+
+    <h2>4.1 미션 계획</h2>
+
+    <pre>
+// 미션 계획 인터페이스
+interface MissionPlan {
+  // 기본 정보
+  metadata: {
+    missionId: string;
+    name: string;
+    type: 'survey' | 'spray' | 'inspection' | 'monitoring';
+    createdAt: ISO8601DateTime;
+    operator: string;
+  };
+
+  // 비행 영역
+  area: {
+    boundary: GeoJSON.Polygon;
+    obstacles: GeoJSON.Point[];
+    noFlyZones: GeoJSON.Polygon[];
+    homePoint: GeoJSON.Point;
+    landingPoint?: GeoJSON.Point;
+  };
+
+  // 비행 파라미터
+  flightParameters: {
+    altitude: number;            // m AGL
+    speed: number;               // m/s
+    overlapForward: number;      // % (조사용)
+    overlapSide: number;         // %
+    pattern: 'crosshatch' | 'parallel' | 'orbital' | 'custom';
+    heading: 'auto' | 'fixed' | 'follow_terrain';
+  };
+
+  // 센서 설정
+  sensorConfig: {
+    sensor: string;
+    captureMode: 'time' | 'distance' | 'overlap';
+    interval: number;
+    settings: Record&lt;string, any&gt;;
+  };
+
+  // 안전 설정
+  safety: {
+    maxAltitude: number;
+    minAltitude: number;
+    geofenceMargin: number;
+    returnOnLowBattery: number;  // % 임계값
+    returnOnSignalLoss: boolean;
+    maxWindSpeed: number;        // m/s
+  };
+}
+
+// 예시: 조사 미션
+const surveyMission: MissionPlan = {
+  metadata: {
+    missionId: 'SURV-2024-001',
+    name: '블록 A 다분광 조사',
+    type: 'survey',
+    createdAt: '2024-06-15T08:00:00Z',
+    operator: 'pilot-001'
+  },
+  area: {
+    boundary: { type: 'Polygon', coordinates: [[...]] },
+    obstacles: [],
+    noFlyZones: [],
+    homePoint: { type: 'Point', coordinates: [127.0, 37.5] },
+  },
+  flightParameters: {
+    altitude: 100,
+    speed: 8,
+    overlapForward: 80,
+    overlapSide: 70,
+    pattern: 'parallel',
+    heading: 'auto'
+  },
+  sensorConfig: {
+    sensor: 'MicaSense RedEdge-P',
+    captureMode: 'overlap',
+    interval: 0,
+    settings: { iso: 'auto', exposure: 'auto' }
+  },
+  safety: {
+    maxAltitude: 120,
+    minAltitude: 30,
+    geofenceMargin: 50,
+    returnOnLowBattery: 25,
+    returnOnSignalLoss: true,
+    maxWindSpeed: 8
+  }
+};
+    </pre>
+
+    <h2>4.2 웨이포인트 내비게이션</h2>
+
+    <table>
+        <tr>
+            <th>내비게이션 모드</th>
+            <th>설명</th>
+            <th>적합한 용도</th>
+        </tr>
+        <tr>
+            <td>포인트 투 포인트</td>
+            <td>순차적 웨이포인트 비행</td>
+            <td>기본 조사, 점검</td>
+        </tr>
+        <tr>
+            <td>지형 추적</td>
+            <td>지면 위 고도 유지</td>
+            <td>경사지 매핑</td>
+        </tr>
+        <tr>
+            <td>스플라인 내비게이션</td>
+            <td>부드러운 곡선 경로</td>
+            <td>고속 조사</td>
+        </tr>
+        <tr>
+            <td>오비탈</td>
+            <td>관심 지점 주위 원형 비행</td>
+            <td>3D 모델링</td>
+        </tr>
+        <tr>
+            <td>그리드</td>
+            <td>자동 그리드 패턴 생성</td>
+            <td>체계적 조사</td>
+        </tr>
+    </table>
+
+    <pre>
+// 웨이포인트 인터페이스
+interface Waypoint {
+  id: number;
+  position: {
+    lat: number;
+    lon: number;
+    altitude: number;            // m AGL 또는 MSL
+    altitudeReference: 'AGL' | 'MSL';
+  };
+  actions: WaypointAction[];
+  speed: number;                 // m/s
+  heading: number | 'auto';      // 도
+  gimbalPitch?: number;          // 도
+  loiterTime?: number;           // 초
+}
+
+// 웨이포인트 액션
+interface WaypointAction {
+  type: 'capture_photo' | 'start_video' | 'stop_video' |
+        'trigger_spray' | 'hover' | 'rotate' | 'custom';
+  parameters?: Record&lt;string, any&gt;;
+}
+
+// 자동 경로 생성
+interface PathGeneration {
+  surveyPattern: {
+    method: 'boustrophedon' | 'spiral' | 'contour';
+    lineSpacing: number;         // m
+    turnaroundType: 'minimum' | 'smooth';
+    startCorner: 'NW' | 'NE' | 'SW' | 'SE' | 'closest';
+  };
+  terrainFollowing: {
+    enabled: boolean;
+    demSource: 'onboard' | 'preloaded' | 'realtime';
+    lookAheadDistance: number;   // m
+    maxClimbRate: number;        // m/s
+    maxDescentRate: number;      // m/s
+  };
+}
+    </pre>
+
+    <h2>4.3 자율 비행 시스템</h2>
+
+    <div class="highlight">
+        <h3>자율 비행 레벨</h3>
+        <ul>
+            <li><strong>레벨 0:</strong> 수동 - 조종사가 모든 제어</li>
+            <li><strong>레벨 1:</strong> 안정화 - 자세 안정화만 자동</li>
+            <li><strong>레벨 2:</strong> 반자율 - 웨이포인트 비행, 조종사 감시 필수</li>
+            <li><strong>레벨 3:</strong> 조건부 자율 - 대부분 자율, 비상시 조종사 개입</li>
+            <li><strong>레벨 4:</strong> 고도 자율 - 완전 자율, 인간 감시 최소화</li>
+            <li><strong>레벨 5:</strong> 완전 자율 - 모든 조건에서 완전 무인 운용</li>
+        </ul>
+    </div>
+
+    <pre>
+// 자율 비행 시스템 인터페이스
+interface AutonomousFlightSystem {
+  // 상태 추정
+  stateEstimation: {
+    sensors: ['IMU', 'GNSS', 'barometer', 'magnetometer', 'optical_flow'];
+    fusion: 'EKF' | 'UKF' | 'complementary';
+    redundancy: number;          // 센서 세트 수
+    failover: boolean;
+  };
+
+  // 경로 계획
+  pathPlanning: {
+    global: {
+      algorithm: 'A*' | 'RRT' | 'dijkstra' | 'custom';
+      updateFrequency: number;   // Hz
+    };
+    local: {
+      algorithm: 'DWA' | 'APF' | 'MPC';
+      horizon: number;           // m
+      updateFrequency: number;   // Hz
+    };
+  };
+
+  // 장애물 회피
+  obstacleAvoidance: {
+    enabled: boolean;
+    sensors: ('stereo' | 'tof' | 'ultrasonic' | 'lidar')[];
+    range: number;               // m
+    horizontalFOV: number;       // 도
+    reactionTime: number;        // ms
+    avoidanceStrategy: 'stop' | 'reroute' | 'climb' | 'descend';
+  };
+
+  // 귀환 로직
+  returnToHome: {
+    triggers: ('low_battery' | 'signal_loss' | 'geofence' | 'operator')[];
+    behavior: {
+      climbFirst: boolean;
+      altitude: number;          // m
+      speed: number;             // m/s
+      landingPrecision: 'standard' | 'precision';
+    };
+  };
+}
+    </pre>
+
+    <h2>4.4 안전 프로토콜</h2>
+
+    <pre>
+// 안전 프로토콜 인터페이스
+interface SafetyProtocol {
+  // 비행 전 점검
+  preflightChecks: {
+    aircraft: {
+      propellers: 'visual_inspection';
+      motors: 'rotation_test';
+      battery: ['charge_level', 'cell_balance', 'temperature'];
+      frame: 'structural_check';
+      connections: 'secure_verification';
+    };
+    sensors: {
+      calibration: 'verify_recent';
+      functionality: 'power_on_test';
+      mounting: 'alignment_check';
+    };
+    communications: {
+      radioLink: 'range_test';
+      videoLink: 'quality_check';
+      telemetry: 'data_flow_verify';
+    };
+    environment: {
+      weather: ['wind_speed', 'precipitation', 'visibility', 'temperature'];
+      airspace: ['notams', 'tfr', 'controlled_airspace'];
+      site: ['obstacles', 'people', 'animals', 'power_lines'];
+    };
+  };
+
+  // 비행 중 모니터링
+  inflightMonitoring: {
+    continuous: ['altitude', 'position', 'speed', 'battery', 'signal_strength'];
+    alerts: {
+      warning: { battery: 30, signal: 70, altitude: 110 };
+      critical: { battery: 20, signal: 50, altitude: 118 };
+    };
+  };
+
+  // 비행 후 절차
+  postflight: {
+    inspection: ['propellers', 'frame', 'battery', 'landing_gear'];
+    dataVerification: ['flight_log', 'imagery', 'telemetry'];
+    maintenance: 'log_flight_hours';
+  };
+}
+
+// 비행 전 체크리스트 예시
+const preflightChecklist = {
+  항목: [
+    { 카테고리: '기체', 항목: '프로펠러 상태', 확인: false },
+    { 카테고리: '기체', 항목: '배터리 충전 (>90%)', 확인: false },
+    { 카테고리: '기체', 항목: '배터리 셀 밸런스', 확인: false },
+    { 카테고리: '센서', 항목: 'IMU 캘리브레이션', 확인: false },
+    { 카테고리: '센서', 항목: '나침반 캘리브레이션', 확인: false },
+    { 카테고리: '통신', 항목: 'RC 링크 테스트', 확인: false },
+    { 카테고리: '환경', 항목: '풍속 확인 (<8m/s)', 확인: false },
+    { 카테고리: '환경', 항목: 'NOTAM 확인', 확인: false },
+    { 카테고리: '환경', 항목: '주변 장애물 확인', 확인: false }
+  ]
+};
+    </pre>
+
+    <h2>4.5 비상 절차</h2>
+
+    <table>
+        <tr>
+            <th>비상 상황</th>
+            <th>자동 대응</th>
+            <th>조종사 조치</th>
+        </tr>
+        <tr>
+            <td>배터리 저전압</td>
+            <td>RTH 시작, 안전 착륙</td>
+            <td>착륙 지점 확인, 필요시 수동 개입</td>
+        </tr>
+        <tr>
+            <td>신호 손실</td>
+            <td>사전 설정 동작 (RTH/호버/착륙)</td>
+            <td>신호 복구 시도, 가시권 유지</td>
+        </tr>
+        <tr>
+            <td>지오펜스 위반</td>
+            <td>정지 후 복귀 또는 착륙</td>
+            <td>경계 확인, 수동 복귀</td>
+        </tr>
+        <tr>
+            <td>모터 고장</td>
+            <td>제어된 하강 (멀티로터)</td>
+            <td>즉시 착륙 지점 선정</td>
+        </tr>
+        <tr>
+            <td>GPS 손실</td>
+            <td>ATTI 모드 전환</td>
+            <td>수동 제어, 안전 착륙</td>
+        </tr>
+    </table>
+
+    <pre>
+// 비상 절차 인터페이스
+interface EmergencyProcedures {
+  // 자동 대응
+  automaticResponses: {
+    lowBattery: {
+      warningLevel: 30;          // %
+      criticalLevel: 20;         // %
+      action: 'return_to_home';
+      landingType: 'controlled';
+    };
+    signalLoss: {
+      waitTime: 3;               // 초
+      action: 'return_to_home' | 'hover' | 'land';
+      maxDuration: 120;          // 초
+    };
+    geofenceBreach: {
+      action: 'stop_and_return' | 'hard_stop';
+      margin: 5;                 // m
+    };
+    motorFailure: {
+      detection: 'rpm_deviation';
+      action: 'emergency_descent';
+      descentRate: number;       // m/s
+    };
+  };
+
+  // 수동 비상 제어
+  manualOverrides: {
+    emergencyStop: {
+      trigger: 'dedicated_switch';
+      action: 'motor_cutoff';
+    };
+    forcedLanding: {
+      trigger: 'button_combination';
+      action: 'immediate_descent';
+    };
+    manualMode: {
+      trigger: 'mode_switch';
+      action: 'full_manual_control';
+    };
+  };
+
+  // 복구 절차
+  recovery: {
+    signalRecovery: '마지막 명령 재개 또는 RTH 계속';
+    partialPowerLoss: '최소 전력 비행 모드';
+    sensorDegradation: '백업 센서 사용';
+  };
+}
+    </pre>
+
+    <h2>4.6 날씨 고려사항</h2>
+
+    <div class="highlight">
+        <h3>운용 날씨 한계</h3>
+        <ul>
+            <li><strong>풍속:</strong> 최대 8-10 m/s (플랫폼에 따라 다름)</li>
+            <li><strong>강수:</strong> 대부분의 드론은 비, 안개, 눈에서 운용 불가</li>
+            <li><strong>온도:</strong> 배터리 성능을 위해 0-45°C 범위</li>
+            <li><strong>시정:</strong> 시각 비행 규칙 준수를 위해 최소 3km</li>
+            <li><strong>조명:</strong> 센서 요구에 따른 광량 조건</li>
+        </ul>
+    </div>
+
+    <h2>4.7 정밀 착륙</h2>
+
+    <pre>
+// 정밀 착륙 시스템
+interface PrecisionLanding {
+  // 착륙 방법
+  methods: {
+    visualMarker: {
+      type: 'AprilTag' | 'ArUco' | 'custom';
+      detection: 'downward_camera';
+      accuracy: 5;               // cm
+    };
+    rtk: {
+      accuracy: 2;               // cm
+      baseStation: 'required';
+    };
+    infrared: {
+      beacon: 'IR_landing_pad';
+      range: 10;                 // m
+      accuracy: 10;              // cm
+    };
+  };
+
+  // 착륙 시퀀스
+  sequence: {
+    approach: {
+      altitude: 30;              // m
+      speed: 3;                  // m/s
+      alignment: 'visual_centering';
+    };
+    finalApproach: {
+      altitude: 10;              // m
+      speed: 1;                  // m/s
+      correction: 'continuous';
+    };
+    touchdown: {
+      descentRate: 0.5;          // m/s
+      confirmation: 'altitude + motor_current';
+    };
+  };
+
+  // 안전 기능
+  safety: {
+    abortAltitude: 5;            // m - 이 이상에서 중단 가능
+    surfaceDetection: boolean;
+    levelCheck: boolean;
+    obstacleCheck: boolean;
+  };
+}
+    </pre>
+
+    <h2>4.8 비행 기록</h2>
+
+    <pre>
+// 비행 기록 인터페이스
+interface FlightLogging {
+  // 자동 로깅
+  automatic: {
+    telemetry: {
+      frequency: 10;             // Hz
+      parameters: ['position', 'attitude', 'velocity', 'battery', 'rc_input'];
+    };
+    events: {
+      logged: ['takeoff', 'waypoint_reached', 'mode_change', 'alert', 'landing'];
+    };
+    sensor: {
+      metadata: ['capture_time', 'position', 'attitude'];
+      format: 'EXIF' | 'XMP' | 'separate';
+    };
+  };
+
+  // 저장 및 동기화
+  storage: {
+    onboard: {
+      format: 'binary';
+      capacity: 'flight_duration';
+      autoOverwrite: boolean;
+    };
+    cloud: {
+      syncOnLanding: boolean;
+      format: 'json';
+      retention: '12_months';
+    };
+  };
+
+  // 규제 준수
+  compliance: {
+    pilotLog: 'flight_hours';
+    maintenanceLog: 'component_hours';
+    applicationLog: 'spray_records';  // 살포 기록
+    retention: 'as_required_by_regulation';
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>장 요약</h3>
+        <p>이 장에서는 미션 계획, 웨이포인트 내비게이션, 자율 비행 시스템, 안전 프로토콜, 비상 절차, 날씨 고려사항, 정밀 착륙, 비행 기록을 포함한 비행 운용을 다루었습니다. 이러한 운용 프레임워크는 WIA-AGRICULTURAL_DRONE 표준에 따른 안전하고 효율적인 농업 드론 미션의 기반을 형성합니다.</p>
+    </div>
+</body>
+</html>

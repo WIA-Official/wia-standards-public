@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 3: API Endpoints - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI Standard</h1>
+    <p class="subtitle">Chapter 3: API Endpoints</p>
+  </header>
+
+  <main class="container">
+    <h1>Chapter 3: API Endpoints</h1>
+
+    <h2>3.1 REST API Overview</h2>
+    <p>The WIA-CI REST API provides comprehensive control over cochlear implant processors, enabling device configuration, audio streaming, and real-time monitoring.</p>
+
+    <div class="info-box">
+      <h3>Base URL</h3>
+      <p><code>https://api.wia.ci/v1</code></p>
+      <p>All endpoints require authentication via Bearer token.</p>
+    </div>
+
+    <h2>3.2 Device Configuration API</h2>
+
+    <h3>Get Device Status</h3>
+    <pre><code>GET /processors/{processorId}/status
+
+Response:
+{
+  "status": "online" | "offline" | "streaming",
+  "battery": 85,              // Percentage
+  "rfLink": 95,               // Link quality %
+  "lastSeen": "2025-12-20T10:30:00Z",
+  "currentProgram": "music",
+  "octaveEnhancement": true
+}</code></pre>
+
+    <h3>Get Configuration</h3>
+    <pre><code>GET /processors/{processorId}/config
+
+Response:
+{
+  "version": "1.0.0",
+  "processor": {
+    "sensitivity": 75,
+    "volume": 80,
+    "noiseReduction": "medium",
+    "directionalMic": true
+  },
+  "mapping": {
+    "strategy": "WIA-OCTAVE",
+    "maxima": 10,
+    "stimulationRate": 900,
+    "pulseWidth": 25
+  },
+  "wiaExtension": {
+    "octaveEnhancement": true,
+    "musicMode": "auto",
+    "tfsEncoding": true,
+    "harmonicPriority": true
+  }
+}</code></pre>
+
+    <h3>Update Configuration</h3>
+    <pre><code>PUT /processors/{processorId}/config
+
+Request:
+{
+  "processor": {
+    "volume": 85
+  },
+  "wiaExtension": {
+    "octaveEnhancement": true,
+    "musicMode": "on"
+  }
+}
+
+Response:
+{
+  "status": "success",
+  "appliedAt": "2025-12-20T10:35:00Z",
+  "config": { /* updated config */ }
+}</code></pre>
+
+    <h2>3.3 Audio Streaming API</h2>
+
+    <h3>Start Audio Stream</h3>
+    <pre><code>POST /processors/{processorId}/stream/start
+
+Request:
+{
+  "sampleRate": 16000,
+  "frameSize": 256,
+  "codec": "opus",
+  "bitrateKbps": 32
+}
+
+Response:
+{
+  "streamId": "stream_abc123",
+  "status": "started",
+  "websocketUrl": "wss://stream.wia.ci/v1/stream_abc123"
+}</code></pre>
+
+    <h3>Stop Audio Stream</h3>
+    <pre><code>POST /processors/{processorId}/stream/stop
+
+Response:
+{
+  "status": "stopped",
+  "totalFrames": 15420,
+  "duration": "2m 34s"
+}</code></pre>
+
+    <h2>3.4 Electrode Mapping API</h2>
+
+    <h3>Get Electrode Impedances</h3>
+    <pre><code>GET /processors/{processorId}/electrodes/impedances
+
+Response:
+{
+  "measured": "2025-12-20T10:30:00Z",
+  "impedances": [
+    { "electrode": 1, "value": 8500, "unit": "ohm", "status": "normal" },
+    { "electrode": 2, "value": 9200, "unit": "ohm", "status": "normal" },
+    // ... 22 electrodes
+  ],
+  "summary": {
+    "average": 8800,
+    "min": 7200,
+    "max": 10500,
+    "outliers": []
+  }
+}</code></pre>
+
+    <h3>Update Electrode Map</h3>
+    <pre><code>PUT /processors/{processorId}/electrodes/map
+
+Request:
+{
+  "electrodes": [
+    {
+      "electrode": 1,
+      "enabled": true,
+      "threshold": 150,      // T-level (μA)
+      "comfort": 180,        // C-level (μA)
+      "frequencyShift": 0    // Hz
+    },
+    // ... for all 22 electrodes
+  ]
+}
+
+Response:
+{
+  "status": "success",
+  "validated": true,
+  "appliedAt": "2025-12-20T10:40:00Z"
+}</code></pre>
+
+    <h2>3.5 WIA Octave Enhancement API</h2>
+
+    <h3>Enable/Disable Octave Enhancement</h3>
+    <pre><code>PUT /processors/{processorId}/wia/octave
+
+Request:
+{
+  "enabled": true,
+  "musicMode": "auto",      // "auto" | "on" | "off"
+  "tfsEncoding": true,
+  "harmonicPriority": true
+}
+
+Response:
+{
+  "status": "success",
+  "octaveEnhancement": {
+    "enabled": true,
+    "activeAlgorithms": ["F0_estimation", "harmonic_analysis", "TFS_encoding"]
+  }
+}</code></pre>
+
+    <h3>Get Octave Performance Stats</h3>
+    <pre><code>GET /processors/{processorId}/wia/octave/stats
+
+Response:
+{
+  "period": "last_30_days",
+  "octaveRecognitionRate": 0.87,
+  "musicDetectionAccuracy": 0.92,
+  "harmonicPreservation": 0.85,
+  "usage": {
+    "totalHours": 120,
+    "musicHours": 45,
+    "speechHours": 75
+  }
+}</code></pre>
+
+    <h2>3.6 Telemetry API</h2>
+
+    <h3>Get Telemetry Data</h3>
+    <pre><code>GET /processors/{processorId}/telemetry
+
+Response:
+{
+  "timestamp": "2025-12-20T10:30:00Z",
+  "implantStatus": {
+    "voltage": 3400,         // mV
+    "current": 850,          // μA
+    "temperature": 37.2,     // °C
+    "compliance": true
+  },
+  "electrodeStatus": {
+    "activeCount": 22,
+    "shortCircuits": 0,
+    "openCircuits": 0
+  }
+}</code></pre>
+
+    <h3>Get Neural Response Telemetry (NRT)</h3>
+    <pre><code>POST /processors/{processorId}/telemetry/nrt
+
+Request:
+{
+  "electrode": 11,
+  "amplitude": 200,         // μA
+  "pulseWidth": 25          // μs
+}
+
+Response:
+{
+  "electrode": 11,
+  "amplitude": 15.2,        // μV (response)
+  "latency": 420,           // μs
+  "waveform": [/* sampled response */],
+  "quality": "good"
+}</code></pre>
+
+    <h2>3.7 Program Management API</h2>
+
+    <h3>List Programs</h3>
+    <pre><code>GET /processors/{processorId}/programs
+
+Response:
+{
+  "programs": [
+    {
+      "id": 1,
+      "name": "Everyday",
+      "strategy": "ACE",
+      "octaveEnhancement": false
+    },
+    {
+      "id": 2,
+      "name": "Music",
+      "strategy": "WIA-OCTAVE",
+      "octaveEnhancement": true
+    },
+    {
+      "id": 3,
+      "name": "Restaurant",
+      "strategy": "ACE",
+      "noiseReduction": "high"
+    }
+  ],
+  "currentProgram": 2
+}</code></pre>
+
+    <h3>Switch Program</h3>
+    <pre><code>POST /processors/{processorId}/programs/switch
+
+Request:
+{
+  "programId": 2
+}
+
+Response:
+{
+  "status": "success",
+  "currentProgram": 2,
+  "name": "Music"
+}</code></pre>
+
+    <h2>3.8 Session Management API</h2>
+
+    <h3>Start Session</h3>
+    <pre><code>POST /processors/{processorId}/session/start
+
+Request:
+{
+  "config": {
+    "mode": "music",
+    "octaveEnhancement": true
+  }
+}
+
+Response:
+{
+  "sessionId": "session_xyz789",
+  "status": "connected",
+  "implantInfo": {
+    "manufacturer": "Cochlear",
+    "model": "CI622",
+    "serialNumber": "CI-2025-001234",
+    "electrodeCount": 22
+  }
+}</code></pre>
+
+    <h3>End Session</h3>
+    <pre><code>POST /processors/{processorId}/session/end
+
+Request:
+{
+  "sessionId": "session_xyz789",
+  "reason": "user"
+}
+
+Response:
+{
+  "status": "disconnected",
+  "duration": "1h 23m",
+  "stats": {
+    "framesSent": 298440,
+    "framesDropped": 12
+  }
+}</code></pre>
+
+    <h2>3.9 WebSocket API</h2>
+
+    <h3>Real-time Stream Connection</h3>
+    <pre><code>// Connect to WebSocket
+ws://api.wia.ci/v1/stream/{processorId}
+
+// Message types
+{
+  "type": "audio" | "envelope" | "stimulation" | "octave" | "status",
+  "timestamp": 1234567890,
+  "data": { /* payload */ }
+}
+
+// Example: Octave detection message
+{
+  "type": "octave",
+  "timestamp": 1234567890,
+  "data": {
+    "f0": 261.63,
+    "octaveNumber": 4,
+    "noteName": "C",
+    "confidence": 0.92,
+    "isMusic": true
+  }
+}</code></pre>
+
+    <h2>3.10 Batch Operations API</h2>
+
+    <h3>Batch Configuration Update</h3>
+    <pre><code>POST /processors/batch/config
+
+Request:
+{
+  "processors": ["proc_001", "proc_002", "proc_003"],
+  "config": {
+    "wiaExtension": {
+      "octaveEnhancement": true
+    }
+  }
+}
+
+Response:
+{
+  "status": "success",
+  "updated": 3,
+  "failed": 0,
+  "results": [
+    { "processorId": "proc_001", "status": "success" },
+    { "processorId": "proc_002", "status": "success" },
+    { "processorId": "proc_003", "status": "success" }
+  ]
+}</code></pre>
+
+    <h2>3.11 Analytics API</h2>
+
+    <h3>Get Listening Statistics</h3>
+    <pre><code>GET /processors/{processorId}/analytics/listening?period=30d
+
+Response:
+{
+  "period": "last_30_days",
+  "totalListeningTime": 7200,    // minutes
+  "breakdown": {
+    "music": 1800,
+    "speech": 4500,
+    "mixed": 900
+  },
+  "dailyAverage": 240,
+  "peakHours": ["18:00-20:00", "09:00-11:00"],
+  "octaveUsage": {
+    "enabled": 1800,
+    "disabled": 5400
+  }
+}</code></pre>
+
+    <div class="info-box">
+      <h3>Rate Limits</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Endpoint Type</th>
+            <th>Rate Limit</th>
+            <th>Burst</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Configuration</td>
+            <td>60 req/min</td>
+            <td>10</td>
+          </tr>
+          <tr>
+            <td>Telemetry</td>
+            <td>120 req/min</td>
+            <td>20</td>
+          </tr>
+          <tr>
+            <td>Streaming</td>
+            <td>Unlimited</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td>Analytics</td>
+            <td>30 req/min</td>
+            <td>5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>3.12 Error Responses</h2>
+
+    <h3>Standard Error Format</h3>
+    <pre><code>{
+  "error": {
+    "code": "INVALID_CONFIG",
+    "message": "T-level must be less than C-level",
+    "details": {
+      "electrode": 5,
+      "tLevel": 200,
+      "cLevel": 180
+    },
+    "timestamp": "2025-12-20T10:30:00Z"
+  }
+}</code></pre>
+
+    <h3>Common Error Codes</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>HTTP Status</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PROCESSOR_NOT_FOUND</td>
+          <td>404</td>
+          <td>Processor ID does not exist</td>
+        </tr>
+        <tr>
+          <td>INVALID_CONFIG</td>
+          <td>400</td>
+          <td>Configuration validation failed</td>
+        </tr>
+        <tr>
+          <td>PROCESSOR_OFFLINE</td>
+          <td>503</td>
+          <td>Processor is not connected</td>
+        </tr>
+        <tr>
+          <td>RATE_LIMIT_EXCEEDED</td>
+          <td>429</td>
+          <td>Too many requests</td>
+        </tr>
+        <tr>
+          <td>UNAUTHORIZED</td>
+          <td>401</td>
+          <td>Invalid or missing auth token</td>
+        </tr>
+      </tbody>
+    </table>
+
+    </main>
+</body>
+</html>

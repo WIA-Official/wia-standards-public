@@ -411,7 +411,10 @@ impl AccessObligation {
     /// Create logging obligation
     pub fn logging(target: impl Into<String>, detail_level: impl Into<String>) -> Self {
         let mut params = HashMap::new();
-        params.insert("detail_level".to_string(), serde_json::json!(detail_level.into()));
+        params.insert(
+            "detail_level".to_string(),
+            serde_json::json!(detail_level.into()),
+        );
 
         Self {
             obligation_type: "logging".to_string(),
@@ -521,7 +524,11 @@ impl AccessDecisionResponse {
         use chrono::Duration;
         let now = Utc::now();
         self.valid_from = Some(now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
-        self.valid_until = Some((now + Duration::hours(hours)).format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
+        self.valid_until = Some(
+            (now + Duration::hours(hours))
+                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                .to_string(),
+        );
         self
     }
 }
@@ -677,9 +684,7 @@ mod tests {
                 AccessCondition::time_limit("2024-12-14T18:00:00Z"),
                 AccessCondition::continuous_auth(30),
             ])
-            .with_obligations(vec![
-                AccessObligation::logging("siem-central", "verbose"),
-            ])
+            .with_obligations(vec![AccessObligation::logging("siem-central", "verbose")])
             .valid_for_hours(8);
 
         assert_eq!(response.decision, AccessDecision::Permit);

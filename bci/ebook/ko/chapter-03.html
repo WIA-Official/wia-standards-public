@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 신호 처리 및 디코딩 | WIA-BCI</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin: 1rem 0; }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a365d);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        pre {
+            background: #000;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
+            margin: 1rem 0;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+        .info-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .algorithm-box {
+            background: linear-gradient(135deg, var(--bg-secondary), #064e3b);
+            border-left: 4px solid var(--success);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .pipeline-step {
+            display: flex;
+            align-items: flex-start;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+        .step-number {
+            background: var(--primary);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+        .footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .philosophy {
+            font-size: 1.25rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>제3장: 신호 처리 및 디코딩</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 이 장에서는 전처리, 특징 추출, 분류 알고리즘을 포함한 뇌-컴퓨터 인터페이스의 신호 처리 파이프라인을 다룹니다. 실시간 처리를 위한 WIA-BCI 요구사항과 디코더 성능 검증 표준을 배우게 됩니다.
+    </div>
+
+    <h2>3.1 신호 처리 파이프라인</h2>
+    <p>신경 신호 처리는 원시 뇌 신호를 의미 있는 명령으로 변환합니다. WIA-BCI 표준은 투명성과 재현성을 유지하면서 신뢰할 수 있는 실시간 성능을 보장하는 포괄적인 파이프라인을 정의합니다.</p>
+
+    <div class="pipeline-step">
+        <div class="step-number">1</div>
+        <div>
+            <strong>획득:</strong> 지정된 샘플링 레이트와 해상도로 신경 센서에서 캡처된 원시 신호.
+        </div>
+    </div>
+    <div class="pipeline-step">
+        <div class="step-number">2</div>
+        <div>
+            <strong>전처리:</strong> 분석을 위해 데이터를 준비하기 위한 필터링, 인공물 제거 및 신호 조절.
+        </div>
+    </div>
+    <div class="pipeline-step">
+        <div class="step-number">3</div>
+        <div>
+            <strong>특징 추출:</strong> 관련 신호 특성의 식별 및 계산.
+        </div>
+    </div>
+    <div class="pipeline-step">
+        <div class="step-number">4</div>
+        <div>
+            <strong>분류/디코딩:</strong> 특징을 이산 명령 또는 연속 제어 신호로 변환.
+        </div>
+    </div>
+    <div class="pipeline-step">
+        <div class="step-number">5</div>
+        <div>
+            <strong>후처리:</strong> 장치 제어를 위한 스무딩, 오류 수정 및 출력 형식화.
+        </div>
+    </div>
+
+    <h2>3.2 전처리 기술</h2>
+    <p>전처리는 관심 있는 신경 신호를 보존하면서 잡음과 인공물을 제거합니다. WIA-BCI 표준은 허용 가능한 전처리 방법과 그 매개변수를 지정합니다.</p>
+
+    <h3>필터링 요구사항</h3>
+    <pre>
+WIA-BCI 필터링 사양
+====================
+
+고역통과_필터:
+  목적: DC 오프셋 및 느린 드리프트 제거
+  차단: 0.1-1.0 Hz (응용에 따라)
+  유형: IIR 버터워스, 차수 ≤ 4
+  위상: 영-위상 (오프라인) 또는 인과적 (온라인)
+
+저역통과_필터:
+  목적: 안티-앨리어싱, 고주파 잡음 제거
+  차단: 응용별 (EEG의 경우 일반적으로 40-100 Hz)
+  유형: IIR 버터워스 또는 FIR
+  롤오프: ≥ 24 dB/옥타브
+
+노치_필터:
+  목적: 전력선 간섭 제거
+  주파수: 50 Hz 또는 60 Hz (지역에 따라)
+  대역폭: ≤ 2 Hz
+  감쇠: ≥ 40 dB
+
+공간_필터링:
+  공통_평균_기준: EEG에 권장
+  라플라시안: 개선된 공간 해상도를 위한 표면 라플라시안
+  공통_공간_패턴: 운동 심상 응용용
+    </pre>
+
+    <h3>인공물 제거</h3>
+    <p>신경 신호는 안구 움직임, 근육 활동 및 환경 간섭을 포함한 다양한 소스의 인공물로 자주 오염됩니다. 효과적인 인공물 제거는 신뢰할 수 있는 BCI 작동에 필수적입니다.</p>
+
+    <div class="info-box">
+        <h3>일반적인 인공물 유형</h3>
+        <ul>
+            <li><strong>안구 인공물:</strong> 눈 깜박임 및 움직임 (10-100 μV)</li>
+            <li><strong>EMG 인공물:</strong> 근육 활동 (10-1000 μV)</li>
+            <li><strong>움직임 인공물:</strong> 전극 움직임 및 케이블 흔들림</li>
+            <li><strong>환경:</strong> 전력선 간섭, 전자기 잡음</li>
+            <li><strong>생리적:</strong> 심장 인공물, 호흡</li>
+        </ul>
+    </div>
+
+    <h2>3.3 특징 추출</h2>
+    <p>특징 추출은 분류를 위해 신경 신호의 가장 유익한 특성을 식별합니다. 특징 선택은 신호 유형, BCI 패러다임 및 응용 요구사항에 따라 달라집니다.</p>
+
+    <h3>시간 영역 특징</h3>
+    <table>
+        <tr>
+            <th>특징</th>
+            <th>설명</th>
+            <th>계산</th>
+        </tr>
+        <tr>
+            <td>평균 진폭</td>
+            <td>평균 신호 값</td>
+            <td>μ = (1/N) Σx[n]</td>
+        </tr>
+        <tr>
+            <td>분산</td>
+            <td>신호 전력/변동성</td>
+            <td>σ² = (1/N) Σ(x[n]-μ)²</td>
+        </tr>
+        <tr>
+            <td>RMS</td>
+            <td>제곱 평균 제곱근 진폭</td>
+            <td>√[(1/N) Σx[n]²]</td>
+        </tr>
+        <tr>
+            <td>영점 교차</td>
+            <td>부호 변화 비율</td>
+            <td>x[n]·x[n+1] < 0 개수</td>
+        </tr>
+        <tr>
+            <td>Hjorth 매개변수</td>
+            <td>활동, 이동성, 복잡성</td>
+            <td>통계적 미분</td>
+        </tr>
+    </table>
+
+    <h3>주파수 영역 특징</h3>
+    <pre>
+WIA-BCI 스펙트럼 특징 사양
+===========================
+
+밴드_파워_특징:
+  계산: FFT 또는 Welch 주기도
+  창: 해밍 또는 한
+  중첩: 50% 권장
+  해상도: ≤ 1 Hz
+  
+  표준_밴드:
+    델타: 0.5-4 Hz
+    세타: 4-8 Hz
+    알파: 8-13 Hz
+    베타: 13-30 Hz
+    감마: 30-100 Hz
+    고_감마: 70-150 Hz (ECoG만)
+
+스펙트럼_특징:
+  절대_파워: 밴드에 걸쳐 ∫PSD(f)df
+  상대_파워: 밴드_파워 / 총_파워
+  피크_주파수: 밴드에서 argmax(PSD(f))
+  스펙트럼_엣지: X% 파워 이하의 주파수
+  스펙트럼_엔트로피: -Σp(f)·log(p(f))
+
+연결성_특징:
+  코히어런스: 교차 스펙트럼 밀도 / PSD들
+  위상_잠금_값: 위상 동기화
+  그랜저_인과성: 방향성 영향
+    </pre>
+
+    <div class="algorithm-box">
+        <h3>공통 공간 패턴 (CSP)</h3>
+        <p>CSP는 운동 심상 BCI를 위한 강력한 특징 추출 방법입니다. 두 클래스 간의 분산 비율을 최대화하는 공간 필터를 찾으며, 일반적으로 왼쪽 대 오른쪽 운동 심상을 구별하는 데 사용됩니다.</p>
+        <pre>
+# CSP 알고리즘 구현
+def compute_csp(X1, X2, n_components=6):
+    """
+    두 클래스 구별을 위한 CSP 필터 계산
+    
+    X1, X2: 시행 데이터 (시행 x 채널 x 샘플)
+    반환: CSP 필터 (n_components x 채널)
+    """
+    # 공분산 행렬 계산
+    C1 = np.mean([np.cov(trial) for trial in X1], axis=0)
+    C2 = np.mean([np.cov(trial) for trial in X2], axis=0)
+    
+    # 복합 공분산
+    Cc = C1 + C2
+    
+    # 백색화 변환
+    eigenvalues, U = np.linalg.eigh(Cc)
+    P = np.dot(np.diag(1/np.sqrt(eigenvalues)), U.T)
+    
+    # 백색화 적용 및 고유값 문제 해결
+    S1 = np.dot(np.dot(P, C1), P.T)
+    eigenvalues, B = np.linalg.eigh(S1)
+    
+    # 최종 투영 행렬
+    W = np.dot(B.T, P)
+    
+    # 컴포넌트 선택 (처음과 마지막 n/2)
+    idx = np.argsort(eigenvalues)
+    idx = np.concatenate([idx[:n_components//2], 
+                          idx[-n_components//2:]])
+    
+    return W[idx]
+        </pre>
+    </div>
+
+    <h2>3.4 분류 알고리즘</h2>
+    <p>분류 알고리즘은 추출된 특징을 이산 명령 또는 연속 제어 신호로 변환합니다. WIA-BCI 표준은 각각에 대한 특정 요구사항과 함께 여러 분류 접근법을 지원합니다.</p>
+
+    <h3>지원되는 분류기</h3>
+    <ul>
+        <li><strong>선형 판별 분석 (LDA):</strong> 빠르고 해석 가능하며 제한된 훈련 데이터로 잘 작동</li>
+        <li><strong>서포트 벡터 머신 (SVM):</strong> 고차원 특징에 효과적, 과적합에 강건</li>
+        <li><strong>신경망:</strong> 복잡한 패턴에 강력, 더 많은 훈련 데이터 필요</li>
+        <li><strong>앙상블 방법:</strong> 개선된 강건성을 위한 랜덤 포레스트, 그래디언트 부스팅</li>
+        <li><strong>딥 러닝:</strong> 원시 신호에서의 엔드-투-엔드 학습을 위한 CNN 및 RNN</li>
+    </ul>
+
+    <pre>
+WIA-BCI 분류기 요구사항
+========================
+
+성능_지표:
+  정확도: 전체 분류 정확성
+  정밀도: 참 양성 / 예측 양성
+  재현율: 참 양성 / 실제 양성
+  f1_점수: 정밀도와 재현율의 조화 평균
+  코헨_카파: 우연에 대해 보정된 일치도
+  
+  최소_요구사항:
+    레벨_1: 정확도 ≥ 70%, 카파 ≥ 0.4
+    레벨_2: 정확도 ≥ 85%, 카파 ≥ 0.7
+    레벨_3: 정확도 ≥ 90%, 카파 ≥ 0.8
+    레벨_4: 정확도 ≥ 95%, 카파 ≥ 0.9
+
+검증_요구사항:
+  방법: k-겹 교차검증 (k ≥ 5)
+  테스트_세트: 독립적인 홀드아웃 데이터
+  통계적_유의성: 우연 대비 p < 0.05
+  
+실시간_요구사항:
+  처리_지연: ≤ 분류_기간 / 2
+  업데이트_레이트: 응용별 (일반적으로 10-100 Hz)
+  버퍼_관리: 슬라이딩 윈도우 또는 시행 기반
+    </pre>
+
+    <h2>3.5 BCI를 위한 딥 러닝</h2>
+    <p>딥 러닝 접근법은 수동 특징 엔지니어링 없이 원시 신경 신호에서 엔드-투-엔드 학습을 가능하게 하여 BCI 응용에 유망한 결과를 보여주었습니다.</p>
+
+    <div class="info-box">
+        <h3>WIA-BCI 딥 러닝 지침</h3>
+        <ul>
+            <li>모델은 독립적인 테스트 피험자에 대해 검증되어야 합니다 (교차 피험자 검증)</li>
+            <li>의료 응용에는 해석 가능성 메커니즘 필요 (어텐션 맵, 그래디언트 분석)</li>
+            <li>훈련 데이터 요구사항 문서화 필요 (클래스당 최소 샘플)</li>
+            <li>배포를 위한 계산 요구사항 명시 필요</li>
+            <li>모델 업데이트는 버전 관리 및 검증 프로토콜 준수 필요</li>
+        </ul>
+    </div>
+
+    <h2>3.6 적응 및 온라인 학습</h2>
+    <p>BCI 시스템은 시간에 따른 신경 신호의 변화에 적응해야 합니다. WIA-BCI 표준은 장기 사용 중 성능을 유지하는 적응 알고리즘에 대한 지침을 제공합니다.</p>
+
+    <h3>적응 전략</h3>
+    <ul>
+        <li><strong>지도 재보정:</strong> 레이블된 데이터로 주기적인 재훈련</li>
+        <li><strong>비지도 적응:</strong> 명시적 레이블 없이 지속적인 조정</li>
+        <li><strong>공동 적응 학습:</strong> 동시 사용자 및 시스템 적응</li>
+        <li><strong>전이 학습:</strong> 다른 사용자 또는 세션의 데이터 활용</li>
+    </ul>
+
+    <h2>3.7 요약</h2>
+    <p>신호 처리 및 디코딩은 뇌-컴퓨터 인터페이스의 계산적 핵심을 형성합니다. 이 장에서는 전처리, 특징 추출, 분류를 위한 WIA-BCI 사양과 검증 및 실시간 성능 요구사항을 제시했습니다. 이러한 표준은 BCI 시스템이 투명성과 재현성을 유지하면서 신뢰할 수 있고 정확한 제어를 제공하도록 보장합니다.</p>
+
+    <div class="footer">
+        <p class="philosophy">弘益人間 (홍익인간)</p>
+        <p>"널리 인간을 이롭게 하라"</p>
+        <p>© 2025 WIA (World Certification Industry Association)</p>
+    </div>
+</body>
+</html>

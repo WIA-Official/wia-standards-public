@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Security | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Security in CI/CD Pipelines</h1>
+
+    <p>Security must be integrated throughout the CI/CD pipeline, not bolted on at the end. This chapter covers secrets management, Static and Dynamic Application Security Testing (SAST/DAST), supply chain security, and practices that embed security into every stage of software delivery.</p>
+
+    <h2>The DevSecOps Approach</h2>
+
+    <p>DevSecOps extends DevOps principles to include security as a shared responsibility. Rather than treating security as a gate at the end of development, it becomes an integral part of every stage.</p>
+
+    <pre><code># DevSecOps Pipeline Stages
+┌──────────────────────────────────────────────────────────────┐
+│                    SECURE CI/CD PIPELINE                      │
+├──────────┬──────────┬──────────┬──────────┬─────────────────┤
+│   Plan   │  Code    │  Build   │  Test    │     Deploy      │
+├──────────┼──────────┼──────────┼──────────┼─────────────────┤
+│ Threat   │ Pre-     │ SAST     │ DAST     │ Container       │
+│ Modeling │ commit   │ SCA      │ Pen Test │ Scanning        │
+│          │ Hooks    │ Secrets  │ API      │ Runtime         │
+│ Security │ IDE      │ Scan     │ Security │ Protection      │
+│ Stories  │ Linters  │          │          │                 │
+└──────────┴──────────┴──────────┴──────────┴─────────────────┘</code></pre>
+
+    <div class="highlight">
+        <strong>Shift-Left Security:</strong> The cost of fixing a security vulnerability increases exponentially as it progresses through the development lifecycle. Finding issues during coding costs 6x less than finding them in testing, and 15x less than finding them in production.
+    </div>
+
+    <h2>Secrets Management</h2>
+
+    <p>Secrets - API keys, credentials, certificates - are essential for CI/CD operations but represent significant security risks if mishandled. Never store secrets in code repositories.</p>
+
+    <h3>Secrets Management Best Practices</h3>
+
+    <ul>
+        <li><strong>External Secrets Store:</strong> Use dedicated secret management services (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault)</li>
+        <li><strong>Environment-Specific Secrets:</strong> Maintain separate secrets for development, staging, and production</li>
+        <li><strong>Rotation Policies:</strong> Implement automatic secret rotation on a regular schedule</li>
+        <li><strong>Audit Logging:</strong> Log all secret access for compliance and incident response</li>
+        <li><strong>Least Privilege:</strong> Grant minimal necessary access to secrets</li>
+    </ul>
+
+    <h3>GitHub Actions Secrets Configuration</h3>
+
+    <pre><code># GitHub Actions - Secure Secret Usage
+name: Secure Deployment
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production  # Requires approval for production secrets
+
+    permissions:
+      contents: read
+      id-token: write  # Required for OIDC
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Use OIDC for cloud authentication (no long-lived credentials)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789:role/github-actions
+          aws-region: us-east-1
+
+      # Secrets accessed via environment
+      - name: Deploy application
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          # Secrets are masked in logs
+          npm run deploy</code></pre>
+
+    <h3>Secret Scanning</h3>
+
+    <pre><code># GitHub Actions - Secret Detection
+name: Secret Scanning
+on: [push, pull_request]
+
+jobs:
+  detect-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Gitleaks - detect secrets in code
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # TruffleHog - high-signal secret detection
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          extra_args: --only-verified</code></pre>
+
+    <pre><code># .gitleaks.toml - Custom rules
+[extend]
+useDefault = true
+
+[[rules]]
+id = "wia-api-key"
+description = "WIA API Key"
+regex = '''wia_[a-zA-Z0-9]{32}'''
+tags = ["key", "wia"]
+
+[allowlist]
+paths = [
+  '''(.*?)(jpg|gif|doc|pdf|bin|svg)$''',
+  '''\.gitleaks\.toml$'''
+]</code></pre>
+
+    <h2>Static Application Security Testing (SAST)</h2>
+
+    <p>SAST tools analyze source code to identify security vulnerabilities without executing the application. They catch issues like SQL injection, XSS, and insecure cryptography early in development.</p>
+
+    <h3>CodeQL Analysis</h3>
+
+    <pre><code># GitHub Actions - CodeQL SAST
+name: CodeQL Analysis
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly deep scan
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript, python]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"</code></pre>
+
+    <h3>Semgrep Custom Rules</h3>
+
+    <pre><code># .semgrep.yml - Custom security rules
+rules:
+  - id: wia-no-eval
+    patterns:
+      - pattern: eval(...)
+    message: "eval() is dangerous and should not be used"
+    severity: ERROR
+    languages: [javascript, typescript]
+
+  - id: wia-sql-injection
+    patterns:
+      - pattern: |
+          $QUERY = "..." + $USER_INPUT + "..."
+          $DB.query($QUERY)
+    message: "Potential SQL injection vulnerability"
+    severity: ERROR
+    languages: [javascript, typescript]
+
+  - id: wia-hardcoded-secret
+    patterns:
+      - pattern-regex: '(password|secret|api_key)\s*=\s*["\'][^"\']{8,}["\']'
+    message: "Hardcoded secret detected"
+    severity: ERROR
+    languages: [javascript, typescript, python]</code></pre>
+
+    <pre><code># GitHub Actions - Semgrep
+name: Semgrep
+on: [push, pull_request]
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: semgrep scan --config auto --config .semgrep.yml --sarif --output semgrep.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif</code></pre>
+
+    <div class="highlight">
+        <strong>SAST Tool Selection:</strong> Use multiple SAST tools as they have different strengths. CodeQL excels at data flow analysis, Semgrep is fast and customizable, and language-specific tools often catch nuanced issues.
+    </div>
+
+    <h2>Dynamic Application Security Testing (DAST)</h2>
+
+    <p>DAST tools test running applications by simulating attacks. They find runtime vulnerabilities that SAST cannot detect, such as authentication flaws and server misconfigurations.</p>
+
+    <h3>OWASP ZAP Integration</h3>
+
+    <pre><code># GitHub Actions - OWASP ZAP DAST
+name: DAST Security Scan
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly security scan
+
+jobs:
+  zap-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start application
+        run: |
+          docker-compose up -d
+          sleep 30  # Wait for app to be ready
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: report_html.html</code></pre>
+
+    <pre><code># .zap/rules.tsv - Customize ZAP scan rules
+# Rule ID   Action   Description
+10021      IGNORE   X-Content-Type-Options Header Missing (handled by CDN)
+10038      WARN     Content Security Policy Header Not Set
+10055      FAIL     CSP Wildcard Directive
+40012      FAIL     Cross Site Scripting (Reflected)
+40014      FAIL     Cross Site Scripting (Persistent)</code></pre>
+
+    <h2>Software Composition Analysis (SCA)</h2>
+
+    <p>SCA tools analyze third-party dependencies for known vulnerabilities. With modern applications using hundreds of dependencies, SCA is essential for supply chain security.</p>
+
+    <h3>Dependency Vulnerability Scanning</h3>
+
+    <pre><code># GitHub Actions - Comprehensive SCA
+name: Dependency Security
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub's built-in dependency scanning
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0
+
+      # Snyk for deep vulnerability analysis
+      - name: Snyk vulnerability scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk.sarif
+
+      - name: Upload Snyk results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk.sarif</code></pre>
+
+    <h3>SBOM Generation</h3>
+
+    <pre><code># Generate Software Bill of Materials
+name: Generate SBOM
+on:
+  release:
+    types: [published]
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM (CycloneDX)
+        uses: CycloneDX/gh-node-module-generatebom@v1
+        with:
+          output: sbom.json
+
+      - name: Generate SBOM (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom-spdx.json
+
+      - name: Attach SBOM to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sbom.json
+            sbom-spdx.json</code></pre>
+
+    <h2>Container Security</h2>
+
+    <p>Container images require special security attention as they package both application code and system dependencies.</p>
+
+    <pre><code># GitHub Actions - Container Security
+name: Container Security
+on:
+  push:
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t myapp:${{ github.sha }} .
+
+      # Trivy vulnerability scanner
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'myapp:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+      # Dockerfile best practices
+      - name: Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI Security Maturity Model:</strong>
+        <ul>
+            <li>Level 1: Secret scanning, basic SAST</li>
+            <li>Level 2: SCA, container scanning, SBOM</li>
+            <li>Level 3: DAST, custom security rules</li>
+            <li>Level 4: Threat modeling integration, security as code</li>
+        </ul>
+    </div>
+
+    <h2>Security Compliance Automation</h2>
+
+    <pre><code># Compliance as Code
+name: Compliance Check
+on:
+  push:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check OWASP Top 10 compliance
+        run: |
+          echo "Verifying OWASP Top 10 controls..."
+          # A01 - Broken Access Control
+          grep -r "authorize" src/ || echo "::warning::No authorization checks found"
+          # A02 - Cryptographic Failures
+          ! grep -r "md5\|sha1" src/ || echo "::warning::Weak crypto detected"
+          # A03 - Injection
+          npm audit --audit-level=moderate
+
+      - name: Generate compliance report
+        run: |
+          node scripts/generate-compliance-report.js > compliance-report.json
+
+      - name: Upload compliance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-report.json</code></pre>
+
+    <p>Security in CI/CD is not a one-time setup but an ongoing practice. Regular updates to security rules, continuous monitoring for new vulnerabilities, and security training for developers are essential for maintaining a secure software delivery pipeline.</p>
+
+</body>
+</html>

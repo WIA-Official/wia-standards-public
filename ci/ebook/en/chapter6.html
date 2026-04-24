@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 6: Security & Privacy - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI Standard</h1>
+    <p class="subtitle">Chapter 6: Security & Privacy</p>
+  </header>
+
+  <main class="container">
+    <h1>Chapter 6: Security & Privacy</h1>
+
+    <h2>6.1 Security Overview</h2>
+    <p>WIA-CI implements comprehensive security measures to protect patient data, ensure device integrity, and prevent unauthorized access.</p>
+
+    <div class="warning-box">
+      <h3>Security Principles</h3>
+      <ul>
+        <li><strong>Defense in Depth:</strong> Multiple layers of security</li>
+        <li><strong>Least Privilege:</strong> Minimum necessary access</li>
+        <li><strong>Zero Trust:</strong> Always verify, never trust</li>
+        <li><strong>Privacy by Design:</strong> Built-in from the ground up</li>
+      </ul>
+    </div>
+
+    <h2>6.2 Authentication & Authorization</h2>
+
+    <h3>Device Pairing</h3>
+    <pre><code>interface DevicePairing {
+  // Pairing method
+  method: 'secure_simple' | 'oob' | 'passkey';
+  bondingRequired: true;
+
+  // Secure Simple Pairing
+  ssp: {
+    ioCap: 'display_yes_no';
+    mitm: true;              // Man-in-the-Middle protection
+    bonding: true;
+  };
+
+  // Out-of-Band pairing
+  oob?: {
+    method: 'nfc' | 'qr_code';
+    confirmationRequired: true;
+  };
+}
+
+// Pairing flow
+async function pairDevice(deviceId: string) {
+  // 1. Generate pairing request
+  const request = generatePairingRequest(deviceId);
+
+  // 2. Display pairing code
+  const code = displayPairingCode();  // e.g., "123456"
+
+  // 3. User confirms on both devices
+  const confirmed = await waitForUserConfirmation();
+
+  // 4. Complete pairing
+  if (confirmed) {
+    const bond = await completePairing(deviceId);
+    storeBond(deviceId, bond);
+  }
+}</code></pre>
+
+    <h3>Session Authentication</h3>
+    <pre><code>interface SessionAuth {
+  // Token-based authentication
+  tokenBased: boolean;
+  tokenExpiry: number;        // seconds (3600 = 1 hour)
+  refreshEnabled: boolean;
+
+  // Challenge-response
+  challengeResponse: {
+    algorithm: 'ECDSA-P256';
+    nonceSize: 32;            // bytes
+  };
+}
+
+// Authenticate session
+async function authenticateSession(deviceId: string) {
+  // 1. Generate challenge
+  const challenge = crypto.randomBytes(32);
+
+  // 2. Send to device
+  const response = await sendChallenge(deviceId, challenge);
+
+  // 3. Verify signature
+  const valid = verifySignature(
+    challenge,
+    response.signature,
+    devicePublicKey
+  );
+
+  if (!valid) {
+    throw new Error('Authentication failed');
+  }
+
+  // 4. Issue session token
+  const token = generateSessionToken(deviceId, {
+    expiresIn: 3600
+  });
+
+  return token;
+}</code></pre>
+
+    <h2>6.3 Encryption</h2>
+
+    <h3>Data Encryption at Rest</h3>
+    <pre><code>interface EncryptionAtRest {
+  // Configuration data
+  config: {
+    algorithm: 'AES-256-GCM';
+    keyDerivation: 'PBKDF2';
+    iterations: 100000;
+  };
+
+  // Patient data (HIPAA compliant)
+  patientData: {
+    algorithm: 'AES-256-GCM';
+    keyRotation: true;
+    rotationPeriod: 2592000;  // 30 days
+  };
+}
+
+// Encrypt sensitive data
+async function encryptData(data: Uint8Array, key: CryptoKey) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+
+  return {
+    ciphertext: new Uint8Array(encrypted),
+    iv: iv,
+    algorithm: 'AES-256-GCM'
+  };
+}</code></pre>
+
+    <h3>Data Encryption in Transit</h3>
+    <pre><code>interface EncryptionInTransit {
+  // BLE encryption
+  ble: {
+    mode: 'AES-128-CCM';
+    keyExchange: 'ECDH';
+    perfectForwardSecrecy: true;
+  };
+
+  // HTTPS/TLS
+  https: {
+    version: 'TLS-1.3';
+    cipherSuites: [
+      'TLS_AES_256_GCM_SHA384',
+      'TLS_CHACHA20_POLY1305_SHA256'
+    ];
+    certificatePinning: true;
+  };
+
+  // End-to-end encryption
+  e2e: {
+    enabled: true;
+    protocol: 'Signal Protocol';
+    keyRotation: true;
+  };
+}</code></pre>
+
+    <h2>6.4 Audio Data Protection</h2>
+    <p>Special considerations for protecting audio data, which may contain sensitive information.</p>
+
+    <h3>Audio Data Handling</h3>
+    <pre><code>interface AudioDataProtection {
+  // Storage policy
+  storage: {
+    neverStorePermanent: true;
+    bufferOnly: true;
+    maxBufferTime: 5000;      // ms
+    clearOnDisconnect: true;
+  };
+
+  // Transmission
+  transmission: {
+    encrypted: true;
+    compression: 'opus';      // Also provides obfuscation
+    streamOnly: true;         // No recording
+  };
+
+  // Processing
+  processing: {
+    onDeviceOnly: boolean;
+    cloudProcessing: 'opt-in';
+    anonymizeBeforeCloud: true;
+  };
+}
+
+// Audio buffer management
+class SecureAudioBuffer {
+  private buffer: Float32Array;
+  private maxAge: number = 5000;  // ms
+
+  push(frame: Float32Array) {
+    this.buffer = frame;
+    setTimeout(() => this.clear(), this.maxAge);
+  }
+
+  clear() {
+    // Secure erase (overwrite with zeros)
+    this.buffer.fill(0);
+    this.buffer = null;
+  }
+}</code></pre>
+
+    <h2>6.5 Device Security</h2>
+
+    <h3>Firmware Security</h3>
+    <pre><code>interface FirmwareSecurity {
+  // Secure boot
+  secureBoot: {
+    enabled: true;
+    bootloaderSigned: true;
+    firmwareSigned: true;
+    publicKeyEmbedded: true;
+  };
+
+  // Firmware updates
+  updates: {
+    signatureVerification: 'mandatory';
+    algorithm: 'ECDSA-P256';
+    rollbackPrevention: true;
+    encryptedTransmission: true;
+  };
+}
+
+// Verify firmware update
+async function verifyFirmwareUpdate(
+  firmware: Uint8Array,
+  signature: Uint8Array
+) {
+  // 1. Verify signature
+  const valid = await crypto.subtle.verify(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    manufacturerPublicKey,
+    signature,
+    firmware
+  );
+
+  if (!valid) {
+    throw new Error('Invalid firmware signature');
+  }
+
+  // 2. Check version (prevent rollback)
+  const version = extractVersion(firmware);
+  if (version <= currentVersion) {
+    throw new Error('Firmware rollback prevented');
+  }
+
+  return true;
+}</code></pre>
+
+    <h3>Hardware Security</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Implementation</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Secure Element</td>
+          <td>Dedicated crypto chip</td>
+          <td>Key storage, crypto operations</td>
+        </tr>
+        <tr>
+          <td>Debug Port Locking</td>
+          <td>JTAG disabled in production</td>
+          <td>Prevent unauthorized access</td>
+        </tr>
+        <tr>
+          <td>Tamper Detection</td>
+          <td>Physical sensors</td>
+          <td>Detect case opening</td>
+        </tr>
+        <tr>
+          <td>Memory Protection</td>
+          <td>MPU regions</td>
+          <td>Isolate sensitive code/data</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6.6 Privacy Compliance</h2>
+
+    <h3>HIPAA Compliance</h3>
+    <pre><code>interface HIPAACompliance {
+  // Protected Health Information (PHI)
+  phi: {
+    encryption: 'AES-256-GCM';
+    accessControl: 'role-based';
+    auditLogging: true;
+    breachNotification: true;
+  };
+
+  // Security Rule
+  security: {
+    administrativeSafeguards: true;
+    physicalSafeguards: true;
+    technicalSafeguards: true;
+  };
+
+  // Privacy Rule
+  privacy: {
+    minimumNecessary: true;
+    patientRights: ['access', 'amendment', 'accounting'];
+    businessAssociateAgreement: true;
+  };
+}</code></pre>
+
+    <h3>GDPR Compliance</h3>
+    <pre><code>interface GDPRCompliance {
+  // Data subject rights
+  rights: {
+    rightToAccess: true;
+    rightToErasure: true;        // "Right to be forgotten"
+    rightToPortability: true;
+    rightToRectification: true;
+  };
+
+  // Principles
+  principles: {
+    dataMinimization: true;
+    purposeLimitation: true;
+    storageMinimization: true;
+    accuracyMaintenance: true;
+  };
+
+  // Consent management
+  consent: {
+    explicit: true;
+    granular: true;              // Per-purpose consent
+    withdrawable: true;
+    documented: true;
+  };
+}
+
+// Implement right to erasure
+async function erasePatientData(patientId: string) {
+  // 1. Delete personal data
+  await db.delete('patients', { id: patientId });
+
+  // 2. Anonymize historical data
+  await db.update('sessions',
+    { patientId },
+    { patientId: 'ANONYMIZED' }
+  );
+
+  // 3. Log erasure
+  await auditLog.record({
+    action: 'DATA_ERASURE',
+    patientId,
+    timestamp: new Date(),
+    reason: 'GDPR_RIGHT_TO_ERASURE'
+  });
+
+  // 4. Notify connected systems
+  await notifyErasure(patientId);
+}</code></pre>
+
+    <h3>Korean PIPA Compliance</h3>
+    <pre><code>interface PIPACompliance {
+  // Personal Information Protection Act
+  requirements: {
+    consentRequired: true;
+    purposeLimitation: true;
+    dataRetentionLimit: 365;     // days
+    crossBorderTransfer: 'restricted';
+  };
+
+  // Security measures
+  security: {
+    accessControl: true;
+    encryptionMandatory: true;
+    auditTrail: true;
+    incidentResponse: true;
+  };
+}</code></pre>
+
+    <h2>6.7 Access Control</h2>
+
+    <h3>Role-Based Access Control (RBAC)</h3>
+    <pre><code>interface RBACRoles {
+  patient: {
+    permissions: [
+      'view_own_data',
+      'update_config',
+      'view_analytics',
+      'export_data'
+    ];
+  };
+
+  clinician: {
+    permissions: [
+      'view_patient_data',
+      'update_patient_config',
+      'view_telemetry',
+      'run_diagnostics',
+      'access_nrt'
+    ];
+  };
+
+  researcher: {
+    permissions: [
+      'view_anonymized_stats',
+      'export_aggregated_data'
+    ];
+  };
+
+  admin: {
+    permissions: [
+      'manage_users',
+      'view_audit_logs',
+      'system_config'
+    ];
+  };
+}
+
+// Check permission
+function checkPermission(user: User, action: string): boolean {
+  const role = user.role;
+  const permissions = RBACRoles[role].permissions;
+  return permissions.includes(action);
+}</code></pre>
+
+    <h2>6.8 Audit Logging</h2>
+
+    <h3>Audit Log Structure</h3>
+    <pre><code>interface AuditLogEntry {
+  id: string;
+  timestamp: string;          // ISO8601
+  userId: string;
+  role: string;
+  action: string;
+  resource: string;
+  result: 'success' | 'failure';
+  ipAddress?: string;
+  deviceId?: string;
+  details?: object;
+}
+
+// Log critical actions
+const auditActions = [
+  'user.login',
+  'user.logout',
+  'config.update',
+  'data.export',
+  'data.delete',
+  'firmware.update',
+  'session.start',
+  'session.end',
+  'telemetry.access',
+  'nrt.run'
+];
+
+async function logAction(
+  userId: string,
+  action: string,
+  details: object
+) {
+  const entry: AuditLogEntry = {
+    id: generateUUID(),
+    timestamp: new Date().toISOString(),
+    userId,
+    role: getUserRole(userId),
+    action,
+    resource: details.resource,
+    result: details.success ? 'success' : 'failure',
+    ipAddress: getClientIP(),
+    details
+  };
+
+  await auditLog.write(entry);
+
+  // Alert on suspicious activity
+  if (isSuspicious(entry)) {
+    await alertSecurityTeam(entry);
+  }
+}</code></pre>
+
+    <h2>6.9 Incident Response</h2>
+
+    <h3>Breach Notification Process</h3>
+    <pre><code>interface IncidentResponse {
+  detection: {
+    monitoring: '24/7';
+    alerting: 'automated';
+    anomalyDetection: true;
+  };
+
+  response: {
+    containment: {
+      maxTime: 3600,          // seconds (1 hour)
+      isolateAffected: true,
+      revokeCredentials: true
+    };
+
+    investigation: {
+      forensics: true,
+      rootCause: true,
+      impactAssessment: true
+    };
+
+    notification: {
+      users: {
+        maxDelay: 72,         // hours
+        method: ['email', 'app_notification']
+      };
+      authorities: {
+        maxDelay: 72,         // hours (HIPAA/GDPR)
+        agencies: ['HHS', 'ICO', 'PIPC']
+      };
+    };
+  };
+}
+
+async function handleSecurityIncident(incident: Incident) {
+  // 1. Contain
+  await containIncident(incident);
+
+  // 2. Investigate
+  const report = await investigateIncident(incident);
+
+  // 3. Notify affected parties
+  if (report.affectedUsers > 0) {
+    await notifyUsers(report.affectedUsers);
+  }
+
+  // 4. Notify authorities (if required)
+  if (report.breachNotificationRequired) {
+    await notifyAuthorities(report);
+  }
+
+  // 5. Remediate
+  await remediateVulnerability(report.vulnerability);
+
+  // 6. Document
+  await documentIncident(incident, report);
+}</code></pre>
+
+    <h2>6.10 Security Best Practices</h2>
+
+    <div class="info-box">
+      <h3>Developer Guidelines</h3>
+      <ul>
+        <li><strong>Never hardcode secrets:</strong> Use secure key storage</li>
+        <li><strong>Validate all inputs:</strong> Prevent injection attacks</li>
+        <li><strong>Use prepared statements:</strong> Prevent SQL injection</li>
+        <li><strong>Implement rate limiting:</strong> Prevent brute force</li>
+        <li><strong>Regular security audits:</strong> Penetration testing</li>
+        <li><strong>Keep dependencies updated:</strong> Patch vulnerabilities</li>
+        <li><strong>Minimize attack surface:</strong> Disable unnecessary features</li>
+      </ul>
+    </div>
+
+    <div class="success-box">
+      <h3>Security Checklist</h3>
+      <ul>
+        <li>✓ Device pairing with MITM protection</li>
+        <li>✓ Session authentication via challenge-response</li>
+        <li>✓ AES-256-GCM encryption at rest</li>
+        <li>✓ TLS 1.3 for data in transit</li>
+        <li>✓ Audio data never stored permanently</li>
+        <li>✓ Signed firmware updates only</li>
+        <li>✓ HIPAA/GDPR/PIPA compliance</li>
+        <li>✓ Role-based access control</li>
+        <li>✓ Comprehensive audit logging</li>
+        <li>✓ Incident response plan</li>
+      </ul>
+    </div>
+
+    </main>
+</body>
+</html>

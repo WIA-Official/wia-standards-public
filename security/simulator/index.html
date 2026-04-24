@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Security - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #dc2626; transform: translateY(-2px); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .threat-viz { background: linear-gradient(135deg, #ef4444 0%, #f59e0b 50%, #10b981 100%); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; position: relative; }
+        .threat-level { font-size: 4rem; font-weight: bold; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .threat-label { font-size: 1.2rem; margin-top: 10px; }
+
+        .security-score { background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; }
+        .score-display { font-size: 4rem; font-weight: bold; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .score-label { font-size: 1.2rem; margin-top: 10px; }
+
+        .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .settings-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .settings-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .slider-row { padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .slider-row:last-child { border-bottom: none; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .slider-value { color: var(--primary); font-weight: 600; }
+        input[type="range"] { width: 100%; height: 8px; border-radius: 4px; background: var(--border); appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-value.danger { color: var(--danger); }
+        .metric-value.warning { color: var(--secondary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .threat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .threat-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .threat-card:hover { border-color: var(--danger); }
+        .threat-card.detected { border-color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        .threat-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .threat-name { font-weight: 600; }
+        .threat-count { font-size: 0.85rem; color: var(--danger); margin-top: 5px; }
+
+        .access-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .access-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
+        .access-card:hover { border-color: var(--primary); }
+        .access-info { flex: 1; }
+        .access-name { font-weight: 600; font-size: 1.1rem; }
+        .access-role { color: var(--text-muted); font-size: 0.85rem; margin-top: 5px; }
+        .access-toggle { width: 60px; height: 30px; background: var(--border); border-radius: 15px; position: relative; cursor: pointer; transition: all 0.3s; }
+        .access-toggle.active { background: var(--primary); }
+        .access-toggle::after { content: ''; position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: all 0.3s; }
+        .access-toggle.active::after { left: 32px; }
+
+        .vuln-list { margin: 20px 0; }
+        .vuln-item { background: var(--bg); border-left: 4px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .vuln-item.critical { border-left-color: var(--danger); }
+        .vuln-item.high { border-left-color: #f59e0b; }
+        .vuln-item.medium { border-left-color: var(--secondary); }
+        .vuln-item.low { border-left-color: var(--primary); }
+        .vuln-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .vuln-title { font-weight: 600; }
+        .vuln-severity { padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .vuln-severity.critical { background: var(--danger); color: white; }
+        .vuln-severity.high { background: #f59e0b; color: white; }
+        .vuln-severity.medium { background: var(--secondary); color: white; }
+        .vuln-severity.low { background: var(--primary); color: white; }
+        .vuln-desc { color: var(--text-muted); font-size: 0.9rem; }
+
+        .incident-timeline { margin: 20px 0; }
+        .incident-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative; padding-left: 50px; }
+        .incident-item::before { content: ''; position: absolute; left: 20px; top: 20px; width: 12px; height: 12px; background: var(--primary); border-radius: 50%; }
+        .incident-item.active::before { background: var(--danger); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .incident-time { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 5px; }
+        .incident-desc { font-weight: 600; margin-bottom: 5px; }
+        .incident-status { color: var(--primary); font-size: 0.85rem; }
+
+        .audit-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .audit-table th { background: var(--bg); color: var(--primary); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); }
+        .audit-table td { padding: 12px; border-bottom: 1px solid var(--border); }
+        .audit-table tr:hover { background: rgba(16, 185, 129, 0.05); }
+        .status-badge { padding: 4px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; }
+        .status-badge.pass { background: rgba(16, 185, 129, 0.2); color: var(--primary); }
+        .status-badge.fail { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .status-badge.warning { background: rgba(245, 158, 11, 0.2); color: var(--secondary); }
+
+        .progress-bar { width: 100%; height: 30px; background: var(--bg); border-radius: 15px; overflow: hidden; margin: 20px 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #34D399); transition: width 0.5s; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; }
+
+        .chart-area { height: 200px; background: var(--bg); border-radius: 8px; margin: 20px 0; display: flex; align-items: flex-end; justify-content: space-around; padding: 20px; }
+        .bar { background: var(--primary); border-radius: 4px 4px 0 0; width: 40px; transition: height 0.5s; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+            .threat-grid { grid-template-columns: 1fr; }
+            .access-grid { grid-template-columns: 1fr; }
+        }
+        .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Security</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🔒 WIA Security</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Security Computing Standard" data-ko="보안 컴퓨팅 표준">Security Computing Standard</h1>
+            <p data-en="Threat detection, access control, vulnerability management" data-ko="위협 탐지, 접근 제어, 취약점 관리">Threat detection, access control, vulnerability management</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🚨 Threat" data-ko="🚨 위협">🚨 Threat</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔐 Access" data-ko="🔐 접근">🔐 Access</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🐛 Vuln" data-ko="🐛 취약점">🐛 Vuln</div>
+            <div class="tab" onclick="showPanel(3)" data-en="⚡ Incident" data-ko="⚡인시던트">⚡ Incident</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📋 Audit" data-ko="📋 감사">📋 Audit</div>
+        </div>
+
+        <!-- Panel 0: Threat Monitor -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🚨 Threat Monitor" data-ko="🚨 위협 모니터">🚨 Threat Monitor</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Real-time threat detection and monitoring" data-ko="실시간 위협 탐지 및 모니터링">Real-time threat detection</p>
+
+            <div class="threat-viz">
+                <div class="threat-level" id="threatLevel">MEDIUM</div>
+                <div class="threat-label" data-en="Current Threat Level" data-ko="현재 위협 수준">Current Threat Level</div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value danger" id="activeThreats">23</div>
+                    <div class="metric-label" data-en="Active Threats" data-ko="활성 위협">Active Threats</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="blockedAttacks">1,247</div>
+                    <div class="metric-label" data-en="Blocked Today" data-ko="오늘 차단">Blocked Today</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value warning" id="suspiciousIPs">89</div>
+                    <div class="metric-label" data-en="Suspicious IPs" data-ko="의심 IP">Suspicious IPs</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="protectedAssets">10,456</div>
+                    <div class="metric-label" data-en="Protected Assets" data-ko="보호된 자산">Protected Assets</div>
+                </div>
+            </div>
+
+            <div class="threat-grid">
+                <div class="threat-card detected">
+                    <div class="threat-icon">🦠</div>
+                    <div class="threat-name">Malware</div>
+                    <div class="threat-count">12 detected</div>
+                </div>
+                <div class="threat-card">
+                    <div class="threat-icon">🎣</div>
+                    <div class="threat-name">Phishing</div>
+                    <div class="threat-count">5 blocked</div>
+                </div>
+                <div class="threat-card detected">
+                    <div class="threat-icon">💥</div>
+                    <div class="threat-name">DDoS</div>
+                    <div class="threat-count">3 mitigated</div>
+                </div>
+                <div class="threat-card">
+                    <div class="threat-icon">🔓</div>
+                    <div class="threat-name">Brute Force</div>
+                    <div class="threat-count">45 attempts</div>
+                </div>
+                <div class="threat-card detected">
+                    <div class="threat-icon">💉</div>
+                    <div class="threat-name">SQL Injection</div>
+                    <div class="threat-count">7 detected</div>
+                </div>
+                <div class="threat-card">
+                    <div class="threat-icon">🕵️</div>
+                    <div class="threat-name">Data Breach</div>
+                    <div class="threat-count">0 incidents</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="scanThreats()" data-en="🚨 Scan Threats" data-ko="🚨 위협 스캔">🚨 Scan Threats</button>
+                <button class="btn btn-danger" onclick="blockThreats()" data-en="🛡️ Block All" data-ko="🛡️ 전체 차단">🛡️ Block All</button>
+            </div>
+            <div class="output" id="threatOutput"></div>
+        </div>
+
+        <!-- Panel 1: Access Control -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🔐 Access Control" data-ko="🔐 접근 제어">🔐 Access Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Identity and access management" data-ko="신원 및 접근 관리">Identity and access management</p>
+
+            <div class="security-score">
+                <div class="score-display" id="securityScore">87%</div>
+                <div class="score-label" data-en="Security Score" data-ko="보안 점수">Security Score</div>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>🔑 <span data-en="Authentication" data-ko="인증">Authentication</span></h5>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="MFA Enabled" data-ko="MFA 활성화">MFA Enabled</span>
+                            <span class="slider-value" id="mfaValue">92%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="92" oninput="updateMFA(this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Password Strength" data-ko="비밀번호 강도">Password Strength</span>
+                            <span class="slider-value" id="pwdValue">85%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="85" oninput="updatePwd(this.value)">
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>👥 <span data-en="Authorization" data-ko="권한">Authorization</span></h5>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="RBAC Coverage" data-ko="RBAC 적용">RBAC Coverage</span>
+                            <span class="slider-value" id="rbacValue">78%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="78" oninput="updateRBAC(this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Least Privilege" data-ko="최소 권한">Least Privilege</span>
+                            <span class="slider-value" id="privValue">81%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="81" oninput="updatePriv(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="access-grid">
+                <div class="access-card">
+                    <div class="access-info">
+                        <div class="access-name">Admin Panel</div>
+                        <div class="access-role" data-en="Administrators only" data-ko="관리자만">Administrators only</div>
+                    </div>
+                    <div class="access-toggle active" onclick="toggleAccess(this)"></div>
+                </div>
+                <div class="access-card">
+                    <div class="access-info">
+                        <div class="access-name">API Gateway</div>
+                        <div class="access-role" data-en="Developers" data-ko="개발자">Developers</div>
+                    </div>
+                    <div class="access-toggle active" onclick="toggleAccess(this)"></div>
+                </div>
+                <div class="access-card">
+                    <div class="access-info">
+                        <div class="access-name">Database</div>
+                        <div class="access-role" data-en="DBAs only" data-ko="DBA만">DBAs only</div>
+                    </div>
+                    <div class="access-toggle active" onclick="toggleAccess(this)"></div>
+                </div>
+                <div class="access-card">
+                    <div class="access-info">
+                        <div class="access-name">Production</div>
+                        <div class="access-role" data-en="Restricted" data-ko="제한됨">Restricted</div>
+                    </div>
+                    <div class="access-toggle" onclick="toggleAccess(this)"></div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="auditAccess()" data-en="🔐 Audit Access" data-ko="🔐 접근 감사">🔐 Audit Access</button>
+            </div>
+            <div class="output" id="accessOutput"></div>
+        </div>
+
+        <!-- Panel 2: Vulnerability Scan -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🐛 Vulnerability Scan" data-ko="🐛 취약점 스캔">🐛 Vulnerability Scan</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Security vulnerability assessment" data-ko="보안 취약점 평가">Security vulnerability assessment</p>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="scanProgress" style="width: 0%;">0%</div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value danger" id="criticalVulns">3</div>
+                    <div class="metric-label" data-en="Critical" data-ko="긴급">Critical</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value warning" id="highVulns">12</div>
+                    <div class="metric-label" data-en="High" data-ko="높음">High</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="mediumVulns">28</div>
+                    <div class="metric-label" data-en="Medium" data-ko="중간">Medium</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="lowVulns">45</div>
+                    <div class="metric-label" data-en="Low" data-ko="낮음">Low</div>
+                </div>
+            </div>
+
+            <div class="vuln-list">
+                <div class="vuln-item critical">
+                    <div class="vuln-header">
+                        <div class="vuln-title">CVE-2024-1234: Remote Code Execution</div>
+                        <div class="vuln-severity critical">CRITICAL</div>
+                    </div>
+                    <div class="vuln-desc" data-en="Unauthenticated RCE in web server" data-ko="웹 서버의 인증되지 않은 원격 코드 실행">Unauthenticated RCE in web server</div>
+                </div>
+                <div class="vuln-item high">
+                    <div class="vuln-header">
+                        <div class="vuln-title">CVE-2024-5678: SQL Injection</div>
+                        <div class="vuln-severity high">HIGH</div>
+                    </div>
+                    <div class="vuln-desc" data-en="SQL injection in login form" data-ko="로그인 폼의 SQL 인젝션">SQL injection in login form</div>
+                </div>
+                <div class="vuln-item medium">
+                    <div class="vuln-header">
+                        <div class="vuln-title">CVE-2024-9012: XSS Vulnerability</div>
+                        <div class="vuln-severity medium">MEDIUM</div>
+                    </div>
+                    <div class="vuln-desc" data-en="Cross-site scripting in user input" data-ko="사용자 입력의 크로스 사이트 스크립팅">Cross-site scripting in user input</div>
+                </div>
+                <div class="vuln-item low">
+                    <div class="vuln-header">
+                        <div class="vuln-title">CVE-2024-3456: Information Disclosure</div>
+                        <div class="vuln-severity low">LOW</div>
+                    </div>
+                    <div class="vuln-desc" data-en="Version information exposed in headers" data-ko="헤더에 노출된 버전 정보">Version information exposed</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startScan()" data-en="🐛 Start Scan" data-ko="🐛 스캔 시작">🐛 Start Scan</button>
+                <button class="btn btn-secondary" onclick="exportReport()" data-en="📄 Export Report" data-ko="📄 보고서 내보내기">📄 Export Report</button>
+            </div>
+            <div class="output" id="vulnOutput"></div>
+        </div>
+
+        <!-- Panel 3: Incident Response -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="⚡ Incident Response" data-ko="⚡ 인시던트 대응">⚡ Incident Response</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Security incident management" data-ko="보안 인시던트 관리">Security incident management</p>
+
+            <div class="incident-timeline">
+                <div class="incident-item active">
+                    <div class="incident-time">2024-12-27 14:32:15</div>
+                    <div class="incident-desc" data-en="🚨 DDoS Attack Detected - 10K requests/sec" data-ko="🚨 DDoS 공격 감지 - 초당 10K 요청">🚨 DDoS Attack Detected</div>
+                    <div class="incident-status" data-en="Status: Investigating" data-ko="상태: 조사 중">Status: Investigating</div>
+                </div>
+                <div class="incident-item">
+                    <div class="incident-time">2024-12-27 12:15:30</div>
+                    <div class="incident-desc" data-en="🔓 Failed Login Attempts - User: admin" data-ko="🔓 로그인 실패 시도 - 사용자: admin">🔓 Failed Login Attempts</div>
+                    <div class="incident-status" data-en="Status: Blocked" data-ko="상태: 차단됨">Status: Blocked</div>
+                </div>
+                <div class="incident-item">
+                    <div class="incident-time">2024-12-27 09:45:12</div>
+                    <div class="incident-desc" data-en="🦠 Malware Detected - File: malicious.exe" data-ko="🦠 악성코드 감지 - 파일: malicious.exe">🦠 Malware Detected</div>
+                    <div class="incident-status" data-en="Status: Quarantined" data-ko="상태: 격리됨">Status: Quarantined</div>
+                </div>
+                <div class="incident-item">
+                    <div class="incident-time">2024-12-27 08:20:45</div>
+                    <div class="incident-desc" data-en="🎣 Phishing Email - 15 users targeted" data-ko="🎣 피싱 이메일 - 15명 사용자 대상">🎣 Phishing Email</div>
+                    <div class="incident-status" data-en="Status: Resolved" data-ko="상태: 해결됨">Status: Resolved</div>
+                </div>
+                <div class="incident-item">
+                    <div class="incident-time">2024-12-26 18:30:00</div>
+                    <div class="incident-desc" data-en="💉 SQL Injection Attempt - /api/users" data-ko="💉 SQL 인젝션 시도 - /api/users">💉 SQL Injection Attempt</div>
+                    <div class="incident-status" data-en="Status: Blocked" data-ko="상태: 차단됨">Status: Blocked</div>
+                </div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value danger">2</div>
+                    <div class="metric-label" data-en="Active Incidents" data-ko="활성 인시던트">Active</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">18</div>
+                    <div class="metric-label" data-en="Resolved Today" data-ko="오늘 해결">Resolved</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">12m</div>
+                    <div class="metric-label" data-en="Avg Response Time" data-ko="평균 응답 시간">Avg Time</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">95%</div>
+                    <div class="metric-label" data-en="Resolution Rate" data-ko="해결률">Rate</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="createIncident()" data-en="⚡ Create Incident" data-ko="⚡ 인시던트 생성">⚡ Create Incident</button>
+                <button class="btn btn-danger" onclick="escalate()" data-en="📢 Escalate" data-ko="📢 에스컬레이션">📢 Escalate</button>
+            </div>
+            <div class="output" id="incidentOutput"></div>
+        </div>
+
+        <!-- Panel 4: Security Audit -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📋 Security Audit" data-ko="📋 보안 감사">📋 Security Audit</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Compliance and security auditing" data-ko="규정 준수 및 보안 감사">Compliance and security auditing</p>
+
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th data-en="Check" data-ko="검사 항목">Check</th>
+                        <th data-en="Category" data-ko="카테고리">Category</th>
+                        <th data-en="Status" data-ko="상태">Status</th>
+                        <th data-en="Last Check" data-ko="마지막 검사">Last Check</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Password Policy</td>
+                        <td data-en="Authentication" data-ko="인증">Authentication</td>
+                        <td><span class="status-badge pass">PASS</span></td>
+                        <td>2024-12-27 14:00</td>
+                    </tr>
+                    <tr>
+                        <td>MFA Enforcement</td>
+                        <td data-en="Authentication" data-ko="인증">Authentication</td>
+                        <td><span class="status-badge pass">PASS</span></td>
+                        <td>2024-12-27 13:45</td>
+                    </tr>
+                    <tr>
+                        <td>Firewall Rules</td>
+                        <td data-en="Network" data-ko="네트워크">Network</td>
+                        <td><span class="status-badge pass">PASS</span></td>
+                        <td>2024-12-27 13:30</td>
+                    </tr>
+                    <tr>
+                        <td>SSL/TLS Configuration</td>
+                        <td data-en="Encryption" data-ko="암호화">Encryption</td>
+                        <td><span class="status-badge warning">WARNING</span></td>
+                        <td>2024-12-27 13:15</td>
+                    </tr>
+                    <tr>
+                        <td>Data Encryption at Rest</td>
+                        <td data-en="Encryption" data-ko="암호화">Encryption</td>
+                        <td><span class="status-badge pass">PASS</span></td>
+                        <td>2024-12-27 13:00</td>
+                    </tr>
+                    <tr>
+                        <td>Access Logs</td>
+                        <td data-en="Monitoring" data-ko="모니터링">Monitoring</td>
+                        <td><span class="status-badge pass">PASS</span></td>
+                        <td>2024-12-27 12:45</td>
+                    </tr>
+                    <tr>
+                        <td>Backup Verification</td>
+                        <td data-en="Data Protection" data-ko="데이터 보호">Data Protection</td>
+                        <td><span class="status-badge fail">FAIL</span></td>
+                        <td>2024-12-27 12:30</td>
+                    </tr>
+                    <tr>
+                        <td>Patch Management</td>
+                        <td data-en="Maintenance" data-ko="유지보수">Maintenance</td>
+                        <td><span class="status-badge warning">WARNING</span></td>
+                        <td>2024-12-27 12:00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">82%</div>
+                    <div class="metric-label" data-en="Compliance Score" data-ko="규정 준수 점수">Compliance</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">6/8</div>
+                    <div class="metric-label" data-en="Checks Passed" data-ko="통과한 검사">Passed</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value warning">2</div>
+                    <div class="metric-label" data-en="Warnings" data-ko="경고">Warnings</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value danger">1</div>
+                    <div class="metric-label" data-en="Failures" data-ko="실패">Failures</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runAudit()" data-en="📋 Run Audit" data-ko="📋 감사 실행">📋 Run Audit</button>
+                <button class="btn btn-secondary" onclick="generateReport()" data-en="📊 Generate Report" data-ko="📊 보고서 생성">📊 Generate Report</button>
+            </div>
+            <div class="output" id="auditOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Security: Protecting digital assets and privacy" data-ko="WIA Security: 디지털 자산과 개인정보 보호">Protecting digital assets and privacy</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                if (el.tagName === 'INPUT' || el.tagName === 'BUTTON') {
+                    el.value = text;
+                } else {
+                    el.textContent = text;
+                }
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        // Threat Monitor Functions
+        function scanThreats() {
+            const threats = Math.floor(Math.random() * 50) + 10;
+            document.getElementById('activeThreats').textContent = threats;
+            document.getElementById('threatLevel').textContent = threats > 30 ? 'HIGH' : threats > 15 ? 'MEDIUM' : 'LOW';
+
+            document.getElementById('threatOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                threatsDetected: threats,
+                threatLevel: threats > 30 ? 'HIGH' : threats > 15 ? 'MEDIUM' : 'LOW',
+                topThreats: [
+                    { type: 'Malware', count: Math.floor(Math.random() * 20) },
+                    { type: 'Phishing', count: Math.floor(Math.random() * 15) },
+                    { type: 'DDoS', count: Math.floor(Math.random() * 10) }
+                ],
+                blockedAttacks: parseInt(document.getElementById('blockedAttacks').textContent) + Math.floor(Math.random() * 100),
+                message: currentLang === 'ko' ? '위협 스캔 완료' : 'Threat scan complete'
+            }, null, 2);
+        }
+
+        function blockThreats() {
+            document.getElementById('activeThreats').textContent = '0';
+            document.getElementById('threatLevel').textContent = 'LOW';
+
+            document.getElementById('threatOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                action: 'BLOCK_ALL',
+                threatsBlocked: parseInt(document.getElementById('activeThreats').textContent),
+                status: 'Success',
+                firewallRules: 'Updated',
+                message: currentLang === 'ko' ? '모든 위협 차단 완료' : 'All threats blocked successfully'
+            }, null, 2);
+        }
+
+        // Access Control Functions
+        function updateMFA(val) {
+            document.getElementById('mfaValue').textContent = val + '%';
+            updateSecurityScore();
+        }
+
+        function updatePwd(val) {
+            document.getElementById('pwdValue').textContent = val + '%';
+            updateSecurityScore();
+        }
+
+        function updateRBAC(val) {
+            document.getElementById('rbacValue').textContent = val + '%';
+            updateSecurityScore();
+        }
+
+        function updatePriv(val) {
+            document.getElementById('privValue').textContent = val + '%';
+            updateSecurityScore();
+        }
+
+        function updateSecurityScore() {
+            const mfa = parseInt(document.getElementById('mfaValue').textContent);
+            const pwd = parseInt(document.getElementById('pwdValue').textContent);
+            const rbac = parseInt(document.getElementById('rbacValue').textContent);
+            const priv = parseInt(document.getElementById('privValue').textContent);
+            const avg = Math.round((mfa + pwd + rbac + priv) / 4);
+            document.getElementById('securityScore').textContent = avg + '%';
+        }
+
+        function toggleAccess(element) {
+            element.classList.toggle('active');
+        }
+
+        function auditAccess() {
+            document.getElementById('accessOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                totalUsers: 1247,
+                activeUsers: 892,
+                mfaEnabled: document.getElementById('mfaValue').textContent,
+                rbacCoverage: document.getElementById('rbacValue').textContent,
+                securityScore: document.getElementById('securityScore').textContent,
+                recommendations: [
+                    'Enable MFA for all admin accounts',
+                    'Review inactive user accounts',
+                    'Implement least privilege access'
+                ],
+                message: currentLang === 'ko' ? '접근 제어 감사 완료' : 'Access control audit complete'
+            }, null, 2);
+        }
+
+        // Vulnerability Scan Functions
+        function startScan() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                document.getElementById('scanProgress').style.width = progress + '%';
+                document.getElementById('scanProgress').textContent = progress + '%';
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    document.getElementById('vulnOutput').textContent = JSON.stringify({
+                        timestamp: new Date().toISOString(),
+                        scanDuration: '45 seconds',
+                        vulnerabilities: {
+                            critical: parseInt(document.getElementById('criticalVulns').textContent),
+                            high: parseInt(document.getElementById('highVulns').textContent),
+                            medium: parseInt(document.getElementById('mediumVulns').textContent),
+                            low: parseInt(document.getElementById('lowVulns').textContent)
+                        },
+                        totalVulnerabilities: 88,
+                        cvssScore: 7.8,
+                        recommendations: [
+                            'Patch critical vulnerabilities immediately',
+                            'Update web server to latest version',
+                            'Implement input validation'
+                        ],
+                        message: currentLang === 'ko' ? '취약점 스캔 완료' : 'Vulnerability scan complete'
+                    }, null, 2);
+                }
+            }, 200);
+        }
+
+        function exportReport() {
+            document.getElementById('vulnOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                reportFormat: 'PDF',
+                fileName: 'vulnerability_report_' + new Date().toISOString().split('T')[0] + '.pdf',
+                totalPages: 24,
+                sections: ['Executive Summary', 'Vulnerabilities', 'Recommendations', 'Remediation'],
+                message: currentLang === 'ko' ? '보고서 내보내기 완료' : 'Report exported successfully'
+            }, null, 2);
+        }
+
+        // Incident Response Functions
+        function createIncident() {
+            document.getElementById('incidentOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                incidentId: 'INC-' + Math.floor(Math.random() * 10000),
+                severity: 'HIGH',
+                type: 'Security Breach',
+                assignedTo: 'Security Team',
+                status: 'Investigating',
+                sla: '2 hours',
+                message: currentLang === 'ko' ? '인시던트 생성 완료' : 'Incident created successfully'
+            }, null, 2);
+        }
+
+        function escalate() {
+            document.getElementById('incidentOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                action: 'ESCALATE',
+                escalatedTo: 'Security Manager',
+                priority: 'CRITICAL',
+                notificationsSent: ['Email', 'SMS', 'Slack'],
+                responseTeam: 'Incident Response Team activated',
+                message: currentLang === 'ko' ? '에스컬레이션 완료' : 'Incident escalated successfully'
+            }, null, 2);
+        }
+
+        // Security Audit Functions
+        function runAudit() {
+            document.getElementById('auditOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                auditType: 'Full Security Audit',
+                checksPerformed: 24,
+                checksPassed: 18,
+                checksWarning: 4,
+                checksFailed: 2,
+                complianceScore: '82%',
+                frameworks: ['NIST CSF', 'ISO 27001', 'SOC 2', 'GDPR'],
+                criticalFindings: [
+                    'Backup verification failed',
+                    'Outdated security patches detected'
+                ],
+                recommendations: [
+                    'Implement automated backup verification',
+                    'Update patch management schedule',
+                    'Review SSL/TLS configuration'
+                ],
+                message: currentLang === 'ko' ? '보안 감사 완료' : 'Security audit complete'
+            }, null, 2);
+        }
+
+        function generateReport() {
+            document.getElementById('auditOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                reportType: 'Compliance Report',
+                format: 'PDF',
+                fileName: 'security_audit_report_' + new Date().toISOString().split('T')[0] + '.pdf',
+                complianceFrameworks: ['NIST CSF', 'ISO 27001', 'SOC 2'],
+                overallScore: '82%',
+                passRate: '75%',
+                executiveSummary: 'Generated',
+                detailedFindings: 'Included',
+                message: currentLang === 'ko' ? '보고서 생성 완료' : 'Audit report generated successfully'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

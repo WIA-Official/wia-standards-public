@@ -1,585 +1,931 @@
-# WIA Cryo-Preservation Ecosystem Integration
-## Phase 4 Specification
+# Phase 4: Integration Guide
+
+## WIA-CRYO-PRESERVATION Implementation Guide
+
+> Practical integration for cryopreservation facilities and systems.
 
 ---
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
+## 1. System Architecture
 
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Integration Architecture](#integration-architecture)
-3. [WIA Standards Interoperability](#wia-standards-interoperability)
-4. [External Systems Integration](#external-systems-integration)
-5. [Migration Guide](#migration-guide)
-6. [Deployment](#deployment)
-7. [Monitoring & Operations](#monitoring--operations)
-8. [Certification](#certification)
-9. [Reference Implementation](#reference-implementation)
-
----
-
-## Overview
-
-### 1.1 Purpose
-
-Phase 4 defines how WIA Cryo-Preservation integrates with the broader WIA ecosystem and external healthcare systems, enabling seamless data exchange, regulatory compliance, and operational interoperability.
-
-### 1.2 Integration Goals
-
-| Goal | Description |
-|------|-------------|
-| **Interoperability** | Seamless data exchange with other WIA standards |
-| **Compliance** | Meet healthcare and regulatory requirements |
-| **Scalability** | Support growing network of facilities |
-| **Resilience** | Fault-tolerant distributed operations |
-| **Auditability** | Complete traceability for legal compliance |
-
-### 1.3 Relationship with Other Phases
+### 1.1 Reference Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Phase 4: Integration                      │
-│           (Ecosystem Connectivity, Deployment, Ops)              │
+│                    FACILITY MANAGEMENT SYSTEM                    │
 ├─────────────────────────────────────────────────────────────────┤
-│  Phase 3: Protocol    │  Phase 2: API      │  Phase 1: Data     │
-│  (Real-time Comms)    │  (REST Interface)  │  (Format & Schema) │
+│                                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │   Web UI    │  │  Mobile App │  │ Control     │             │
+│  │  Dashboard  │  │  Alerts     │  │ Terminals   │             │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘             │
+│         │                │                │                      │
+│         └────────────────┼────────────────┘                      │
+│                          │                                       │
+│                 ┌────────▼────────┐                              │
+│                 │   API Gateway   │                              │
+│                 │  (REST + WS)    │                              │
+│                 └────────┬────────┘                              │
+│                          │                                       │
+│    ┌─────────────────────┼─────────────────────┐                │
+│    │                     │                     │                │
+│  ┌─▼───────────┐  ┌──────▼──────┐  ┌──────────▼─┐              │
+│  │  Subject    │  │  Storage    │  │  Protocol  │              │
+│  │  Service    │  │  Service    │  │  Service   │              │
+│  └─────────────┘  └─────────────┘  └────────────┘              │
+│                          │                                       │
+│                 ┌────────▼────────┐                              │
+│                 │   Data Layer    │                              │
+│                 │  (PostgreSQL)   │                              │
+│                 └────────┬────────┘                              │
+│                          │                                       │
+├──────────────────────────┼──────────────────────────────────────┤
+│                          │                                       │
+│  ┌─────────────┐  ┌──────▼──────┐  ┌─────────────┐             │
+│  │   Sensor    │  │  Monitoring │  │   Alert     │             │
+│  │  Network    ├──┤   Service   ├──┤   Service   │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                  │
+│  HARDWARE LAYER                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ Temperature │  │  LN2 Level  │  │   Access    │             │
+│  │  Sensors    │  │  Sensors    │  │   Control   │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
----
+### 1.2 Component Overview
 
-## Integration Architecture
-
-### 2.1 System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         External Systems                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │ Hospital │  │ Insurer  │  │Government│  │ Research │            │
-│  │   EHR    │  │ Systems  │  │ Registry │  │ Partners │            │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
-└───────┼─────────────┼─────────────┼─────────────┼───────────────────┘
-        │             │             │             │
-        │ HL7 FHIR    │ EDI/X12     │ Custom API  │ Research API
-        │             │             │             │
-┌───────▼─────────────▼─────────────▼─────────────▼───────────────────┐
-│                    Integration Gateway                               │
-│         (Protocol Translation, Authentication, Routing)             │
-└───────────────────────────────┬─────────────────────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌───────────────┐     ┌───────────────┐     ┌───────────────┐
-│ Cryo-Preserve │     │ Cryo-Identity │     │ Cryo-Consent  │
-│   Service     │◄───►│   Service     │◄───►│   Service     │
-└───────────────┘     └───────────────┘     └───────────────┘
-        │                       │                       │
-        └───────────────────────┼───────────────────────┘
-                                │
-                    ┌───────────▼───────────┐
-                    │   Shared Data Layer   │
-                    │ (Blockchain / IPFS)   │
-                    └───────────────────────┘
-```
-
-### 2.2 Data Flow Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                       Data Flow Layers                            │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │ Data Input  │───►│ Processing  │───►│ Data Output │          │
-│  │   Layer     │    │   Layer     │    │   Layer     │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│                                                                   │
-│  Sources:          Operations:         Destinations:             │
-│  • Sensors         • Validation        • WIA Services            │
-│  • Manual Entry    • Enrichment        • External APIs           │
-│  • Imports         • Transformation    • Reports                 │
-│  • APIs            • Storage           • Notifications           │
-│                                                                   │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### 2.3 Event-Driven Architecture
-
-```typescript
-// Event Types
-type CryoEvent =
-  | 'preservation.started'
-  | 'preservation.completed'
-  | 'status.changed'
-  | 'storage.alert'
-  | 'transfer.initiated'
-  | 'transfer.completed'
-  | 'quality.reported'
-  | 'consent.updated';
-
-// Event Structure
-interface CryoEventMessage {
-  eventType: CryoEvent;
-  eventId: string;
-  timestamp: string;
-  source: {
-    service: string;
-    facilityId: string;
-  };
-  data: Record<string, unknown>;
-  metadata: {
-    correlationId: string;
-    causationId?: string;
-  };
-}
-```
+| Component | Purpose | Technology |
+|-----------|---------|------------|
+| API Gateway | Route requests, auth | Kong / AWS API Gateway |
+| Subject Service | Patient/specimen management | Rust / Go |
+| Storage Service | Container management | Rust / Go |
+| Monitoring Service | Real-time data collection | Rust + TimescaleDB |
+| Alert Service | Alert processing & dispatch | Go + Redis |
+| Protocol Service | Preservation protocol management | Rust |
+| Sensor Network | Hardware integration | Embedded C / Rust |
 
 ---
 
-## WIA Standards Interoperability
+## 2. Sensor Integration
 
-### 3.1 Related WIA Standards
+### 2.1 Temperature Sensor Interface
 
-| Standard | Integration Type | Data Exchange |
-|----------|-----------------|---------------|
-| **Cryo-Identity** | Bidirectional | Subject identification |
-| **Cryo-Consent** | Required | Legal consent records |
-| **Cryo-Revival** | Forward | Revival procedures |
-| **Cryo-Legal** | Required | Legal documentation |
-| **Cryo-Asset** | Bidirectional | Financial records |
-| **Cryo-Facility** | Required | Facility certification |
+```rust
+// sensor_interface.rs
+use wia_cryo::sensors::{Sensor, SensorReading, SensorError};
 
-### 3.2 Cryo-Identity Integration
+pub trait TemperatureSensor: Sensor {
+    /// Read current temperature
+    fn read_temperature(&self) -> Result<Temperature, SensorError>;
 
-Link preservation records to identity:
+    /// Get sensor accuracy specification
+    fn accuracy(&self) -> f64;
 
-```json
-{
-  "subjectId": "SUBJ-2025-001",
-  "identityReference": {
-    "standard": "wia-cryo-identity",
-    "version": "1.0.0",
-    "identityId": "ID-2025-001",
-    "verificationLevel": "biometric",
-    "lastVerified": "2025-01-15T10:00:00Z"
-  }
+    /// Get measurement range
+    fn range(&self) -> (Temperature, Temperature);
+
+    /// Perform self-calibration check
+    fn self_test(&self) -> Result<SensorHealth, SensorError>;
 }
-```
 
-**API Integration:**
-```typescript
-// Verify identity before preservation
-const identity = await cryoIdentityClient.verify({
-  subjectId: 'SUBJ-2025-001',
-  biometricData: biometricSample,
-  requiredLevel: 'biometric'
-});
-
-if (identity.verified) {
-  await cryoPreservationClient.startPreservation({
-    subjectId: 'SUBJ-2025-001',
-    identityId: identity.identityId
-  });
+// PT100 RTD implementation
+pub struct PT100Sensor {
+    device_id: String,
+    bus: I2CBus,
+    calibration: CalibrationData,
+    last_reading: Option<SensorReading>,
 }
-```
 
-### 3.3 Cryo-Consent Integration
+impl TemperatureSensor for PT100Sensor {
+    fn read_temperature(&self) -> Result<Temperature, SensorError> {
+        // Read raw resistance
+        let resistance = self.bus.read_register(self.address, REG_RESISTANCE)?;
 
-Validate consent before operations:
+        // Convert using Callendar-Van Dusen equation
+        let temp_c = self.callendar_van_dusen(resistance);
 
-```json
-{
-  "preservationId": "PRV-2025-001",
-  "consentReference": {
-    "standard": "wia-cryo-consent",
-    "version": "1.0.0",
-    "consentId": "CONSENT-2024-1234",
-    "scope": ["whole_body_preservation", "research_use", "revival_attempt"],
-    "validFrom": "2024-06-01T00:00:00Z",
-    "validUntil": null,
-    "status": "active"
-  }
-}
-```
+        // Apply calibration offset
+        let calibrated = temp_c + self.calibration.offset;
 
-**Consent Validation Flow:**
-```typescript
-// Check consent before any operation
-async function validateConsentForOperation(
-  subjectId: string,
-  operation: string
-): Promise<ConsentValidation> {
-  const consent = await cryoConsentClient.getActiveConsent(subjectId);
+        Ok(Temperature {
+            value: calibrated,
+            unit: TemperatureUnit::Celsius,
+            timestamp: Utc::now(),
+            sensor_id: self.device_id.clone(),
+        })
+    }
 
-  if (!consent) {
-    throw new Error('No active consent found');
-  }
+    fn accuracy(&self) -> f64 {
+        // PT100 Class A: ±(0.15 + 0.002 × |t|) °C
+        0.15  // Base accuracy at 0°C
+    }
 
-  if (!consent.scope.includes(operation)) {
-    throw new Error(`Operation "${operation}" not in consent scope`);
-  }
+    fn range(&self) -> (Temperature, Temperature) {
+        (
+            Temperature::celsius(-200.0),
+            Temperature::celsius(850.0)
+        )
+    }
 
-  return {
-    valid: true,
-    consentId: consent.consentId,
-    validatedAt: new Date().toISOString()
-  };
-}
-```
+    fn self_test(&self) -> Result<SensorHealth, SensorError> {
+        // Check response at known reference
+        let reading = self.read_temperature()?;
 
-### 3.4 Cryo-Facility Integration
-
-Facility certification validation:
-
-```json
-{
-  "facilityId": "FAC-KR-001",
-  "facilityReference": {
-    "standard": "wia-cryo-facility",
-    "version": "1.0.0",
-    "certifications": [
-      {
-        "type": "WIA-CRYO-CERTIFIED",
-        "level": "platinum",
-        "validUntil": "2026-12-31",
-        "auditDate": "2024-12-01"
-      }
-    ],
-    "capabilities": [
-      "whole_body_preservation",
-      "neuro_preservation",
-      "long_term_storage"
-    ]
-  }
-}
-```
-
-### 3.5 Cross-Standard Event Flow
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Consent   │     │ Preservation│     │  Identity   │
-│   Service   │     │   Service   │     │   Service   │
-└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-       │                   │                   │
-       │  consent.created  │                   │
-       │──────────────────►│                   │
-       │                   │                   │
-       │                   │  identity.verify  │
-       │                   │──────────────────►│
-       │                   │                   │
-       │                   │◄──────────────────│
-       │                   │  identity.verified│
-       │                   │                   │
-       │ preservation.started                  │
-       │◄──────────────────│                   │
-       │                   │                   │
-       │                   │ preservation.completed
-       │                   │──────────────────►│
-       │                   │                   │ update identity
-```
-
----
-
-## External Systems Integration
-
-### 4.1 HL7 FHIR Integration
-
-**FHIR Resource Mapping:**
-
-| Cryo Data | FHIR Resource |
-|-----------|---------------|
-| Subject Demographics | Patient |
-| Preservation Procedure | Procedure |
-| Quality Report | DiagnosticReport |
-| Consent | Consent |
-| Facility | Organization |
-
-**FHIR Procedure Example:**
-```json
-{
-  "resourceType": "Procedure",
-  "id": "cryo-preservation-001",
-  "status": "completed",
-  "category": [
-    {
-      "coding": [
-        {
-          "system": "https://wia.live/fhir/procedure-category",
-          "code": "cryopreservation",
-          "display": "Cryopreservation"
+        // Verify reading is within valid range
+        let (min, max) = self.range();
+        if reading.value < min.value || reading.value > max.value {
+            return Err(SensorError::OutOfRange);
         }
-      ]
+
+        // Check noise level
+        let noise = self.measure_noise()?;
+        if noise > self.calibration.max_noise {
+            return Ok(SensorHealth::Degraded {
+                reason: "Excessive noise".into()
+            });
+        }
+
+        Ok(SensorHealth::Healthy)
     }
-  ],
-  "code": {
-    "coding": [
-      {
-        "system": "https://wia.live/fhir/procedure-code",
-        "code": "whole-body-vitrification",
-        "display": "Whole Body Vitrification"
-      }
-    ]
-  },
-  "subject": {
-    "reference": "Patient/SUBJ-2025-001"
-  },
-  "performedPeriod": {
-    "start": "2025-01-15T08:00:00Z",
-    "end": "2025-01-16T03:00:00Z"
-  },
-  "outcome": {
-    "coding": [
-      {
-        "system": "https://wia.live/fhir/outcome",
-        "code": "successful",
-        "display": "Successfully Preserved"
-      }
-    ]
-  }
 }
 ```
 
-### 4.2 Blockchain Integration
+### 2.2 LN2 Level Sensor Interface
 
-**Immutable Record Storage:**
+```rust
+// ln2_sensor.rs
+pub trait LN2LevelSensor: Sensor {
+    /// Read current LN2 level (0-100%)
+    fn read_level(&self) -> Result<f64, SensorError>;
 
-```typescript
-interface BlockchainRecord {
-  recordType: 'preservation' | 'transfer' | 'quality';
-  hash: string;
-  previousHash: string;
-  timestamp: number;
-  facilityId: string;
-  signature: string;
-  metadata: {
-    version: string;
-    schema: string;
-  };
-}
-
-// Store preservation record hash
-async function storeOnBlockchain(
-  record: PreservationRecord
-): Promise<BlockchainReceipt> {
-  const hash = await calculateHash(record);
-
-  const blockchainRecord: BlockchainRecord = {
-    recordType: 'preservation',
-    hash: hash,
-    previousHash: await getLatestHash(record.subjectId),
-    timestamp: Date.now(),
-    facilityId: record.facilityId,
-    signature: await signRecord(hash),
-    metadata: {
-      version: '1.0.0',
-      schema: 'wia-cryo-preservation'
+    /// Get volume in liters
+    fn read_volume(&self, container_capacity: f64) -> Result<f64, SensorError> {
+        let level = self.read_level()?;
+        Ok(container_capacity * level / 100.0)
     }
-  };
 
-  return await blockchainClient.store(blockchainRecord);
-}
-```
-
-### 4.3 Insurance System Integration
-
-**EDI X12 837 Mapping:**
-
-```typescript
-// Map preservation to insurance claim
-function mapToInsuranceClaim(preservation: PreservationRecord): X12Claim {
-  return {
-    claimType: '837P',
-    serviceDate: preservation.timeline.storage_start,
-    procedureCodes: [
-      { code: 'S9999', modifier: 'CR', description: 'Cryopreservation Service' }
-    ],
-    diagnosis: [
-      { code: 'Z99.89', description: 'Dependence on other enabling machines' }
-    ],
-    provider: {
-      npi: preservation.facility.npi,
-      name: preservation.facility.name
-    },
-    charges: calculateCharges(preservation)
-  };
-}
-```
-
-### 4.4 Research Data Export
-
-**Anonymized Data Export:**
-
-```typescript
-interface ResearchDataset {
-  exportId: string;
-  exportDate: string;
-  consent: {
-    researchUseApproved: boolean;
-    anonymizationLevel: 'full' | 'partial' | 'coded';
-  };
-  records: AnonymizedRecord[];
-  metadata: {
-    recordCount: number;
-    dateRange: { from: string; to: string };
-    includedFields: string[];
-  };
+    /// Estimate time to critical level
+    fn estimate_time_to_critical(
+        &self,
+        history: &[LevelReading],
+        critical_level: f64
+    ) -> Result<Duration, SensorError>;
 }
 
-// Export anonymized data for research
-async function exportForResearch(
-  criteria: ExportCriteria
-): Promise<ResearchDataset> {
-  const records = await getRecordsWithResearchConsent(criteria);
+// Capacitive level sensor implementation
+pub struct CapacitiveLN2Sensor {
+    device_id: String,
+    probe_length: f64,  // mm
+    calibration: LN2Calibration,
+}
 
-  const anonymizedRecords = records.map(record => ({
-    preservationType: record.preservationType,
-    demographicBucket: anonymizeDemographics(record.demographics),
-    qualityMetrics: record.quality,
-    timeline: {
-      ischemicTime: calculateIschemicTime(record.timeline),
-      totalProcedureHours: calculateProcedureTime(record.timeline)
+impl LN2LevelSensor for CapacitiveLN2Sensor {
+    fn read_level(&self) -> Result<f64, SensorError> {
+        // Read capacitance
+        let capacitance = self.read_capacitance()?;
+
+        // Convert to level using calibration curve
+        let level = self.capacitance_to_level(capacitance);
+
+        // Clamp to valid range
+        Ok(level.clamp(0.0, 100.0))
     }
-    // No identifying information
-  }));
 
-  return {
-    exportId: generateExportId(),
-    exportDate: new Date().toISOString(),
-    consent: { researchUseApproved: true, anonymizationLevel: 'full' },
-    records: anonymizedRecords,
-    metadata: {
-      recordCount: anonymizedRecords.length,
-      dateRange: criteria.dateRange,
-      includedFields: ['preservationType', 'qualityMetrics', 'timeline']
+    fn estimate_time_to_critical(
+        &self,
+        history: &[LevelReading],
+        critical_level: f64
+    ) -> Result<Duration, SensorError> {
+        if history.len() < 2 {
+            return Err(SensorError::InsufficientData);
+        }
+
+        // Calculate evaporation rate from recent history
+        let recent: Vec<_> = history.iter()
+            .rev()
+            .take(48)  // Last 48 readings
+            .collect();
+
+        let evap_rate = calculate_evaporation_rate(&recent)?;
+
+        if evap_rate <= 0.0 {
+            return Ok(Duration::MAX);  // Not evaporating
+        }
+
+        let current_level = self.read_level()?;
+        let level_to_critical = current_level - critical_level;
+
+        if level_to_critical <= 0.0 {
+            return Ok(Duration::ZERO);  // Already critical
+        }
+
+        let hours = level_to_critical / evap_rate;
+        Ok(Duration::from_secs_f64(hours * 3600.0))
     }
-  };
 }
 ```
 
----
-
-## Migration Guide
-
-### 5.1 Migration Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Migration Phases                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Phase 1: Assessment     Phase 2: Preparation    Phase 3: Migration
-│  ├─ Data audit          ├─ Schema mapping       ├─ Data transform
-│  ├─ Gap analysis        ├─ API setup            ├─ Validation
-│  └─ Risk assessment     └─ Testing env          └─ Cutover
-│                                                                  │
-│  Phase 4: Verification   Phase 5: Optimization                  │
-│  ├─ Data integrity      ├─ Performance tuning                   │
-│  ├─ Compliance check    ├─ Training                             │
-│  └─ User acceptance     └─ Documentation                        │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 5.2 Data Migration Script
-
-```typescript
-import { MigrationEngine, DataTransformer } from '@wia/cryo-migration';
-
-const migrationConfig = {
-  source: {
-    type: 'legacy_database',
-    connection: process.env.LEGACY_DB_URL
-  },
-  target: {
-    type: 'wia_cryo_api',
-    endpoint: 'https://api.wia.live/cryo-preservation/v1',
-    apiKey: process.env.WIA_API_KEY
-  },
-  options: {
-    batchSize: 100,
-    validateBeforeInsert: true,
-    continueOnError: false,
-    generateReport: true
-  }
-};
-
-const transformer = new DataTransformer({
-  mappings: {
-    'patient_id': 'subject.id',
-    'patient_name': null, // Drop - use identity service
-    'preservation_date': 'timeline.storage_start',
-    'tank_id': 'storage.container_id',
-    'tank_position': 'storage.position',
-    'temp_celsius': 'storage.temperature_celsius'
-  },
-  transformers: {
-    'preservation_date': (val) => new Date(val).toISOString(),
-    'temp_celsius': (val) => parseFloat(val)
-  },
-  validators: {
-    'storage.temperature_celsius': (val) => val <= -190
-  }
-});
-
-const engine = new MigrationEngine(migrationConfig, transformer);
-
-// Run migration
-const result = await engine.migrate();
-console.log('Migration completed:', result.summary);
-```
-
-### 5.3 Migration Checklist
-
-| Step | Description | Status |
-|------|-------------|--------|
-| 1 | Backup existing data | ☐ |
-| 2 | Set up WIA API credentials | ☐ |
-| 3 | Map legacy fields to WIA schema | ☐ |
-| 4 | Create data transformers | ☐ |
-| 5 | Run test migration | ☐ |
-| 6 | Validate migrated data | ☐ |
-| 7 | Run production migration | ☐ |
-| 8 | Verify data integrity | ☐ |
-| 9 | Update application integrations | ☐ |
-| 10 | Decommission legacy system | ☐ |
-
----
-
-## Deployment
-
-### 6.1 Cloud Deployment (Kubernetes)
+### 2.3 Sensor Network Configuration
 
 ```yaml
-# deployment.yaml
+# sensor_config.yaml
+sensor_network:
+  protocol: MODBUS_TCP
+  scan_interval: 10s
+  timeout: 5s
+
+  containers:
+    - id: dewar-001
+      sensors:
+        - id: temp-001
+          type: PT100
+          address: 0x48
+          location: top
+          calibration_date: 2024-01-01
+          calibration_offset: -0.15
+
+        - id: temp-002
+          type: PT100
+          address: 0x49
+          location: bottom
+          calibration_date: 2024-01-01
+          calibration_offset: -0.12
+
+        - id: ln2-001
+          type: CAPACITIVE
+          address: 0x50
+          probe_length: 500
+          calibration:
+            empty_capacitance: 10.5
+            full_capacitance: 85.2
+
+  alert_thresholds:
+    temperature:
+      warning: -190.0
+      critical: -180.0
+      emergency: -170.0
+
+    ln2_level:
+      warning: 30.0
+      critical: 20.0
+      emergency: 10.0
+```
+
+---
+
+## 3. Database Schema
+
+### 3.1 Core Tables
+
+```sql
+-- Subject management
+CREATE TABLE subjects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    did VARCHAR(255) UNIQUE NOT NULL,
+    subject_type VARCHAR(50) NOT NULL,
+    species VARCHAR(50) NOT NULL DEFAULT 'HUMAN',
+
+    -- Biological info
+    biological_age DECIMAL(5,2),
+    chronological_age DECIMAL(5,2),
+    sex VARCHAR(20),
+    blood_type JSONB,
+
+    -- Status
+    status VARCHAR(50) NOT NULL DEFAULT 'REGISTERED',
+    preservation_date TIMESTAMPTZ,
+    preservation_facility_id UUID REFERENCES facilities(id),
+
+    -- Legal
+    consent_document_id UUID,
+    legal_status VARCHAR(50),
+
+    -- Metadata
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX idx_subjects_status ON subjects(status);
+CREATE INDEX idx_subjects_facility ON subjects(preservation_facility_id);
+
+-- Storage containers
+CREATE TABLE containers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    facility_id UUID NOT NULL REFERENCES facilities(id),
+    container_type VARCHAR(50) NOT NULL,
+
+    -- Location
+    building VARCHAR(100),
+    room VARCHAR(100),
+    position VARCHAR(100),
+
+    -- Specifications
+    capacity_liters DECIMAL(10,2),
+    manufacturer VARCHAR(100),
+    model VARCHAR(100),
+    serial_number VARCHAR(100),
+
+    -- Current state
+    current_ln2_level DECIMAL(5,2),
+    current_temperature DECIMAL(6,2),
+
+    -- Maintenance
+    installation_date DATE,
+    last_maintenance DATE,
+    next_maintenance DATE,
+
+    -- Status
+    status VARCHAR(50) NOT NULL DEFAULT 'OPERATIONAL',
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Storage slots within containers
+CREATE TABLE storage_slots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    container_id UUID NOT NULL REFERENCES containers(id),
+    slot_position JSONB NOT NULL,
+
+    -- Content
+    subject_id UUID REFERENCES subjects(id),
+    inner_container_type VARCHAR(50),
+    inner_container_id VARCHAR(100),
+
+    -- Status
+    occupied BOOLEAN NOT NULL DEFAULT FALSE,
+    reserved_for UUID REFERENCES subjects(id),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Monitoring data (TimescaleDB hypertable)
+CREATE TABLE monitoring_data (
+    time TIMESTAMPTZ NOT NULL,
+    container_id UUID NOT NULL REFERENCES containers(id),
+
+    -- Measurements
+    temperature DECIMAL(6,2),
+    ln2_level DECIMAL(5,2),
+    pressure DECIMAL(8,2),
+    humidity DECIMAL(5,2),
+
+    -- Sensor health
+    sensor_status JSONB,
+
+    -- Calculated
+    evaporation_rate DECIMAL(6,4),
+    estimated_hold_time INTERVAL
+);
+
+SELECT create_hypertable('monitoring_data', 'time');
+CREATE INDEX idx_monitoring_container ON monitoring_data(container_id, time DESC);
+
+-- Preservation events
+CREATE TABLE preservation_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_id UUID NOT NULL REFERENCES subjects(id),
+    event_type VARCHAR(100) NOT NULL,
+    phase VARCHAR(100),
+
+    -- Details
+    description TEXT,
+    parameters JSONB,
+
+    -- Personnel
+    performed_by UUID[],
+    witnessed_by UUID[],
+
+    -- Outcome
+    outcome VARCHAR(50),
+    deviations JSONB,
+
+    -- Documentation
+    notes TEXT,
+    attachments JSONB,
+
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_events_subject ON preservation_events(subject_id, timestamp DESC);
+CREATE INDEX idx_events_type ON preservation_events(event_type);
+
+-- Alerts
+CREATE TABLE alerts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    container_id UUID REFERENCES containers(id),
+    facility_id UUID REFERENCES facilities(id),
+
+    level VARCHAR(20) NOT NULL,
+    alert_type VARCHAR(100) NOT NULL,
+    message TEXT NOT NULL,
+    details JSONB,
+
+    -- Status
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    acknowledged_by UUID,
+    acknowledged_at TIMESTAMPTZ,
+    resolved_at TIMESTAMPTZ,
+    resolution_notes TEXT,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_alerts_status ON alerts(status, level);
+CREATE INDEX idx_alerts_container ON alerts(container_id, created_at DESC);
+```
+
+### 3.2 Quality Assessment Tables
+
+```sql
+-- VQI Assessments
+CREATE TABLE vqi_assessments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_id UUID NOT NULL REFERENCES subjects(id),
+
+    -- Component scores
+    ice_fraction DECIMAL(5,4),
+    cpa_distribution DECIMAL(5,4),
+    cooling_rate_score DECIMAL(5,4),
+    integrity_score DECIMAL(5,4),
+
+    -- Calculated VQI
+    vqi DECIMAL(5,4) NOT NULL,
+    vqi_grade VARCHAR(20) NOT NULL,
+
+    -- Details
+    findings JSONB,
+    recommendations TEXT[],
+
+    -- Assessor
+    assessor_id UUID NOT NULL,
+    assessment_method VARCHAR(100),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_vqi_subject ON vqi_assessments(subject_id, created_at DESC);
+
+-- Sample analyses
+CREATE TABLE sample_analyses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_id UUID NOT NULL REFERENCES subjects(id),
+    sample_type VARCHAR(50) NOT NULL,
+
+    -- Results
+    cell_viability JSONB,
+    ice_content JSONB,
+    cpa_concentration JSONB,
+    structural_integrity JSONB,
+
+    -- Method
+    analysis_method VARCHAR(100),
+    equipment TEXT[],
+    operator_id UUID,
+
+    -- Raw data
+    raw_data_reference VARCHAR(500),
+
+    collection_time TIMESTAMPTZ NOT NULL,
+    analysis_time TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+---
+
+## 4. Alert System Integration
+
+### 4.1 Alert Configuration
+
+```yaml
+# alert_config.yaml
+alert_system:
+  # Escalation levels
+  escalation:
+    - level: WARNING
+      initial_delay: 0
+      repeat_interval: 30m
+      channels: [dashboard, email]
+
+    - level: CRITICAL
+      initial_delay: 0
+      repeat_interval: 10m
+      channels: [dashboard, email, sms, phone]
+
+    - level: EMERGENCY
+      initial_delay: 0
+      repeat_interval: 5m
+      channels: [dashboard, email, sms, phone, pa_system]
+
+  # On-call rotation
+  on_call:
+    primary:
+      - name: "Dr. Smith"
+        phone: "+1-555-0100"
+        email: "smith@facility.org"
+
+    secondary:
+      - name: "Dr. Jones"
+        phone: "+1-555-0101"
+        email: "jones@facility.org"
+
+    escalation_timeout: 15m
+
+  # Integration endpoints
+  integrations:
+    email:
+      smtp_host: smtp.facility.org
+      smtp_port: 587
+      from: alerts@facility.org
+
+    sms:
+      provider: twilio
+      account_sid: ${TWILIO_SID}
+      auth_token: ${TWILIO_TOKEN}
+      from_number: "+1-555-0000"
+
+    phone:
+      provider: twilio
+      voice_url: https://facility.org/voice/alert.xml
+
+    pa_system:
+      endpoint: http://pa-controller.local/announce
+      api_key: ${PA_API_KEY}
+```
+
+### 4.2 Alert Processing
+
+```rust
+// alert_processor.rs
+use wia_cryo::alerts::{Alert, AlertLevel, Notification};
+
+pub struct AlertProcessor {
+    config: AlertConfig,
+    notifiers: Vec<Box<dyn Notifier>>,
+    on_call: OnCallManager,
+}
+
+impl AlertProcessor {
+    pub async fn process_alert(&self, alert: Alert) -> Result<(), AlertError> {
+        // Deduplicate
+        if self.is_duplicate(&alert) {
+            return Ok(());
+        }
+
+        // Store alert
+        self.store_alert(&alert).await?;
+
+        // Get escalation config
+        let escalation = self.config.get_escalation(alert.level);
+
+        // Build notification
+        let notification = self.build_notification(&alert);
+
+        // Send to configured channels
+        for channel in &escalation.channels {
+            match channel.as_str() {
+                "dashboard" => {
+                    self.notifiers.dashboard.send(&notification).await?;
+                }
+                "email" => {
+                    let recipients = self.get_email_recipients(&alert);
+                    self.notifiers.email.send(&notification, recipients).await?;
+                }
+                "sms" => {
+                    let phones = self.on_call.get_on_call_phones();
+                    self.notifiers.sms.send(&notification, phones).await?;
+                }
+                "phone" => {
+                    let phone = self.on_call.get_primary_phone();
+                    self.notifiers.phone.call(phone, &notification).await?;
+                }
+                "pa_system" => {
+                    self.notifiers.pa.announce(&notification).await?;
+                }
+                _ => {}
+            }
+        }
+
+        // Schedule escalation if not acknowledged
+        if alert.level >= AlertLevel::Critical {
+            self.schedule_escalation(alert.id, escalation.repeat_interval).await?;
+        }
+
+        Ok(())
+    }
+
+    fn build_notification(&self, alert: &Alert) -> Notification {
+        Notification {
+            id: alert.id.clone(),
+            level: alert.level,
+            title: format!(
+                "[{}] {} - {}",
+                alert.level,
+                alert.alert_type,
+                alert.container_id.as_deref().unwrap_or("Facility")
+            ),
+            message: alert.message.clone(),
+            details: alert.details.clone(),
+            timestamp: alert.created_at,
+            action_required: alert.level >= AlertLevel::Critical,
+            acknowledge_url: format!(
+                "https://facility.org/alerts/{}/acknowledge",
+                alert.id
+            ),
+        }
+    }
+}
+```
+
+---
+
+## 5. Backup Power Integration
+
+### 5.1 UPS Monitoring
+
+```rust
+// ups_monitor.rs
+pub struct UPSMonitor {
+    ups_client: UPSClient,
+    config: UPSConfig,
+}
+
+impl UPSMonitor {
+    pub async fn check_status(&self) -> UPSStatus {
+        let status = self.ups_client.get_status().await;
+
+        UPSStatus {
+            online: status.input_voltage > 0.0,
+            battery_level: status.battery_percent,
+            runtime_remaining: Duration::from_secs(status.runtime_seconds),
+            load_percent: status.load_percent,
+            input_voltage: status.input_voltage,
+            output_voltage: status.output_voltage,
+            last_test: status.last_test_date,
+            alarms: status.active_alarms,
+        }
+    }
+
+    pub async fn handle_power_event(&self, event: PowerEvent) {
+        match event {
+            PowerEvent::MainsLoss => {
+                // Log event
+                log_event("POWER_FAILURE", "Mains power lost, on UPS battery");
+
+                // Alert
+                send_alert(Alert {
+                    level: AlertLevel::Critical,
+                    alert_type: "POWER_FAILURE".into(),
+                    message: "Facility running on UPS backup power".into(),
+                    details: serde_json::json!({
+                        "battery_level": self.check_status().await.battery_level,
+                        "runtime_remaining": self.check_status().await.runtime_remaining,
+                    }),
+                }).await;
+
+                // Start enhanced monitoring
+                self.start_enhanced_monitoring().await;
+
+                // Prepare generator transfer
+                self.prepare_generator_transfer().await;
+            }
+
+            PowerEvent::BatteryLow => {
+                send_alert(Alert {
+                    level: AlertLevel::Emergency,
+                    alert_type: "BATTERY_LOW".into(),
+                    message: "UPS battery critically low".into(),
+                    ..Default::default()
+                }).await;
+
+                // Initiate emergency procedures
+                self.initiate_emergency_protocol().await;
+            }
+
+            PowerEvent::MainsRestored => {
+                log_event("POWER_RESTORED", "Mains power restored");
+
+                send_alert(Alert {
+                    level: AlertLevel::Info,
+                    alert_type: "POWER_RESTORED".into(),
+                    message: "Mains power has been restored".into(),
+                    ..Default::default()
+                }).await;
+
+                self.stop_enhanced_monitoring().await;
+            }
+
+            _ => {}
+        }
+    }
+}
+```
+
+---
+
+## 6. Compliance and Audit
+
+### 6.1 Audit Logging
+
+```rust
+// audit_log.rs
+#[derive(Debug, Serialize)]
+pub struct AuditEntry {
+    id: Uuid,
+    timestamp: DateTime<Utc>,
+    actor: ActorInfo,
+    action: AuditAction,
+    resource_type: String,
+    resource_id: String,
+    details: serde_json::Value,
+    ip_address: Option<IpAddr>,
+    user_agent: Option<String>,
+    result: ActionResult,
+}
+
+pub struct AuditLogger {
+    storage: AuditStorage,
+    config: AuditConfig,
+}
+
+impl AuditLogger {
+    pub async fn log(&self, entry: AuditEntry) -> Result<(), AuditError> {
+        // Ensure immutability
+        let entry = self.sign_entry(entry)?;
+
+        // Store with replication
+        self.storage.store(entry.clone()).await?;
+
+        // Send to external SIEM if configured
+        if let Some(siem) = &self.config.siem_endpoint {
+            self.forward_to_siem(siem, &entry).await?;
+        }
+
+        // Check for compliance violations
+        self.check_compliance(&entry).await?;
+
+        Ok(())
+    }
+
+    fn sign_entry(&self, mut entry: AuditEntry) -> Result<AuditEntry, AuditError> {
+        // Create hash of entry content
+        let content = serde_json::to_string(&entry)?;
+        let hash = sha256::digest(&content);
+
+        // Sign with facility key
+        let signature = self.config.signing_key.sign(&hash)?;
+
+        entry.details["_signature"] = serde_json::json!({
+            "hash": hash,
+            "signature": signature,
+            "algorithm": "Ed25519"
+        });
+
+        Ok(entry)
+    }
+}
+```
+
+### 6.2 Regulatory Compliance
+
+```yaml
+# compliance_config.yaml
+compliance:
+  frameworks:
+    - name: FDA_21_CFR_1271
+      enabled: true
+      requirements:
+        - id: establishment_registration
+        - id: listing_of_hct_ps
+        - id: donor_eligibility
+        - id: cgtp_compliance
+        - id: adverse_reaction_reports
+
+    - name: EU_2004_23_EC
+      enabled: true
+      requirements:
+        - id: quality_and_safety
+        - id: traceability
+        - id: serious_adverse_events
+
+    - name: WIA_CRYO_PRESERVATION
+      enabled: true
+      requirements:
+        - id: vqi_minimum
+          threshold: 0.70
+        - id: monitoring_frequency
+          max_interval: 1h
+        - id: temperature_tolerance
+          max_deviation: 5.0
+
+  reporting:
+    - type: ANNUAL_REVIEW
+      frequency: yearly
+      deadline_month: 3
+
+    - type: ADVERSE_EVENT
+      frequency: as_needed
+      deadline_hours: 24
+
+    - type: QUALITY_METRICS
+      frequency: quarterly
+```
+
+---
+
+## 7. Deployment Options
+
+### 7.1 Docker Deployment
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  api:
+    image: wia-cryo/api:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://cryo:${DB_PASSWORD}@db:5432/cryo
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+
+  monitoring:
+    image: wia-cryo/monitoring:latest
+    environment:
+      - TIMESCALE_URL=postgres://cryo:${DB_PASSWORD}@timescaledb:5432/monitoring
+      - SENSOR_CONFIG=/config/sensors.yaml
+    volumes:
+      - ./config:/config:ro
+    depends_on:
+      - timescaledb
+
+  alerts:
+    image: wia-cryo/alerts:latest
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - ALERT_CONFIG=/config/alerts.yaml
+    volumes:
+      - ./config:/config:ro
+    depends_on:
+      - redis
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=cryo
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    environment:
+      - POSTGRES_DB=monitoring
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - tsdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  tsdata:
+  redisdata:
+```
+
+### 7.2 Kubernetes Deployment
+
+```yaml
+# kubernetes/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cryo-preservation-api
-  namespace: wia-cryo
+  name: wia-cryo-api
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: cryo-preservation-api
+      app: wia-cryo-api
   template:
     metadata:
       labels:
-        app: cryo-preservation-api
+        app: wia-cryo-api
     spec:
       containers:
       - name: api
-        image: wia/cryo-preservation-api:1.0.0
+        image: wia-cryo/api:latest
         ports:
         - containerPort: 8080
         env:
@@ -588,317 +934,28 @@ spec:
             secretKeyRef:
               name: cryo-secrets
               key: database-url
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: cryo-secrets
-              key: jwt-secret
         resources:
           requests:
             memory: "256Mi"
             cpu: "250m"
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "1Gi"
+            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /health
             port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 10
+          periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /ready
             port: 8080
           initialDelaySeconds: 5
-          periodSeconds: 5
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: cryo-preservation-api
-  namespace: wia-cryo
-spec:
-  selector:
-    app: cryo-preservation-api
-  ports:
-  - port: 80
-    targetPort: 8080
-  type: ClusterIP
-```
-
-### 6.2 On-Premise Deployment
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  cryo-api:
-    image: wia/cryo-preservation-api:1.0.0
-    ports:
-      - "8080:8080"
-    environment:
-      - DATABASE_URL=postgresql://user:pass@db:5432/cryo
-      - REDIS_URL=redis://cache:6379
-      - JWT_SECRET=${JWT_SECRET}
-    depends_on:
-      - db
-      - cache
-    restart: unless-stopped
-
-  db:
-    image: postgres:15
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=cryo
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-
-  cache:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-
-  monitoring:
-    image: wia/cryo-monitoring:1.0.0
-    ports:
-      - "3000:3000"
-    environment:
-      - PROMETHEUS_URL=http://prometheus:9090
-
-volumes:
-  postgres_data:
-  redis_data:
-```
-
-### 6.3 High Availability Configuration
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    High Availability Setup                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│     Load Balancer (Active-Standby)                              │
-│            │                                                     │
-│     ┌──────┴──────┐                                             │
-│     ▼             ▼                                              │
-│  ┌─────┐       ┌─────┐                                          │
-│  │ API │       │ API │       API Cluster                        │
-│  │  1  │       │  2  │       (Auto-scaling)                     │
-│  └──┬──┘       └──┬──┘                                          │
-│     │             │                                              │
-│     └──────┬──────┘                                             │
-│            │                                                     │
-│     ┌──────┴──────┐                                             │
-│     ▼             ▼                                              │
-│  ┌─────┐       ┌─────┐                                          │
-│  │ DB  │◄─────►│ DB  │       Database Cluster                   │
-│  │Prim │       │Repl │       (Primary + Replicas)               │
-│  └─────┘       └─────┘                                          │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+          periodSeconds: 10
 ```
 
 ---
 
-## Monitoring & Operations
-
-### 7.1 Key Metrics
-
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `storage.temperature` | Dewar temperature | > -195°C |
-| `storage.nitrogen_level` | LN2 fill level | < 20% |
-| `api.response_time_p99` | 99th percentile latency | > 500ms |
-| `api.error_rate` | Request error rate | > 1% |
-| `system.uptime` | Service availability | < 99.9% |
-
-### 7.2 Prometheus Metrics
-
-```yaml
-# prometheus-rules.yaml
-groups:
-- name: cryo-preservation
-  rules:
-  - alert: StorageTemperatureHigh
-    expr: cryo_storage_temperature_celsius > -195
-    for: 5m
-    labels:
-      severity: critical
-    annotations:
-      summary: "Storage temperature above safe threshold"
-      description: "Container {{ $labels.container_id }} temperature is {{ $value }}°C"
-
-  - alert: NitrogenLevelLow
-    expr: cryo_storage_nitrogen_level < 0.2
-    for: 15m
-    labels:
-      severity: warning
-    annotations:
-      summary: "Liquid nitrogen level low"
-      description: "Container {{ $labels.container_id }} LN2 at {{ $value | humanizePercentage }}"
-```
-
-### 7.3 Grafana Dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "WIA Cryo-Preservation Monitoring",
-    "panels": [
-      {
-        "title": "Storage Temperatures",
-        "type": "timeseries",
-        "targets": [
-          {
-            "expr": "cryo_storage_temperature_celsius",
-            "legendFormat": "{{ container_id }}"
-          }
-        ]
-      },
-      {
-        "title": "API Latency",
-        "type": "heatmap",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))"
-          }
-        ]
-      },
-      {
-        "title": "Active Alerts",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "count(ALERTS{alertstate=\"firing\"})"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### 7.4 Operational Runbooks
-
-**Alert: Storage Temperature High**
-
-1. **Immediate Actions:**
-   - Check LN2 levels in affected container
-   - Verify sensor accuracy with manual reading
-   - Check facility HVAC status
-
-2. **Escalation:**
-   - If temperature > -190°C: Page on-call engineer
-   - If temperature > -180°C: Initiate emergency protocol
-
-3. **Resolution:**
-   - Document incident in audit log
-   - Update preventive maintenance schedule
-
----
-
-## Certification
-
-### 8.1 WIA Certification Levels
-
-| Level | Requirements |
-|-------|--------------|
-| **Bronze** | Basic compliance with data format |
-| **Silver** | Full API integration, automated monitoring |
-| **Gold** | HA deployment, blockchain audit trail |
-| **Platinum** | Multi-facility integration, research capabilities |
-
-### 8.2 Certification Process
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Certification Process                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. Application        2. Assessment        3. Audit            │
-│  ├─ Submit form       ├─ Technical review  ├─ On-site visit    │
-│  ├─ Documentation     ├─ Security scan     ├─ Data validation  │
-│  └─ Fee payment       └─ API testing       └─ Staff interview  │
-│                                                                  │
-│  4. Remediation        5. Certification    6. Maintenance       │
-│  ├─ Fix issues        ├─ Certificate      ├─ Annual audit      │
-│  ├─ Re-test           ├─ Badge/logo       ├─ Update reports    │
-│  └─ Documentation     └─ Registry entry   └─ Renewal           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 8.3 Compliance Checklist
-
-| Requirement | Bronze | Silver | Gold | Platinum |
-|-------------|:------:|:------:|:----:|:--------:|
-| Phase 1 Data Format | ✓ | ✓ | ✓ | ✓ |
-| Phase 2 API Implementation | - | ✓ | ✓ | ✓ |
-| Phase 3 Protocol Support | - | ✓ | ✓ | ✓ |
-| Real-time Monitoring | - | ✓ | ✓ | ✓ |
-| High Availability | - | - | ✓ | ✓ |
-| Blockchain Audit Trail | - | - | ✓ | ✓ |
-| Multi-facility Integration | - | - | - | ✓ |
-| Research Data Export | - | - | - | ✓ |
-
----
-
-## Reference Implementation
-
-### 9.1 GitHub Repository
-
-```
-https://github.com/WIA-Official/cryo-preservation-reference
-```
-
-### 9.2 Quick Start
-
-```bash
-# Clone repository
-git clone https://github.com/WIA-Official/cryo-preservation-reference.git
-cd cryo-preservation-reference
-
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings
-
-# Run migrations
-npm run db:migrate
-
-# Start server
-npm run start
-
-# Run tests
-npm run test
-```
-
-### 9.3 SDK Downloads
-
-| Language | Package |
-|----------|---------|
-| TypeScript/JS | `npm install @wia/cryo-preservation` |
-| Python | `pip install wia-cryo-preservation` |
-| Java | `implementation 'live.wia:cryo-preservation:1.0.0'` |
-| Go | `go get github.com/WIA-Official/cryo-preservation-go` |
-
----
-
-<div align="center">
-
-**WIA Cryo-Preservation Ecosystem Integration v1.0.0**
-
-**弘益人間 (홍익인간)** - Benefit All Humanity
-
----
-
-**© 2025 WIA Standards Committee**
-
-**MIT License**
-
-</div>
+**Phase 4 Integration Guide**
+**WIA-CRYO-PRESERVATION v1.0.0**

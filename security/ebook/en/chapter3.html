@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Encryption Standards - WIA Security Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 3: Encryption Standards</h1>
+
+        <section>
+            <h2>3.1 Introduction to Cryptography</h2>
+            <p>Encryption is the cornerstone of modern information security, providing confidentiality, integrity, and authenticity for data at rest and in transit. The WIA Security Standard mandates strong encryption algorithms and proper key management practices to protect sensitive information from unauthorized access.</p>
+
+            <div class="alert alert-info">
+                <strong>Core Principle:</strong> Encryption should be the default state for all sensitive data. Assume that perimeter defenses will be breached and ensure that encrypted data remains protected even when accessed by unauthorized parties.
+            </div>
+
+            <h3>Encryption Types and Use Cases</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Algorithm Examples</th>
+                        <th>Use Cases</th>
+                        <th>Key Size</th>
+                        <th>Performance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Symmetric</strong></td>
+                        <td>AES, ChaCha20</td>
+                        <td>Data at rest, Bulk encryption</td>
+                        <td>128, 192, 256 bits</td>
+                        <td>Fast</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Asymmetric</strong></td>
+                        <td>RSA, ECC, Ed25519</td>
+                        <td>Key exchange, Digital signatures</td>
+                        <td>2048-4096 bits (RSA)</td>
+                        <td>Slower</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hash Functions</strong></td>
+                        <td>SHA-256, SHA-3, BLAKE2</td>
+                        <td>Data integrity, Password storage</td>
+                        <td>256-512 bits output</td>
+                        <td>Fast</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Key Derivation</strong></td>
+                        <td>PBKDF2, Argon2, scrypt</td>
+                        <td>Password hashing, Key generation</td>
+                        <td>Variable</td>
+                        <td>Intentionally slow</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Authenticated</strong></td>
+                        <td>AES-GCM, ChaCha20-Poly1305</td>
+                        <td>Encryption + Authentication</td>
+                        <td>256 bits + tag</td>
+                        <td>Fast</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>3.2 WIA Encryption Requirements</h2>
+            <p>The WIA Security Standard specifies minimum encryption requirements for different data classifications and transmission scenarios.</p>
+
+            <h3>Encryption Standards by Data Classification</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data Classification</th>
+                        <th>At Rest</th>
+                        <th>In Transit</th>
+                        <th>Key Storage</th>
+                        <th>Rotation Period</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Public</strong></td>
+                        <td>Not required</td>
+                        <td>TLS 1.2+</td>
+                        <td>N/A</td>
+                        <td>N/A</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Internal</strong></td>
+                        <td>AES-128+</td>
+                        <td>TLS 1.2+</td>
+                        <td>KMS</td>
+                        <td>Annually</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Confidential</strong></td>
+                        <td>AES-256</td>
+                        <td>TLS 1.3</td>
+                        <td>Hardware KMS</td>
+                        <td>Quarterly</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Restricted</strong></td>
+                        <td>AES-256-GCM</td>
+                        <td>TLS 1.3 + mutual auth</td>
+                        <td>HSM</td>
+                        <td>Monthly</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PII/PHI</strong></td>
+                        <td>AES-256-GCM</td>
+                        <td>TLS 1.3 + mutual auth</td>
+                        <td>HSM + backup</td>
+                        <td>Monthly</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>3.3 Encryption Configuration Schema</h2>
+            <p>The WIA Security Standard defines a comprehensive schema for encryption configurations, ensuring consistent implementation across systems.</p>
+
+            <div class="code-header">JSON Schema - Encryption Configuration</div>
+            <pre><code>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA Encryption Configuration",
+  "type": "object",
+  "properties": {
+    "encryptionPolicyId": {
+      "type": "string",
+      "description": "Unique identifier for encryption policy"
+    },
+    "dataAtRest": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "algorithm": {
+          "type": "string",
+          "enum": ["AES-128-GCM", "AES-192-GCM", "AES-256-GCM", "ChaCha20-Poly1305"]
+        },
+        "keySize": {"type": "integer", "enum": [128, 192, 256]},
+        "mode": {"type": "string", "enum": ["GCM", "CBC", "CTR"]},
+        "keyManagement": {
+          "type": "object",
+          "properties": {
+            "provider": {"type": "string", "enum": ["AWS-KMS", "Azure-KeyVault", "GCP-KMS", "HashiCorp-Vault", "HSM"]},
+            "keyId": {"type": "string"},
+            "rotationEnabled": {"type": "boolean", "default": true},
+            "rotationPeriodDays": {"type": "integer", "minimum": 30},
+            "backupEnabled": {"type": "boolean", "default": true}
+          },
+          "required": ["provider", "keyId", "rotationEnabled"]
+        },
+        "encryptedFields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldName": {"type": "string"},
+              "dataType": {"type": "string"},
+              "classification": {"type": "string", "enum": ["Public", "Internal", "Confidential", "Restricted"]}
+            }
+          }
+        }
+      },
+      "required": ["enabled", "algorithm", "keyManagement"]
+    },
+    "dataInTransit": {
+      "type": "object",
+      "properties": {
+        "tlsVersion": {
+          "type": "string",
+          "enum": ["1.2", "1.3"]
+        },
+        "cipherSuites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "TLS_AES_256_GCM_SHA384",
+              "TLS_CHACHA20_POLY1305_SHA256",
+              "TLS_AES_128_GCM_SHA256",
+              "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+              "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+            ]
+          },
+          "minItems": 1
+        },
+        "mutualTLS": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "clientCertRequired": {"type": "boolean"},
+            "trustedCAs": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "certificateManagement": {
+          "type": "object",
+          "properties": {
+            "provider": {"type": "string"},
+            "autoRenewal": {"type": "boolean"},
+            "expirationWarningDays": {"type": "integer", "default": 30}
+          }
+        }
+      },
+      "required": ["tlsVersion", "cipherSuites"]
+    },
+    "hashingConfiguration": {
+      "type": "object",
+      "properties": {
+        "algorithm": {"type": "string", "enum": ["SHA-256", "SHA-384", "SHA-512", "SHA3-256", "BLAKE2b"]},
+        "saltEnabled": {"type": "boolean", "default": true},
+        "saltLength": {"type": "integer", "minimum": 16}
+      }
+    },
+    "passwordEncryption": {
+      "type": "object",
+      "properties": {
+        "algorithm": {"type": "string", "enum": ["Argon2id", "bcrypt", "PBKDF2"]},
+        "iterations": {"type": "integer", "minimum": 100000},
+        "memoryKB": {"type": "integer", "minimum": 65536},
+        "parallelism": {"type": "integer", "minimum": 1}
+      }
+    },
+    "complianceRequirements": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["FIPS-140-2", "FIPS-140-3", "PCI-DSS", "HIPAA", "GDPR"]
+      }
+    }
+  },
+  "required": ["encryptionPolicyId", "dataAtRest", "dataInTransit"]
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>3.4 Encryption API Endpoints</h2>
+            <p>The WIA Security Standard provides comprehensive APIs for encryption operations and key management.</p>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/encrypt</span>
+                <p>Encrypt data using specified algorithm and key</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/decrypt</span>
+                <p>Decrypt encrypted data with proper authorization</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/keys/generate</span>
+                <p>Generate new encryption key with specified parameters</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-get">GET</span>
+                <span class="api-path">/api/v1/encryption/keys/{keyId}</span>
+                <p>Retrieve key metadata (not the key material)</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/keys/{keyId}/rotate</span>
+                <p>Rotate encryption key and re-encrypt affected data</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-delete">DELETE</span>
+                <span class="api-path">/api/v1/encryption/keys/{keyId}</span>
+                <p>Schedule key for deletion (with grace period)</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/hash</span>
+                <p>Generate cryptographic hash of data</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/sign</span>
+                <p>Create digital signature for data integrity</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/verify</span>
+                <p>Verify digital signature authenticity</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-get">GET</span>
+                <span class="api-path">/api/v1/encryption/compliance/validate</span>
+                <p>Validate encryption configuration against compliance requirements</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-get">GET</span>
+                <span class="api-path">/api/v1/encryption/audit-trail</span>
+                <p>Retrieve encryption operation audit logs</p>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method method-post">POST</span>
+                <span class="api-path">/api/v1/encryption/tls/certificate/renew</span>
+                <p>Renew TLS certificate before expiration</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>3.5 Implementation Examples</h2>
+
+            <h3>Example 1: AES-256-GCM Encryption (Python)</h3>
+            <div class="code-header">Python - AES-GCM Encryption Service</div>
+            <pre><code>from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import os
+import base64
+import json
+from typing import Tuple, Dict
+
+class EncryptionService:
+    """
+    WIA Security Standard compliant encryption service using AES-256-GCM
+    """
+
+    def __init__(self, kms_client=None):
+        self.kms_client = kms_client
+        self.algorithm = "AES-256-GCM"
+
+    def encrypt_data(self, plaintext: bytes, key_id: str,
+                     associated_data: bytes = None) -> Dict[str, str]:
+        """
+        Encrypt data using AES-256-GCM with authenticated encryption
+
+        Args:
+            plaintext: Data to encrypt
+            key_id: KMS key identifier
+            associated_data: Additional authenticated data (AAD)
+
+        Returns:
+            Dictionary containing ciphertext, nonce, tag, and metadata
+        """
+        # Get encryption key from KMS
+        key = self._get_key_from_kms(key_id)
+
+        # Generate random nonce (96 bits for GCM)
+        nonce = os.urandom(12)
+
+        # Initialize AES-GCM cipher
+        aesgcm = AESGCM(key)
+
+        # Encrypt and authenticate
+        ciphertext = aesgcm.encrypt(
+            nonce=nonce,
+            data=plaintext,
+            associated_data=associated_data
+        )
+
+        # Return encrypted data with metadata
+        return {
+            "algorithm": self.algorithm,
+            "keyId": key_id,
+            "ciphertext": base64.b64encode(ciphertext).decode('utf-8'),
+            "nonce": base64.b64encode(nonce).decode('utf-8'),
+            "version": "1.0"
+        }
+
+    def decrypt_data(self, encrypted_data: Dict[str, str],
+                     associated_data: bytes = None) -> bytes:
+        """
+        Decrypt AES-256-GCM encrypted data
+
+        Args:
+            encrypted_data: Dictionary containing encrypted data and metadata
+            associated_data: Additional authenticated data (must match encryption)
+
+        Returns:
+            Decrypted plaintext
+        """
+        # Get decryption key from KMS
+        key = self._get_key_from_kms(encrypted_data["keyId"])
+
+        # Decode ciphertext and nonce
+        ciphertext = base64.b64decode(encrypted_data["ciphertext"])
+        nonce = base64.b64decode(encrypted_data["nonce"])
+
+        # Initialize AES-GCM cipher
+        aesgcm = AESGCM(key)
+
+        # Decrypt and verify authentication
+        try:
+            plaintext = aesgcm.decrypt(
+                nonce=nonce,
+                data=ciphertext,
+                associated_data=associated_data
+            )
+            return plaintext
+        except Exception as e:
+            raise ValueError(f"Decryption failed: Authentication verification failed")
+
+    def encrypt_field(self, data: Dict, field_name: str, key_id: str) -> Dict:
+        """
+        Encrypt a specific field in a dictionary (for database encryption)
+        """
+        if field_name not in data:
+            raise ValueError(f"Field {field_name} not found in data")
+
+        # Convert field value to bytes
+        field_value = str(data[field_name]).encode('utf-8')
+
+        # Encrypt the field
+        encrypted = self.encrypt_data(
+            plaintext=field_value,
+            key_id=key_id,
+            associated_data=field_name.encode('utf-8')
+        )
+
+        # Replace field with encrypted version
+        data[field_name] = encrypted
+        data[f"{field_name}_encrypted"] = True
+
+        return data
+
+    def rotate_encryption_key(self, old_key_id: str, new_key_id: str,
+                              encrypted_data: Dict[str, str]) -> Dict[str, str]:
+        """
+        Rotate encryption key by decrypting with old key and re-encrypting with new key
+        """
+        # Decrypt with old key
+        plaintext = self.decrypt_data(encrypted_data)
+
+        # Re-encrypt with new key
+        re_encrypted = self.encrypt_data(plaintext, new_key_id)
+
+        return re_encrypted
+
+    def _get_key_from_kms(self, key_id: str) -> bytes:
+        """
+        Retrieve encryption key from KMS
+        In production, this would call actual KMS service
+        """
+        if self.kms_client:
+            return self.kms_client.get_key(key_id)
+        else:
+            # For demo purposes - in production, NEVER hardcode keys
+            # This would retrieve from AWS KMS, Azure Key Vault, etc.
+            return os.urandom(32)  # 256-bit key
+
+    def derive_key_from_password(self, password: str, salt: bytes = None) -> Tuple[bytes, bytes]:
+        """
+        Derive encryption key from password using PBKDF2
+        """
+        if salt is None:
+            salt = os.urandom(16)
+
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,  # 256 bits
+            salt=salt,
+            iterations=480000,  # OWASP recommended minimum
+        )
+
+        key = kdf.derive(password.encode('utf-8'))
+        return key, salt</code></pre>
+
+            <h3>Example 2: TLS Configuration (Node.js)</h3>
+            <div class="code-header">JavaScript/Node.js - TLS 1.3 Server Configuration</div>
+            <pre><code>const https = require('https');
+const fs = require('fs');
+const crypto = require('crypto');
+
+class SecureTLSServer {
+    constructor(config) {
+        this.config = config;
+        this.tlsOptions = this.buildTLSOptions();
+    }
+
+    buildTLSOptions() {
+        // WIA Security Standard compliant TLS configuration
+        const options = {
+            // TLS version enforcement
+            minVersion: 'TLSv1.3',
+            maxVersion: 'TLSv1.3',
+
+            // Certificate configuration
+            key: fs.readFileSync(this.config.keyPath),
+            cert: fs.readFileSync(this.config.certPath),
+            ca: this.config.caPath ? fs.readFileSync(this.config.caPath) : undefined,
+
+            // Cipher suite configuration (TLS 1.3)
+            ciphers: [
+                'TLS_AES_256_GCM_SHA384',
+                'TLS_CHACHA20_POLY1305_SHA256',
+                'TLS_AES_128_GCM_SHA256'
+            ].join(':'),
+
+            // Security options
+            honorCipherOrder: true,
+            requestCert: this.config.mutualTLS || false,
+            rejectUnauthorized: true,
+
+            // Disable insecure features
+            secureOptions:
+                crypto.constants.SSL_OP_NO_SSLv2 |
+                crypto.constants.SSL_OP_NO_SSLv3 |
+                crypto.constants.SSL_OP_NO_TLSv1 |
+                crypto.constants.SSL_OP_NO_TLSv1_1,
+
+            // ALPN protocols
+            ALPNProtocols: ['h2', 'http/1.1'],
+
+            // Session management
+            sessionTimeout: 300, // 5 minutes
+            sessionIdContext: 'wia-security-standard'
+        };
+
+        return options;
+    }
+
+    createServer(app) {
+        const server = https.createServer(this.tlsOptions, app);
+
+        // TLS connection event logging
+        server.on('secureConnection', (tlsSocket) => {
+            this.logTLSConnection(tlsSocket);
+        });
+
+        // Certificate validation
+        server.on('tlsClientError', (error, tlsSocket) => {
+            console.error('TLS Client Error:', error.message);
+            this.logSecurityEvent('TLS_ERROR', {
+                error: error.message,
+                remoteAddress: tlsSocket.remoteAddress
+            });
+        });
+
+        return server;
+    }
+
+    logTLSConnection(tlsSocket) {
+        const connectionInfo = {
+            protocol: tlsSocket.getProtocol(),
+            cipher: tlsSocket.getCipher(),
+            peerCertificate: tlsSocket.getPeerCertificate(),
+            authorized: tlsSocket.authorized,
+            remoteAddress: tlsSocket.remoteAddress,
+            timestamp: new Date().toISOString()
+        };
+
+        // Verify TLS 1.3 is being used
+        if (connectionInfo.protocol !== 'TLSv1.3') {
+            console.warn('Non-TLS 1.3 connection attempted:', connectionInfo);
+            this.logSecurityEvent('WEAK_TLS', connectionInfo);
+        }
+
+        console.log('Secure TLS connection established:', connectionInfo);
+    }
+
+    validateCertificate(cert) {
+        // Check certificate expiration
+        const now = new Date();
+        const validTo = new Date(cert.valid_to);
+        const daysUntilExpiration = (validTo - now) / (1000 * 60 * 60 * 24);
+
+        if (daysUntilExpiration < 30) {
+            console.warn(`Certificate expires in ${daysUntilExpiration} days`);
+            this.logSecurityEvent('CERT_EXPIRING', {
+                subject: cert.subject,
+                daysUntilExpiration
+            });
+        }
+
+        // Verify certificate chain
+        if (!cert.issuerCertificate) {
+            throw new Error('Certificate chain validation failed');
+        }
+
+        return true;
+    }
+
+    logSecurityEvent(eventType, details) {
+        // Log to SIEM or security monitoring system
+        const event = {
+            eventType,
+            timestamp: new Date().toISOString(),
+            details,
+            severity: this.getSeverity(eventType)
+        };
+
+        console.log('[SECURITY EVENT]', JSON.stringify(event));
+    }
+
+    getSeverity(eventType) {
+        const severityMap = {
+            'TLS_ERROR': 'HIGH',
+            'WEAK_TLS': 'CRITICAL',
+            'CERT_EXPIRING': 'WARNING',
+            'CERT_EXPIRED': 'CRITICAL'
+        };
+
+        return severityMap[eventType] || 'INFO';
+    }
+}
+
+// Usage example
+const server = new SecureTLSServer({
+    keyPath: '/path/to/private-key.pem',
+    certPath: '/path/to/certificate.pem',
+    caPath: '/path/to/ca-bundle.pem',
+    mutualTLS: true
+});
+
+module.exports = SecureTLSServer;</code></pre>
+
+            <h3>Example 3: Password Hashing with Argon2 (Go)</h3>
+            <div class="code-header">Go - Argon2id Password Hashing</div>
+            <pre><code>package encryption
+
+import (
+    "crypto/rand"
+    "crypto/subtle"
+    "encoding/base64"
+    "errors"
+    "fmt"
+    "strings"
+
+    "golang.org/x/crypto/argon2"
+)
+
+// PasswordHasher implements WIA Security Standard password hashing
+type PasswordHasher struct {
+    memory      uint32
+    iterations  uint32
+    parallelism uint8
+    saltLength  uint32
+    keyLength   uint32
+}
+
+// NewPasswordHasher creates a hasher with WIA recommended parameters
+func NewPasswordHasher() *PasswordHasher {
+    return &PasswordHasher{
+        memory:      64 * 1024, // 64 MB
+        iterations:  3,
+        parallelism: 2,
+        saltLength:  16,
+        keyLength:   32, // 256 bits
+    }
+}
+
+// HashPassword creates an Argon2id hash of the password
+func (ph *PasswordHasher) HashPassword(password string) (string, error) {
+    // Generate random salt
+    salt := make([]byte, ph.saltLength)
+    if _, err := rand.Read(salt); err != nil {
+        return "", err
+    }
+
+    // Generate hash
+    hash := argon2.IDKey(
+        []byte(password),
+        salt,
+        ph.iterations,
+        ph.memory,
+        ph.parallelism,
+        ph.keyLength,
+    )
+
+    // Encode hash with parameters for verification
+    encodedHash := ph.encodeHash(hash, salt)
+    return encodedHash, nil
+}
+
+// VerifyPassword checks if password matches the hash
+func (ph *PasswordHasher) VerifyPassword(password, encodedHash string) (bool, error) {
+    // Decode hash and extract parameters
+    hash, salt, err := ph.decodeHash(encodedHash)
+    if err != nil {
+        return false, err
+    }
+
+    // Generate hash from provided password
+    computedHash := argon2.IDKey(
+        []byte(password),
+        salt,
+        ph.iterations,
+        ph.memory,
+        ph.parallelism,
+        ph.keyLength,
+    )
+
+    // Constant-time comparison to prevent timing attacks
+    if subtle.ConstantTimeCompare(hash, computedHash) == 1 {
+        return true, nil
+    }
+
+    return false, nil
+}
+
+// encodeHash creates encoded string with format:
+// $argon2id$v=19$m=65536,t=3,p=2$salt$hash
+func (ph *PasswordHasher) encodeHash(hash, salt []byte) string {
+    b64Salt := base64.RawStdEncoding.EncodeToString(salt)
+    b64Hash := base64.RawStdEncoding.EncodeToString(hash)
+
+    return fmt.Sprintf(
+        "$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
+        argon2.Version,
+        ph.memory,
+        ph.iterations,
+        ph.parallelism,
+        b64Salt,
+        b64Hash,
+    )
+}
+
+// decodeHash extracts hash and salt from encoded string
+func (ph *PasswordHasher) decodeHash(encodedHash string) (hash, salt []byte, err error) {
+    parts := strings.Split(encodedHash, "$")
+    if len(parts) != 6 {
+        return nil, nil, errors.New("invalid hash format")
+    }
+
+    if parts[1] != "argon2id" {
+        return nil, nil, errors.New("incompatible algorithm")
+    }
+
+    salt, err = base64.RawStdEncoding.DecodeString(parts[4])
+    if err != nil {
+        return nil, nil, err
+    }
+
+    hash, err = base64.RawStdEncoding.DecodeString(parts[5])
+    if err != nil {
+        return nil, nil, err
+    }
+
+    return hash, salt, nil
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>3.6 WIA Encryption Standards Certification</h2>
+            <p>Organizations must implement and maintain robust encryption practices across all systems to achieve certification:</p>
+
+            <div class="card">
+                <h3>Certification Requirements</h3>
+                <ul class="cert-checklist">
+                    <li>AES-256 encryption implemented for all sensitive data at rest</li>
+                    <li>TLS 1.3 enforced for all data in transit (TLS 1.2 minimum acceptable)</li>
+                    <li>Key management system (KMS) deployed for centralized key management</li>
+                    <li>Hardware Security Module (HSM) used for critical key storage</li>
+                    <li>Encryption key rotation automated and performed quarterly minimum</li>
+                    <li>Weak cipher suites disabled (RC4, DES, 3DES, MD5)</li>
+                    <li>Perfect Forward Secrecy (PFS) enabled for all TLS connections</li>
+                    <li>Certificate management automated with renewal 30 days before expiration</li>
+                    <li>Mutual TLS (mTLS) implemented for service-to-service communication</li>
+                    <li>Password hashing using Argon2id, bcrypt, or PBKDF2 with 100k+ iterations</li>
+                    <li>Salt generation using cryptographically secure random number generator</li>
+                    <li>Encryption keys never stored in source code or configuration files</li>
+                    <li>Key backup and recovery procedures documented and tested</li>
+                    <li>Encryption audit logging enabled for all key operations</li>
+                    <li>Field-level encryption implemented for PII and sensitive data</li>
+                    <li>Database encryption at rest enabled (TDE or equivalent)</li>
+                    <li>Encryption performance impact monitored and optimized</li>
+                    <li>FIPS 140-2 or 140-3 validated cryptographic modules used</li>
+                    <li>Digital signature verification implemented for critical operations</li>
+                    <li>Secure key destruction procedures when keys are rotated or retired</li>
+                    <li>Encryption compliance validated against regulatory requirements</li>
+                    <li>Annual cryptographic algorithm review and update process</li>
+                    <li>Zero-knowledge encryption for highly sensitive user data</li>
+                    <li>Post-quantum cryptography readiness assessment completed</li>
+                </ul>
+            </div>
+
+            <div class="alert alert-danger">
+                <strong>Critical Warning:</strong> Never implement custom cryptography. Always use well-tested, industry-standard cryptographic libraries and follow established best practices.
+            </div>
+        </section>
+
+        </main>
+</body>
+</html>

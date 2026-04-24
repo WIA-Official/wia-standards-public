@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA BCI Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 5: Integration Guide</h1>
+        <p class="subtitle">Medical Devices, Accessibility Tools, and Research Platforms</p>
+        <p class="version">WIA BCI Standard v1.0.0</p>
+    </header>
+
+    <main>
+        <section>
+            <h1>5.1 Overview</h1>
+            <p>WIA BCI integrates with the broader WIA ecosystem to provide multimodal output capabilities. BCI signals can control text-to-speech, sign language avatars, braille displays, and neurofeedback visualizations.</p>
+
+            <div class="info-box">
+                <h3>Integration Architecture</h3>
+                <pre><code>BCI Signal → Classification → Output Manager → Multiple Outputs
+                                                    ├─ TTS (Speech)
+                                                    ├─ Sign Language
+                                                    ├─ Braille
+                                                    └─ Neurofeedback</code></pre>
+            </div>
+        </section>
+
+        <section>
+            <h1>5.2 Output Manager</h1>
+
+            <h2>OutputManager Interface</h2>
+            <pre><code>interface IOutputManager {
+  // Adapter Management
+  register(adapter: IOutputAdapter): void;
+  unregister(type: OutputType): void;
+  get(type: OutputType): IOutputAdapter | undefined;
+  getAll(): IOutputAdapter[];
+
+  // Initialization
+  initialize(options?: ManagerOptions): Promise&lt;void&gt;;
+
+  // Output
+  output(content: OutputContent, targets?: OutputType[]): Promise&lt;void&gt;;
+  broadcast(content: OutputContent): Promise&lt;void&gt;;
+
+  // User Preferences
+  setPreferences(prefs: OutputPreferences): void;
+  getPreferences(): OutputPreferences;
+
+  // Events
+  on(event: ManagerEvent, handler: ManagerEventHandler): void;
+  off(event: ManagerEvent, handler: ManagerEventHandler): void;
+
+  // Cleanup
+  dispose(): Promise&lt;void&gt;;
+}</code></pre>
+
+            <h2>Output Types</h2>
+            <pre><code>type OutputType =
+  | 'tts'             // Text-to-Speech
+  | 'sign_language'   // Sign Language Avatar (ISP)
+  | 'braille'         // Braille Display
+  | 'neurofeedback'   // Neurofeedback Visualization
+  | 'cursor'          // Cursor Control
+  | 'custom';         // Custom Output</code></pre>
+        </section>
+
+        <section>
+            <h1>5.3 Text-to-Speech Integration</h1>
+
+            <h2>TTS Adapter Interface</h2>
+            <pre><code>interface ITTSAdapter extends IOutputAdapter {
+  type: 'tts';
+
+  // Voice Management
+  getVoices(): Promise&lt;Voice[]&gt;;
+  setVoice(voiceId: string): void;
+  getVoice(): Voice | undefined;
+
+  // Speech Control
+  speak(text: string, options?: TTSOptions): Promise&lt;void&gt;;
+  pause(): void;
+  resume(): void;
+  stop(): void;
+
+  // Status
+  isSpeaking(): boolean;
+  isPaused(): boolean;
+
+  // Properties
+  setRate(rate: number): void;     // 0.1 ~ 10
+  setPitch(pitch: number): void;   // 0 ~ 2
+  setVolume(volume: number): void; // 0 ~ 1
+}</code></pre>
+
+            <h2>BCI to TTS Example</h2>
+            <pre><code>import { WiaBci, OutputManager } from 'wia-bci';
+
+const bci = new WiaBci();
+const output = new OutputManager();
+
+await bci.connect({ type: 'simulator' });
+await output.initialize();
+
+// Motor imagery to speech
+bci.on('classification', async (event) => {
+  const commands = {
+    'left_hand': '왼쪽',
+    'right_hand': '오른쪽',
+    'feet': '발',
+    'rest': '휴식'
+  };
+
+  const text = commands[event.className];
+  if (text) {
+    await output.output({ type: 'text', text });
+  }
+});
+
+await bci.startStream();</code></pre>
+        </section>
+
+        <section>
+            <h1>5.4 Sign Language Integration</h1>
+
+            <h2>Sign Language Adapter</h2>
+            <pre><code>interface ISignLanguageAdapter extends IOutputAdapter {
+  type: 'sign_language';
+
+  // Text to ISP Conversion
+  textToISP(text: string): Promise&lt;ISPCode[]&gt;;
+
+  // Gesture Playback
+  playGesture(code: ISPCode): Promise&lt;void&gt;;
+  playSequence(codes: ISPCode[]): Promise&lt;void&gt;;
+
+  // Avatar Settings
+  getAvatars(): Avatar[];
+  setAvatar(avatarId: string): void;
+  getAvatar(): Avatar | undefined;
+
+  // Playback Control
+  pause(): void;
+  resume(): void;
+  stop(): void;
+
+  // Speed Control
+  setSpeed(speed: number): void; // 0.5 ~ 2.0
+}</code></pre>
+
+            <h2>ISP Code Format</h2>
+            <pre><code>interface ISPCode {
+  code: string;           // "HS01-LC07-MV10-OR02-NM15"
+  meaning?: string;       // "안녕" (optional)
+  duration?: number;      // milliseconds
+  metadata?: {
+    handshape?: string;   // Hand configuration
+    location?: string;    // Position in signing space
+    movement?: string;    // Movement pattern
+    orientation?: string; // Palm/finger orientation
+    nonManual?: string;   // Facial expressions, body posture
+  };
+}
+
+// Example ISP Code
+HS: Handshape (손 모양)
+LC: Location (위치)
+MV: Movement (움직임)
+OR: Orientation (방향)
+NM: Non-Manual (비수지 신호)</code></pre>
+        </section>
+
+        <section>
+            <h1>5.5 Braille Integration</h1>
+
+            <h2>Braille Adapter Interface</h2>
+            <pre><code>interface IBrailleAdapter extends IOutputAdapter {
+  type: 'braille';
+
+  // Text Conversion
+  textToIPA(text: string, language?: string): Promise&lt;string&gt;;
+  textToBraille(text: string, language?: string): Promise&lt;BrailleOutput&gt;;
+
+  // Display Management
+  getDisplays(): Promise&lt;BrailleDisplay[]&gt;;
+  setDisplay(displayId: string): void;
+  getDisplay(): BrailleDisplay | undefined;
+
+  // Braille Transmission
+  sendToDisplay(braille: BrailleOutput): Promise&lt;void&gt;;
+
+  // Paging
+  nextPage(): void;
+  previousPage(): void;
+  setPage(page: number): void;
+}
+
+interface BrailleOutput {
+  original: string;       // Original text
+  ipa: string;            // IPA phonetic notation
+  braille: string;        // Braille characters (Unicode)
+  unicode: string[];      // Unicode codepoints
+  cells: number;          // Number of braille cells
+  grade: 1 | 2;           // Braille grade
+}</code></pre>
+
+            <h2>BCI to Braille Example</h2>
+            <pre><code>import { WiaBci, OutputManager } from 'wia-bci';
+
+const bci = new WiaBci();
+const output = new OutputManager();
+
+await output.initialize();
+
+// P300 speller to braille
+bci.on('classification', async (event) => {
+  if (event.className === 'letter_A') {
+    await output.output({
+      type: 'text',
+      text: 'A'
+    }, ['braille']);
+  }
+});</code></pre>
+        </section>
+
+        <section>
+            <h1>5.6 Neurofeedback Visualization</h1>
+
+            <h2>Neurofeedback Adapter</h2>
+            <pre><code>interface INeurofeedbackAdapter extends IOutputAdapter {
+  type: 'neurofeedback';
+
+  // Visualization Mode
+  setVisualization(mode: VisualizationMode): void;
+  getVisualization(): VisualizationMode;
+
+  // Real-time Updates
+  updateBandPowers(powers: BandPowers): void;
+  updateTopography(channels: ChannelData[]): void;
+  updateClassification(result: ClassificationResult): void;
+
+  // Cursor Control
+  updateCursor(position: CursorPosition): void;
+
+  // Canvas/Renderer Settings
+  setCanvas(canvas: HTMLCanvasElement): void;
+  setRenderer(renderer: 'canvas' | 'webgl' | 'svg'): void;
+
+  // Theme
+  setTheme(theme: NeurofeedbackTheme): void;
+}
+
+type VisualizationMode =
+  | 'band_powers'     // Frequency band bar chart
+  | 'topography'      // Scalp activation map
+  | 'time_series'     // Time series graph
+  | 'spectrogram'     // Spectrogram
+  | 'classification'  // Classification results
+  | 'cursor'          // Cursor control
+  | 'combined';       // Combined view</code></pre>
+
+            <h2>Real-time Band Power Visualization</h2>
+            <pre><code>import { WiaBci, OutputManager, SignalProcessor } from 'wia-bci';
+
+const bci = new WiaBci();
+const output = new OutputManager();
+
+await bci.connect({ type: 'eeg_headset' });
+await output.initialize();
+
+// Configure neurofeedback
+const neuroAdapter = output.get('neurofeedback');
+neuroAdapter?.setVisualization('band_powers');
+neuroAdapter?.setCanvas(document.getElementById('viz-canvas'));
+
+// Update visualization in real-time
+bci.on('signal', async (event) => {
+  const bandPowers = SignalProcessor.allBandPowers(event.data, 250);
+
+  await output.output({
+    type: 'signal',
+    signal: { bandPowers, channels: [] }
+  }, ['neurofeedback']);
+});
+
+await bci.startStream();</code></pre>
+        </section>
+
+        <section>
+            <h1>5.7 Multimodal Output</h1>
+
+            <h2>Simultaneous Multi-Channel Output</h2>
+            <pre><code>import { WiaBci, OutputManager } from 'wia-bci';
+
+const bci = new WiaBci();
+const output = new OutputManager();
+
+await bci.connect({ type: 'eeg_headset' });
+await output.initialize();
+
+// Set user preferences
+output.setPreferences({
+  primaryOutput: 'tts',
+  enabledOutputs: ['tts', 'sign_language', 'braille'],
+  language: 'ko'
+});
+
+// Motor imagery classification with multimodal output
+bci.on('classification', async (event) => {
+  if (event.confidence > 0.7) {
+    const text = getTextFromClass(event.className);
+
+    // Output to ALL enabled outputs simultaneously
+    await output.broadcast({
+      type: 'text',
+      text,
+      metadata: {
+        confidence: event.confidence,
+        timestamp: Date.now()
+      }
+    });
+
+    // TTS speaks, sign language avatar gestures, braille displays
+  }
+});
+
+await bci.startStream();</code></pre>
+        </section>
+
+        <section>
+            <h1>5.8 Medical Device Integration</h1>
+
+            <h2>Clinical Workflow Integration</h2>
+            <div class="info-box">
+                <h3>Integration Points</h3>
+                <ul>
+                    <li><strong>Electronic Health Records (EHR):</strong> Export BCI session data to FHIR format</li>
+                    <li><strong>Rehabilitation Systems:</strong> Track motor imagery training progress</li>
+                    <li><strong>Assistive Technology:</strong> Control wheelchairs, communication devices</li>
+                    <li><strong>Sleep Labs:</strong> Automated sleep stage classification</li>
+                </ul>
+            </div>
+
+            <h2>FHIR Export Example</h2>
+            <pre><code>import { WiaBci, exportToFHIR } from 'wia-bci';
+
+const bci = new WiaBci();
+await bci.connect({ type: 'eeg_headset' });
+
+// Record session
+const recording = createRecording({
+  patient: { id: 'patient-001' },
+  device: bci.getDeviceInfo(),
+  channels: bci.getChannels()
+});
+
+bci.on('signal', (event) => {
+  recording.addSample(event);
+});
+
+// After session
+await recording.save('./session-data');
+
+// Export to FHIR
+const fhirBundle = exportToFHIR({
+  recording: './session-data',
+  patient: { id: 'patient-001', name: 'Anonymous' },
+  practitioner: { id: 'doc-001', name: 'Dr. Smith' },
+  encounter: { id: 'visit-2025-01-15' }
+});
+
+// Send to EHR system
+await sendToEHR(fhirBundle);</code></pre>
+        </section>
+
+        <section>
+            <h1>5.9 Research Platform Integration</h1>
+
+            <h2>Lab Streaming Layer (LSL)</h2>
+            <pre><code>import { WiaBci, LslAdapter } from 'wia-bci';
+
+// Receive BCI data via LSL
+const bci = new WiaBci();
+await bci.connect({
+  type: 'eeg_headset',
+  connection: {
+    protocol: 'lsl',
+    address: 'type=EEG'  // LSL query
+  }
+});
+
+// Stream info
+const info = bci.getDeviceInfo();
+console.log('LSL Stream:', info.name, info.type);
+
+// Process incoming data
+bci.on('signal', (event) => {
+  // Integrate with existing LSL-based analysis pipeline
+  processPsychoPyTrial(event);
+});</code></pre>
+
+            <h2>BIDS Dataset Export</h2>
+            <pre><code>import { convertWiaToBids } from 'wia-bci';
+
+// Convert WIA BCI recording to BIDS format
+await convertWiaToBids(
+  'wia-recording/',
+  'bids-dataset/',
+  {
+    datasetDescription: {
+      Name: 'Motor Imagery Study 2025',
+      BIDSVersion: '1.7.0'
+    },
+    participant: {
+      participant_id: 'sub-001',
+      age: 35,
+      sex: 'M',
+      handedness: 'R'
+    }
+  }
+);
+
+// BIDS structure created:
+// bids-dataset/
+// ├── dataset_description.json
+// ├── participants.tsv
+// ├── sub-001/
+// │   └── ses-01/
+// │       └── eeg/
+// │           ├── sub-001_ses-01_task-motor_eeg.edf
+// │           ├── sub-001_ses-01_task-motor_eeg.json
+// │           ├── sub-001_ses-01_task-motor_events.tsv
+// │           └── sub-001_ses-01_task-motor_channels.tsv</code></pre>
+        </section>
+
+        <section>
+            <h1>5.10 Accessibility Applications</h1>
+
+            <h2>Complete Accessibility Pipeline</h2>
+            <pre><code>import { WiaBci, OutputManager, Classifier } from 'wia-bci';
+
+// Initialize BCI and outputs
+const bci = new WiaBci();
+const output = new OutputManager();
+const classifier = new MotorImageryClassifier();
+
+await bci.connect({ type: 'eeg_headset' });
+await output.initialize();
+
+// User preferences
+output.setPreferences({
+  primaryOutput: 'tts',
+  enabledOutputs: ['tts', 'sign_language'],
+  language: 'ko'
+});
+
+// Menu navigation
+const menu = ['물', '음식', '도움', '화장실', '고통'];
+let currentSelection = 0;
+
+bci.on('classification', async (event) => {
+  switch (event.className) {
+    case 'left_hand':
+      currentSelection = (currentSelection - 1 + menu.length) % menu.length;
+      await output.output({
+        type: 'text',
+        text: menu[currentSelection]
+      });
+      break;
+
+    case 'right_hand':
+      currentSelection = (currentSelection + 1) % menu.length;
+      await output.output({
+        type: 'text',
+        text: menu[currentSelection]
+      });
+      break;
+
+    case 'feet':
+      // Select current item
+      await output.output({
+        type: 'text',
+        text: `선택: ${menu[currentSelection]}`
+      });
+      // Trigger action (e.g., call nurse)
+      await triggerAction(menu[currentSelection]);
+      break;
+  }
+});
+
+await bci.startStream();</code></pre>
+
+            <h2>P300 Speller</h2>
+            <pre><code>import { WiaBci, P300Classifier, OutputManager } from 'wia-bci';
+
+const bci = new WiaBci();
+const output = new OutputManager();
+const p300 = new P300Classifier();
+
+const keyboard = [
+  ['A', 'B', 'C', 'D', 'E', 'F'],
+  ['G', 'H', 'I', 'J', 'K', 'L'],
+  ['M', 'N', 'O', 'P', 'Q', 'R'],
+  ['S', 'T', 'U', 'V', 'W', 'X'],
+  ['Y', 'Z', '1', '2', '3', '4'],
+  ['5', '6', '7', '8', '9', '0']
+];
+
+let currentText = '';
+
+// Detect P300 responses
+bci.on('signal', async (event) => {
+  const p300Detected = p300.detectP300(event);
+
+  if (p300Detected) {
+    const letter = p300Detected.target;
+    currentText += letter;
+
+    // Output typed letter
+    await output.output({
+      type: 'text',
+      text: letter
+    }, ['tts', 'braille']);
+
+    console.log('Current text:', currentText);
+  }
+});
+
+await bci.startStream();</code></pre>
+        </section>
+
+        <section>
+            <h1>5.11 Best Practices</h1>
+
+            <h2>User Preferences</h2>
+            <ul>
+                <li>Allow users to select preferred output modalities</li>
+                <li>Remember settings across sessions</li>
+                <li>Provide easy switching between modes</li>
+                <li>Support simultaneous multiple outputs</li>
+            </ul>
+
+            <h2>Error Handling</h2>
+            <ul>
+                <li>Fallback to alternative output if primary fails</li>
+                <li>Queue messages when output is busy</li>
+                <li>Provide visual feedback for all actions</li>
+                <li>Log failures for troubleshooting</li>
+            </ul>
+
+            <h2>Performance</h2>
+            <ul>
+                <li>Use output batching for efficiency</li>
+                <li>Prioritize critical messages</li>
+                <li>Implement rate limiting to avoid overload</li>
+                <li>Cache frequently used resources</li>
+            </ul>
+
+            <h2>Accessibility</h2>
+            <ul>
+                <li>Support keyboard-only navigation</li>
+                <li>Provide high contrast visual themes</li>
+                <li>Enable adjustable speeds for all outputs</li>
+                <li>Test with actual users with disabilities</li>
+            </ul>
+        </section>
+
+        <div class="navigation">
+            <a href="chapter4.html">← Previous: Chapter 4</a>
+            <a href="chapter6.html">Next: Chapter 6 (Security) →</a>
+        </div>
+    </main>
+</body>
+</html>

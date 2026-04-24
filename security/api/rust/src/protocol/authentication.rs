@@ -4,7 +4,6 @@
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ============================================================================
 // JWT Token
@@ -386,7 +385,10 @@ impl AuthenticatedIdentity {
             method: AuthMethod::Jwt,
             scopes: claims.scope.clone().unwrap_or_default(),
             component_type: claims.component.as_ref().map(|c| c.component_type.clone()),
-            organization: claims.component.as_ref().and_then(|c| c.organization.clone()),
+            organization: claims
+                .component
+                .as_ref()
+                .and_then(|c| c.organization.clone()),
             authenticated_at: Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
             certificate: None,
         }
@@ -487,13 +489,8 @@ mod tests {
 
     #[test]
     fn test_authenticated_identity() {
-        let claims = JwtClaims::new(
-            "issuer",
-            "subject",
-            "audience",
-            Duration::hours(1),
-        )
-        .with_scopes(vec!["read:alerts".to_string()]);
+        let claims = JwtClaims::new("issuer", "subject", "audience", Duration::hours(1))
+            .with_scopes(vec!["read:alerts".to_string()]);
 
         let identity = AuthenticatedIdentity::from_jwt(&claims);
         assert!(identity.has_scope("read:alerts"));

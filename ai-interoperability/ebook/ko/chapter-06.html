@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 3단계 - 프로토콜 게이트웨이 | WIA AI 상호운용성 표준</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #10B981;">🔄 제6장: 3단계 - 프로토콜 게이트웨이</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #10B981; margin: 20px 0;">
+<p style="color: #6ee7b7; font-style: italic; margin-bottom: 10px;">"진정한 상호운용성의 힘은 교환하는 데이터뿐만 아니라 교환 방식에 있습니다."</p>
+<p style="color: #94a3b8; font-size: 0.95rem;"><strong>弘益人間 (홍익인간)</strong> — WIA 프로토콜 게이트웨이는 AI 시스템이 모든 전송 프로토콜을 통해 원활하게 통신할 수 있도록 보장하여, 호환되지 않는 통신 채널의 장벽을 허물고 모든 인류에게 이익을 줍니다.</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.1 프로토콜 아키텍처</h2>
+
+<p>프로토콜 게이트웨이는 WIA AI 상호운용성 표준의 세 번째 단계로, 기본 전송 프로토콜에 관계없이 AI 시스템 간의 원활한 통신을 가능하게 하도록 설계되었습니다. 1단계(모델 교환)는 모델 형식을 처리하고 2단계(API 브릿지)는 인터페이스를 표준화하는 반면, 3단계는 프로토콜 변환 및 통신 계층 상호운용성의 중요한 과제를 해결합니다.</p>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+    <h4 style="color: #3b82f6; margin-top: 0;">🎯 핵심 목표</h4>
+    <ul style="color: #94a3b8; margin-bottom: 0;">
+        <li><strong style="color: #e2e8f0;">프로토콜 독립성:</strong> HTTP/1.1, HTTP/2, HTTP/3, gRPC, WebSocket, MQTT 등 지원</li>
+        <li><strong style="color: #e2e8f0;">실시간 스트리밍:</strong> 대화형 AI 및 연속 추론을 위한 양방향 스트리밍 지원</li>
+        <li><strong style="color: #e2e8f0;">제로 변환 오버헤드:</strong> 대기 시간을 최소화하고 처리량을 최대화하도록 프로토콜 변환 최적화</li>
+        <li><strong style="color: #e2e8f0;">자동 협상:</strong> 클라이언트 기능 및 네트워크 조건을 기반으로 최상의 프로토콜을 지능적으로 선택</li>
+    </ul>
+</div>
+
+<h3 style="color: #10B981;">프로토콜 게이트웨이 아키텍처</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">
+┌──────────────────────────────────────────────────────────────────────────┐
+│                      WIA 프로토콜 게이트웨이 아키텍처                    │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌────────────────────── 클라이언트 계층 ──────────────────────────┐    │
+│  │                                                               │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │    │
+│  │  │   웹     │  │  모바일  │  │   IoT    │  │   CLI    │     │    │
+│  │  │ 브라우저 │  │   앱     │  │  장치    │  │   도구   │     │    │
+│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │    │
+│  │       │             │             │             │           │    │
+│  └───────┼─────────────┼─────────────┼─────────────┼───────────┘    │
+│          │             │             │             │                │
+│          │ HTTP/2      │ WebSocket   │ MQTT        │ gRPC           │
+│          │             │             │             │                │
+│  ┌───────▼─────────────▼─────────────▼─────────────▼───────────┐    │
+│  │                 프로토콜 감지 계층                           │    │
+│  │  • 수신 프로토콜 자동 감지                                  │    │
+│  │  • 기능 협상 (HTTP/2, gRPC, WebSocket)                      │    │
+│  │  • 프로토콜 버전 감지 (HTTP/1.1, HTTP/2, HTTP/3)            │    │
+│  └───────────────────────────┬───────────────────────────────────┘    │
+│                              │                                        │
+│  ┌───────────────────────────▼───────────────────────────────────┐    │
+│  │                  프로토콜 변환 엔진                           │    │
+│  │                                                               │    │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │    │
+│  │  │ REST→gRPC   │  │ WS→HTTP/2   │  │ MQTT→gRPC   │           │    │
+│  │  │  변환기     │  │  변환기     │  │  변환기     │           │    │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘           │    │
+│  │                                                               │    │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │    │
+│  │  │  메시지     │  │  스트리밍   │  │ 연결        │           │    │
+│  │  │   형식      │  │   핸들러    │  │   풀링      │           │    │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘           │    │
+│  └───────────────────────────┬───────────────────────────────────┘    │
+│                              │                                        │
+│  ┌───────────────────────────▼───────────────────────────────────┐    │
+│  │                   전송 추상화 계층                            │    │
+│  │  • 통합 메시지 봉투                                          │    │
+│  │  • 프로토콜 독립적 라우팅                                    │    │
+│  │  • 부하 분산 및 장애 조치                                    │    │
+│  └───────────────────────────┬───────────────────────────────────┘    │
+│                              │                                        │
+│  ┌───────────────────────────▼───────────────────────────────────┐    │
+│  │                      보안 계층                                │    │
+│  │  • TLS 1.3 암호화                                            │    │
+│  │  • 상호 인증을 위한 mTLS                                     │    │
+│  │  • 인증서 검증 및 순환                                       │    │
+│  └───────────────────────────┬───────────────────────────────────┘    │
+│                              │                                        │
+│  ┌───────────────────────────▼───────────────────────────────────┐    │
+│  │                      백엔드 서비스                            │    │
+│  │                                                               │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │    │
+│  │  │  OpenAI  │  │ Anthropic│  │  Google  │  │   Meta   │     │    │
+│  │  │   gRPC   │  │   REST   │  │  HTTP/2  │  │   gRPC   │     │    │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘     │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+└──────────────────────────────────────────────────────────────────────┘
+</code>
+</pre>
+
+<h3 style="color: #10B981;">주요 아키텍처 원칙</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10B981;">원칙</th>
+        <th style="border: 1px solid #475569; color: #10B981;">설명</th>
+        <th style="border: 1px solid #475569; color: #10B981;">이점</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #fbbf24;"><strong>프로토콜 투명성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">클라이언트와 서버가 서로의 프로토콜을 알 필요가 없음</td>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">통합 단순화</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #10b981;"><strong>제로 카피 설계</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">프로토콜 변환 중 데이터 복사 최소화</td>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">최대 성능</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #3b82f6;"><strong>양방향 스트리밍</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">전이중 통신 패턴 지원</td>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">실시간 상호작용</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #8b5cf6;"><strong>적응형 라우팅</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">프로토콜 기능에 따라 요청 라우팅</td>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">최적의 리소스 사용</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #ec4899;"><strong>기본 보안</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">모든 연결 암호화, 선택적 mTLS</td>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">엔터프라이즈 준비</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.2 전송 계층 (HTTP/2, gRPC, WebSocket)</h2>
+
+<p>프로토콜 게이트웨이는 여러 전송 프로토콜을 지원하며, 각각 서로 다른 사용 사례와 네트워크 조건에 최적화되어 있습니다. 각 프로토콜을 언제 사용할지 이해하는 것은 효율적인 AI 애플리케이션 구축에 매우 중요합니다.</p>
+
+<h3 style="color: #10B981;">지원되는 전송 프로토콜</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10B981;">프로토콜</th>
+        <th style="border: 1px solid #475569; color: #10B981;">최적 용도</th>
+        <th style="border: 1px solid #475569; color: #10B981;">대기 시간</th>
+        <th style="border: 1px solid #475569; color: #10B981;">오버헤드</th>
+        <th style="border: 1px solid #475569; color: #10B981;">브라우저 지원</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #fbbf24;"><strong>HTTP/1.1</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">간단한 요청, 레거시 시스템</td>
+        <td style="border: 1px solid #475569; color: #f87171;">높음 (100-300ms)</td>
+        <td style="border: 1px solid #475569; color: #f87171;">높음</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">✓ 범용</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #10b981;"><strong>HTTP/2</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">최신 웹 앱, 멀티플렉싱</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통 (50-100ms)</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">✓ 97%+</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #3b82f6;"><strong>HTTP/3 (QUIC)</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">모바일 네트워크, 패킷 손실</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">낮음 (20-50ms)</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">낮음</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">⚠ 부분 (75%)</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #8b5cf6;"><strong>gRPC</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">서비스 간, 스트리밍</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">매우 낮음 (5-20ms)</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">매우 낮음</td>
+        <td style="border: 1px solid #475569; color: #f87171;">✗ 없음 (프록시 필요)</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #ec4899;"><strong>WebSocket</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">실시간, 양방향</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">매우 낮음 (5-15ms)</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">✓ 범용</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #06b6d4;"><strong>MQTT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">IoT, 제약된 장치</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통 (30-80ms)</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">매우 낮음</td>
+        <td style="border: 1px solid #475569; color: #f87171;">✗ 없음</td>
+    </tr>
+</table>
+
+<h3 style="color: #10B981;">HTTP/2 구현</h3>
+
+<p>HTTP/2는 멀티플렉싱, 헤더 압축 및 서버 푸시 기능을 제공하여 최신 웹 애플리케이션에 이상적입니다.</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #6ee7b7;">
+// TypeScript 예제: HTTP/2 클라이언트
+import { WIAProtocolGateway } from '@wia/protocol-gateway';
+
+const gateway = new WIAProtocolGateway({
+  transport: 'http2',
+  host: 'api.wia.ai',
+  port: 443,
+  tls: {
+    enabled: true,
+    version: 'TLSv1.3'
+  },
+  http2: {
+    maxConcurrentStreams: 100,
+    initialWindowSize: 65535,
+    enablePush: true,
+    headerCompression: 'hpack'
+  }
+});
+
+// 단일 연결, 여러 동시 요청
+const responses = await Promise.all([
+  gateway.request({
+    method: 'POST',
+    path: '/v1/chat/completions',
+    body: { model: 'gpt-4', messages: [...] }
+  }),
+  gateway.request({
+    method: 'POST',
+    path: '/v1/embeddings',
+    body: { model: 'text-embedding-3', input: [...] }
+  }),
+  gateway.request({
+    method: 'POST',
+    path: '/v1/images/generate',
+    body: { model: 'dall-e-3', prompt: '...' }
+  })
+]);
+
+console.log('단일 HTTP/2 연결에서 모든 요청 완료');
+</code>
+</pre>
+
+<h3 style="color: #10B981;">gRPC 구현</h3>
+
+<p>gRPC는 효율적인 직렬화를 위해 Protocol Buffers를 사용하고 전송을 위해 HTTP/2를 사용하여 서비스 간 통신에 가장 낮은 대기 시간을 제공합니다.</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #6ee7b7;">
+// Protocol Buffer 정의
+syntax = "proto3";
+
+package wia.ai.v1;
+
+service AIModelService {
+  // Unary RPC: 단일 요청, 단일 응답
+  rpc Predict(PredictRequest) returns (PredictResponse);
+
+  // 서버 스트리밍: 단일 요청, 응답 스트림
+  rpc StreamPredict(PredictRequest) returns (stream PredictResponse);
+
+  // 클라이언트 스트리밍: 요청 스트림, 단일 응답
+  rpc AggregatePredict(stream PredictRequest) returns (PredictResponse);
+
+  // 양방향 스트리밍: 양측 모두 스트림
+  rpc ChatStream(stream ChatMessage) returns (stream ChatMessage);
+}
+
+message PredictRequest {
+  string model_id = 1;
+  bytes input_data = 2;
+  map&lt;string, string&gt; parameters = 3;
+}
+
+message PredictResponse {
+  bytes output_data = 1;
+  float confidence = 2;
+  int64 latency_ms = 3;
+}
+</code>
+</pre>
+
+<h3 style="color: #10B981;">WebSocket 구현</h3>
+
+<p>WebSocket은 단일 TCP 연결을 통해 전이중 통신 채널을 제공하며 실시간 대화형 AI에 이상적입니다.</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #6ee7b7;">
+// JavaScript 예제: WebSocket 클라이언트
+class WIAWebSocketClient {
+  constructor(url, options = {}) {
+    this.ws = new WebSocket(url, options.protocols || ['wia-protocol-v1']);
+    this.messageHandlers = new Map();
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = options.maxReconnectAttempts || 5;
+
+    this.setupEventHandlers();
+  }
+
+  setupEventHandlers() {
+    this.ws.onopen = () => {
+      console.log('WebSocket 연결됨');
+      this.reconnectAttempts = 0;
+      this.sendHandshake();
+    };
+
+    this.ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      const handler = this.messageHandlers.get(message.type);
+      if (handler) handler(message.data);
+    };
+
+    this.ws.onerror = (error) => {
+      console.error('WebSocket 오류:', error);
+    };
+
+    this.ws.onclose = (event) => {
+      if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
+        setTimeout(() => this.reconnect(), 2000 * Math.pow(2, this.reconnectAttempts));
+        this.reconnectAttempts++;
+      }
+    };
+  }
+
+  sendHandshake() {
+    this.send({
+      type: 'handshake',
+      data: {
+        version: '1.0',
+        capabilities: ['streaming', 'compression', 'binary'],
+        authentication: this.getAuthToken()
+      }
+    });
+  }
+
+  send(message) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    }
+  }
+
+  on(messageType, handler) {
+    this.messageHandlers.set(messageType, handler);
+  }
+
+  streamChat(messages) {
+    this.send({
+      type: 'chat.stream',
+      data: {
+        messages,
+        stream: true,
+        temperature: 0.7
+      }
+    });
+  }
+}
+
+// 사용법
+const client = new WIAWebSocketClient('wss://api.wia.ai/v1/stream');
+
+client.on('chat.delta', (delta) => {
+  process.stdout.write(delta.content); // 토큰이 도착하는 대로 스트리밍
+});
+
+client.on('chat.complete', (response) => {
+  console.log('\n채팅 완료:', response.finish_reason);
+});
+
+client.streamChat([
+  { role: 'user', content: '양자 컴퓨팅을 간단한 용어로 설명해주세요' }
+]);
+</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.3 메시지 형식 및 직렬화</h2>
+
+<p>효율적인 메시지 직렬화는 AI 시스템에서 오버헤드를 최소화하고 처리량을 최대화하는 데 매우 중요합니다. 프로토콜 게이트웨이는 각각 다른 시나리오에 최적화된 여러 직렬화 형식을 지원합니다.</p>
+
+<h3 style="color: #10B981;">직렬화 형식 비교</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10B981;">형식</th>
+        <th style="border: 1px solid #475569; color: #10B981;">크기</th>
+        <th style="border: 1px solid #475569; color: #10B981;">속도</th>
+        <th style="border: 1px solid #475569; color: #10B981;">사람이 읽을 수 있음</th>
+        <th style="border: 1px solid #475569; color: #10B981;">사용 사례</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #fbbf24;"><strong>JSON</strong></td>
+        <td style="border: 1px solid #475569; color: #f87171;">큼 (1x)</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">✓ 예</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">웹 API, 디버깅</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #10b981;"><strong>MessagePack</strong></td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통 (0.6x)</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">빠름</td>
+        <td style="border: 1px solid #475569; color: #f87171;">✗ 아니오</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">범용</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #3b82f6;"><strong>Protocol Buffers</strong></td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">작음 (0.4x)</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">매우 빠름</td>
+        <td style="border: 1px solid #475569; color: #f87171;">✗ 아니오</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">gRPC, 마이크로서비스</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #8b5cf6;"><strong>FlatBuffers</strong></td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">작음 (0.5x)</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7;">가장 빠름</td>
+        <td style="border: 1px solid #475569; color: #f87171;">✗ 아니오</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">제로 카피, 게임</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #ec4899;"><strong>CBOR</strong></td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통 (0.7x)</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">보통</td>
+        <td style="border: 1px solid #475569; color: #f87171;">✗ 아니오</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">IoT, 제약된</td>
+    </tr>
+</table>
+
+<h3 style="color: #10B981;">WIA 범용 메시지 봉투</h3>
+
+<p>프로토콜 게이트웨이를 통해 교환되는 모든 메시지는 기본 직렬화 방법에 관계없이 표준 봉투 형식을 사용합니다.</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #6ee7b7;">
+// TypeScript: WIA 메시지 봉투
+interface WIAMessageEnvelope {
+  // 헤더
+  version: string;              // 프로토콜 버전 (예: "1.0")
+  messageId: string;            // 고유 메시지 식별자 (UUID)
+  correlationId?: string;       // 요청-응답 상관관계
+  timestamp: number;            // Unix 타임스탬프 (밀리초)
+
+  // 라우팅
+  source: {
+    service: string;            // 소스 서비스 이름
+    instance: string;           // 서비스 인스턴스 ID
+  };
+  destination?: {
+    service: string;            // 대상 서비스 이름
+    route?: string;             // 라우팅 키
+  };
+
+  // 메시지 메타데이터
+  type: MessageType;            // 'request' | 'response' | 'event' | 'stream'
+  priority: number;             // 0-9, 높을수록 긴급함
+  ttl?: number;                 // 밀리초 단위 TTL
+
+  // 콘텐츠
+  encoding: EncodingType;       // 'json' | 'msgpack' | 'protobuf' | 'flatbuf'
+  compression?: CompressionType; // 'none' | 'gzip' | 'brotli' | 'zstd'
+  payload: Uint8Array;          // 직렬화된 메시지 본문
+
+  // 보안
+  signature?: string;           // HMAC-SHA256 서명
+  encryption?: {
+    algorithm: string;          // 'AES-256-GCM'
+    keyId: string;              // 키 식별자
+  };
+
+  // 관찰 가능성
+  traceId?: string;             // 분산 추적 ID
+  spanId?: string;              // 추적을 위한 Span ID
+  baggage?: Record<string, string>; // 컨텍스트 전파
+}
+
+// 예제: 메시지 생성
+const envelope: WIAMessageEnvelope = {
+  version: '1.0',
+  messageId: crypto.randomUUID(),
+  timestamp: Date.now(),
+  source: {
+    service: 'web-client',
+    instance: 'browser-abc123'
+  },
+  destination: {
+    service: 'ai-inference',
+    route: 'chat.completions'
+  },
+  type: 'request',
+  priority: 5,
+  ttl: 30000, // 30초
+  encoding: 'msgpack',
+  compression: 'zstd',
+  payload: msgpack.encode({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: '안녕하세요!' }],
+    temperature: 0.7
+  }),
+  traceId: '4bf92f3577b34da6a3ce929d0e0e4736'
+};
+</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.4 실시간 스트리밍</h2>
+
+<p>실시간 스트리밍은 특히 대화형 인터페이스, 실시간 전사 및 점진적 이미지 생성을 위한 최신 AI 애플리케이션에 필수적입니다. 프로토콜 게이트웨이는 다양한 스트리밍 패턴에 대한 최고 수준의 지원을 제공합니다.</p>
+
+<h3 style="color: #10B981;">스트리밍 패턴</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">
+스트리밍 통신 패턴:
+
+┌──────────────────────────────────────────────────────────────────┐
+│                     UNARY (요청-응답)                            │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   클라이언트 ──────────[요청]──────────▶ 서버                    │
+│   클라이언트 ◀─────────[응답]────────── 서버                    │
+│                                                                  │
+│   사용: 간단한 예측, 분류                                       │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                      서버 스트리밍                               │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   클라이언트 ──────────[요청]──────────▶ 서버                    │
+│   클라이언트 ◀────────[응답 1]───────── 서버                    │
+│   클라이언트 ◀────────[응답 2]───────── 서버                    │
+│   클라이언트 ◀────────[응답 3]───────── 서버                    │
+│   클라이언트 ◀────────[응답 N]───────── 서버                    │
+│                                                                  │
+│   사용: 채팅 완성, 텍스트 생성, 실시간 전사                     │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                      클라이언트 스트리밍                         │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   클라이언트 ──────────[요청 1]────────▶ 서버                    │
+│   클라이언트 ──────────[요청 2]────────▶ 서버                    │
+│   클라이언트 ──────────[요청 3]────────▶ 서버                    │
+│   클라이언트 ──────────[요청 N]────────▶ 서버                    │
+│   클라이언트 ◀─────────[응답]────────── 서버                    │
+│                                                                  │
+│   사용: 오디오 스트리밍, 배치 예측, 메트릭 집계                 │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                   양방향 스트리밍                                │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   클라이언트 ──────────[요청 1]────────▶ 서버                    │
+│   클라이언트 ◀────────[응답 1]───────── 서버                    │
+│   클라이언트 ──────────[요청 2]────────▶ 서버                    │
+│   클라이언트 ◀────────[응답 2]───────── 서버                    │
+│   클라이언트 ──────────[요청 3]────────▶ 서버                    │
+│   클라이언트 ◀────────[응답 3]───────── 서버                    │
+│                                                                  │
+│   사용: 대화형 채팅, 실시간 번역, 음성 통화                     │
+└──────────────────────────────────────────────────────────────────┘
+</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.5 연결 관리</h2>
+
+<p>효율적인 연결 관리는 분산 AI 시스템에서 높은 성능과 안정성을 유지하는 데 매우 중요합니다. 프로토콜 게이트웨이는 고급 연결 풀링, 상태 확인 및 자동 장애 조치를 구현합니다.</p>
+
+<h3 style="color: #10B981;">연결 풀링 아키텍처</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">
+연결 풀 아키텍처:
+
+┌────────────────────────────────────────────────────────────────┐
+│                      연결 풀 매니저                            │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  ┌──────────────────── 풀 설정 ─────────────────┐             │
+│  │  • 최소 연결: 5                                │             │
+│  │  • 최대 연결: 100                              │             │
+│  │  • 유휴 타임아웃: 5분                          │             │
+│  │  • 최대 수명: 30분                             │             │
+│  │  • 상태 확인 간격: 30초                        │             │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                │
+│  ┌──────────────────── 활성 연결 ──────────────────┐          │
+│  │  [연결1] ──▶ api.openai.com:443     [정상] [5 req]   │    │
+│  │  [연결2] ──▶ api.anthropic.com:443  [정상] [12 req]  │    │
+│  │  [연결3] ──▶ api.google.com:443     [정상] [3 req]   │    │
+│  │  [연결4] ──▶ api.openai.com:443     [정상] [8 req]   │    │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                │
+│  ┌──────────────────── 유휴 연결 ────────────────────┐        │
+│  │  [연결5] ──▶ api.openai.com:443     [유휴] [0 req]    │  │
+│  │  [연결6] ──▶ api.anthropic.com:443  [유휴] [0 req]    │  │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                │
+│  ┌─────────────────── 연결 메트릭 ───────────────────┐        │
+│  │  • 총 연결: 6 / 100                                │        │
+│  │  • 활성: 4, 유휴: 2                                │        │
+│  │  • 요청/초: 47.3                                   │        │
+│  │  • 평균 대기 시간: 245ms                           │        │
+│  │  • 연결 재사용률: 94.7%                            │        │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.6 프로토콜 변환 (REST에서 gRPC 등)</h2>
+
+<p>프로토콜 게이트웨이의 가장 강력한 기능 중 하나는 자동 프로토콜 변환으로, 서로 다른 프로토콜을 사용하는 클라이언트와 서버가 원활하게 통신할 수 있도록 합니다.</p>
+
+<h3 style="color: #10B981;">프로토콜 변환 매트릭스</h3>
+
+<table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10B981;">From \ To</th>
+        <th style="border: 1px solid #475569; color: #10B981;">REST</th>
+        <th style="border: 1px solid #475569; color: #10B981;">gRPC</th>
+        <th style="border: 1px solid #475569; color: #10B981;">WebSocket</th>
+        <th style="border: 1px solid #475569; color: #10B981;">GraphQL</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #fbbf24;"><strong>REST</strong></td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 네이티브</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 완전</td>
+        <td style="border: 1px solid #475569; color: #fbbf24; text-align: center;">⚠ Unary만</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 완전</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #10b981;"><strong>gRPC</strong></td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 완전</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 네이티브</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 완전</td>
+        <td style="border: 1px solid #475569; color: #fbbf24; text-align: center;">⚠ 제한적</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #3b82f6;"><strong>WebSocket</strong></td>
+        <td style="border: 1px solid #475569; color: #fbbf24; text-align: center;">⚠ 폴링</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 완전</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 네이티브</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 구독</td>
+    </tr>
+    <tr style="background: #1a2332;">
+        <td style="border: 1px solid #475569; color: #8b5cf6;"><strong>GraphQL</strong></td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 완전</td>
+        <td style="border: 1px solid #475569; color: #fbbf24; text-align: center;">⚠ 쿼리만</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 완전</td>
+        <td style="border: 1px solid #475569; color: #6ee7b7; text-align: center;">✓ 네이티브</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.7 보안 및 암호화 (TLS, mTLS)</h2>
+
+<p>민감한 데이터를 처리하는 AI 시스템에서는 보안이 가장 중요합니다. 프로토콜 게이트웨이는 모든 계층에서 암호화, 인증 및 권한 부여를 통한 심층 방어 보안을 구현합니다.</p>
+
+<h3 style="color: #10B981;">보안 아키텍처</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">
+보안 계층:
+
+┌──────────────────────────────────────────────────────────────────┐
+│                        전송 보안                                 │
+├──────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  TLS 1.3 (필수)                                            │  │
+│  │  • AES-256-GCM 암호화                                      │  │
+│  │  • 완전 순방향 비밀성 (PFS)                                │  │
+│  │  • 인증서 고정                                             │  │
+│  │  • HSTS 적용                                               │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                      인증 계층                                   │
+├──────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │   API 키        │  │   OAuth 2.0     │  │   mTLS 인증서   │  │
+│  │   (간단)        │  │   (표준)        │  │   (엔터프라이즈)│  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                      권한 부여 계층                              │
+├──────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  역할 기반 액세스 제어 (RBAC)                             │  │
+│  │  • admin, developer, user, service                         │  │
+│  │  • 세밀한 권한 (읽기, 쓰기, 스트리밍)                      │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  속도 제한 및 할당량                                       │  │
+│  │  • 사용자당: 100 req/min                                   │  │
+│  │  • IP당: 1000 req/hour                                     │  │
+│  │  • API 키당: 커스텀 제한                                   │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                        메시지 보안                               │
+├──────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  종단 간 암호화 (선택)                                     │  │
+│  │  • 페이로드 암호화를 위한 AES-256-GCM                      │  │
+│  │  • ECDH를 통한 키 교환                                     │  │
+│  │  • HMAC-SHA256으로 메시지 서명                             │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.8 챕터 요약</h2>
+
+<p>이 장에서는 다양한 전송 프로토콜과 메시지 형식 간의 원활한 통신을 가능하게 하는 WIA AI 상호운용성 표준의 3단계인 프로토콜 게이트웨이를 살펴보았습니다.</p>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981;">
+    <h3 style="color: #10B981; margin-top: 0;">핵심 요점</h3>
+
+    <div style="margin: 15px 0; padding-left: 20px; border-left: 3px solid #10b981;">
+        <p style="color: #e2e8f0; font-weight: bold; margin-bottom: 5px;">1. 프로토콜 투명성</p>
+        <p style="color: #94a3b8; font-size: 0.95rem;">프로토콜 게이트웨이는 프로토콜 복잡성을 추상화하여 클라이언트와 서버가 기본 프로토콜(HTTP/2, gRPC, WebSocket, MQTT)에 관계없이 통신할 수 있도록 합니다.</p>
+    </div>
+
+    <div style="margin: 15px 0; padding-left: 20px; border-left: 3px solid #3b82f6;">
+        <p style="color: #e2e8f0; font-weight: bold; margin-bottom: 5px;">2. 효율적인 직렬화</p>
+        <p style="color: #94a3b8; font-size: 0.95rem;">페이로드 특성 및 성능 요구 사항에 따라 자동 선택이 가능한 여러 직렬화 형식(JSON, MessagePack, Protocol Buffers, FlatBuffers) 지원</p>
+    </div>
+
+    <div style="margin: 15px 0; padding-left: 20px; border-left: 3px solid #8b5cf6;">
+        <p style="color: #e2e8f0; font-weight: bold; margin-bottom: 5px;">3. 실시간 스트리밍</p>
+        <p style="color: #94a3b8; font-size: 0.95rem;">적절한 흐름 제어 및 배압 관리를 통한 서버 스트리밍, 클라이언트 스트리밍 및 양방향 스트리밍을 포함한 스트리밍 패턴에 대한 최고 수준의 지원</p>
+    </div>
+
+    <div style="margin: 15px 0; padding-left: 20px; border-left: 3px solid #f59e0b;">
+        <p style="color: #e2e8f0; font-weight: bold; margin-bottom: 5px;">4. 연결 관리</p>
+        <p style="color: #94a3b8; font-size: 0.95rem;">상태 확인, 자동 장애 조치, 지수 백오프를 통한 지능형 재시도 로직 및 복원력을 위한 서킷 브레이커 패턴을 갖춘 고급 연결 풀링</p>
+    </div>
+
+    <div style="margin: 15px 0; padding-left: 20px; border-left: 3px solid #ec4899;">
+        <p style="color: #e2e8f0; font-weight: bold; margin-bottom: 5px;">5. 프로토콜 변환</p>
+        <p style="color: #94a3b8; font-size: 0.95rem;">애플리케이션 코드 변경 없이 프로토콜 간 자동 변환(REST↔gRPC, WebSocket↔HTTP/2)으로 레거시 시스템이 최신 마이크로서비스와 통신할 수 있음</p>
+    </div>
+
+    <div style="margin: 15px 0; padding-left: 20px; border-left: 3px solid #06b6d4;">
+        <p style="color: #e2e8f0; font-weight: bold; margin-bottom: 5px;">6. 심층 방어 보안</p>
+        <p style="color: #94a3b8; font-size: 0.95rem;">TLS 1.3 암호화, 인증을 위한 상호 TLS(mTLS), 선택적 종단 간 메시지 암호화 및 포괄적인 권한 부여 제어를 통한 다층 보안</p>
+    </div>
+</div>
+
+<p style="color: #6ee7b7; font-style: italic; margin-top: 20px;">"프로토콜 게이트웨이는 이기종 통신 프로토콜의 복잡성을 간단하고 통합된 인터페이스로 변환하여 AI 시스템이 인프라가 아닌 지능에 집중할 수 있도록 합니다."</p>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.9 복습 문제</h2>
+
+<p>프로토콜 게이트웨이와 통신 프로토콜에 대한 이해도를 테스트하세요:</p>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <h4 style="color: #10B981; margin-top: 0;">문제 1: 프로토콜 선택</h4>
+    <p style="color: #e2e8f0; margin-bottom: 10px;">AI 애플리케이션에서 WebSocket 대신 gRPC를 선택하는 경우는 언제이며, 각 프로토콜의 주요 이점은 무엇입니까?</p>
+    <details style="margin-top: 10px;">
+        <summary style="color: #6ee7b7; cursor: pointer;">답변 보기</summary>
+        <p style="color: #94a3b8; margin-top: 10px; padding: 10px; background: #0f172a; border-radius: 4px;">
+            <strong>gRPC를 선택하는 경우:</strong> 서비스 간 통신 구축, 가장 낮은 대기 시간(5-20ms) 필요, Protocol Buffers를 사용한 강력한 타이핑 필요 또는 마이크로서비스 아키텍처 구축. gRPC는 뛰어난 성능, 내장 부하 분산 및 우수한 도구를 제공합니다.<br><br>
+            <strong>WebSocket을 선택하는 경우:</strong> 브라우저 호환성 필요, 실시간 사용자 대면 애플리케이션 구축, 웹 클라이언트의 전이중 통신 필요 또는 범용 클라이언트 지원 필요. WebSocket은 채팅 인터페이스 및 실시간 대시보드에 이상적이지만 gRPC(5-15ms)보다 약간 높은 대기 시간이 있습니다.
+        </p>
+    </details>
+</div>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <h4 style="color: #10B981; margin-top: 0;">문제 2: 직렬화 성능</h4>
+    <p style="color: #e2e8f0; margin-bottom: 10px;">직렬화 비교 표에 따르면 10KB JSON 페이로드가 Protocol Buffers로 직렬화되면 대략 얼마나 큰가요? 이 감소의 주요 이점은 무엇입니까?</p>
+    <details style="margin-top: 10px;">
+        <summary style="color: #6ee7b7; cursor: pointer;">답변 보기</summary>
+        <p style="color: #94a3b8; margin-top: 10px; padding: 10px; background: #0f172a; border-radius: 4px;">
+            Protocol Buffers는 10KB JSON을 약 <strong>4KB(0.4x 크기)</strong>로 줄입니다. 주요 이점은: (1) <strong>60% 대역폭 감소</strong>로 네트워크 비용 절감 및 느린 연결에서 성능 향상, (2) 바이너리 형식 및 스키마 기반 인코딩으로 인한 <strong>빠른 직렬화/역직렬화</strong>, (3) 모바일 및 엣지 장치에 중요한 <strong>낮은 메모리 사용량</strong>입니다.
+        </p>
+    </details>
+</div>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <h4 style="color: #10B981; margin-top: 0;">문제 3: 스트리밍 패턴</h4>
+    <p style="color: #e2e8f0; margin-bottom: 10px;">네 가지 스트리밍 패턴(Unary, 서버 스트리밍, 클라이언트 스트리밍, 양방향 스트리밍) 각각에 대한 실제 AI 사용 사례를 설명하세요.</p>
+    <details style="margin-top: 10px;">
+        <summary style="color: #6ee7b7; cursor: pointer;">답변 보기</summary>
+        <p style="color: #94a3b8; margin-top: 10px; padding: 10px; background: #0f172a; border-radius: 4px;">
+            <strong>Unary:</strong> 이미지 분류 - 하나의 이미지를 보내고 하나의 예측 결과를 받습니다.<br>
+            <strong>서버 스트리밍:</strong> 채팅 완성 - 하나의 프롬프트를 보내고 생성되는 대로 스트리밍된 토큰을 받습니다(ChatGPT의 타이핑 효과와 같음).<br>
+            <strong>클라이언트 스트리밍:</strong> 오디오 전사 - 마이크에서 오디오 청크를 스트리밍하고 사용자가 말하기를 멈추면 최종 전사를 받습니다.<br>
+            <strong>양방향 스트리밍:</strong> 음성 대화 - 인터럽트 지원을 통한 실시간 AI 음성 통화를 위해 양방향으로 오디오를 지속적으로 스트리밍합니다.
+        </p>
+    </details>
+</div>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <h4 style="color: #10B981; margin-top: 0;">문제 4: 연결 풀링</h4>
+    <p style="color: #e2e8f0; margin-bottom: 10px;">연결 풀 예제에서 배압 관리의 "고수위 표시" 및 "저수위 표시"의 목적은 무엇입니까?</p>
+    <details style="margin-top: 10px;">
+        <summary style="color: #6ee7b7; cursor: pointer;">답변 보기</summary>
+        <p style="color: #94a3b8; margin-top: 10px; padding: 10px; background: #0f172a; border-radius: 4px;">
+            <strong>고수위 표시(버퍼의 80%)</strong>는 배압을 트리거합니다. 버퍼가 이 수준까지 차면 시스템은 오버플로를 방지하기 위해 스트림을 일시 중지합니다. <strong>저수위 표시(버퍼의 20%)</strong>는 재개가 안전한 시점을 나타냅니다. 버퍼가 이 수준까지 비워지면 스트림이 재개됩니다. 이 히스테리시스는 스래싱(빠른 일시 중지/재개 주기)을 방지하고 원활한 데이터 흐름을 보장합니다. 예: 1024 버퍼의 경우 819개 항목에서 일시 중지, 205개 항목에서 재개합니다.
+        </p>
+    </details>
+</div>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <h4 style="color: #10B981; margin-top: 0;">문제 5: 서킷 브레이커 패턴</h4>
+    <p style="color: #e2e8f0; margin-bottom: 10px;">서킷 브레이커의 세 가지 상태(Closed, Open, Half-Open)와 상태 간 전환이 발생하는 시기를 설명하세요.</p>
+    <details style="margin-top: 10px;">
+        <summary style="color: #6ee7b7; cursor: pointer;">답변 보기</summary>
+        <p style="color: #94a3b8; margin-top: 10px; padding: 10px; background: #0f172a; border-radius: 4px;">
+            <strong>CLOSED(정상 작동):</strong> 요청이 정상적으로 통과합니다. 실패 횟수가 임계값(예: 5회 실패)에 도달하면 OPEN으로 전환됩니다.<br><br>
+            <strong>OPEN(빠른 실패):</strong> 모든 요청이 호출을 시도하지 않고 즉시 실패합니다. 재설정 타임아웃(예: 60초) 후 HALF-OPEN으로 전환됩니다.<br><br>
+            <strong>HALF-OPEN(복구 테스트):</strong> 하나의 테스트 요청을 허용합니다. 성공하면 CLOSED로 전환(서비스 복구됨). 실패하면 다시 OPEN으로 전환(여전히 중단됨).<br><br>
+            이것은 연쇄 실패를 방지하고 실패한 서비스에 복구 시간을 제공합니다.
+        </p>
+    </details>
+</div>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <h4 style="color: #10B981; margin-top: 0;">문제 6: TLS 보안</h4>
+    <p style="color: #e2e8f0; margin-bottom: 10px;">TLS와 mTLS의 차이점은 무엇입니까? 일반 TLS 대신 mTLS를 사용해야 하는 경우는 언제입니까?</p>
+    <details style="margin-top: 10px;">
+        <summary style="color: #6ee7b7; cursor: pointer;">답변 보기</summary>
+        <p style="color: #94a3b8; margin-top: 10px; padding: 10px; background: #0f172a; border-radius: 4px;">
+            <strong>TLS(전송 계층 보안):</strong> 서버가 인증서를 사용하여 클라이언트에 자신을 인증합니다. 클라이언트는 서버를 신뢰하지만 서버는 클라이언트 ID를 확인하지 않습니다. 대부분의 웹 애플리케이션에 사용됩니다.<br><br>
+            <strong>mTLS(상호 TLS):</strong> 서버와 클라이언트 모두 인증서를 사용하여 서로 인증합니다. 양 당사자는 연결을 설정하기 전에 ID를 확인합니다.<br><br>
+            <strong>mTLS를 사용하는 경우:</strong> (1) 마이크로서비스의 서비스 간 통신, (2) 엄격한 인증이 필요한 엔터프라이즈 애플리케이션, (3) 제로 트러스트 보안 아키텍처, (4) 매우 민감한 데이터(의료, 금융) 처리 또는 (5) 규정 준수 요구 사항(HIPAA, PCI-DSS). WIA 프로토콜 게이트웨이는 최대 유연성을 위해 둘 다 지원합니다.
+        </p>
+    </details>
+</div>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #6ee7b7;">6.10 다음 단계</h2>
+
+<p>프로토콜 게이트웨이가 다양한 전송 프로토콜 간에 원활한 통신을 제공함에 따라 이제 WIA AI 상호운용성 표준의 최종 단계에서 모든 것이 어떻게 통합되는지 살펴볼 준비가 되었습니다.</p>
+
+<div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 25px; border-radius: 8px; margin: 25px 0; border: 1px solid #10B981;">
+    <h3 style="color: #10B981; margin-top: 0;">📘 제7장에서 다룰 내용: 4단계 - 범용 어댑터</h3>
+    <p style="color: #e2e8f0; margin-bottom: 15px;">다음 장에서는 퍼즐의 마지막 조각을 탐구합니다:</p>
+    <ul style="color: #94a3b8; line-height: 2;">
+        <li><strong style="color: #6ee7b7;">범용 어댑터 아키텍처:</strong> 모든 AI 모델 또는 플랫폼을 위한 플러그인 기반 시스템</li>
+        <li><strong style="color: #6ee7b7;">사용자 정의 어댑터 개발:</strong> 독점 AI 시스템용 어댑터 구축</li>
+        <li><strong style="color: #6ee7b7;">어댑터 마켓플레이스:</strong> 롱테일 AI 모델을 위한 커뮤니티 기여 어댑터</li>
+        <li><strong style="color: #6ee7b7;">통합 패턴:</strong> 어댑터 구현을 위한 모범 사례</li>
+        <li><strong style="color: #6ee7b7;">완전한 시스템 통합:</strong> 4단계가 모두 함께 작동하는 방법</li>
+        <li><strong style="color: #6ee7b7;">프로덕션 배포:</strong> 대규모 WIA 준수 시스템 운영</li>
+    </ul>
+    <p style="color: #6ee7b7; font-style: italic; margin-top: 15px; margin-bottom: 0;">범용 어댑터가 WIA AI 상호운용성 비전을 완성하는 방법을 알아보세요!</p>
+</div>
+
+<hr style="border-color: #334155; margin-top: 40px;">
+</body>
+</html>

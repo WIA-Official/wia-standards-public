@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 4: Phase 1 - 데이터 형식 - WIA 점자 디스플레이 표준</title>
+</head>
+<body>
+    <header>
+        <h1>챕터 4: Phase 1 - 데이터 형식</h1>
+        <h2>점자 데이터의 표준화된 표현</h2>
+    </header>
+
+    <section>
+        <h2>학습 목표</h2>
+        <p>이 챕터를 마친 후, 독자는 다음을 이해할 수 있습니다:</p>
+        <ol>
+            <li>WIA 점자 셀 데이터 모델의 구조와 설계 원칙</li>
+            <li>JSON 기반 스키마의 정의와 사용 방법</li>
+            <li>유니코드 점자 패턴 (U+2800~U+28FF)의 매핑 체계</li>
+            <li>6점 및 8점 점자 형식의 인코딩 방식</li>
+            <li>다국어 점자 변환 테이블의 구조</li>
+            <li>데이터 유효성 검사 규칙 및 구현</li>
+            <li>실제 애플리케이션에서의 코드 예제 활용</li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>4.1 WIA 데이터 형식의 철학</h2>
+
+        <blockquote>
+            <p><strong>弘益人間 (홍익인간)</strong> - 널리 인간을 이롭게 하라</p>
+            <p>표준화된 데이터 형식은 모든 제조업체와 개발자가 같은 언어로 소통할 수 있게 합니다. 이는 기술 장벽을 낮추고, 혁신을 촉진하며, 궁극적으로 사용자에게 이익을 가져다줍니다.</p>
+        </blockquote>
+
+        <h3>4.1.1 설계 원칙</h3>
+        <p>WIA Phase 1 데이터 형식은 다음 원칙을 따릅니다:</p>
+
+        <ul>
+            <li><strong>인간 가독성 (Human Readability)</strong>: JSON 형식 채택으로 개발자가 쉽게 이해하고 디버깅</li>
+            <li><strong>기계 효율성 (Machine Efficiency)</strong>: 바이너리 변환 가능, 최소 오버헤드</li>
+            <li><strong>확장성 (Extensibility)</strong>: 미래 기능 추가 시 하위 호환성 유지</li>
+            <li><strong>언어 중립성 (Language Neutrality)</strong>: 모든 점자 코드 지원 (영어, 한국어, 일본어, 아랍어 등)</li>
+            <li><strong>검증 가능성 (Verifiability)</strong>: 스키마 기반 자동 검증</li>
+            <li><strong>상호운용성 (Interoperability)</strong>: 기존 유니코드 점자 표준과 완벽 호환</li>
+        </ul>
+
+        <h3>4.1.2 왜 JSON인가?</h3>
+        <table border="1">
+            <tr>
+                <th>형식</th>
+                <th>장점</th>
+                <th>단점</th>
+                <th>WIA 선택</th>
+            </tr>
+            <tr>
+                <td>바이너리</td>
+                <td>컴팩트, 빠름</td>
+                <td>사람이 읽을 수 없음, 디버깅 어려움</td>
+                <td>✗ (레이어 2에서 사용)</td>
+            </tr>
+            <tr>
+                <td>XML</td>
+                <td>구조화, 검증 가능</td>
+                <td>장황함, 파싱 오버헤드</td>
+                <td>✗</td>
+            </tr>
+            <tr>
+                <td>JSON</td>
+                <td>가독성, 범용성, 가벼움</td>
+                <td>바이너리보다 큼</td>
+                <td>✓ (최적의 균형)</td>
+            </tr>
+            <tr>
+                <td>Protocol Buffers</td>
+                <td>매우 컴팩트, 성능</td>
+                <td>스키마 의존, 가독성 낮음</td>
+                <td>✗</td>
+            </tr>
+        </table>
+
+        <p><strong>결론</strong>: JSON은 개발 용이성과 성능의 최적 균형을 제공합니다. 실시간 성능이 필요한 경우, Phase 2에서 바이너리 직렬화로 변환 가능합니다.</p>
+    </section>
+
+    <section>
+        <h2>4.2 점자 셀 데이터 모델</h2>
+
+        <h3>4.2.1 기본 BrailleCell 구조</h3>
+        <p>WIA 표준의 가장 기본적인 단위는 <strong>BrailleCell</strong>입니다:</p>
+
+        <pre>
+{
+  "type": "BrailleCell",
+  "dots": 6,           // 6 또는 8
+  "pattern": "⠓",     // 유니코드 점자 문자
+  "dotPattern": [1, 2, 5],  // 활성화된 점의 번호 (1-6 또는 1-8)
+  "decimal": 27,       // 10진수 표현 (0-63 또는 0-255)
+  "hex": "0x1B",       // 16진수 표현
+  "binary": "00011011" // 2진수 표현 (점 8-7-6-5-4-3-2-1)
+}
+        </pre>
+
+        <h3>4.2.2 점 번호 체계</h3>
+        <p>점자 점은 국제 표준에 따라 번호가 매겨집니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>6점 점자</th>
+                <th>8점 점자</th>
+            </tr>
+            <tr>
+                <td>
+                    <pre>
+1 ⚫ ⚫ 4
+2 ⚫ ⚫ 5
+3 ⚫ ⚫ 6
+                    </pre>
+                </td>
+                <td>
+                    <pre>
+1 ⚫ ⚫ 4
+2 ⚫ ⚫ 5
+3 ⚫ ⚫ 6
+7 ⚫ ⚫ 8
+                    </pre>
+                </td>
+            </tr>
+        </table>
+
+        <h3>4.2.3 비트 매핑</h3>
+        <p>각 점은 비트로 표현됩니다 (점 1 = LSB):</p>
+
+        <table border="1">
+            <tr>
+                <th>문자</th>
+                <th>유니코드</th>
+                <th>활성 점</th>
+                <th>비트 패턴</th>
+                <th>10진수</th>
+                <th>16진수</th>
+            </tr>
+            <tr>
+                <td>A</td>
+                <td>⠁ (U+2801)</td>
+                <td>1</td>
+                <td>00000001</td>
+                <td>1</td>
+                <td>0x01</td>
+            </tr>
+            <tr>
+                <td>B</td>
+                <td>⠃ (U+2803)</td>
+                <td>1, 2</td>
+                <td>00000011</td>
+                <td>3</td>
+                <td>0x03</td>
+            </tr>
+            <tr>
+                <td>C</td>
+                <td>⠉ (U+2809)</td>
+                <td>1, 4</td>
+                <td>00001001</td>
+                <td>9</td>
+                <td>0x09</td>
+            </tr>
+            <tr>
+                <td>H</td>
+                <td>⠓ (U+2813)</td>
+                <td>1, 2, 5</td>
+                <td>00010011</td>
+                <td>19</td>
+                <td>0x13</td>
+            </tr>
+            <tr>
+                <td>Z</td>
+                <td>⠵ (U+2835)</td>
+                <td>1, 3, 5, 6</td>
+                <td>00110101</td>
+                <td>53</td>
+                <td>0x35</td>
+            </tr>
+        </table>
+
+        <p><strong>계산 공식 (6점):</strong></p>
+        <pre>
+decimal = (점1 ? 1 : 0) + (점2 ? 2 : 0) + (점3 ? 4 : 0) +
+          (점4 ? 8 : 0) + (점5 ? 16 : 0) + (점6 ? 32 : 0)
+
+유니코드 = U+2800 + decimal
+        </pre>
+
+        <p><strong>계산 공식 (8점):</strong></p>
+        <pre>
+decimal = (점1~6 계산) + (점7 ? 64 : 0) + (점8 ? 128 : 0)
+
+유니코드 = U+2800 + decimal
+        </pre>
+
+        <h3>4.2.4 BrailleLine 구조</h3>
+        <p>한 줄의 점자는 BrailleCell의 배열로 표현됩니다:</p>
+
+        <pre>
+{
+  "type": "BrailleLine",
+  "cells": [
+    {"pattern": "⠓", "decimal": 19},
+    {"pattern": "⠑", "decimal": 5},
+    {"pattern": "⠇", "decimal": 11},
+    {"pattern": "⠇", "decimal": 11},
+    {"pattern": "⠕", "decimal": 15}
+  ],
+  "length": 5,
+  "encoding": "grade1",  // "grade1", "grade2", "computer"
+  "language": "en-US"
+}
+        </pre>
+
+        <h3>4.2.5 BrailleDocument 구조</h3>
+        <p>전체 문서는 여러 줄과 메타데이터로 구성됩니다:</p>
+
+        <pre>
+{
+  "type": "BrailleDocument",
+  "version": "1.0",
+  "metadata": {
+    "title": "Sample Braille Document",
+    "author": "WIA Standards Committee",
+    "date": "2025-12-25",
+    "language": "en-US",
+    "brailleCode": "UEB",  // Unified English Braille
+    "dots": 6,
+    "encoding": "grade2"
+  },
+  "lines": [
+    {
+      "lineNumber": 1,
+      "cells": [...]
+    },
+    {
+      "lineNumber": 2,
+      "cells": [...]
+    }
+  ],
+  "totalLines": 2,
+  "totalCells": 80
+}
+        </pre>
+    </section>
+
+    <section>
+        <h2>4.3 JSON 스키마 정의</h2>
+
+        <h3>4.3.1 BrailleCell JSON Schema</h3>
+        <pre>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA Braille Cell",
+  "type": "object",
+  "required": ["type", "dots", "pattern"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "BrailleCell"
+    },
+    "dots": {
+      "type": "integer",
+      "enum": [6, 8],
+      "description": "6점 또는 8점 점자 셀"
+    },
+    "pattern": {
+      "type": "string",
+      "pattern": "^[⠀-⣿]$",
+      "description": "유니코드 점자 문자 (U+2800 ~ U+28FF)"
+    },
+    "dotPattern": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 8
+      },
+      "uniqueItems": true,
+      "description": "활성화된 점의 번호"
+    },
+    "decimal": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255,
+      "description": "10진수 표현"
+    },
+    "hex": {
+      "type": "string",
+      "pattern": "^0x[0-9A-Fa-f]{1,2}$",
+      "description": "16진수 표현"
+    },
+    "binary": {
+      "type": "string",
+      "pattern": "^[01]{6,8}$",
+      "description": "2진수 표현"
+    }
+  },
+  "additionalProperties": false
+}
+        </pre>
+
+        <h3>4.3.2 BrailleLine JSON Schema</h3>
+        <pre>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA Braille Line",
+  "type": "object",
+  "required": ["type", "cells"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "BrailleLine"
+    },
+    "cells": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/BrailleCell"
+      },
+      "minItems": 1,
+      "maxItems": 320,
+      "description": "점자 셀 배열 (최대 320셀 - Hyperbraille)"
+    },
+    "length": {
+      "type": "integer",
+      "description": "셀 개수"
+    },
+    "encoding": {
+      "type": "string",
+      "enum": ["grade1", "grade2", "computer", "nemeth", "music"],
+      "description": "점자 인코딩 유형"
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}-[A-Z]{2}$",
+      "description": "언어 코드 (ISO 639-1 + ISO 3166-1)"
+    }
+  }
+}
+        </pre>
+
+        <h3>4.3.3 검증 예제 (TypeScript)</h3>
+        <pre>
+import Ajv from 'ajv';
+import brailleCellSchema from './schemas/braille-cell.json';
+
+const ajv = new Ajv();
+const validate = ajv.compile(brailleCellSchema);
+
+// 유효한 데이터
+const validCell = {
+  type: "BrailleCell",
+  dots: 6,
+  pattern: "⠓",
+  dotPattern: [1, 2, 5],
+  decimal: 19,
+  hex: "0x13",
+  binary: "00010011"
+};
+
+if (validate(validCell)) {
+  console.log("✓ 유효한 점자 셀");
+} else {
+  console.error("✗ 검증 실패:", validate.errors);
+}
+
+// 잘못된 데이터
+const invalidCell = {
+  type: "BrailleCell",
+  dots: 6,
+  pattern: "A",  // 유니코드 점자가 아님!
+  decimal: 19
+};
+
+if (!validate(invalidCell)) {
+  console.error("✗ 예상된 실패:", validate.errors);
+  // 오류: pattern은 유니코드 점자 문자여야 함
+}
+        </pre>
+    </section>
+
+    <section>
+        <h2>4.4 유니코드 점자 패턴 매핑</h2>
+
+        <h3>4.4.1 유니코드 점자 블록</h3>
+        <p>유니코드는 U+2800 ~ U+28FF (256개 코드 포인트)를 점자에 할당했습니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>범위</th>
+                <th>설명</th>
+                <th>문자 수</th>
+            </tr>
+            <tr>
+                <td>U+2800</td>
+                <td>⠀ (빈 셀 - 점이 없음)</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <td>U+2801 ~ U+283F</td>
+                <td>6점 점자 (점 1-6만 사용)</td>
+                <td>63</td>
+            </tr>
+            <tr>
+                <td>U+2840 ~ U+28FF</td>
+                <td>8점 점자 (점 7, 8 포함)</td>
+                <td>192</td>
+            </tr>
+        </table>
+
+        <h3>4.4.2 6점 점자 전체 맵</h3>
+        <p>6점 점자의 주요 문자 (1급 점자 기준):</p>
+
+        <table border="1">
+            <tr>
+                <th>문자</th>
+                <th>유니코드</th>
+                <th>점 패턴</th>
+                <th>10진수</th>
+            </tr>
+            <tr>
+                <td>A</td>
+                <td>⠁ U+2801</td>
+                <td>1</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <td>B</td>
+                <td>⠃ U+2803</td>
+                <td>1-2</td>
+                <td>3</td>
+            </tr>
+            <tr>
+                <td>C</td>
+                <td>⠉ U+2809</td>
+                <td>1-4</td>
+                <td>9</td>
+            </tr>
+            <tr>
+                <td>D</td>
+                <td>⠙ U+2819</td>
+                <td>1-4-5</td>
+                <td>25</td>
+            </tr>
+            <tr>
+                <td>E</td>
+                <td>⠑ U+2811</td>
+                <td>1-5</td>
+                <td>17</td>
+            </tr>
+            <tr>
+                <td>F</td>
+                <td>⠋ U+280B</td>
+                <td>1-2-4</td>
+                <td>11</td>
+            </tr>
+            <tr>
+                <td>G</td>
+                <td>⠛ U+281B</td>
+                <td>1-2-4-5</td>
+                <td>27</td>
+            </tr>
+            <tr>
+                <td>H</td>
+                <td>⠓ U+2813</td>
+                <td>1-2-5</td>
+                <td>19</td>
+            </tr>
+            <tr>
+                <td>I</td>
+                <td>⠊ U+280A</td>
+                <td>2-4</td>
+                <td>10</td>
+            </tr>
+            <tr>
+                <td>J</td>
+                <td>⠚ U+281A</td>
+                <td>2-4-5</td>
+                <td>26</td>
+            </tr>
+            <tr>
+                <td>K</td>
+                <td>⠅ U+2805</td>
+                <td>1-3</td>
+                <td>5</td>
+            </tr>
+            <tr>
+                <td>L</td>
+                <td>⠇ U+2807</td>
+                <td>1-2-3</td>
+                <td>7</td>
+            </tr>
+            <tr>
+                <td>M</td>
+                <td>⠍ U+280D</td>
+                <td>1-3-4</td>
+                <td>13</td>
+            </tr>
+            <tr>
+                <td>N</td>
+                <td>⠝ U+281D</td>
+                <td>1-3-4-5</td>
+                <td>29</td>
+            </tr>
+            <tr>
+                <td>O</td>
+                <td>⠕ U+2815</td>
+                <td>1-3-5</td>
+                <td>21</td>
+            </tr>
+            <tr>
+                <td>P</td>
+                <td>⠏ U+280F</td>
+                <td>1-2-3-4</td>
+                <td>15</td>
+            </tr>
+            <tr>
+                <td>Q</td>
+                <td>⠟ U+281F</td>
+                <td>1-2-3-4-5</td>
+                <td>31</td>
+            </tr>
+            <tr>
+                <td>R</td>
+                <td>⠗ U+2817</td>
+                <td>1-2-3-5</td>
+                <td>23</td>
+            </tr>
+            <tr>
+                <td>S</td>
+                <td>⠎ U+280E</td>
+                <td>2-3-4</td>
+                <td>14</td>
+            </tr>
+            <tr>
+                <td>T</td>
+                <td>⠞ U+281E</td>
+                <td>2-3-4-5</td>
+                <td>30</td>
+            </tr>
+            <tr>
+                <td>U</td>
+                <td>⠥ U+2825</td>
+                <td>1-3-6</td>
+                <td>37</td>
+            </tr>
+            <tr>
+                <td>V</td>
+                <td>⠧ U+2827</td>
+                <td>1-2-3-6</td>
+                <td>39</td>
+            </tr>
+            <tr>
+                <td>W</td>
+                <td>⠺ U+283A</td>
+                <td>2-4-5-6</td>
+                <td>58</td>
+            </tr>
+            <tr>
+                <td>X</td>
+                <td>⠭ U+282D</td>
+                <td>1-3-4-6</td>
+                <td>45</td>
+            </tr>
+            <tr>
+                <td>Y</td>
+                <td>⠽ U+283D</td>
+                <td>1-3-4-5-6</td>
+                <td>61</td>
+            </tr>
+            <tr>
+                <td>Z</td>
+                <td>⠵ U+2835</td>
+                <td>1-3-5-6</td>
+                <td>53</td>
+            </tr>
+        </table>
+
+        <h3>4.4.3 숫자 및 특수 문자</h3>
+        <table border="1">
+            <tr>
+                <th>문자</th>
+                <th>유니코드</th>
+                <th>설명</th>
+            </tr>
+            <tr>
+                <td>⠼</td>
+                <td>U+283C</td>
+                <td>숫자 표시기 (다음이 숫자임을 나타냄)</td>
+            </tr>
+            <tr>
+                <td>⠁</td>
+                <td>U+2801</td>
+                <td>숫자 1 (숫자 표시기 다음)</td>
+            </tr>
+            <tr>
+                <td>⠂</td>
+                <td>U+2802</td>
+                <td>쉼표</td>
+            </tr>
+            <tr>
+                <td>⠆</td>
+                <td>U+2806</td>
+                <td>세미콜론</td>
+            </tr>
+            <tr>
+                <td>⠒</td>
+                <td>U+2812</td>
+                <td>콜론</td>
+            </tr>
+            <tr>
+                <td>⠲</td>
+                <td>U+2832</td>
+                <td>마침표</td>
+            </tr>
+            <tr>
+                <td>⠦</td>
+                <td>U+2826</td>
+                <td>여는 따옴표</td>
+            </tr>
+            <tr>
+                <td>⠴</td>
+                <td>U+2834</td>
+                <td>닫는 따옴표</td>
+            </tr>
+        </table>
+
+        <h3>4.4.4 8점 컴퓨터 점자</h3>
+        <p>8점 점자는 ASCII 문자를 직접 매핑할 수 있습니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>ASCII</th>
+                <th>문자</th>
+                <th>유니코드</th>
+                <th>점 패턴</th>
+            </tr>
+            <tr>
+                <td>0x41</td>
+                <td>A</td>
+                <td>⡁ U+2841</td>
+                <td>1-7</td>
+            </tr>
+            <tr>
+                <td>0x61</td>
+                <td>a</td>
+                <td>⠁ U+2801</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <td>0x7B</td>
+                <td>{</td>
+                <td>⢸ U+28B8</td>
+                <td>4-5-6-8</td>
+            </tr>
+            <tr>
+                <td>0x7D</td>
+                <td>}</td>
+                <td>⢾ U+28BE</td>
+                <td>2-3-4-5-6-8</td>
+            </tr>
+            <tr>
+                <td>0x5B</td>
+                <td>[</td>
+                <td>⢷ U+28B7</td>
+                <td>1-2-3-5-6-8</td>
+            </tr>
+            <tr>
+                <td>0x5D</td>
+                <td>]</td>
+                <td>⢻ U+28BB</td>
+                <td>1-2-4-5-6-8</td>
+            </tr>
+        </table>
+    </section>
+
+    <section>
+        <h2>4.5 다국어 점자 변환 테이블</h2>
+
+        <h3>4.5.1 언어별 점자 코드</h3>
+        <p>각 언어는 고유한 점자 체계를 가지고 있습니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>언어</th>
+                <th>코드</th>
+                <th>점자 유형</th>
+                <th>특징</th>
+            </tr>
+            <tr>
+                <td>영어</td>
+                <td>en-US</td>
+                <td>UEB (Unified English Braille)</td>
+                <td>1급, 2급 축약</td>
+            </tr>
+            <tr>
+                <td>한국어</td>
+                <td>ko-KR</td>
+                <td>Korean Braille</td>
+                <td>자모 기반, 특수 규칙</td>
+            </tr>
+            <tr>
+                <td>일본어</td>
+                <td>ja-JP</td>
+                <td>Japanese Braille</td>
+                <td>가나 + 한자 점역</td>
+            </tr>
+            <tr>
+                <td>중국어</td>
+                <td>zh-CN</td>
+                <td>Chinese Braille</td>
+                <td>병음 기반</td>
+            </tr>
+            <tr>
+                <td>아랍어</td>
+                <td>ar-SA</td>
+                <td>Arabic Braille</td>
+                <td>우-좌 방향</td>
+            </tr>
+            <tr>
+                <td>프랑스어</td>
+                <td>fr-FR</td>
+                <td>French Braille</td>
+                <td>루이 브라유 원본</td>
+            </tr>
+            <tr>
+                <td>독일어</td>
+                <td>de-DE</td>
+                <td>German Braille</td>
+                <td>움라우트 지원</td>
+            </tr>
+        </table>
+
+        <h3>4.5.2 한국어 점자 예제</h3>
+        <p>한국어 "안녕하세요"의 점역:</p>
+
+        <pre>
+// 한글 분해: ㅇ + ㅏ + ㄴ + ㄴ + ㅕ + ㅇ + ...
+{
+  "type": "BrailleLine",
+  "cells": [
+    {"pattern": "⠈", "description": "ㅇ (초성)", "decimal": 8},
+    {"pattern": "⠣", "description": "ㅏ", "decimal": 35},
+    {"pattern": "⠴", "description": "ㄴ (종성)", "decimal": 52},
+    {"pattern": "⠒", "description": "ㄴ (초성)", "decimal": 18},
+    {"pattern": "⠬", "description": "ㅕ", "decimal": 44},
+    {"pattern": "⠁", "description": "ㅇ (종성)", "decimal": 1},
+    {"pattern": "⠐", "description": "ㅎ (초성)", "decimal": 16},
+    {"pattern": "⠣", "description": "ㅏ", "decimal": 35},
+    {"pattern": "⠎", "description": "ㅅ (초성)", "decimal": 14},
+    {"pattern": "⠢", "description": "ㅔ", "decimal": 34},
+    {"pattern": "⠾", "description": "ㅇ (종성)", "decimal": 62},
+    {"pattern": "⠎", "description": "ㅅ (초성)", "decimal": 14},
+    {"pattern": "⠱", "description": "ㅗ", "decimal": 49}
+  ],
+  "language": "ko-KR",
+  "encoding": "korean-standard"
+}
+        </pre>
+
+        <h3>4.5.3 변환 테이블 JSON 구조</h3>
+        <pre>
+{
+  "translationTable": {
+    "name": "UEB Grade 2",
+    "language": "en-US",
+    "version": "1.0",
+    "rules": [
+      {
+        "text": "and",
+        "context": "word",
+        "braille": "⠯",
+        "description": "축약어: and"
+      },
+      {
+        "text": "the",
+        "context": "word",
+        "braille": "⠮",
+        "description": "축약어: the"
+      },
+      {
+        "text": "for",
+        "context": "word",
+        "braille": "⠿",
+        "description": "축약어: for"
+      },
+      {
+        "text": "ing",
+        "context": "suffix",
+        "braille": "⠬",
+        "description": "접미사: -ing"
+      },
+      {
+        "text": "ed",
+        "context": "suffix",
+        "braille": "⠫",
+        "description": "접미사: -ed"
+      }
+    ]
+  }
+}
+        </pre>
+    </section>
+
+    <section>
+        <h2>4.6 데이터 유효성 검사 규칙</h2>
+
+        <h3>4.6.1 구조적 검증</h3>
+        <table border="1">
+            <tr>
+                <th>규칙</th>
+                <th>설명</th>
+                <th>검증 방법</th>
+            </tr>
+            <tr>
+                <td>Type Validation</td>
+                <td>type 필드가 유효한 값</td>
+                <td>JSON Schema enum 체크</td>
+            </tr>
+            <tr>
+                <td>Dots Consistency</td>
+                <td>dots=6이면 점 7,8 사용 불가</td>
+                <td>dotPattern 배열 최대값 체크</td>
+            </tr>
+            <tr>
+                <td>Unicode Range</td>
+                <td>pattern이 U+2800~U+28FF 범위</td>
+                <td>정규식 ^[⠀-⣿]$</td>
+            </tr>
+            <tr>
+                <td>Decimal Range</td>
+                <td>decimal이 0~63(6점) 또는 0~255(8점)</td>
+                <td>조건부 범위 체크</td>
+            </tr>
+            <tr>
+                <td>Pattern Consistency</td>
+                <td>pattern, decimal, dotPattern 일치</td>
+                <td>크로스 필드 검증</td>
+            </tr>
+        </table>
+
+        <h3>4.6.2 의미적 검증</h3>
+        <pre>
+// TypeScript 검증 함수
+function validateBrailleCell(cell: BrailleCell): ValidationResult {
+  const errors: string[] = [];
+
+  // 1. Dots 일관성 체크
+  if (cell.dots === 6 && cell.decimal > 63) {
+    errors.push("6점 셀은 decimal이 0-63 범위여야 합니다");
+  }
+
+  // 2. dotPattern과 decimal 일치 체크
+  const calculatedDecimal = cell.dotPattern.reduce(
+    (sum, dot) => sum + Math.pow(2, dot - 1),
+    0
+  );
+  if (calculatedDecimal !== cell.decimal) {
+    errors.push(`dotPattern [${cell.dotPattern}]에서 계산된 값 ${calculatedDecimal}이(가) decimal ${cell.decimal}과(와) 불일치`);
+  }
+
+  // 3. Unicode 일치 체크
+  const expectedUnicode = String.fromCharCode(0x2800 + cell.decimal);
+  if (cell.pattern !== expectedUnicode) {
+    errors.push(`pattern '${cell.pattern}'이(가) decimal ${cell.decimal}에 대응하는 '${expectedUnicode}'와(과) 불일치`);
+  }
+
+  // 4. Binary 일치 체크
+  if (cell.binary) {
+    const binaryDecimal = parseInt(cell.binary, 2);
+    if (binaryDecimal !== cell.decimal) {
+      errors.push(`binary '${cell.binary}'이(가) decimal ${cell.decimal}과(와) 불일치`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors: errors
+  };
+}
+        </pre>
+
+        <h3>4.6.3 언어별 검증</h3>
+        <pre>
+// 한국어 점자 검증 예제
+function validateKoreanBraille(line: BrailleLine): ValidationResult {
+  const errors: string[] = [];
+
+  if (line.language !== "ko-KR") {
+    errors.push("한국어 점자는 language='ko-KR'이어야 합니다");
+  }
+
+  // 한국어 점자 규칙 체크
+  for (let i = 0; i < line.cells.length; i++) {
+    const cell = line.cells[i];
+
+    // 초성, 중성, 종성 패턴 검증
+    // (실제로는 복잡한 한글 점역 규칙 적용)
+    if (!isValidKoreanBraillePattern(cell.pattern)) {
+      errors.push(`셀 ${i}: '${cell.pattern}'은(는) 유효한 한국어 점자가 아닙니다`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors: errors
+  };
+}
+        </pre>
+    </section>
+
+    <section>
+        <h2>4.7 실용적인 코드 예제</h2>
+
+        <h3>4.7.1 텍스트를 점자로 변환 (JavaScript)</h3>
+        <pre>
+// 1급 영어 점자 변환 (간단한 예제)
+const grade1Map = {
+  'a': 0x01, 'b': 0x03, 'c': 0x09, 'd': 0x19, 'e': 0x11,
+  'f': 0x0B, 'g': 0x1B, 'h': 0x13, 'i': 0x0A, 'j': 0x1A,
+  'k': 0x05, 'l': 0x07, 'm': 0x0D, 'n': 0x1D, 'o': 0x15,
+  'p': 0x0F, 'q': 0x1F, 'r': 0x17, 's': 0x0E, 't': 0x1E,
+  'u': 0x25, 'v': 0x27, 'w': 0x3A, 'x': 0x2D, 'y': 0x3D, 'z': 0x35,
+  ' ': 0x00  // 빈 셀
+};
+
+function textToBraille(text) {
+  const lowerText = text.toLowerCase();
+  const cells = [];
+
+  for (let char of lowerText) {
+    const decimal = grade1Map[char];
+    if (decimal !== undefined) {
+      cells.push({
+        type: "BrailleCell",
+        dots: 6,
+        pattern: String.fromCharCode(0x2800 + decimal),
+        decimal: decimal,
+        hex: "0x" + decimal.toString(16).toUpperCase().padStart(2, '0')
+      });
+    }
+  }
+
+  return {
+    type: "BrailleLine",
+    cells: cells,
+    length: cells.length,
+    encoding: "grade1",
+    language: "en-US"
+  };
+}
+
+// 사용 예
+const result = textToBraille("hello");
+console.log(JSON.stringify(result, null, 2));
+/*
+{
+  "type": "BrailleLine",
+  "cells": [
+    {"type": "BrailleCell", "dots": 6, "pattern": "⠓", "decimal": 19, "hex": "0x13"},
+    {"type": "BrailleCell", "dots": 6, "pattern": "⠑", "decimal": 17, "hex": "0x11"},
+    {"type": "BrailleCell", "dots": 6, "pattern": "⠇", "decimal": 7, "hex": "0x07"},
+    {"type": "BrailleCell", "dots": 6, "pattern": "⠇", "decimal": 7, "hex": "0x07"},
+    {"type": "BrailleCell", "dots": 6, "pattern": "⠕", "decimal": 21, "hex": "0x15"}
+  ],
+  "length": 5,
+  "encoding": "grade1",
+  "language": "en-US"
+}
+*/
+        </pre>
+
+        <h3>4.7.2 점자를 텍스트로 변환 (Python)</h3>
+        <pre>
+# 점자 -> 텍스트 역변환
+grade1_reverse_map = {
+    0x01: 'a', 0x03: 'b', 0x09: 'c', 0x19: 'd', 0x11: 'e',
+    0x0B: 'f', 0x1B: 'g', 0x13: 'h', 0x0A: 'i', 0x1A: 'j',
+    0x05: 'k', 0x07: 'l', 0x0D: 'm', 0x1D: 'n', 0x15: 'o',
+    0x0F: 'p', 0x1F: 'q', 0x17: 'r', 0x0E: 's', 0x1E: 't',
+    0x25: 'u', 0x27: 'v', 0x3A: 'w', 0x2D: 'x', 0x3D: 'y', 0x35: 'z',
+    0x00: ' '
+}
+
+def braille_to_text(braille_line):
+    text = ""
+    for cell in braille_line['cells']:
+        decimal = cell['decimal']
+        char = grade1_reverse_map.get(decimal, '?')
+        text += char
+    return text
+
+# 사용 예
+braille_data = {
+    "type": "BrailleLine",
+    "cells": [
+        {"decimal": 19},  # h
+        {"decimal": 17},  # e
+        {"decimal": 7},   # l
+        {"decimal": 7},   # l
+        {"decimal": 21}   # o
+    ]
+}
+
+print(braille_to_text(braille_data))  # 출력: "hello"
+        </pre>
+
+        <h3>4.7.3 점자 파일 읽기/쓰기 (TypeScript)</h3>
+        <pre>
+import * as fs from 'fs';
+
+// 점자 문서 저장
+function saveBrailleDocument(doc: BrailleDocument, filename: string): void {
+  const json = JSON.stringify(doc, null, 2);
+  fs.writeFileSync(filename, json, 'utf-8');
+  console.log(`✓ 점자 문서 저장: ${filename}`);
+}
+
+// 점자 문서 로드
+function loadBrailleDocument(filename: string): BrailleDocument {
+  const json = fs.readFileSync(filename, 'utf-8');
+  const doc = JSON.parse(json);
+
+  // 검증
+  if (doc.type !== "BrailleDocument") {
+    throw new Error("유효하지 않은 점자 문서");
+  }
+
+  console.log(`✓ 점자 문서 로드: ${filename}`);
+  console.log(`  - 제목: ${doc.metadata.title}`);
+  console.log(`  - 언어: ${doc.metadata.language}`);
+  console.log(`  - 총 줄: ${doc.totalLines}`);
+
+  return doc;
+}
+
+// 사용 예
+const myDoc: BrailleDocument = {
+  type: "BrailleDocument",
+  version: "1.0",
+  metadata: {
+    title: "WIA 표준 샘플",
+    author: "홍길동",
+    date: "2025-12-25",
+    language: "ko-KR",
+    brailleCode: "Korean",
+    dots: 6,
+    encoding: "grade1"
+  },
+  lines: [
+    {
+      lineNumber: 1,
+      cells: [
+        {type: "BrailleCell", dots: 6, pattern: "⠓", decimal: 19}
+      ]
+    }
+  ],
+  totalLines: 1,
+  totalCells: 1
+};
+
+saveBrailleDocument(myDoc, "sample.braille.json");
+const loaded = loadBrailleDocument("sample.braille.json");
+        </pre>
+
+        <h3>4.7.4 REST API 엔드포인트 예제</h3>
+        <pre>
+// Express.js 서버 예제
+import express from 'express';
+
+const app = express();
+app.use(express.json());
+
+// POST /api/braille/convert
+// 텍스트 -> 점자 변환
+app.post('/api/braille/convert', (req, res) => {
+  const { text, language, encoding } = req.body;
+
+  try {
+    const brailleLine = textToBraille(text, language, encoding);
+    res.json({
+      success: true,
+      data: brailleLine
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// POST /api/braille/validate
+// 점자 데이터 검증
+app.post('/api/braille/validate', (req, res) => {
+  const brailleData = req.body;
+
+  const validation = validateBrailleCell(brailleData);
+
+  res.json({
+    valid: validation.valid,
+    errors: validation.errors
+  });
+});
+
+// GET /api/braille/unicode/:decimal
+// 10진수 -> 유니코드 점자 변환
+app.get('/api/braille/unicode/:decimal', (req, res) => {
+  const decimal = parseInt(req.params.decimal);
+
+  if (decimal < 0 || decimal > 255) {
+    return res.status(400).json({
+      error: "decimal은 0-255 범위여야 합니다"
+    });
+  }
+
+  const unicode = String.fromCharCode(0x2800 + decimal);
+  const codePoint = "U+" + (0x2800 + decimal).toString(16).toUpperCase().padStart(4, '0');
+
+  res.json({
+    decimal: decimal,
+    hex: "0x" + decimal.toString(16).toUpperCase(),
+    unicode: unicode,
+    codePoint: codePoint
+  });
+});
+
+app.listen(3000, () => {
+  console.log('WIA 점자 API 서버 실행 중: http://localhost:3000');
+});
+        </pre>
+    </section>
+
+    <section>
+        <h2>4.8 실전 사례: 점자 편집기 구현</h2>
+
+        <h3>4.8.1 기본 편집기 클래스</h3>
+        <pre>
+class BrailleEditor {
+  private document: BrailleDocument;
+  private currentLine: number;
+
+  constructor() {
+    this.document = this.createEmptyDocument();
+    this.currentLine = 0;
+  }
+
+  createEmptyDocument(): BrailleDocument {
+    return {
+      type: "BrailleDocument",
+      version: "1.0",
+      metadata: {
+        title: "새 문서",
+        author: "",
+        date: new Date().toISOString().split('T')[0],
+        language: "en-US",
+        brailleCode: "UEB",
+        dots: 6,
+        encoding: "grade1"
+      },
+      lines: [],
+      totalLines: 0,
+      totalCells: 0
+    };
+  }
+
+  insertText(text: string): void {
+    const brailleLine = textToBraille(text);
+    this.document.lines.push({
+      lineNumber: this.document.lines.length + 1,
+      cells: brailleLine.cells
+    });
+    this.document.totalLines++;
+    this.document.totalCells += brailleLine.cells.length;
+  }
+
+  deleteLine(lineNumber: number): void {
+    const index = this.document.lines.findIndex(
+      l => l.lineNumber === lineNumber
+    );
+    if (index !== -1) {
+      const removedCells = this.document.lines[index].cells.length;
+      this.document.lines.splice(index, 1);
+      this.document.totalLines--;
+      this.document.totalCells -= removedCells;
+
+      // 줄 번호 재정렬
+      this.document.lines.forEach((line, i) => {
+        line.lineNumber = i + 1;
+      });
+    }
+  }
+
+  save(filename: string): void {
+    saveBrailleDocument(this.document, filename);
+  }
+
+  load(filename: string): void {
+    this.document = loadBrailleDocument(filename);
+  }
+
+  export(): string {
+    return JSON.stringify(this.document, null, 2);
+  }
+}
+
+// 사용 예
+const editor = new BrailleEditor();
+editor.insertText("Hello World");
+editor.insertText("WIA Standards");
+editor.save("my-document.braille.json");
+        </pre>
+    </section>
+
+    <section>
+        <h2>4.9 챕터 요약: 5가지 핵심 포인트</h2>
+        <ol>
+            <li>
+                <strong>JSON 기반 데이터 형식은 개발 용이성과 성능의 균형</strong>
+                <p>WIA Phase 1은 JSON을 채택하여 인간 가독성과 기계 효율성을 동시에 달성했습니다. BrailleCell, BrailleLine, BrailleDocument의 계층 구조로 복잡한 점자 데이터를 명확하게 표현합니다.</p>
+            </li>
+            <li>
+                <strong>유니코드 점자 블록(U+2800~U+28FF)과 완벽 호환</strong>
+                <p>256개 코드 포인트로 6점(64개) 및 8점(192개) 점자를 모두 표현합니다. 각 점자 셀은 decimal, hex, binary, dotPattern, unicode 등 다양한 형식으로 상호 변환 가능합니다.</p>
+            </li>
+            <li>
+                <strong>JSON Schema로 자동 검증 가능</strong>
+                <p>타입, 범위, 일관성을 자동으로 검증하여 개발 오류를 사전 방지합니다. Ajv 등의 도구로 런타임 검증을 쉽게 구현할 수 있습니다.</p>
+            </li>
+            <li>
+                <strong>다국어 지원은 변환 테이블로 확장</strong>
+                <p>영어 UEB, 한국어, 일본어, 중국어, 아랍어 등 각 언어의 점자 규칙을 JSON 변환 테이블로 정의합니다. language 및 encoding 필드로 적절한 테이블을 선택합니다.</p>
+            </li>
+            <li>
+                <strong>실용적인 구현 예제로 즉시 활용 가능</strong>
+                <p>JavaScript, TypeScript, Python 코드 예제로 텍스트-점자 변환, 파일 I/O, REST API, 편집기 구현을 쉽게 시작할 수 있습니다. 弘익人間의 철학처럼, 표준은 모두에게 접근 가능해야 합니다.</p>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>4.10 복습 문제</h2>
+        <ol>
+            <li>
+                <strong>BrailleCell JSON 객체의 필수 필드 3가지는 무엇이며, 각각의 역할은 무엇입니까?</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>필수 필드는 (1) <strong>type</strong>: "BrailleCell"로 객체 유형 식별, (2) <strong>dots</strong>: 6 또는 8로 점자 셀 크기 정의, (3) <strong>pattern</strong>: 유니코드 점자 문자(U+2800~U+28FF)로 실제 점자 패턴 표현. 이 3개 필드만으로 점자 셀의 핵심 정보를 전달할 수 있으며, dotPattern, decimal, hex, binary는 선택적 보조 정보입니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>유니코드 점자 문자 "⠓" (H)의 decimal, hex, dotPattern, binary 값을 계산하세요.</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>"⠓"는 점 1-2-5가 활성화된 패턴입니다. <br>
+                    <strong>dotPattern</strong>: [1, 2, 5] <br>
+                    <strong>decimal</strong>: 2^0 + 2^1 + 2^4 = 1 + 2 + 16 = 19 <br>
+                    <strong>hex</strong>: 0x13 <br>
+                    <strong>binary</strong>: 00010011 (오른쪽부터 점1, 점2, ..., 점8) <br>
+                    <strong>유니코드</strong>: U+2800 + 19 = U+2813 = "⠓"</p>
+                </details>
+            </li>
+            <li>
+                <strong>6점 점자와 8점 점자의 decimal 범위 차이는 무엇이며, 이것이 실무에서 왜 중요합니까?</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>6점 점자는 decimal 범위가 0-63 (2^6=64개 조합), 8점 점자는 0-255 (2^8=256개 조합)입니다. 실무에서 중요한 이유: (1) <strong>검증</strong> - dots=6일 때 decimal > 63이면 오류, (2) <strong>호환성</strong> - 6점 전용 디스플레이에 8점 데이터 전송 시 하위 6점만 사용, (3) <strong>용도 구분</strong> - 일반 텍스트는 6점, 프로그래밍/특수문자는 8점 필요. 올바른 범위 체크로 런타임 오류를 방지합니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>WIA가 XML이나 Protocol Buffers 대신 JSON을 선택한 주요 이유 3가지는 무엇입니까?</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>(1) <strong>인간 가독성</strong>: 개발자가 파일을 직접 읽고 편집할 수 있어 디버깅과 학습이 쉬움. XML은 너무 장황하고 Protocol Buffers는 바이너리라 읽기 불가. (2) <strong>범용성</strong>: 모든 프로그래밍 언어에 JSON 파서가 내장되어 있어 즉시 사용 가능. (3) <strong>성능과 크기의 균형</strong>: XML보다 가볍고 빠르며, Protocol Buffers만큼 복잡하지 않음. Phase 2에서 바이너리 최적화 가능하므로 Phase 1은 개발 편의성 우선.</p>
+                </details>
+            </li>
+            <li>
+                <strong>다국어 점자를 지원하기 위해 BrailleLine 객체에 포함되어야 할 필드는 무엇이며, 한국어 "안녕"을 점역할 때 필요한 정보는?</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>필수 필드: (1) <strong>language</strong>: "ko-KR" (언어 코드), (2) <strong>encoding</strong>: "korean-standard" (점자 체계). 한국어 "안녕" 점역 시 필요한 정보: (1) 한글 분해 규칙 (초성 ㅇ, 중성 ㅏ, 종성 ㄴ 등), (2) 각 자모의 점자 패턴 (ㅇ=⠈, ㅏ=⠣, ㄴ=⠴ 등), (3) 초성/중성/종성 위치에 따른 변환 규칙, (4) 한국어 점자 변환 테이블. 이를 통해 "안녕" = [⠈, ⠣, ⠴, ⠒, ⠬, ⠁] 등으로 변환됩니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>점자 데이터의 구조적 검증과 의미적 검증의 차이를 설명하고, 각각의 예를 드세요.</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p><strong>구조적 검증</strong>: JSON 스키마로 타입, 필드 존재, 값 범위를 체크. 예: type이 "BrailleCell"인지, dots가 6 또는 8인지, pattern이 유니코드 점자 문자(⠀-⣿)인지 확인. <strong>의미적 검증</strong>: 필드 간 일관성과 논리적 정합성을 체크. 예: dotPattern [1,2,5]에서 계산한 decimal (19)가 실제 decimal 필드 값과 일치하는지, pattern "⠓"가 U+2800+19=U+2813와 일치하는지 검증. 구조적 검증은 자동화 가능하지만, 의미적 검증은 도메인 지식과 커스텀 로직이 필요합니다.</p>
+                </details>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>4.11 다음 챕터 미리보기</h2>
+        <p><strong>챕터 5: Phase 2 - 통신 프로토콜</strong>에서는 점자 디스플레이와 호스트 시스템 간의 실시간 통신을 다룹니다:</p>
+        <ul>
+            <li><strong>전송 계층</strong>: USB HID, Bluetooth SPP, WiFi 소켓 프로토콜</li>
+            <li><strong>메시지 형식</strong>: 바이너리 직렬화, 압축, 오류 검출</li>
+            <li><strong>명령 세트</strong>: 점자 쓰기, 커서 이동, 상태 조회, 설정 변경</li>
+            <li><strong>응답 처리</strong>: ACK/NAK, 타임아웃, 재시도 로직</li>
+            <li><strong>실시간 성능</strong>: 지연 시간 최소화 (< 100ms), 버퍼링 전략</li>
+            <li><strong>보안</strong>: 디바이스 인증, 데이터 무결성, 암호화</li>
+        </ul>
+
+        <p>Phase 1의 데이터 형식이 "무엇을" 전달할지 정의했다면, Phase 2는 "어떻게" 전달할지를 정의합니다. 실제 하드웨어와의 통신을 구현할 준비를 하세요!</p>
+
+        <p><strong><a href="chapter-05.html">챕터 5로 계속 →</a></strong></p>
+    </section>
+</body>
+</html>

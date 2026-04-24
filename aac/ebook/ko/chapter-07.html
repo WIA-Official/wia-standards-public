@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 보안, 개인정보 보호 및 데이터 관리 | WIA-AAC</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>7장: 보안, 개인정보 보호 및 데이터 관리</h1>
+
+    <h2>7.1 AAC 데이터의 민감성</h2>
+    <p>AAC 시스템은 상상할 수 있는 가장 민감한 데이터 중 일부를 처리합니다: 사람이 의사소통하는 모든 단어를 캡처합니다. 이 데이터는 사용자의 삶, 관계, 건강 및 생각에 대한 친밀한 세부 사항을 드러냅니다. WIA-AAC 표준은 이것이 수반하는 깊은 책임을 인식하고 포괄적인 보안 및 개인정보 보호 요구사항을 수립합니다.</p>
+
+    <p>메시지 내용 외에도 AAC 시스템은 음성 뱅킹 녹음, 의료 상태를 드러낼 수 있는 보정 데이터, 위치 데이터 및 상세한 사용 패턴을 저장합니다. 이 모든 정보는 최고 수준의 보호가 필요합니다.</p>
+
+    <div class="highlight">
+        <strong>개인정보 우선 원칙:</strong> AAC 사용자는 자신의 의사소통 데이터에 대한 완전한 통제권을 가져야 합니다. 기본 상태는 항상 최대 개인정보 보호여야 합니다. 데이터 수집은 최소화되고, 투명하며, 사용자가 제어해야 합니다.
+    </div>
+
+    <h2>7.2 데이터 분류</h2>
+    <p>WIA-AAC는 보호 요구사항을 안내하기 위한 데이터 민감도 수준을 정의합니다:</p>
+
+    <table>
+        <tr>
+            <th>수준</th>
+            <th>데이터 유형</th>
+            <th>보호 요구사항</th>
+        </tr>
+        <tr>
+            <td>중요</td>
+            <td>메시지 내용, 음성 녹음, 건강 관련 어휘 사용</td>
+            <td>저장 및 전송 시 암호화, 접근 로깅, 사용자 동의 필수</td>
+        </tr>
+        <tr>
+            <td>높음</td>
+            <td>사용자 프로필, 보정 데이터, 개인 상징, 연락처</td>
+            <td>저장 시 암호화, 인증 필수</td>
+        </tr>
+        <tr>
+            <td>중간</td>
+            <td>일반 설정, 어휘 구조, 사용 통계</td>
+            <td>인증 필수, 암호화 선택</td>
+        </tr>
+        <tr>
+            <td>낮음</td>
+            <td>애플리케이션 선호도, 디스플레이 설정, 일반 문서</td>
+            <td>표준 보호</td>
+        </tr>
+    </table>
+
+    <h2>7.3 암호화 표준</h2>
+    <p>모든 민감한 AAC 데이터는 강력한 암호화로 보호되어야 합니다:</p>
+
+    <h3>7.3.1 암호화 요구사항</h3>
+    <pre><code>// WIA-AAC 암호화 표준
+const encryptionRequirements = {
+    // 저장된 데이터
+    atRest: {
+        algorithm: 'AES-256-GCM',
+        keyDerivation: 'PBKDF2',
+        keyIterations: 100000,
+        saltLength: 16
+    },
+
+    // 전송 중인 데이터
+    inTransit: {
+        protocol: 'TLS 1.3',
+        minimumProtocol: 'TLS 1.2',
+        cipherSuites: [
+            'TLS_AES_256_GCM_SHA384',
+            'TLS_CHACHA20_POLY1305_SHA256'
+        ],
+        certificateValidation: 'required'
+    },
+
+    // 클라우드 동기화
+    cloudSync: {
+        endToEndEncryption: 'required',
+        keyManagement: 'client-side',
+        zeroKnowledge: 'recommended'
+    }
+};
+
+// 구현 예시
+class SecureStorage {
+    private encryptionKey: CryptoKey;
+
+    async encryptData(data: any): Promise&lt;EncryptedData&gt; {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encoded = new TextEncoder().encode(JSON.stringify(data));
+
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            this.encryptionKey,
+            encoded
+        );
+
+        return {
+            iv: this.arrayToBase64(iv),
+            data: this.arrayToBase64(new Uint8Array(encrypted)),
+            algorithm: 'AES-256-GCM'
+        };
+    }
+
+    async decryptData(encrypted: EncryptedData): Promise&lt;any&gt; {
+        const iv = this.base64ToArray(encrypted.iv);
+        const data = this.base64ToArray(encrypted.data);
+
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            this.encryptionKey,
+            data
+        );
+
+        return JSON.parse(new TextDecoder().decode(decrypted));
+    }
+}</code></pre>
+
+    <h3>7.3.2 키 관리</h3>
+    <ul>
+        <li>사용자 제어 자격 증명에서 파생된 암호화 키</li>
+        <li>데이터 손실 없이 키 순환 지원</li>
+        <li>플랫폼 기능을 사용한 안전한 키 저장 (키체인, 키스토어)</li>
+        <li>보안을 손상시키지 않는 복구 메커니즘</li>
+    </ul>
+
+    <div class="highlight">
+        <strong>제로 지식 설계:</strong> 클라우드 서비스 제공자는 암호화되지 않은 사용자 데이터에 접근할 수 없어야 합니다. 클라이언트 측 키 관리와 함께 종단간 암호화는 서버가 손상되더라도 메시지 내용이 보호되도록 보장합니다.
+    </div>
+
+    <h2>7.4 인증 및 접근 제어</h2>
+    <p>AAC 시스템 및 데이터에 대한 접근 제어:</p>
+
+    <h3>7.4.1 사용자 인증</h3>
+    <pre><code>// AAC 시스템을 위한 인증 옵션
+interface AuthenticationConfig {
+    // 기본 인증
+    primary: AuthMethod;
+
+    // 대체 방법 (접근성 고려)
+    fallbacks: AuthMethod[];
+
+    // 타임아웃 설정
+    lockTimeout: number;  // 재인증 전 분
+    requireAuthForSettings: boolean;
+
+    // 대리 접근
+    delegateAccess: DelegateConfig[];
+}
+
+type AuthMethod =
+    | { type: 'pin'; length: number }
+    | { type: 'pattern'; gridSize: number }
+    | { type: 'biometric'; modality: 'fingerprint' | 'face' }
+    | { type: 'switch-pattern'; sequence: string }
+    | { type: 'voice'; passphrase: string }
+    | { type: 'device-trust'; deviceId: string };
+
+// 접근 가능한 인증 예시
+const accessibleAuth: AuthenticationConfig = {
+    primary: { type: 'pin', length: 4 },
+    fallbacks: [
+        { type: 'switch-pattern', sequence: 'long-short-long' },
+        { type: 'device-trust', deviceId: 'trusted-ipad' }
+    ],
+    lockTimeout: 30,
+    requireAuthForSettings: true,
+    delegateAccess: [
+        {
+            name: '부모',
+            permissions: ['settings', 'vocabulary-edit'],
+            authMethod: { type: 'pin', length: 6 }
+        }
+    ]
+};</code></pre>
+
+    <h3>7.4.2 보호자 및 지원 접근</h3>
+    <p>AAC 사용자는 종종 보호자, 치료사 및 교육자의 지원이 필요합니다:</p>
+
+    <table>
+        <tr>
+            <th>역할</th>
+            <th>일반적인 권한</th>
+        </tr>
+        <tr>
+            <td>주 사용자</td>
+            <td>모든 기능 및 데이터에 대한 전체 접근</td>
+        </tr>
+        <tr>
+            <td>부모/보호자</td>
+            <td>설정, 어휘 편집, 사용 보고서</td>
+        </tr>
+        <tr>
+            <td>언어재활사</td>
+            <td>어휘 편집, 평가 도구, 진행 데이터</td>
+        </tr>
+        <tr>
+            <td>교사</td>
+            <td>제한된 어휘 편집, 활동 로그</td>
+        </tr>
+        <tr>
+            <td>지원 직원</td>
+            <td>기본 설정, 충전 상태, 문제 해결</td>
+        </tr>
+    </table>
+
+    <h2>7.5 개인정보 보호 제어</h2>
+    <p>데이터 수집 및 공유에 대한 사용자 제어:</p>
+
+    <h3>7.5.1 개인정보 보호 설정</h3>
+    <pre><code>// 개인정보 보호 구성 인터페이스
+interface PrivacySettings {
+    // 메시지 기록
+    messageHistory: {
+        enabled: boolean;
+        retentionDays: number;  // 0 = 보관 안 함
+        includeInBackup: boolean;
+    };
+
+    // 사용 분석
+    analytics: {
+        enabled: boolean;
+        level: 'none' | 'basic' | 'detailed';
+        includeVocabularyStats: boolean;
+    };
+
+    // 클라우드 기능
+    cloud: {
+        syncEnabled: boolean;
+        backupEnabled: boolean;
+        voiceBankStorage: boolean;
+    };
+
+    // 공유
+    sharing: {
+        allowProfileExport: boolean;
+        allowRemoteSupport: boolean;
+        sharePredictionData: boolean;  // AI 모델 개선용
+    };
+
+    // 연구 참여
+    research: {
+        participateInResearch: boolean;
+        anonymizeData: boolean;
+    };
+}
+
+// 기본 개인정보 우선 설정
+const defaultPrivacy: PrivacySettings = {
+    messageHistory: { enabled: false, retentionDays: 0, includeInBackup: false },
+    analytics: { enabled: false, level: 'none', includeVocabularyStats: false },
+    cloud: { syncEnabled: false, backupEnabled: false, voiceBankStorage: false },
+    sharing: { allowProfileExport: true, allowRemoteSupport: false, sharePredictionData: false },
+    research: { participateInResearch: false, anonymizeData: true }
+};</code></pre>
+
+    <h3>7.5.2 데이터 주체 권리</h3>
+    <p>WIA-AAC 시스템은 개인정보 보호 규정에 따른 사용자 권리를 지원해야 합니다:</p>
+    <ul>
+        <li><strong>접근 권리:</strong> 사용자는 자신에 대해 수집된 모든 데이터를 볼 수 있음</li>
+        <li><strong>이동성 권리:</strong> 표준 형식으로 개인 데이터 내보내기</li>
+        <li><strong>수정 권리:</strong> 부정확한 데이터 수정</li>
+        <li><strong>삭제 권리:</strong> 완전한 데이터 제거 요청</li>
+        <li><strong>제한 권리:</strong> 데이터 처리 제한</li>
+    </ul>
+
+    <pre><code>// 데이터 권리 구현
+interface DataRights {
+    // 모든 개인 데이터 접근
+    exportAllData(): Promise&lt;PersonalDataExport&gt;;
+
+    // 특정 데이터 카테고리 삭제
+    deleteData(categories: DataCategory[]): Promise&lt;DeletionResult&gt;;
+
+    // 완전한 계정 삭제
+    deleteAccount(): Promise&lt;void&gt;;
+
+    // 데이터 처리 활동 보기
+    getProcessingActivities(): ProcessingActivity[];
+
+    // 동의 관리
+    getConsents(): ConsentRecord[];
+    updateConsent(consentId: string, granted: boolean): Promise&lt;void&gt;;
+}</code></pre>
+
+    <div class="highlight">
+        <strong>규정 준수:</strong> WIA-AAC 시스템은 GDPR, CCPA, HIPAA(해당되는 경우) 및 접근성 규정을 포함한 적용 가능한 개인정보 보호 규정을 준수해야 합니다. 표준은 이러한 요구사항을 충족하거나 초과하는 프레임워크를 제공합니다.
+    </div>
+
+    <h2>7.6 보안 통신 채널</h2>
+    <p>전송 중 데이터 보호:</p>
+
+    <h3>7.6.1 전송 보안</h3>
+    <pre><code>// 네트워크 보안 구성
+interface NetworkSecurity {
+    // TLS 구성
+    tls: {
+        minimumVersion: 'TLS1.2' | 'TLS1.3';
+        certificatePinning: boolean;
+        pinnedCertificates?: string[];
+    };
+
+    // API 보안
+    api: {
+        authentication: 'oauth2' | 'api-key';
+        rateLimit: number;  // 분당 요청 수
+        requestSigning: boolean;
+    };
+
+    // 로컬 네트워크
+    localNetwork: {
+        discoveryProtocol: 'mDNS' | 'SSDP';
+        requireAuthentication: boolean;
+        allowedClients: string[];  // MAC 주소 또는 기기 ID
+    };
+}</code></pre>
+
+    <h2>7.7 백업 및 복구</h2>
+    <p>안전한 백업 시스템을 통한 사용자 데이터 보호:</p>
+
+    <h3>7.7.1 백업 전략</h3>
+    <pre><code>// 백업 구성
+interface BackupConfig {
+    // 자동 백업
+    automatic: {
+        enabled: boolean;
+        frequency: 'daily' | 'weekly' | 'monthly';
+        time: string;  // 선호하는 백업 시간
+        requireWifi: boolean;
+        requireCharging: boolean;
+    };
+
+    // 백업 콘텐츠
+    content: {
+        vocabulary: boolean;
+        settings: boolean;
+        messageHistory: boolean;
+        voiceBank: boolean;
+        calibrationData: boolean;
+    };
+
+    // 저장소
+    storage: {
+        local: boolean;
+        cloud: boolean;
+        cloudProvider?: string;
+    };
+
+    // 보존
+    retention: {
+        keepCount: number;  // 유지할 백업 수
+        keepDays: number;   // 백업 보존 일수
+    };
+}
+
+// 백업 작업
+interface BackupService {
+    createBackup(name?: string): Promise&lt;BackupInfo&gt;;
+    listBackups(): Promise&lt;BackupInfo[]&gt;;
+    restoreBackup(backupId: string): Promise&lt;RestoreResult&gt;;
+    deleteBackup(backupId: string): Promise&lt;void&gt;;
+    verifyBackup(backupId: string): Promise&lt;VerificationResult&gt;;
+}</code></pre>
+
+    <h3>7.7.2 복구 절차</h3>
+    <ul>
+        <li>클라우드 백업에서 기기 교체 복구</li>
+        <li>로컬 백업에서 공장 초기화 복구</li>
+        <li>부분 복원 (어휘만, 설정만)</li>
+        <li>플랫폼 간 마이그레이션</li>
+    </ul>
+
+    <h2>7.8 감사 로깅</h2>
+    <p>보안 및 책임을 위한 접근 및 변경 추적:</p>
+
+    <pre><code>// 감사 로그 구성
+interface AuditConfig {
+    enabled: boolean;
+    events: AuditEventType[];
+    retention: number;  // 로그 보존 일수
+    exportable: boolean;
+}
+
+type AuditEventType =
+    | 'login'
+    | 'logout'
+    | 'failed-login'
+    | 'settings-change'
+    | 'vocabulary-edit'
+    | 'profile-export'
+    | 'profile-import'
+    | 'delegate-access'
+    | 'backup-created'
+    | 'backup-restored'
+    | 'data-deleted';
+
+interface AuditEntry {
+    timestamp: Date;
+    event: AuditEventType;
+    actor: string;  // 사용자 또는 대리인 식별자
+    details: Record&lt;string, any&gt;;
+    ipAddress?: string;
+    deviceId?: string;
+}
+
+// 감사 로그 접근
+interface AuditService {
+    log(event: AuditEventType, details: Record&lt;string, any&gt;): void;
+    query(filter: AuditFilter): Promise&lt;AuditEntry[]&gt;;
+    export(format: 'json' | 'csv'): Promise&lt;Blob&gt;;
+}</code></pre>
+
+    <h2>7.9 사고 대응</h2>
+    <p>보안 사고 처리를 위한 절차:</p>
+
+    <h3>7.9.1 사고 카테고리</h3>
+    <table>
+        <tr>
+            <th>카테고리</th>
+            <th>예시</th>
+            <th>대응</th>
+        </tr>
+        <tr>
+            <td>데이터 유출</td>
+            <td>사용자 데이터에 대한 무단 접근</td>
+            <td>사용자 알림, 비밀번호 재설정, 조사</td>
+        </tr>
+        <tr>
+            <td>기기 도난</td>
+            <td>AAC 기기 분실 또는 도난</td>
+            <td>원격 삭제, 계정 잠금, 백업 복원</td>
+        </tr>
+        <tr>
+            <td>악성코드</td>
+            <td>기기의 악성 소프트웨어</td>
+            <td>격리, 클린 재설치, 자격 증명 변경</td>
+        </tr>
+        <tr>
+            <td>무단 접근</td>
+            <td>알 수 없는 사람이 시스템 접근</td>
+            <td>세션 종료, 감사 검토, 접근 변경</td>
+        </tr>
+    </table>
+
+    <h3>7.9.2 원격 보안 명령</h3>
+    <pre><code>// 긴급 보안 명령 (강력한 인증 필요)
+interface RemoteSecurity {
+    // 기기 즉시 잠금
+    remoteLock(deviceId: string): Promise&lt;void&gt;;
+
+    // 민감한 데이터 삭제
+    remoteWipe(deviceId: string, level: WipeLevel): Promise&lt;void&gt;;
+
+    // 모든 세션 취소
+    revokeAllSessions(userId: string): Promise&lt;void&gt;;
+
+    // 클라우드 접근 비활성화
+    disableCloudAccess(userId: string): Promise&lt;void&gt;;
+}
+
+type WipeLevel = 'messages-only' | 'user-data' | 'complete';</code></pre>
+
+    <div class="highlight">
+        <strong>사용자 권한 부여:</strong> 사용자 또는 권한 있는 대리인은 분실된 기기를 원격으로 보안하거나 삭제할 수 있어야 합니다. 이러한 기능은 기본 AAC 기기를 사용할 수 없는 경우에도 접근 가능해야 합니다.
+    </div>
+
+    <h2>7.10 준수 및 인증</h2>
+    <p>WIA-AAC 보안 요구사항은 주요 프레임워크와 일치합니다:</p>
+    <ul>
+        <li>GDPR (일반 데이터 보호 규정)</li>
+        <li>HIPAA (의료 상황용)</li>
+        <li>COPPA (아동 사용자용)</li>
+        <li>SOC 2 Type II (클라우드 서비스용)</li>
+        <li>ISO 27001 (정보 보안 관리)</li>
+    </ul>
+
+    <p>WIA-AAC 준수를 추구하는 벤더는 제3자 감사 또는 문서화된 자체 인증을 통해 이러한 보안 및 개인정보 보호 요구사항 준수를 입증해야 합니다.</p>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Data Standards and Protocols - WIA-BATTERY_PASSPORT</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --accent: #8b5cf6;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--success);
+            font-size: 1.8rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+        h3 {
+            color: var(--accent);
+            font-size: 1.4rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        p {
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #2d3748);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        pre {
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            margin: 1.5rem 0;
+            color: #e0e0e0;
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        .protocol-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .footer-content {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Data Standards and Protocols</h1>
+    
+    <div class="highlight">
+        <p><strong>Interoperability is the cornerstone of effective battery passports.</strong> This chapter defines the data formats, communication protocols, and API specifications that enable seamless data exchange between all participants in the battery value chain. Adherence to these standards ensures that battery passport data remains accessible and meaningful regardless of the systems or organizations involved.</p>
+    </div>
+
+    <h2>Data Format Specifications</h2>
+    <p>The WIA-BATTERY_PASSPORT standard uses JSON as the primary data interchange format. All data exchanges must conform to the defined JSON schemas, which specify required fields, data types, validation rules, and semantic meaning. The schemas are versioned to allow for evolution while maintaining backward compatibility.</p>
+
+    <h3>Core Schema Structure</h3>
+    <pre>
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://wia.org/schemas/battery-passport/v1.0",
+    "title": "WIA Battery Passport Schema",
+    "type": "object",
+    "required": ["passportId", "version", "identity", "technical"],
+    "properties": {
+        "passportId": {
+            "type": "string",
+            "pattern": "^WIA-BP-[0-9]{4}-[0-9]{6}$",
+            "description": "Unique identifier for the battery passport"
+        },
+        "version": {
+            "type": "string",
+            "enum": ["1.0"],
+            "description": "Schema version"
+        },
+        "identity": {
+            "$ref": "#/$defs/IdentityBlock"
+        },
+        "technical": {
+            "$ref": "#/$defs/TechnicalBlock"
+        },
+        "materials": {
+            "$ref": "#/$defs/MaterialsBlock"
+        },
+        "carbonFootprint": {
+            "$ref": "#/$defs/CarbonFootprintBlock"
+        },
+        "lifecycle": {
+            "$ref": "#/$defs/LifecycleBlock"
+        }
+    }
+}
+    </pre>
+
+    <h2>Communication Protocols</h2>
+    <p>The standard defines multiple communication protocols to accommodate different use cases and integration scenarios. All protocols support both synchronous and asynchronous operations.</p>
+
+    <div class="protocol-box">
+        <h3>REST API Protocol</h3>
+        <p>The primary protocol for most integrations is a RESTful HTTP API. All endpoints use HTTPS with TLS 1.3 minimum. Authentication is performed using OAuth 2.0 with JWT tokens. Rate limiting and throttling protect against abuse while ensuring fair access for all participants.</p>
+        <pre>
+// REST API Endpoints
+Base URL: https://api.wia-passport.org/v1
+
+GET    /passports/{id}           - Retrieve passport
+POST   /passports                - Create new passport
+PUT    /passports/{id}           - Update passport
+DELETE /passports/{id}           - Deactivate passport
+
+GET    /passports/{id}/events    - List lifecycle events
+POST   /passports/{id}/events    - Add lifecycle event
+
+GET    /passports/{id}/soh       - Get current SoH
+GET    /passports/{id}/history   - Get SoH history
+
+POST   /verify                   - Verify passport authenticity
+        </pre>
+    </div>
+
+    <div class="protocol-box">
+        <h3>GraphQL Protocol</h3>
+        <p>For complex queries requiring flexible data selection, a GraphQL endpoint is provided. This is particularly useful for dashboard applications that need to aggregate data from multiple passports or retrieve specific subsets of information.</p>
+        <pre>
+# GraphQL Query Example
+query GetBatteryDetails($id: ID!) {
+    passport(id: $id) {
+        passportId
+        identity {
+            manufacturer {
+                name
+                country
+            }
+            productionDate
+        }
+        technical {
+            chemistry
+            nominalCapacity
+            energyDensity
+        }
+        currentSoH
+        lifecycle {
+            events(last: 10) {
+                eventType
+                timestamp
+                location {
+                    facility
+                    country
+                }
+            }
+        }
+    }
+}
+        </pre>
+    </div>
+
+    <div class="protocol-box">
+        <h3>Event Streaming Protocol</h3>
+        <p>For real-time monitoring applications, the standard supports event streaming via WebSocket connections and Apache Kafka topics. This enables immediate notification of lifecycle events and continuous SoH updates.</p>
+        <pre>
+// WebSocket Connection Example
+const ws = new WebSocket('wss://stream.wia-passport.org/v1');
+
+ws.onopen = () => {
+    ws.send(JSON.stringify({
+        action: 'subscribe',
+        passportIds: ['WIA-BP-2025-001234'],
+        eventTypes: ['soh_update', 'incident_reported']
+    }));
+};
+
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    console.log('Received event:', data);
+};
+        </pre>
+    </div>
+
+    <h2>Identifier Systems</h2>
+    <p>Unique identification is fundamental to the passport system. The standard defines a hierarchical identifier scheme that ensures global uniqueness while maintaining human readability.</p>
+
+    <h3>Passport ID Format</h3>
+    <pre>
+Format: WIA-BP-YYYY-NNNNNN
+
+Where:
+- WIA    = World Interoperability Alliance prefix
+- BP     = Battery Passport indicator
+- YYYY   = Year of passport creation
+- NNNNNN = Sequential number (000001-999999)
+
+Examples:
+- WIA-BP-2025-000001 (First passport of 2025)
+- WIA-BP-2025-123456 (123,456th passport of 2025)
+    </pre>
+
+    <h3>Related Identifier Formats</h3>
+    <pre>
+Material Batch:    WIA-MB-YYYY-TTTT-NNNNNN
+Cell Batch:        WIA-CB-YYYY-NNNNNN
+Event ID:          WIA-EV-YYYYMMDD-NNNNNNNN
+Organization ID:   WIA-ORG-CCCC-NNNNNN
+
+Where:
+- TTTT = Material type code (LITH, COBL, NICK, etc.)
+- CCCC = ISO 3166-1 alpha-2 country code
+    </pre>
+
+    <h2>Data Validation Rules</h2>
+    <p>All data submitted to the passport system must pass validation checks before acceptance. The validation framework includes schema validation, business rule validation, and cross-reference validation.</p>
+
+    <ul>
+        <li><strong>Schema Validation:</strong> JSON structure must conform to defined schemas</li>
+        <li><strong>Type Validation:</strong> Values must match specified data types</li>
+        <li><strong>Range Validation:</strong> Numeric values must fall within valid ranges</li>
+        <li><strong>Format Validation:</strong> Strings must match required patterns (dates, IDs, etc.)</li>
+        <li><strong>Reference Validation:</strong> Foreign keys must reference existing entities</li>
+        <li><strong>Temporal Validation:</strong> Events must have logical chronological order</li>
+    </ul>
+
+    <pre>
+// Validation Response Structure
+{
+    "valid": false,
+    "errors": [
+        {
+            "field": "technical.nominalCapacity",
+            "code": "RANGE_ERROR",
+            "message": "Value 150000 exceeds maximum of 100000 Wh",
+            "severity": "error"
+        },
+        {
+            "field": "materials.cathode.cobaltPercent",
+            "code": "SUM_MISMATCH",
+            "message": "Cathode percentages must sum to 100",
+            "severity": "error"
+        }
+    ],
+    "warnings": [
+        {
+            "field": "carbonFootprint.totalKgCO2e",
+            "code": "UNUSUAL_VALUE",
+            "message": "Carbon footprint unusually low for battery size",
+            "severity": "warning"
+        }
+    ]
+}
+    </pre>
+
+    <h2>API Authentication and Authorization</h2>
+    <p>Security is paramount in the battery passport system. The authentication and authorization framework ensures that only verified participants can access data, and that access is appropriately scoped based on roles and permissions.</p>
+
+    <pre>
+// OAuth 2.0 Token Request
+POST /oauth/token HTTP/1.1
+Host: auth.wia-passport.org
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&client_id=org_123456
+&client_secret=secret_value
+&scope=passport:read passport:write events:write
+
+// Response
+{
+    "access_token": "eyJhbGciOiJSUzI1NiIs...",
+    "token_type": "Bearer",
+    "expires_in": 3600,
+    "scope": "passport:read passport:write events:write"
+}
+
+// Using the Token
+GET /v1/passports/WIA-BP-2025-001234 HTTP/1.1
+Host: api.wia-passport.org
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+    </pre>
+
+    <h2>Data Privacy and Access Control</h2>
+    <p>The battery passport contains both public and confidential information. The access control system ensures appropriate visibility for different stakeholder categories while protecting sensitive business data.</p>
+
+    <ul>
+        <li><strong>Public Access:</strong> Basic identity, chemistry type, capacity, certifications</li>
+        <li><strong>Consumer Access:</strong> Environmental data, safety records, maintenance history</li>
+        <li><strong>Operator Access:</strong> Detailed technical data, operational history</li>
+        <li><strong>Manufacturer Access:</strong> Full production data, supply chain details</li>
+        <li><strong>Regulator Access:</strong> Complete data set including confidential information</li>
+    </ul>
+
+    <h2>Interoperability with External Systems</h2>
+    <p>The standard defines integration patterns for connecting with external systems commonly found in the battery ecosystem, including ERP systems, manufacturing execution systems, and fleet management platforms.</p>
+
+    <pre>
+// External System Integration Configuration
+{
+    "integration": {
+        "type": "erp",
+        "vendor": "SAP",
+        "connection": {
+            "protocol": "RFC",
+            "system": "PRD",
+            "client": "100"
+        },
+        "mappings": {
+            "passportId": "ZBATT_PASSPORT_ID",
+            "productionDate": "ERSDA",
+            "batchNumber": "CHARG"
+        },
+        "sync": {
+            "mode": "bidirectional",
+            "frequency": "realtime",
+            "conflictResolution": "passport_priority"
+        }
+    }
+}
+    </pre>
+
+    <div class="footer-content">
+        <p>© 2025 WIA (World Interoperability Alliance)</p>
+        <p>弘益人間 (홍익인간) · Benefit All Humanity</p>
+        <p>WIA-BATTERY_PASSPORT v1.0 - Chapter 3</p>
+    </div>
+</body>
+</html>

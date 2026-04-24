@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 2: Data Schema - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI Standard</h1>
+    <p class="subtitle">Chapter 2: Data Schema</p>
+  </header>
+
+  <main class="container">
+    <h1>Chapter 2: Data Schema</h1>
+
+    <h2>2.1 Audio Input Format</h2>
+    <p>WIA-CI defines a flexible audio input format that balances quality with real-time processing requirements.</p>
+
+    <h3>Basic Audio Specification</h3>
+    <pre><code>interface CIAudioInput {
+  sampleRate: 16000 | 22050 | 44100 | 48000;  // Hz
+  bitDepth: 16 | 24 | 32;
+  channels: 1;  // Mono (CI is unilateral)
+
+  frameSize: number;     // Samples (recommended: 256 @ 16kHz)
+  hopSize: number;       // Frame advance (recommended: 128)
+
+  encoding: 'pcm_s16le' | 'pcm_f32le' | 'pcm_s24le';
+}</code></pre>
+
+    <h3>Recommended Configurations</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Use Case</th>
+          <th>Sample Rate</th>
+          <th>Frame Size</th>
+          <th>Hop Size</th>
+          <th>Latency</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Real-time Speech</td>
+          <td>16 kHz</td>
+          <td>256</td>
+          <td>128</td>
+          <td>16 ms</td>
+        </tr>
+        <tr>
+          <td>Music</td>
+          <td>44.1 kHz</td>
+          <td>1024</td>
+          <td>512</td>
+          <td>23 ms</td>
+        </tr>
+        <tr>
+          <td>Low Latency</td>
+          <td>16 kHz</td>
+          <td>128</td>
+          <td>64</td>
+          <td>8 ms</td>
+        </tr>
+        <tr>
+          <td>High Quality</td>
+          <td>48 kHz</td>
+          <td>2048</td>
+          <td>1024</td>
+          <td>43 ms</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2.2 Electrode Mapping</h2>
+    <p>The 22-channel frequency allocation table (FAT) is the cornerstone of WIA-CI electrode mapping.</p>
+
+    <h3>Frequency Allocation Table Structure</h3>
+    <pre><code>interface FrequencyAllocationTable {
+  electrodeCount: 22;
+
+  // Center frequencies (Hz) - Base to Apex
+  centerFrequencies: [
+    7438, 6500, 5688, 5000, 4375, 3813, 3313, 2875,
+    2500, 2188, 1938, 1688, 1438, 1250, 1125, 1000,
+    875, 750, 625, 500, 375, 250
+  ];
+
+  // Bandwidth for each electrode
+  bandwidths: number[];  // Calculated from frequency ranges
+
+  // Logarithmic distribution parameters
+  logarithmic: {
+    minFreq: 250;   // Hz
+    maxFreq: 8000;  // Hz
+    octaves: 5;     // Total octave range
+  };
+}</code></pre>
+
+    <h3>Electrode Configuration</h3>
+    <pre><code>interface ElectrodeMap {
+  electrode: number;        // 1-22
+  centerFreq: number;       // Hz
+  lowCutoff: number;        // Hz (band edge)
+  highCutoff: number;       // Hz (band edge)
+  insertionDepth: number;   // mm (cochlear position)
+  tonotopicAngle: number;   // degrees (Greenwood function)
+}</code></pre>
+
+    <div class="info-box">
+      <h3>Greenwood Function</h3>
+      <p>WIA-CI uses the Greenwood function to map frequency to cochlear position: <code>f = 165.4 × (10^(0.06x) - 1)</code> where x is distance from apex in mm. This ensures physiologically accurate frequency-to-place mapping.</p>
+    </div>
+
+    <h2>2.3 Personalized Mapping</h2>
+    <p>Individual patients may require customized electrode mappings based on their specific cochlear anatomy and neural response patterns.</p>
+
+    <pre><code>interface PersonalizedMap {
+  patientId: string;
+
+  // Audiometric thresholds (T-levels)
+  audiometricThresholds: number[];  // μA per electrode
+
+  // Comfort levels (C-levels)
+  comfortLevels: number[];          // μA per electrode
+
+  // Tonotopic mismatch correction
+  frequencyShift: number[];         // Hz adjustment per electrode
+
+  // Active electrodes
+  activeElectrodes: number[];       // Enabled electrode numbers
+  disabledElectrodes: number[];     // Disabled (e.g., facial nerve)
+}</code></pre>
+
+    <h2>2.4 Envelope Data Format</h2>
+    <p>The envelope represents the amplitude modulation of each frequency channel over time.</p>
+
+    <h3>Basic Envelope Structure</h3>
+    <pre><code>interface EnvelopeFrame {
+  timestamp: number;        // ms (frame start time)
+  frameIndex: number;       // Sequential frame number
+
+  // 22-channel envelope values
+  envelopes: Float32Array;  // length: 22, range: 0.0-1.0
+
+  // Signal statistics
+  rms: number;              // Overall RMS level
+  peak: number;             // Peak level
+
+  // Selected channels (n-of-m strategy)
+  selectedChannels: number[]; // ACE: top 8-12 channels
+}</code></pre>
+
+    <h3>Extended Envelope with Octave Information</h3>
+    <pre><code>interface ExtendedEnvelopeFrame extends EnvelopeFrame {
+  // WIA-CI Enhancement: Octave information
+  octaveInfo: {
+    fundamentalFreq: number;     // Estimated F0 (Hz)
+    octaveNumber: number;        // 0-8
+    octaveConfidence: number;    // 0.0-1.0
+
+    // Harmonic analysis
+    harmonics: HarmonicInfo[];
+  };
+
+  // Temporal modulation parameters
+  temporalModulation: {
+    pattern: 'AM' | 'FM' | 'mixed';
+    frequency: number;           // Modulation rate (Hz)
+    depth: number;               // 0.0-1.0
+  };
+}
+
+interface HarmonicInfo {
+  harmonic: number;      // 1=fundamental, 2=2nd harmonic...
+  frequency: number;     // Hz
+  amplitude: number;     // Relative amplitude
+  present: boolean;      // Detected yes/no
+}</code></pre>
+
+    <h2>2.5 Stimulation Data Format</h2>
+    <p>Stimulation commands specify the electrical pulses delivered to each electrode.</p>
+
+    <h3>Stimulation Command</h3>
+    <pre><code>interface StimulationCommand {
+  timestamp: number;          // μs (microsecond precision)
+  electrode: number;          // 1-22
+
+  // Stimulation parameters
+  amplitude: number;          // μA (0-2000)
+  pulseWidth: number;         // μs (typically 25-50)
+  interphaseGap: number;      // μs (typically 8)
+
+  // Polarity
+  polarity: 'cathodic_first' | 'anodic_first';
+
+  // WIA-CI Extension: Octave modulation
+  octaveModulation?: {
+    enabled: boolean;
+    pattern: number[];        // Modulation pattern
+    rate: number;             // Hz
+  };
+}</code></pre>
+
+    <h3>Stimulation Frame</h3>
+    <pre><code>interface StimulationFrame {
+  frameTimestamp: number;     // ms
+  stimulations: StimulationCommand[];
+
+  // CIS interleaving (no simultaneous stimulation)
+  interleaved: boolean;
+
+  // Safety limits
+  totalCurrent: number;       // μA (total across all electrodes)
+  compliance: boolean;        // Voltage compliance met
+}</code></pre>
+
+    <h2>2.6 Stream Format</h2>
+    <p>Real-time streaming uses a packetized format for efficient transmission.</p>
+
+    <h3>Stream Packet Structure</h3>
+    <pre><code>interface CIStreamPacket {
+  header: {
+    magic: 0x57494143;        // 'WIAC' (WIA Cochlear)
+    version: number;          // Protocol version
+    packetType: PacketType;
+    sequenceNumber: number;
+    timestamp: number;        // μs
+    payloadLength: number;
+  };
+
+  payload: AudioPayload | EnvelopePayload | StimulationPayload;
+
+  checksum: number;           // CRC32
+}
+
+type PacketType =
+  | 0x01  // Audio Input
+  | 0x02  // Envelope Data
+  | 0x03  // Stimulation Commands
+  | 0x04  // Status/Telemetry
+  | 0x05  // Configuration
+  | 0x10  // Extended (with Octave);</code></pre>
+
+    <h3>Binary Layout</h3>
+    <pre><code>┌────────────────────────────────────────────┐
+│ Header (16 bytes)                          │
+├────────────────────────────────────────────┤
+│ Magic    │ Ver  │ Type │ Seq  │ Timestamp │
+│ 4 bytes  │ 2 b  │ 1 b  │ 2 b  │ 4 bytes   │
+├────────────────────────────────────────────┤
+│ PayloadLen │ Reserved                      │
+│ 2 bytes    │ 1 byte                        │
+├────────────────────────────────────────────┤
+│ Payload (variable length)                  │
+│ ...                                        │
+├────────────────────────────────────────────┤
+│ Checksum (4 bytes)                         │
+└────────────────────────────────────────────┘</code></pre>
+
+    <h2>2.7 File Format (.wiac)</h2>
+    <p>WIA-CI defines a standardized file format for storing and exchanging CI data.</p>
+
+    <pre><code>interface WIACFile {
+  header: {
+    magic: 'WIAC';
+    version: [1, 0, 0];
+
+    // Metadata
+    createdAt: string;  // ISO8601
+    duration: number;   // ms
+
+    // Device information
+    device: {
+      manufacturer: string;   // 'Cochlear', 'MED-EL', 'AB'
+      model: string;
+      serialNumber?: string;
+    };
+
+    // Patient information (anonymized)
+    patient?: {
+      id: string;             // Anonymous ID
+      implantSide: 'left' | 'right';
+      implantDate?: string;   // ISO8601
+    };
+  };
+
+  // Configuration
+  configuration: {
+    audioInput: CIAudioInput;
+    frequencyTable: FrequencyAllocationTable;
+    processingStrategy: 'CIS' | 'ACE' | 'FSP' | 'WIA-OCTAVE';
+    personalizedMap?: PersonalizedMap;
+  };
+
+  // Data blocks
+  blocks: DataBlock[];
+}</code></pre>
+
+    <h2>2.8 JSON Schema</h2>
+    <p>WIA-CI provides JSON schemas for validation and interoperability.</p>
+
+    <pre><code>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wiastandards.com/schemas/ci/config.json",
+  "title": "WIA-CI Configuration",
+  "type": "object",
+  "required": ["version", "audioInput", "electrodeMap"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "audioInput": {
+      "type": "object",
+      "properties": {
+        "sampleRate": { "enum": [16000, 22050, 44100, 48000] },
+        "bitDepth": { "enum": [16, 24, 32] },
+        "frameSize": { "type": "integer", "minimum": 64 },
+        "hopSize": { "type": "integer", "minimum": 32 }
+      }
+    },
+    "electrodeMap": {
+      "type": "object",
+      "properties": {
+        "electrodeCount": { "type": "integer", "default": 22 },
+        "centerFrequencies": {
+          "type": "array",
+          "items": { "type": "number" }
+        }
+      }
+    }
+  }
+}</code></pre>
+
+    <h2>2.9 Manufacturer Compatibility</h2>
+    <p>WIA-CI provides mapping functions to convert between different manufacturer formats.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Electrode Count</th>
+          <th>Conversion Method</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cochlear</td>
+          <td>22</td>
+          <td>Direct mapping</td>
+          <td>Native compatibility</td>
+        </tr>
+        <tr>
+          <td>MED-EL</td>
+          <td>12</td>
+          <td>2:1 downsampling</td>
+          <td>Frequency interpolation</td>
+        </tr>
+        <tr>
+          <td>Advanced Bionics</td>
+          <td>16</td>
+          <td>Interpolation</td>
+          <td>16 → 22 channel mapping</td>
+        </tr>
+        <tr>
+          <td>Oticon Medical</td>
+          <td>20</td>
+          <td>Near-direct</td>
+          <td>Minimal adjustment</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      <h3>Performance Requirements</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Requirement</th>
+            <th>Target</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Latency</td>
+            <td>&lt; 50 ms</td>
+            <td>&lt; 20 ms</td>
+          </tr>
+          <tr>
+            <td>Throughput</td>
+            <td>&gt; 100 frames/sec</td>
+            <td>&gt; 200 frames/sec</td>
+          </tr>
+          <tr>
+            <td>Memory</td>
+            <td>&lt; 10 MB</td>
+            <td>&lt; 5 MB</td>
+          </tr>
+          <tr>
+            <td>CPU (mobile)</td>
+            <td>&lt; 20%</td>
+            <td>&lt; 10%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    </main>
+</body>
+</html>

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA Climate Data Format Standard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 { color: #10B981; margin-top: 2em; }
+        h1 { border-bottom: 3px solid #10B981; padding-bottom: 10px; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; border-left: 4px solid #10B981; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; color: #10B981; }
+        tr:nth-child(even) { background: #1e293b40; }
+        blockquote { border-left: 4px solid #ffd700; padding-left: 20px; margin: 20px 0; background: #1e293b; padding: 20px; border-radius: 0 8px 8px 0; }
+        .highlight { background: #10B98120; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .warning { background: #f59e0b20; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        footer .philosophy { color: #ffd700; font-size: 1.2em; margin-bottom: 10px; }
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Integration Guide</h1>
+
+    <blockquote>
+        <p>"Integration is where standards meet reality. A sensor in the field, a satellite in orbit, a dashboard in a control room—all speaking the same language."</p>
+    </blockquote>
+
+    <h2>5.1 Integration Architecture</h2>
+
+    <p>WIA Climate integrates with diverse systems across the climate technology ecosystem. This chapter covers patterns for connecting IoT sensors, satellite systems, research platforms, visualization tools, and storage backends.</p>
+
+    <h3>5.1.1 Integration Patterns</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Pattern</th>
+                <th>Use Case</th>
+                <th>Transport</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Direct Sensor</strong></td>
+                <td>Field IoT devices reporting directly</td>
+                <td>MQTT, WebSocket</td>
+            </tr>
+            <tr>
+                <td><strong>Gateway</strong></td>
+                <td>Edge device aggregating multiple sensors</td>
+                <td>HTTP batch, MQTT</td>
+            </tr>
+            <tr>
+                <td><strong>Satellite Downlink</strong></td>
+                <td>Remote sensing data from satellites</td>
+                <td>HTTP batch, SFTP+transform</td>
+            </tr>
+            <tr>
+                <td><strong>Research Platform</strong></td>
+                <td>Climate model outputs, experiments</td>
+                <td>HTTP API, NetCDF export</td>
+            </tr>
+            <tr>
+                <td><strong>Bidirectional</strong></td>
+                <td>Control + monitoring (vertical farms)</td>
+                <td>WebSocket full-duplex</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>5.2 IoT Sensor Integration</h2>
+
+    <h3>5.2.1 Carbon Capture Facility Integration</h3>
+
+    <div class="highlight">
+        <p><strong>Scenario:</strong> Climeworks Orca DAC facility in Iceland reporting hourly capture metrics.</p>
+    </div>
+
+    <p><strong>Hardware Stack:</strong></p>
+    <ul>
+        <li>Raspberry Pi 4 edge gateway</li>
+        <li>Modbus RTU sensors (CO2, temperature, pressure)</li>
+        <li>4G LTE modem for connectivity</li>
+    </ul>
+
+    <pre><code>#!/usr/bin/env python3
+# Edge gateway code for carbon capture sensor
+
+import json
+import time
+import requests
+from datetime import datetime
+from modbus_reader import read_sensors
+
+WIA_API_URL = "https://api.wia.live/climate/v1/data"
+API_KEY = "your_api_key_here"
+
+def collect_data():
+    sensors = read_sensors()
+
+    message = {
+        "version": "1.0.0",
+        "type": "carbon_capture",
+        "timestamp": {
+            "unix_ms": int(time.time() * 1000),
+            "iso8601": datetime.utcnow().isoformat() + "Z"
+        },
+        "location": {
+            "latitude": 64.0,
+            "longitude": -21.0,
+            "altitude_m": 100
+        },
+        "device": {
+            "manufacturer": "Climeworks",
+            "model": "Orca DAC",
+            "serial": "ORCA-2024-001"
+        },
+        "data": {
+            "technology": "dac",
+            "capture_rate_kg_per_hour": sensors['capture_rate'],
+            "co2_purity_percentage": sensors['purity'],
+            "energy_consumption_kwh": sensors['power']
+        },
+        "meta": {
+            "quality_score": 0.98,
+            "source": "sensor"
+        }
+    }
+
+    return message
+
+def send_to_wia(message):
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(WIA_API_URL,
+                            json=message,
+                            headers=headers)
+
+    if response.status_code == 201:
+        print(f"✓ Data sent: {response.json()['data']['message_id']}")
+    else:
+        print(f"✗ Error: {response.status_code}")
+
+# Main loop: collect and send every hour
+while True:
+    try:
+        message = collect_data()
+        send_to_wia(message)
+    except Exception as e:
+        print(f"Error: {e}")
+
+    time.sleep(3600)  # 1 hour
+</code></pre>
+
+    <h3>5.2.2 Vertical Farm Sensor Network</h3>
+
+    <div class="highlight">
+        <p><strong>Scenario:</strong> Indoor farm with 100+ environmental sensors reporting every 5 minutes.</p>
+    </div>
+
+    <pre><code>// TypeScript MQTT integration for vertical farm
+import mqtt from 'mqtt';
+import { ClimateMessage } from './types';
+
+const client = mqtt.connect('mqtts://mqtt.wia.live:8883', {
+  clientId: 'farm-singapore-001',
+  username: 'wia_climate',
+  password: process.env.WIA_MQTT_PASSWORD
+});
+
+function publishFarmData(zoneId: string, sensors: any) {
+  const message: ClimateMessage = {
+    version: '1.0.0',
+    type: 'vertical_farming',
+    timestamp: {
+      unix_ms: Date.now(),
+      iso8601: new Date().toISOString()
+    },
+    location: {
+      latitude: 1.3521,
+      longitude: 103.8198,
+      altitude_m: 50
+    },
+    device: {
+      manufacturer: 'SmartFarm Inc',
+      model: `Zone-${zoneId}`,
+      serial: `FARM-SG-${zoneId}`
+    },
+    data: {
+      system_type: 'hydroponics',
+      environment: {
+        temperature_celsius: sensors.temp,
+        humidity_percentage: sensors.humidity,
+        co2_ppm: sensors.co2,
+        vpd_kpa: sensors.vpd
+      },
+      lighting: {
+        type: 'led',
+        ppfd_umol_per_m2_s: sensors.ppfd,
+        photoperiod_hours: 16,
+        spectrum: 'full_spectrum'
+      },
+      nutrient_solution: {
+        ph: sensors.ph,
+        ec_ms_per_cm: sensors.ec,
+        temperature_celsius: sensors.water_temp
+      },
+      crop: {
+        species: 'lactuca_sativa',
+        variety: 'butterhead',
+        growth_stage: 'vegetative',
+        days_after_planting: sensors.plant_age
+      }
+    }
+  };
+
+  const topic = `wia/climate/v1/farm-singapore-001/data/vertical_farming`;
+  client.publish(topic, JSON.stringify(message), { qos: 0 });
+}
+
+// Collect from all zones every 5 minutes
+setInterval(() => {
+  for (let zone = 1; zone <= 10; zone++) {
+    const sensors = readZoneSensors(zone);
+    publishFarmData(zone.toString(), sensors);
+  }
+}, 5 * 60 * 1000);
+</code></pre>
+
+    <h2>5.3 Satellite Integration</h2>
+
+    <h3>5.3.1 Processing Satellite Ocean Cleanup Data</h3>
+
+    <p>Satellites can detect ocean plastic concentrations using spectral imaging. Transform satellite data into WIA Climate format:</p>
+
+    <pre><code>#!/usr/bin/env python3
+# Transform satellite ocean monitoring data
+
+import numpy as np
+import xarray as xr
+from datetime import datetime
+
+def process_satellite_data(netcdf_file):
+    """
+    Convert satellite NetCDF to WIA Climate ocean_cleanup messages
+    """
+    ds = xr.open_dataset(netcdf_file)
+
+    messages = []
+
+    for lat_idx in range(ds.dims['lat']):
+        for lon_idx in range(ds.dims['lon']):
+            plastic_concentration = ds.plastic_density[lat_idx, lon_idx].values
+
+            if plastic_concentration > 0:  # Only report non-zero
+                message = {
+                    "version": "1.0.0",
+                    "type": "ocean_cleanup",
+                    "timestamp": {
+                        "unix_ms": int(ds.time.values.astype('datetime64[ms]')
+                                     .astype('int')),
+                        "iso8601": str(ds.time.values)
+                    },
+                    "location": {
+                        "latitude": float(ds.lat[lat_idx].values),
+                        "longitude": float(ds.lon[lon_idx].values)
+                    },
+                    "device": {
+                        "manufacturer": "ESA",
+                        "model": "Sentinel-2",
+                        "serial": ds.attrs['satellite_id']
+                    },
+                    "data": {
+                        "operation_type": "satellite_observation",
+                        "collection": {
+                            "plastic_density_kg_per_km2":
+                                float(plastic_concentration)
+                        },
+                        "area": {
+                            "grid_cell_km2": 1.0
+                        }
+                    },
+                    "meta": {
+                        "quality_score": float(ds.quality_flag[lat_idx, lon_idx]),
+                        "source": "satellite"
+                    }
+                }
+                messages.append(message)
+
+    return messages
+
+# Process and batch upload
+messages = process_satellite_data('sentinel2_ocean_20241214.nc')
+batch_upload_to_wia(messages)
+</code></pre>
+
+    <h2>5.4 Research Platform Integration</h2>
+
+    <h3>5.4.1 CMIP6 Climate Model Output</h3>
+
+    <p>Climate models generate massive datasets. Extract key variables and publish to WIA Climate:</p>
+
+    <pre><code>#!/usr/bin/env python3
+# Extract CMIP6 model data and publish to WIA Climate
+
+import xarray as xr
+import cftime
+from wia_climate import ClimateClient
+
+def publish_climate_model(model_file, variable='tas'):
+    """
+    Publish CMIP6 temperature anomaly data
+    """
+    ds = xr.open_dataset(model_file)
+    client = ClimateClient(api_key='your_key')
+
+    # Extract global mean for each time step
+    for time_idx in range(len(ds.time)):
+        global_mean = float(ds[variable].isel(time=time_idx).mean())
+
+        message = {
+            "version": "1.0.0",
+            "type": "climate_model",
+            "timestamp": {
+                "unix_ms": int(cftime.num2date(
+                    ds.time[time_idx],
+                    ds.time.units
+                ).timestamp() * 1000)
+            },
+            "location": {
+                "latitude": 0.0,  # Global average
+                "longitude": 0.0
+            },
+            "device": {
+                "manufacturer": ds.attrs['institution_id'],
+                "model": ds.attrs['source_id']
+            },
+            "data": {
+                "model": {
+                    "source_id": ds.attrs['source_id'],
+                    "experiment_id": ds.attrs['experiment_id'],
+                    "variant_label": ds.attrs['variant_label']
+                },
+                "variable": {
+                    "name": variable,
+                    "long_name": ds[variable].attrs['long_name'],
+                    "units": ds[variable].attrs['units']
+                },
+                "value": {
+                    "data": global_mean,
+                    "anomaly": global_mean - 287.3  # vs pre-industrial
+                },
+                "scenario": {
+                    "ssp": "SSP2-4.5"
+                }
+            }
+        }
+
+        client.submit_data(message)
+        print(f"Published time step {time_idx + 1}/{len(ds.time)}")
+
+publish_climate_model('CESM2_ssp245_tas.nc')
+</code></pre>
+
+    <h2>5.5 Visualization Dashboard Integration</h2>
+
+    <h3>5.5.1 Grafana Integration</h3>
+
+    <p>WIA Climate provides a Grafana data source plugin for real-time visualization:</p>
+
+    <pre><code>// Grafana dashboard JSON configuration
+{
+  "dashboard": {
+    "title": "Global Carbon Capture Monitor",
+    "panels": [
+      {
+        "title": "CO2 Capture Rate (Last 24h)",
+        "type": "timeseries",
+        "datasource": "WIA Climate",
+        "targets": [
+          {
+            "queryType": "timeseries",
+            "dataType": "carbon_capture",
+            "metric": "capture_rate_kg_per_hour",
+            "aggregation": "avg",
+            "interval": "1h"
+          }
+        ]
+      },
+      {
+        "title": "Active Facilities Map",
+        "type": "geomap",
+        "datasource": "WIA Climate",
+        "targets": [
+          {
+            "queryType": "geospatial",
+            "dataType": "carbon_capture",
+            "timeRange": "now-1h"
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+
+    <h3>5.5.2 CesiumJS 3D Visualization</h3>
+
+    <pre><code>// Real-time climate data visualization with Cesium
+import { Viewer, CzmlDataSource } from 'cesium';
+
+const viewer = new Viewer('cesiumContainer');
+const dataSource = new CzmlDataSource();
+
+// Connect to WIA Climate WebSocket
+const ws = new WebSocket('wss://api.wia.live/climate/v1/stream');
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+
+  if (message.type === 'data') {
+    const climateData = message.payload;
+
+    // Create Cesium entity
+    const entity = {
+      id: climateData.device.serial,
+      position: {
+        cartographicDegrees: [
+          climateData.location.longitude,
+          climateData.location.latitude,
+          climateData.location.altitude_m || 0
+        ]
+      },
+      point: {
+        pixelSize: 10,
+        color: getColorForDataType(climateData.type)
+      },
+      properties: climateData.data
+    };
+
+    dataSource.entities.add(entity);
+  }
+};
+
+viewer.dataSources.add(dataSource);
+</code></pre>
+
+    <h2>5.6 Storage Backend Integration</h2>
+
+    <h3>5.6.1 InfluxDB Time-Series Storage</h3>
+
+    <pre><code>#!/usr/bin/env python3
+# WIA Climate to InfluxDB adapter
+
+from influxdb_client import InfluxDBClient, Point
+from influxdb_client.client.write_api import SYNCHRONOUS
+
+client = InfluxDBClient(
+    url="http://localhost:8086",
+    token="your_token",
+    org="wia-climate"
+)
+
+write_api = client.write_api(write_options=SYNCHRONOUS)
+
+def write_to_influx(climate_message):
+    point = Point("wia_climate") \
+        .tag("type", climate_message['type']) \
+        .tag("device_id", climate_message['device']['serial']) \
+        .tag("manufacturer", climate_message['device']['manufacturer'])
+
+    # Add measurements based on type
+    if climate_message['type'] == 'carbon_capture':
+        point.field("capture_rate_kg_per_hour",
+                   climate_message['data']['capture_rate_kg_per_hour'])
+        point.field("co2_purity_percentage",
+                   climate_message['data']['co2_purity_percentage'])
+
+    point.time(climate_message['timestamp']['unix_ms'],
+              write_precision='ms')
+
+    write_api.write(bucket="climate-data", record=point)
+</code></pre>
+
+    <h2>5.7 Integration Best Practices</h2>
+
+    <div class="highlight">
+        <h3>✓ Do's</h3>
+        <ul>
+            <li>Use UTC timestamps consistently</li>
+            <li>Implement exponential backoff for retries</li>
+            <li>Validate data locally before sending</li>
+            <li>Buffer messages during network outages</li>
+            <li>Include quality scores when available</li>
+            <li>Use batch APIs for historical data</li>
+        </ul>
+    </div>
+
+    <div class="warning">
+        <h3>✗ Don'ts</h3>
+        <ul>
+            <li>Don't send duplicate messages</li>
+            <li>Don't hardcode credentials in code</li>
+            <li>Don't ignore API rate limits</li>
+            <li>Don't send data without device registration</li>
+            <li>Don't mix measurement and protocol timestamps</li>
+        </ul>
+    </div>
+</body>
+</html>

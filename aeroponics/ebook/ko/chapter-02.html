@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 시스템 아키텍처 | WIA-AEROPONICS</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        code { font-family: 'D2Coding', monospace; background: var(--bg-secondary); padding: 0.2rem 0.4rem; border-radius: 4px; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight-success { background: linear-gradient(135deg, var(--bg-secondary), #064e3b); border-left: 4px solid var(--success); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight-warning { background: linear-gradient(135deg, var(--bg-secondary), #78350f); border-left: 4px solid var(--warning); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>2장: 시스템 아키텍처</h1>
+
+    <p>에어로포닉 시스템의 아키텍처 설계는 성능, 신뢰성, 확장성을 근본적으로 결정합니다. 이 장에서는 미스팅 챔버, 루트존 인클로저, 지지 프레임워크, 배수 인프라를 포함하여 WIA-AEROPONICS 준수 시스템을 구성하는 구조적 구성요소에 대한 포괄적인 사양을 제공합니다. 이러한 아키텍처 요소의 적절한 구현은 유지보수와 시스템 확장을 용이하게 하면서 최적의 재배 조건을 보장합니다.</p>
+
+    <h2>2.1 시스템 아키텍처 개요</h2>
+
+    <p>완전한 에어로포닉 시스템은 최적의 재배 조건을 유지하기 위해 조화롭게 작동하는 여러 통합 서브시스템으로 구성됩니다. WIA-AEROPONICS 표준은 다음 주요 아키텍처 구성요소를 정의합니다:</p>
+
+    <pre>
+WIA-AEROPONICS 시스템 아키텍처
+==============================
+
+┌─────────────────────────────────────────────────────────────┐
+│                    지지 구조물                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                  재배 플랫폼                           │  │
+│  │  ┌─────────────────────────────────────────────────┐  │  │
+│  │  │              식물 홀더                           │  │  │
+│  │  │  [●] [●] [●] [●] [●] [●] [●] [●] [●] [●]       │  │  │
+│  │  └─────────────────────────────────────────────────┘  │  │
+│  │  ┌─────────────────────────────────────────────────┐  │  │
+│  │  │              루트존 챔버                         │  │  │
+│  │  │                                                  │  │  │
+│  │  │     ╔════════════════════════════════════╗      │  │  │
+│  │  │     ║   미스팅 매니폴드 + 노즐           ║      │  │  │
+│  │  │     ╚════════════════════════════════════╝      │  │  │
+│  │  │                   ↓  ↓  ↓                       │  │  │
+│  │  │              매달린 뿌리                        │  │  │
+│  │  │                                                  │  │  │
+│  │  │  ────────────────────────────────────────────   │  │  │
+│  │  │              배수 수집                          │  │  │
+│  │  └─────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                           ↓                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │              영양액 저장조                             │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>2.2 미스팅 챔버 설계</h2>
+
+    <p>미스팅 챔버는 식물 뿌리가 매달려 영양 미스트를 공급받는 주요 재배 환경을 구성합니다. 챔버 설계는 차광, 습도 유지, 미스트 분배, 유지보수 접근성을 포함한 여러 요구사항의 균형을 맞춰야 합니다.</p>
+
+    <h3>2.2.1 챔버 재료</h3>
+
+    <p>챔버 구조 재료는 내구성, 차광, 내화학성에 대한 특정 기준을 충족해야 합니다. WIA-AEROPONICS 표준은 다음 재료 요구사항을 명시합니다:</p>
+
+    <div class="highlight">
+        <h3>승인된 챔버 재료</h3>
+        <ul>
+            <li><strong>식품 등급 HDPE:</strong> UV 안정제가 포함된 고밀도 폴리에틸렌, 최소 6mm 두께</li>
+            <li><strong>ABS 플라스틱:</strong> 식품 안전 인증을 받은 아크릴로니트릴 부타디엔 스티렌</li>
+            <li><strong>스테인리스 스틸 316:</strong> 내식성을 위한 해양용 스테인리스 스틸</li>
+            <li><strong>유리섬유 강화 플라스틱:</strong> 식품 안전 젤 코트 마감</li>
+        </ul>
+        <p><strong>금지 재료:</strong> 일반 PVC (화학물질 침출), 아연 도금 강철 (아연 독성), 미처리 목재 (병원균 서식지), 구리 (고농도에서 식물 독성).</p>
+    </div>
+
+    <h3>2.2.2 치수 사양</h3>
+
+    <p>챔버 치수는 균일한 미스트 분배를 보장하면서 뿌리 발달을 수용해야 합니다. 다음 사양이 표준 구성에 적용됩니다:</p>
+
+    <table>
+        <tr>
+            <th>시스템 등급</th>
+            <th>챔버 깊이</th>
+            <th>챔버 폭</th>
+            <th>식물 간격</th>
+            <th>노즐 커버리지</th>
+        </tr>
+        <tr>
+            <td>주거용 (R)</td>
+            <td>30-45 cm</td>
+            <td>30-60 cm</td>
+            <td>15-20 cm</td>
+            <td>단일 열</td>
+        </tr>
+        <tr>
+            <td>상업용 (C)</td>
+            <td>45-60 cm</td>
+            <td>60-120 cm</td>
+            <td>20-30 cm</td>
+            <td>이중 열</td>
+        </tr>
+        <tr>
+            <td>산업용 (I)</td>
+            <td>60-90 cm</td>
+            <td>120-240 cm</td>
+            <td>30-45 cm</td>
+            <td>다열 매니폴드</td>
+        </tr>
+    </table>
+
+    <pre>
+// 챔버 치수 계산기
+interface ChamberDimensions {
+  calculateMinimumDepth(cropType: CropType): number {
+    const baseDepth = {
+      leafyGreens: 30,      // cm - 엽채류
+      herbs: 35,            // cm - 허브
+      fruiting: 45,         // cm - 과채류
+      rootVegetables: 60,   // cm - 근채류
+      vining: 75            // cm - 덩굴식물
+    };
+    return baseDepth[cropType] * 1.2; // 20% 안전 마진
+  }
+
+  calculateVolume(depth: number, width: number, length: number): number {
+    return (depth * width * length) / 1000000; // 입방미터
+  }
+
+  calculateNozzleCount(length: number, spacing: number): number {
+    return Math.ceil(length / spacing) + 1;
+  }
+}
+    </pre>
+
+    <h2>2.3 루트존 관리</h2>
+
+    <p>루트존 환경은 영양분 흡수와 뿌리 건강을 위한 최적 조건을 유지하기 위해 정밀한 제어가 필요합니다. 이 섹션에서는 루트존 인프라에 대한 엔지니어링 사양을 상세히 설명합니다.</p>
+
+    <h3>2.3.1 루트존 환경 파라미터</h3>
+
+    <div class="highlight-success">
+        <h3>최적 루트존 조건</h3>
+        <pre>
+파라미터                최적 범위          허용 범위
+─────────────────────────────────────────────────────────────
+온도                    18-22°C           15-25°C
+상대습도                95-100%           90-100%
+광 노출                 0 lux (완전차단)  최대 0-10 lux
+공기 교환율             0.5-1.0 볼륨/hr   0.2-2.0 볼륨/hr
+미스트 커버리지         100% 표면         최소 95%+
+        </pre>
+    </div>
+
+    <h3>2.3.2 차광 요구사항</h3>
+
+    <p>루트존의 완전한 차광은 조류 성장을 방지하고 뿌리 건강을 유지하는 데 필수적입니다. 모든 챔버 접합부, 접근 패널, 식물 홀더 인터페이스는 빛 침투를 방지해야 합니다. WIA-AEROPONICS 표준은 모든 작동 조건에서 루트존 내 광량이 10 lux 미만일 것을 요구합니다.</p>
+
+    <pre>
+// 차광 검증 프로토콜
+const lightExclusionTest = {
+  testConditions: {
+    externalIllumination: 50000,  // lux (정오 햇빛)
+    measurementPoints: [
+      '챔버 중앙',
+      '모서리 (4개 모두)',
+      '식물 홀더 근처',
+      '배수 영역'
+    ],
+    acceptanceCriteria: 10  // 최대 lux
+  },
+
+  sealingRequirements: {
+    plantHolders: '오버랩 플랜지가 있는 네오프렌 칼라',
+    accessPanels: '광 배플이 있는 압축 가스켓',
+    drainPorts: '침수 출구 또는 광 트랩',
+    sensorPorts: '케이블 글랜드가 있는 그로밋 씰'
+  }
+};
+    </pre>
+
+    <h2>2.4 지지 프레임워크 설계</h2>
+
+    <p>지지 프레임워크는 성숙한 식물 성장과 물로 채워진 구성요소의 상당한 무게를 수용하면서 재배 플랫폼, 영양액 저장조, 제어 장비에 안정적인 장착을 제공해야 합니다.</p>
+
+    <h3>2.4.1 구조 하중 요구사항</h3>
+
+    <p>하중 계산은 완전히 발달한 식물, 포화된 넷 포트의 재배 배지, 가득 찬 영양액 저장조를 포함한 최대 작동 조건을 고려해야 합니다. 안전 계수는 예상치 못한 조건에서 구조적 무결성을 보장합니다.</p>
+
+    <div class="highlight-warning">
+        <h3>하중 계산 지침</h3>
+        <pre>
+구성요소 하중 추정 (선형 미터당):
+─────────────────────────────────────────────
+재배 플랫폼 (빈 상태):       15-25 kg/m
+식물 홀더 (빈 상태):         2-5 kg/m
+성숙 식물 (엽채류):          5-15 kg/m
+성숙 식물 (과채류):          20-50 kg/m
+영양액 저장조 (리터당):      1.0 kg/L
+젖은 뿌리 질량:              5-10 kg/m
+
+안전 계수 요구사항:
+  정적 하중:    최소 2.0x
+  동적 하중:    최소 3.0x
+  지진 구역:    추가 지역 요구사항
+        </pre>
+    </div>
+
+    <h3>2.4.2 프레임워크 재료</h3>
+
+    <p>지지 프레임워크 구조는 환경 조건과 예산 제약에 따라 다음 재료 시스템 중 하나를 사용합니다:</p>
+
+    <ul>
+        <li><strong>알루미늄 압출재:</strong> T-슬롯 프로파일 (40x40mm 또는 45x45mm 시리즈)은 우수한 강도 대 중량 비율, 내식성, 모듈식 조립 기능을 제공</li>
+        <li><strong>스테인리스 스틸 튜빙:</strong> 304 또는 316 등급 사각 튜빙은 고습도 환경에서 최대 내구성 제공</li>
+        <li><strong>분체 도장 강철:</strong> 적절한 부식 방지 처리가 된 기후 제어 환경을 위한 비용 효율적 옵션</li>
+        <li><strong>복합 재료:</strong> 비전도성 특성이 필요한 특수 응용을 위한 유리섬유 펄트루전</li>
+    </ul>
+
+    <h2>2.5 배수 시스템 아키텍처</h2>
+
+    <p>효율적인 배수 수집 및 반환 시스템은 병원균이 서식할 수 있는 고인 물을 방지하면서 영양분 낭비를 최소화합니다. WIA-AEROPONICS 표준은 시스템 위생과 자원 효율성을 보장하기 위한 배수 요구사항을 명시합니다.</p>
+
+    <pre>
+// 배수 시스템 사양
+interface DrainageSystem {
+  chamberFloor: {
+    slope: 2.0;                    // 최소 각도 (도)
+    surfaceFinish: 'smooth';       // 생물막 부착 방지
+    material: '식품 등급 HDPE';
+    drainLocations: '섬프 수집이 있는 최저점';
+  };
+
+  drainLines: {
+    minimumDiameter: 25;           // mm
+    material: '스케줄 40 PVC 또는 실리콘 튜빙';
+    slope: 1.5;                    // 최소 각도 (도)
+    cleanouts: '3미터마다 및 방향 전환 지점';
+  };
+
+  returnToReservoir: {
+    filtration: '200 마이크론 프리필터';
+    airGap: true;                  // 역 사이펀 방지
+    flowCapacity: '최대 미스팅 속도의 150% 초과';
+  };
+}
+    </pre>
+
+    <h2>2.6 식물 홀더 시스템</h2>
+
+    <p>식물 홀더는 뿌리가 미스팅 챔버로 자유롭게 뻗을 수 있도록 하면서 재배 플랫폼 인터페이스에서 식물을 고정합니다. 설계는 식물 지지, 차광, 유지보수 용이성의 균형을 맞춰야 합니다.</p>
+
+    <h3>2.6.1 넷 포트 사양</h3>
+
+    <p>넷 포트는 식물 줄기와 발아 중에 사용되는 재배 배지에 물리적 지지를 제공합니다. 표준 크기는 다양한 작물 유형을 수용합니다:</p>
+
+    <table>
+        <tr>
+            <th>넷 포트 직경</th>
+            <th>권장 작물</th>
+            <th>일반적인 간격</th>
+        </tr>
+        <tr>
+            <td>50mm (2")</td>
+            <td>마이크로그린, 소형 허브</td>
+            <td>10-15 cm</td>
+        </tr>
+        <tr>
+            <td>75mm (3")</td>
+            <td>엽채류, 표준 허브</td>
+            <td>15-20 cm</td>
+        </tr>
+        <tr>
+            <td>100mm (4")</td>
+            <td>대형 엽채류, 소형 과채류</td>
+            <td>20-30 cm</td>
+        </tr>
+        <tr>
+            <td>150mm (6")</td>
+            <td>토마토, 피망, 대형 식물</td>
+            <td>30-45 cm</td>
+        </tr>
+    </table>
+
+    <h3>2.6.2 칼라 및 씰 설계</h3>
+
+    <div class="highlight">
+        <h3>식물 칼라 요구사항</h3>
+        <p>차광 칼라는 다음 기능을 제공해야 합니다:</p>
+        <ul>
+            <li>줄기 직경 변화에 관계없이 식물 줄기 주위의 완전한 광 밀봉</li>
+            <li>압축 손상 없이 줄기 성장 확장 허용</li>
+            <li>식물 크라운에 응축수 떨어짐 방지</li>
+            <li>수확 및 교체를 위한 쉬운 제거 가능</li>
+        </ul>
+        <p>권장 재료로는 조절 가능한 압축 피팅이 있는 독립 기포 네오프렌 폼 또는 실리콘 고무가 있습니다.</p>
+    </div>
+
+    <h2>2.7 모듈식 설계 원칙</h2>
+
+    <p>모듈식 시스템 아키텍처는 확장성을 가능하게 하고, 유지보수를 용이하게 하며, 시스템 전체에 영향을 주지 않고 구성요소 교체를 허용합니다. WIA-AEROPONICS 표준은 다음 원칙에 따른 모듈식 설계를 권장합니다:</p>
+
+    <pre>
+// 모듈식 아키텍처 구성
+const modularDesign = {
+  standardModules: {
+    growChannel: {
+      length: 1200,           // mm 표준 모듈
+      width: [300, 600, 900], // mm 옵션
+      plantCapacity: [8, 16, 24] // 모듈당 식물 수
+    },
+    reservoir: {
+      volumes: [50, 100, 200, 500], // 리터
+      connectorsType: '퀵 디스커넥트',
+      manifoldCompatible: true
+    }
+  },
+
+  interconnectionStandards: {
+    nutrientLines: '푸시핏 12mm OD 튜빙',
+    drainLines: '슬립핏 25mm ID 연결',
+    electricalConnectors: 'IP67 등급, 편극',
+    dataConnections: 'RJ45 또는 M12 원형'
+  },
+
+  expansionCapability: {
+    horizontal: '매니폴드 확장으로 무제한',
+    vertical: '구조적 지지와 함께 최대 12단',
+    centralControl: '단일 컨트롤러로 최대 100 모듈'
+  }
+};
+    </pre>
+
+    <h2>2.8 통합 지점</h2>
+
+    <p>시스템 아키텍처는 영양 공급, 환경 제어, 모니터링 인프라를 포함한 지원 서브시스템과의 통합을 수용해야 합니다. 표준 통합 지점은 호환성을 보장하고 설치를 단순화합니다.</p>
+
+    <div class="highlight-success">
+        <h3>표준 통합 지점</h3>
+        <ul>
+            <li><strong>영양 공급:</strong> 체크 밸브가 있는 12mm 푸시핏 입구</li>
+            <li><strong>배수 반환:</strong> 에어 갭이 있는 25mm 중력 배수</li>
+            <li><strong>센서 포트:</strong> pH, EC, 온도 프로브용 M12 스레드 글랜드</li>
+            <li><strong>전기:</strong> 밸브 제어 및 센서 전원용 IP67 커넥터</li>
+            <li><strong>데이터 네트워크:</strong> CAT6 또는 무선 브리지 연결 지점</li>
+            <li><strong>비상 배수:</strong> 정상 배수 수위 50mm 위의 오버플로 포트</li>
+        </ul>
+    </div>
+
+    <h2>2.9 시공 모범 사례</h2>
+
+    <p>적절한 시공 기술은 장기적인 시스템 신뢰성과 유지보수성을 보장합니다. 다음 지침은 WIA-AEROPONICS 시스템 제작에 적용됩니다:</p>
+
+    <pre>
+시공 지침
+=========
+
+1. 표면 준비
+   - 절단 재료에서 모든 버와 날카로운 모서리 제거
+   - 접착 전 이소프로필 알코올로 표면 청소
+   - 접착제 제조업체가 지정한 경우 프라이머 적용
+
+2. 밀봉 및 접착
+   - 식품 등급 실리콘 실런트만 사용
+   - 간격 없이 연속 비드 적용
+   - 시스템 가압 전 완전 경화 시간 확보
+
+3. 조립 순서
+   - 센서 설치 전 모든 용접/접착 완료
+   - 미스팅 매니폴드 전 배수 시스템 설치
+   - 식물 추가 전 압력 테스트
+
+4. 품질 검증
+   - 작동 압력의 1.5배로 1시간 누출 테스트
+   - 외부 조명으로 차광 테스트
+   - 수분 감지 페이퍼로 미스트 커버리지 검증
+    </pre>
+
+    <div class="highlight-warning">
+        <h3>장 요약</h3>
+        <p>이 장에서는 미스팅 챔버 설계, 루트존 관리 인프라, 지지 프레임워크 요구사항, 배수 시스템, 식물 홀더 구성을 포함하여 WIA-AEROPONICS 준수 시스템의 아키텍처 사양을 상세히 설명했습니다. 이러한 사양을 준수하면 시스템 유지보수와 향후 확장을 용이하게 하면서 최적의 재배 조건을 보장합니다. 제시된 모듈식 설계 원칙은 주거용 설치부터 산업용 수직 농장 운영까지 적합한 확장 가능한 구현을 가능하게 합니다.</p>
+    </div>
+</body>
+</html>

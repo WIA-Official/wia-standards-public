@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Phase 4 Ecosystem Integration - WIA AAC Standard Ebook</title>
+</head>
+<body>
+
+<p><a href="index.html">[AAC] WIA AAC Standard Ebook</a> | Chapter 7 of 8</p>
+
+<hr>
+
+<h1>[AAC] Chapter 7: Phase 4 - WIA Ecosystem Integration</h1>
+
+<blockquote>
+<p><strong>Hongik Ingan (弘益人間)</strong></p>
+<p>"From thought to expression in every modality."</p>
+<p>Phase 4 connects AAC users to the full spectrum of human communication through the WIA ecosystem.</p>
+</blockquote>
+
+<hr>
+
+<h2>7.1 Overview of Phase 4</h2>
+
+<h3>7.1.1 Purpose</h3>
+
+<p>Phase 4 defines the Ecosystem Integration layer - how AAC text output connects to the broader WIA standards family, enabling communication through speech, sign language, and braille simultaneously.</p>
+
+<h3>7.1.2 The WIA Standards Family</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Standard</th>
+            <th>Full Name</th>
+            <th>Purpose</th>
+            <th>Output</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>WIA AAC</strong></td>
+            <td>Augmentative Alternative Communication</td>
+            <td>Assistive input standardization</td>
+            <td>Text</td>
+        </tr>
+        <tr>
+            <td><strong>WIA Talk</strong></td>
+            <td>Text-to-Speech Standard</td>
+            <td>Speech synthesis</td>
+            <td>Audio</td>
+        </tr>
+        <tr>
+            <td><strong>ISP</strong></td>
+            <td>International Sign Protocol</td>
+            <td>Sign language representation</td>
+            <td>Animation</td>
+        </tr>
+        <tr>
+            <td><strong>WIA Braille</strong></td>
+            <td>Braille Standard</td>
+            <td>Braille conversion</td>
+            <td>Tactile</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>7.1.3 Integration Vision</h3>
+
+<pre>
+Complete Communication Pipeline:
+
+User Input (AAC)
+      |
+      v
++------------------+
+|   WIA AAC        |
+| Signal Processing|
++--------+---------+
+         |
+         v
+    Text Output
+    "Hello, World"
+         |
+    +----+----+----+----+
+    |         |         |
+    v         v         v
++-------+ +-------+ +--------+
+|  WIA  | |  ISP  | |  WIA   |
+| Talk  | |       | |Braille |
++---+---+ +---+---+ +---+----+
+    |         |         |
+    v         v         v
+ Audio    Sign Lang  Braille
+ Output   Animation  Display
+
+Result: The same message reaches:
+  - Hearing users (speech)
+  - Deaf users (sign language)
+  - Deaf-blind users (braille)
+</pre>
+
+<hr>
+
+<h2>7.2 WIA Talk Integration</h2>
+
+<h3>7.2.1 Overview</h3>
+
+<p>WIA Talk is the text-to-speech standard that converts AAC text output to natural-sounding speech. It supports multiple languages, voices, and speech parameters.</p>
+
+<h3>7.2.2 Integration API</h3>
+
+<pre>
+import { WiaAAC } from 'wia-aac';
+import { WiaTalk } from 'wia-talk';
+
+// Initialize both systems
+const aac = new WiaAAC();
+const talk = new WiaTalk({
+    voice: 'en-US-Neural-J',
+    rate: 1.0,
+    pitch: 1.0
+});
+
+// Connect AAC to Talk
+aac.on('text', async (text) =&gt; {
+    await talk.speak(text);
+});
+
+// Advanced usage with SSML
+aac.on('text', async (text, context) =&gt; {
+    const ssml = talk.buildSSML(text, {
+        emphasis: context.emphasis,
+        pauseAfter: context.punctuation ? 300 : 0
+    });
+    await talk.speakSSML(ssml);
+});
+</pre>
+
+<h3>7.2.3 Voice Configuration</h3>
+
+<pre>
+WIA Talk Voice Options:
+
+Languages Supported:
+  - English (US, UK, AU, IN)
+  - Korean
+  - Japanese
+  - Chinese (Mandarin, Cantonese)
+  - Spanish
+  - French
+  - German
+  - And 50+ more languages
+
+Voice Types:
+  - Neural (high quality, natural)
+  - Standard (lower latency)
+  - Custom (user-trained)
+
+Configuration Example:
+{
+    "voice": {
+        "id": "en-US-Neural-J",
+        "language": "en-US",
+        "gender": "male",
+        "age": "adult"
+    },
+    "parameters": {
+        "rate": 1.0,        // 0.5 - 2.0
+        "pitch": 1.0,       // 0.5 - 2.0
+        "volume": 1.0,      // 0.0 - 1.0
+        "emphasis": "moderate"
+    },
+    "output": {
+        "format": "audio/wav",
+        "sampleRate": 24000
+    }
+}
+</pre>
+
+<h3>7.2.4 Real-Time Considerations</h3>
+
+<pre>
+Latency Management:
+
+For AAC Users:
+  - Immediate feedback is critical
+  - Pre-generate common phrases
+  - Use predictive synthesis
+  - Buffer for smooth playback
+
+Optimization Strategies:
+  1. Cache frequently used phrases
+  2. Use streaming synthesis for long text
+  3. Pre-warm TTS engine
+  4. Local synthesis when possible
+  5. Fallback to simpler voice on high latency
+
+Example - Predictive Caching:
+const commonPhrases = [
+    "Yes", "No", "Help", "Thank you",
+    "I need", "Please", "Stop"
+];
+
+// Pre-generate on startup
+await talk.pregenerate(commonPhrases);
+
+// Instant playback
+aac.on('quickPhrase', (phrase) =&gt; {
+    talk.playFromCache(phrase);
+});
+</pre>
+
+<hr>
+
+<h2>7.3 ISP Integration (Sign Language)</h2>
+
+<h3>7.3.1 Overview</h3>
+
+<p>ISP (International Sign Protocol) is the WIA standard for representing sign language digitally. It enables text-to-sign translation displayed via 3D avatars or video.</p>
+
+<h3>7.3.2 Integration API</h3>
+
+<pre>
+import { WiaAAC } from 'wia-aac';
+import { ISP, ISPAvatar } from 'wia-isp';
+
+// Initialize
+const aac = new WiaAAC();
+const isp = new ISP();
+const avatar = new ISPAvatar({
+    model: 'standard-human',
+    signLanguage: 'ASL'  // ASL, BSL, KSL, JSL, etc.
+});
+
+// Connect AAC to ISP
+aac.on('text', async (text) =&gt; {
+    // Convert text to sign language notation
+    const signs = await isp.textToSigns(text);
+
+    // Render avatar animation
+    await avatar.animate(signs);
+});
+
+// Get ISP notation
+aac.on('text', async (text) =&gt; {
+    const ispNotation = await isp.textToISP(text);
+    console.log(ispNotation);
+    // Output: "[HELLO:wave+smile] [WORLD:sphere-gesture]"
+});
+</pre>
+
+<h3>7.3.3 Sign Language Support</h3>
+
+<pre>
+Supported Sign Languages:
+
+Primary Support:
+  - ASL (American Sign Language)
+  - BSL (British Sign Language)
+  - KSL (Korean Sign Language)
+  - JSL (Japanese Sign Language)
+  - LSF (French Sign Language)
+  - DGS (German Sign Language)
+
+ISP Format Example:
+{
+    "text": "Hello, how are you?",
+    "target_language": "ASL",
+    "signs": [
+        {
+            "gloss": "HELLO",
+            "handshape": "B",
+            "location": "forehead",
+            "movement": "wave-outward",
+            "expression": "smile"
+        },
+        {
+            "gloss": "HOW",
+            "handshape": "bent-B-both",
+            "location": "chest",
+            "movement": "rotate-up",
+            "expression": "question"
+        },
+        {
+            "gloss": "YOU",
+            "handshape": "1",
+            "location": "front",
+            "movement": "point-forward",
+            "expression": "neutral"
+        }
+    ]
+}
+</pre>
+
+<h3>7.3.4 Avatar Rendering Options</h3>
+
+<pre>
+ISP Avatar Configuration:
+
+Rendering Modes:
+  - 3D Avatar (WebGL/Three.js)
+  - 2D Sprite Animation
+  - Video (pre-recorded clips)
+  - Skeletal Data (for custom rendering)
+
+Avatar Options:
+{
+    "model": "standard-human",
+    "customization": {
+        "skinTone": "#C68642",
+        "hairColor": "#000000",
+        "clothing": "casual"
+    },
+    "camera": {
+        "view": "front",      // front, side, 3/4
+        "distance": "medium"  // close, medium, far
+    },
+    "animation": {
+        "speed": 1.0,
+        "smoothing": true,
+        "transitionTime": 200  // ms between signs
+    }
+}
+</pre>
+
+<hr>
+
+<h2>7.4 WIA Braille Integration</h2>
+
+<h3>7.4.1 Overview</h3>
+
+<p>WIA Braille is the standard for converting text to braille notation. It supports multiple braille codes and can output to refreshable braille displays.</p>
+
+<h3>7.4.2 Integration API</h3>
+
+<pre>
+import { WiaAAC } from 'wia-aac';
+import { WiaBraille, BrailleDisplay } from 'wia-braille';
+
+// Initialize
+const aac = new WiaAAC();
+const braille = new WiaBraille({
+    code: 'UEB',  // Unified English Braille
+    grade: 2      // Grade 1 (letter-by-letter) or Grade 2 (contracted)
+});
+
+// Connect to braille display
+const display = await BrailleDisplay.connect();
+
+// Connect AAC to Braille
+aac.on('text', async (text) =&gt; {
+    // Convert to braille
+    const brailleText = braille.convert(text);
+
+    // Send to display
+    await display.write(brailleText);
+});
+
+// Get braille unicode
+aac.on('text', (text) =&gt; {
+    const brailleUnicode = braille.toUnicode(text);
+    console.log(brailleUnicode);
+    // Output: "⠓⠑⠇⠇⠕" for "hello"
+});
+</pre>
+
+<h3>7.4.3 Braille Code Support</h3>
+
+<pre>
+Supported Braille Codes:
+
+Grade 1 (Uncontracted):
+  - Letter-by-letter transcription
+  - Used for beginners and technical text
+
+Grade 2 (Contracted):
+  - Uses contractions for common words
+  - Standard for most braille readers
+
+Code Standards:
+  - UEB (Unified English Braille) - International
+  - EBAE (English Braille American Edition) - US
+  - Korean Braille - Korea
+  - Japanese Braille - Japan
+  - And 30+ national codes
+
+Conversion Example:
+Input: "Hello World"
+
+Grade 1: ⠓⠑⠇⠇⠕ ⠺⠕⠗⠇⠙
+Grade 2: ⠓⠑⠇⠇⠕ ⠺⠕⠗⠇⠙ (same for these words)
+
+Input: "the quick brown fox"
+
+Grade 1: ⠞⠓⠑ ⠟⠥⠊⠉⠅ ⠃⠗⠕⠺⠝ ⠋⠕⠭
+Grade 2: ⠮ ⠟⠅ ⠃⠗⠪⠝ ⠋⠕⠭ (contractions used)
+</pre>
+
+<h3>7.4.4 Braille Display Support</h3>
+
+<pre>
+Braille Display Integration:
+
+Supported Protocols:
+  - HID Braille (USB)
+  - Serial Protocol
+  - Bluetooth (BrailleNote, etc.)
+
+Display Features:
+  - Cursor routing buttons
+  - Navigation keys
+  - Status cells
+  - Multi-line displays
+
+Configuration:
+{
+    "display": {
+        "cells": 40,           // 14, 20, 40, 80
+        "protocol": "hid",
+        "vendor": "HumanWare"
+    },
+    "routing": {
+        "cursorRouting": true,
+        "panLeft": "space+dot1",
+        "panRight": "space+dot4"
+    },
+    "output": {
+        "scrollDelay": 100,    // ms
+        "autoScroll": false
+    }
+}
+</pre>
+
+<hr>
+
+<h2>7.5 Unified Output Manager</h2>
+
+<h3>7.5.1 Overview</h3>
+
+<p>The Output Manager coordinates all output modalities, ensuring synchronized delivery to speech, sign, and braille simultaneously.</p>
+
+<h3>7.5.2 Implementation</h3>
+
+<pre>
+import { WiaAAC } from 'wia-aac';
+import { OutputManager } from 'wia-aac/output';
+
+const aac = new WiaAAC();
+const output = new OutputManager();
+
+// Configure outputs
+output.configure({
+    talk: {
+        enabled: true,
+        voice: 'en-US-Neural-J'
+    },
+    isp: {
+        enabled: true,
+        language: 'ASL',
+        avatar: 'standard-human'
+    },
+    braille: {
+        enabled: true,
+        code: 'UEB',
+        display: 'auto-detect'
+    }
+});
+
+// Connect AAC to unified output
+aac.on('text', async (text) =&gt; {
+    await output.broadcast(text);
+    // Automatically sends to all enabled outputs
+});
+
+// Output events
+output.on('talkComplete', () =&gt; console.log('Speech done'));
+output.on('ispComplete', () =&gt; console.log('Sign animation done'));
+output.on('brailleComplete', () =&gt; console.log('Braille displayed'));
+
+// Error handling
+output.on('outputError', (error, modality) =&gt; {
+    console.error(`${modality} error:`, error);
+    // Continue with other outputs
+});
+</pre>
+
+<h3>7.5.3 Synchronization</h3>
+
+<pre>
+Output Synchronization Options:
+
+Mode 1: Simultaneous (Default)
+  - All outputs start together
+  - Best for live communication
+
+Mode 2: Sequential
+  - Speech first, then sign, then braille
+  - For presentation/teaching
+
+Mode 3: Priority
+  - Primary output immediately
+  - Others as resources allow
+
+Configuration:
+{
+    "synchronization": {
+        "mode": "simultaneous",
+        "startDelay": 0,
+        "outputs": {
+            "talk": { "priority": 1 },
+            "isp": { "priority": 2 },
+            "braille": { "priority": 3 }
+        }
+    },
+    "fallback": {
+        "onError": "continue",  // continue | stop | retry
+        "retryCount": 2
+    }
+}
+</pre>
+
+<hr>
+
+<h2>7.6 IPA Phonetic Bridge</h2>
+
+<h3>7.6.1 Overview</h3>
+
+<p>The IPA (International Phonetic Alphabet) bridge enables precise pronunciation control and cross-language translation support.</p>
+
+<h3>7.6.2 Implementation</h3>
+
+<pre>
+import { IPAConverter } from 'wia-aac/ipa';
+
+const ipa = new IPAConverter();
+
+// Text to IPA
+const phonemes = ipa.convert("Hello World");
+// Output: "hɛˈloʊ wɜrld"
+
+// Use IPA for TTS
+aac.on('text', async (text) =&gt; {
+    const ipaText = ipa.convert(text);
+
+    // More accurate pronunciation
+    await talk.speakIPA(ipaText);
+});
+
+// Custom pronunciations
+ipa.addCustom("AAC", "eɪ eɪ si");
+ipa.addCustom("WIA", "wiːə");
+
+// Language-specific conversion
+const koreanIPA = ipa.convert("안녕하세요", { language: "ko" });
+// Output: "annjʌŋhaseyo"
+</pre>
+
+<hr>
+
+<h2>7.7 Complete Integration Example</h2>
+
+<h3>7.7.1 Full Pipeline Code</h3>
+
+<pre>
+import { WiaAAC } from 'wia-aac';
+import { WiaTalk } from 'wia-talk';
+import { ISP, ISPAvatar } from 'wia-isp';
+import { WiaBraille, BrailleDisplay } from 'wia-braille';
+
+async function initializeAAC() {
+    // Initialize AAC
+    const aac = new WiaAAC();
+    await aac.connect({ type: 'eye_tracker' });
+
+    // Initialize TTS
+    const talk = new WiaTalk({ voice: 'en-US-Neural-J' });
+
+    // Initialize Sign Language
+    const isp = new ISP();
+    const avatar = new ISPAvatar({
+        model: 'standard-human',
+        signLanguage: 'ASL'
+    });
+
+    // Initialize Braille
+    const braille = new WiaBraille({ code: 'UEB', grade: 2 });
+    const display = await BrailleDisplay.connect();
+
+    // Main text output handler
+    aac.on('text', async (text) =&gt; {
+        console.log('User says:', text);
+
+        // Execute all outputs in parallel
+        await Promise.all([
+            // 1. Speak the text
+            talk.speak(text).catch(e =&gt;
+                console.error('TTS error:', e)
+            ),
+
+            // 2. Sign the text
+            (async () =&gt; {
+                const signs = await isp.textToSigns(text);
+                await avatar.animate(signs);
+            })().catch(e =&gt;
+                console.error('ISP error:', e)
+            ),
+
+            // 3. Display on braille
+            (async () =&gt; {
+                const brailleText = braille.convert(text);
+                await display.write(brailleText);
+            })().catch(e =&gt;
+                console.error('Braille error:', e)
+            )
+        ]);
+
+        console.log('All outputs complete');
+    });
+
+    // Handle errors
+    aac.on('error', (error) =&gt; {
+        console.error('AAC Error:', error);
+    });
+
+    console.log('WIA AAC system ready');
+    return aac;
+}
+
+// Start the system
+initializeAAC();
+</pre>
+
+<hr>
+
+<h2>7.8 Deployment Considerations</h2>
+
+<h3>7.8.1 System Requirements</h3>
+
+<pre>
+Minimum Requirements:
+
+For Basic AAC + TTS:
+  - CPU: 2 cores
+  - RAM: 4GB
+  - Storage: 1GB
+  - Network: Optional
+
+For Full Ecosystem:
+  - CPU: 4 cores
+  - RAM: 8GB
+  - Storage: 5GB
+  - GPU: Recommended for ISP avatar
+  - Network: Required for neural TTS
+
+Mobile Devices:
+  - iOS 14+ / Android 10+
+  - 3GB RAM minimum
+  - Local processing or cloud hybrid
+</pre>
+
+<h3>7.8.2 Cloud vs Local Processing</h3>
+
+<pre>
+Processing Options:
+
+Fully Local:
+  + No internet required
+  + Lowest latency
+  + Full privacy
+  - Higher device requirements
+  - Larger app size
+
+Cloud Hybrid:
+  + Better TTS quality
+  + Smaller app footprint
+  + Access to updates
+  - Requires internet
+  - Variable latency
+
+Recommendation:
+  - AAC signal processing: Always local
+  - TTS: Local with cloud enhancement
+  - ISP: Local avatar, cloud translation
+  - Braille: Always local
+</pre>
+
+<hr>
+
+<h2>7.9 Chapter Summary</h2>
+
+<p>[OK] <strong>Key Takeaways:</strong></p>
+
+<ol>
+    <li><strong>WIA Family:</strong> AAC integrates with Talk, ISP, and Braille</li>
+    <li><strong>WIA Talk:</strong> Natural TTS with 50+ languages</li>
+    <li><strong>ISP:</strong> Sign language via 3D avatar animation</li>
+    <li><strong>WIA Braille:</strong> Multiple codes, display support</li>
+    <li><strong>Output Manager:</strong> Synchronized multi-modal output</li>
+    <li><strong>IPA Bridge:</strong> Precise pronunciation control</li>
+</ol>
+
+<hr>
+
+<h2>7.10 Review Questions</h2>
+
+<ol>
+    <li>What are the four standards in the WIA ecosystem?</li>
+    <li>How does AAC output connect to text-to-speech?</li>
+    <li>What is ISP and how does it represent sign language?</li>
+    <li>What braille grades are supported and when is each used?</li>
+    <li>Describe the three output synchronization modes.</li>
+    <li>What is the purpose of the IPA phonetic bridge?</li>
+</ol>
+
+<hr>
+
+<p><strong>Chapter 7 Complete</strong> | Approximate pages: 14</p>
+
+<p><a href="chapter-06.html">Previous: Chapter 6</a> | <a href="chapter-08.html">Next: Chapter 8 - Implementation Guide</a></p>
+
+<hr>
+
+<p><strong>WIA - World Certification Industry Association</strong></p>
+<p>Hongik Ingan - Benefit All Humanity</p>
+<p><a href="https://wia.live">https://wia.live</a></p>
+
+</body>
+</html>

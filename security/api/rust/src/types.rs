@@ -2,7 +2,7 @@
 //!
 //! Core type definitions for the WIA Security Standard.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;

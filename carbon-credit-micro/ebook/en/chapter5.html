@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA Micro Carbon Credit Trading Standard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 { color: #10B981; margin-top: 2em; }
+        h1 { border-bottom: 3px solid #10B981; padding-bottom: 10px; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; border-left: 4px solid #10B981; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; color: #10B981; }
+        tr:nth-child(even) { background: #1e293b40; }
+        blockquote { border-left: 4px solid #ffd700; padding-left: 20px; margin: 20px 0; background: #1e293b; padding: 20px; border-radius: 0 8px 8px 0; }
+        .highlight { background: #10B98120; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .warning { background: #f59e0b20; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
+        .success { background: #10b98120; border-left: 4px solid #10b981; padding: 15px; margin: 15px 0; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        footer .philosophy { color: #ffd700; font-size: 1.2em; margin-bottom: 10px; }
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Integration Guide</h1>
+
+    <blockquote>
+        <p><strong>Connecting the Physical and Digital Worlds</strong></p>
+        <p>The power of micro carbon credits lies in seamless integration with IoT devices, mobile apps, and smart meters. This chapter provides practical integration guides for developers and manufacturers.</p>
+    </blockquote>
+
+    <hr>
+
+    <h2>5.1 IoT Sensor Integration</h2>
+
+    <h3>5.1.1 GPS Tracker Integration (Bicycle/Scooter)</h3>
+
+    <div class="highlight">
+        <p><strong>Use Case:</strong> Track bike commutes and automatically earn carbon credits.</p>
+    </div>
+
+    <pre>
+# Arduino/ESP32 GPS Tracker Code
+#include <TinyGPS++.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+TinyGPSPlus gps;
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+
+const char* WIFI_SSID = "your_wifi";
+const char* WIFI_PASSWORD = "your_password";
+const char* MQTT_SERVER = "mqtt.wia.live";
+const int MQTT_PORT = 1883;
+const char* DEVICE_ID = "WIA-DEVICE-2024-GPS-BIKE-123";
+const char* API_KEY = "your_api_key";
+
+struct TripData {
+    double startLat, startLon;
+    double endLat, endLon;
+    unsigned long startTime, endTime;
+    double distanceKm;
+};
+
+void setup() {
+    Serial.begin(115200);
+    connectWiFi();
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+}
+
+void connectWiFi() {
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("WiFi connected");
+}
+
+void publishActivity(TripData trip) {
+    String topic = "wia/carbon-credits/devices/" + String(DEVICE_ID) + "/activity";
+
+    String payload = "{";
+    payload += "\"device_id\":\"" + String(DEVICE_ID) + "\",";
+    payload += "\"activity_type\":\"bicycle_commute\",";
+    payload += "\"timestamp_start\":\"" + getISO8601(trip.startTime) + "\",";
+    payload += "\"timestamp_end\":\"" + getISO8601(trip.endTime) + "\",";
+    payload += "\"transport_data\":{";
+    payload += "\"mode\":\"bicycle\",";
+    payload += "\"distance_km\":" + String(trip.distanceKm) + ",";
+    payload += "\"route\":{";
+    payload += "\"start_point\":{\"lat\":" + String(trip.startLat, 6) +
+               ",\"lon\":" + String(trip.startLon, 6) + "},";
+    payload += "\"end_point\":{\"lat\":" + String(trip.endLat, 6) +
+               ",\"lon\":" + String(trip.endLon, 6) + "}";
+    payload += "}}}";
+
+    mqttClient.publish(topic.c_str(), payload.c_str());
+    Serial.println("Activity published to WIA");
+}
+
+void loop() {
+    // GPS tracking logic here
+    // Detect trip start/end, calculate distance
+    // Call publishActivity() when trip ends
+}
+    </pre>
+
+    <h3>5.1.2 Smart Meter Integration (Solar/Home Energy)</h3>
+
+    <pre>
+# Python Integration for Smart Energy Meter
+import requests
+import time
+from datetime import datetime, timezone
+
+class WIASmartMeterClient:
+    def __init__(self, meter_id, api_key):
+        self.meter_id = meter_id
+        self.api_key = api_key
+        self.base_url = "https://api.wia.live/v1/carbon-credits"
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    def report_solar_generation(self, generation_kwh, grid_carbon_intensity=0.5):
+        """
+        Report solar generation and automatically calculate carbon credits
+
+        Args:
+            generation_kwh: Energy generated in kWh
+            grid_carbon_intensity: kg CO2 per kWh (default: 0.5)
+        """
+        activity_data = {
+            "installation_id": self.meter_id,
+            "activity_type": "solar_generation",
+            "timestamp_start": datetime.now(timezone.utc).isoformat(),
+            "energy_data": {
+                "generation_kwh": generation_kwh,
+                "grid_offset_kwh": generation_kwh,
+                "grid_carbon_intensity_kg_per_kwh": grid_carbon_intensity
+            },
+            "carbon_calculation": {
+                "avoided_emissions_kg": generation_kwh * grid_carbon_intensity
+            }
+        }
+
+        response = requests.post(
+            f"{self.base_url}/activities",
+            json=activity_data,
+            headers=self.headers
+        )
+
+        if response.status_code == 201:
+            result = response.json()
+            print(f"✓ Activity submitted: {result['activity_record_id']}")
+            print(f"  Estimated credits: {result['estimated_credits_tco2e']} tCO2e")
+            return result
+        else:
+            print(f"✗ Error: {response.status_code} - {response.text}")
+            return None
+
+    def get_daily_summary(self):
+        """Get daily carbon credit summary"""
+        response = requests.get(
+            f"{self.base_url}/wallets/{self.meter_id}/balance",
+            headers=self.headers
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Daily Summary:")
+            print(f"  Total Credits: {data['balance']['total_credits_tco2e']} tCO2e")
+            print(f"  Value (USD): ${data['total_value_usd']['at_current_market_price']}")
+            return data
+        return None
+
+# Usage Example
+meter = WIASmartMeterClient(
+    meter_id="WIA-SOLAR-2024-TOM",
+    api_key="your_api_key_here"
+)
+
+# Report daily generation
+meter.report_solar_generation(generation_kwh=15.3)
+
+# Get summary
+meter.get_daily_summary()
+    </pre>
+
+    <hr>
+
+    <h2>5.2 Mobile App Integration</h2>
+
+    <h3>5.2.1 React Native SDK</h3>
+
+    <pre>
+// Install WIA Carbon Credits SDK
+npm install @wia/carbon-credits-sdk
+
+// Initialize SDK
+import WIACarbonCredits from '@wia/carbon-credits-sdk';
+
+const wiaClient = new WIACarbonCredits({
+    apiKey: 'your_api_key',
+    userId: 'WIA-USER-2024-SARAH'
+});
+
+// Track Bicycle Commute with Phone GPS
+import * as Location from 'expo-location';
+
+async function trackBikeCommute() {
+    // Request location permissions
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+        console.error('Location permission denied');
+        return;
+    }
+
+    const tripData = {
+        startTime: Date.now(),
+        waypoints: []
+    };
+
+    // Track location every 10 seconds
+    const locationSubscription = await Location.watchPositionAsync(
+        {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 10000,
+            distanceInterval: 50
+        },
+        (location) => {
+            tripData.waypoints.push({
+                lat: location.coords.latitude,
+                lon: location.coords.longitude,
+                timestamp: new Date(location.timestamp).toISOString()
+            });
+        }
+    );
+
+    // When trip ends
+    const endTrip = async () => {
+        locationSubscription.remove();
+        tripData.endTime = Date.now();
+
+        // Calculate distance
+        const distanceKm = calculateDistance(tripData.waypoints);
+
+        // Submit to WIA
+        const result = await wiaClient.submitActivity({
+            activityType: 'bicycle_commute',
+            timestampStart: new Date(tripData.startTime).toISOString(),
+            timestampEnd: new Date(tripData.endTime).toISOString(),
+            transportData: {
+                mode: 'bicycle',
+                distanceKm: distanceKm,
+                route: {
+                    startPoint: tripData.waypoints[0],
+                    endPoint: tripData.waypoints[tripData.waypoints.length - 1],
+                    waypoints: tripData.waypoints
+                }
+            }
+        });
+
+        console.log(`Earned ${result.estimatedCreditsTco2e} carbon credits!`);
+        return result;
+    };
+
+    return { endTrip };
+}
+
+// Get Wallet Balance
+async function getWalletBalance() {
+    const balance = await wiaClient.getWalletBalance();
+    console.log(`Total Credits: ${balance.totalCreditsTco2e} tCO2e`);
+    console.log(`Value: $${balance.totalValueUsd}`);
+    return balance;
+}
+
+// Auto-Sell Credits
+async function configureAutoSell() {
+    await wiaClient.configureAutoTrading({
+        enabled: true,
+        minimumBalanceTco2e: 0.1,
+        sellPriceUsdPerTco2e: 23.0,
+        autoSellEnabled: true
+    });
+    console.log('Auto-trading configured');
+}
+    </pre>
+
+    <h3>5.2.2 iOS Swift Integration</h3>
+
+    <pre>
+import Foundation
+import CoreLocation
+
+class WIACarbonCreditTracker: NSObject, CLLocationManagerDelegate {
+    let locationManager = CLLocationManager()
+    var tripWaypoints: [(lat: Double, lon: Double, timestamp: Date)] = []
+    var tripStartTime: Date?
+
+    let apiKey = "your_api_key"
+    let baseURL = "https://api.wia.live/v1/carbon-credits"
+
+    override init() {
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.requestAlwaysAuthorization()
+    }
+
+    func startTracking() {
+        tripStartTime = Date()
+        tripWaypoints = []
+        locationManager.startUpdatingLocation()
+        print("Started tracking bike commute")
+    }
+
+    func stopTracking() {
+        locationManager.stopUpdatingLocation()
+        submitActivity()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        for location in locations {
+            tripWaypoints.append((
+                lat: location.coordinate.latitude,
+                lon: location.coordinate.longitude,
+                timestamp: location.timestamp
+            ))
+        }
+    }
+
+    func submitActivity() {
+        guard let startTime = tripStartTime, !tripWaypoints.isEmpty else {
+            print("No trip data to submit")
+            return
+        }
+
+        let distanceKm = calculateDistance(waypoints: tripWaypoints)
+
+        let activityData: [String: Any] = [
+            "activity_type": "bicycle_commute",
+            "timestamp_start": ISO8601DateFormatter().string(from: startTime),
+            "timestamp_end": ISO8601DateFormatter().string(from: Date()),
+            "transport_data": [
+                "mode": "bicycle",
+                "distance_km": distanceKm,
+                "route": [
+                    "start_point": ["lat": tripWaypoints.first!.lat, "lon": tripWaypoints.first!.lon],
+                    "end_point": ["lat": tripWaypoints.last!.lat, "lon": tripWaypoints.last!.lon]
+                ]
+            ]
+        ]
+
+        submitToAPI(activityData: activityData)
+    }
+
+    func submitToAPI(activityData: [String: Any]) {
+        guard let url = URL(string: "\(baseURL)/activities") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: activityData)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let data = data,
+               let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("Activity submitted: \(result)")
+            }
+        }.resume()
+    }
+
+    func calculateDistance(waypoints: [(lat: Double, lon: Double, timestamp: Date)]) -> Double {
+        var totalDistance = 0.0
+        for i in 1..<waypoints.count {
+            let loc1 = CLLocation(latitude: waypoints[i-1].lat, longitude: waypoints[i-1].lon)
+            let loc2 = CLLocation(latitude: waypoints[i].lat, longitude: waypoints[i].lon)
+            totalDistance += loc1.distance(from: loc2)
+        }
+        return totalDistance / 1000.0 // Convert to km
+    }
+}
+    </pre>
+
+    <hr>
+
+    <h2>5.3 Smart Home Integration</h2>
+
+    <h3>5.3.1 Home Assistant Integration</h3>
+
+    <pre>
+# Home Assistant configuration.yaml
+sensor:
+  - platform: template
+    sensors:
+      solar_carbon_credits_today:
+        friendly_name: "Carbon Credits Today"
+        unit_of_measurement: "tCO2e"
+        value_template: >
+          {% set generation = states('sensor.solar_generation_today') | float %}
+          {% set carbon_intensity = 0.5 %}
+          {{ (generation * carbon_intensity / 1000) | round(5) }}
+
+      carbon_credits_value:
+        friendly_name: "Credit Value Today"
+        unit_of_measurement: "USD"
+        value_template: >
+          {% set credits = states('sensor.solar_carbon_credits_today') | float %}
+          {% set price_per_tco2e = 22.0 %}
+          {{ (credits * price_per_tco2e) | round(2) }}
+
+automation:
+  - alias: "Report Daily Solar to WIA"
+    trigger:
+      - platform: time
+        at: "23:55:00"
+    action:
+      - service: rest_command.report_solar_to_wia
+        data:
+          generation_kwh: "{{ states('sensor.solar_generation_today') }}"
+
+rest_command:
+  report_solar_to_wia:
+    url: "https://api.wia.live/v1/carbon-credits/activities"
+    method: POST
+    headers:
+      Authorization: "Bearer YOUR_API_KEY"
+      Content-Type: "application/json"
+    payload: >
+      {
+        "installation_id": "WIA-SOLAR-2024-HOME",
+        "activity_type": "solar_generation",
+        "timestamp_start": "{{ now().replace(hour=0, minute=0, second=0).isoformat() }}",
+        "energy_data": {
+          "generation_kwh": {{ generation_kwh }},
+          "grid_carbon_intensity_kg_per_kwh": 0.5
+        }
+      }
+    </pre>
+
+    <h3>5.3.2 Amazon Alexa Skill</h3>
+
+    <pre>
+// Alexa Skill Lambda Function (Node.js)
+const Alexa = require('ask-sdk-core');
+const axios = require('axios');
+
+const GetCarbonBalanceIntentHandler = {
+    canHandle(handlerInput) {
+        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
+            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'GetCarbonBalanceIntent';
+    },
+    async handle(handlerInput) {
+        const userId = handlerInput.requestEnvelope.context.System.user.userId;
+
+        try {
+            const response = await axios.get(
+                `https://api.wia.live/v1/carbon-credits/wallets/${userId}/balance`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${process.env.WIA_API_KEY}`
+                    }
+                }
+            );
+
+            const balance = response.data.balance.total_credits_tco2e;
+            const value = response.data.total_value_usd.at_current_market_price;
+
+            const speakOutput = `You have ${balance.toFixed(3)} carbon credits,
+                                worth approximately ${value.toFixed(2)} dollars.
+                                Great job helping the environment!`;
+
+            return handlerInput.responseBuilder
+                .speak(speakOutput)
+                .getResponse();
+        } catch (error) {
+            return handlerInput.responseBuilder
+                .speak('Sorry, I had trouble getting your carbon credit balance.')
+                .getResponse();
+        }
+    }
+};
+
+// Register bike commute
+const LogBikeCommuteIntentHandler = {
+    canHandle(handlerInput) {
+        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
+            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'LogBikeCommuteIntent';
+    },
+    async handle(handlerInput) {
+        const distanceKm = Alexa.getSlotValue(handlerInput.requestEnvelope, 'distance');
+
+        const activityData = {
+            activity_type: 'bicycle_commute',
+            timestamp_start: new Date().toISOString(),
+            transport_data: {
+                mode: 'bicycle',
+                distance_km: parseFloat(distanceKm)
+            }
+        };
+
+        try {
+            const response = await axios.post(
+                'https://api.wia.live/v1/carbon-credits/activities',
+                activityData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${process.env.WIA_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            const credits = response.data.estimated_credits_tco2e;
+            const speakOutput = `Nice! I logged your ${distanceKm} kilometer bike commute.
+                                You earned ${credits.toFixed(4)} carbon credits.`;
+
+            return handlerInput.responseBuilder
+                .speak(speakOutput)
+                .getResponse();
+        } catch (error) {
+            return handlerInput.responseBuilder
+                .speak('Sorry, I had trouble logging your bike commute.')
+                .getResponse();
+        }
+    }
+};
+    </pre>
+
+    <hr>
+
+    <h2>5.4 Third-Party Integrations</h2>
+
+    <h3>5.4.1 Supported Platforms</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Platform</th>
+                <th>Integration Type</th>
+                <th>Features</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Strava</td>
+                <td>OAuth + Webhook</td>
+                <td>Auto-track bike/run activities, earn credits</td>
+            </tr>
+            <tr>
+                <td>Tesla</td>
+                <td>API Integration</td>
+                <td>Track solar generation, Powerwall usage</td>
+            </tr>
+            <tr>
+                <td>Nest Thermostat</td>
+                <td>API Integration</td>
+                <td>Energy efficiency credits</td>
+            </tr>
+            <tr>
+                <td>Uber/Lyft</td>
+                <td>API Integration</td>
+                <td>Credits for electric/shared rides</td>
+            </tr>
+            <tr>
+                <td>Zapier</td>
+                <td>Webhook</td>
+                <td>Custom automation workflows</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>5.4.2 Zapier Integration Example</h3>
+
+    <pre>
+// Zapier Webhook to WIA Carbon Credits
+Trigger: New activity in Strava (bike ride)
+Action: HTTP POST to WIA API
+
+URL: https://api.wia.live/v1/carbon-credits/activities
+Method: POST
+Headers:
+  Authorization: Bearer YOUR_API_KEY
+  Content-Type: application/json
+
+Body:
+{
+  "activity_type": "bicycle_commute",
+  "timestamp_start": "{{strava_start_date}}",
+  "timestamp_end": "{{strava_end_date}}",
+  "transport_data": {
+    "mode": "bicycle",
+    "distance_km": "{{strava_distance_km}}",
+    "route": {
+      "start_point": {
+        "lat": "{{strava_start_lat}}",
+        "lon": "{{strava_start_lon}}"
+      },
+      "end_point": {
+        "lat": "{{strava_end_lat}}",
+        "lon": "{{strava_end_lon}}"
+      }
+    }
+  }
+}
+    </pre>
+
+    <hr>
+
+    <h2>5.5 Chapter Summary</h2>
+
+    <div class="success">
+        <p><strong>Key Takeaways:</strong></p>
+        <ol>
+            <li><strong>IoT Integration:</strong> GPS trackers and smart meters with MQTT/HTTP protocols</li>
+            <li><strong>Mobile SDKs:</strong> React Native, iOS Swift, Android integration examples</li>
+            <li><strong>Smart Home:</strong> Home Assistant, Alexa, Google Home integrations</li>
+            <li><strong>Third-Party:</strong> Strava, Tesla, Nest, Uber/Lyft, Zapier connections</li>
+            <li><strong>Real-time Updates:</strong> WebSocket and MQTT for instant credit notifications</li>
+            <li><strong>Easy Setup:</strong> Simple API calls with comprehensive SDKs</li>
+        </ol>
+    </div>
+</body>
+</html>

@@ -2,10 +2,10 @@
 //!
 //! WebSocket-based event streaming implementation.
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::Utc;
 
 // ============================================================================
 // Stream Actions
@@ -250,12 +250,7 @@ impl SubscribeRequest {
 
     /// Create from channel names
     pub fn channels(channels: Vec<&str>) -> Self {
-        Self::new(
-            channels
-                .into_iter()
-                .map(ChannelSubscription::new)
-                .collect(),
-        )
+        Self::new(channels.into_iter().map(ChannelSubscription::new).collect())
     }
 }
 
@@ -532,8 +527,7 @@ mod tests {
     #[test]
     fn test_subscribe_request() {
         let request = SubscribeRequest::new(vec![
-            ChannelSubscription::new("alerts")
-                .with_filters(ChannelFilter::critical_high()),
+            ChannelSubscription::new("alerts").with_filters(ChannelFilter::critical_high()),
             ChannelSubscription::new("threat_intel"),
         ]);
 
@@ -543,10 +537,8 @@ mod tests {
 
     #[test]
     fn test_subscribed_response() {
-        let response = SubscribedResponse::new(vec![
-            "alerts".to_string(),
-            "threat_intel".to_string(),
-        ]);
+        let response =
+            SubscribedResponse::new(vec!["alerts".to_string(), "threat_intel".to_string()]);
 
         assert_eq!(response.action, StreamAction::Subscribed);
         assert_eq!(response.channels.len(), 2);

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Implementation Guide and Best Practices</title>
+</head>
+<body>
+
+<p><a href="index.html">[DATA-002] WIA Data Lake Standard Ebook</a> | Chapter 8 (of 8)</p>
+
+<hr>
+
+<h1>Chapter 8: Implementation Guide and Best Practices</h1>
+
+<blockquote>
+<p><strong>Theory is knowing how it should work. Practice is knowing how it actually works.</strong></p>
+<p>This chapter bridges the gap.</p>
+</blockquote>
+
+<hr>
+
+<h2>8.1 Implementation Roadmap</h2>
+
+<h3>8.1.1 Phase 1: Foundation (Weeks 1-4)</h3>
+
+<pre>
+Week 1: Architecture Design
+☐ Define storage zones (Raw, Curated, Consumption)
+☐ Choose cloud platform (AWS/Azure/GCP)
+☐ Select table format (Delta/Iceberg/Hudi)
+☐ Design naming conventions
+☐ Plan security model
+
+Week 2: Infrastructure Setup
+☐ Provision cloud storage (S3/ADLS/GCS)
+☐ Set up metadata catalog (Glue/Unity/Hive)
+☐ Deploy compute cluster (EMR/Databricks/Dataproc)
+☐ Configure networking & VPC
+☐ Implement IAM roles & policies
+
+Week 3: Initial Data Ingestion
+☐ Identify first data source
+☐ Implement ingestion pipeline
+☐ Validate data quality
+☐ Set up monitoring & alerting
+☐ Document processes
+
+Week 4: Validation & Testing
+☐ End-to-end testing
+☐ Performance benchmarks
+☐ Security audit
+☐ Disaster recovery test
+☐ Team training
+</pre>
+
+<h3>8.1.2 Phase 2: Expansion (Months 2-3)</h3>
+
+<ul>
+    <li>Onboard additional data sources</li>
+    <li>Implement data quality framework</li>
+    <li>Set up BI tool integrations</li>
+    <li>Optimize query performance</li>
+    <li>Establish data governance policies</li>
+</ul>
+
+<h3>8.1.3 Phase 3: Maturity (Months 4-6)</h3>
+
+<ul>
+    <li>Implement advanced analytics use cases</li>
+    <li>Machine learning model training</li>
+    <li>Real-time streaming pipelines</li>
+    <li>Cost optimization initiatives</li>
+    <li>Self-service analytics enablement</li>
+</ul>
+
+<hr>
+
+<h2>8.2 Quick Start Guides</h2>
+
+<h3>8.2.1 AWS Quick Start</h3>
+
+<pre>
+# 1. Create S3 bucket
+aws s3 mb s3://my-datalake --region us-east-1
+
+# 2. Set up Glue catalog
+aws glue create-database --database-input '{
+  "Name": "datalake",
+  "Description": "WIA Data Lake"
+}'
+
+# 3. Launch EMR cluster with Delta Lake
+aws emr create-cluster \
+  --name "DataLake-Cluster" \
+  --release-label emr-6.10.0 \
+  --applications Name=Spark Name=Hive \
+  --ec2-attributes KeyName=my-key \
+  --instance-type m5.xlarge \
+  --instance-count 3 \
+  --configurations file://delta-config.json
+
+# 4. Create first Delta table
+spark-sql --packages io.delta:delta-core_2.12:2.4.0
+> CREATE TABLE datalake.events
+  USING delta
+  LOCATION 's3://my-datalake/curated/events/';
+</pre>
+
+<h3>8.2.2 Azure Quick Start</h3>
+
+<pre>
+# 1. Create ADLS Gen2 account
+az storage account create \
+  --name mydatalake \
+  --resource-group my-rg \
+  --location eastus \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --hierarchical-namespace true
+
+# 2. Create Databricks workspace
+az databricks workspace create \
+  --resource-group my-rg \
+  --name my-workspace \
+  --location eastus \
+  --sku premium
+
+# 3. Create Delta Lake table
+%sql
+CREATE DATABASE IF NOT EXISTS datalake;
+CREATE TABLE datalake.events
+USING delta
+LOCATION 'abfss://curated@mydatalake.dfs.core.windows.net/events/';
+</pre>
+
+<h3>8.2.3 GCP Quick Start</h3>
+
+<pre>
+# 1. Create GCS bucket
+gcloud storage buckets create gs://my-datalake --location=us-central1
+
+# 2. Create Dataproc cluster
+gcloud dataproc clusters create datalake-cluster \
+  --region us-central1 \
+  --zone us-central1-a \
+  --master-machine-type n1-standard-4 \
+  --worker-machine-type n1-standard-4 \
+  --num-workers 2 \
+  --image-version 2.1-debian11
+
+# 3. Create Iceberg table
+spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.4.0
+> CREATE TABLE datalake.events
+  USING iceberg
+  LOCATION 'gs://my-datalake/curated/events/';
+</pre>
+
+<hr>
+
+<h2>8.3 Performance Tuning</h2>
+
+<h3>8.3.1 File Size Optimization</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Problem</th>
+            <th>Symptom</th>
+            <th>Solution</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Small Files</strong></td>
+            <td>Slow queries, high listing overhead</td>
+            <td>OPTIMIZE table (compact files to 128MB-1GB)</td>
+        </tr>
+        <tr>
+            <td><strong>Large Files</strong></td>
+            <td>Low parallelism, OOM errors</td>
+            <td>Repartition data before writing</td>
+        </tr>
+    </tbody>
+</table>
+
+<pre>
+# Compact small files
+OPTIMIZE events WHERE date = '2025-01-15';
+
+# Repartition before writing
+df.repartition(100).write.format("delta").save(...)
+</pre>
+
+<h3>8.3.2 Partitioning Strategy</h3>
+
+<pre>
+# Good: Balanced partitions (1-10 GB each)
+year=2025/month=01/day=15/
+
+# Bad: Over-partitioned (thousands of tiny partitions)
+year=2025/month=01/day=15/hour=10/minute=30/
+
+# Bad: Under-partitioned (100+ GB per partition)
+year=2025/
+</pre>
+
+<h3>8.3.3 Z-Ordering</h3>
+
+<pre>
+# Multi-dimensional clustering for better data skipping
+OPTIMIZE events ZORDER BY (user_id, event_type);
+
+# Typical improvements:
+# - 50-90% reduction in data scanned
+# - 2-10x faster query performance
+# - Works best with 2-4 columns
+</pre>
+
+<h3>8.3.4 Caching Strategies</h3>
+
+<pre>
+# Cache frequently accessed tables
+CACHE TABLE events;
+
+# Partitioned caching (Delta Cache in Databricks)
+SELECT * FROM events
+OPTIONS (cachingEnabled = true)
+WHERE date >= '2025-01-01';
+</pre>
+
+<hr>
+
+<h2>8.4 Security & Governance</h2>
+
+<h3>8.4.1 Encryption</h3>
+
+<pre>
+# Encryption at rest (S3)
+aws s3api put-bucket-encryption \
+  --bucket my-datalake \
+  --server-side-encryption-configuration '{
+    "Rules": [{
+      "ApplyServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "aws:kms",
+        "KMSMasterKeyID": "arn:aws:kms:..."
+      }
+    }]
+  }'
+
+# Encryption in transit
+spark.hadoop.fs.s3a.connection.ssl.enabled=true
+</pre>
+
+<h3>8.4.2 Access Control</h3>
+
+<pre>
+# Table-level permissions (Unity Catalog)
+GRANT SELECT ON TABLE curated.events TO analytics_team;
+GRANT MODIFY ON TABLE curated.events TO data_engineers;
+REVOKE ALL ON TABLE curated.sensitive_data FROM public;
+
+# Column-level masking
+CREATE FUNCTION mask_email(email STRING)
+  RETURN CASE WHEN is_member('pii_viewers')
+              THEN email
+              ELSE 'REDACTED'
+         END;
+
+ALTER TABLE users ALTER COLUMN email SET MASK mask_email;
+</pre>
+
+<h3>8.4.3 Data Quality Checks</h3>
+
+<pre>
+from great_expectations import DataContext
+
+context = DataContext()
+
+# Define expectations
+expectation_suite = context.create_expectation_suite("events_suite")
+batch = context.get_batch(...)
+
+batch.expect_column_values_to_not_be_null("user_id")
+batch.expect_column_values_to_be_unique("id")
+batch.expect_column_values_to_be_in_set("event_type", ["click", "purchase", "view"])
+batch.expect_column_min_to_be_between("timestamp", min_value=datetime(2020,1,1))
+
+# Validate
+results = batch.validate()
+if not results["success"]:
+    raise DataQualityException("Quality checks failed")
+</pre>
+
+<hr>
+
+<h2>8.5 Cost Optimization</h2>
+
+<h3>8.5.1 Storage Tiering</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Data Age</th>
+            <th>Access Pattern</th>
+            <th>Storage Class</th>
+            <th>Cost Savings</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>0-30 days</td>
+            <td>Frequent</td>
+            <td>S3 Standard</td>
+            <td>Baseline</td>
+        </tr>
+        <tr>
+            <td>30-90 days</td>
+            <td>Infrequent</td>
+            <td>S3 Intelligent-Tiering</td>
+            <td>~40%</td>
+        </tr>
+        <tr>
+            <td>90-365 days</td>
+            <td>Rare</td>
+            <td>S3 Glacier Instant</td>
+            <td>~70%</td>
+        </tr>
+        <tr>
+            <td>1+ years</td>
+            <td>Archive</td>
+            <td>S3 Glacier Deep Archive</td>
+            <td>~95%</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>8.5.2 Compute Optimization</h3>
+
+<pre>
+# Auto-scaling EMR clusters
+aws emr create-cluster \
+  --auto-scaling-role EMR_AutoScaling_DefaultRole \
+  --instance-groups \
+    InstanceGroupType=MASTER,InstanceType=m5.xlarge,InstanceCount=1 \
+    InstanceGroupType=CORE,InstanceType=m5.xlarge,InstanceCount=2,AutoScalingPolicy=file://scaling-policy.json
+
+# Spot instances for cost savings (50-90% cheaper)
+--instance-groups \
+  InstanceGroupType=TASK,InstanceType=m5.xlarge,BidPrice=0.10,InstanceCount=10
+</pre>
+
+<h3>8.5.3 Data Lifecycle Policies</h3>
+
+<pre>
+# Automatic data archival
+CREATE TABLE events (...)
+TBLPROPERTIES (
+  'delta.deletedFileRetentionDuration' = '7 days',
+  'delta.logRetentionDuration' = '30 days'
+);
+
+# Vacuum old files regularly
+VACUUM events RETAIN 168 HOURS;  -- Keep 7 days of history
+</pre>
+
+<hr>
+
+<h2>8.6 Monitoring & Observability</h2>
+
+<h3>8.6.1 Key Metrics</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Metrics</th>
+            <th>Alerting Threshold</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Ingestion</strong></td>
+            <td>Records/sec, Latency, Error rate</td>
+            <td>Error rate > 1%</td>
+        </tr>
+        <tr>
+            <td><strong>Storage</strong></td>
+            <td>Size, Growth rate, File count</td>
+            <td>Growth > 50% week-over-week</td>
+        </tr>
+        <tr>
+            <td><strong>Query</strong></td>
+            <td>P50/P95/P99 latency, Query count</td>
+            <td>P95 > 30 seconds</td>
+        </tr>
+        <tr>
+            <td><strong>Cost</strong></td>
+            <td>Storage cost, Compute cost</td>
+            <td>Cost > budget + 20%</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>8.6.2 Observability Stack</h3>
+
+<pre>
+# Prometheus metrics
+spark.metrics.conf.*.sink.prometheus.class=org.apache.spark.metrics.sink.PrometheusSink
+spark.metrics.conf.*.sink.prometheus.port=9091
+
+# Grafana dashboard
+- Panel: Ingestion throughput (records/sec)
+- Panel: Query latency (P50, P95, P99)
+- Panel: Storage growth trend
+- Panel: Cost per TB
+
+# Alerts
+- PagerDuty: Critical failures
+- Slack: Performance degradation
+- Email: Daily summary reports
+</pre>
+
+<hr>
+
+<h2>8.7 Migration Strategies</h2>
+
+<h3>8.7.1 From Data Warehouse to Data Lake</h3>
+
+<pre>
+Phase 1: Parallel Run (Months 1-2)
+- Keep existing warehouse
+- Replicate data to lake
+- Validate data consistency
+- Build confidence
+
+Phase 2: Hybrid Mode (Months 3-4)
+- New workloads on lake
+- Legacy reports on warehouse
+- Gradual migration of queries
+
+Phase 3: Full Migration (Months 5-6)
+- All workloads on lake
+- Decommission warehouse
+- Cost savings realized
+</pre>
+
+<h3>8.7.2 From Hive to Iceberg/Delta</h3>
+
+<pre>
+# In-place conversion (Iceberg)
+ALTER TABLE hive_table
+SET TBLPROPERTIES (
+  'table_type'='ICEBERG',
+  'format-version'='2'
+);
+
+# Or: Create new table + migrate
+CREATE TABLE events_iceberg USING iceberg AS
+SELECT * FROM hive_events;
+</pre>
+
+<hr>
+
+<h2>8.8 Troubleshooting Guide</h2>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Problem</th>
+            <th>Cause</th>
+            <th>Solution</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Slow Queries</strong></td>
+            <td>Small files, no partitioning</td>
+            <td>OPTIMIZE + Z-ORDER, add partitions</td>
+        </tr>
+        <tr>
+            <td><strong>OOM Errors</strong></td>
+            <td>Large files, skewed data</td>
+            <td>Repartition, increase executor memory</td>
+        </tr>
+        <tr>
+            <td><strong>Data Corruption</strong></td>
+            <td>Concurrent writes without ACID</td>
+            <td>Use Delta/Iceberg/Hudi, never Parquet directly</td>
+        </tr>
+        <tr>
+            <td><strong>High Costs</strong></td>
+            <td>No lifecycle policies</td>
+            <td>Implement tiered storage, vacuum old data</td>
+        </tr>
+        <tr>
+            <td><strong>Schema Conflicts</strong></td>
+            <td>Incompatible schema changes</td>
+            <td>Use schema evolution, test migrations</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>8.9 WIA Certification Process</h2>
+
+<pre>
+Step 1: Self-Assessment (Free)
+☐ Review compliance checklist
+☐ Implement required features
+☐ Run validation tests
+
+Step 2: Submit Application
+☐ Fill out certification form
+☐ Provide architecture documentation
+☐ Share sample queries & results
+
+Step 3: Technical Review (1-2 weeks)
+☐ WIA team reviews implementation
+☐ Validates compliance
+☐ Provides feedback if needed
+
+Step 4: Certification Issued
+☐ Receive WIA certification badge
+☐ Listed on wia.live/certified
+☐ Annual recertification required
+</pre>
+
+<hr>
+
+<h2>8.10 Resources</h2>
+
+<ul>
+    <li><strong>Documentation:</strong> <a href="https://wia.live/standards/data-lake">https://wia.live/standards/data-lake</a></li>
+    <li><strong>GitHub:</strong> <a href="https://github.com/WIA-Official/wia-standards">https://github.com/WIA-Official/wia-standards</a></li>
+    <li><strong>Community:</strong> <a href="https://discord.gg/wia">https://discord.gg/wia</a></li>
+    <li><strong>Training:</strong> <a href="https://wia.live/training">https://wia.live/training</a></li>
+    <li><strong>Certification:</strong> <a href="https://wia.live/certifications">https://wia.live/certifications</a></li>
+</ul>
+
+<hr>
+
+<h2>Conclusion</h2>
+
+<p>You've now completed the WIA Data Lake Standard ebook! You've learned:</p>
+
+<ul>
+    <li>Data lake fundamentals and architecture patterns</li>
+    <li>File formats, table formats, and storage optimization</li>
+    <li>API interfaces and programming SDKs</li>
+    <li>ACID transactions with Delta, Iceberg, Hudi</li>
+    <li>Ecosystem integrations across clouds and tools</li>
+    <li>Implementation strategies and best practices</li>
+</ul>
+
+<blockquote>
+<p><strong>弘益人間 (Hongik Ingan) · Benefit All Humanity</strong></p>
+<p>The WIA Data Lake Standard is free forever. Build amazing things. Share your knowledge. Help others succeed.</p>
+<p>Together, we're building a more open, interoperable data ecosystem.</p>
+</blockquote>
+
+<hr>
+
+<p><a href="chapter-07.html">← Previous Chapter</a> | <a href="index.html">Back to Table of Contents</a></p>
+
+<hr>
+
+<p><strong>© 2025 WIA Standards / MIT License</strong></p>
+</body>
+</html>

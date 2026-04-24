@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Lake Architecture - WIA Data Lake Standard</title>
+</head>
+<body>
+
+<p><a href="index.html">[DATA-002] WIA Data Lake Standard Ebook</a> | Chapter 2 (of 8)</p>
+
+<hr>
+
+<h1>[DATA-002] Chapter 2: Data Lake Architecture</h1>
+
+<blockquote>
+<p><strong>Good architecture is invisible. Poor architecture is everywhere.</strong></p>
+<p>A well-designed data lake enables teams to move fast while maintaining quality and governance.</p>
+</blockquote>
+
+<hr>
+
+<h2>2.1 Three-Zone Architecture</h2>
+
+<p>The WIA Data Lake Standard recommends a three-zone architecture pattern that separates data by its level of processing and intended use:</p>
+
+<pre>
+┌─────────────────────────────────────────────────────────────┐
+│                      DATA SOURCES                            │
+│   IoT • APIs • Databases • Files • Streams • Applications    │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    RAW ZONE (Bronze)                         │
+│  • Unprocessed data as-is                                    │
+│  • Schema-on-read                                            │
+│  • High durability, low cost storage                         │
+│  • Append-only, immutable                                    │
+└────────────────────┬────────────────────────────────────────┘
+                     │ Data Quality • Cleansing • Enrichment
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  CURATED ZONE (Silver)                       │
+│  • Cleaned, validated, transformed                           │
+│  • Schema-on-write                                           │
+│  • Business rules applied                                    │
+│  • ACID transactions enabled                                 │
+└────────────────────┬────────────────────────────────────────┘
+                     │ Aggregation • Feature Engineering
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                CONSUMPTION ZONE (Gold)                       │
+│  • Analytics-ready datasets                                  │
+│  • Optimized for query performance                           │
+│  • Star/snowflake schemas                                    │
+│  • BI-friendly views                                         │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    CONSUMERS                                 │
+│  BI Tools • ML Pipelines • Reports • APIs • Applications     │
+└─────────────────────────────────────────────────────────────┘
+</pre>
+
+<h3>2.1.1 Raw Zone (Bronze Layer)</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Characteristic</th>
+            <th>Implementation</th>
+            <th>Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Data State</strong></td>
+            <td>Raw, unprocessed, as-received</td>
+            <td>Preserve original source data</td>
+        </tr>
+        <tr>
+            <td><strong>Schema</strong></td>
+            <td>Schema-on-read</td>
+            <td>Flexibility to ingest any format</td>
+        </tr>
+        <tr>
+            <td><strong>Storage</strong></td>
+            <td>S3 Standard, Azure Blob Hot</td>
+            <td>Balance cost and access speed</td>
+        </tr>
+        <tr>
+            <td><strong>Formats</strong></td>
+            <td>JSON, CSV, Avro, raw logs</td>
+            <td>Native source formats</td>
+        </tr>
+        <tr>
+            <td><strong>Retention</strong></td>
+            <td>Long-term (years)</td>
+            <td>Regulatory compliance, reprocessing</td>
+        </tr>
+        <tr>
+            <td><strong>Users</strong></td>
+            <td>Data engineers, data scientists</td>
+            <td>Exploratory analysis, debugging</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>Example Directory Structure:</strong></p>
+
+<pre>
+s3://my-datalake/raw/
+├── iot-sensors/
+│   ├── year=2025/
+│   │   ├── month=01/
+│   │   │   ├── day=15/
+│   │   │   │   ├── hour=10/
+│   │   │   │   │   └── sensors-20250115-1000.json.gz
+├── api-logs/
+│   ├── source=payment-api/
+│   │   ├── date=2025-01-15/
+│   │   │   └── logs-20250115.jsonl.gz
+└── database-dumps/
+    ├── postgres/
+    │   ├── table=users/
+    │   │   └── dump-20250115.parquet
+</pre>
+
+<h3>2.1.2 Curated Zone (Silver Layer)</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Characteristic</th>
+            <th>Implementation</th>
+            <th>Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Data State</strong></td>
+            <td>Cleaned, validated, enriched</td>
+            <td>High-quality business data</td>
+        </tr>
+        <tr>
+            <td><strong>Schema</strong></td>
+            <td>Schema-on-write with enforcement</td>
+            <td>Data quality guarantees</td>
+        </tr>
+        <tr>
+            <td><strong>Storage</strong></td>
+            <td>Delta Lake, Iceberg, Hudi</td>
+            <td>ACID transactions, versioning</td>
+        </tr>
+        <tr>
+            <td><strong>Formats</strong></td>
+            <td>Parquet, ORC</td>
+            <td>Columnar, compressed, optimized</td>
+        </tr>
+        <tr>
+            <td><strong>Operations</strong></td>
+            <td>INSERT, UPDATE, DELETE, MERGE</td>
+            <td>Full DML support</td>
+        </tr>
+        <tr>
+            <td><strong>Users</strong></td>
+            <td>Analytics engineers, data scientists</td>
+            <td>Feature engineering, modeling</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>Example Directory Structure:</strong></p>
+
+<pre>
+s3://my-datalake/curated/
+├── delta-lake/
+│   ├── customer_events/
+│   │   ├── _delta_log/
+│   │   │   ├── 00000000000000000000.json
+│   │   │   ├── 00000000000000000001.json
+│   │   ├── event_type=click/
+│   │   │   └── part-00000.snappy.parquet
+│   │   ├── event_type=purchase/
+│   │   │   └── part-00001.snappy.parquet
+└── iceberg/
+    ├── transactions/
+    │   ├── metadata/
+    │   │   ├── v1.metadata.json
+    │   │   ├── v2.metadata.json
+    │   └── data/
+    │       └── 00001-1-data.parquet
+</pre>
+
+<h3>2.1.3 Consumption Zone (Gold Layer)</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Characteristic</th>
+            <th>Implementation</th>
+            <th>Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Data State</strong></td>
+            <td>Aggregated, denormalized</td>
+            <td>Ready for reporting and BI</td>
+        </tr>
+        <tr>
+            <td><strong>Schema</strong></td>
+            <td>Star/snowflake schemas</td>
+            <td>Optimized for analytical queries</td>
+        </tr>
+        <tr>
+            <td><strong>Storage</strong></td>
+            <td>Materialized views, cubes</td>
+            <td>Pre-computed aggregations</td>
+        </tr>
+        <tr>
+            <td><strong>Performance</strong></td>
+            <td>Z-ordering, data skipping</td>
+            <td>Sub-second query latency</td>
+        </tr>
+        <tr>
+            <td><strong>Access</strong></td>
+            <td>SQL, REST APIs</td>
+            <td>Business user friendly</td>
+        </tr>
+        <tr>
+            <td><strong>Users</strong></td>
+            <td>Business analysts, executives</td>
+            <td>Dashboards, reports, decisions</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>2.2 Schema-on-Read vs Schema-on-Write</h2>
+
+<p>One of the most important architectural decisions in data lake design:</p>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Aspect</th>
+            <th>Schema-on-Read</th>
+            <th>Schema-on-Write</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>When Applied</strong></td>
+            <td>When data is queried</td>
+            <td>When data is written</td>
+        </tr>
+        <tr>
+            <td><strong>Flexibility</strong></td>
+            <td>High - can reinterpret data</td>
+            <td>Low - schema changes require migration</td>
+        </tr>
+        <tr>
+            <td><strong>Write Speed</strong></td>
+            <td>Fast - no validation</td>
+            <td>Slower - schema enforcement</td>
+        </tr>
+        <tr>
+            <td><strong>Read Speed</strong></td>
+            <td>Slower - schema interpretation</td>
+            <td>Faster - schema known</td>
+        </tr>
+        <tr>
+            <td><strong>Data Quality</strong></td>
+            <td>Variable - validation at query time</td>
+            <td>Guaranteed - validation at write time</td>
+        </tr>
+        <tr>
+            <td><strong>Use Case</strong></td>
+            <td>Exploration, raw data ingestion</td>
+            <td>Production pipelines, reporting</td>
+        </tr>
+        <tr>
+            <td><strong>Zone</strong></td>
+            <td>Raw (Bronze)</td>
+            <td>Curated (Silver), Consumption (Gold)</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>Best Practice:</strong> Use schema-on-read for ingestion (Raw zone), then enforce schema-on-write as data progresses to Curated and Consumption zones.</p>
+
+<hr>
+
+<h2>2.3 Data Lakehouse Architecture</h2>
+
+<p>The data lakehouse combines the best attributes of data lakes and data warehouses:</p>
+
+<h3>2.3.1 Key Capabilities</h3>
+
+<ol>
+    <li><strong>ACID Transactions</strong>
+        <ul>
+            <li>Atomic, Consistent, Isolated, Durable writes</li>
+            <li>Prevents data corruption in concurrent workloads</li>
+            <li>Enabled by Delta Lake, Iceberg, Hudi</li>
+        </ul>
+    </li>
+    <li><strong>Schema Enforcement & Evolution</strong>
+        <ul>
+            <li>Prevent bad data from entering the lake</li>
+            <li>Safely add/remove columns without rewriting data</li>
+            <li>Backward and forward compatibility</li>
+        </ul>
+    </li>
+    <li><strong>Time Travel</strong>
+        <ul>
+            <li>Access historical versions of data</li>
+            <li>Rollback erroneous updates</li>
+            <li>Audit and compliance</li>
+        </ul>
+    </li>
+    <li><strong>Efficient Upserts & Deletes</strong>
+        <ul>
+            <li>UPDATE and DELETE operations on immutable storage</li>
+            <li>Critical for GDPR compliance (right to be forgotten)</li>
+            <li>CDC (Change Data Capture) support</li>
+        </ul>
+    </li>
+    <li><strong>Unified Batch & Streaming</strong>
+        <ul>
+            <li>Same tables for real-time and batch processing</li>
+            <li>Lambda architecture without complexity</li>
+            <li>Simplified data pipelines</li>
+        </ul>
+    </li>
+</ol>
+
+<h3>2.3.2 Lakehouse Reference Architecture</h3>
+
+<pre>
+┌─────────────────────────────────────────────────────────────┐
+│                   INGESTION LAYER                            │
+│  Kafka • Kinesis • API Gateway • CDC • Batch ETL             │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   STORAGE LAYER                              │
+│  S3 • ADLS • GCS • HDFS                                      │
+│  ├── Delta Lake Tables                                       │
+│  ├── Iceberg Tables                                          │
+│  └── Hudi Tables                                             │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   METADATA LAYER                             │
+│  Hive Metastore • Glue Catalog • Unity Catalog • Nessie     │
+│  • Schema Registry • Data Lineage • Access Control           │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   COMPUTE LAYER                              │
+│  Spark • Presto • Trino • Hive • Flink • Databricks          │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   CONSUMPTION LAYER                          │
+│  BI Tools • ML Platforms • APIs • Notebooks • Applications   │
+└─────────────────────────────────────────────────────────────┘
+</pre>
+
+<hr>
+
+<h2>2.4 Storage Optimization Strategies</h2>
+
+<h3>2.4.1 File Organization</h3>
+
+<p><strong>Partitioning:</strong></p>
+
+<pre>
+# Good: Balanced partitioning (1-10 GB per partition)
+/year=2025/month=01/day=15/
+
+# Bad: Over-partitioning (too many small files)
+/year=2025/month=01/day=15/hour=10/minute=30/second=45/
+
+# Bad: Under-partitioning (files too large)
+/all_data/
+</pre>
+
+<p><strong>File Sizing Best Practices:</strong></p>
+
+<ul>
+    <li>Optimal file size: 128 MB - 1 GB (matches HDFS block size)</li>
+    <li>Avoid small files (&lt; 10 MB): causes metadata overhead</li>
+    <li>Avoid huge files (&gt; 10 GB): reduces parallelism</li>
+    <li>Use compaction to merge small files periodically</li>
+</ul>
+
+<h3>2.4.2 Compression</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Codec</th>
+            <th>Compression Ratio</th>
+            <th>Speed</th>
+            <th>Splittable</th>
+            <th>Use Case</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Snappy</strong></td>
+            <td>Good</td>
+            <td>Very Fast</td>
+            <td>No*</td>
+            <td>Default for Parquet/ORC</td>
+        </tr>
+        <tr>
+            <td><strong>GZIP</strong></td>
+            <td>Better</td>
+            <td>Medium</td>
+            <td>No</td>
+            <td>Long-term storage</td>
+        </tr>
+        <tr>
+            <td><strong>ZSTD</strong></td>
+            <td>Best</td>
+            <td>Fast</td>
+            <td>No*</td>
+            <td>Modern default</td>
+        </tr>
+        <tr>
+            <td><strong>LZ4</strong></td>
+            <td>Good</td>
+            <td>Fastest</td>
+            <td>No</td>
+            <td>Real-time streaming</td>
+        </tr>
+        <tr>
+            <td><strong>Brotli</strong></td>
+            <td>Excellent</td>
+            <td>Slow</td>
+            <td>No</td>
+            <td>Cold storage</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>* When used with Parquet/ORC, splittable at row group level</p>
+
+<h3>2.4.3 Data Layout Optimization</h3>
+
+<p><strong>Z-Ordering (Multi-dimensional clustering):</strong></p>
+
+<pre>
+-- Without Z-order: Linear scan
+SELECT * FROM events WHERE user_id = 123 AND date = '2025-01-15'
+-- Scans: 100% of files
+
+-- With Z-order on (user_id, date)
+OPTIMIZE events ZORDER BY (user_id, date)
+-- Scans: ~5% of files (data skipping)
+</pre>
+
+<p><strong>Column Ordering:</strong></p>
+
+<ul>
+    <li>Place frequently filtered columns first</li>
+    <li>Group related columns together</li>
+    <li>Improves compression and query performance</li>
+</ul>
+
+<hr>
+
+<h2>2.5 Data Lifecycle Management</h2>
+
+<h3>2.5.1 Tiered Storage Strategy</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Tier</th>
+            <th>Age</th>
+            <th>Storage Class</th>
+            <th>Cost</th>
+            <th>Access Time</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Hot</strong></td>
+            <td>0-30 days</td>
+            <td>S3 Standard, Azure Hot</td>
+            <td>$$$</td>
+            <td>Milliseconds</td>
+        </tr>
+        <tr>
+            <td><strong>Warm</strong></td>
+            <td>30-90 days</td>
+            <td>S3 Intelligent-Tiering</td>
+            <td>$$</td>
+            <td>Milliseconds</td>
+        </tr>
+        <tr>
+            <td><strong>Cold</strong></td>
+            <td>90-365 days</td>
+            <td>S3 Glacier Instant</td>
+            <td>$</td>
+            <td>Milliseconds</td>
+        </tr>
+        <tr>
+            <td><strong>Archive</strong></td>
+            <td>1+ years</td>
+            <td>S3 Glacier Deep Archive</td>
+            <td>¢</td>
+            <td>12+ hours</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>Lifecycle Policy Example:</strong></p>
+
+<pre>
+{
+  "Rules": [
+    {
+      "Id": "RawDataLifecycle",
+      "Prefix": "raw/",
+      "Transitions": [
+        {"Days": 30, "StorageClass": "INTELLIGENT_TIERING"},
+        {"Days": 90, "StorageClass": "GLACIER_IR"},
+        {"Days": 365, "StorageClass": "DEEP_ARCHIVE"}
+      ]
+    }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>Summary</h2>
+
+<p>In this chapter, we covered:</p>
+
+<ul>
+    <li>Three-zone architecture: Raw (Bronze), Curated (Silver), Consumption (Gold)</li>
+    <li>Schema-on-read for flexibility, schema-on-write for quality</li>
+    <li>Data lakehouse pattern combines lake and warehouse benefits</li>
+    <li>Storage optimization through partitioning, compression, and Z-ordering</li>
+    <li>Tiered storage for cost-effective data lifecycle management</li>
+</ul>
+
+<p><strong>Next Chapter:</strong> <a href="chapter-03.html">Chapter 3: WIA Data Lake Standard Overview</a></p>
+
+<hr>
+
+<p><a href="chapter-01.html">← Previous Chapter</a> | <a href="index.html">Table of Contents</a> | <a href="chapter-03.html">Next Chapter →</a></p>
+
+<hr>
+
+<p><strong>弘益人間 · Benefit All Humanity</strong></p>
+<p>© 2025 WIA Standards / MIT License</p>
+</body>
+</html>

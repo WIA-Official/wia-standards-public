@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - API Interface Standard</title>
+</head>
+<body>
+
+<p><a href="index.html">[DATA-002] WIA Data Lake Standard Ebook</a> | Chapter 5 (of 8)</p>
+
+<hr>
+
+<h1>Chapter 5: Phase 2 - API Interface Standard</h1>
+
+<blockquote>
+<p><strong>A consistent API is worth a thousand documentation pages.</strong></p>
+<p>The WIA Data Lake API provides a unified interface across all implementations.</p>
+</blockquote>
+
+<hr>
+
+<h2>5.1 Core API Design Philosophy</h2>
+
+<p>The WIA Data Lake API follows these principles:</p>
+
+<ul>
+    <li><strong>Simplicity:</strong> Common operations should be one-liners</li>
+    <li><strong>Consistency:</strong> Same patterns across languages</li>
+    <li><strong>Composability:</strong> Methods chain naturally</li>
+    <li><strong>Extensibility:</strong> Easy to add custom functionality</li>
+</ul>
+
+<hr>
+
+<h2>5.2 WiaDataLake Class</h2>
+
+<h3>5.2.1 Initialization</h3>
+
+<pre>
+# Python
+from wia_datalake import WiaDataLake
+
+lake = WiaDataLake(
+    storage_path="s3://my-datalake/",
+    catalog_uri="glue://us-east-1/my-catalog",
+    table_format="delta"  # or "iceberg", "hudi"
+)
+
+# TypeScript
+import { WiaDataLake } from '@wia/datalake';
+
+const lake = new WiaDataLake({
+  storagePath: 's3://my-datalake/',
+  catalogUri: 'glue://us-east-1/my-catalog',
+  tableFormat: 'delta'
+});
+</pre>
+
+<h3>5.2.2 Core Methods</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Method</th>
+            <th>Purpose</th>
+            <th>Returns</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>ingest()</code></td>
+            <td>Load data into lake</td>
+            <td>IngestJob</td>
+        </tr>
+        <tr>
+            <td><code>query()</code></td>
+            <td>Execute SQL query</td>
+            <td>DataFrame</td>
+        </tr>
+        <tr>
+            <td><code>get_metadata()</code></td>
+            <td>Retrieve table metadata</td>
+            <td>TableMetadata</td>
+        </tr>
+        <tr>
+            <td><code>optimize()</code></td>
+            <td>Compact files, z-order</td>
+            <td>OptimizeResult</td>
+        </tr>
+        <tr>
+            <td><code>vacuum()</code></td>
+            <td>Clean up old files</td>
+            <td>VacuumResult</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>5.3 Data Ingestion API</h2>
+
+<h3>5.3.1 Basic Ingestion</h3>
+
+<pre>
+# Ingest JSON files to raw zone
+job = lake.ingest(
+    source="s3://source-bucket/events/*.json",
+    target_zone="raw",
+    target_table="events",
+    format="parquet",
+    mode="append"
+)
+
+# Monitor job
+print(f"Status: {job.status}")
+print(f"Records processed: {job.records_processed}")
+print(f"Duration: {job.duration_ms} ms")
+</pre>
+
+<h3>5.3.2 Advanced Ingestion Options</h3>
+
+<pre>
+# With partitioning, schema, and transformation
+job = lake.ingest(
+    source="s3://source/data/",
+    target_zone="curated",
+    target_table="events_processed",
+    format="delta",
+    partition_by=["year", "month", "day"],
+    schema={
+        "user_id": "bigint",
+        "event_type": "string",
+        "timestamp": "timestamp",
+        "properties": "map<string,string>"
+    },
+    transform=lambda df: df.filter("event_type != 'test'"),
+    mode="overwrite",
+    compression="zstd"
+)
+</pre>
+
+<h3>5.3.3 Streaming Ingestion</h3>
+
+<pre>
+# Continuous ingestion from Kafka
+stream_job = lake.ingest_stream(
+    source="kafka://localhost:9092/events",
+    target_zone="curated",
+    target_table="real_time_events",
+    format="delta",
+    checkpoint_location="s3://checkpoints/events/",
+    trigger="processingTime='10 seconds'"
+)
+</pre>
+
+<hr>
+
+<h2>5.4 Query Interface</h2>
+
+<h3>5.4.1 SQL Query API</h3>
+
+<pre>
+# Execute SQL query
+df = lake.query("""
+    SELECT
+        user_id,
+        COUNT(*) as event_count,
+        MAX(timestamp) as last_event
+    FROM curated.events
+    WHERE date = '2025-01-15'
+    GROUP BY user_id
+    ORDER BY event_count DESC
+    LIMIT 100
+""")
+
+# Results as DataFrame
+for row in df.collect():
+    print(f"User {row.user_id}: {row.event_count} events")
+</pre>
+
+<h3>5.4.2 DataFrame API</h3>
+
+<pre>
+# Programmatic query building
+df = lake.table("curated.events") \
+    .filter("date = '2025-01-15'") \
+    .groupBy("user_id") \
+    .agg({"event_type": "count", "timestamp": "max"}) \
+    .orderBy("count", ascending=False) \
+    .limit(100)
+</pre>
+
+<h3>5.4.3 Time Travel Queries</h3>
+
+<pre>
+# Query historical version (Delta Lake)
+df = lake.query("""
+    SELECT * FROM curated.events
+    VERSION AS OF 10
+""")
+
+# Query as of timestamp
+df = lake.query("""
+    SELECT * FROM curated.events
+    TIMESTAMP AS OF '2025-01-15 10:00:00'
+""")
+</pre>
+
+<hr>
+
+<h2>5.5 Metadata Operations</h2>
+
+<h3>5.5.1 Get Table Metadata</h3>
+
+<pre>
+metadata = lake.get_metadata("curated.events")
+
+print(f"Table: {metadata.table_name}")
+print(f"Location: {metadata.location}")
+print(f"Format: {metadata.format}")
+print(f"Schema: {metadata.schema}")
+print(f"Partitions: {metadata.partitions}")
+print(f"Row count: {metadata.num_rows}")
+print(f"Size: {metadata.size_bytes / 1e9:.2f} GB")
+</pre>
+
+<h3>5.5.2 List Tables</h3>
+
+<pre>
+# List all tables in a zone
+tables = lake.list_tables(zone="curated")
+for table in tables:
+    print(f"{table.name}: {table.num_rows} rows, {table.size_gb:.2f} GB")
+</pre>
+
+<h3>5.5.3 Schema Evolution</h3>
+
+<pre>
+# Add new column
+lake.add_column(
+    table="curated.events",
+    column_name="session_id",
+    column_type="string",
+    nullable=True
+)
+
+# Rename column
+lake.rename_column(
+    table="curated.events",
+    old_name="user_id",
+    new_name="customer_id"
+)
+</pre>
+
+<hr>
+
+<h2>5.6 Optimization Operations</h2>
+
+<h3>5.6.1 File Compaction</h3>
+
+<pre>
+# Compact small files
+result = lake.optimize(
+    table="curated.events",
+    strategy="compact",
+    target_file_size_mb=128
+)
+
+print(f"Files before: {result.files_before}")
+print(f"Files after: {result.files_after}")
+print(f"Space saved: {result.space_saved_mb:.2f} MB")
+</pre>
+
+<h3>5.6.2 Z-Ordering</h3>
+
+<pre>
+# Z-order for better query performance
+result = lake.optimize(
+    table="curated.events",
+    strategy="zorder",
+    zorder_by=["user_id", "date"]
+)
+
+print(f"Data skipping improvement: {result.skipping_improvement}%")
+</pre>
+
+<h3>5.6.3 Vacuum Old Files</h3>
+
+<pre>
+# Clean up files older than 7 days
+result = lake.vacuum(
+    table="curated.events",
+    retention_hours=168  # 7 days
+)
+
+print(f"Files deleted: {result.files_deleted}")
+print(f"Space freed: {result.space_freed_gb:.2f} GB")
+</pre>
+
+<hr>
+
+<h2>5.7 Error Handling</h2>
+
+<pre>
+from wia_datalake import (
+    WiaDataLake,
+    TableNotFoundException,
+    SchemaValidationException,
+    IngestionException
+)
+
+try:
+    lake.ingest(
+        source="s3://data/",
+        target_table="invalid_table",
+        schema={"id": "bigint"}
+    )
+except TableNotFoundException as e:
+    print(f"Table not found: {e.table_name}")
+except SchemaValidationException as e:
+    print(f"Schema mismatch: {e.message}")
+except IngestionException as e:
+    print(f"Ingestion failed: {e.message}")
+    print(f"Failed records: {e.failed_records}")
+</pre>
+
+<hr>
+
+<h2>5.8 Python SDK Reference</h2>
+
+<pre>
+class WiaDataLake:
+    """WIA Data Lake Standard API"""
+
+    def __init__(self,
+                 storage_path: str,
+                 catalog_uri: str,
+                 table_format: str = "delta"):
+        """Initialize data lake connection"""
+
+    def ingest(self,
+               source: str,
+               target_zone: str,
+               target_table: str,
+               format: str = "parquet",
+               partition_by: List[str] = None,
+               mode: str = "append") -> IngestJob:
+        """Ingest data into the lake"""
+
+    def query(self, sql: str) -> DataFrame:
+        """Execute SQL query"""
+
+    def table(self, table_name: str) -> Table:
+        """Get table handle"""
+
+    def get_metadata(self, table_name: str) -> TableMetadata:
+        """Get table metadata"""
+
+    def optimize(self,
+                 table: str,
+                 strategy: str = "compact",
+                 **kwargs) -> OptimizeResult:
+        """Optimize table storage"""
+
+    def vacuum(self,
+               table: str,
+               retention_hours: int = 168) -> VacuumResult:
+        """Remove old data files"""
+</pre>
+
+<hr>
+
+<h2>5.9 TypeScript SDK Reference</h2>
+
+<pre>
+interface WiaDataLakeConfig {
+  storagePath: string;
+  catalogUri: string;
+  tableFormat?: 'delta' | 'iceberg' | 'hudi';
+}
+
+class WiaDataLake {
+  constructor(config: WiaDataLakeConfig);
+
+  async ingest(options: IngestOptions): Promise<IngestJob>;
+  async query(sql: string): Promise<DataFrame>;
+  async getMetadata(tableName: string): Promise<TableMetadata>;
+  async optimize(table: string, strategy: OptimizeStrategy): Promise<OptimizeResult>;
+  async vacuum(table: string, retentionHours?: number): Promise<VacuumResult>;
+}
+</pre>
+
+<hr>
+
+<h2>Summary</h2>
+
+<p>In this chapter, we learned:</p>
+
+<ul>
+    <li>WiaDataLake class provides unified API across implementations</li>
+    <li>Core operations: ingest, query, metadata, optimize, vacuum</li>
+    <li>Support for batch and streaming ingestion</li>
+    <li>SQL and DataFrame query interfaces</li>
+    <li>Schema evolution and metadata management</li>
+    <li>Python and TypeScript SDK implementations</li>
+</ul>
+
+<p><strong>Next Chapter:</strong> <a href="chapter-06.html">Chapter 6: Phase 3 - Table Format Protocol</a></p>
+
+<hr>
+
+<p><a href="chapter-04.html">← Previous</a> | <a href="index.html">Contents</a> | <a href="chapter-06.html">Next →</a></p>
+
+<hr>
+
+<p><strong>弘益人間 · Benefit All Humanity</strong></p>
+<p>© 2025 WIA Standards / MIT License</p>
+</body>
+</html>

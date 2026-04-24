@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5장: 통합 가이드 - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI 표준</h1>
+    <p class="subtitle">5장: 통합 가이드</p>
+  </header>
+
+  <main class="container">
+    <h1>5장: 통합 가이드</h1>
+
+    <h2>5.1 음성 프로세서 통합</h2>
+    <p>기존 인공와우 사운드 프로세서와 WIA-CI 통합.</p>
+
+    <h3>빠른 시작</h3>
+    <pre><code>import { WIACI } from '@anthropic/wia-ci';
+
+// CI 프로세서 초기화
+const ci = new WIACI({
+  electrodes: 22,
+  strategy: 'WIA-OCTAVE',
+  sampleRate: 16000,
+  frameSize: 256
+});
+
+// 장치 연결
+await ci.connect('BLE:XX:XX:XX:XX:XX:XX');
+
+// 옥타브 향상 활성화
+await ci.wia.enableOctaveEnhancement();
+
+// 오디오 처리
+ci.on('audio', (frame) => {
+  const processed = ci.process(frame);
+  console.log('옥타브:', processed.octaveInfo.octaveNumber);
+});</code></pre>
+
+    <h2>5.2 모바일 앱 통합</h2>
+    <p>CI 제어 및 모니터링을 위한 모바일 애플리케이션 구축.</p>
+
+    <h3>iOS 통합</h3>
+    <pre><code>import WIACI
+
+class CIViewController: UIViewController {
+    let ci = WIACIManager.shared
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        // CI 프로세서 스캔
+        ci.startScanning { devices in
+            self.showDeviceList(devices)
+        }
+    }
+
+    @IBAction func volumeChanged(_ sender: UISlider) {
+        ci.setVolume(Int(sender.value))
+    }
+
+    @IBAction func enableMusic(_ sender: UISwitch) {
+        ci.wia.setOctaveEnhancement(enabled: sender.isOn)
+    }
+}</code></pre>
+
+    <h3>Android 통합</h3>
+    <pre><code>import com.wia.ci.sdk.*
+
+class CIActivity : AppCompatActivity() {
+    private lateinit var ci: WIACIManager
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        ci = WIACIManager.getInstance(this)
+        ci.connect(device, object : ConnectionCallback {
+            override fun onConnected(device: CIDevice) {
+                setupUI(device)
+            }
+        })
+    }
+}</code></pre>
+
+    <h2>5.3 음악 최적화</h2>
+    <p>최적의 음악 청취 경험을 위한 WIA-CI 구성.</p>
+
+    <h3>음악 모드 설정</h3>
+    <pre><code>const musicConfig = {
+  // 오디오 처리
+  sampleRate: 44100,          // 음악용 높은 샘플레이트
+  frameSize: 1024,            // 더 나은 주파수 해상도
+
+  // 옥타브 향상
+  octaveEnhancement: {
+    enabled: true,
+    f0Range: [80, 600],
+    modulationRate: 8,
+    depth: 0.4
+  },
+
+  // TFS 인코딩
+  tfs: {
+    enabled: true,
+    channels: [17, 18, 19, 20, 21, 22],
+    maxRate: 500
+  },
+
+  // 채널 선택
+  channelSelection: {
+    maxima: 12,
+    harmonicPriority: true,
+    preserveF0: true
+  }
+};
+
+await ci.setConfig(musicConfig);</code></pre>
+
+    <h2>5.4 WIA 생태계 통합</h2>
+    <p>WIA-CI는 WIA 표준 제품군과 원활하게 통합됩니다.</p>
+
+    <h3>WIA-INTENT 통합</h3>
+    <pre><code>import { WIAIntent } from '@anthropic/wia-intent';
+import { WIACI } from '@anthropic/wia-ci';
+
+const intent = new WIAIntent();
+const ci = new WIACI();
+
+// CI를 위한 음성 제어
+intent.on('command', async (cmd) => {
+  switch (cmd.intent) {
+    case 'music.play':
+      await ci.setMode('music');
+      await ci.wia.enableOctaveEnhancement();
+      break;
+
+    case 'volume.adjust':
+      await ci.setVolume(cmd.parameters.level);
+      break;
+  }
+});</code></pre>
+
+    <h2>5.5 음악 스트리밍 서비스</h2>
+    <p>인기있는 음악 스트리밍 플랫폼과의 통합.</p>
+
+    <h3>Spotify 통합</h3>
+    <pre><code>import SpotifyWebApi from 'spotify-web-api-node';
+
+const spotify = new SpotifyWebApi();
+const ci = new WIACI();
+
+// CI를 위한 재생 최적화
+spotify.on('track.play', async (track) => {
+  const analysis = await spotify.getAudioAnalysis(track.id);
+
+  if (analysis.track.tempo > 120) {
+    await ci.wia.setTFSStrength(0.8);
+  }
+
+  await ci.setMode('music');
+});</code></pre>
+
+    <h2>5.6 스마트 홈 통합</h2>
+    <p>향상된 접근성을 위해 CI를 스마트 홈 생태계에 연결.</p>
+
+    <h3>HomeKit 통합</h3>
+    <pre><code>import { HomeKit } from 'homekit-sdk';
+
+const homekit = new HomeKit();
+
+// CI를 액세서리로 등록
+homekit.addAccessory({
+  name: 'My CI',
+  category: 'hearing_aid',
+  services: [
+    {
+      type: 'hearing_aid',
+      characteristics: [
+        { name: 'volume', type: 'int', min: 0, max: 100 },
+        { name: 'program', type: 'string' }
+      ]
+    }
+  ]
+});
+
+// Siri 명령:
+// "Siri야, CI 볼륨 올려"
+// "Siri야, 음악 모드로 바꿔"</code></pre>
+
+    <div class="success-box">
+      <h3>통합 체크리스트</h3>
+      <ul>
+        <li>✓ 음성 프로세서 연결 (RF/BLE)</li>
+        <li>✓ 모바일 앱 (iOS/Android)</li>
+        <li>✓ 음악 스트리밍 최적화</li>
+        <li>✓ WIA 생태계 통합</li>
+        <li>✓ 스마트 홈 자동화</li>
+        <li>✓ 웨어러블 장치 제어</li>
+        <li>✓ 임상 시스템 통합</li>
+        <li>✓ 클라우드 백업 및 분석</li>
+      </ul>
+    </div>
+
+    </main>
+</body>
+</html>

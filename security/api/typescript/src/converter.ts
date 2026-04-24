@@ -586,8 +586,8 @@ export function toElasticEvent(event: WiaSecurityEvent, indexPrefix = 'wia-secur
     _index: `${indexPrefix}-${event.type}-${dateStr}`,
     _id: event.id,
     _source: {
-      '@timestamp': event.timestamp,
-      ...toEcsEvent(event)
+      ...toEcsEvent(event),
+      '@timestamp': event.timestamp
     }
   };
 }

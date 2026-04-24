@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 5: 보안 | WIA-CARBON_CREDIT_MICRO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 5: 보안 및 사기 방지</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 이중 지불 방지 메커니즘을 이해하고, 사기 탐지 알고리즘을 마스터하며, 암호화 기술을 통한 시스템 보호 방법을 학습합니다.
+    </div>
+
+    <h2>보안 아키텍처 개요</h2>
+
+    <p>마이크로 탄소 크레딧 시스템의 무결성은 사용자 프라이버시와 시스템 접근성을 유지하면서 사기를 방지하는 강력한 보안 조치에 달려 있습니다. 보안 아키텍처는 장치 수준 검증부터 블록체인 수준 불변성까지 여러 계층에서 작동합니다.</p>
+
+    <h3>위협 환경</h3>
+
+    <table>
+        <tr>
+            <th>위협 카테고리</th>
+            <th>설명</th>
+            <th>위험 수준</th>
+        </tr>
+        <tr>
+            <td>행동 조작</td>
+            <td>수행하지 않은 행동에 대한 크레딧 주장</td>
+            <td>높음</td>
+        </tr>
+        <tr>
+            <td>행동 부풀리기</td>
+            <td>실제 행동의 범위를 과장</td>
+            <td>높음</td>
+        </tr>
+        <tr>
+            <td>이중 계산</td>
+            <td>동일한 감축을 여러 번 청구</td>
+            <td>치명적</td>
+        </tr>
+        <tr>
+            <td>기준선 조작</td>
+            <td>개인 기준선을 인위적으로 부풀리기</td>
+            <td>중간</td>
+        </tr>
+        <tr>
+            <td>장치 스푸핑</td>
+            <td>센서 또는 GPS 데이터 위조</td>
+            <td>중간</td>
+        </tr>
+        <tr>
+            <td>시빌 공격</td>
+            <td>여러 개의 가짜 계정 생성</td>
+            <td>중간</td>
+        </tr>
+        <tr>
+            <td>공모</td>
+            <td>사용자/검증자 간의 조직적 사기</td>
+            <td>낮음-중간</td>
+        </tr>
+    </table>
+
+    <h2>이중 지불 방지</h2>
+
+    <p>이중 계산은 동일한 탄소 감축이 같은 사용자, 다른 사용자 또는 다른 시스템에서 여러 번 청구될 때 발생합니다. WIA-CARBON_CREDIT_MICRO 표준은 이를 방지하기 위해 여러 메커니즘을 구현합니다:</p>
+
+    <div class="highlight">
+        <strong>고유 행동 지문:</strong> 각 탄소 절감 행동은 시간, 위치, 행동 유형 및 컨텍스트 데이터를 기반으로 고유한 지문을 생성합니다. 이 지문은 중복을 감지하기 위해 전역 레지스트리에 저장됩니다.
+    </div>
+
+    <pre><code>// 이중 계산 방지 시스템
+class DoubleCountingPrevention {
+    private actionRegistry: ActionRegistry;
+    private fingerprintService: FingerprintService;
+    private crossSystemValidator: CrossSystemValidator;
+
+    async checkForDuplicates(action: TrackedAction): Promise&lt;DuplicateCheck&gt; {
+        // 고유 행동 지문 생성
+        const fingerprint = await this.fingerprintService.generate(action);
+
+        // 내부 시스템 내에서 확인
+        const internalDuplicate = await this.actionRegistry.findByFingerprint(fingerprint);
+
+        if (internalDuplicate) {
+            return {
+                isDuplicate: true,
+                duplicateType: 'INTERNAL',
+                originalActionId: internalDuplicate.id,
+                similarity: 1.0
+            };
+        }
+
+        // 유사 지문 확인 (퍼지 매칭)
+        const similarActions = await this.actionRegistry.findSimilar(fingerprint, 0.9);
+
+        if (similarActions.length > 0) {
+            return {
+                isDuplicate: true,
+                duplicateType: 'SIMILAR',
+                originalActionId: similarActions[0].id,
+                similarity: similarActions[0].similarity
+            };
+        }
+
+        // 교차 시스템 검증 (탄소 레지스트리에 등록된 경우)
+        const crossSystemDuplicate = await this.crossSystemValidator.check(fingerprint);
+
+        if (crossSystemDuplicate) {
+            return {
+                isDuplicate: true,
+                duplicateType: 'CROSS_SYSTEM',
+                externalSystem: crossSystemDuplicate.system
+            };
+        }
+
+        // 이 지문 등록
+        await this.actionRegistry.register(action.id, fingerprint);
+
+        return { isDuplicate: false };
+    }
+}
+
+// 행동 지문 생성기
+class FingerprintService {
+    async generate(action: TrackedAction): Promise&lt;ActionFingerprint&gt; {
+        // 핵심 지문 구성 요소
+        const components = {
+            // 시간 구성 요소 (경미한 시간 변동 방지를 위해 반올림)
+            timeBlock: Math.floor(action.timestamp.getTime() / 300000), // 5분 블록
+
+            // 공간 구성 요소 (위치의 지오해시)
+            locationHash: this.geohash(action.location, 7), // ~150m 정밀도
+
+            // 행동 구성 요소
+            actionType: action.type,
+
+            // 크기 구성 요소 (이산화)
+            magnitudeBucket: this.bucketMagnitude(action),
+
+            // 사용자 구성 요소 (동일 사용자 중복 감지용)
+            userHash: this.hashUserId(action.userId)
+        };
+
+        // 암호화 해시 생성
+        const fingerprintData = JSON.stringify(components);
+        const hash = await crypto.subtle.digest('SHA-256',
+            new TextEncoder().encode(fingerprintData));
+
+        return {
+            hash: this.arrayBufferToHex(hash),
+            components,
+            version: 'v2'
+        };
+    }
+}</code></pre>
+
+    <h2>사기 탐지 시스템</h2>
+
+    <p>사기 탐지 시스템은 합법적인 활동과 사기 활동의 과거 패턴에 대해 학습된 기계 학습 모델을 사용합니다:</p>
+
+    <pre><code>// 사기 탐지 엔진
+class FraudDetectionEngine {
+    private models: Map&lt;string, MLModel&gt; = new Map();
+    private ruleEngine: RuleEngine;
+    private alertService: AlertService;
+
+    constructor() {
+        this.models.set('action_validity', loadModel('action_validity_v3'));
+        this.models.set('pattern_anomaly', loadModel('pattern_anomaly_v2'));
+        this.models.set('device_integrity', loadModel('device_integrity_v1'));
+        this.ruleEngine = new RuleEngine();
+    }
+
+    async analyzeAction(action: TrackedAction): Promise&lt;FraudAnalysis&gt; {
+        const results = await Promise.all([
+            this.checkActionValidity(action),
+            this.checkPatternAnomaly(action),
+            this.checkDeviceIntegrity(action),
+            this.checkRuleViolations(action)
+        ]);
+
+        const [validity, anomaly, device, rules] = results;
+
+        // 가중 사기 점수 계산
+        const fraudScore =
+            validity.score * 0.3 +
+            anomaly.score * 0.25 +
+            device.score * 0.25 +
+            rules.score * 0.2;
+
+        const analysis: FraudAnalysis = {
+            actionId: action.id,
+            fraudScore,
+            riskLevel: this.calculateRiskLevel(fraudScore),
+            flags: this.collectFlags(results),
+            recommendation: this.generateRecommendation(fraudScore, results)
+        };
+
+        // 고위험 행동에 대한 알림
+        if (analysis.riskLevel === 'high' || analysis.riskLevel === 'critical') {
+            await this.alertService.raise(analysis);
+        }
+
+        return analysis;
+    }
+
+    private async checkPatternAnomaly(action: TrackedAction): Promise&lt;CheckResult&gt; {
+        // 사용자의 과거 패턴 가져오기
+        const history = await this.getUserHistory(action.userId, 90); // 90일
+
+        // 이상 탐지를 위한 특성 추출
+        const features = {
+            timeOfDay: action.timestamp.getHours(),
+            dayOfWeek: action.timestamp.getDay(),
+            actionType: action.type,
+            duration: action.duration,
+            frequency: this.calculateFrequency(history, action.type),
+            avgCredits: this.calculateAvgCredits(history, action.type),
+            claimedCredits: action.estimatedCredits
+        };
+
+        // 이상 탐지 모델 실행
+        const anomalyScore = await this.models.get('pattern_anomaly')!.predict(features);
+
+        return {
+            score: anomalyScore,
+            flags: anomalyScore > 0.7 ? ['UNUSUAL_PATTERN'] : [],
+            confidence: 0.85
+        };
+    }
+}</code></pre>
+
+    <h2>장치 및 센서 무결성</h2>
+
+    <p>사용자 장치에서 오는 데이터의 무결성을 보장하는 것은 스푸핑되거나 조작된 센서 판독값을 방지하는 데 중요합니다:</p>
+
+    <pre><code>// 장치 증명 서비스
+class DeviceAttestationService {
+    private attestationProviders: Map&lt;string, AttestationProvider&gt; = new Map();
+
+    constructor() {
+        // 플랫폼별 증명 제공자 등록
+        this.attestationProviders.set('ios', new AppleDeviceAttestation());
+        this.attestationProviders.set('android', new GooglePlayIntegrity());
+        this.attestationProviders.set('web', new WebauthnAttestation());
+    }
+
+    async attestDevice(deviceInfo: DeviceInfo): Promise&lt;AttestationResult&gt; {
+        const provider = this.attestationProviders.get(deviceInfo.platform);
+
+        if (!provider) {
+            return {
+                attested: false,
+                reason: '지원되지 않는 플랫폼',
+                trustLevel: 0
+            };
+        }
+
+        // 장치에서 증명 요청
+        const attestation = await provider.requestAttestation({
+            challenge: this.generateChallenge(),
+            timestamp: Date.now()
+        });
+
+        // 증명 서명 검증
+        const verified = await provider.verifyAttestation(attestation);
+
+        if (!verified) {
+            return {
+                attested: false,
+                reason: '유효하지 않은 증명',
+                trustLevel: 0
+            };
+        }
+
+        // 장치 속성 확인
+        const deviceChecks = await this.checkDeviceProperties(attestation);
+
+        return {
+            attested: true,
+            trustLevel: this.calculateTrustLevel(deviceChecks),
+            deviceId: attestation.deviceId,
+            properties: deviceChecks,
+            validUntil: new Date(Date.now() + 86400000) // 24시간
+        };
+    }
+
+    private async checkDeviceProperties(
+        attestation: DeviceAttestation
+    ): Promise&lt;DevicePropertyChecks&gt; {
+        return {
+            isRooted: attestation.securityLevel !== 'STRONG_INTEGRITY',
+            isEmulator: attestation.deviceType === 'EMULATOR',
+            hasSecureHardware: attestation.keyAttestationAvailable,
+            locationServicesEnabled: attestation.locationEnabled,
+            mockLocationDetected: attestation.mockLocations,
+            appIntegrityValid: attestation.appSignatureValid
+        };
+    }
+}</code></pre>
+
+    <h2>암호화 기술</h2>
+
+    <p>시스템 전반에 걸쳐 다양한 암호화 기술이 보안을 강화합니다:</p>
+
+    <table>
+        <tr>
+            <th>기술</th>
+            <th>용도</th>
+            <th>구현</th>
+        </tr>
+        <tr>
+            <td>SHA-256 해싱</td>
+            <td>행동 지문 생성</td>
+            <td>고유 식별자 생성</td>
+        </tr>
+        <tr>
+            <td>ECDSA 서명</td>
+            <td>거래 인증</td>
+            <td>소유권 증명</td>
+        </tr>
+        <tr>
+            <td>AES-256 암호화</td>
+            <td>개인 데이터 보호</td>
+            <td>민감 정보 암호화</td>
+        </tr>
+        <tr>
+            <td>영지식 증명</td>
+            <td>프라이버시 보존 검증</td>
+            <td>위치 공개 없이 검증</td>
+        </tr>
+        <tr>
+            <td>머클 트리</td>
+            <td>데이터 무결성</td>
+            <td>감사 로그 검증</td>
+        </tr>
+    </table>
+
+    <h2>사용자 계정 보안</h2>
+
+    <p>사용자 계정 보호는 무단 크레딧 생성 및 거래를 방지합니다:</p>
+
+    <div class="highlight">
+        <strong>다중 인증:</strong> 모든 계정은 거래 작업 및 민감한 작업에 MFA를 요구합니다. 모바일 앱 사용자에게는 생체 인증이 권장됩니다.
+    </div>
+
+    <pre><code>// 계정 보안 구현
+interface SecuritySettings {
+    mfaEnabled: boolean;
+    mfaMethods: ('totp' | 'sms' | 'biometric' | 'hardware')[];
+    tradingPin: boolean;
+    withdrawalWhitelist: string[];
+    sessionTimeout: number;
+    emailNotifications: SecurityNotificationSettings;
+}
+
+class AccountSecurityService {
+    async enforceSecurityForAction(
+        userId: string,
+        action: SecuritySensitiveAction
+    ): Promise&lt;SecurityEnforcement&gt; {
+        const settings = await this.getSecuritySettings(userId);
+        const requirements = this.getActionRequirements(action);
+
+        const checks: SecurityCheck[] = [];
+
+        // MFA 검사
+        if (requirements.requiresMfa) {
+            const mfaValid = await this.verifyMfa(userId, action.mfaToken);
+            checks.push({ type: 'MFA', passed: mfaValid });
+        }
+
+        // 거래 PIN 검사
+        if (requirements.requiresPin && settings.tradingPin) {
+            const pinValid = await this.verifyPin(userId, action.pin);
+            checks.push({ type: 'PIN', passed: pinValid });
+        }
+
+        // 세션 검증
+        const sessionValid = await this.validateSession(userId, action.sessionId);
+        checks.push({ type: 'SESSION', passed: sessionValid });
+
+        const allPassed = checks.every(c => c.passed);
+
+        if (!allPassed) {
+            await this.logSecurityEvent(userId, action, checks);
+        }
+
+        return {
+            allowed: allPassed,
+            checks,
+            additionalRequirements: this.getFailedRequirements(checks)
+        };
+    }
+}</code></pre>
+
+    <h2>요약</h2>
+
+    <p>마이크로 탄소 크레딧 생태계의 보안은 조작된 행동부터 정교한 공모 계획까지 위협을 해결하는 다층 접근 방식이 필요합니다. 고급 사기 탐지, 강력한 이중 계산 방지, 장치 증명, 오라클 무결성 메커니즘을 통해 WIA-CARBON_CREDIT_MICRO 표준은 신뢰할 수 있는 탄소 크레딧 마켓플레이스에 필요한 보안 기반을 제공합니다.</p>
+
+</body>
+</html>

@@ -1,787 +1,773 @@
-# WIA Battery Passport Data Format Standard
-## Phase 1 Specification
+# WIA-BATTERY-PASSPORT: Phase 1 - Data Format
+
+**EU 배터리 여권 데이터 형식**
+*Battery lifecycle tracking for EU Regulation 2027*
+
+홍익인간 (弘益人間) - Benefit All Humanity
 
 ---
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #22C55E (Green)
+## 1. Overview
+
+EU Battery Regulation (2023/1542) mandates digital battery passports for:
+- EV batteries > 2 kWh (from 2027)
+- Industrial batteries > 2 kWh (from 2027)
+- LMT batteries (from 2028)
+
+This specification defines the data format for WIA-compliant battery passports.
 
 ---
 
-## Table of Contents
+## 2. Core Data Structures
 
-1. [Overview](#overview)
-2. [Terminology](#terminology)
-3. [Base Structure](#base-structure)
-4. [Data Schema](#data-schema)
-5. [Field Specifications](#field-specifications)
-6. [Battery Chemistry](#battery-chemistry)
-7. [Lifecycle Tracking](#lifecycle-tracking)
-8. [Validation Rules](#validation-rules)
-9. [Examples](#examples)
-10. [Version History](#version-history)
+### 2.1 BatteryPassport (Root)
 
----
+```typescript
+interface BatteryPassport {
+  // Identifier
+  id: UUID;                          // WIA passport ID
+  qr_code: string;                   // Physical QR link
+  version: string;                   // Spec version "1.0.0"
 
-## Overview
+  // Timestamps
+  created_at: ISO8601;
+  updated_at: ISO8601;
 
-### 1.1 Purpose
+  // Core data
+  identity: BatteryIdentity;
+  manufacturer: ManufacturerInfo;
+  specifications: BatterySpecifications;
+  materials: MaterialComposition;
+  carbon_footprint: CarbonFootprint;
+  supply_chain: SupplyChainRecord[];
+  health: BatteryHealth;
+  lifecycle: LifecycleEvent[];
+  recycling: RecyclingInfo;
+  certifications: Certification[];
 
-The WIA Battery Passport Data Format Standard defines a unified digital framework for tracking battery lifecycle data, from manufacturing through end-of-life. This standard enables complete transparency in battery supply chains, sustainability metrics, and circular economy integration, ensuring compliance with EU Battery Regulation and global environmental standards.
-
-**Core Objectives**:
-- Enable complete battery traceability from raw materials to recycling
-- Standardize battery identity, chemistry, and performance data
-- Support carbon footprint tracking and sustainability reporting
-- Facilitate second-life applications and recycling processes
-- Ensure EU Battery Regulation compliance
-- Enable digital passport access via QR codes and NFC
-
-### 1.2 Scope
-
-This standard covers:
-
-| Domain | Description |
-|--------|-------------|
-| Battery Identity | Unique identification, manufacturer data, model specifications |
-| Chemistry Composition | Materials, cell chemistry, sourcing transparency |
-| Lifecycle Data | Manufacturing, usage, state of health (SoH), aging |
-| Carbon Footprint | Cradle-to-gate emissions, supply chain impact |
-| Supply Chain | Material sourcing, ethical mining, traceability |
-| Performance Metrics | Capacity, voltage, energy density, cycle life |
-| Second-Life Applications | Repurposing, energy storage systems |
-| Recycling Data | Material recovery, circular economy integration |
-
-### 1.3 Design Principles
-
-1. **Transparency**: Complete supply chain visibility from mining to recycling
-2. **Sustainability**: Carbon footprint tracking and environmental impact assessment
-3. **Traceability**: Immutable record of battery lifecycle events
-4. **Accessibility**: QR code and NFC-enabled digital passport access
-5. **Interoperability**: Compatible with EU Battery Regulation, GBA standards
-6. **Privacy**: Protect sensitive manufacturing data while ensuring compliance
-
----
-
-## Terminology
-
-### 2.1 Core Terms
-
-| Term | Definition |
-|------|------------|
-| **Battery Passport** | Digital record of battery identity, composition, and lifecycle |
-| **State of Health (SoH)** | Battery's current capacity as percentage of original capacity |
-| **State of Charge (SoC)** | Current charge level as percentage of total capacity |
-| **Cycle Life** | Number of charge-discharge cycles before degradation |
-| **Carbon Footprint** | Total CO2e emissions from production and use |
-| **Second-Life** | Battery repurposing after primary application |
-| **Material Traceability** | Tracking of raw materials from source to product |
-| **Circular Economy** | Closed-loop system for material recovery and reuse |
-
-### 2.2 Data Types
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `battery_id` | Unique battery identifier | `"BAT-2025-LI-001234"` |
-| `chemistry_code` | Battery chemistry type | `"NMC811"` |
-| `soh_percentage` | State of health (0-100%) | `95.5` |
-| `carbon_co2e` | CO2 equivalent in kg | `125.8` |
-| `gps_coordinate` | Geographic coordinates | `{"lat": 37.5665, "lng": 126.9780}` |
-
-### 2.3 Field Requirements
-
-| Marker | Meaning |
-|--------|---------|
-| **REQUIRED** | Must be present |
-| **OPTIONAL** | May be omitted |
-| **CONDITIONAL** | Required under specific conditions |
-
----
-
-## Base Structure
-
-### 3.1 Battery Passport Record Format
-
-```json
-{
-  "$schema": "https://wia.live/battery-passport/v1/schema.json",
-  "version": "1.0.0",
-  "passportId": "BP-2025-000001",
-  "batteryId": "BAT-2025-LI-001234",
-  "created": "2025-01-15T10:00:00Z",
-  "updated": "2025-01-15T10:00:00Z",
-  "identity": {
-    "manufacturer": "GreenCell Technologies",
-    "manufacturerId": "MFG-2025-001",
-    "model": "GC-NMC-100kWh",
-    "serialNumber": "SN-2025-001234",
-    "manufacturingDate": "2025-01-10",
-    "manufacturingLocation": {
-      "country": "KR",
-      "city": "Seoul",
-      "facility": "Facility-A",
-      "coordinates": {
-        "lat": 37.5665,
-        "lng": 126.9780
-      }
-    }
-  },
-  "chemistry": {
-    "type": "lithium-ion",
-    "cathode": "NMC811",
-    "anode": "graphite",
-    "electrolyte": "liquid",
-    "materials": [],
-    "weight": {}
-  },
-  "specifications": {
-    "nominalVoltage": 400,
-    "nominalCapacity": 250,
-    "energyDensity": 260,
-    "powerDensity": 1800,
-    "expectedCycleLife": 3000
-  },
-  "lifecycle": {
-    "status": "in_use",
-    "currentOwner": "USER-2025-001",
-    "installationDate": "2025-01-12",
-    "application": "electric_vehicle",
-    "stateOfHealth": 100.0,
-    "cycleCount": 0,
-    "events": []
-  },
-  "carbonFootprint": {
-    "totalCO2e": 12580,
-    "cradleToGate": 12580,
-    "productionPhase": {},
-    "transportationEmissions": 850,
-    "recyclability": 95
-  },
-  "supplyChain": {
-    "materials": [],
-    "certifications": [],
-    "ethicalSourcing": true
-  },
-  "digitalAccess": {
-    "qrCode": "https://wia.live/passport/BP-2025-000001",
-    "nfcTag": "NFC-2025-001234",
-    "publicUrl": "https://wia.live/passport/BP-2025-000001"
-  },
-  "compliance": {
-    "euBatteryRegulation": true,
-    "regulationVersion": "2023/1542",
-    "certifications": [],
-    "safetyStandards": []
-  },
-  "verification": {
-    "status": "verified",
-    "verifiedBy": "WIA-Verifier-001",
-    "verifiedAt": "2025-01-15T10:00:00Z",
-    "blockchainHash": "0xabc123...",
-    "dataIntegrity": "sha256:..."
-  }
+  // Digital signature
+  signature: DigitalSignature;
 }
 ```
 
-### 3.2 Field Details
+### 2.2 BatteryIdentity
 
-#### 3.2.1 `passportId` (REQUIRED)
+```typescript
+interface BatteryIdentity {
+  // EU required identifiers
+  unique_identifier: string;         // EU Battery Passport ID
+  global_trade_item_number: string;  // GTIN (if applicable)
 
+  // Battery classification
+  category: BatteryCategory;
+  chemistry: BatteryChemistry;
+
+  // Product info
+  model: string;
+  serial_number: string;
+  batch_number: string;
+
+  // Physical characteristics
+  weight_kg: number;
+  dimensions: Dimensions;
+
+  // Manufacturing
+  production_date: ISO8601;
+  production_country: ISO3166Alpha2;
+  production_facility_id: string;
+}
+
+enum BatteryCategory {
+  EV = "ev",                         // Electric Vehicle
+  LMT = "lmt",                       // Light Means of Transport
+  INDUSTRIAL = "industrial",
+  STATIONARY = "stationary",         // Energy Storage Systems
+  PORTABLE = "portable",
+  SLI = "sli"                        // Starting, Lighting, Ignition
+}
+
+enum BatteryChemistry {
+  // Lithium-based
+  LFP = "lfp",                       // Lithium Iron Phosphate
+  NMC = "nmc",                       // Nickel Manganese Cobalt
+  NCA = "nca",                       // Nickel Cobalt Aluminum
+  LCO = "lco",                       // Lithium Cobalt Oxide
+  LMO = "lmo",                       // Lithium Manganese Oxide
+  LTO = "lto",                       // Lithium Titanate
+
+  // Solid-state
+  SOLID_STATE = "solid_state",
+
+  // Sodium-based
+  SODIUM_ION = "sodium_ion",
+
+  // Lead-acid
+  LEAD_ACID = "lead_acid",
+  AGM = "agm",
+
+  // Other
+  NIMH = "nimh",                     // Nickel Metal Hydride
+  OTHER = "other"
+}
+
+interface Dimensions {
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  form_factor: FormFactor;
+}
+
+enum FormFactor {
+  CYLINDRICAL = "cylindrical",       // 18650, 21700, 4680
+  PRISMATIC = "prismatic",
+  POUCH = "pouch",
+  PACK = "pack"
+}
 ```
-Type: string
-Format: BP-YYYY-NNNNNN
-Description: Unique identifier for this battery passport
-Example: "BP-2025-000001"
+
+### 2.3 ManufacturerInfo
+
+```typescript
+interface ManufacturerInfo {
+  // Company info
+  name: string;
+  legal_name: string;
+  registration_number: string;       // Business registration
+
+  // Contact
+  address: Address;
+  contact_email: string;
+  contact_phone: string;
+  website: string;
+
+  // EU Representative (for non-EU manufacturers)
+  eu_representative?: EURepresentative;
+
+  // Facility info
+  production_facilities: Facility[];
+}
+
+interface EURepresentative {
+  name: string;
+  address: Address;
+  registration_number: string;
+}
+
+interface Facility {
+  id: string;
+  name: string;
+  country: ISO3166Alpha2;
+  address: Address;
+  certifications: string[];          // ISO 14001, etc.
+}
 ```
 
-#### 3.2.2 `batteryId` (REQUIRED)
+### 2.4 BatterySpecifications
 
+```typescript
+interface BatterySpecifications {
+  // Electrical
+  nominal_voltage_v: number;
+  min_voltage_v: number;
+  max_voltage_v: number;
+  nominal_capacity_ah: number;       // Ampere-hours
+  rated_capacity_wh: number;         // Watt-hours
+  energy_density_wh_kg: number;
+  power_density_w_kg: number;
+
+  // Performance
+  c_rate_charge: number;             // Max charging rate (e.g., 2C)
+  c_rate_discharge: number;          // Max discharge rate
+  round_trip_efficiency: number;     // % (typically 90-98%)
+  self_discharge_rate: number;       // % per month
+
+  // Temperature
+  operating_temp_min_c: number;
+  operating_temp_max_c: number;
+  storage_temp_min_c: number;
+  storage_temp_max_c: number;
+
+  // Cycle life
+  expected_cycle_life: number;       // Cycles to 80% SOH
+  calendar_life_years: number;
+  warranty_years: number;
+  warranty_cycles: number;
+
+  // Safety
+  ip_rating: string;                 // e.g., "IP67"
+  un38_3_certified: boolean;
+  thermal_runaway_protection: boolean;
+}
 ```
-Type: string
-Format: BAT-YYYY-CC-NNNNNN (CC = Chemistry Code)
-Description: Unique battery identifier
-Example: "BAT-2025-LI-001234"
+
+### 2.5 MaterialComposition
+
+```typescript
+interface MaterialComposition {
+  // Critical raw materials (EU CRM list)
+  cobalt: MaterialInfo;
+  lithium: MaterialInfo;
+  nickel: MaterialInfo;
+  manganese: MaterialInfo;
+  graphite: MaterialInfo;
+
+  // Recycled content
+  recycled_cobalt_percent: number;
+  recycled_lithium_percent: number;
+  recycled_nickel_percent: number;
+  recycled_lead_percent: number;     // For lead-acid
+
+  // Hazardous substances
+  hazardous_substances: HazardousSubstance[];
+
+  // Full bill of materials
+  bill_of_materials: BOMEntry[];
+}
+
+interface MaterialInfo {
+  weight_kg: number;
+  percentage: number;
+  source_country: ISO3166Alpha2[];
+  recycled_content_percent: number;
+  responsible_sourcing: ResponsibleSourcing;
+}
+
+interface ResponsibleSourcing {
+  certified: boolean;
+  certification_scheme: string;      // "RMI", "IRMA", "ASI", etc.
+  certificate_id: string;
+  audit_date: ISO8601;
+  due_diligence_report_url: string;
+}
+
+interface HazardousSubstance {
+  name: string;
+  cas_number: string;                // Chemical Abstracts Service
+  concentration_ppm: number;
+  reach_compliant: boolean;          // EU REACH regulation
+  rohs_compliant: boolean;           // EU RoHS directive
+}
+
+interface BOMEntry {
+  component: string;
+  material: string;
+  weight_kg: number;
+  supplier: string;
+  country_of_origin: ISO3166Alpha2;
+}
+```
+
+### 2.6 CarbonFootprint
+
+```typescript
+interface CarbonFootprint {
+  // Total lifecycle
+  total_kg_co2e: number;             // Total CO2 equivalent
+  per_kwh_kg_co2e: number;           // Per kWh capacity
+
+  // Breakdown by phase
+  raw_material_acquisition: number;   // kg CO2e
+  manufacturing: number;
+  transport: number;
+
+  // Performance class (EU requirement)
+  performance_class: CarbonClass;
+
+  // Calculation methodology
+  methodology: string;               // "ISO 14067", "PEF", etc.
+  calculation_date: ISO8601;
+  third_party_verified: boolean;
+  verifier: string;
+  verification_report_url: string;
+
+  // Data quality
+  data_quality_rating: DataQuality;
+}
+
+enum CarbonClass {
+  A = "A",    // < 50 kg CO2e/kWh
+  B = "B",    // 50-65 kg CO2e/kWh
+  C = "C",    // 65-80 kg CO2e/kWh
+  D = "D",    // 80-95 kg CO2e/kWh
+  E = "E"     // > 95 kg CO2e/kWh
+}
+
+enum DataQuality {
+  MEASURED = "measured",             // Primary data
+  CALCULATED = "calculated",         // Secondary data
+  ESTIMATED = "estimated",           // Default values
+  MIXED = "mixed"
+}
+```
+
+### 2.7 BatteryHealth
+
+```typescript
+interface BatteryHealth {
+  // State indicators
+  state_of_health_percent: number;   // SOH (0-100%)
+  state_of_charge_percent: number;   // SOC (0-100%)
+
+  // Capacity
+  original_capacity_ah: number;
+  current_capacity_ah: number;
+  capacity_fade_percent: number;
+
+  // Resistance
+  internal_resistance_mohm: number;
+  resistance_increase_percent: number;
+
+  // Usage statistics
+  total_energy_throughput_kwh: number;
+  full_cycle_equivalents: number;
+  partial_cycles: number;
+
+  // Operating history
+  max_temperature_reached_c: number;
+  min_temperature_reached_c: number;
+  time_above_45c_hours: number;
+  time_below_0c_hours: number;
+
+  // Charging history
+  fast_charge_count: number;         // DC fast charging
+  slow_charge_count: number;         // AC charging
+  avg_charge_rate_c: number;
+
+  // Predictions
+  remaining_useful_life_months: number;
+  expected_eol_date: ISO8601;
+
+  // Last update
+  last_bms_sync: ISO8601;
+  data_source: HealthDataSource;
+}
+
+enum HealthDataSource {
+  BMS = "bms",                       // Direct from Battery Management System
+  DIAGNOSTIC = "diagnostic",          // Diagnostic tool
+  ESTIMATED = "estimated",           // Model-based estimation
+  MANUAL = "manual"                  // Manual entry
+}
+```
+
+### 2.8 LifecycleEvent
+
+```typescript
+interface LifecycleEvent {
+  id: UUID;
+  event_type: LifecycleEventType;
+  timestamp: ISO8601;
+
+  // Location
+  facility_id?: string;
+  country: ISO3166Alpha2;
+
+  // Parties involved
+  actor: ActorInfo;
+
+  // Event-specific data
+  data: LifecycleEventData;
+
+  // Verification
+  verified: boolean;
+  verifier?: string;
+
+  // Documentation
+  documents: Document[];
+}
+
+enum LifecycleEventType {
+  // Production
+  MANUFACTURED = "manufactured",
+  QUALITY_TESTED = "quality_tested",
+
+  // Distribution
+  SHIPPED = "shipped",
+  RECEIVED = "received",
+  SOLD = "sold",
+
+  // First use
+  INSTALLED = "installed",
+  ACTIVATED = "activated",
+
+  // Service
+  MAINTAINED = "maintained",
+  REPAIRED = "repaired",
+  DIAGNOSED = "diagnosed",
+  UPDATED = "updated",               // Firmware/software
+
+  // Ownership
+  OWNERSHIP_TRANSFERRED = "ownership_transferred",
+  LEASED = "leased",
+  RETURNED = "returned",
+
+  // Second life
+  REPURPOSED = "repurposed",         // EV → Stationary storage
+  RECERTIFIED = "recertified",
+
+  // End of life
+  DECOMMISSIONED = "decommissioned",
+  COLLECTED = "collected",
+  RECYCLED = "recycled",
+  DISPOSED = "disposed"
+}
+
+interface ActorInfo {
+  type: ActorType;
+  name: string;
+  id: string;                        // Registration/license number
+  country: ISO3166Alpha2;
+}
+
+enum ActorType {
+  MANUFACTURER = "manufacturer",
+  DISTRIBUTOR = "distributor",
+  DEALER = "dealer",
+  OWNER = "owner",
+  OPERATOR = "operator",
+  SERVICE_CENTER = "service_center",
+  RECYCLER = "recycler",
+  REGULATOR = "regulator"
+}
+
+type LifecycleEventData =
+  | ManufacturedData
+  | ShippedData
+  | InstalledData
+  | MaintenanceData
+  | RepurposedData
+  | RecycledData;
+
+interface ManufacturedData {
+  production_line: string;
+  quality_grade: string;
+  test_results: TestResult[];
+}
+
+interface ShippedData {
+  origin: Address;
+  destination: Address;
+  carrier: string;
+  tracking_number: string;
+  transport_mode: string;
+}
+
+interface InstalledData {
+  vehicle_vin?: string;              // For EV batteries
+  system_id?: string;                // For stationary
+  installation_type: string;
+}
+
+interface MaintenanceData {
+  maintenance_type: string;
+  description: string;
+  parts_replaced: string[];
+  soh_before: number;
+  soh_after: number;
+}
+
+interface RepurposedData {
+  original_application: string;
+  new_application: string;
+  soh_at_repurpose: number;
+  recertification_id: string;
+}
+
+interface RecycledData {
+  recycler_license: string;
+  process_type: string;              // "Pyrometallurgical", "Hydrometallurgical"
+  materials_recovered: MaterialRecovery[];
+  recovery_efficiency_percent: number;
+}
+
+interface MaterialRecovery {
+  material: string;
+  weight_kg: number;
+  purity_percent: number;
+}
+```
+
+### 2.9 RecyclingInfo
+
+```typescript
+interface RecyclingInfo {
+  // Recyclability
+  recyclability_score: number;       // 0-100
+  design_for_recycling: boolean;
+  disassembly_manual_url: string;
+
+  // Material recovery targets (EU requirements)
+  cobalt_recovery_target: number;    // % (90% by 2031)
+  lithium_recovery_target: number;   // % (80% by 2031)
+  nickel_recovery_target: number;    // % (90% by 2031)
+  copper_recovery_target: number;    // % (90% by 2031)
+
+  // Hazardous material handling
+  hazard_classification: string;     // UN hazard class
+  special_handling_required: boolean;
+  handling_instructions: string;
+
+  // Collection points
+  take_back_scheme: string;
+  collection_points_url: string;
+}
+```
+
+### 2.10 Certification
+
+```typescript
+interface Certification {
+  type: CertificationType;
+  name: string;
+  issuer: string;
+  certificate_id: string;
+  issue_date: ISO8601;
+  expiry_date: ISO8601;
+  verification_url: string;
+  status: CertificationStatus;
+}
+
+enum CertificationType {
+  // Safety
+  UN38_3 = "un38_3",                 // UN transport safety
+  IEC62619 = "iec62619",             // Safety requirements
+  IEC62660 = "iec62660",             // Performance testing
+  UL2580 = "ul2580",                 // EV battery safety
+
+  // Quality
+  ISO9001 = "iso9001",
+  IATF16949 = "iatf16949",           // Automotive quality
+
+  // Environmental
+  ISO14001 = "iso14001",
+  ISO14067 = "iso14067",             // Carbon footprint
+
+  // Responsible sourcing
+  RMI = "rmi",                       // Responsible Minerals Initiative
+  IRMA = "irma",                     // Initiative for Responsible Mining
+  ASI = "asi",                       // Aluminium Stewardship Initiative
+
+  // EU specific
+  CE_MARKING = "ce_marking",
+  EU_TYPE_APPROVAL = "eu_type_approval"
+}
+
+enum CertificationStatus {
+  VALID = "valid",
+  EXPIRED = "expired",
+  REVOKED = "revoked",
+  PENDING = "pending"
+}
 ```
 
 ---
 
-## Data Schema
+## 3. JSON Schema
 
-### 4.1 Complete JSON Schema
+### 3.1 Complete Battery Passport Schema
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wia.live/battery-passport/v1/schema.json",
-  "title": "WIA Battery Passport Record",
+  "$id": "https://wia.org/schemas/battery-passport/v1.0.0",
+  "title": "WIA Battery Passport",
   "type": "object",
-  "required": ["version", "passportId", "batteryId", "identity", "chemistry", "specifications"],
+  "required": [
+    "id",
+    "version",
+    "identity",
+    "manufacturer",
+    "specifications",
+    "materials",
+    "carbon_footprint",
+    "health"
+  ],
   "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "qr_code": {
+      "type": "string",
+      "pattern": "^WIABAT:[A-Z0-9]{16}$"
+    },
     "version": {
       "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Schema version"
-    },
-    "passportId": {
-      "type": "string",
-      "pattern": "^BP-\\d{4}-\\d{6}$",
-      "description": "Unique passport identifier"
-    },
-    "batteryId": {
-      "type": "string",
-      "pattern": "^BAT-\\d{4}-[A-Z]{2}-\\d{6}$",
-      "description": "Unique battery identifier"
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
     },
     "identity": {
-      "type": "object",
-      "required": ["manufacturer", "model", "serialNumber", "manufacturingDate"],
-      "properties": {
-        "manufacturer": { "type": "string" },
-        "manufacturerId": { "type": "string" },
-        "model": { "type": "string" },
-        "serialNumber": { "type": "string" },
-        "manufacturingDate": { "type": "string", "format": "date" },
-        "manufacturingLocation": {
-          "type": "object",
-          "properties": {
-            "country": { "type": "string", "minLength": 2, "maxLength": 2 },
-            "city": { "type": "string" },
-            "facility": { "type": "string" },
-            "coordinates": {
-              "type": "object",
-              "properties": {
-                "lat": { "type": "number", "minimum": -90, "maximum": 90 },
-                "lng": { "type": "number", "minimum": -180, "maximum": 180 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "chemistry": {
-      "type": "object",
-      "required": ["type", "cathode", "anode"],
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["lithium-ion", "lithium-polymer", "solid-state", "sodium-ion", "lead-acid"]
-        },
-        "cathode": { "type": "string" },
-        "anode": { "type": "string" },
-        "electrolyte": { "type": "string" },
-        "materials": { "type": "array" },
-        "weight": { "type": "object" }
-      }
+      "$ref": "#/definitions/BatteryIdentity"
     },
     "specifications": {
-      "type": "object",
-      "required": ["nominalVoltage", "nominalCapacity"],
-      "properties": {
-        "nominalVoltage": { "type": "number", "minimum": 0 },
-        "nominalCapacity": { "type": "number", "minimum": 0 },
-        "energyDensity": { "type": "number", "minimum": 0 },
-        "powerDensity": { "type": "number", "minimum": 0 },
-        "expectedCycleLife": { "type": "integer", "minimum": 0 }
-      }
+      "$ref": "#/definitions/BatterySpecifications"
+    },
+    "materials": {
+      "$ref": "#/definitions/MaterialComposition"
+    },
+    "carbon_footprint": {
+      "$ref": "#/definitions/CarbonFootprint"
+    },
+    "health": {
+      "$ref": "#/definitions/BatteryHealth"
     }
   }
 }
 ```
 
-### 4.2 Battery Chemistry Schema
+---
 
-```json
-{
-  "chemistry": {
-    "type": "lithium-ion",
-    "subtype": "NMC811",
-    "cathode": "NMC811",
-    "anode": "graphite",
-    "electrolyte": "liquid",
-    "separator": "polyethylene",
-    "materials": [
-      {
-        "materialId": "MAT-2025-0001",
-        "name": "Nickel",
-        "symbol": "Ni",
-        "percentage": 80,
-        "weight": 48.0,
-        "unit": "kg",
-        "source": {
-          "country": "AU",
-          "mine": "Australian Nickel Mine",
-          "supplier": "Nickel Supply Co",
-          "certifications": ["RMI", "IRMA"],
-          "ethicalSourcing": true
-        }
-      },
-      {
-        "materialId": "MAT-2025-0002",
-        "name": "Manganese",
-        "symbol": "Mn",
-        "percentage": 10,
-        "weight": 6.0,
-        "unit": "kg",
-        "source": {
-          "country": "ZA",
-          "supplier": "SA Minerals Ltd",
-          "certifications": ["RMI"],
-          "ethicalSourcing": true
-        }
-      },
-      {
-        "materialId": "MAT-2025-0003",
-        "name": "Cobalt",
-        "symbol": "Co",
-        "percentage": 10,
-        "weight": 6.0,
-        "unit": "kg",
-        "source": {
-          "country": "CD",
-          "supplier": "Ethical Cobalt Supply",
-          "certifications": ["RMI", "Fair Cobalt Alliance"],
-          "ethicalSourcing": true,
-          "conflictFree": true
-        }
-      },
-      {
-        "materialId": "MAT-2025-0004",
-        "name": "Lithium",
-        "symbol": "Li",
-        "percentage": 7,
-        "weight": 4.2,
-        "unit": "kg",
-        "source": {
-          "country": "CL",
-          "supplier": "Chilean Lithium Corp",
-          "certifications": ["RMI"],
-          "ethicalSourcing": true
-        }
-      }
-    ],
-    "weight": {
-      "total": 250,
-      "activeMaterials": 180,
-      "packaging": 50,
-      "electronics": 20,
-      "unit": "kg"
-    },
-    "recycledContent": {
-      "nickel": 15,
-      "cobalt": 20,
-      "lithium": 10,
-      "unit": "percentage"
-    }
-  }
+## 4. Binary Format (.wiabat)
+
+### 4.1 File Structure
+
+```
+┌─────────────────────────────────────┐
+│ Magic Number (4 bytes): "WBAT"      │
+├─────────────────────────────────────┤
+│ Version (2 bytes): 0x0100           │
+├─────────────────────────────────────┤
+│ Header Length (4 bytes)             │
+├─────────────────────────────────────┤
+│ Header (variable)                   │
+│  - Passport ID (16 bytes UUID)      │
+│  - Created timestamp (8 bytes)      │
+│  - Checksum (32 bytes SHA-256)      │
+├─────────────────────────────────────┤
+│ Sections                            │
+│  - Identity section                 │
+│  - Specs section                    │
+│  - Materials section                │
+│  - Carbon section                   │
+│  - Health section                   │
+│  - Lifecycle section                │
+├─────────────────────────────────────┤
+│ Digital Signature (variable)        │
+└─────────────────────────────────────┘
+```
+
+### 4.2 Section Format
+
+```
+┌─────────────────────────────────────┐
+│ Section Type (2 bytes)              │
+│  0x0001 = Identity                  │
+│  0x0002 = Specifications            │
+│  0x0003 = Materials                 │
+│  0x0004 = Carbon Footprint          │
+│  0x0005 = Health                    │
+│  0x0006 = Lifecycle                 │
+│  0x0007 = Certifications            │
+├─────────────────────────────────────┤
+│ Section Length (4 bytes)            │
+├─────────────────────────────────────┤
+│ Compressed Data (MessagePack + LZ4) │
+└─────────────────────────────────────┘
+```
+
+---
+
+## 5. QR Code Format
+
+### 5.1 URL Format
+
+```
+https://battery.wia.org/p/{passport_id}
+```
+
+### 5.2 Compact Data Format (for offline)
+
+```
+WIABAT:1.0:{base64url_encoded_essential_data}
+```
+
+Essential data includes:
+- Passport ID
+- Manufacturer
+- Chemistry type
+- Capacity (Wh)
+- SOH percentage
+- Carbon class
+- Production date
+
+Example:
+```
+WIABAT:1.0:eyJpZCI6IjAxOTM1YTJiLTNjNGQiLCJtZnIiOiJDQVRMIiwiY2hlbSI6Im5tYyIsImNhcCI6NzUwMDAsInNvaCI6OTgsImNhcmIiOiJCIiwicHJvZCI6IjIwMjUtMDEtMTV9
+```
+
+---
+
+## 6. Data Exchange Formats
+
+### 6.1 EU Battery Passport Interoperability
+
+WIA format maps to EU Battery Passport data model:
+- Global Battery Alliance (GBA) schema compatible
+- Catena-X Battery Pass compatible
+
+### 6.2 Export Formats
+
+| Format | Use Case | Extension |
+|--------|----------|-----------|
+| JSON | API exchange | .json |
+| Binary | Efficient storage | .wiabat |
+| PDF | Human-readable report | .pdf |
+| XML | Legacy systems | .xml |
+
+---
+
+## 7. Data Integrity
+
+### 7.1 Required Hashes
+
+```typescript
+interface DataIntegrity {
+  // Overall passport hash
+  passport_hash: string;             // SHA-256
+
+  // Section hashes
+  identity_hash: string;
+  specs_hash: string;
+  materials_hash: string;
+  carbon_hash: string;
+  health_hash: string;
+  lifecycle_hash: string;
+
+  // Merkle root for lifecycle events
+  lifecycle_merkle_root: string;
 }
 ```
 
-### 4.3 Lifecycle Tracking Schema
+### 7.2 Digital Signature
 
-```json
-{
-  "lifecycle": {
-    "status": "in_use",
-    "currentOwner": "USER-2025-001",
-    "ownershipHistory": [
-      {
-        "owner": "MFG-2025-001",
-        "ownerType": "manufacturer",
-        "startDate": "2025-01-10",
-        "endDate": "2025-01-11"
-      },
-      {
-        "owner": "USER-2025-001",
-        "ownerType": "end_user",
-        "startDate": "2025-01-12",
-        "endDate": null
-      }
-    ],
-    "installationDate": "2025-01-12T09:00:00Z",
-    "application": "electric_vehicle",
-    "vehicleVIN": "VIN123456789ABCDEF",
-    "stateOfHealth": 100.0,
-    "stateOfCharge": 85.0,
-    "cycleCount": 45,
-    "totalEnergyThroughput": 11250,
-    "totalEnergyThroughputUnit": "kWh",
-    "operatingHours": 450,
-    "temperatureExposure": {
-      "min": -10,
-      "max": 45,
-      "average": 25,
-      "unit": "celsius"
-    },
-    "events": [
-      {
-        "eventId": "EVT-2025-0001",
-        "type": "manufacturing_complete",
-        "timestamp": "2025-01-10T18:00:00Z",
-        "description": "Battery manufacturing completed",
-        "location": "Seoul, KR"
-      },
-      {
-        "eventId": "EVT-2025-0002",
-        "type": "quality_inspection",
-        "timestamp": "2025-01-11T10:00:00Z",
-        "description": "Quality inspection passed",
-        "inspector": "QA-001",
-        "result": "passed"
-      },
-      {
-        "eventId": "EVT-2025-0003",
-        "type": "installation",
-        "timestamp": "2025-01-12T09:00:00Z",
-        "description": "Installed in electric vehicle",
-        "application": "electric_vehicle",
-        "installer": "INST-001"
-      },
-      {
-        "eventId": "EVT-2025-0004",
-        "type": "soh_measurement",
-        "timestamp": "2025-01-15T10:00:00Z",
-        "stateOfHealth": 99.8,
-        "cycleCount": 45,
-        "capacity": 249.5,
-        "capacityUnit": "Ah"
-      }
-    ],
-    "maintenanceHistory": [
-      {
-        "maintenanceId": "MNT-2025-0001",
-        "date": "2025-01-14",
-        "type": "diagnostic",
-        "description": "Routine diagnostic check",
-        "technician": "TECH-001",
-        "findings": "All systems normal"
-      }
-    ],
-    "warrantyInfo": {
-      "startDate": "2025-01-12",
-      "endDate": "2033-01-12",
-      "durationYears": 8,
-      "coverageType": "full",
-      "minSoHGuarantee": 70
-    }
-  }
-}
-```
-
-### 4.4 Carbon Footprint Schema
-
-```json
-{
-  "carbonFootprint": {
-    "totalCO2e": 12580,
-    "unit": "kg CO2e",
-    "calculationMethod": "ISO 14067",
-    "calculationDate": "2025-01-15",
-    "cradleToGate": 12580,
-    "productionPhase": {
-      "rawMaterialExtraction": 3800,
-      "materialProcessing": 2500,
-      "cellManufacturing": 3200,
-      "packAssembly": 1500,
-      "qualityControl": 180,
-      "packaging": 250
-    },
-    "transportationEmissions": 850,
-    "transportationDetails": [
-      {
-        "from": "Australian Nickel Mine, AU",
-        "to": "Seoul, KR",
-        "material": "Nickel",
-        "distance": 8500,
-        "distanceUnit": "km",
-        "transportMode": "ship",
-        "co2e": 320
-      },
-      {
-        "from": "Chilean Lithium Mine, CL",
-        "to": "Seoul, KR",
-        "material": "Lithium",
-        "distance": 18000,
-        "distanceUnit": "km",
-        "transportMode": "ship",
-        "co2e": 280
-      }
-    ],
-    "usePhaseEstimate": {
-      "lifetimeKm": 300000,
-      "estimatedUseCO2e": 15000,
-      "gridEmissionFactor": 0.459,
-      "gridRegion": "KR"
-    },
-    "endOfLifeRecycling": {
-      "recyclingCO2e": -2500,
-      "materialRecovery": 95,
-      "energyRecovery": 85
-    },
-    "recyclability": 95,
-    "recyclabilityBreakdown": {
-      "metals": 98,
-      "plastics": 85,
-      "electrolyte": 60
-    },
-    "certifications": [
-      "ISO 14067",
-      "Carbon Trust Certified"
-    ]
-  }
+```typescript
+interface DigitalSignature {
+  algorithm: "Ed25519" | "ECDSA-P256";
+  public_key: string;
+  signature: string;
+  signed_at: ISO8601;
+  signer_did: string;                // DID of manufacturer/authority
 }
 ```
 
 ---
 
-## Field Specifications
+## 8. Compliance Mapping
 
-### 5.1 Battery Identity Fields
+### 8.1 EU Battery Regulation (2023/1542) Mapping
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `manufacturer` | string | REQUIRED | Manufacturer name | `"GreenCell Technologies"` |
-| `model` | string | REQUIRED | Battery model | `"GC-NMC-100kWh"` |
-| `serialNumber` | string | REQUIRED | Unique serial number | `"SN-2025-001234"` |
-| `manufacturingDate` | string | REQUIRED | Date of manufacture | `"2025-01-10"` |
-| `manufacturingLocation` | object | OPTIONAL | Manufacturing facility | `{...}` |
-
-### 5.2 Battery Chemistry Fields
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `type` | string | REQUIRED | Battery chemistry type | `"lithium-ion"` |
-| `cathode` | string | REQUIRED | Cathode material | `"NMC811"` |
-| `anode` | string | REQUIRED | Anode material | `"graphite"` |
-| `materials[]` | array | REQUIRED | Material composition | `[{...}]` |
-| `recycledContent` | object | OPTIONAL | Recycled material % | `{...}` |
-
-**Valid Chemistry Types:**
-
-| Type | Description | Common Applications |
-|------|-------------|-------------------|
-| `lithium-ion` | Li-ion batteries (NMC, NCA, LFP) | EVs, energy storage |
-| `lithium-polymer` | Li-Po batteries | Mobile devices, drones |
-| `solid-state` | Solid electrolyte batteries | Next-gen EVs |
-| `sodium-ion` | Na-ion batteries | Grid storage |
-| `lead-acid` | Traditional lead-acid | Automotive starter |
-
-### 5.3 Lifecycle Status Values
-
-| Status | Description | Next States |
-|--------|-------------|-------------|
-| `manufactured` | Freshly produced | `in_transit`, `in_storage` |
-| `in_storage` | Warehouse storage | `in_transit`, `in_use` |
-| `in_transit` | Being transported | `in_storage`, `in_use` |
-| `in_use` | Active operation | `maintenance`, `second_life`, `end_of_life` |
-| `maintenance` | Under maintenance | `in_use`, `second_life` |
-| `second_life` | Repurposed application | `maintenance`, `end_of_life` |
-| `end_of_life` | Ready for recycling | `recycled` |
-| `recycled` | Materials recovered | (terminal state) |
-
-### 5.4 State of Health (SoH) Calculation
-
-```
-SoH (%) = (Current Capacity / Original Capacity) × 100
-
-Where:
-- Current Capacity: Measured capacity at present
-- Original Capacity: Nominal capacity when new
-- Range: 0-100%
-- Warning threshold: < 80%
-- End-of-life threshold: < 70%
-```
-
-### 5.5 Carbon Footprint Calculation
-
-```
-Total CO2e = Production + Transportation + Use + End-of-Life
-
-Production CO2e = Raw Materials + Processing + Manufacturing
-Transportation CO2e = Σ(Distance × Emission Factor × Weight)
-Use CO2e = Energy Consumption × Grid Emission Factor
-End-of-Life CO2e = Recycling Emissions - Material Recovery Credit
-```
+| EU Requirement | WIA Field |
+|----------------|-----------|
+| Unique identifier | `identity.unique_identifier` |
+| Manufacturer info | `manufacturer.*` |
+| Carbon footprint | `carbon_footprint.*` |
+| Recycled content | `materials.recycled_*_percent` |
+| SOH data | `health.state_of_health_percent` |
+| Expected lifetime | `specifications.expected_cycle_life` |
+| Due diligence | `materials.*.responsible_sourcing` |
 
 ---
 
-## Battery Chemistry
-
-### 6.1 Common Cathode Materials
-
-| Code | Name | Formula | Voltage | Energy Density | Applications |
-|------|------|---------|---------|---------------|--------------|
-| **NMC111** | Nickel Manganese Cobalt | LiNi₀.₃₃Mn₀.₃₃Co₀.₃₃O₂ | 3.7V | 150-200 Wh/kg | Early EVs |
-| **NMC532** | NMC 5-3-2 | LiNi₀.₅Mn₀.₃Co₀.₂O₂ | 3.7V | 180-220 Wh/kg | EVs |
-| **NMC622** | NMC 6-2-2 | LiNi₀.₆Mn₀.₂Co₀.₂O₂ | 3.7V | 200-230 Wh/kg | EVs |
-| **NMC811** | NMC 8-1-1 | LiNi₀.₈Mn₀.₁Co₀.₁O₂ | 3.7V | 220-260 Wh/kg | Modern EVs |
-| **NCA** | Nickel Cobalt Aluminum | LiNi₀.₈Co₀.₁₅Al₀.₀₅O₂ | 3.65V | 200-260 Wh/kg | Tesla EVs |
-| **LFP** | Lithium Iron Phosphate | LiFePO₄ | 3.2V | 90-160 Wh/kg | Buses, storage |
-| **LCO** | Lithium Cobalt Oxide | LiCoO₂ | 3.7V | 150-200 Wh/kg | Smartphones |
-
-### 6.2 Material Sourcing Requirements
-
-| Material | Certification | Traceability Level | Ethical Requirements |
-|----------|--------------|-------------------|---------------------|
-| **Cobalt** | RMI, Fair Cobalt Alliance | Full chain | Conflict-free, child labor-free |
-| **Lithium** | RMI | Mine to manufacturer | Environmental impact assessment |
-| **Nickel** | RMI, IRMA | Mine to manufacturer | Responsible mining practices |
-| **Graphite** | RMI | Supplier verified | Sustainable sourcing |
-
----
-
-## Lifecycle Tracking
-
-### 7.1 Lifecycle Event Types
-
-| Event Type | Description | Required Data |
-|------------|-------------|---------------|
-| `manufacturing_complete` | Battery production finished | Timestamp, location, QA status |
-| `quality_inspection` | Quality control check | Inspector, result, metrics |
-| `installation` | Installed in application | Application type, installer |
-| `soh_measurement` | State of health measured | SoH %, cycle count, capacity |
-| `maintenance` | Maintenance performed | Type, technician, findings |
-| `relocation` | Moved to new location | From, to, transport mode |
-| `second_life_conversion` | Repurposed for second-life | New application, modifications |
-| `end_of_life_declaration` | Marked for recycling | Reason, final SoH |
-| `recycling_complete` | Materials recovered | Recovery %, materials |
-
----
-
-## Validation Rules
-
-### 8.1 Required Field Validation
-
-| Rule ID | Field | Validation |
-|---------|-------|------------|
-| VAL-001 | `passportId` | Must match `^BP-\d{4}-\d{6}$` |
-| VAL-002 | `batteryId` | Must match `^BAT-\d{4}-[A-Z]{2}-\d{6}$` |
-| VAL-003 | `stateOfHealth` | Must be >= 0 and <= 100 |
-| VAL-004 | `nominalVoltage` | Must be > 0 |
-| VAL-005 | `manufacturingDate` | Must be valid date, not in future |
-
-### 8.2 Business Logic Validation
-
-| Rule ID | Description | Error Code |
-|---------|-------------|------------|
-| BUS-001 | Material percentages must sum to 100% | `ERR_MATERIAL_SUM` |
-| BUS-002 | SoH must decrease or stay same over time | `ERR_SOH_INCREASE` |
-| BUS-003 | Cycle count must only increase | `ERR_CYCLE_DECREASE` |
-| BUS-004 | End-of-life requires SoH measurement | `ERR_MISSING_SOH` |
-| BUS-005 | Cobalt must have conflict-free certification | `ERR_COBALT_CERT` |
-
----
-
-## Examples
-
-### 8.1 Valid Battery Passport - Electric Vehicle
-
-```json
-{
-  "$schema": "https://wia.live/battery-passport/v1/schema.json",
-  "version": "1.0.0",
-  "passportId": "BP-2025-000001",
-  "batteryId": "BAT-2025-LI-001234",
-  "created": "2025-01-15T10:00:00Z",
-  "updated": "2025-01-15T10:00:00Z",
-  "identity": {
-    "manufacturer": "GreenCell Technologies",
-    "manufacturerId": "MFG-2025-001",
-    "model": "GC-NMC811-100kWh",
-    "serialNumber": "SN-2025-001234",
-    "manufacturingDate": "2025-01-10",
-    "manufacturingLocation": {
-      "country": "KR",
-      "city": "Seoul",
-      "facility": "GreenCell Facility A",
-      "coordinates": { "lat": 37.5665, "lng": 126.9780 }
-    }
-  },
-  "chemistry": {
-    "type": "lithium-ion",
-    "subtype": "NMC811",
-    "cathode": "NMC811",
-    "anode": "graphite",
-    "electrolyte": "liquid",
-    "separator": "polyethylene",
-    "weight": {
-      "total": 250,
-      "activeMaterials": 180,
-      "packaging": 50,
-      "electronics": 20,
-      "unit": "kg"
-    }
-  },
-  "specifications": {
-    "nominalVoltage": 400,
-    "nominalVoltageUnit": "V",
-    "nominalCapacity": 250,
-    "nominalCapacityUnit": "Ah",
-    "energyCapacity": 100,
-    "energyCapacityUnit": "kWh",
-    "energyDensity": 260,
-    "energyDensityUnit": "Wh/kg",
-    "powerDensity": 1800,
-    "powerDensityUnit": "W/kg",
-    "expectedCycleLife": 3000,
-    "operatingTemperatureMin": -20,
-    "operatingTemperatureMax": 55,
-    "temperatureUnit": "celsius"
-  },
-  "lifecycle": {
-    "status": "in_use",
-    "currentOwner": "USER-2025-001",
-    "installationDate": "2025-01-12T09:00:00Z",
-    "application": "electric_vehicle",
-    "vehicleVIN": "VIN123456789ABCDEF",
-    "stateOfHealth": 99.8,
-    "stateOfCharge": 85.0,
-    "cycleCount": 45,
-    "totalEnergyThroughput": 4500,
-    "totalEnergyThroughputUnit": "kWh"
-  },
-  "carbonFootprint": {
-    "totalCO2e": 12580,
-    "unit": "kg CO2e",
-    "cradleToGate": 12580,
-    "recyclability": 95
-  },
-  "digitalAccess": {
-    "qrCode": "https://wia.live/passport/BP-2025-000001",
-    "nfcTag": "NFC-2025-001234",
-    "publicUrl": "https://wia.live/passport/BP-2025-000001"
-  },
-  "compliance": {
-    "euBatteryRegulation": true,
-    "regulationVersion": "2023/1542",
-    "certifications": ["CE", "UN38.3", "ISO 14001"]
-  }
-}
-```
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial release |
-
----
-
-<div align="center">
-
-**WIA Battery Passport Standard v1.0.0**
-
-**弘益人間 (홍익인간)** - Benefit All Humanity
-
----
-
-**© 2025 WIA**
-
-**MIT License**
-
-</div>
+**Document ID**: WIA-BATTERY-PASSPORT-PHASE-1
+**Version**: 1.0.0
+**Date**: 2025-12-16
+**Status**: Draft

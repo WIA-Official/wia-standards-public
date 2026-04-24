@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Phase 4 - Ecosystem Integration</title>
+</head>
+<body>
+
+<p><a href="index.html">[DATA-002] WIA Data Lake Standard Ebook</a> | Chapter 7 (of 8)</p>
+
+<hr>
+
+<h1>Chapter 7: Phase 4 - Ecosystem Integration</h1>
+
+<blockquote>
+<p><strong>A standard without integrations is just documentation.</strong></p>
+<p>The WIA Data Lake Standard thrives through its ecosystem connections.</p>
+</blockquote>
+
+<hr>
+
+<h2>7.1 Compute Engine Integration</h2>
+
+<h3>7.1.1 Apache Spark</h3>
+
+<pre>
+from pyspark.sql import SparkSession
+
+# Delta Lake
+spark = SparkSession.builder \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+    .getOrCreate()
+
+# Iceberg
+spark = SparkSession.builder \
+    .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
+    .config("spark.sql.catalog.catalog_name", "org.apache.iceberg.spark.SparkCatalog") \
+    .getOrCreate()
+
+# Hudi
+spark = SparkSession.builder \
+    .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.hudi.catalog.HoodieCatalog") \
+    .getOrCreate()
+</pre>
+
+<h3>7.1.2 Presto / Trino</h3>
+
+<pre>
+-- Presto catalog configuration (catalog/delta.properties)
+connector.name=delta_lake
+hive.metastore.uri=thrift://metastore:9083
+delta.register-table-procedure.enabled=true
+
+-- Trino catalog configuration (catalog/iceberg.properties)
+connector.name=iceberg
+hive.metastore.uri=thrift://metastore:9083
+iceberg.catalog.type=hive_metastore
+
+-- Query Delta/Iceberg tables
+SELECT * FROM delta.curated.events WHERE date = '2025-01-15';
+SELECT * FROM iceberg.analytics.users LIMIT 100;
+</pre>
+
+<h3>7.1.3 Apache Hive</h3>
+
+<pre>
+-- Register external Delta table
+CREATE EXTERNAL TABLE events
+USING delta
+LOCATION 's3://lake/curated/events';
+
+-- Query via Hive
+SELECT event_type, COUNT(*) as count
+FROM events
+WHERE date = '2025-01-15'
+GROUP BY event_type;
+</pre>
+
+<hr>
+
+<h2>7.2 Catalog Integration</h2>
+
+<h3>7.2.1 AWS Glue Catalog</h3>
+
+<pre>
+import boto3
+
+glue = boto3.client('glue')
+
+# Register table in Glue Catalog
+glue.create_table(
+    DatabaseName='datalake',
+    TableInput={
+        'Name': 'events',
+        'StorageDescriptor': {
+            'Location': 's3://lake/curated/events/',
+            'InputFormat': 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat',
+            'OutputFormat': 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat',
+            'SerdeInfo': {
+                'SerializationLibrary': 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
+            },
+            'Columns': [
+                {'Name': 'id', 'Type': 'bigint'},
+                {'Name': 'event_type', 'Type': 'string'},
+                {'Name': 'timestamp', 'Type': 'timestamp'}
+            ]
+        },
+        'PartitionKeys': [
+            {'Name': 'date', 'Type': 'string'}
+        ],
+        'Parameters': {
+            'table_type': 'DELTA'
+        }
+    }
+)
+</pre>
+
+<h3>7.2.2 Unity Catalog (Databricks)</h3>
+
+<pre>
+-- Create catalog
+CREATE CATALOG IF NOT EXISTS wia_datalake;
+
+-- Create schema
+CREATE SCHEMA IF NOT EXISTS wia_datalake.curated;
+
+-- Create table
+CREATE TABLE wia_datalake.curated.events
+USING delta
+LOCATION 's3://lake/curated/events/';
+
+-- Grant permissions
+GRANT SELECT ON TABLE wia_datalake.curated.events TO analytics_team;
+</pre>
+
+<h3>7.2.3 Project Nessie (Git-like Catalog)</h3>
+
+<pre>
+from pynessie import Client
+
+# Initialize Nessie client
+client = Client("http://nessie:19120/api/v1")
+
+# Create branch (like git branch)
+client.create_branch("dev", from_ref="main")
+
+# Commit table changes to branch
+client.commit(
+    branch="dev",
+    message="Add events table",
+    operations=[...]
+)
+
+# Merge to main (like git merge)
+client.merge(from_ref="dev", into_ref="main")
+</pre>
+
+<hr>
+
+<h2>7.3 Cloud Platform Integration</h2>
+
+<h3>7.3.1 AWS Integration</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>AWS Service</th>
+            <th>Purpose</th>
+            <th>Integration</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>S3</strong></td>
+            <td>Storage layer</td>
+            <td>Primary data lake storage</td>
+        </tr>
+        <tr>
+            <td><strong>Glue</strong></td>
+            <td>Catalog & ETL</td>
+            <td>Metadata management</td>
+        </tr>
+        <tr>
+            <td><strong>Athena</strong></td>
+            <td>Query engine</td>
+            <td>SQL queries on lake data</td>
+        </tr>
+        <tr>
+            <td><strong>EMR</strong></td>
+            <td>Spark cluster</td>
+            <td>Big data processing</td>
+        </tr>
+        <tr>
+            <td><strong>Kinesis</strong></td>
+            <td>Streaming</td>
+            <td>Real-time data ingestion</td>
+        </tr>
+        <tr>
+            <td><strong>Lake Formation</strong></td>
+            <td>Governance</td>
+            <td>Security & access control</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>7.3.2 Azure Integration</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Azure Service</th>
+            <th>Purpose</th>
+            <th>Integration</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>ADLS Gen2</strong></td>
+            <td>Storage layer</td>
+            <td>Primary data lake storage</td>
+        </tr>
+        <tr>
+            <td><strong>Synapse Analytics</strong></td>
+            <td>Analytics platform</td>
+            <td>Unified analytics workspace</td>
+        </tr>
+        <tr>
+            <td><strong>Databricks</strong></td>
+            <td>Spark platform</td>
+            <td>Delta Lake lakehouse</td>
+        </tr>
+        <tr>
+            <td><strong>Data Factory</strong></td>
+            <td>ETL orchestration</td>
+            <td>Data pipeline management</td>
+        </tr>
+        <tr>
+            <td><strong>Event Hubs</strong></td>
+            <td>Streaming</td>
+            <td>Real-time ingestion</td>
+        </tr>
+        <tr>
+            <td><strong>Purview</strong></td>
+            <td>Data governance</td>
+            <td>Metadata & lineage</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>7.3.3 GCP Integration</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>GCP Service</th>
+            <th>Purpose</th>
+            <th>Integration</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Cloud Storage</strong></td>
+            <td>Storage layer</td>
+            <td>Primary data lake storage</td>
+        </tr>
+        <tr>
+            <td><strong>BigQuery</strong></td>
+            <td>Data warehouse</td>
+            <td>Query lake data via external tables</td>
+        </tr>
+        <tr>
+            <td><strong>Dataproc</strong></td>
+            <td>Spark cluster</td>
+            <td>Big data processing</td>
+        </tr>
+        <tr>
+            <td><strong>Dataflow</strong></td>
+            <td>Stream processing</td>
+            <td>Apache Beam pipelines</td>
+        </tr>
+        <tr>
+            <td><strong>Pub/Sub</strong></td>
+            <td>Messaging</td>
+            <td>Event-driven ingestion</td>
+        </tr>
+        <tr>
+            <td><strong>Data Catalog</strong></td>
+            <td>Metadata</td>
+            <td>Data discovery</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>7.4 Streaming Integration</h2>
+
+<h3>7.4.1 Apache Kafka</h3>
+
+<pre>
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+# Read from Kafka
+df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "events") \
+    .load()
+
+# Parse JSON and write to Delta Lake
+parsed_df = df.selectExpr("CAST(value AS STRING) as json") \
+    .select(from_json("json", schema).alias("data")) \
+    .select("data.*")
+
+query = parsed_df.writeStream \
+    .format("delta") \
+    .option("checkpointLocation", "s3://checkpoints/events/") \
+    .start("s3://lake/curated/events/")
+</pre>
+
+<h3>7.4.2 AWS Kinesis</h3>
+
+<pre>
+# Read from Kinesis
+df = spark.readStream \
+    .format("kinesis") \
+    .option("streamName", "events-stream") \
+    .option("region", "us-east-1") \
+    .option("initialPosition", "latest") \
+    .load()
+
+# Write to Delta Lake
+df.writeStream \
+    .format("delta") \
+    .option("checkpointLocation", "s3://checkpoints/") \
+    .start("s3://lake/curated/events/")
+</pre>
+
+<hr>
+
+<h2>7.5 BI Tool Integration</h2>
+
+<h3>7.5.1 Tableau</h3>
+
+<pre>
+# Connect Tableau to Delta Lake via JDBC
+1. Install Spark JDBC driver
+2. Configure connection:
+   - Type: Spark SQL
+   - Server: spark-thrift-server:10000
+   - Database: curated
+3. Query Delta tables as normal SQL tables
+</pre>
+
+<h3>7.5.2 Power BI</h3>
+
+<pre>
+# Connect Power BI to Synapse/Databricks
+1. Get Data → Azure → Azure Synapse Analytics
+2. Server: workspace.sql.azuresynapse.net
+3. Database: curated
+4. Import or DirectQuery mode
+5. Delta tables appear as regular tables
+</pre>
+
+<h3>7.5.3 Apache Superset</h3>
+
+<pre>
+# Configure Superset database connection
+{
+  "database_name": "WIA Data Lake",
+  "sqlalchemy_uri": "trino://trino:8080/iceberg/curated",
+  "expose_in_sqllab": true,
+  "allow_ctas": true,
+  "allow_cvas": true
+}
+</pre>
+
+<hr>
+
+<h2>7.6 Data Governance Integration</h2>
+
+<h3>7.6.1 Data Lineage Tracking</h3>
+
+<pre>
+# Using OpenLineage standard
+from openlineage.spark import setup_openlineage
+
+setup_openlineage(spark,
+    transport="http://lineage-api:5000/api/v1/lineage",
+    namespace="production"
+)
+
+# Lineage automatically tracked:
+# Source → Transform → Destination
+# s3://raw/events → Spark Job → s3://curated/events
+</pre>
+
+<h3>7.6.2 Access Control</h3>
+
+<pre>
+# Row-level security (Delta Lake + Unity Catalog)
+CREATE OR REPLACE FUNCTION customer_filter()
+RETURN current_user() = 'admin' OR customer_id = current_user_id();
+
+ALTER TABLE customers SET ROW FILTER customer_filter ON (customer_id);
+
+-- Users only see their own rows
+SELECT * FROM customers;  -- Automatic filtering applied
+</pre>
+
+<h3>7.6.3 Audit Logging</h3>
+
+<pre>
+# Track all table operations
+DESCRIBE HISTORY curated.events;
+
+# Output:
+# version | timestamp           | operation | user        | operationMetrics
+# --------|---------------------|-----------|-------------|------------------
+# 5       | 2025-01-15 10:00:00 | MERGE     | etl_user    | {"numTargetRowsInserted":"1000"}
+# 4       | 2025-01-15 09:00:00 | UPDATE    | admin_user  | {"numUpdatedRows":"500"}
+# 3       | 2025-01-15 08:00:00 | DELETE    | compliance  | {"numDeletedRows":"100"}
+</pre>
+
+<hr>
+
+<h2>7.7 End-to-End Integration Example</h2>
+
+<pre>
+Architecture:
+┌─────────────┐
+│   Kafka     │ → Streaming data
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│ Spark       │ → Real-time processing
+│ Structured  │
+│ Streaming   │
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│ Delta Lake  │ → ACID storage on S3
+│ (Curated)   │
+└──────┬──────┘
+       ↓
+   ┌───┴───┐
+   ↓       ↓
+┌──────┐ ┌────────┐
+│Athena│ │Tableau │ → Analytics & BI
+└──────┘ └────────┘
+
+Implementation:
+# 1. Ingest from Kafka
+spark.readStream.format("kafka")...
+
+# 2. Transform and validate
+.transform(validate_schema)
+.transform(enrich_data)
+
+# 3. Write to Delta Lake
+.writeStream.format("delta")
+.option("checkpointLocation", "...")
+.start("s3://lake/curated/events/")
+
+# 4. Query via Athena
+CREATE EXTERNAL TABLE events
+USING DELTA
+LOCATION 's3://lake/curated/events/';
+
+# 5. Visualize in Tableau
+Connect to Athena → Build dashboard
+</pre>
+
+<hr>
+
+<h2>Summary</h2>
+
+<p>In this chapter, we learned:</p>
+
+<ul>
+    <li>Compute engine integration: Spark, Presto, Trino, Hive</li>
+    <li>Catalog integration: Glue, Unity, Nessie</li>
+    <li>Cloud platforms: AWS, Azure, GCP</li>
+    <li>Streaming: Kafka, Kinesis integration</li>
+    <li>BI tools: Tableau, Power BI, Superset</li>
+    <li>Governance: Lineage, access control, audit logs</li>
+</ul>
+
+<p><strong>Next Chapter:</strong> <a href="chapter-08.html">Chapter 8: Implementation Guide and Best Practices</a></p>
+
+<hr>
+
+<p><a href="chapter-06.html">← Previous</a> | <a href="index.html">Contents</a> | <a href="chapter-08.html">Next →</a></p>
+
+<hr>
+
+<p><strong>弘益人間 · Benefit All Humanity</strong></p>
+<p>© 2025 WIA Standards / MIT License</p>
+</body>
+</html>

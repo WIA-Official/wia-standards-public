@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Chapter 7: Phase 4 - Ecosystem Integration | WIA Braille Display</title>
+</head>
+<body>
+
+<h1>⠿ Chapter 7: Phase 4 - Ecosystem Integration</h1>
+
+<p><em>Part III: Technical Specification</em></p>
+
+<hr>
+
+<h2>Introduction</h2>
+
+<p>Phase 4 represents the culmination of the WIA Braille Display Standard: seamless integration with the broader accessibility ecosystem. While Phases 1-3 defined data formats, APIs, and protocols, Phase 4 ensures that WIA-compliant displays work harmoniously with screen readers, operating systems, and web applications.</p>
+
+<p>This chapter covers integration patterns for major platforms including Windows (NVDA, JAWS), macOS/iOS (VoiceOver), Android (TalkBack), and Linux (Orca). We'll explore driver development, API bridging, and best practices for providing consistent Braille output across the accessibility landscape.</p>
+
+<blockquote>
+<p><strong>Integration Goal:</strong> A WIA-compliant Braille display should provide a consistent, high-quality experience regardless of the screen reader or platform—write once, work everywhere.</p>
+</blockquote>
+
+<hr>
+
+<h2>7.1 Screen Reader Integration Patterns</h2>
+
+<h3>7.1.1 Architecture Overview</h3>
+
+<p>Screen readers interact with Braille displays through a layered architecture:</p>
+
+<pre>
+┌─────────────────────────────────────────────┐
+│         Application (Browser, Word)        │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│      Accessibility API (UIA, AT-SPI)       │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│     Screen Reader (NVDA, JAWS, Orca)       │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│       Braille Driver (WIA Driver)          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│    Communication Protocol (USB, BT, etc)    │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│       Physical Braille Display Device      │
+└─────────────────────────────────────────────┘
+</pre>
+
+<h3>7.1.2 Common Integration Challenges</h3>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Challenge</th>
+<th>Description</th>
+<th>WIA Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Device Fragmentation</td>
+<td>Each manufacturer uses different protocols</td>
+<td>Unified WIA protocol</td>
+</tr>
+<tr>
+<td>Driver Complexity</td>
+<td>Screen readers need drivers for each device</td>
+<td>Single WIA driver for all compliant devices</td>
+</tr>
+<tr>
+<td>Capability Detection</td>
+<td>Unknown device features</td>
+<td>Standardized device info structure</td>
+</tr>
+<tr>
+<td>Latency Variance</td>
+<td>Inconsistent update speeds</td>
+<td>Sub-100ms latency requirement</td>
+</tr>
+<tr>
+<td>Platform Differences</td>
+<td>Different APIs per OS</td>
+<td>Platform-specific WIA adapters</td>
+</tr>
+</tbody>
+</table>
+
+<h3>7.1.3 Integration Patterns</h3>
+
+<p>Three primary integration patterns:</p>
+
+<ol>
+<li><strong>Direct Integration</strong> - Screen reader uses WIA SDK directly</li>
+<li><strong>Driver Wrapper</strong> - WIA SDK wrapped as native driver format</li>
+<li><strong>Bridge Service</strong> - Standalone service exposes WIA displays to multiple clients</li>
+</ol>
+
+<pre>
+// Pattern 1: Direct Integration
+import { WiaBrailleDisplay } from '@wia/braille-display';
+
+class ScreenReader {
+    async initBraille() {
+        this.braille = new WiaBrailleDisplay();
+        await this.braille.connect();
+        this.braille.on('routing', this.handleRouting);
+    }
+
+    async updateBrailleDisplay(text) {
+        await this.braille.write(text);
+    }
+}
+
+// Pattern 2: Driver Wrapper (e.g., NVDA)
+class WiaNvdaDriver extends nvdaDisplayDriver {
+    constructor() {
+        this.wiaDisplay = new WiaBrailleDisplay();
+    }
+
+    async initialize() {
+        await this.wiaDisplay.connect();
+        return {
+            numCells: this.wiaDisplay.getCellCount(),
+            hasRoutingKeys: this.wiaDisplay.hasCapability('routingKeys')
+        };
+    }
+
+    display(cells) {
+        return this.wiaDisplay.writeCells(cells);
+    }
+}
+
+// Pattern 3: Bridge Service
+class WiaBrailleService {
+    constructor() {
+        this.displays = new Map();
+        this.clients = new Map();
+    }
+
+    async registerClient(clientId) {
+        const display = new WiaBrailleDisplay();
+        await display.connect();
+        this.clients.set(clientId, display);
+    }
+
+    async writeForClient(clientId, text) {
+        const display = this.clients.get(clientId);
+        await display.write(text);
+    }
+}
+</pre>
+
+<hr>
+
+<h2>7.2 NVDA Integration</h2>
+
+<h3>7.2.1 NVDA Overview</h3>
+
+<p>NVDA (NonVisual Desktop Access) is the most popular open-source screen reader for Windows. Key facts:</p>
+
+<ul>
+<li>Platform: Windows 7+</li>
+<li>Language: Python</li>
+<li>Architecture: Modular driver system</li>
+<li>License: GPL v2</li>
+<li>Users: 100,000+ worldwide</li>
+</ul>
+
+<h3>7.2.2 NVDA Driver Structure</h3>
+
+<p>NVDA Braille drivers are Python modules implementing a specific interface:</p>
+
+<pre>
+# brailleDisplayDrivers/wia.py
+
+import braille
+import inputCore
+from logHandler import log
+from wia_braille import WiaBrailleDisplay, WiaBrailleError
+
+class BrailleDisplayDriver(braille.BrailleDisplayDriver):
+    """WIA Braille Display driver for NVDA"""
+
+    name = "wia"
+    description = "WIA Braille Display (Universal)"
+    isThreadSafe = True
+
+    @classmethod
+    def check(cls):
+        """Check if WIA displays are available"""
+        try:
+            devices = WiaBrailleDisplay.discover()
+            return len(devices) > 0
+        except Exception:
+            return False
+
+    def __init__(self):
+        super().__init__()
+        self._display = WiaBrailleDisplay()
+
+    def _connect(self):
+        """Establish connection to display"""
+        try:
+            self._display.connect()
+
+            # Get device capabilities
+            info = self._display.get_device_info()
+            self.numCells = info['cellCount']
+
+            # Set up event handlers
+            self._display.on('routing', self._handleRouting)
+            self._display.on('key', self._handleKey)
+            self._display.on('error', self._handleError)
+
+            log.info(f"Connected to {info['manufacturer']} {info['model']}")
+
+        except WiaBrailleError as e:
+            log.error(f"Failed to connect: {e}")
+            raise
+
+    def terminate(self):
+        """Clean up on driver unload"""
+        try:
+            self._display.disconnect()
+        except Exception:
+            pass
+
+    def display(self, cells):
+        """Update Braille display with cell patterns"""
+        try:
+            self._display.write_cells(cells)
+        except WiaBrailleError as e:
+            log.error(f"Display update failed: {e}")
+
+    def _handleRouting(self, event):
+        """Handle routing key press"""
+        try:
+            # Map to NVDA gesture
+            inputCore.manager.executeGesture(
+                InputGesture(event['cellIndex'])
+            )
+        except Exception as e:
+            log.error(f"Routing error: {e}")
+
+    def _handleKey(self, event):
+        """Handle navigation/function keys"""
+        gesture = self._mapKeyToGesture(event)
+        if gesture:
+            inputCore.manager.executeGesture(gesture)
+
+    def _mapKeyToGesture(self, event):
+        """Map WIA key event to NVDA gesture"""
+        keyMap = {
+            'left': 'braille(wia):panLeft',
+            'right': 'braille(wia):panRight',
+            'up': 'braille(wia):previousLine',
+            'down': 'braille(wia):nextLine',
+        }
+        return keyMap.get(event['key'])
+
+class InputGesture(braille.BrailleDisplayGesture):
+    """Represents a WIA Braille display gesture"""
+
+    source = BrailleDisplayDriver.name
+
+    def __init__(self, routingIndex=None, key=None):
+        super().__init__()
+        if routingIndex is not None:
+            self.routingIndex = routingIndex
+            self.id = f"routing:{routingIndex}"
+        elif key:
+            self.id = f"key:{key}"
+</pre>
+
+<h3>7.2.3 NVDA Configuration</h3>
+
+<pre>
+# nvda.ini - User configuration
+[braille]
+display = wia
+translationTable = en-us-comp8.ctb
+cursorBlink = True
+cursorBlinkRate = 500
+messageTimeout = 4
+tetherTo = focus
+
+# WIA-specific settings
+[braille.wia]
+autoConnect = True
+connectionType = usb
+fallbackToSerial = True
+</pre>
+
+<h3>7.2.4 Gesture Mapping</h3>
+
+<p>NVDA uses a gesture system for input handling:</p>
+
+<pre>
+# gestures.ini - Default WIA gestures
+[globalCommands.GlobalCommands]
+kb:NVDA+upArrow = braille(wia):previousLine
+kb:NVDA+downArrow = braille(wia):nextLine
+routing = braille(wia):routing
+
+[brailleDisplayDrivers.wia]
+# Navigation
+panLeft = left, space+dot1
+panRight = right, space+dot4
+previousLine = up, space+dot7
+nextLine = down, space+dot8
+
+# Cursor routing
+routing = routing
+
+# Mode switches
+toggleInputMode = space+dots1+3+6
+toggleBrailleGrade = space+dots2+3+5
+
+# Screen reader functions
+sayAll = space+dots1+2+3+4+5+6
+</pre>
+
+<hr>
+
+<h2>7.3 JAWS Integration</h2>
+
+<h3>7.3.1 JAWS Overview</h3>
+
+<p>JAWS (Job Access With Speech) is the most widely-used commercial screen reader:</p>
+
+<ul>
+<li>Platform: Windows</li>
+<li>Developer: Freedom Scientific</li>
+<li>Language: C++ (drivers), JDF scripting</li>
+<li>Market Share: ~50% of screen reader users</li>
+</ul>
+
+<h3>7.3.2 JAWS Driver Development</h3>
+
+<p>JAWS drivers are native DLLs implementing the Braille Display Driver API:</p>
+
+<pre>
+// WiaBraille.dll - JAWS driver (C++)
+
+#include "BrailleDriverAPI.h"
+#include "wia_braille_sdk.h"
+
+static WiaBrailleDisplay* g_display = nullptr;
+
+// Driver initialization
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
+    if (reason == DLL_PROCESS_ATTACH) {
+        g_display = wia_braille_display_new();
+    }
+    else if (reason == DLL_PROCESS_DETACH) {
+        if (g_display) {
+            wia_braille_display_free(g_display);
+        }
+    }
+    return TRUE;
+}
+
+// Get driver information
+extern "C" __declspec(dllexport)
+BOOL GetBrailleDisplayInfo(BrailleDisplayInfo* info) {
+    if (!info) return FALSE;
+
+    wcscpy_s(info->wszName, L"WIA Braille Display");
+    wcscpy_s(info->wszManufacturer, L"WIA Standards");
+    info->dwVersion = 0x00010000;  // Version 1.0
+    info->dwCapabilities =
+        BRAILLE_CAP_ROUTING |
+        BRAILLE_CAP_CURSOR |
+        BRAILLE_CAP_SCROLL;
+
+    return TRUE;
+}
+
+// Open connection
+extern "C" __declspec(dllexport)
+BOOL OpenBrailleDisplay() {
+    if (!g_display) return FALSE;
+
+    try {
+        wia_braille_display_connect(g_display);
+
+        // Get device info
+        WiaDeviceInfo info;
+        wia_braille_display_get_info(g_display, &info);
+
+        // Register callbacks
+        wia_braille_display_on_routing(g_display, OnRoutingKey, nullptr);
+        wia_braille_display_on_key(g_display, OnNavigationKey, nullptr);
+
+        return TRUE;
+    }
+    catch (...) {
+        return FALSE;
+    }
+}
+
+// Close connection
+extern "C" __declspec(dllexport)
+BOOL CloseBrailleDisplay() {
+    if (!g_display) return FALSE;
+
+    wia_braille_display_disconnect(g_display);
+    return TRUE;
+}
+
+// Write to display
+extern "C" __declspec(dllexport)
+BOOL WriteBrailleCells(BYTE* cells, DWORD cellCount, DWORD startPos) {
+    if (!g_display || !cells) return FALSE;
+
+    try {
+        wia_braille_display_write_cells_partial(
+            g_display,
+            cells,
+            cellCount,
+            startPos
+        );
+        return TRUE;
+    }
+    catch (...) {
+        return FALSE;
+    }
+}
+
+// Get cell count
+extern "C" __declspec(dllexport)
+DWORD GetCellCount() {
+    if (!g_display) return 0;
+
+    WiaDeviceInfo info;
+    wia_braille_display_get_info(g_display, &info);
+    return info.cellCount;
+}
+
+// Routing key callback
+void CALLBACK OnRoutingKey(int cellIndex, void* userData) {
+    // Notify JAWS of routing key press
+    SendJAWSBrailleKey(BRAILLE_ROUTING_KEY, cellIndex);
+}
+
+// Navigation key callback
+void CALLBACK OnNavigationKey(const char* key, void* userData) {
+    // Map WIA key to JAWS key code
+    int jawsKey = MapWiaKeyToJaws(key);
+    if (jawsKey != 0) {
+        SendJAWSBrailleKey(jawsKey, 0);
+    }
+}
+
+// Key mapping
+int MapWiaKeyToJaws(const char* wiaKey) {
+    static const struct {
+        const char* wiaKey;
+        int jawsKey;
+    } keyMap[] = {
+        { "left", BRAILLE_KEY_LEFT },
+        { "right", BRAILLE_KEY_RIGHT },
+        { "up", BRAILLE_KEY_UP },
+        { "down", BRAILLE_KEY_DOWN },
+        { "f1", BRAILLE_KEY_F1 },
+        // ... more mappings
+    };
+
+    for (const auto& mapping : keyMap) {
+        if (strcmp(wiaKey, mapping.wiaKey) == 0) {
+            return mapping.jawsKey;
+        }
+    }
+
+    return 0;
+}
+</pre>
+
+<h3>7.3.3 JAWS Configuration Files</h3>
+
+<pre>
+; WiaBraille.jcf - JAWS Configuration File
+
+[Braille Display]
+Name=WIA Braille Display
+Type=USB
+Port=AUTO
+Cells=40
+
+[Display Settings]
+Cursor=Block
+CursorBlink=1
+BlinkRate=500
+StatusCells=0
+PanMode=Overlap
+
+[Key Mappings]
+LeftWizWheel=PriorLine
+RightWizWheel=NextLine
+LeftRockerUp=PanLeft
+LeftRockerDown=PanRight
+RoutingKey=RouteCursor
+
+[Advanced]
+AutoConnect=1
+ReconnectDelay=5000
+UpdateInterval=50
+DebugLogging=0
+</pre>
+
+<hr>
+
+<h2>7.4 VoiceOver Integration (macOS/iOS)</h2>
+
+<h3>7.4.1 VoiceOver Overview</h3>
+
+<p>VoiceOver is Apple's built-in screen reader for macOS and iOS:</p>
+
+<ul>
+<li>Platform: macOS 10.4+, iOS 3.0+</li>
+<li>Language: Objective-C / Swift</li>
+<li>Integration: Accessibility Framework</li>
+<li>Adoption: Pre-installed, high usage among Apple users</li>
+</ul>
+
+<h3>7.4.2 macOS Driver Development</h3>
+
+<pre>
+// WiaBrailleDriver.swift
+// macOS VoiceOver Braille driver
+
+import Foundation
+import Accessibility
+import WiaBrailleSDK
+
+@objc(WiaBrailleDriver)
+class WiaBrailleDriver: BRLTDriver {
+
+    private var display: WiaBrailleDisplay?
+    private var modelName: String = "WIA Braille Display"
+    private var cellCount: Int = 0
+
+    // Initialize driver
+    override func initialize() -> Bool {
+        display = WiaBrailleDisplay()
+
+        do {
+            try display?.connect()
+
+            // Get device info
+            if let info = display?.getDeviceInfo() {
+                modelName = "\(info.manufacturer) \(info.model)"
+                cellCount = Int(info.cellCount)
+
+                // Set up event handlers
+                display?.onRouting { [weak self] event in
+                    self?.handleRoutingEvent(event)
+                }
+
+                display?.onKey { [weak self] event in
+                    self?.handleKeyEvent(event)
+                }
+
+                NSLog("VoiceOver: Connected to WIA display - \(modelName)")
+                return true
+            }
+        }
+        catch {
+            NSLog("VoiceOver: WIA connection failed - \(error)")
+            return false
+        }
+
+        return false
+    }
+
+    // Clean up
+    override func terminate() {
+        do {
+            try display?.disconnect()
+        }
+        catch {
+            NSLog("VoiceOver: Disconnect error - \(error)")
+        }
+        display = nil
+    }
+
+    // Get display size
+    override func getDisplaySize() -> BRLTDisplaySize {
+        return BRLTDisplaySize(
+            columns: UInt32(cellCount),
+            rows: 1
+        )
+    }
+
+    // Write to display
+    override func write(_ cells: UnsafePointer<UInt8>,
+                       length: Int,
+                       at position: Int) -> Bool {
+        guard let display = display else { return false }
+
+        do {
+            let cellArray = Array(UnsafeBufferPointer(
+                start: cells,
+                count: length
+            ))
+
+            try display.writeCells(cellArray, startCell: position)
+            return true
+        }
+        catch {
+            NSLog("VoiceOver: Write error - \(error)")
+            return false
+        }
+    }
+
+    // Handle routing key
+    private func handleRoutingEvent(_ event: WiaRoutingEvent) {
+        // Create VoiceOver routing gesture
+        let gesture = BRLTGesture(
+            type: .routing,
+            cellIndex: UInt32(event.cellIndex)
+        )
+
+        // Send to VoiceOver
+        self.postGesture(gesture)
+    }
+
+    // Handle navigation keys
+    private func handleKeyEvent(_ event: WiaKeyEvent) {
+        var gestureType: BRLTGestureType
+
+        switch event.key {
+        case "left":
+            gestureType = .panLeft
+        case "right":
+            gestureType = .panRight
+        case "up":
+            gestureType = .scrollUp
+        case "down":
+            gestureType = .scrollDown
+        default:
+            return  // Unsupported key
+        }
+
+        let gesture = BRLTGesture(type: gestureType)
+        self.postGesture(gesture)
+    }
+
+    // Get driver name
+    override func getName() -> String {
+        return modelName
+    }
+
+    // Check for device availability
+    override class func isAvailable() -> Bool {
+        do {
+            let devices = try WiaBrailleDisplay.discover()
+            return !devices.isEmpty
+        }
+        catch {
+            return false
+        }
+    }
+}
+</pre>
+
+<h3>7.4.3 iOS Integration</h3>
+
+<p>iOS uses a similar but simplified model due to sandboxing:</p>
+
+<pre>
+// iOS VoiceOver integration via MFi (Made for iPhone) protocol
+
+import ExternalAccessory
+import WiaBrailleSDK
+
+class iOSWiaBrailleDriver: NSObject, EAAccessoryDelegate {
+
+    private var session: EASession?
+    private var display: WiaBrailleDisplay?
+
+    // Detect accessory connection
+    func accessoryDidConnect(_ notification: Notification) {
+        guard let accessory = notification.userInfo?[
+            EAAccessoryKey
+        ] as? EAAccessory else {
+            return
+        }
+
+        // Check for WIA protocol
+        if accessory.protocolStrings.contains("com.wia.braille") {
+            connectToAccessory(accessory)
+        }
+    }
+
+    // Establish connection
+    private func connectToAccessory(_ accessory: EAAccessory) {
+        session = EASession(
+            accessory: accessory,
+            forProtocol: "com.wia.braille"
+        )
+
+        guard let session = session else { return }
+
+        // Initialize WIA display over MFi connection
+        display = WiaBrailleDisplay(transport: .mfi(session))
+
+        do {
+            try display?.connect()
+            notifyVoiceOverDisplayReady()
+        }
+        catch {
+            print("iOS WIA connection failed: \(error)")
+        }
+    }
+
+    // VoiceOver display protocol
+    func updateDisplay(text: String) {
+        do {
+            try display?.write(text)
+        }
+        catch {
+            print("Display update failed: \(error)")
+        }
+    }
+}
+</pre>
+
+<h3>7.4.4 VoiceOver Braille Settings</h3>
+
+<p>Users configure VoiceOver Braille through System Preferences:</p>
+
+<pre>
+System Preferences → Accessibility → VoiceOver → Braille
+
+Settings:
+- Display: [WIA Braille Display (Auto-detected)]
+- Input Table: English (Unified)
+- Output Table: English (Grade 2)
+- Show alerts: Yes
+- Alert duration: 5 seconds
+- Status cells: General
+- Word wrap: Yes
+- Cursor style: Blinking block
+- Panning mode: Continuous
+</pre>
+
+<hr>
+
+<h2>7.5 TalkBack Integration (Android)</h2>
+
+<h3>7.5.1 TalkBack Overview</h3>
+
+<p>TalkBack is Android's built-in screen reader:</p>
+
+<ul>
+<li>Platform: Android 4.0+</li>
+<li>Language: Java / Kotlin</li>
+<li>Developer: Google</li>
+<li>Distribution: Pre-installed on most devices</li>
+</ul>
+
+<h3>7.5.2 Android Braille Service</h3>
+
+<pre>
+// WiaBrailleService.kt
+// Android TalkBack Braille service
+
+package com.wia.braille.talkback
+
+import android.accessibilityservice.AccessibilityService
+import android.view.accessibility.AccessibilityEvent
+import com.wia.braille.sdk.WiaBrailleDisplay
+import com.wia.braille.sdk.WiaDeviceInfo
+
+class WiaBrailleService : AccessibilityService() {
+
+    private var display: WiaBrailleDisplay? = null
+    private var deviceInfo: WiaDeviceInfo? = null
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+
+        // Initialize WIA Braille display
+        initializeBrailleDisplay()
+    }
+
+    private fun initializeBrailleDisplay() {
+        try {
+            display = WiaBrailleDisplay()
+
+            // Discover and connect
+            display?.connect(
+                connectionType = WiaConnectionType.BLUETOOTH,
+                autoConnect = true
+            )
+
+            // Get device info
+            deviceInfo = display?.getDeviceInfo()
+
+            // Set up event handlers
+            display?.setRoutingListener { event ->
+                handleRoutingKey(event)
+            }
+
+            display?.setKeyListener { event ->
+                handleNavigationKey(event)
+            }
+
+            Log.i(TAG, "TalkBack: WIA Braille connected - " +
+                  "${deviceInfo?.manufacturer} ${deviceInfo?.model}")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Braille initialization failed", e)
+        }
+    }
+
+    // Handle accessibility events from TalkBack
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_VIEW_FOCUSED -> {
+                // Update Braille with focused element
+                updateBrailleDisplay(event)
+            }
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
+                // Update Braille with new text
+                updateBrailleDisplay(event)
+            }
+        }
+    }
+
+    private fun updateBrailleDisplay(event: AccessibilityEvent) {
+        try {
+            // Get text from event
+            val text = event.text.joinToString(" ")
+
+            // Convert to Braille and display
+            display?.write(text)
+
+            // Show cursor if editable
+            if (event.source?.isEditable == true) {
+                val cursorPosition = event.source?.textSelectionStart ?: 0
+                display?.setCursor(cursorPosition, visible = true)
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Display update failed", e)
+        }
+    }
+
+    private fun handleRoutingKey(event: WiaRoutingEvent) {
+        // Simulate touch at routing position
+        val node = rootInActiveWindow ?: return
+
+        // Find node at Braille position
+        val textNode = findNodeAtBraillePosition(
+            node,
+            event.logicalPosition
+        )
+
+        // Perform click
+        textNode?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
+    private fun handleNavigationKey(event: WiaKeyEvent) {
+        when (event.key) {
+            "left" -> performGlobalAction(GLOBAL_ACTION_BACK)
+            "right" -> {
+                // Navigate to next element
+                rootInActiveWindow?.performAction(
+                    AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY
+                )
+            }
+            "up" -> {
+                // Scroll up
+                performGlobalAction(GLOBAL_ACTION_SCROLL_UP)
+            }
+            "down" -> {
+                // Scroll down
+                performGlobalAction(GLOBAL_ACTION_SCROLL_DOWN)
+            }
+        }
+    }
+
+    override fun onInterrupt() {
+        // TalkBack interrupted
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        // Clean up
+        try {
+            display?.disconnect()
+        } catch (e: Exception) {
+            Log.e(TAG, "Disconnect failed", e)
+        }
+    }
+
+    companion object {
+        private const val TAG = "WiaBrailleService"
+    }
+}
+</pre>
+
+<h3>7.5.3 Android Manifest Configuration</h3>
+
+<pre>
+<!-- AndroidManifest.xml -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.wia.braille.talkback">
+
+    <!-- Bluetooth permissions for wireless displays -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- USB host for wired displays -->
+    <uses-feature android:name="android.hardware.usb.host" />
+
+    <application>
+        <!-- Accessibility service -->
+        <service
+            android:name=".WiaBrailleService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:label="@string/wia_braille_service_name"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+    </application>
+</manifest>
+</pre>
+
+<h3>7.5.4 Braille Keyboard Input</h3>
+
+<pre>
+// Braille keyboard for text input
+class WiaBrailleKeyboard {
+
+    private val display: WiaBrailleDisplay
+    private var inputBuffer = StringBuilder()
+
+    init {
+        display.enableBrailleInput()
+
+        display.setBrailleInputListener { event ->
+            handleBrailleInput(event)
+        }
+    }
+
+    private fun handleBrailleInput(event: WiaBrailleInputEvent) {
+        // Convert Braille pattern to character
+        val char = brailleToText(event.pattern, grade = 2)
+
+        // Check for special commands
+        when {
+            event.isBackspace() -> {
+                if (inputBuffer.isNotEmpty()) {
+                    inputBuffer.deleteCharAt(inputBuffer.length - 1)
+                    updateDisplay()
+                }
+            }
+            event.isEnter() -> {
+                submitInput()
+            }
+            else -> {
+                inputBuffer.append(char)
+                updateDisplay()
+            }
+        }
+    }
+
+    private fun updateDisplay() {
+        display.write("Input: $inputBuffer")
+    }
+
+    private fun submitInput() {
+        // Send input to focused text field
+        val inputConnection = currentInputConnection
+        inputConnection?.commitText(inputBuffer.toString(), 1)
+        inputBuffer.clear()
+    }
+}
+</pre>
+
+<hr>
+
+<h2>7.6 Linux Orca Integration</h2>
+
+<h3>7.6.1 Orca Overview</h3>
+
+<p>Orca is the primary screen reader for Linux distributions:</p>
+
+<ul>
+<li>Platform: Linux (GNOME desktop)</li>
+<li>Language: Python</li>
+<li>Accessibility: AT-SPI (Assistive Technology Service Provider Interface)</li>
+<li>Integration: Via BRLTTY (covered in Chapter 6)</li>
+</ul>
+
+<h3>7.6.2 Orca Configuration</h3>
+
+<pre>
+# ~/.config/orca/user-settings.conf
+
+import orca.braille
+
+# Braille settings
+orca.settings.enableBraille = True
+orca.settings.brailleVerbosityLevel = 1
+
+# Use BRLTTY with WIA driver
+orca.settings.brailleDriver = "brltty"
+orca.braille.BRLTTY_DRIVER = "wia"
+
+# Braille table
+orca.settings.brailleContractionTable = "en-us-g2.ctb"
+
+# Display settings
+orca.settings.brailleRolenameStyle = orca.settings.BRAILLE_ROLENAME_STYLE_SHORT
+orca.settings.disableBrailleEOL = False
+orca.settings.enableBrailleMonitor = False
+
+# Flash messages
+orca.settings.brailleFlashTime = 5000  # 5 seconds
+orca.settings.enableFlashMessages = True
+
+# Cursor tracking
+orca.settings.brailleSelectorIndicator = orca.settings.BRAILLE_UNDERLINE
+orca.settings.brailleLinkIndicator = orca.settings.BRAILLE_UNDERLINE
+</pre>
+
+<h3>7.6.3 Direct Orca Integration (Alternative to BRLTTY)</h3>
+
+<pre>
+# orca/braille/wia_braille.py
+# Direct WIA integration for Orca
+
+from orca import braille
+from wia_braille import WiaBrailleDisplay, WiaError
+import logging
+
+logger = logging.getLogger(__name__)
+
+class WiaBraille(braille.BrailleDevice):
+    """WIA Braille Display support for Orca"""
+
+    def __init__(self):
+        super().__init__()
+        self._display = None
+        self._numCells = 0
+
+    def open(self):
+        """Open connection to WIA Braille display"""
+        try:
+            self._display = WiaBrailleDisplay()
+            self._display.connect()
+
+            info = self._display.get_device_info()
+            self._numCells = info['cellCount']
+
+            # Event handlers
+            self._display.on('routing', self._onRouting)
+            self._display.on('key', self._onKey)
+
+            logger.info(f"Orca: Connected to WIA display "
+                       f"({info['manufacturer']} {info['model']})")
+
+            return True
+
+        except WiaError as e:
+            logger.error(f"Orca: WIA connection failed - {e}")
+            return False
+
+    def close(self):
+        """Close display connection"""
+        if self._display:
+            try:
+                self._display.disconnect()
+            except WiaError as e:
+                logger.error(f"Disconnect error: {e}")
+            finally:
+                self._display = None
+
+    def getNumCells(self):
+        """Get number of Braille cells"""
+        return self._numCells
+
+    def write(self, cells):
+        """Write to Braille display"""
+        if not self._display:
+            return False
+
+        try:
+            self._display.write_cells(cells)
+            return True
+        except WiaError as e:
+            logger.error(f"Write error: {e}")
+            return False
+
+    def _onRouting(self, event):
+        """Handle routing key press"""
+        # Trigger Orca routing action
+        braille.processRoutingKey(event['cellIndex'])
+
+    def _onKey(self, event):
+        """Handle navigation keys"""
+        keyMap = {
+            'left': 'panLeft',
+            'right': 'panRight',
+            'up': 'lineUp',
+            'down': 'lineDown',
+        }
+
+        orcaAction = keyMap.get(event['key'])
+        if orcaAction:
+            braille.processKey(orcaAction)
+
+# Register driver
+braille.registerDevice("wia", WiaBraille)
+</pre>
+
+<hr>
+
+<h2>7.7 Web Accessibility Integration</h2>
+
+<h3>7.7.1 ARIA and Web Standards</h3>
+
+<p>Modern web applications can integrate directly with Braille displays via browser accessibility APIs:</p>
+
+<pre>
+<!-- Accessible web form with Braille support -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>WIA Braille Web Demo</title>
+    </head>
+<body>
+    <h1>Accessible Form</h1>
+
+    <form aria-label="Contact Form">
+        <label for="name">Name:</label>
+        <input
+            id="name"
+            type="text"
+            aria-label="Enter your name"
+            aria-required="true">
+
+        <label for="email">Email:</label>
+        <input
+            id="email"
+            type="email"
+            aria-label="Enter your email address"
+            aria-required="true">
+
+        <button
+            type="submit"
+            aria-label="Submit form">
+            Submit
+        </button>
+    </form>
+</body>
+</html>
+</pre>
+
+<h3>7.7.2 Web Braille Display API (Proposed)</h3>
+
+<pre>
+// Proposed W3C Web Braille API (future standard)
+
+interface BrailleDisplay extends EventTarget {
+    // Connection
+    Promise<void> requestDevice();
+    Promise<void> disconnect();
+
+    // Properties
+    readonly attribute unsigned long cellCount;
+    readonly attribute boolean connected;
+    readonly attribute BrailleDeviceInfo info;
+
+    // Output
+    Promise<void> write(DOMString text);
+    Promise<void> writeCells(sequence<octet> cells);
+    Promise<void> clear();
+
+    // Input events
+    attribute EventHandler onrouting;
+    attribute EventHandler onkey;
+}
+
+// Usage in web app
+const braille = new BrailleDisplay();
+
+// Request permission
+await braille.requestDevice();  // Shows browser picker
+
+// Display content
+await braille.write("Hello from the web!");
+
+// Handle input
+braille.onrouting = (event) => {
+    console.log(`Routing at cell ${event.cellIndex}`);
+    // Navigate to content at that position
+};
+</pre>
+
+<hr>
+
+<h2>7.8 弘益人間 (Hongik Ingan) - Philosophy Reflection</h2>
+
+<blockquote>
+<p><strong>弘益人間 (Hongik Ingan)</strong><br>
+"Benefit All Humanity"</p>
+</blockquote>
+
+<p>The WIA Braille Display Standard embodies the ancient Korean philosophy of 弘益人間 (Hongik Ingan) — "Benefit All Humanity." This isn't merely a tagline; it's the foundational principle guiding every technical decision in the standard.</p>
+
+<h3>Breaking Down Barriers</h3>
+
+<p>For decades, the Braille display ecosystem has been fragmented. A person who is blind purchasing a $3,000 Braille display faced uncertainty: Will it work with my screen reader? What about the next operating system update? Can I switch to a different screen reader if needed? These shouldn't be questions anyone has to ask.</p>
+
+<p>WIA's universal approach means <strong>freedom of choice</strong>. A student using NVDA on Windows can collaborate with a colleague using VoiceOver on macOS, both with compatible Braille displays. A developer can switch from JAWS to Orca without replacing expensive hardware. This is 弘益人間 in action — removing barriers that unfairly burden a community.</p>
+
+<h3>Economic Justice</h3>
+
+<p>Braille displays are prohibitively expensive, partly due to hardware complexity, but also due to ecosystem fragmentation requiring device manufacturers to develop and maintain dozens of proprietary drivers. A single universal standard:</p>
+
+<ul>
+<li>Reduces manufacturer development costs → Lower device prices</li>
+<li>Increases competition → Better products</li>
+<li>Enables innovation → New form factors and features</li>
+<li>Encourages adoption → More users benefit</li>
+</ul>
+
+<p>When we lower costs and increase availability, we honor 弘益人間 — making assistive technology accessible to all, not just the wealthy.</p>
+
+<h3>Global Inclusion</h3>
+
+<p>The WIA standard supports <strong>all Braille codes</strong> across <strong>all languages</strong>. English Grade 2, Unified English Braille (UEB), Korean Braille, Japanese Braille, Arabic Braille, Nemeth Code for mathematics — all are first-class citizens.</p>
+
+<p>This multilingual commitment reflects 弘익人間 on a global scale. Accessibility isn't a Western concern; it's a human right worldwide. A blind student in Seoul deserves the same quality tools as one in San Francisco. A researcher in Cairo should have the same access to mathematical notation in Braille as one in Cambridge.</p>
+
+<h3>Open and Free Forever</h3>
+
+<p>The WIA Braille Display Standard is released under the MIT License — free forever, for anyone, anywhere. No licensing fees. No proprietary restrictions. No gatekeepers.</p>
+
+<p>This openness is deliberate. If the goal is to "benefit all humanity," the standard must belong to humanity, not to a corporation or consortium. Open source enables:</p>
+
+<ul>
+<li><strong>Transparency</strong> — Anyone can audit the standard for accessibility and security</li>
+<li><strong>Contribution</strong> — Experts worldwide can improve and extend the specification</li>
+<li><strong>Innovation</strong> — Startups and researchers can build without permission</li>
+<li><strong>Longevity</strong> — The standard outlives any single organization</li>
+</ul>
+
+<h3>Developer Empowerment</h3>
+
+<p>By providing clean, well-documented APIs and comprehensive SDKs in multiple languages, WIA empowers developers to build accessible applications without becoming Braille experts. A web developer who's never used a Braille display can now integrate support in minutes:</p>
+
+<pre>
+import { WiaBrailleDisplay } from '@wia/braille-display';
+
+const display = new WiaBrailleDisplay();
+await display.connect();
+await display.write('Accessible content!');
+</pre>
+
+<p>This simplicity is intentional. When accessibility is easy, it becomes ubiquitous. When it's ubiquitous, everyone benefits. This is 弘益人間.</p>
+
+<h3>A Standard for the Future</h3>
+
+<p>Technology evolves. Screen readers change. Operating systems update. Braille displays become smaller, cheaper, more advanced. But the WIA standard is designed to evolve with technology, not against it.</p>
+
+<p>The four-phase architecture (Data, API, Protocol, Integration) provides stability at each layer while allowing innovation above. New protocols can be added (Phase 3) without breaking APIs (Phase 2). New devices can emerge without rewriting screen reader drivers (Phase 4).</p>
+
+<p>This forward-thinking design ensures that WIA will benefit not just today's users, but future generations. Our children's children, should they need Braille, will inherit a robust, mature, universal ecosystem. That's the long-term vision of 弘益人間.</p>
+
+<h3>Call to Action</h3>
+
+<p>If you're a <strong>manufacturer</strong>: Build WIA-compliant devices and join a growing ecosystem.<br>
+If you're a <strong>developer</strong>: Integrate WIA Braille support into your applications.<br>
+If you're a <strong>screen reader maintainer</strong>: Adopt the WIA driver for universal device support.<br>
+If you're a <strong>user</strong>: Request WIA compatibility from vendors you buy from.<br>
+If you're a <strong>researcher</strong>: Contribute improvements to the standard.</p>
+
+<p>Together, we can realize the promise of 弘益人間 — a world where Braille displays work seamlessly across all devices, all platforms, all languages, for all people.</p>
+
+<blockquote>
+<p><em>"The best way to predict the future is to create it."</em><br>
+Let's create an accessible future, together.</p>
+</blockquote>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<p>Phase 4 of the WIA Braille Display Standard addresses ecosystem integration, ensuring WIA-compliant devices work seamlessly across platforms and screen readers:</p>
+
+<ul>
+<li><strong>Integration Patterns</strong> - Direct integration, driver wrappers, and bridge services provide flexibility for different architectures</li>
+<li><strong>NVDA (Windows)</strong> - Python-based driver with gesture mapping and NVDA-specific event handling</li>
+<li><strong>JAWS (Windows)</strong> - Native C++ driver implementing the Braille Display Driver API</li>
+<li><strong>VoiceOver (macOS/iOS)</strong> - Swift/Objective-C driver using Apple's accessibility frameworks and MFi protocol for iOS</li>
+<li><strong>TalkBack (Android)</strong> - Kotlin-based accessibility service with Braille keyboard input support</li>
+<li><strong>Orca (Linux)</strong> - Python driver with BRLTTY integration and AT-SPI compatibility</li>
+<li><strong>Web Accessibility</strong> - ARIA integration and proposed Web Braille API for direct browser support</li>
+<li><strong>弘益人間 Philosophy</strong> - The standard's commitment to universal accessibility, economic justice, and open collaboration</li>
+</ul>
+
+<p>With comprehensive platform support, WIA enables true "write once, work everywhere" Braille accessibility.</p>
+
+<hr>
+
+<h2>Review Questions</h2>
+
+<ol>
+<li>What are the three primary integration patterns for screen readers?</li>
+<li>How does the NVDA driver implement WIA Braille support using Python?</li>
+<li>What are the key differences between JAWS and NVDA driver architectures?</li>
+<li>Explain how VoiceOver on iOS differs from macOS in Braille display connectivity.</li>
+<li>How does the Android TalkBack service handle Braille keyboard input?</li>
+<li>What role does BRLTTY play in Linux Braille accessibility?</li>
+<li>How can web applications directly integrate with Braille displays?</li>
+<li>What does 弘益人間 (Hongik Ingan) mean, and how does it relate to the WIA standard?</li>
+<li>Why is the WIA standard released under an open source license?</li>
+<li>How does WIA's universal approach reduce economic barriers to Braille display adoption?</li>
+</ol>
+
+<hr>
+
+<h2>Looking Ahead: Chapter 8</h2>
+
+<p>The final chapter covers practical implementation: how to build WIA-compliant devices, integrate the standard into applications, test for compliance, and achieve WIA certification. You'll find quick start guides, troubleshooting tips, a comprehensive best practices checklist, and resources for joining the WIA community.</p>
+
+<hr>
+
+<h2>Navigation</h2>
+
+<p>
+<a href="chapter-06.html">← Previous: Chapter 6 - Phase 3: Communication Protocol</a> |
+<a href="index.html">Table of Contents</a> |
+<a href="chapter-08.html">Next: Chapter 8 - Implementation & Certification →</a>
+</p>
+
+<hr>
+
+<p><strong>弘益人間 (Hongik Ingan) - Benefit All Humanity</strong></p>
+
+<p><em>Copyright 2025 SmileStory Inc. / WIA - Released under MIT License</em></p>
+</body>
+</html>

@@ -3,8 +3,6 @@
 //! Parses Nessus .nessus XML files and converts to WIA Security format.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use super::{ImportResult, ImportError};
 
 /// Nessus report structure (from XML)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,36 +171,40 @@ impl NessusImporter {
                 2 => "medium",
                 1 => "low",
                 _ => "info",
-            }.to_string();
+            }
+            .to_string();
 
-            let cvss_score = item.cvss3_base_score
+            let cvss_score = item
+                .cvss3_base_score
                 .as_ref()
                 .or(item.cvss_base_score.as_ref())
                 .and_then(|s| s.parse::<f64>().ok());
 
-            let cvss_vector = item.cvss3_vector
-                .clone()
-                .or(item.cvss_vector.clone());
+            let cvss_vector = item.cvss3_vector.clone().or(item.cvss_vector.clone());
 
             // Parse CVE list
-            let cve = item.cve
+            let cve = item
+                .cve
                 .as_ref()
                 .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
                 .unwrap_or_default();
 
             // Parse CWE
-            let cwe = item.cwe
+            let cwe = item
+                .cwe
                 .as_ref()
                 .map(|s| vec![s.clone()])
                 .unwrap_or_default();
 
             // Parse references from see_also
-            let references = item.see_also
+            let references = item
+                .see_also
                 .as_ref()
                 .map(|s| s.lines().map(|l| l.trim().to_string()).collect())
                 .unwrap_or_default();
 
-            let exploit_available = item.exploit_available
+            let exploit_available = item
+                .exploit_available
                 .as_ref()
                 .map(|s| s == "true" || s == "True")
                 .unwrap_or(false);
@@ -212,7 +214,9 @@ impl NessusImporter {
             findings.push(WiaFinding {
                 id: format!("NESSUS-{}", item.plugin_id),
                 title: item.plugin_name.clone(),
-                description: item.description.unwrap_or_else(|| item.synopsis.unwrap_or_default()),
+                description: item
+                    .description
+                    .unwrap_or_else(|| item.synopsis.unwrap_or_default()),
                 severity,
                 cvss_score,
                 cvss_vector,
@@ -239,7 +243,11 @@ impl NessusImporter {
 
     /// Convert Nessus report to WIA format
     pub fn convert_to_wia(&self, report: &NessusReport) -> WiaScanResult {
-        let scan_name = report.report.name.clone().unwrap_or_else(|| "Nessus Scan".to_string());
+        let scan_name = report
+            .report
+            .name
+            .clone()
+            .unwrap_or_else(|| "Nessus Scan".to_string());
         let scan_id = format!("nessus-{}", uuid::Uuid::new_v4());
 
         let mut targets = Vec::new();
@@ -275,7 +283,9 @@ impl NessusImporter {
         WiaScanResult {
             scan_id,
             scan_name,
-            scan_time: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
+            scan_time: chrono::Utc::now()
+                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                .to_string(),
             targets,
             summary,
         }
@@ -293,7 +303,10 @@ impl NessusImporter {
                 plugin_name: "SSL Certificate Expired".to_string(),
                 plugin_family: Some("SSL/TLS".to_string()),
                 synopsis: Some("The remote SSL certificate has expired.".to_string()),
-                description: Some("The SSL certificate has expired and should be renewed immediately.".to_string()),
+                description: Some(
+                    "The SSL certificate has expired and should be renewed immediately."
+                        .to_string(),
+                ),
                 solution: Some("Renew the SSL certificate.".to_string()),
                 risk_factor: Some("Critical".to_string()),
                 see_also: Some("https://example.com/ssl-renewal".to_string()),
@@ -319,7 +332,9 @@ impl NessusImporter {
                 plugin_name: "SSH Weak Algorithms".to_string(),
                 plugin_family: Some("SSH".to_string()),
                 synopsis: Some("The SSH server uses weak algorithms.".to_string()),
-                description: Some("The SSH server supports weak encryption algorithms.".to_string()),
+                description: Some(
+                    "The SSH server supports weak encryption algorithms.".to_string(),
+                ),
                 solution: Some("Disable weak ciphers in sshd_config.".to_string()),
                 risk_factor: Some("High".to_string()),
                 see_also: None,
@@ -369,34 +384,32 @@ mod tests {
     fn test_severity_mapping() {
         let importer = NessusImporter::new();
 
-        let items = vec![
-            NessusReportItem {
-                port: 80,
-                svc_name: None,
-                protocol: None,
-                severity: 4,
-                plugin_id: "1".to_string(),
-                plugin_name: "Critical Issue".to_string(),
-                plugin_family: None,
-                synopsis: None,
-                description: None,
-                solution: None,
-                risk_factor: None,
-                see_also: None,
-                cvss_base_score: None,
-                cvss_vector: None,
-                cvss3_base_score: None,
-                cvss3_vector: None,
-                cve: None,
-                cwe: None,
-                xref: None,
-                plugin_output: None,
-                exploit_available: None,
-                exploitability_ease: None,
-                patch_publication_date: None,
-                vuln_publication_date: None,
-            },
-        ];
+        let items = vec![NessusReportItem {
+            port: 80,
+            svc_name: None,
+            protocol: None,
+            severity: 4,
+            plugin_id: "1".to_string(),
+            plugin_name: "Critical Issue".to_string(),
+            plugin_family: None,
+            synopsis: None,
+            description: None,
+            solution: None,
+            risk_factor: None,
+            see_also: None,
+            cvss_base_score: None,
+            cvss_vector: None,
+            cvss3_base_score: None,
+            cvss3_vector: None,
+            cve: None,
+            cwe: None,
+            xref: None,
+            plugin_output: None,
+            exploit_available: None,
+            exploitability_ease: None,
+            patch_publication_date: None,
+            vuln_publication_date: None,
+        }];
 
         let target = importer.parse_simplified(items, "test");
         assert_eq!(target.findings[0].severity, "critical");

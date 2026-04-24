@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 4: 물리적 지원 | WIA-CAREBOT</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 4: 물리적 지원 - 이동 보조, 낙상 방지, 재활 지원</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong><br>
+        - 보행 보조 및 지원 시스템 구현<br>
+        - 낙상 감지 알고리즘 설계 및 배포<br>
+        - 안전한 물리적 지원 메커니즘 구축<br>
+        - 재활 지원 로봇 기능 이해
+    </div>
+
+    <h2>4.1 이동성의 중요성</h2>
+
+    <p>이동성은 독립성과 삶의 질의 기반입니다. 노인과 장애인에게 이동성 제한은 연쇄적인 부정적 효과를 만듭니다: 신체 활동 감소는 근육 약화로 이어지고, 이는 낙상 위험을 증가시키며, 낙상에 대한 두려움과 활동 감소로 이어집니다. 케어 로봇은 낙상을 예방하면서 활동을 장려하는 안전하고 신뢰할 수 있는 이동 보조를 제공하여 이 악순환을 끊을 수 있습니다.</p>
+
+    <p>WIA-CAREBOT은 로봇이 제공할 수 있는 세 가지 수준의 이동 보조를 정의하며, 각각 특정 기술 요구사항과 안전 고려사항을 갖습니다:</p>
+
+    <table>
+        <tr>
+            <th>수준</th>
+            <th>설명</th>
+            <th>로봇 기능</th>
+        </tr>
+        <tr>
+            <td>모니터링</td>
+            <td>수동적 관찰 및 알림</td>
+            <td>낙상 감지, 보행 분석, 활동 추적</td>
+        </tr>
+        <tr>
+            <td>안내</td>
+            <td>내비게이션 및 보행 동반</td>
+            <td>경로 안내, 장애물 경고, 속도 조절 지원</td>
+        </tr>
+        <tr>
+            <td>물리적 지원</td>
+            <td>직접적인 신체 보조</td>
+            <td>보행 지원, 이송 보조, 낙상 예방</td>
+        </tr>
+    </table>
+
+    <h2>4.2 낙상 감지 시스템</h2>
+
+    <p>낙상은 노인의 부상과 사망의 주요 원인입니다. 신속한 감지와 대응은 결과를 크게 개선할 수 있습니다. WIA-CAREBOT은 거짓 음성(누락된 낙상)을 최소화하면서 허용 가능한 거짓 양성 비율을 유지하는 다중 모달 낙상 감지 시스템을 지정합니다.</p>
+
+    <h3>낙상 감지를 위한 센서 융합</h3>
+
+    <pre><code>// 다중 모달 낙상 감지 시스템
+class FallDetectionSystem {
+    async monitorContinuously(): Promise&lt;void&gt; {
+        while (true) {
+            const sensorData = await this.collectSensorData();
+            const prediction = await this.analyzeFallRisk(sensorData);
+            if (prediction.fallDetected) await this.handleFallEvent(prediction);
+            else if (prediction.fallRisk > 0.7) await this.issuePreemptiveWarning(prediction);
+            await this.sleep(50);  // 20Hz 모니터링
+        }
+    }
+
+    private async analyzeFallRisk(data: SensorData): Promise&lt;FallPrediction&gt; {
+        const fusedFeatures = this.fuseFeatures({
+            radar: this.extractRadarFeatures(data.radar),
+            visual: this.extractVisualFeatures(data.cameras)
+        });
+        const prediction = await this.mlModel.predict(fusedFeatures);
+        return { fallDetected: prediction.fallProbability > 0.85, fallRisk: prediction.fallProbability };
+    }
+}</code></pre>
+
+    <h3>레이더 기반 낙상 감지</h3>
+
+    <p>밀리미터파 레이더는 카메라 없이 프라이버시를 보호하면서 낙상 감지를 제공합니다. 의복과 침구를 통해 신체 위치와 움직임 패턴을 감지하므로 프라이버시가 가장 중요한 욕실과 침실 모니터링에 이상적입니다.</p>
+
+    <pre><code># ROS 2 레이더 낙상 감지 노드
+# carebot_fall_detection/src/radar_fall_detector.py
+
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import PointCloud2
+from carebot_msgs.msg import FallAlert, PersonState
+
+class RadarFallDetector(Node):
+    def __init__(self):
+        super().__init__('radar_fall_detector')
+
+        # 파라미터
+        self.declare_parameter('fall_height_threshold', 0.5)  # 미터
+        self.declare_parameter('fall_velocity_threshold', 1.5)  # m/s
+
+        # 구독자
+        self.radar_sub = self.create_subscription(
+            PointCloud2,
+            '/sensors/radar/point_cloud',
+            self.radar_callback, 10
+        )
+
+        # 발행자
+        self.fall_pub = self.create_publisher(FallAlert, '/safety/fall_alert', 10)
+        self.state_pub = self.create_publisher(PersonState, '/monitoring/person_state', 10)
+
+    def analyze_fall_pattern(self):
+        if len(self.position_history) < 10:
+            return False, None
+
+        # 수직 속도 계산
+        heights = [p['position'][2] for p in self.position_history[-10:]]
+        vertical_velocity = (heights[-1] - heights[0]) / 0.5  # 0.5초 동안
+
+        height_threshold = self.get_parameter('fall_height_threshold').value
+        velocity_threshold = self.get_parameter('fall_velocity_threshold').value
+
+        is_fall = (heights[-1] < height_threshold and
+                   vertical_velocity < -velocity_threshold)
+
+        return is_fall, {'height': heights[-1], 'velocity': vertical_velocity}</code></pre>
+
+    <h2>4.3 보행 보조 시스템</h2>
+
+    <p>보행 보조 로봇은 이동 장애가 있는 사용자에게 물리적 지원과 안내를 제공합니다. 이 시스템은 속도를 조절하고 장애물 경고를 제공하는 단순한 보행 동반자부터 체중을 지탱하고 보행을 안정시키는 능동 지원 시스템까지 다양합니다.</p>
+
+    <h3>수동적 보행 동반자</h3>
+
+    <pre><code>// 보행 동반자 행동 컨트롤러
+class WalkingCompanion {
+    private navigation: NavigationSystem;
+    private personTracker: PersonTracker;
+    private speechOutput: SpeechSynthesis;
+    private gaitAnalyzer: GaitAnalyzer;
+
+    async accompanyWalk(userId: string, destination?: Location): Promise&lt;void&gt; {
+        const user = await this.personTracker.getUser(userId);
+        this.setState('accompanying');
+
+        while (this.state === 'accompanying') {
+            const userPose = await this.personTracker.getCurrentPose(userId);
+            const userGait = await this.gaitAnalyzer.analyze(userId);
+
+            // 사용자 옆에 로봇 위치
+            const targetPose = this.calculateCompanionPose(userPose, {
+                lateralOffset: 0.6,  // 측면 60cm
+                longitudinalOffset: -0.2,  // 약간 뒤
+                side: user.preferences.companionSide || 'left'
+            });
+
+            await this.navigation.moveToward(targetPose, {
+                maxSpeed: Math.min(userGait.speed * 1.1, 0.8),
+                avoidOvertaking: true
+            });
+
+            // 피드백 제공
+            await this.provideWalkingFeedback(userGait);
+
+            // 앞쪽 장애물 확인
+            const obstacles = await this.detectUpcomingObstacles(userPose);
+            if (obstacles.length > 0) {
+                await this.warnAboutObstacles(obstacles);
+            }
+
+            await this.sleep(100);
+        }
+    }
+
+    private async provideWalkingFeedback(gait: GaitAnalysis): Promise&lt;void&gt; {
+        if (gait.asymmetry > 0.3) {
+            this.speechOutput.speak(
+                "왼쪽을 조금 편하게 하시는 것 같아요. 잠시 쉬어가실래요?"
+            );
+        }
+    }
+}</code></pre>
+
+    <h2>4.4 보행 분석 및 모니터링</h2>
+
+    <p>지속적인 보행 분석은 가치 있는 건강 통찰력과 잠재적 문제에 대한 조기 경고를 제공합니다. 보행 패턴의 변화는 통증, 약화, 약물 효과 또는 질병 진행을 나타낼 수 있습니다.</p>
+
+    <pre><code>// 보행 분석 시스템
+interface GaitMetrics {
+    cadence: number;           // 분당 걸음 수
+    strideLength: number;      // 보폭 길이 (미터)
+    leftRightSymmetry: number; // 1.0 = 완벽한 대칭
+    gaitVariability: number;   // 변동 계수
+    fallRiskScore: number;     // 0-100, 높을수록 위험
+}
+
+class GaitAnalyzer {
+    async analyzeGait(frames: VideoFrame[]): Promise&lt;GaitMetrics&gt; {
+        const poses = await Promise.all(frames.map(f => this.poseEstimator.estimate(f)));
+        const metrics = this.computeMetrics(this.extractFootTrajectories(poses));
+        metrics.fallRiskScore = this.calculateFallRisk(metrics);
+        return metrics;
+    }
+
+    private calculateFallRisk(metrics: GaitMetrics): number {
+        let risk = 0;
+        if (metrics.strideLength * metrics.cadence / 60 < 0.8) risk += 25;
+        if (metrics.gaitVariability > 0.05) risk += 20;
+        if (metrics.leftRightSymmetry < 0.9) risk += 15;
+        return Math.min(risk, 100);
+    }
+}</code></pre>
+
+    <h2>4.5 이송 보조</h2>
+
+    <p>앉은 자세와 선 자세 사이의 이송, 또는 침대와 휠체어 사이의 이송은 고위험 활동입니다. 케어 로봇은 사용자의 안전과 존엄성을 유지하면서 상당한 도움을 제공할 수 있습니다.</p>
+
+    <div class="highlight">
+        <strong>이송 유형:</strong><br>
+        - 앉기-일어서기: 의자, 침대 또는 화장실에서 일어나기<br>
+        - 일어서기-앉기: 앉은 자세로 제어된 내려가기<br>
+        - 측면 이송: 인접한 표면 사이 이동<br>
+        - 피벗 이송: 지지를 받으며 회전
+    </div>
+
+    <pre><code>// 이송 보조 서버
+class TransferAssistServer {
+    private forceLimit = 150.0;  // 뉴턴
+    private velocityLimit = 0.1;  // m/s
+
+    async executeSitToStand(goalHandle, userWeight): Promise&lt;TransferResult&gt; {
+        // 1단계: 준비 - 사용자가 손잡이를 잡음
+        await this.announce("손잡이를 단단히 잡아주세요");
+        await this.waitForGripConfirmation();
+
+        // 2단계: 앞으로 기울이기
+        await this.announce("살짝 앞으로 기울어주세요");
+        await this.guideForwardLean();
+
+        // 3단계: 일어서기 보조
+        await this.announce("다리로 밀면서 제가 도와드릴게요");
+
+        let currentHeight = 0.45;  // 앉은 높이
+        const targetHeight = 0.9;   // 선 높이
+
+        while (currentHeight < targetHeight) {
+            const userForce = await this.readHandleForces();
+            const supportForce = this.calculateSupport(userForce, userWeight);
+
+            if (Math.abs(supportForce) > this.forceLimit) {
+                await this.pauseAndReassess();
+                continue;
+            }
+
+            await this.applyLiftForce(supportForce);
+            currentHeight = await this.getUserHeight();
+        }
+
+        // 4단계: 안정화
+        await this.stabilizeStanding();
+
+        return { success: true, finalPosition: 'standing' };
+    }
+}</code></pre>
+
+    <h2>4.6 재활 지원</h2>
+
+    <p>재활 로봇은 치료 운동과 부상 또는 질병으로부터의 회복을 지원합니다. 정밀하고 반복 가능한 움직임을 제공하고, 진행 상황을 측정하며, 개별 환자 능력에 적응합니다.</p>
+
+    <pre><code>// 재활 운동 시스템
+class RehabilitationSystem {
+    private exerciseLibrary: ExerciseLibrary;
+    private motionTracker: MotionTracker;
+    private feedbackSystem: FeedbackSystem;
+
+    async conductSession(userId: string, exercisePlan: ExercisePlan): Promise&lt;SessionResult&gt; {
+        const results: ExerciseResult[] = [];
+
+        for (const exercise of exercisePlan.exercises) {
+            await this.announceExercise(exercise);
+            await this.demonstrateExercise(exercise);
+
+            const exerciseResult = await this.guideExercise(exercise, userId);
+            results.push(exerciseResult);
+
+            // 휴식 및 피드백
+            await this.provideFeedback(exerciseResult);
+            await this.rest(exercise.restDuration);
+        }
+
+        return {
+            userId,
+            completedExercises: results.filter(r => r.completed).length,
+            totalExercises: exercisePlan.exercises.length,
+            overallScore: this.calculateOverallScore(results),
+            recommendations: this.generateRecommendations(results)
+        };
+    }
+
+    private async guideExercise(exercise: Exercise, userId: string): Promise&lt;ExerciseResult&gt; {
+        const motionData = await this.motionTracker.track(userId, exercise.duration);
+        const accuracy = this.compareToIdeal(motionData, exercise.idealMotion);
+
+        // 실시간 교정 피드백
+        if (accuracy < 0.7) {
+            await this.feedbackSystem.correctForm(exercise, motionData);
+        }
+
+        return {
+            exerciseId: exercise.id,
+            completed: accuracy > 0.5,
+            accuracy,
+            duration: exercise.duration,
+            notes: this.generateExerciseNotes(motionData)
+        };
+    }
+}</code></pre>
+
+    <h2>4.7 낙상 예방 개입</h2>
+
+    <p>낙상 감지를 넘어 케어 로봇은 불안정성이 감지되면 낙상을 예방하기 위해 능동적으로 개입할 수 있습니다. 이를 위해서는 빠른 대응과 해를 끼치지 않는 개입 방법에 대한 신중한 고려가 필요합니다.</p>
+
+    <pre><code>// 사전적 낙상 예방 시스템
+class FallPreventionSystem {
+    private balanceMonitor: BalanceMonitor;
+    private audioSystem: AudioSystem;
+
+    async monitorAndIntervene(): Promise&lt;void&gt; {
+        while (this.isActive) {
+            const balance = await this.balanceMonitor.assess();
+
+            if (balance.instabilityLevel > 0.8) {
+                // 임박한 낙상 - 즉각 개입
+                await this.executeImmediateIntervention(balance);
+            } else if (balance.instabilityLevel > 0.5) {
+                // 우려되는 불안정성 - 음성 경고
+                await this.issueVerbalWarning(balance);
+            }
+
+            await this.sleep(20);  // 50Hz 모니터링
+        }
+    }
+
+    private async executeImmediateIntervention(balance: BalanceAssessment): Promise&lt;void&gt; {
+        await Promise.all([
+            this.audioSystem.playAlert('stability_warning'),
+            this.baseController.moveToward(balance.userPosition, { speed: 0.5 })
+        ]);
+
+        await this.logInterventionEvent(balance);
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>챕터 요약:</strong> 물리적 지원은 케어 로봇의 핵심 기능으로, 다중 모달 센싱을 통한 낙상 감지, 수동적 동반자에서 능동적 지원 시스템까지의 보행 보조, 건강 모니터링을 위한 보행 분석, 이송 보조, 재활 지원 및 사전적 낙상 예방을 포함합니다. 이 시스템들은 항상 사용자 자율성을 존중하면서 신뢰할 수 있는 지원을 제공하며 효과성과 안전의 균형을 맞추어야 합니다. 다음 챕터에서는 보안 및 안전 프로토콜을 살펴봅니다.
+    </div>
+</body>
+</html>

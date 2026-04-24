@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 4: Protocol Specification - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI Standard</h1>
+    <p class="subtitle">Chapter 4: Protocol Specification</p>
+  </header>
+
+  <main class="container">
+    <h1>Chapter 4: Protocol Specification</h1>
+
+    <h2>4.1 Communication Architecture</h2>
+    <p>WIA-CI defines a multi-layer communication architecture supporting both RF (Processor ↔ Implant) and Bluetooth LE (Processor ↔ Mobile App) protocols.</p>
+
+    <pre><code>┌──────────────────────────────────────────────────┐
+│           WIA-CI Communication Stack             │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  [Microphone/Audio] → [Sound Processor]         │
+│         ↑                    ↓      ↑            │
+│         │                [RF Coil]  │            │
+│         │                    ↓      │            │
+│         │               [Implant]   │            │
+│         │                           │            │
+│   [Smartphone App] ←→ [Bluetooth LE]             │
+│         ↓                                        │
+│   [WIA Cloud API]                                │
+│                                                  │
+└──────────────────────────────────────────────────┘</code></pre>
+
+    <h2>4.2 RF Communication Protocol</h2>
+    <p>The RF link connects the external sound processor to the implanted device through the skin.</p>
+
+    <h3>RF Link Specifications</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Value</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Carrier Frequency</td>
+          <td>49 MHz</td>
+          <td>ISM band</td>
+        </tr>
+        <tr>
+          <td>Bandwidth</td>
+          <td>2 MHz</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Modulation</td>
+          <td>ASK / FSK</td>
+          <td>Amplitude or Frequency Shift Keying</td>
+        </tr>
+        <tr>
+          <td>Data Rate</td>
+          <td>1 Mbps</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Power Transfer</td>
+          <td>40 mW max</td>
+          <td>Inductive coupling</td>
+        </tr>
+        <tr>
+          <td>Range</td>
+          <td>10 mm max</td>
+          <td>Through skin</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>RF Packet Structure</h3>
+    <pre><code>interface RFPacket {
+  header: {
+    sync: 0xAA55;               // Sync word
+    type: RFPacketType;
+    length: number;             // Payload bytes
+    sequence: number;           // 0-255
+  };
+
+  payload: StimulationPayload | TelemetryPayload | CommandPayload;
+
+  footer: {
+    crc16: number;              // CRC-16-CCITT
+  };
+}
+
+type RFPacketType =
+  | 0x01   // Stimulation Data
+  | 0x02   // Telemetry Request
+  | 0x03   // Telemetry Response
+  | 0x04   // Configuration
+  | 0x05   // Status
+  | 0x10   // Extended (WIA Octave);</code></pre>
+
+    <h3>Compressed Stimulation Format</h3>
+    <p>To minimize RF bandwidth, stimulation commands are compressed into 4 bytes:</p>
+    <pre><code>// 32-bit packed stimulation command
+// [electrode:5][amplitude:11][pulseWidth:6][flags:10]
+
+function packStimulation(stim) {
+  return (
+    ((stim.electrode & 0x1F) << 27) |
+    ((stim.amplitude & 0x7FF) << 16) |
+    ((stim.pulseWidth & 0x3F) << 10) |
+    (stim.flags & 0x3FF)
+  );
+}</code></pre>
+
+    <h2>4.3 Bluetooth LE Protocol</h2>
+    <p>BLE enables wireless communication between the CI processor and mobile devices.</p>
+
+    <h3>GATT Service Definition</h3>
+    <pre><code>WIA-CI GATT Service
+UUID: 0000FE01-0000-1000-8000-00805F9B34FB
+
+Characteristics:
+├─ STATUS (FE02)
+│  Properties: Read, Notify
+│  Description: CI processor status
+│
+├─ AUDIO_STREAM (FE03)
+│  Properties: Notify
+│  Description: Real-time audio data
+│
+├─ CONFIG_WRITE (FE04)
+│  Properties: Write
+│  Description: Configuration updates
+│
+├─ TELEMETRY (FE05)
+│  Properties: Read, Notify
+│  Description: Telemetry data
+│
+└─ WIA_EXTENDED (FE10)
+   Properties: Read, Write, Notify
+   Description: WIA octave enhancement</code></pre>
+
+    <h3>BLE Packet Protocol</h3>
+    <pre><code>interface BLEPacket {
+  header: {
+    version: number;            // Protocol version
+    messageType: BLEMessageType;
+    flags: number;
+    length: number;
+  };
+
+  payload: Uint8Array;
+
+  // MTU fragmentation support
+  fragmentation?: {
+    fragmentIndex: number;
+    totalFragments: number;
+    fragmentOffset: number;
+  };
+}</code></pre>
+
+    <h2>4.4 Real-time Audio Processing</h2>
+    <p>WIA-CI processes audio in real-time with strict latency requirements.</p>
+
+    <h3>Processing Pipeline</h3>
+    <pre><code>Audio Input (16ms frame)
+    ↓
+[1] Pre-processing (1ms)
+    - AGC (Automatic Gain Control)
+    - Pre-emphasis
+    ↓
+[2] Frequency Analysis (5ms)
+    - FFT
+    - Gammatone filterbank
+    ↓
+[3] F0 & Octave Detection (10ms)
+    - YIN algorithm
+    - Harmonic analysis
+    - Octave classification
+    ↓
+[4] Envelope Extraction (2ms)
+    - Hilbert transform
+    - Smoothing
+    - Octave modulation
+    ↓
+[5] Channel Selection (1ms)
+    - ACE (n-of-m)
+    - Harmonic priority
+    ↓
+[6] Stimulation Generation (1ms)
+    - Amplitude mapping
+    - Interleaving
+    ↓
+Total Latency: ~20ms</code></pre>
+
+    <h3>Octave Detection Algorithm</h3>
+    <pre><code>function detectOctave(audioFrame: Float32Array) {
+  // 1. F0 Estimation (YIN algorithm)
+  const f0Result = yinEstimateF0(audioFrame, sampleRate);
+
+  // 2. Octave Classification
+  const octaveInfo = classifyOctave(f0Result.f0);
+  // octaveInfo = { octaveNumber: 4, noteName: 'C', cents: -5 }
+
+  // 3. Harmonic Analysis
+  const spectrum = fft(audioFrame);
+  const harmonics = analyzeHarmonics(spectrum, f0Result.f0);
+
+  // 4. Confidence Calculation
+  const confidence = calculateConfidence(f0Result, harmonics);
+
+  return {
+    f0: f0Result.f0,
+    octave: octaveInfo,
+    harmonics: harmonics,
+    confidence: confidence
+  };
+}</code></pre>
+
+    <h2>4.5 Signal Encoding</h2>
+
+    <h3>Envelope Encoding</h3>
+    <pre><code>// Enhanced envelope with octave information
+function extractEnhancedEnvelope(signal, f0, octaveInfo) {
+  // 1. Base envelope extraction
+  const baseEnvelope = hilbertEnvelope(signal);
+
+  // 2. Generate octave-specific modulation
+  const octaveModulation = generateOctaveModulation(
+    signal.length,
+    octaveInfo.octaveNumber,
+    modulationRate: 8,  // Hz
+    depth: 0.3          // 30% modulation
+  );
+
+  // 3. Combine
+  const enhancedEnvelope = baseEnvelope.map((val, i) =>
+    val * (1 + octaveModulation[i])
+  );
+
+  return {
+    base: baseEnvelope,
+    enhanced: enhancedEnvelope,
+    octaveInfo: octaveInfo
+  };
+}</code></pre>
+
+    <h3>Temporal Fine Structure (TFS) Encoding</h3>
+    <pre><code>// Phase-locking for low frequencies
+function encodeTFS(signal, electrode) {
+  // Apply gammatone filter
+  const filtered = applyGammatone(signal, electrode);
+
+  // Hilbert transform for analytic signal
+  const analytic = hilbertTransform(filtered);
+
+  // Extract instantaneous phase
+  const phase = computePhase(analytic);
+
+  // Zero-crossing detection for pulse timing
+  const pulses = detectZeroCrossings(phase);
+
+  return {
+    pulses: pulses,
+    electrode: electrode,
+    method: 'phase_locking'
+  };
+}</code></pre>
+
+    <h2>4.6 Streaming Protocol</h2>
+
+    <h3>Real-time Stream Setup</h3>
+    <pre><code>// Client initiates stream
+POST /stream/start
+{
+  "sampleRate": 16000,
+  "codec": "opus",
+  "bitrateKbps": 32
+}
+
+// Server responds with WebSocket URL
+{
+  "streamId": "stream_abc123",
+  "websocketUrl": "wss://stream.wia.ci/stream_abc123"
+}
+
+// Client connects to WebSocket
+ws = new WebSocket("wss://stream.wia.ci/stream_abc123");
+
+// Server sends frames
+ws.onmessage = (event) => {
+  const frame = JSON.parse(event.data);
+  // frame.type = "audio" | "envelope" | "octave"
+};</code></pre>
+
+    <h3>Stream Synchronization</h3>
+    <pre><code>interface StreamSync {
+  // Timestamp synchronization
+  timestampSync: {
+    processorClock: number;     // μs
+    implantClock: number;       // μs
+    offset: number;             // Correction
+    drift: number;              // ppm
+  };
+
+  // Buffer management
+  buffer: {
+    targetLatency: 20,          // ms
+    currentLatency: 18,         // ms
+    jitterBuffer: 5,            // ms
+    underruns: 0,
+    overruns: 0
+  };
+}</code></pre>
+
+    <h2>4.7 Quality of Service (QoS)</h2>
+
+    <h3>Packet Loss Handling</h3>
+    <pre><code>function handlePacketLoss(lastSeq, currentSeq) {
+  const lostCount = currentSeq - lastSeq - 1;
+
+  if (lostCount > MAX_CONSECUTIVE_LOSS) {
+    initiateReconnect();
+    return;
+  }
+
+  // Packet loss concealment
+  switch (concealmentMethod) {
+    case 'repeat':
+      repeatLastFrame(lostCount);
+      break;
+    case 'interpolate':
+      interpolateFrames(lastFrame, currentFrame, lostCount);
+      break;
+    case 'mute':
+      insertSilence(lostCount);
+      break;
+  }
+}</code></pre>
+
+    <h3>Adaptive Bitrate</h3>
+    <pre><code>interface AdaptiveBitrate {
+  enabled: true;
+  minBitrate: 16;               // kbps
+  maxBitrate: 64;               // kbps
+  stepSize: 8;                  // kbps
+
+  // Triggers
+  adjustOn: {
+    packetLoss: 0.05,           // 5% loss
+    latencyIncrease: 10,        // ms
+    rssiDrop: -10               // dBm
+  };
+}</code></pre>
+
+    <h2>4.8 Error Handling</h2>
+
+    <h3>Error Codes</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Category</th>
+          <th>Description</th>
+          <th>Recovery</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0x0101</td>
+          <td>Connection</td>
+          <td>Connection timeout</td>
+          <td>Auto-retry</td>
+        </tr>
+        <tr>
+          <td>0x0103</td>
+          <td>Connection</td>
+          <td>RF link failure</td>
+          <td>Fallback to BLE</td>
+        </tr>
+        <tr>
+          <td>0x0202</td>
+          <td>Protocol</td>
+          <td>CRC error</td>
+          <td>Request retransmit</td>
+        </tr>
+        <tr>
+          <td>0x0404</td>
+          <td>Hardware</td>
+          <td>Compliance limit</td>
+          <td>Reduce current</td>
+        </tr>
+        <tr>
+          <td>0x1002</td>
+          <td>WIA</td>
+          <td>Octave detection failed</td>
+          <td>Fallback to standard</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Recovery Strategy</h3>
+    <pre><code>async function handleError(error) {
+  const severity = classifyError(error.code);
+
+  switch (severity) {
+    case 'critical':
+      await emergencyStop();
+      notifyUser(error, 'critical');
+      break;
+
+    case 'recoverable':
+      for (let i = 0; i < maxRetries; i++) {
+        await delay(backoffTime * Math.pow(2, i));
+        const result = await retryOperation();
+        if (result.success) return result;
+      }
+      applyFallback(error);
+      break;
+
+    case 'warning':
+      logWarning(error);
+      continue;
+  }
+}</code></pre>
+
+    <h2>4.9 Performance Metrics</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Requirement</th>
+          <th>Target</th>
+          <th>Measurement</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>End-to-end Latency</td>
+          <td>&lt; 50 ms</td>
+          <td>&lt; 20 ms</td>
+          <td>Audio in → Stimulation out</td>
+        </tr>
+        <tr>
+          <td>F0 Estimation</td>
+          <td>&lt; 20 ms</td>
+          <td>&lt; 10 ms</td>
+          <td>Per frame</td>
+        </tr>
+        <tr>
+          <td>Packet Loss</td>
+          <td>&lt; 1%</td>
+          <td>&lt; 0.1%</td>
+          <td>Over 1 hour</td>
+        </tr>
+        <tr>
+          <td>Throughput</td>
+          <td>&gt; 100 fps</td>
+          <td>&gt; 200 fps</td>
+          <td>Frames per second</td>
+        </tr>
+        <tr>
+          <td>Jitter</td>
+          <td>&lt; 5 ms</td>
+          <td>&lt; 2 ms</td>
+          <td>Frame arrival variance</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      <h3>Safety Limits</h3>
+      <ul>
+        <li><strong>Maximum Current:</strong> 5 mA total across all electrodes</li>
+        <li><strong>Per-Electrode Current:</strong> 2 mA maximum</li>
+        <li><strong>Pulse Rate:</strong> 32,000 pulses/sec maximum (all channels combined)</li>
+        <li><strong>Temperature:</strong> Implant must stay below 41°C</li>
+      </ul>
+    </div>
+
+    </main>
+</body>
+</html>

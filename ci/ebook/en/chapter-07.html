@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Operations | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: CI/CD Operations and Optimization</h1>
+
+    <p>Running a CI/CD system is not a set-and-forget endeavor. It requires continuous monitoring, optimization, and troubleshooting to maintain performance and reliability. This chapter covers the operational aspects of managing CI/CD infrastructure at scale.</p>
+
+    <h2>Pipeline Monitoring</h2>
+
+    <p>Effective monitoring provides visibility into pipeline health, performance trends, and potential issues before they impact development teams.</p>
+
+    <h3>Key Metrics to Track</h3>
+
+    <table>
+        <tr>
+            <th>Metric</th>
+            <th>Description</th>
+            <th>Target</th>
+            <th>Alert Threshold</th>
+        </tr>
+        <tr>
+            <td>Build Duration</td>
+            <td>Time from trigger to completion</td>
+            <td>< 10 minutes</td>
+            <td>> 20 minutes</td>
+        </tr>
+        <tr>
+            <td>Success Rate</td>
+            <td>Percentage of successful builds</td>
+            <td>> 95%</td>
+            <td>< 80%</td>
+        </tr>
+        <tr>
+            <td>Queue Time</td>
+            <td>Time waiting for runner</td>
+            <td>< 30 seconds</td>
+            <td>> 5 minutes</td>
+        </tr>
+        <tr>
+            <td>Flaky Test Rate</td>
+            <td>Tests that pass/fail inconsistently</td>
+            <td>< 1%</td>
+            <td>> 5%</td>
+        </tr>
+        <tr>
+            <td>MTTR</td>
+            <td>Mean time to recovery after failure</td>
+            <td>< 30 minutes</td>
+            <td>> 2 hours</td>
+        </tr>
+    </table>
+
+    <h3>Prometheus Metrics Configuration</h3>
+
+    <pre><code># prometheus.yml - CI Metrics Collection
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'github-actions'
+    static_configs:
+      - targets: ['github-exporter:9171']
+
+  - job_name: 'jenkins'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['jenkins:8080']
+
+  - job_name: 'gitlab-ci'
+    static_configs:
+      - targets: ['gitlab:9090']
+
+rule_files:
+  - 'ci_alerts.yml'</code></pre>
+
+    <pre><code># ci_alerts.yml - Alerting Rules
+groups:
+  - name: ci_pipeline_alerts
+    rules:
+      - alert: HighBuildFailureRate
+        expr: |
+          sum(rate(ci_builds_failed_total[1h])) /
+          sum(rate(ci_builds_total[1h])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High build failure rate detected"
+          description: "Build failure rate is {{ $value | humanizePercentage }}"
+
+      - alert: LongBuildQueue
+        expr: ci_builds_queued > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Build queue is backing up"
+          description: "{{ $value }} builds waiting in queue"
+
+      - alert: SlowBuildTimes
+        expr: |
+          histogram_quantile(0.95, rate(ci_build_duration_seconds_bucket[1h])) > 1800
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Build times are increasing"
+          description: "95th percentile build time is {{ $value | humanizeDuration }}"</code></pre>
+
+    <div class="highlight">
+        <strong>DORA Metrics:</strong> The DevOps Research and Assessment (DORA) team identified four key metrics that correlate with high-performing organizations: Deployment Frequency, Lead Time for Changes, Change Failure Rate, and Time to Restore Service. Track these to measure CI/CD effectiveness.
+    </div>
+
+    <h2>Dashboard Design</h2>
+
+    <pre><code># Grafana Dashboard Configuration
+{
+  "title": "WIA-CI Pipeline Dashboard",
+  "panels": [
+    {
+      "title": "Build Success Rate (24h)",
+      "type": "gauge",
+      "targets": [{
+        "expr": "sum(ci_builds_success_total) / sum(ci_builds_total) * 100"
+      }],
+      "thresholds": {
+        "steps": [
+          {"value": 0, "color": "red"},
+          {"value": 80, "color": "yellow"},
+          {"value": 95, "color": "green"}
+        ]
+      }
+    },
+    {
+      "title": "Build Duration Trend",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "histogram_quantile(0.50, rate(ci_build_duration_seconds_bucket[5m]))",
+        "legendFormat": "p50"
+      }, {
+        "expr": "histogram_quantile(0.95, rate(ci_build_duration_seconds_bucket[5m]))",
+        "legendFormat": "p95"
+      }]
+    },
+    {
+      "title": "Active Runners",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(ci_runners_active)"
+      }]
+    },
+    {
+      "title": "Builds by Status",
+      "type": "piechart",
+      "targets": [{
+        "expr": "sum by (status) (ci_builds_total)"
+      }]
+    }
+  ]
+}</code></pre>
+
+    <h2>Performance Optimization</h2>
+
+    <p>Pipeline performance directly impacts developer productivity. Slow pipelines lead to context switching, batched commits, and delayed feedback.</p>
+
+    <h3>Build Time Analysis</h3>
+
+    <pre><code># GitHub Actions - Build Time Analysis
+name: Build Time Analysis
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types: [completed]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch workflow run data
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+
+            // Analyze step durations
+            const stepAnalysis = jobs.data.jobs.flatMap(job =>
+              job.steps.map(step => ({
+                job: job.name,
+                step: step.name,
+                duration: new Date(step.completed_at) - new Date(step.started_at)
+              }))
+            );
+
+            // Find slowest steps
+            const slowest = stepAnalysis
+              .sort((a, b) => b.duration - a.duration)
+              .slice(0, 5);
+
+            console.log('Slowest steps:', slowest);
+
+            // Send to monitoring
+            // await sendMetrics(stepAnalysis);</code></pre>
+
+    <h3>Optimization Strategies</h3>
+
+    <pre><code># Optimization Checklist
+
+## Caching Optimization
+- [ ] Dependencies cached with lock file hash
+- [ ] Build outputs cached between runs
+- [ ] Docker layer caching enabled
+- [ ] Remote cache for monorepos (Turborepo, Nx)
+
+## Parallelization
+- [ ] Independent jobs run in parallel
+- [ ] Test suites split across shards
+- [ ] Matrix builds for multi-platform testing
+- [ ] Parallel step execution where possible
+
+## Resource Optimization
+- [ ] Right-sized runner instances
+- [ ] Spot/preemptible instances for non-critical jobs
+- [ ] Scheduled cleanup of old artifacts
+- [ ] Efficient base images (Alpine, distroless)
+
+## Pipeline Design
+- [ ] Fail-fast for quick feedback
+- [ ] Conditional job execution
+- [ ] Path-based filtering for monorepos
+- [ ] Staged pipelines (fast feedback first)</code></pre>
+
+    <h3>Caching Optimization Example</h3>
+
+    <pre><code># Advanced Caching Strategy
+name: Optimized Build
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Restore all caches in parallel
+      - name: Restore dependency cache
+        uses: actions/cache/restore@v4
+        id: deps-cache
+        with:
+          path: node_modules
+          key: deps-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Restore build cache
+        uses: actions/cache/restore@v4
+        id: build-cache
+        with:
+          path: |
+            .next/cache
+            dist
+          key: build-${{ runner.os }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            build-${{ runner.os }}-
+
+      # Only install if cache miss
+      - name: Install dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      # Incremental build
+      - name: Build
+        run: pnpm build
+
+      # Save caches for future runs
+      - name: Save dependency cache
+        uses: actions/cache/save@v4
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: node_modules
+          key: deps-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Save build cache
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .next/cache
+            dist
+          key: build-${{ runner.os }}-${{ hashFiles('src/**') }}</code></pre>
+
+    <div class="highlight">
+        <strong>10x Build Time Improvement:</strong> A typical optimization journey can reduce build times from 20+ minutes to under 2 minutes by implementing aggressive caching, parallelization, and incremental builds. Track build times as a key engineering metric.
+    </div>
+
+    <h2>Troubleshooting Common Issues</h2>
+
+    <h3>Flaky Tests</h3>
+
+    <pre><code># Flaky Test Detection and Quarantine
+name: Test with Flaky Detection
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests with retries
+        run: |
+          npm test -- --retries=2 --reporter=json > test-results.json
+
+      - name: Analyze flaky tests
+        run: |
+          node << 'EOF'
+          const results = require('./test-results.json');
+          const flaky = results.testResults
+            .flatMap(f => f.assertionResults)
+            .filter(t => t.retryReasons && t.retryReasons.length > 0);
+
+          if (flaky.length > 0) {
+            console.log('Flaky tests detected:');
+            flaky.forEach(t => console.log(`  - ${t.fullName}`));
+
+            // Report to tracking system
+            // await reportFlakyTests(flaky);
+          }
+          EOF
+
+      - name: Upload flaky test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-test-report
+          path: test-results.json</code></pre>
+
+    <h3>Resource Exhaustion</h3>
+
+    <pre><code># GitHub Actions - Resource Monitoring
+name: Build with Resource Monitoring
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start resource monitoring
+        run: |
+          # Monitor resources in background
+          while true; do
+            echo "$(date) - Memory: $(free -m | awk 'NR==2{print $3}')MB used"
+            echo "$(date) - Disk: $(df -h / | awk 'NR==2{print $5}') used"
+            sleep 30
+          done &
+          echo $! > /tmp/monitor.pid
+
+      - name: Build
+        run: npm run build
+
+      - name: Stop monitoring
+        if: always()
+        run: kill $(cat /tmp/monitor.pid) 2>/dev/null || true</code></pre>
+
+    <h3>Debugging Failed Builds</h3>
+
+    <pre><code># Enable debug logging
+# GitHub Actions
+- name: Debug build failure
+  if: failure()
+  run: |
+    echo "=== Environment ==="
+    env | sort
+
+    echo "=== Disk Space ==="
+    df -h
+
+    echo "=== Memory ==="
+    free -m
+
+    echo "=== Process List ==="
+    ps aux
+
+    echo "=== Recent Logs ==="
+    cat ~/.npm/_logs/*.log 2>/dev/null || true
+
+# GitLab CI - SSH debug session
+debug-job:
+  script:
+    - sleep 3600  # Keep job alive for SSH
+  when: manual
+  tags:
+    - debug</code></pre>
+
+    <h2>Capacity Planning</h2>
+
+    <pre><code># Capacity Planning Model
+"""
+WIA-CI Capacity Planning Calculator
+
+Inputs:
+- daily_commits: Average commits per day
+- avg_build_time: Average build duration (minutes)
+- peak_multiplier: Peak vs average ratio
+- target_queue_time: Maximum acceptable queue time (minutes)
+
+Output:
+- Required runner capacity
+"""
+
+def calculate_runners(daily_commits, avg_build_time, peak_multiplier, target_queue_time):
+    # Convert to hourly rate
+    hourly_builds = daily_commits / 8  # Assume 8 working hours
+
+    # Peak hour builds
+    peak_builds = hourly_builds * peak_multiplier
+
+    # Required capacity (builds per hour)
+    builds_per_runner_hour = 60 / avg_build_time
+
+    # Minimum runners for peak load
+    min_runners = peak_builds / builds_per_runner_hour
+
+    # Add buffer for queue time target
+    buffer_factor = 1 + (avg_build_time / (target_queue_time + avg_build_time))
+
+    return ceil(min_runners * buffer_factor)
+
+# Example: 200 commits/day, 10 min builds, 2x peak, 2 min queue target
+# calculate_runners(200, 10, 2, 2) = 10 runners</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI Operations Maturity:</strong>
+        <ul>
+            <li>Level 1: Basic monitoring, manual troubleshooting</li>
+            <li>Level 2: Dashboards, alerting, documented runbooks</li>
+            <li>Level 3: Automated optimization, self-service debugging</li>
+            <li>Level 4: Predictive capacity, automated remediation</li>
+        </ul>
+    </div>
+
+    <p>Operational excellence in CI/CD is an ongoing journey. Regular review of metrics, proactive optimization, and investment in tooling pays dividends in developer productivity and system reliability.</p>
+
+</body>
+</html>

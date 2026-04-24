@@ -1,773 +1,946 @@
-# WIA Cryo-Preservation Communication Protocol
-## Phase 3 Specification
+# Phase 3: Protocol Specification
+
+## WIA-CRYO-PRESERVATION API and Communication Protocols
+
+> Standardized interfaces for cryopreservation facility systems.
 
 ---
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
+## 1. API Overview
 
----
+### 1.1 Base Configuration
 
-## Table of Contents
+```yaml
+openapi: 3.0.3
+info:
+  title: WIA Cryopreservation API
+  version: 1.0.0
+  description: |
+    API for cryopreservation facility management, monitoring,
+    and inter-facility communication.
 
-1. [Overview](#overview)
-2. [Protocol Architecture](#protocol-architecture)
-3. [Transport Layer](#transport-layer)
-4. [Message Format](#message-format)
-5. [Connection Lifecycle](#connection-lifecycle)
-6. [Message Types](#message-types)
-7. [Security](#security)
-8. [Error Handling](#error-handling)
-9. [Examples](#examples)
+servers:
+  - url: https://api.cryo.wia.org/v1
+    description: Production
+  - url: https://staging.cryo.wia.org/v1
+    description: Staging
 
----
-
-## Overview
-
-### 1.1 Purpose
-
-The WIA Cryo-Preservation Communication Protocol defines real-time communication standards for monitoring storage conditions, receiving alerts, and coordinating facility operations.
-
-**Core Objectives**:
-- Real-time storage condition monitoring
-- Instant alert notification delivery
-- Secure facility-to-facility communication
-- Reliable message delivery with acknowledgment
-
-### 1.2 Protocol Selection
-
-| Use Case | Recommended Protocol |
-|----------|---------------------|
-| Real-time monitoring | WebSocket |
-| IoT sensor data | MQTT |
-| High-throughput data | gRPC |
-| Event notifications | Server-Sent Events (SSE) |
-
-### 1.3 Design Principles
-
-1. **Reliability**: At-least-once delivery guarantee
-2. **Low Latency**: Sub-second message delivery
-3. **Security**: End-to-end encryption
-4. **Resilience**: Automatic reconnection
-5. **Scalability**: Horizontal scaling support
-
----
-
-## Protocol Architecture
-
-### 2.1 Layer Model
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    Application Layer                          │
-│            (WIA Cryo-Preservation Services)                   │
-├──────────────────────────────────────────────────────────────┤
-│                    Protocol Layer                             │
-│              (Message Format, Handlers)                       │
-├──────────────────────────────────────────────────────────────┤
-│                    Security Layer                             │
-│                  (TLS 1.3, JWT Auth)                         │
-├──────────────────────────────────────────────────────────────┤
-│                    Transport Layer                            │
-│           (WebSocket / MQTT / gRPC / SSE)                    │
-├──────────────────────────────────────────────────────────────┤
-│                    Network Layer                              │
-│                     (TCP/IP)                                  │
-└──────────────────────────────────────────────────────────────┘
+security:
+  - BearerAuth: []
+  - FacilityAuth: []
 ```
 
-### 2.2 Component Architecture
+### 1.2 Authentication
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Storage Sensor │     │  Control Panel  │     │  Mobile App     │
-│     Devices     │     │    Dashboard    │     │   (Alerts)      │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         │ MQTT                  │ WebSocket             │ WebSocket
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    Message Broker / Gateway                       │
-│               (Authentication, Routing, Buffering)               │
-└──────────────────────────────────────────────────────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Storage Data   │     │  Alert Service  │     │  Audit Log      │
-│    Service      │     │                 │     │   Service       │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+```yaml
+securitySchemes:
+  BearerAuth:
+    type: http
+    scheme: bearer
+    bearerFormat: JWT
+
+  FacilityAuth:
+    type: apiKey
+    in: header
+    name: X-Facility-Key
+    description: Facility-to-facility authentication
+
+  DIDAuth:
+    type: http
+    scheme: bearer
+    bearerFormat: DID-Auth
 ```
 
 ---
 
-## Transport Layer
+## 2. Subject Management Endpoints
 
-### 3.1 WebSocket (Primary)
+### 2.1 Subject Registration
 
-**Connection URL:**
-```
-wss://ws.wia.live/cryo-preservation/v1
-```
+```yaml
+/subjects:
+  post:
+    summary: Register new subject for preservation
+    operationId: registerSubject
+    tags: [Subjects]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SubjectRegistration'
+    responses:
+      201:
+        description: Subject registered successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectDocument'
+      400:
+        $ref: '#/components/responses/ValidationError'
+      409:
+        description: Subject already exists
 
-**Default Port:** 443 (WSS)
-
-**Subprotocol:** `wia-cryo-v1`
-
-**Connection Example:**
-```javascript
-const ws = new WebSocket('wss://ws.wia.live/cryo-preservation/v1', 'wia-cryo-v1');
-```
-
-### 3.2 MQTT (IoT Sensors)
-
-**Broker URL:**
-```
-mqtts://mqtt.wia.live:8883
-```
-
-**Topic Structure:**
-```
-wia/cryo/{facility_id}/{container_id}/{metric_type}
-
-Examples:
-wia/cryo/FAC-KR-001/DEW-001/temperature
-wia/cryo/FAC-KR-001/DEW-001/nitrogen_level
-wia/cryo/FAC-KR-001/+/alerts
-```
-
-**QoS Levels:**
-| QoS | Use Case |
-|-----|----------|
-| 0 | Routine sensor readings |
-| 1 | Status updates |
-| 2 | Critical alerts |
-
-### 3.3 gRPC (Service-to-Service)
-
-**Proto Definition:**
-```protobuf
-syntax = "proto3";
-
-package wia.cryo.v1;
-
-service CryoMonitoring {
-  rpc StreamConditions(ContainerRequest) returns (stream StorageCondition);
-  rpc SendAlert(Alert) returns (AlertAck);
-  rpc GetStatus(StatusRequest) returns (StatusResponse);
-}
-
-message StorageCondition {
-  string container_id = 1;
-  int64 timestamp = 2;
-  double temperature = 3;
-  double nitrogen_level = 4;
-  double vacuum_pressure = 5;
-}
+  get:
+    summary: List subjects at facility
+    operationId: listSubjects
+    tags: [Subjects]
+    parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/PreservationStatus'
+      - name: type
+        in: query
+        schema:
+          $ref: '#/components/schemas/SubjectType'
+      - $ref: '#/components/parameters/Pagination'
+    responses:
+      200:
+        description: List of subjects
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subjects:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SubjectSummary'
+                pagination:
+                  $ref: '#/components/schemas/PaginationInfo'
 ```
 
-### 3.4 Server-Sent Events (Alerts)
+### 2.2 Subject Details
 
-**Endpoint:**
+```yaml
+/subjects/{subjectId}:
+  get:
+    summary: Get subject details
+    operationId: getSubject
+    tags: [Subjects]
+    parameters:
+      - $ref: '#/components/parameters/SubjectId'
+    responses:
+      200:
+        description: Subject details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectDocument'
+      404:
+        $ref: '#/components/responses/NotFound'
+
+  patch:
+    summary: Update subject information
+    operationId: updateSubject
+    tags: [Subjects]
+    parameters:
+      - $ref: '#/components/parameters/SubjectId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SubjectUpdate'
+    responses:
+      200:
+        description: Subject updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectDocument'
 ```
-GET /api/v1/events/stream
-Accept: text/event-stream
-```
 
-**Event Format:**
-```
-event: storage.alert
-data: {"containerId":"DEW-001","type":"temperature","value":-195.0}
+### 2.3 Subject Events
 
-event: heartbeat
-data: {"timestamp":1704067200}
-```
+```yaml
+/subjects/{subjectId}/events:
+  get:
+    summary: Get subject event history
+    operationId: getSubjectEvents
+    tags: [Subjects, Events]
+    parameters:
+      - $ref: '#/components/parameters/SubjectId'
+      - name: eventType
+        in: query
+        schema:
+          $ref: '#/components/schemas/PreservationEventType'
+      - $ref: '#/components/parameters/DateRange'
+      - $ref: '#/components/parameters/Pagination'
+    responses:
+      200:
+        description: Event history
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PreservationEvent'
 
----
-
-## Message Format
-
-### 4.1 Base Message Structure
-
-```json
-{
-  "protocol": "wia-cryo",
-  "version": "1.0.0",
-  "messageId": "msg-uuid-v4",
-  "timestamp": 1704067200000,
-  "type": "message_type",
-  "source": {
-    "type": "sensor|service|client",
-    "id": "source-identifier"
-  },
-  "payload": {}
-}
-```
-
-### 4.2 Field Definitions
-
-| Field | Type | Required | Description |
-|-------|------|:--------:|-------------|
-| `protocol` | string | Yes | Protocol identifier `"wia-cryo"` |
-| `version` | string | Yes | Protocol version |
-| `messageId` | string | Yes | Unique message ID (UUID v4) |
-| `timestamp` | integer | Yes | Unix timestamp (ms) |
-| `type` | string | Yes | Message type |
-| `source` | object | Yes | Message source info |
-| `payload` | object | Yes | Type-specific data |
-
-### 4.3 JSON Schema
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wia.live/cryo-preservation/protocol/v1/message.schema.json",
-  "title": "WIA Cryo Protocol Message",
-  "type": "object",
-  "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"],
-  "properties": {
-    "protocol": {
-      "type": "string",
-      "const": "wia-cryo"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "messageId": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "timestamp": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "type": {
-      "type": "string",
-      "enum": [
-        "connect", "connect_ack", "disconnect",
-        "subscribe", "subscribe_ack", "unsubscribe",
-        "sensor_data", "alert", "alert_ack",
-        "command", "command_ack",
-        "ping", "pong", "error"
-      ]
-    },
-    "source": {
-      "type": "object",
-      "required": ["type", "id"],
-      "properties": {
-        "type": { "type": "string" },
-        "id": { "type": "string" }
-      }
-    },
-    "payload": {
-      "type": "object"
-    }
-  }
-}
+  post:
+    summary: Log new event for subject
+    operationId: logSubjectEvent
+    tags: [Subjects, Events]
+    parameters:
+      - $ref: '#/components/parameters/SubjectId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/EventLog'
+    responses:
+      201:
+        description: Event logged
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreservationEvent'
 ```
 
 ---
 
-## Connection Lifecycle
+## 3. Storage Management Endpoints
 
-### 5.1 Connection States
+### 3.1 Containers
 
-```
-                          ┌─────────────────┐
-                          │  DISCONNECTED   │
-                          └────────┬────────┘
-                                   │ connect()
-                                   ▼
-                          ┌─────────────────┐
-                          │   CONNECTING    │
-                          └────────┬────────┘
-                                   │ connect_ack
-                    ┌──────────────┼──────────────┐
-                    │              ▼              │
-         error/     │     ┌─────────────────┐     │ auth failed
-         timeout    │     │   CONNECTED     │     │
-                    │     └────────┬────────┘     │
-                    │              │              │
-                    │         disconnect/         │
-                    │         error               │
-                    │              ▼              │
-                    │     ┌─────────────────┐     │
-                    │     │  RECONNECTING   │     │
-                    │     └────────┬────────┘     │
-                    │              │              │
-                    └──────────────┴──────────────┘
-                                   │
-                                   ▼
-                          ┌─────────────────┐
-                          │  DISCONNECTED   │
-                          └─────────────────┘
-```
+```yaml
+/containers:
+  get:
+    summary: List storage containers
+    operationId: listContainers
+    tags: [Storage]
+    parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [NORMAL, WARNING, CRITICAL]
+      - name: type
+        in: query
+        schema:
+          $ref: '#/components/schemas/ContainerType'
+    responses:
+      200:
+        description: Container list
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                containers:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/StorageContainer'
 
-### 5.2 Connection Sequence
+  post:
+    summary: Register new container
+    operationId: registerContainer
+    tags: [Storage]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ContainerRegistration'
+    responses:
+      201:
+        description: Container registered
 
-```
-Client                                           Server
-   │                                                │
-   │ ─────────── TLS Handshake ──────────────────► │
-   │                                                │
-   │ ◄─────────── TLS Established ─────────────── │
-   │                                                │
-   │ ─────────── WebSocket Upgrade ──────────────► │
-   │                                                │
-   │ ◄─────────── 101 Switching ──────────────── │
-   │                                                │
-   │ ─────────────── connect ────────────────────► │
-   │     { "type": "connect",                      │
-   │       "payload": { "token": "jwt..." } }      │
-   │                                                │
-   │ ◄────────────── connect_ack ────────────────  │
-   │     { "type": "connect_ack",                  │
-   │       "payload": { "sessionId": "..." } }     │
-   │                                                │
-   │ ─────────────── subscribe ──────────────────► │
-   │                                                │
-   │ ◄────────────── subscribe_ack ──────────────  │
-   │                                                │
-   │ ◄────────────── sensor_data ────────────────  │
-   │ ◄────────────── sensor_data ────────────────  │
-   │                  ...                           │
-```
+/containers/{containerId}:
+  get:
+    summary: Get container details
+    operationId: getContainer
+    tags: [Storage]
+    parameters:
+      - $ref: '#/components/parameters/ContainerId'
+    responses:
+      200:
+        description: Container details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorageContainer'
 
-### 5.3 Reconnection Policy
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `autoReconnect` | `true` | Enable auto-reconnect |
-| `initialDelay` | `1000ms` | First retry delay |
-| `maxDelay` | `30000ms` | Maximum retry delay |
-| `maxAttempts` | `10` | Maximum retry attempts |
-| `backoffMultiplier` | `2.0` | Exponential backoff |
-
-**Reconnection Schedule:**
-```
-Attempt 1:  1,000ms
-Attempt 2:  2,000ms
-Attempt 3:  4,000ms
-Attempt 4:  8,000ms
-Attempt 5: 16,000ms
-Attempt 6+: 30,000ms (capped)
-```
-
-### 5.4 Heartbeat
-
-- **Interval:** 30 seconds
-- **Timeout:** 10 seconds
-- **Max Missed:** 3 pings before disconnect
-
-```json
-// Ping
-{
-  "type": "ping",
-  "messageId": "ping-001",
-  "timestamp": 1704067200000,
-  "payload": { "sequence": 1 }
-}
-
-// Pong
-{
-  "type": "pong",
-  "messageId": "pong-001",
-  "timestamp": 1704067200005,
-  "payload": { "sequence": 1, "latency_ms": 5 }
-}
+/containers/{containerId}/slots:
+  get:
+    summary: Get container slot status
+    operationId: getContainerSlots
+    tags: [Storage]
+    parameters:
+      - $ref: '#/components/parameters/ContainerId'
+    responses:
+      200:
+        description: Slot information
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                totalSlots: { type: integer }
+                occupiedSlots: { type: integer }
+                availableSlots: { type: integer }
+                slots:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/StorageSlot'
 ```
 
----
+### 3.2 Monitoring
 
-## Message Types
+```yaml
+/containers/{containerId}/monitoring:
+  get:
+    summary: Get container monitoring data
+    operationId: getContainerMonitoring
+    tags: [Storage, Monitoring]
+    parameters:
+      - $ref: '#/components/parameters/ContainerId'
+      - $ref: '#/components/parameters/DateRange'
+      - name: resolution
+        in: query
+        description: Data point resolution
+        schema:
+          type: string
+          enum: [1min, 5min, 15min, 1hour, 1day]
+          default: 1hour
+    responses:
+      200:
+        description: Monitoring data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                containerId: { type: string }
+                readings:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/MonitoringRecord'
+                statistics:
+                  $ref: '#/components/schemas/MonitoringStatistics'
 
-### 6.1 Message Type Summary
-
-| Type | Direction | Description |
-|------|-----------|-------------|
-| `connect` | C → S | Connection request |
-| `connect_ack` | S → C | Connection response |
-| `disconnect` | Both | Disconnection notice |
-| `subscribe` | C → S | Subscribe to topics |
-| `subscribe_ack` | S → C | Subscription confirmed |
-| `unsubscribe` | C → S | Unsubscribe from topics |
-| `sensor_data` | S → C | Sensor readings |
-| `alert` | S → C | Alert notification |
-| `alert_ack` | C → S | Alert acknowledgment |
-| `command` | C → S | Device command |
-| `command_ack` | S → C | Command response |
-| `ping` | C → S | Heartbeat ping |
-| `pong` | S → C | Heartbeat pong |
-| `error` | Both | Error message |
-
-### 6.2 Connection Messages
-
-#### connect
-
-```json
-{
-  "protocol": "wia-cryo",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440000",
-  "timestamp": 1704067200000,
-  "type": "connect",
-  "source": {
-    "type": "client",
-    "id": "dashboard-001"
-  },
-  "payload": {
-    "token": "eyJhbGciOiJSUzI1NiIs...",
-    "facilityId": "FAC-KR-001",
-    "clientVersion": "2.1.0",
-    "capabilities": ["sensor_data", "alerts", "commands"]
-  }
-}
+/containers/{containerId}/monitoring/live:
+  get:
+    summary: WebSocket endpoint for live monitoring
+    operationId: liveMonitoring
+    tags: [Storage, Monitoring]
+    parameters:
+      - $ref: '#/components/parameters/ContainerId'
+    responses:
+      101:
+        description: Switching to WebSocket protocol
 ```
 
-#### connect_ack
+### 3.3 Alerts
 
-```json
-{
-  "protocol": "wia-cryo",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440001",
-  "timestamp": 1704067200050,
-  "type": "connect_ack",
-  "source": {
-    "type": "service",
-    "id": "gateway-001"
-  },
-  "payload": {
-    "success": true,
-    "sessionId": "session-abc123",
-    "heartbeatInterval": 30000,
-    "serverVersion": "1.0.0"
-  }
-}
-```
+```yaml
+/containers/{containerId}/alerts:
+  get:
+    summary: Get container alerts
+    operationId: getContainerAlerts
+    tags: [Storage, Alerts]
+    parameters:
+      - $ref: '#/components/parameters/ContainerId'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [ACTIVE, ACKNOWLEDGED, RESOLVED]
+      - name: level
+        in: query
+        schema:
+          $ref: '#/components/schemas/AlertLevel'
+    responses:
+      200:
+        description: Alert list
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Alert'
 
-### 6.3 Subscription Messages
-
-#### subscribe
-
-```json
-{
-  "type": "subscribe",
-  "messageId": "550e8400-e29b-41d4-a716-446655440010",
-  "timestamp": 1704067200100,
-  "payload": {
-    "topics": [
-      "containers/DEW-KR-001/temperature",
-      "containers/DEW-KR-001/nitrogen",
-      "containers/+/alerts"
-    ],
-    "options": {
-      "includeHistory": true,
-      "historyDuration": 3600
-    }
-  }
-}
-```
-
-### 6.4 Sensor Data Messages
-
-#### sensor_data
-
-```json
-{
-  "protocol": "wia-cryo",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440100",
-  "timestamp": 1704067200200,
-  "type": "sensor_data",
-  "source": {
-    "type": "sensor",
-    "id": "SENSOR-DEW-KR-001-TEMP"
-  },
-  "payload": {
-    "containerId": "DEW-KR-001",
-    "metricType": "temperature",
-    "value": -196.2,
-    "unit": "celsius",
-    "quality": {
-      "accuracy": 0.1,
-      "status": "normal"
-    }
-  }
-}
-```
-
-### 6.5 Alert Messages
-
-#### alert
-
-```json
-{
-  "protocol": "wia-cryo",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440200",
-  "timestamp": 1704067200300,
-  "type": "alert",
-  "source": {
-    "type": "service",
-    "id": "alert-service"
-  },
-  "payload": {
-    "alertId": "ALERT-2025-001",
-    "severity": "warning",
-    "category": "temperature",
-    "containerId": "DEW-KR-001",
-    "message": "Temperature variance detected",
-    "details": {
-      "currentValue": -195.0,
-      "expectedValue": -196.0,
-      "threshold": 0.5
-    },
-    "actions": ["acknowledge", "dismiss", "escalate"]
-  }
-}
-```
-
-#### alert_ack
-
-```json
-{
-  "type": "alert_ack",
-  "messageId": "550e8400-e29b-41d4-a716-446655440201",
-  "timestamp": 1704067200400,
-  "payload": {
-    "alertId": "ALERT-2025-001",
-    "action": "acknowledge",
-    "acknowledgedBy": "STAFF-001",
-    "notes": "Checking LN2 levels"
-  }
-}
-```
-
-### 6.6 Command Messages
-
-#### command
-
-```json
-{
-  "type": "command",
-  "messageId": "550e8400-e29b-41d4-a716-446655440300",
-  "timestamp": 1704067200500,
-  "payload": {
-    "command": "refill_nitrogen",
-    "target": "DEW-KR-001",
-    "parameters": {
-      "targetLevel": 0.95,
-      "priority": "normal"
-    }
-  }
-}
+/alerts/{alertId}/acknowledge:
+  post:
+    summary: Acknowledge an alert
+    operationId: acknowledgeAlert
+    tags: [Alerts]
+    parameters:
+      - name: alertId
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              acknowledgedBy: { type: string }
+              notes: { type: string }
+    responses:
+      200:
+        description: Alert acknowledged
 ```
 
 ---
 
-## Security
+## 4. Protocol Management Endpoints
 
-### 7.1 Transport Security
+### 4.1 Preservation Protocols
 
-- **TLS Version:** 1.3 required
-- **Cipher Suites:** TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256
-- **Certificate:** Valid TLS certificate required
+```yaml
+/protocols:
+  get:
+    summary: List available protocols
+    operationId: listProtocols
+    tags: [Protocols]
+    parameters:
+      - name: subjectType
+        in: query
+        schema:
+          $ref: '#/components/schemas/SubjectType'
+      - name: species
+        in: query
+        schema:
+          $ref: '#/components/schemas/SpeciesCode'
+    responses:
+      200:
+        description: Protocol list
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProtocolSummary'
 
-### 7.2 Authentication
+  post:
+    summary: Create new protocol
+    operationId: createProtocol
+    tags: [Protocols]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PreservationProtocol'
+    responses:
+      201:
+        description: Protocol created
 
-All connections require JWT authentication:
+/protocols/{protocolId}:
+  get:
+    summary: Get protocol details
+    operationId: getProtocol
+    tags: [Protocols]
+    parameters:
+      - name: protocolId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      200:
+        description: Protocol details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreservationProtocol'
 
-```json
-{
-  "type": "connect",
-  "payload": {
-    "token": "eyJhbGciOiJSUzI1NiIs..."
-  }
-}
-```
-
-### 7.3 Authorization
-
-Topic-based access control:
-
-| Role | Allowed Topics |
-|------|---------------|
-| `viewer` | `containers/+/temperature`, `containers/+/nitrogen` |
-| `operator` | All viewer + `commands/*` |
-| `admin` | All topics |
-
-### 7.4 Message Signing (Optional)
-
-For critical messages:
-
-```json
-{
-  "payload": { ... },
-  "signature": {
-    "algorithm": "ES256",
-    "value": "MEUCIQDi...",
-    "keyId": "key-001"
-  }
-}
-```
-
----
-
-## Error Handling
-
-### 8.1 Error Codes
-
-| Code | Name | Description |
-|------|------|-------------|
-| 1000 | `CONNECTION_CLOSED` | Normal closure |
-| 1001 | `CONNECTION_LOST` | Unexpected disconnect |
-| 1002 | `PROTOCOL_ERROR` | Protocol violation |
-| 2001 | `AUTH_FAILED` | Authentication failed |
-| 2002 | `AUTH_EXPIRED` | Token expired |
-| 2003 | `PERMISSION_DENIED` | Insufficient permissions |
-| 3001 | `INVALID_MESSAGE` | Malformed message |
-| 3002 | `INVALID_TOPIC` | Unknown topic |
-| 3003 | `RATE_LIMITED` | Too many messages |
-| 4001 | `CONTAINER_NOT_FOUND` | Container doesn't exist |
-| 4002 | `SENSOR_OFFLINE` | Sensor not responding |
-| 5001 | `INTERNAL_ERROR` | Server error |
-
-### 8.2 Error Message Format
-
-```json
-{
-  "protocol": "wia-cryo",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440999",
-  "timestamp": 1704067200600,
-  "type": "error",
-  "payload": {
-    "code": 2001,
-    "name": "AUTH_FAILED",
-    "message": "Invalid or expired token",
-    "recoverable": true,
-    "retryAfter": 0,
-    "relatedMessageId": "550e8400-e29b-41d4-a716-446655440000"
-  }
-}
+/protocols/{protocolId}/validate:
+  post:
+    summary: Validate protocol against standards
+    operationId: validateProtocol
+    tags: [Protocols]
+    parameters:
+      - name: protocolId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      200:
+        description: Validation results
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationResult'
 ```
 
 ---
 
-## Examples
+## 5. Transfer Endpoints
 
-### 9.1 Complete Session Example (TypeScript)
+### 5.1 Transfer Management
+
+```yaml
+/transfers:
+  get:
+    summary: List transfers
+    operationId: listTransfers
+    tags: [Transfers]
+    parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [PENDING, IN_TRANSIT, COMPLETED, CANCELLED]
+      - name: direction
+        in: query
+        schema:
+          type: string
+          enum: [INCOMING, OUTGOING]
+    responses:
+      200:
+        description: Transfer list
+
+  post:
+    summary: Initiate transfer
+    operationId: initiateTransfer
+    tags: [Transfers]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TransferRequest'
+    responses:
+      201:
+        description: Transfer initiated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferManifest'
+      400:
+        description: Transfer not feasible
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferFeasibility'
+
+/transfers/{transferId}:
+  get:
+    summary: Get transfer details
+    operationId: getTransfer
+    tags: [Transfers]
+    parameters:
+      - name: transferId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      200:
+        description: Transfer details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferManifest'
+
+/transfers/{transferId}/tracking:
+  get:
+    summary: Get transfer tracking updates
+    operationId: getTransferTracking
+    tags: [Transfers]
+    parameters:
+      - name: transferId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      200:
+        description: Tracking history
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/TransferUpdate'
+
+/transfers/{transferId}/confirm-receipt:
+  post:
+    summary: Confirm transfer receipt at destination
+    operationId: confirmTransferReceipt
+    tags: [Transfers]
+    parameters:
+      - name: transferId
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ReceiptConfirmation'
+    responses:
+      200:
+        description: Receipt confirmed
+```
+
+---
+
+## 6. Quality Assessment Endpoints
+
+### 6.1 VQI Assessment
+
+```yaml
+/subjects/{subjectId}/quality:
+  get:
+    summary: Get quality assessments for subject
+    operationId: getSubjectQuality
+    tags: [Quality]
+    parameters:
+      - $ref: '#/components/parameters/SubjectId'
+    responses:
+      200:
+        description: Quality assessments
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/VQIAssessment'
+
+  post:
+    summary: Submit new quality assessment
+    operationId: submitQualityAssessment
+    tags: [Quality]
+    parameters:
+      - $ref: '#/components/parameters/SubjectId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VQIAssessmentInput'
+    responses:
+      201:
+        description: Assessment recorded
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VQIAssessment'
+
+/subjects/{subjectId}/quality/latest:
+  get:
+    summary: Get latest VQI score
+    operationId: getLatestVQI
+    tags: [Quality]
+    parameters:
+      - $ref: '#/components/parameters/SubjectId'
+    responses:
+      200:
+        description: Latest VQI
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vqi: { type: number }
+                grade: { type: string }
+                assessmentDate: { type: string, format: date-time }
+```
+
+---
+
+## 7. WebSocket Protocol
+
+### 7.1 Connection
 
 ```typescript
-import { WiaCryoProtocol, ConnectionState } from '@wia/cryo-protocol';
+// WebSocket endpoint: wss://api.cryo.wia.org/v1/ws
 
-const protocol = new WiaCryoProtocol({
-  url: 'wss://ws.wia.live/cryo-preservation/v1',
-  token: 'your-jwt-token',
-  facilityId: 'FAC-KR-001',
-  autoReconnect: true
-});
+interface WebSocketMessage {
+    type: MessageType;
+    payload: any;
+    timestamp: string;
+    correlationId?: string;
+}
 
-// Connection events
-protocol.on('connected', (session) => {
-  console.log('Connected:', session.sessionId);
-});
-
-protocol.on('disconnected', (reason) => {
-  console.log('Disconnected:', reason);
-});
-
-// Subscribe to sensor data
-await protocol.subscribe([
-  'containers/DEW-KR-001/temperature',
-  'containers/DEW-KR-001/nitrogen',
-  'containers/+/alerts'
-]);
-
-// Handle sensor data
-protocol.on('sensor_data', (data) => {
-  console.log(`${data.containerId} ${data.metricType}: ${data.value}${data.unit}`);
-});
-
-// Handle alerts
-protocol.on('alert', async (alert) => {
-  console.log(`Alert [${alert.severity}]: ${alert.message}`);
-
-  // Acknowledge alert
-  await protocol.acknowledgeAlert(alert.alertId, {
-    action: 'acknowledge',
-    notes: 'Investigating'
-  });
-});
-
-// Send command
-await protocol.sendCommand({
-  command: 'refill_nitrogen',
-  target: 'DEW-KR-001',
-  parameters: { targetLevel: 0.95 }
-});
-
-// Cleanup
-await protocol.disconnect();
+type MessageType =
+    | "AUTH"
+    | "AUTH_ACK"
+    | "SUBSCRIBE"
+    | "UNSUBSCRIBE"
+    | "MONITORING_UPDATE"
+    | "ALERT"
+    | "TRANSFER_UPDATE"
+    | "PING"
+    | "PONG"
+    | "ERROR";
 ```
 
-### 9.2 Python Example
+### 7.2 Subscription Topics
 
-```python
-import asyncio
-from wia_cryo import WiaCryoProtocol
+```typescript
+// Subscribe to container monitoring
+{
+    type: "SUBSCRIBE",
+    payload: {
+        topic: "container.monitoring",
+        containerId: "container-123",
+        interval: 60  // seconds
+    }
+}
 
-async def main():
-    protocol = WiaCryoProtocol(
-        url='wss://ws.wia.live/cryo-preservation/v1',
-        token='your-jwt-token',
-        facility_id='FAC-KR-001'
-    )
+// Subscribe to facility alerts
+{
+    type: "SUBSCRIBE",
+    payload: {
+        topic: "facility.alerts",
+        levels: ["WARNING", "CRITICAL", "EMERGENCY"]
+    }
+}
 
-    await protocol.connect()
+// Subscribe to transfer tracking
+{
+    type: "SUBSCRIBE",
+    payload: {
+        topic: "transfer.tracking",
+        transferId: "transfer-456"
+    }
+}
+```
 
-    # Subscribe
-    await protocol.subscribe([
-        'containers/DEW-KR-001/temperature',
-        'containers/+/alerts'
-    ])
+### 7.3 Real-time Updates
 
-    # Handle messages
-    @protocol.on('sensor_data')
-    async def on_sensor_data(data):
-        print(f"{data['containerId']}: {data['value']}")
+```typescript
+// Monitoring update
+{
+    type: "MONITORING_UPDATE",
+    payload: {
+        containerId: "container-123",
+        timestamp: "2024-01-15T10:30:00Z",
+        temperature: -196.2,
+        ln2Level: 85.5,
+        status: "NORMAL"
+    }
+}
 
-    @protocol.on('alert')
-    async def on_alert(alert):
-        print(f"Alert: {alert['message']}")
-        await protocol.acknowledge_alert(alert['alertId'])
-
-    # Keep running
-    await asyncio.sleep(3600)
-
-    await protocol.disconnect()
-
-asyncio.run(main())
+// Alert notification
+{
+    type: "ALERT",
+    payload: {
+        alertId: "alert-789",
+        containerId: "container-123",
+        level: "WARNING",
+        message: "LN2 level below 80%",
+        timestamp: "2024-01-15T10:30:00Z"
+    }
+}
 ```
 
 ---
 
-<div align="center">
+## 8. Inter-Facility Protocol
 
-**WIA Cryo-Preservation Communication Protocol v1.0.0**
+### 8.1 Facility Discovery
 
-**弘益人間 (홍익인간)** - Benefit All Humanity
+```yaml
+/facilities:
+  get:
+    summary: List registered facilities
+    operationId: listFacilities
+    tags: [Facilities]
+    parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [OPERATIONAL, MAINTENANCE, OFFLINE]
+      - name: capability
+        in: query
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacilityCapability'
+      - name: location
+        in: query
+        description: Geographic filter (lat,lng,radius_km)
+        schema: { type: string }
+    responses:
+      200:
+        description: Facility list
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/FacilityInfo'
+
+/facilities/{facilityId}:
+  get:
+    summary: Get facility details
+    operationId: getFacility
+    tags: [Facilities]
+    parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      200:
+        description: Facility details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityDocument'
+```
+
+### 8.2 Facility-to-Facility Communication
+
+```typescript
+interface FacilityMessage {
+    messageId: string;
+    type: FacilityMessageType;
+    from: FacilityId;
+    to: FacilityId;
+    timestamp: string;
+    payload: any;
+    signature: DigitalSignature;
+}
+
+type FacilityMessageType =
+    | "TRANSFER_REQUEST"
+    | "TRANSFER_ACCEPT"
+    | "TRANSFER_REJECT"
+    | "TRANSFER_STATUS"
+    | "EMERGENCY_ALERT"
+    | "CAPACITY_QUERY"
+    | "CAPACITY_RESPONSE"
+    | "PROTOCOL_SYNC"
+    | "HEARTBEAT";
+```
 
 ---
 
-**© 2025 WIA Standards Committee**
+## 9. Emergency Endpoints
 
-**MIT License**
+### 9.1 Emergency Declaration
 
-</div>
+```yaml
+/emergency:
+  post:
+    summary: Declare emergency
+    operationId: declareEmergency
+    tags: [Emergency]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [type, severity, description]
+            properties:
+              type:
+                $ref: '#/components/schemas/EmergencyType'
+              severity:
+                type: string
+                enum: [WARNING, CRITICAL, CATASTROPHIC]
+              description: { type: string }
+              affectedContainers:
+                type: array
+                items: { type: string }
+              affectedSubjects:
+                type: array
+                items: { type: string }
+    responses:
+      201:
+        description: Emergency declared
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmergencyResponse'
+
+  get:
+    summary: Get active emergencies
+    operationId: getActiveEmergencies
+    tags: [Emergency]
+    responses:
+      200:
+        description: Active emergency list
+
+/emergency/{emergencyId}/resolve:
+  post:
+    summary: Resolve emergency
+    operationId: resolveEmergency
+    tags: [Emergency]
+    parameters:
+      - name: emergencyId
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              resolution: { type: string }
+              actions: { type: array, items: { type: string } }
+    responses:
+      200:
+        description: Emergency resolved
+```
+
+---
+
+## 10. Error Responses
+
+```yaml
+components:
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: "VALIDATION_ERROR" }
+              message: { type: string }
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field: { type: string }
+                    message: { type: string }
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: "NOT_FOUND" }
+              message: { type: string }
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: "UNAUTHORIZED" }
+              message: { type: string }
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: "FORBIDDEN" }
+              message: { type: string }
+```
+
+---
+
+**Phase 3 Protocol Specification**
+**WIA-CRYO-PRESERVATION v1.0.0**

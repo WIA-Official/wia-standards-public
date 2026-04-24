@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 4: 검증 시스템 | WIA-CARBON_CREDIT_MICRO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 4: 검증 시스템</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> MRV(측정/보고/검증) 프레임워크를 이해하고, 오라클 네트워크의 작동 원리를 마스터하며, 감사 추적 메커니즘을 통한 투명성 보장 방법을 학습합니다.
+    </div>
+
+    <h2>MRV 프레임워크 개요</h2>
+
+    <p>MRV(Measurement, Reporting, Verification - 측정, 보고, 검증)는 탄소 크레딧 시스템의 신뢰성을 보장하는 핵심 프레임워크입니다. WIA-CARBON_CREDIT_MICRO는 마이크로 규모의 개인 행동에 맞게 최적화된 MRV 시스템을 구현합니다.</p>
+
+    <h3>측정 (Measurement)</h3>
+
+    <p>개인의 탄소 절감 행동을 정확하게 측정하기 위해 다양한 데이터 소스를 활용합니다:</p>
+
+    <pre><code>// 측정 시스템 구현
+class MeasurementSystem {
+    private dataSources: Map&lt;string, DataSource&gt; = new Map();
+
+    constructor() {
+        // 데이터 소스 등록
+        this.dataSources.set('gps', new GPSDataSource());
+        this.dataSources.set('accelerometer', new AccelerometerDataSource());
+        this.dataSources.set('smart_meter', new SmartMeterDataSource());
+        this.dataSources.set('receipt', new ReceiptScanDataSource());
+        this.dataSources.set('iot', new IoTDeviceDataSource());
+    }
+
+    async measureAction(action: UserAction): Promise&lt;MeasurementResult&gt; {
+        const measurements: DataPoint[] = [];
+
+        // 행동 유형에 따른 데이터 소스 선택
+        const sources = this.selectDataSources(action.type);
+
+        for (const source of sources) {
+            const data = await source.collect(action);
+            measurements.push({
+                source: source.name,
+                data,
+                timestamp: new Date(),
+                accuracy: source.accuracy
+            });
+        }
+
+        // 다중 소스 데이터 통합
+        const consolidated = this.consolidateMeasurements(measurements);
+
+        // 탄소 절감량 계산
+        const carbonReduction = await this.calculateReduction(
+            action.type,
+            consolidated
+        );
+
+        return {
+            actionId: action.id,
+            measurements,
+            consolidated,
+            carbonReduction,
+            confidence: this.calculateConfidence(measurements),
+            methodology: this.getMethodology(action.type)
+        };
+    }
+
+    private selectDataSources(actionType: ActionType): DataSource[] {
+        const sourceMap = {
+            WALKING: ['gps', 'accelerometer'],
+            CYCLING: ['gps', 'accelerometer'],
+            PUBLIC_TRANSIT: ['gps', 'transit_api'],
+            ENERGY_SAVING: ['smart_meter', 'iot'],
+            SUSTAINABLE_PURCHASE: ['receipt', 'partner_api'],
+            RECYCLING: ['iot', 'facility_api']
+        };
+
+        return (sourceMap[actionType] || [])
+            .map(name => this.dataSources.get(name))
+            .filter(Boolean);
+    }
+}</code></pre>
+
+    <h3>보고 (Reporting)</h3>
+
+    <p>측정된 데이터는 표준화된 형식으로 보고되어 검증 프로세스에 제출됩니다:</p>
+
+    <table>
+        <tr>
+            <th>보고 요소</th>
+            <th>설명</th>
+            <th>필수 여부</th>
+        </tr>
+        <tr>
+            <td>행동 유형</td>
+            <td>수행된 탄소 절감 행동의 분류</td>
+            <td>필수</td>
+        </tr>
+        <tr>
+            <td>시간 정보</td>
+            <td>시작/종료 시간, 지속 시간</td>
+            <td>필수</td>
+        </tr>
+        <tr>
+            <td>위치 정보</td>
+            <td>행동이 발생한 지리적 위치</td>
+            <td>조건부</td>
+        </tr>
+        <tr>
+            <td>정량적 데이터</td>
+            <td>거리, 에너지량, 수량 등</td>
+            <td>필수</td>
+        </tr>
+        <tr>
+            <td>증빙 자료</td>
+            <td>영수증, 사진, 센서 데이터</td>
+            <td>조건부</td>
+        </tr>
+        <tr>
+            <td>기준선 참조</td>
+            <td>비교 기준이 되는 배출량</td>
+            <td>필수</td>
+        </tr>
+    </table>
+
+    <h2>다중 계층 검증</h2>
+
+    <p>검증은 크레딧 가치와 행동 유형에 따라 다양한 수준에서 수행됩니다:</p>
+
+    <div class="highlight">
+        <strong>검증 무결성:</strong> 각 검증 계층은 행동 유형에 특정한 검사를 포함합니다. 교통 검증은 GPS 데이터를 지도 서비스와 교차 참조하고, 에너지 검증은 스마트 미터 판독값을 비교하며, 소비 검증은 영수증 또는 사진 증거를 요구할 수 있습니다.
+    </div>
+
+    <table>
+        <tr>
+            <th>계층</th>
+            <th>크레딧 범위</th>
+            <th>검증 방법</th>
+            <th>소요 시간</th>
+        </tr>
+        <tr>
+            <td>계층 1</td>
+            <td>1-100g</td>
+            <td>자동 센서 검증</td>
+            <td>즉시</td>
+        </tr>
+        <tr>
+            <td>계층 2</td>
+            <td>100-1,000g</td>
+            <td>AI 분석 + 규칙 검사</td>
+            <td>5-30분</td>
+        </tr>
+        <tr>
+            <td>계층 3</td>
+            <td>1,000-10,000g</td>
+            <td>오라클 네트워크 합의</td>
+            <td>1-4시간</td>
+        </tr>
+        <tr>
+            <td>계층 4</td>
+            <td>10,000g+</td>
+            <td>수동 검토 + 문서화</td>
+            <td>24-72시간</td>
+        </tr>
+    </table>
+
+    <pre><code>// 다중 계층 검증 시스템
+class VerificationService {
+    private tierHandlers: Map&lt;number, VerificationHandler&gt; = new Map();
+
+    constructor() {
+        this.tierHandlers.set(1, new AutomatedVerificationHandler());
+        this.tierHandlers.set(2, new AIVerificationHandler());
+        this.tierHandlers.set(3, new OracleVerificationHandler());
+        this.tierHandlers.set(4, new ManualVerificationHandler());
+    }
+
+    async verify(request: VerificationRequest): Promise&lt;VerificationResult&gt; {
+        const tier = this.determineTier(request.estimatedCredits);
+        const handler = this.tierHandlers.get(tier);
+
+        if (!handler) throw new Error(`계층 ${tier}에 대한 핸들러 없음`);
+
+        // 계층별 검증 실행
+        const result = await handler.verify(request);
+
+        // 검증 실패 시 하위 신뢰도 검증 시도
+        if (!result.verified && tier > 1) {
+            return this.escalateVerification(request, tier);
+        }
+
+        return result;
+    }
+
+    private determineTier(credits: number): number {
+        if (credits <= 100) return 1;
+        if (credits <= 1000) return 2;
+        if (credits <= 10000) return 3;
+        return 4;
+    }
+}
+
+// 계층 2: AI 검증 핸들러
+class AIVerificationHandler implements VerificationHandler {
+    private model: CarbonVerificationModel;
+
+    async verify(request: VerificationRequest): Promise&lt;VerificationResult&gt; {
+        // 행동 데이터에서 특성 추출
+        const features = this.extractFeatures(request);
+
+        // 검증 모델 실행
+        const prediction = await this.model.predict(features);
+
+        // 규칙 기반 검사 적용
+        const ruleResults = await this.applyRules(request);
+
+        // AI와 규칙 결과 결합
+        const confidence = this.combineScores(prediction, ruleResults);
+
+        return {
+            verified: confidence >= 0.85,
+            confidence,
+            tier: 2,
+            method: 'ai_verification',
+            details: {
+                aiScore: prediction.score,
+                rulesChecked: ruleResults.length,
+                rulesPassed: ruleResults.filter(r => r.passed).length
+            }
+        };
+    }
+}</code></pre>
+
+    <h2>오라클 네트워크</h2>
+
+    <p>오라클은 실제 세계의 데이터를 블록체인에 안전하게 전달하는 중요한 역할을 합니다. WIA-CARBON_CREDIT_MICRO는 분산형 오라클 네트워크를 통해 검증의 신뢰성을 보장합니다:</p>
+
+    <pre><code>// 오라클 무결성 시스템
+class OracleIntegritySystem {
+    private oracleRegistry: OracleRegistry;
+    private slashingContract: SlashingContract;
+
+    async validateOracleResponse(
+        request: VerificationRequest,
+        response: OracleResponse
+    ): Promise&lt;OracleValidation&gt; {
+        const oracle = await this.oracleRegistry.getOracle(response.oracleId);
+
+        // 오라클이 정상 상태인지 확인
+        if (oracle.status !== 'ACTIVE') {
+            return { valid: false, reason: '오라클이 활성 상태가 아님' };
+        }
+
+        // 응답 서명 검증
+        const signatureValid = await this.verifySignature(
+            response.data,
+            response.signature,
+            oracle.publicKey
+        );
+
+        if (!signatureValid) {
+            return { valid: false, reason: '유효하지 않은 서명' };
+        }
+
+        // 다른 오라클과의 응답 일관성 검사
+        const consensusCheck = await this.checkConsensus(request.id, response);
+
+        if (!consensusCheck.consistent) {
+            // 잠재적 부정직 오라클 - 조사를 위해 플래그
+            await this.flagForInvestigation(oracle, request, response);
+            return { valid: false, reason: '합의 불일치' };
+        }
+
+        return { valid: true, confidence: consensusCheck.confidence };
+    }
+
+    async penalizeOracle(
+        oracleId: string,
+        violation: OracleViolation
+    ): Promise&lt;SlashingResult&gt; {
+        const oracle = await this.oracleRegistry.getOracle(oracleId);
+
+        // 위반 심각도에 따른 슬래싱 금액 계산
+        const slashPercentage = this.getSlashPercentage(violation.type);
+        const slashAmount = (oracle.stakedAmount * slashPercentage) / 100;
+
+        // 온체인 슬래싱 실행
+        const tx = await this.slashingContract.slash(
+            oracleId,
+            slashAmount,
+            violation.evidence
+        );
+
+        return {
+            slashed: true,
+            amount: slashAmount,
+            txHash: tx.hash
+        };
+    }
+}</code></pre>
+
+    <h2>감사 추적</h2>
+
+    <p>완전한 감사 추적은 의심스러운 활동의 조사를 가능하게 하고 분쟁에 대한 증거를 제공합니다:</p>
+
+    <div class="highlight">
+        <strong>감사 원칙:</strong> 불변 로깅 - 모든 행동이 추가 전용 저장소에 기록됩니다. 암호화 체이닝 - 로그 항목이 암호화적으로 연결됩니다. 보존 정책 - 규제 준수를 위한 최소 7년 보존. 접근 제어 - 내부 및 외부 감사인을 위한 계층화된 접근.
+    </div>
+
+    <pre><code>// 감사 추적 시스템
+class AuditTrailSystem {
+    async createAuditEntry(event: AuditableEvent): Promise&lt;AuditEntry&gt; {
+        const entry: AuditEntry = {
+            id: generateAuditId(),
+            timestamp: new Date(),
+            eventType: event.type,
+            actor: event.actor,
+            subject: event.subject,
+            action: event.action,
+            details: event.details,
+            previousState: event.previousState,
+            newState: event.newState,
+            ipAddress: event.context?.ipAddress,
+            signature: null
+        };
+
+        // 항목 서명
+        entry.signature = await this.signEntry(entry);
+
+        // 추가 전용 로그에 저장
+        await this.appendToLog(entry);
+
+        // 증명 생성을 위한 머클 트리 업데이트
+        await this.updateMerkleTree(entry);
+
+        return entry;
+    }
+
+    async generateAuditProof(entryId: string): Promise&lt;AuditProof&gt; {
+        const entry = await this.getEntry(entryId);
+        const merkleProof = await this.getMerkleProof(entry);
+
+        return {
+            entry,
+            merkleProof,
+            rootHash: await this.getCurrentRoot(),
+            verificationUrl: `https://audit.wia.org/verify/${entryId}`
+        };
+    }
+
+    async queryAuditLog(query: AuditQuery): Promise&lt;AuditEntry[]&gt; {
+        return this.auditLog.find({
+            eventType: query.eventType,
+            actor: query.actor,
+            timestamp: {
+                $gte: query.startDate,
+                $lte: query.endDate
+            }
+        }).sort({ timestamp: -1 }).limit(query.limit);
+    }
+}</code></pre>
+
+    <h2>검증 증명서</h2>
+
+    <p>검증이 완료되면 검증 증명서가 발급되어 크레딧의 신뢰성을 보장합니다:</p>
+
+    <pre><code>// 검증 증명서 생성
+interface VerificationCertificate {
+    certificateId: string;
+    creditId: string;
+    verificationDate: Date;
+    verificationTier: number;
+    methodology: string;
+
+    // 측정 세부사항
+    measurement: {
+        dataSource: string[];
+        accuracy: number;
+        rawData: DataHash;
+    };
+
+    // 검증 세부사항
+    verification: {
+        verifiers: OracleInfo[];
+        consensusLevel: number;
+        confidenceScore: number;
+    };
+
+    // 암호화 증명
+    proof: {
+        merkleRoot: string;
+        signature: string;
+        timestamp: number;
+    };
+}</code></pre>
+
+    <h2>요약</h2>
+
+    <p>WIA-CARBON_CREDIT_MICRO의 검증 시스템은 마이크로 탄소 크레딧의 신뢰성을 보장하는 핵심 인프라입니다. MRV 프레임워크를 통한 체계적인 측정, 보고, 검증 프로세스, 다중 계층 검증 시스템, 분산형 오라클 네트워크, 그리고 완전한 감사 추적을 통해 개인의 작은 탄소 절감 행동도 신뢰할 수 있는 가치로 전환됩니다.</p>
+
+</body>
+</html>

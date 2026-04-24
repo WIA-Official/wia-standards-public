@@ -2,10 +2,10 @@
 //!
 //! Integration with Security Information and Event Management systems.
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::Utc;
 
 // ============================================================================
 // SIEM Types
@@ -218,10 +218,7 @@ pub struct EventSubscription {
 
 impl EventSubscription {
     /// Create a new subscription
-    pub fn new(
-        name: impl Into<String>,
-        delivery: DeliveryConfig,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, delivery: DeliveryConfig) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             name: name.into(),
@@ -547,7 +544,8 @@ mod tests {
             "severity": 8.0
         });
 
-        let hec = SplunkHecEvent::from_wia_event(&wia_event, "scanner-001", Some("security".to_string()));
+        let hec =
+            SplunkHecEvent::from_wia_event(&wia_event, "scanner-001", Some("security".to_string()));
         assert_eq!(hec.sourcetype, "wia:alert");
         assert!(hec.event.get("wia_event").is_some());
     }

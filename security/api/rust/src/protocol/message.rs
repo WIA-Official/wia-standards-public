@@ -2,9 +2,8 @@
 //!
 //! Core message structures for the WIA Security Communication Protocol.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::PROTOCOL_VERSION;

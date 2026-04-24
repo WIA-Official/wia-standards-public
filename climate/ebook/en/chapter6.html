@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA Climate Data Format Standard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 { color: #10B981; margin-top: 2em; }
+        h1 { border-bottom: 3px solid #10B981; padding-bottom: 10px; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; border-left: 4px solid #10B981; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; color: #10B981; }
+        tr:nth-child(even) { background: #1e293b40; }
+        blockquote { border-left: 4px solid #ffd700; padding-left: 20px; margin: 20px 0; background: #1e293b; padding: 20px; border-radius: 0 8px 8px 0; }
+        .highlight { background: #10B98120; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .warning { background: #ef444420; border-left: 4px solid #ef4444; padding: 15px; margin: 15px 0; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        footer .philosophy { color: #ffd700; font-size: 1.2em; margin-bottom: 10px; }
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Security & Privacy</h1>
+
+    <blockquote>
+        <p>"Climate data powers global decisions. Securing that data from tampering, theft, and unauthorized access is not optional—it's foundational to trust in climate action."</p>
+    </blockquote>
+
+    <h2>6.1 Security Architecture</h2>
+
+    <h3>6.1.1 Defense in Depth</h3>
+
+    <pre><code>┌─────────────────────────────────────────────┐
+│  Application Layer Security                 │
+│  • Input validation                          │
+│  • Authorization checks                      │
+│  • Data integrity validation                 │
+├─────────────────────────────────────────────┤
+│  API Layer Security                          │
+│  • API key authentication                    │
+│  • JWT tokens                                │
+│  • Rate limiting                             │
+├─────────────────────────────────────────────┤
+│  Transport Layer Security                    │
+│  • TLS 1.3 encryption                        │
+│  • Certificate validation                    │
+│  • Perfect forward secrecy                   │
+├─────────────────────────────────────────────┤
+│  Network Layer Security                      │
+│  • Firewall rules                            │
+│  • DDoS protection                           │
+│  • IP allowlisting                           │
+└─────────────────────────────────────────────┘</code></pre>
+
+    <h2>6.2 Authentication Methods</h2>
+
+    <h3>6.2.1 API Key Authentication</h3>
+
+    <div class="highlight">
+        <p><strong>For:</strong> Sensors, embedded devices, server-to-server</p>
+        <p><strong>Format:</strong> <code>wia_climate_live_1A2B3C4D5E...</code> (64 hex chars)</p>
+    </div>
+
+    <pre><code>curl -H "Authorization: Bearer wia_climate_live_..." \
+     https://api.wia.live/climate/v1/data</code></pre>
+
+    <h3>6.2.2 JWT Token Authentication</h3>
+
+    <div class="highlight">
+        <p><strong>For:</strong> User sessions, dashboards, mobile apps</p>
+        <p><strong>Expiry:</strong> 1 hour (access token), 30 days (refresh token)</p>
+    </div>
+
+    <pre><code>{
+  "alg": "RS256",
+  "typ": "JWT"
+}.{
+  "sub": "user_12345",
+  "iss": "api.wia.live",
+  "aud": "climate",
+  "exp": 1702483200,
+  "scope": ["read:data", "write:data"],
+  "device_id": "ORCA-001"
+}</code></pre>
+
+    <h3>6.2.3 mTLS (Mutual TLS)</h3>
+
+    <div class="highlight">
+        <p><strong>For:</strong> High-security deployments, government installations</p>
+        <p><strong>Requires:</strong> Client certificate signed by WIA CA</p>
+    </div>
+
+    <h2>6.3 Authorization & Access Control</h2>
+
+    <h3>6.3.1 Permission Model</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Permission</th>
+                <th>Scope</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>read:data</code></td>
+                <td>Global or filtered</td>
+                <td>Query climate messages</td>
+            </tr>
+            <tr>
+                <td><code>write:data</code></td>
+                <td>Device-specific</td>
+                <td>Submit climate messages</td>
+            </tr>
+            <tr>
+                <td><code>manage:devices</code></td>
+                <td>Organization</td>
+                <td>Register/update devices</td>
+            </tr>
+            <tr>
+                <td><code>send:commands</code></td>
+                <td>Device-specific</td>
+                <td>Control device operations</td>
+            </tr>
+            <tr>
+                <td><code>admin</code></td>
+                <td>Organization</td>
+                <td>Full administrative access</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>6.3.2 Data Isolation</h3>
+
+    <ul>
+        <li><strong>Public Data:</strong> Climate model outputs, aggregated statistics (read by anyone)</li>
+        <li><strong>Organization Data:</strong> Device telemetry, operational metrics (read/write by org members)</li>
+        <li><strong>Private Data:</strong> Proprietary research, competitive intelligence (owner only)</li>
+    </ul>
+
+    <h2>6.4 Data Integrity</h2>
+
+    <h3>6.4.1 Message Signing</h3>
+
+    <p>Optional HMAC-SHA256 signatures for high-integrity applications:</p>
+
+    <pre><code>{
+  "version": "1.0.0",
+  "type": "carbon_capture",
+  // ... message content ...
+  "meta": {
+    "signature": {
+      "algorithm": "HMAC-SHA256",
+      "value": "a1b2c3d4...",
+      "key_id": "key_123"
+    }
+  }
+}</code></pre>
+
+    <p><strong>Signature Computation:</strong></p>
+    <pre><code>import hmac
+import hashlib
+import json
+
+def sign_message(message, secret_key):
+    # Create canonical JSON (sorted keys, no whitespace)
+    canonical = json.dumps(message, sort_keys=True, separators=(',', ':'))
+
+    # Compute HMAC-SHA256
+    signature = hmac.new(
+        secret_key.encode(),
+        canonical.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    return signature</code></pre>
+
+    <h3>6.4.2 Validation Pipeline</h3>
+
+    <ol>
+        <li><strong>Schema Validation:</strong> Ensure message conforms to JSON Schema</li>
+        <li><strong>Range Validation:</strong> Check values are within physical limits</li>
+        <li><strong>Temporal Validation:</strong> Reject messages with future timestamps or excessive clock skew (&gt;5 minutes)</li>
+        <li><strong>Geospatial Validation:</strong> Verify coordinates are valid and match registered device location (within tolerance)</li>
+        <li><strong>Device Authorization:</strong> Confirm device is registered and authorized to send this data type</li>
+    </ol>
+
+    <h2>6.5 Encryption</h2>
+
+    <h3>6.5.1 Transport Encryption</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Protocol</th>
+                <th>Encryption</th>
+                <th>Minimum Version</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>HTTPS</td>
+                <td>TLS</td>
+                <td>1.3 (fallback: 1.2)</td>
+            </tr>
+            <tr>
+                <td>WebSocket</td>
+                <td>WSS (TLS)</td>
+                <td>1.3</td>
+            </tr>
+            <tr>
+                <td>MQTT</td>
+                <td>MQTTS (TLS)</td>
+                <td>1.2</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>6.5.2 At-Rest Encryption</h3>
+
+    <ul>
+        <li><strong>Database:</strong> AES-256 encryption for sensitive fields</li>
+        <li><strong>Backups:</strong> Encrypted with rotating keys</li>
+        <li><strong>Logs:</strong> PII and secrets redacted/encrypted</li>
+    </ul>
+
+    <h2>6.6 Sensor Network Security</h2>
+
+    <h3>6.6.1 IoT Device Hardening</h3>
+
+    <div class="highlight">
+        <p><strong>Best Practices:</strong></p>
+        <ul>
+            <li>Store API keys in secure element or TPM</li>
+            <li>Disable unused network services</li>
+            <li>Use read-only filesystem where possible</li>
+            <li>Implement secure boot</li>
+            <li>Regular firmware updates via signed OTA</li>
+        </ul>
+    </div>
+
+    <h3>6.6.2 Edge Gateway Security</h3>
+
+    <pre><code>#!/bin/bash
+# Secure edge gateway setup
+
+# 1. Firewall rules (only HTTPS/MQTTS outbound)
+sudo ufw default deny incoming
+sudo ufw default deny outgoing
+sudo ufw allow out 443/tcp  # HTTPS
+sudo ufw allow out 8883/tcp # MQTTS
+sudo ufw enable
+
+# 2. Fail2ban for SSH
+sudo apt install fail2ban
+
+# 3. Automatic security updates
+sudo apt install unattended-upgrades
+
+# 4. Secure API key storage
+echo "WIA_API_KEY=wia_climate_..." | sudo tee /etc/wia/credentials
+sudo chmod 600 /etc/wia/credentials
+sudo chown root:root /etc/wia/credentials</code></pre>
+
+    <h2>6.7 Privacy Considerations</h2>
+
+    <h3>6.7.1 Data Minimization</h3>
+
+    <div class="warning">
+        <p><strong>Principle:</strong> Only collect and transmit data necessary for climate monitoring.</p>
+        <ul>
+            <li>Avoid including Personally Identifiable Information (PII)</li>
+            <li>Use device IDs instead of operator names</li>
+            <li>Aggregate fine-grained location data when possible</li>
+            <li>Redact proprietary algorithms or trade secrets</li>
+        </ul>
+    </div>
+
+    <h3>6.7.2 GDPR Compliance (if applicable)</h3>
+
+    <ul>
+        <li><strong>Right to Access:</strong> Users can query all data associated with their devices</li>
+        <li><strong>Right to Deletion:</strong> API endpoint to delete historical data</li>
+        <li><strong>Data Portability:</strong> Export data in standard JSON format</li>
+        <li><strong>Consent:</strong> Required for any human-related climate data (e.g., indoor vertical farm worker exposure)</li>
+    </ul>
+
+    <h2>6.8 Incident Response</h2>
+
+    <h3>6.8.1 Security Event Categories</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Severity</th>
+                <th>Examples</th>
+                <th>Response Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Critical</strong></td>
+                <td>Data breach, API compromise, ransomware</td>
+                <td>&lt; 1 hour</td>
+            </tr>
+            <tr>
+                <td><strong>High</strong></td>
+                <td>Unauthorized access attempt, DDoS attack</td>
+                <td>&lt; 4 hours</td>
+            </tr>
+            <tr>
+                <td><strong>Medium</strong></td>
+                <td>Suspicious activity, rate limit abuse</td>
+                <td>&lt; 24 hours</td>
+            </tr>
+            <tr>
+                <td><strong>Low</strong></td>
+                <td>Failed login attempts, invalid data</td>
+                <td>&lt; 1 week</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>6.8.2 Incident Response Playbook</h3>
+
+    <ol>
+        <li><strong>Detect:</strong> Automated monitoring alerts security team</li>
+        <li><strong>Contain:</strong> Isolate affected systems, revoke compromised credentials</li>
+        <li><strong>Investigate:</strong> Analyze logs, identify root cause and scope</li>
+        <li><strong>Remediate:</strong> Patch vulnerabilities, restore from clean backups</li>
+        <li><strong>Notify:</strong> Inform affected users within 72 hours (GDPR requirement)</li>
+        <li><strong>Review:</strong> Post-mortem analysis, update security procedures</li>
+    </ol>
+
+    <h2>6.9 Compliance & Certifications</h2>
+
+    <h3>6.9.1 Relevant Standards</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Standard</th>
+                <th>Applicability</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>ISO/IEC 27001</td>
+                <td>Information security management</td>
+                <td>Recommended</td>
+            </tr>
+            <tr>
+                <td>SOC 2 Type II</td>
+                <td>Service organization controls</td>
+                <td>Recommended</td>
+            </tr>
+            <tr>
+                <td>GDPR</td>
+                <td>EU data protection</td>
+                <td>Required (EU)</td>
+            </tr>
+            <tr>
+                <td>CCPA</td>
+                <td>California privacy</td>
+                <td>Required (CA, USA)</td>
+            </tr>
+            <tr>
+                <td>IEC 62443</td>
+                <td>Industrial cybersecurity</td>
+                <td>Recommended (IoT)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>6.10 Security Checklist</h2>
+
+    <div class="highlight">
+        <h3>✓ Implementation Checklist</h3>
+        <ul>
+            <li>☐ TLS 1.3 enabled on all endpoints</li>
+            <li>☐ API keys stored in secrets manager (not hardcoded)</li>
+            <li>☐ Certificate pinning for critical connections</li>
+            <li>☐ Input validation on all API endpoints</li>
+            <li>☐ Rate limiting configured (per IP and per API key)</li>
+            <li>☐ Logging enabled with log retention policy</li>
+            <li>☐ Security headers configured (HSTS, CSP, etc.)</li>
+            <li>☐ Regular security audits scheduled</li>
+            <li>☐ Incident response plan documented</li>
+            <li>☐ Dependency scanning for vulnerabilities</li>
+        </ul>
+    </div>
+</body>
+</html>

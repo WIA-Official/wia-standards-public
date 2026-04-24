@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA BCI Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 4: Protocol Specification</h1>
+        <p class="subtitle">Real-time Streaming and Data Synchronization</p>
+        <p class="version">WIA BCI Standard v1.0.0</p>
+    </header>
+
+    <main>
+        <section>
+            <h1>4.1 Overview</h1>
+            <p>The WIA BCI Communication Protocol enables real-time, low-latency data transmission between BCI devices and applications. It supports multiple transport layers while maintaining a consistent message format.</p>
+
+            <div class="info-box">
+                <h3>Protocol Goals</h3>
+                <ul>
+                    <li><strong>Transport Agnostic:</strong> Works over WebSocket, TCP, LSL</li>
+                    <li><strong>Real-time:</strong> Low-latency streaming for responsive BCIs</li>
+                    <li><strong>Reliable:</strong> Connection management and error recovery</li>
+                    <li><strong>Compatible:</strong> Integrates with Phase 1/2 standards</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
+            <h1>4.2 Protocol Stack</h1>
+            <pre><code>┌─────────────────────────────────────┐
+│        Application Layer            │
+│   (WiaBci, Signal Processing)       │
+├─────────────────────────────────────┤
+│        Protocol Layer               │
+│   (Message Format, Handlers)        │
+├─────────────────────────────────────┤
+│        Transport Layer              │
+│   (WebSocket, TCP, LSL, BLE)        │
+├─────────────────────────────────────┤
+│        Network Layer                │
+│   (TCP/IP, UDP, Serial)             │
+└─────────────────────────────────────┘</code></pre>
+        </section>
+
+        <section>
+            <h1>4.3 Message Format</h1>
+
+            <h2>Base Message Structure</h2>
+            <pre><code>{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": 1702483200000,
+  "type": "message_type",
+  "payload": {}
+}</code></pre>
+
+            <h2>Message Fields</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>protocol</code></td>
+                        <td>string</td>
+                        <td>Yes</td>
+                        <td>Protocol identifier ("wia-bci")</td>
+                    </tr>
+                    <tr>
+                        <td><code>version</code></td>
+                        <td>string</td>
+                        <td>Yes</td>
+                        <td>Protocol version (semver)</td>
+                    </tr>
+                    <tr>
+                        <td><code>messageId</code></td>
+                        <td>string</td>
+                        <td>Yes</td>
+                        <td>Unique message ID (UUID v4)</td>
+                    </tr>
+                    <tr>
+                        <td><code>timestamp</code></td>
+                        <td>number</td>
+                        <td>Yes</td>
+                        <td>Unix timestamp (milliseconds)</td>
+                    </tr>
+                    <tr>
+                        <td><code>type</code></td>
+                        <td>string</td>
+                        <td>Yes</td>
+                        <td>Message type</td>
+                    </tr>
+                    <tr>
+                        <td><code>payload</code></td>
+                        <td>object</td>
+                        <td>Yes</td>
+                        <td>Message content</td>
+                    </tr>
+                    <tr>
+                        <td><code>sequence</code></td>
+                        <td>number</td>
+                        <td>No</td>
+                        <td>Message sequence number</td>
+                    </tr>
+                    <tr>
+                        <td><code>sessionId</code></td>
+                        <td>string</td>
+                        <td>No</td>
+                        <td>Session identifier</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Message Types</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Direction</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>connect</code></td>
+                        <td>Client → Server</td>
+                        <td>Connection request</td>
+                    </tr>
+                    <tr>
+                        <td><code>connect_ack</code></td>
+                        <td>Server → Client</td>
+                        <td>Connection acknowledgment</td>
+                    </tr>
+                    <tr>
+                        <td><code>disconnect</code></td>
+                        <td>Both</td>
+                        <td>Connection termination</td>
+                    </tr>
+                    <tr>
+                        <td><code>start_stream</code></td>
+                        <td>Client → Server</td>
+                        <td>Start streaming request</td>
+                    </tr>
+                    <tr>
+                        <td><code>stop_stream</code></td>
+                        <td>Client → Server</td>
+                        <td>Stop streaming request</td>
+                    </tr>
+                    <tr>
+                        <td><code>signal</code></td>
+                        <td>Server → Client</td>
+                        <td>Signal data</td>
+                    </tr>
+                    <tr>
+                        <td><code>signal_batch</code></td>
+                        <td>Server → Client</td>
+                        <td>Batched signal data</td>
+                    </tr>
+                    <tr>
+                        <td><code>marker</code></td>
+                        <td>Both</td>
+                        <td>Event marker</td>
+                    </tr>
+                    <tr>
+                        <td><code>error</code></td>
+                        <td>Both</td>
+                        <td>Error message</td>
+                    </tr>
+                    <tr>
+                        <td><code>ping</code></td>
+                        <td>Client → Server</td>
+                        <td>Connection check</td>
+                    </tr>
+                    <tr>
+                        <td><code>pong</code></td>
+                        <td>Server → Client</td>
+                        <td>Connection check response</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h1>4.4 Connection Management</h1>
+
+            <h2>Connection State Machine</h2>
+            <pre><code>                    ┌─────────────────┐
+                    │  DISCONNECTED   │
+                    └────────┬────────┘
+                             │ connect()
+                             ▼
+                    ┌─────────────────┐
+         timeout    │   CONNECTING    │
+        ┌──────────│                 │
+        │          └────────┬────────┘
+        │                   │ connect_ack
+        │                   ▼
+        │          ┌─────────────────┐
+        │          │    CONNECTED    │◄────────┐
+        │          └────────┬────────┘         │
+        │                   │                  │
+        │           error / │                  │ success
+        │         disconnect│                  │
+        │                   ▼                  │
+        │          ┌─────────────────┐         │
+        └─────────►│  RECONNECTING   ├─────────┘
+                   └────────┬────────┘
+                            │ max retries
+                            ▼
+                   ┌─────────────────┐
+                   │     ERROR       │
+                   └─────────────────┘</code></pre>
+
+            <h2>Connect Message</h2>
+            <pre><code>{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": 1702483200000,
+  "type": "connect",
+  "payload": {
+    "clientId": "app-12345",
+    "clientName": "My BCI App",
+    "clientVersion": "1.0.0",
+    "capabilities": ["eeg", "emg", "markers"],
+    "options": {
+      "samplingRate": 250,
+      "channels": ["Fp1", "Fp2", "C3", "C4"],
+      "compression": false,
+      "binaryMode": false
+    }
+  }
+}</code></pre>
+
+            <h2>Connect Acknowledgment</h2>
+            <pre><code>{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": 1702483200100,
+  "type": "connect_ack",
+  "payload": {
+    "sessionId": "session-67890",
+    "status": "connected",
+    "serverInfo": {
+      "name": "OpenBCI Server",
+      "version": "2.0.0"
+    },
+    "deviceInfo": {
+      "type": "eeg_headset",
+      "manufacturer": "OpenBCI",
+      "model": "Cyton",
+      "channels": 8,
+      "samplingRate": 250
+    },
+    "negotiated": {
+      "samplingRate": 250,
+      "channels": ["Fp1", "Fp2", "C3", "C4", "O1", "O2", "P3", "P4"],
+      "compression": false
+    }
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>4.5 Data Streaming</h1>
+
+            <h2>Signal Message</h2>
+            <pre><code>{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440002",
+  "timestamp": 1702483200200,
+  "type": "signal",
+  "sequence": 1,
+  "payload": {
+    "sampleIndex": 1000,
+    "timestamp": 1702483200200,
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "data": [12.5, -8.3, 15.2, -3.1, 22.7, -11.4, 8.9, -5.6]
+  }
+}</code></pre>
+
+            <h2>Signal Batch (Efficient)</h2>
+            <pre><code>{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440003",
+  "timestamp": 1702483200300,
+  "type": "signal_batch",
+  "sequence": 2,
+  "payload": {
+    "startSampleIndex": 1000,
+    "sampleCount": 10,
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "data": [
+      [12.5, -8.3, 15.2, -3.1, 22.7, -11.4, 8.9, -5.6],
+      [13.1, -7.9, 14.8, -2.8, 23.1, -10.9, 9.2, -5.2]
+    ],
+    "timestamps": [1702483200200, 1702483200204]
+  }
+}</code></pre>
+
+            <h2>Marker Message</h2>
+            <pre><code>{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440004",
+  "timestamp": 1702483200400,
+  "type": "marker",
+  "payload": {
+    "sampleIndex": 1050,
+    "code": 10,
+    "label": "stimulus_onset",
+    "value": "left_hand",
+    "duration": 4000
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>4.6 Transport Layers</h1>
+
+            <h2>WebSocket Transport</h2>
+            <pre><code>// Connection URL format
+ws://host:port/wia-bci
+wss://host:port/wia-bci
+
+// Default port: 9876
+
+// Subprotocol
+Sec-WebSocket-Protocol: wia-bci-v1
+
+// Configuration
+{
+  binaryType: 'arraybuffer',  // or 'text' for JSON
+  pingInterval: 30000,        // 30 seconds
+  maxMessageSize: 1048576     // 1 MB
+}</code></pre>
+
+            <h2>TCP Transport</h2>
+            <pre><code>// Connection format
+tcp://host:port
+
+// Default port: 9877
+
+// Message framing
+[4 bytes: length][payload]
+
+// Example in bytes
+[0x00, 0x00, 0x01, 0x50] [JSON payload...]
+ ^                        ^
+ Length = 336 bytes       Actual message</code></pre>
+
+            <h2>LSL Bridge</h2>
+            <pre><code>// Stream info
+Name: "WIA-BCI"
+Type: "EEG"
+Channel Count: 8
+Nominal Rate: 250
+Channel Format: float32
+Source ID: "wia-bci-dev-001"
+
+// Marker stream
+Name: "WIA-BCI-Markers"
+Type: "Markers"
+Channel Format: string</code></pre>
+        </section>
+
+        <section>
+            <h1>4.7 Heartbeat & Reconnection</h1>
+
+            <h2>Heartbeat Configuration</h2>
+            <pre><code>interface HeartbeatConfig {
+  pingInterval: number;    // 30000ms (30 seconds)
+  pongTimeout: number;     // 10000ms (10 seconds)
+  maxMissedPongs: number;  // 3
+}</code></pre>
+
+            <h2>Ping/Pong Messages</h2>
+            <pre><code>// Ping
+{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440007",
+  "timestamp": 1702483200700,
+  "type": "ping",
+  "payload": {}
+}
+
+// Pong
+{
+  "protocol": "wia-bci",
+  "version": "1.0.0",
+  "messageId": "550e8400-e29b-41d4-a716-446655440008",
+  "timestamp": 1702483200710,
+  "type": "pong",
+  "payload": {
+    "serverTime": 1702483200710
+  }
+}</code></pre>
+
+            <h2>Reconnection Strategy</h2>
+            <pre><code>interface ReconnectConfig {
+  enabled: boolean;
+  maxAttempts: number;       // 5
+  initialDelay: number;      // 1000ms
+  maxDelay: number;          // 30000ms
+  backoffMultiplier: number; // 2
+}
+
+// Delay calculation
+delay = min(initialDelay * (backoffMultiplier ^ attempt), maxDelay)
+
+// Example: 1s, 2s, 4s, 8s, 16s, 30s (capped)</code></pre>
+        </section>
+
+        <section>
+            <h1>4.8 Binary Mode</h1>
+
+            <h2>Binary Message Format</h2>
+            <pre><code>┌──────────────────────────────────────────────────┐
+│ Header (16 bytes)                                │
+├──────────────────────────────────────────────────┤
+│ [0-3]   Magic Number (0x57494142 = "WIAB")       │
+│ [4-5]   Version (uint16, 0x0100 = 1.0)           │
+│ [6-7]   Message Type (uint16)                    │
+│ [8-11]  Sequence Number (uint32)                 │
+│ [12-15] Payload Length (uint32)                  │
+├──────────────────────────────────────────────────┤
+│ Payload (variable length)                        │
+└──────────────────────────────────────────────────┘</code></pre>
+
+            <h2>Signal Binary Format</h2>
+            <pre><code>┌──────────────────────────────────────────────────┐
+│ Signal Header (16 bytes)                         │
+├──────────────────────────────────────────────────┤
+│ [0-7]   Timestamp (int64, microseconds)          │
+│ [8-11]  Sample Index (uint32)                    │
+│ [12-13] Channel Count (uint16)                   │
+│ [14-15] Reserved                                 │
+├──────────────────────────────────────────────────┤
+│ Channel Data (channels × 4 bytes)                │
+│ [float32 × channel_count]                        │
+└──────────────────────────────────────────────────┘</code></pre>
+
+            <div class="info-box">
+                <p><strong>Performance Benefit:</strong> Binary mode reduces message size by ~60% and eliminates JSON parsing overhead, critical for high-frequency BCI applications.</p>
+            </div>
+        </section>
+
+        <section>
+            <h1>4.9 Error Handling</h1>
+
+            <h2>Error Codes</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Recoverable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1000</td>
+                        <td>CONNECTION_CLOSED</td>
+                        <td>N/A</td>
+                    </tr>
+                    <tr>
+                        <td>1001</td>
+                        <td>CONNECTION_LOST</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td>1002</td>
+                        <td>CONNECTION_TIMEOUT</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td>1003</td>
+                        <td>PROTOCOL_ERROR</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>2001</td>
+                        <td>DEVICE_NOT_FOUND</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>2004</td>
+                        <td>STREAM_ERROR</td>
+                        <td>Yes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Error Message</h2>
+            <pre><code>{
+  "type": "error",
+  "payload": {
+    "code": 2003,
+    "name": "DEVICE_ERROR",
+    "message": "Electrode contact lost on channel C3",
+    "recoverable": true,
+    "details": {
+      "channel": "C3",
+      "impedance": "Infinity"
+    }
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>4.10 Complete Session Example</h1>
+            <pre><code>Client                          Server
+  │                               │
+  │──────── connect ─────────────>│
+  │                               │
+  │<─────── connect_ack ──────────│
+  │                               │
+  │──────── start_stream ────────>│
+  │                               │
+  │<─────── stream_ack ───────────│
+  │                               │
+  │<─────── signal ───────────────│
+  │<─────── signal ───────────────│
+  │<─────── signal ───────────────│
+  │                               │
+  │──────── marker ──────────────>│
+  │                               │
+  │<─────── signal ───────────────│
+  │<─────── signal ───────────────│
+  │                               │
+  │──────── ping ────────────────>│
+  │<─────── pong ─────────────────│
+  │                               │
+  │──────── stop_stream ─────────>│
+  │                               │
+  │<─────── stream_ack ───────────│
+  │                               │
+  │──────── disconnect ──────────>│
+  │                               │</code></pre>
+        </section>
+
+        <div class="navigation">
+            <a href="chapter3.html">← Previous: Chapter 3</a>
+            <a href="chapter5.html">Next: Chapter 5 (Integration) →</a>
+        </div>
+    </main>
+</body>
+</html>

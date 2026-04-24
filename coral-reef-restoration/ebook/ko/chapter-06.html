@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 3단계 - 프로토콜 | WIA-REEF</title>
+    <style>
+        :root { --primary-color: #EF4444; --secondary-color: #06b6d4; --accent-color: #F87171; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(6,182,212,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .alert-level { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; margin: 0.25rem; }
+        .critical { background: #dc2626; color: white; }
+        .warning { background: #f59e0b; color: #1a202c; }
+        .watch { background: #3b82f6; color: white; }
+        .info { background: #22c55e; color: white; }
+    </style>
+</head>
+<body>
+    <h1>제6장: 3단계 - 프로토콜</h1>
+
+    <div class="objectives-box">
+        <h3>🎯 학습 목표</h3>
+        <ul>
+            <li>센서 데이터를 위한 MQTT 스트리밍 이해</li>
+            <li>WebSocket 실시간 연결 구현</li>
+            <li>경보 라우팅 및 에스컬레이션 설계</li>
+            <li>조직 간 데이터 공유 구성</li>
+            <li>오프라인 운영 및 동기화 처리</li>
+        </ul>
+    </div>
+
+    <h2>6.1 스트리밍 아키텍처</h2>
+
+    <p>WIA-REEF 프로토콜 계층은 수중 센서, 부이, 모니터링 스테이션에서 중앙 시스템 및 구독자 애플리케이션으로의 실시간 데이터 스트리밍을 가능하게 합니다. 이 아키텍처는 지속적인 모니터링과 이벤트 기반 경보를 모두 지원합니다.</p>
+
+    <pre><code>// 스트리밍 아키텍처
+{
+  "protocols": {
+    "mqtt": {
+      "broker": "mqtt.wia-reef.org",
+      "port": 8883,
+      "tls": true,
+      "qos_levels": [0, 1, 2],
+      "use_case": "IoT 센서, 저대역폭"
+    },
+    "websocket": {
+      "endpoint": "wss://stream.wia-reef.org",
+      "use_case": "웹 대시보드, 실시간 시각화"
+    },
+    "sse": {
+      "endpoint": "https://api.wia-reef.org/v1/events",
+      "use_case": "서버 전송 이벤트, 경보"
+    }
+  },
+  "message_format": "스키마 검증을 포함한 JSON",
+  "compression": "대용량 페이로드용 gzip"
+}</code></pre>
+
+    <h2>6.2 MQTT 토픽 구조</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>토픽 패턴</th>
+                <th>설명</th>
+                <th>QoS</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>wia/reef/{site_id}/sensors/+</td>
+                <td>사이트의 모든 센서</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>wia/reef/{site_id}/sensors/temperature</td>
+                <td>온도 측정값</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>wia/reef/{site_id}/alerts/#</td>
+                <td>사이트의 모든 경보</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <td>wia/reef/global/alerts/critical</td>
+                <td>글로벌 긴급 경보</td>
+                <td>2</td>
+            </tr>
+            <tr>
+                <td>wia/reef/{site_id}/restoration/+</td>
+                <td>복원 업데이트</td>
+                <td>1</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <pre><code>// MQTT 센서 메시지
+{
+  "topic": "wia/reef/reef-aus-gbr-001/sensors/temperature",
+  "payload": {
+    "sensor_id": "temp-001",
+    "site_id": "reef-aus-gbr-001",
+    "timestamp": "2024-03-15T14:30:00.000Z",
+    "value": 28.4,
+    "unit": "celsius",
+    "depth_m": 5,
+    "quality": "good",
+    "battery_pct": 85
+  },
+  "qos": 0,
+  "retain": false
+}</code></pre>
+
+    <h2>6.3 경보 시스템</h2>
+
+    <p>
+        <span class="alert-level critical">긴급</span>
+        <span class="alert-level warning">경고</span>
+        <span class="alert-level watch">주의</span>
+        <span class="alert-level info">정보</span>
+    </p>
+
+    <pre><code>// 경보 우선순위 수준
+{
+  "levels": {
+    "critical": {
+      "code": 1,
+      "response_time": "즉시",
+      "notification": ["sms", "email", "push", "webhook"],
+      "examples": ["대량_백화_감지", "장비_고장"]
+    },
+    "warning": {
+      "code": 2,
+      "response_time": "< 1시간",
+      "notification": ["email", "push", "webhook"],
+      "examples": ["온도_임계값", "dhw_상승"]
+    },
+    "watch": {
+      "code": 3,
+      "response_time": "< 24시간",
+      "notification": ["email", "webhook"],
+      "examples": ["예보_우려", "비정상_패턴"]
+    },
+    "info": {
+      "code": 4,
+      "response_time": "일일 요약",
+      "notification": ["email_digest"],
+      "examples": ["평가_예정", "보고서_가용"]
+    }
+  }
+}</code></pre>
+
+    <h3>6.3.1 경보 메시지 형식</h3>
+
+    <pre><code>// 긴급 경보 예시
+{
+  "alert_id": "alert-2024-0315-001",
+  "level": "critical",
+  "type": "bleaching_event",
+  "site_id": "reef-aus-gbr-001",
+  "site_name": "오스프리 리프",
+  "timestamp": "2024-03-15T14:35:00Z",
+  "details": {
+    "current_temp": 30.2,
+    "threshold": 29.0,
+    "dhw": 5.8,
+    "duration_hours": 48,
+    "affected_area_pct": 35
+  },
+  "actions_required": [
+    "모니터링 팀 배치",
+    "개입 프로토콜 시작",
+    "이해관계자 통보"
+  ],
+  "escalation": {
+    "next_level": "regional_coordinator",
+    "escalate_after_minutes": 30
+  }
+}</code></pre>
+
+    <h2>6.4 조직 간 프로토콜</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>프로토콜 기능</th>
+                <th>설명</th>
+                <th>구현</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>데이터 공유 계약</td>
+                <td>공유 가능한 데이터 정의</td>
+                <td>JSON-LD 계약</td>
+            </tr>
+            <tr>
+                <td>연합</td>
+                <td>교차 네트워크 데이터 검색</td>
+                <td>WIA 연합 프로토콜</td>
+            </tr>
+            <tr>
+                <td>귀속</td>
+                <td>데이터 출처 추적</td>
+                <td>암호화 서명</td>
+            </tr>
+            <tr>
+                <td>접근 제어</td>
+                <td>역할 기반 권한</td>
+                <td>OAuth 스코프 + 정책</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <pre><code>// 데이터 공유 계약
+{
+  "agreement_id": "dsa-2024-001",
+  "parties": [
+    {
+      "org_id": "org-marine-research",
+      "role": "data_provider"
+    },
+    {
+      "org_id": "org-conservation-ngo",
+      "role": "data_consumer"
+    }
+  ],
+  "data_scope": {
+    "sites": ["reef-aus-gbr-*"],
+    "data_types": ["health_assessments", "water_quality"],
+    "date_range": "2024-01-01/2024-12-31"
+  },
+  "permissions": {
+    "read": true,
+    "derive": true,
+    "publish": "with_attribution",
+    "commercial": false
+  },
+  "attribution_required": "해양연구소 (CC-BY-NC 4.0)"
+}</code></pre>
+
+    <h2>6.5 오프라인 운영</h2>
+
+    <blockquote>
+        <h3>현장 운영</h3>
+        <p>많은 산호초 모니터링 활동이 신뢰할 수 있는 연결 없이 원격 지역에서 수행됩니다. WIA-REEF 프로토콜은 연결이 복원되면 자동 동기화와 함께 오프라인 데이터 수집을 지원합니다.</p>
+    </blockquote>
+
+    <pre><code>// 오프라인 동기화 프로토콜
+{
+  "offline_mode": {
+    "local_storage": "IndexedDB / SQLite",
+    "queue_limit": "10000 레코드",
+    "conflict_resolution": "server_wins_with_merge",
+    "sync_on_connect": true
+  },
+  "sync_process": {
+    "1_connect": "보안 연결 수립",
+    "2_auth": "필요시 토큰 갱신",
+    "3_pull": "보류 중인 업데이트 다운로드",
+    "4_merge": "로컬에서 충돌 해결",
+    "5_push": "대기 중인 레코드 업로드",
+    "6_confirm": "성공적인 동기화 확인"
+  },
+  "conflict_types": {
+    "create_create": "UUID로 병합",
+    "update_update": "타임스탬프 비교",
+    "delete_update": "검토 플래그"
+  }
+}</code></pre>
+
+    <h2>6.6 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>MQTT가 효율적인 IoT 센서 스트리밍 제공</li>
+            <li>WebSocket이 실시간 대시보드 업데이트 가능케 함</li>
+            <li>4단계 경보 시스템이 적절한 대응 보장</li>
+            <li>조직 간 프로토콜이 귀속을 포함한 데이터 공유 가능케 함</li>
+            <li>오프라인 모드가 원격 현장 운영 지원</li>
+        </ul>
+    </blockquote>
+
+    <h2>6.7 복습 문제</h2>
+
+    <ol>
+        <li>긴급 경보에 어떤 QoS 레벨을 사용해야 하나요?</li>
+        <li>온도 센서의 MQTT 토픽 패턴은?</li>
+        <li>경고 수준 경보에 기대되는 응답 시간은?</li>
+        <li>프로토콜이 데이터 귀속을 어떻게 처리하나요?</li>
+        <li>오프라인 동기화의 충돌 해결 전략은?</li>
+    </ol>
+
+    <h2>6.8 다음 장 미리보기</h2>
+
+    <p>제7장에서는 4단계: WIA 통합을 탐색하여 WIA-REEF가 더 넓은 WIA 생태계, 글로벌 인증 프로그램, 국제 협업 네트워크와 어떻게 연결되는지 다룹니다.</p>
+</body>
+</html>

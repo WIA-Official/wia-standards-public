@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Data Processing and Analytics | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Data Processing and Analytics</h1>
+
+    <p>Raw drone imagery must be processed and analyzed to extract actionable agricultural insights. This chapter covers the complete data processing pipeline from image stitching and orthomosaic generation to vegetation index calculation and AI-powered analytics. Understanding these workflows enables efficient transformation of aerial data into decision-support tools for precision agriculture.</p>
+
+    <h2>5.1 Photogrammetry Pipeline</h2>
+
+    <pre>
+// Photogrammetry Processing Pipeline
+interface PhotogrammetryPipeline {
+  // Input Data
+  input: {
+    images: {
+      count: number;
+      format: 'JPEG' | 'TIFF' | 'RAW';
+      resolution: { width: number; height: number };
+      geotags: boolean;
+      overlap: { front: number; side: number };
+    };
+    gcps?: {
+      count: number;
+      accuracy: number;          // cm
+      distribution: 'corners' | 'grid' | 'strategic';
+    };
+  };
+
+  // Processing Steps
+  steps: {
+    alignment: {
+      purpose: 'Match features across images';
+      algorithm: 'SIFT' | 'SURF' | 'ORB';
+      keypoints: number;         // per image
+      matchThreshold: number;
+    };
+    denseCloud: {
+      purpose: 'Generate 3D point cloud';
+      quality: 'low' | 'medium' | 'high' | 'ultra';
+      depthFiltering: 'disabled' | 'mild' | 'moderate' | 'aggressive';
+      pointDensity: number;      // points per m²
+    };
+    mesh: {
+      purpose: 'Create surface model';
+      faceCount: number;
+      interpolation: boolean;
+    };
+    texture: {
+      purpose: 'Apply imagery to mesh';
+      resolution: number;        // pixels
+      blendingMode: 'mosaic' | 'average' | 'max_intensity';
+    };
+    orthomosaic: {
+      purpose: 'Generate georeferenced map';
+      resolution: number;        // cm/pixel
+      format: 'GeoTIFF' | 'JPEG' | 'PNG';
+      projection: string;        // EPSG code
+    };
+  };
+
+  // Output Products
+  outputs: {
+    orthomosaic: string;         // Georeferenced mosaic
+    dem: string;                 // Digital Elevation Model
+    dsm: string;                 // Digital Surface Model
+    pointCloud: string;          // 3D point cloud
+    report: string;              // Processing report
+  };
+}
+
+// Processing Time Estimates
+const processingEstimates = {
+  images_100: { time: '15-30 min', storage: '500 MB' },
+  images_500: { time: '1-2 hours', storage: '2 GB' },
+  images_1000: { time: '3-5 hours', storage: '5 GB' },
+  images_5000: { time: '12-24 hours', storage: '25 GB' }
+};
+    </pre>
+
+    <h2>5.2 Vegetation Indices</h2>
+
+    <table>
+        <tr>
+            <th>Index</th>
+            <th>Formula</th>
+            <th>Application</th>
+            <th>Range</th>
+        </tr>
+        <tr>
+            <td>NDVI</td>
+            <td>(NIR - Red) / (NIR + Red)</td>
+            <td>General vegetation health</td>
+            <td>-1 to 1</td>
+        </tr>
+        <tr>
+            <td>NDRE</td>
+            <td>(NIR - RedEdge) / (NIR + RedEdge)</td>
+            <td>Chlorophyll content, N status</td>
+            <td>-1 to 1</td>
+        </tr>
+        <tr>
+            <td>GNDVI</td>
+            <td>(NIR - Green) / (NIR + Green)</td>
+            <td>Chlorophyll concentration</td>
+            <td>-1 to 1</td>
+        </tr>
+        <tr>
+            <td>SAVI</td>
+            <td>(NIR - Red) / (NIR + Red + L) * (1 + L)</td>
+            <td>Soil-adjusted health</td>
+            <td>-1 to 1</td>
+        </tr>
+        <tr>
+            <td>CWSI</td>
+            <td>(Tc - Twet) / (Tdry - Twet)</td>
+            <td>Water stress (thermal)</td>
+            <td>0 to 1</td>
+        </tr>
+    </table>
+
+    <pre>
+// Vegetation Index Calculation
+interface VegetationIndexProcessor {
+  // Input Bands
+  bands: {
+    blue?: number[];
+    green?: number[];
+    red: number[];
+    redEdge?: number[];
+    nir: number[];
+  };
+
+  // Index Calculations
+  calculateNDVI(): number[] {
+    // return (nir - red) / (nir + red);
+  };
+
+  calculateNDRE(): number[] {
+    // return (nir - redEdge) / (nir + redEdge);
+  };
+
+  calculateSAVI(L: number = 0.5): number[] {
+    // return ((nir - red) / (nir + red + L)) * (1 + L);
+  };
+
+  // Classification
+  classifyHealth(ndvi: number): string {
+    // if (ndvi < 0.2) return 'bare_soil';
+    // if (ndvi < 0.4) return 'stressed';
+    // if (ndvi < 0.6) return 'moderate';
+    // if (ndvi < 0.8) return 'healthy';
+    // return 'very_healthy';
+  };
+
+  // Zone Generation
+  generateZones(values: number[], thresholds: number[]): GeoJSON.FeatureCollection;
+
+  // Statistics
+  calculateStats(values: number[]): {
+    min: number;
+    max: number;
+    mean: number;
+    stdDev: number;
+    histogram: number[];
+  };
+}
+    </pre>
+
+    <h2>5.3 Radiometric Calibration</h2>
+
+    <div class="highlight">
+        <h3>Calibration Importance</h3>
+        <p>Radiometric calibration converts raw digital numbers to meaningful reflectance values, enabling comparison across flights, sensors, and environmental conditions. Without proper calibration, vegetation indices may be affected by sun angle, cloud cover, and sensor variations.</p>
+    </div>
+
+    <pre>
+// Radiometric Calibration Workflow
+interface RadiometricCalibration {
+  // Calibration Inputs
+  inputs: {
+    rawImages: Image[];
+    calibrationPanel: {
+      captured: boolean;
+      reflectanceValues: { [band: string]: number };
+      imageTimestamp: ISO8601DateTime;
+    };
+    dlsData?: {
+      irradiance: { [band: string]: number[] };
+      timestamps: ISO8601DateTime[];
+    };
+  };
+
+  // Calibration Steps
+  calibration: {
+    vignetteCorrection: {
+      purpose: 'Correct lens light falloff';
+      method: 'polynomial_model' | 'measured_profile';
+    };
+    darkCurrentSubtraction: {
+      purpose: 'Remove sensor noise';
+      method: 'dark_frame' | 'model';
+    };
+    sensorCalibration: {
+      purpose: 'Apply factory calibration';
+      coefficients: number[][];
+    };
+    irradianceNormalization: {
+      purpose: 'Account for changing light';
+      source: 'dls' | 'panel' | 'model';
+    };
+    reflectanceConversion: {
+      purpose: 'Convert DN to reflectance';
+      outputRange: [0, 1];
+    };
+  };
+
+  // Output
+  output: {
+    calibratedImages: Image[];
+    qualityMetrics: {
+      calibrationAccuracy: number;
+      coverageUniformity: number;
+    };
+  };
+}
+    </pre>
+
+    <h2>5.4 AI-Powered Analysis</h2>
+
+    <pre>
+// AI Analysis Capabilities
+interface AIAnalytics {
+  // Object Detection
+  objectDetection: {
+    plantCounting: {
+      model: 'YOLO' | 'Faster_RCNN' | 'custom';
+      classes: ['plant', 'gap', 'weed'];
+      accuracy: number;
+      outputFormat: GeoJSON.FeatureCollection;
+    };
+    weedDetection: {
+      model: 'semantic_segmentation';
+      weedTypes: string[];
+      minimumSize: number;       // cm²
+      confidenceThreshold: number;
+    };
+    diseaseDetection: {
+      model: 'classification';
+      diseases: string[];
+      requiresMultispectral: boolean;
+    };
+  };
+
+  // Semantic Segmentation
+  segmentation: {
+    cropVsBackground: {
+      classes: ['crop', 'soil', 'residue', 'shadow'];
+      resolution: number;        // cm
+    };
+    canopyCover: {
+      output: 'percentage_map';
+      correlation: 'LAI';
+    };
+  };
+
+  // Yield Prediction
+  yieldPrediction: {
+    inputs: ['ndvi_timeseries', 'weather', 'historical_yield'];
+    model: 'regression' | 'random_forest' | 'neural_network';
+    accuracy: number;            // R²
+    outputResolution: 'field' | 'zone' | 'pixel';
+  };
+
+  // Anomaly Detection
+  anomalyDetection: {
+    method: 'statistical' | 'ml_based';
+    types: ['disease_spot', 'nutrient_deficiency', 'water_stress', 'pest_damage'];
+    alertThreshold: number;
+  };
+}
+
+// Plant Counting Example
+const plantCountingResult = {
+  totalPlants: 45230,
+  gaps: 156,
+  doublets: 89,
+  plantsPerHectare: 76200,
+  targetPopulation: 80000,
+  emergenceRate: 0.952,
+  gapMap: 'geojson_feature_collection',
+  replantRecommendation: false
+};
+    </pre>
+
+    <h2>5.5 Thermal Data Analysis</h2>
+
+    <pre>
+// Thermal Analysis Pipeline
+interface ThermalAnalysis {
+  // Data Preprocessing
+  preprocessing: {
+    temperatureExtraction: {
+      input: 'radiometric_thermal_image';
+      emissivity: number;        // Crop-specific
+      atmosphericCorrection: boolean;
+    };
+    canopyTemperature: {
+      method: 'threshold' | 'classification';
+      soilExclusion: boolean;
+    };
+  };
+
+  // Water Stress Analysis
+  waterStress: {
+    cwsi: {
+      formula: '(Tc - Twet) / (Tdry - Twet)';
+      wetReference: 'measured' | 'calculated';
+      dryReference: 'measured' | 'calculated';
+      vpd: number;               // Vapor pressure deficit
+    };
+    interpretation: {
+      range_0_0_3: 'No stress - adequate water';
+      range_0_3_0_5: 'Mild stress - monitor';
+      range_0_5_0_7: 'Moderate stress - irrigate soon';
+      range_0_7_1_0: 'Severe stress - immediate irrigation';
+    };
+  };
+
+  // Spatial Analysis
+  spatialAnalysis: {
+    zoning: {
+      method: 'clustering' | 'classification';
+      zones: number;
+      outputFormat: 'polygon_shapefile';
+    };
+    statistics: {
+      meanTemperature: number;
+      minTemperature: number;
+      maxTemperature: number;
+      temperatureRange: number;
+      coefficientOfVariation: number;
+    };
+  };
+}
+    </pre>
+
+    <h2>5.6 Prescription Map Generation</h2>
+
+    <table>
+        <tr>
+            <th>Prescription Type</th>
+            <th>Input Data</th>
+            <th>Algorithm</th>
+            <th>Output</th>
+        </tr>
+        <tr>
+            <td>Variable Rate Nitrogen</td>
+            <td>NDRE, yield history</td>
+            <td>Zone-based or continuous</td>
+            <td>kg N/ha per zone</td>
+        </tr>
+        <tr>
+            <td>Variable Rate Seeding</td>
+            <td>Yield potential map, soil EC</td>
+            <td>Population optimization</td>
+            <td>seeds/ha per zone</td>
+        </tr>
+        <tr>
+            <td>Spot Spray</td>
+            <td>Weed detection map</td>
+            <td>Binary on/off</td>
+            <td>Spray/no-spray zones</td>
+        </tr>
+        <tr>
+            <td>Variable Rate Irrigation</td>
+            <td>CWSI, soil type</td>
+            <td>Deficit irrigation</td>
+            <td>mm water per zone</td>
+        </tr>
+    </table>
+
+    <pre>
+// Prescription Generation
+interface PrescriptionGenerator {
+  // Input Data
+  inputs: {
+    indexMap: GeoJSON.FeatureCollection;
+    yieldHistory?: number[];
+    soilData?: SoilMap;
+    managementZones?: GeoJSON.FeatureCollection;
+  };
+
+  // Generation Parameters
+  parameters: {
+    prescriptionType: 'nitrogen' | 'seeding' | 'spray' | 'irrigation';
+    algorithm: 'zone_based' | 'continuous' | 'rule_based';
+    targetYield?: number;
+    budgetConstraint?: number;
+    environmentalConstraint?: number;
+  };
+
+  // Zone Generation
+  zoneGeneration: {
+    method: 'kmeans' | 'iso_cluster' | 'natural_breaks' | 'equal_interval';
+    zoneCount: number;
+    minimumZoneSize: number;     // hectares
+    smoothing: boolean;
+  };
+
+  // Rate Calculation
+  rateCalculation: {
+    method: 'lookup_table' | 'regression' | 'optimization';
+    constraints: {
+      minRate: number;
+      maxRate: number;
+      rateIncrement: number;
+    };
+  };
+
+  // Output
+  output: {
+    prescriptionMap: GeoJSON.FeatureCollection;
+    format: 'shapefile' | 'isoxml' | 'geojson' | 'agx';
+    statistics: {
+      totalArea: number;
+      averageRate: number;
+      totalProduct: number;
+      zoneBreakdown: { zone: string; area: number; rate: number }[];
+    };
+  };
+}
+    </pre>
+
+    <h2>5.7 Temporal Analysis</h2>
+
+    <div class="highlight">
+        <h3>Multi-Temporal Monitoring</h3>
+        <ul>
+            <li><strong>Growth Tracking:</strong> Monitor crop development through season</li>
+            <li><strong>Change Detection:</strong> Identify emerging issues early</li>
+            <li><strong>Yield Prediction:</strong> Correlate season-long data with harvest</li>
+            <li><strong>Treatment Assessment:</strong> Evaluate intervention effectiveness</li>
+        </ul>
+    </div>
+
+    <pre>
+// Temporal Analysis
+interface TemporalAnalysis {
+  // Time Series Data
+  timeSeries: {
+    fieldId: string;
+    observations: {
+      date: ISO8601Date;
+      source: 'drone' | 'satellite';
+      indexType: string;
+      statistics: {
+        mean: number;
+        stdDev: number;
+        percentiles: number[];
+      };
+      raster?: string;           // Path to raster file
+    }[];
+  };
+
+  // Analysis Methods
+  analysis: {
+    trendAnalysis: {
+      method: 'linear_regression' | 'moving_average' | 'seasonal_decomposition';
+      windowSize?: number;
+    };
+    changeDetection: {
+      method: 'differencing' | 'ratio' | 'classification';
+      threshold: number;
+      alertOnChange: boolean;
+    };
+    phenologyTracking: {
+      stages: ['emergence', 'vegetative', 'reproductive', 'maturity'];
+      indicators: { [stage: string]: { index: string; threshold: number } };
+    };
+  };
+
+  // Outputs
+  outputs: {
+    growthCurve: { date: string; value: number }[];
+    changeAlerts: { date: string; location: GeoJSON.Point; severity: string }[];
+    phenologyStage: string;
+    seasonSummary: object;
+  };
+}
+    </pre>
+
+    <h2>5.8 Reporting and Visualization</h2>
+
+    <pre>
+// Report Generation
+interface ReportGeneration {
+  // Report Configuration
+  config: {
+    reportType: 'flight_summary' | 'crop_health' | 'prescription' | 'season_summary';
+    format: 'pdf' | 'html' | 'interactive';
+    branding: {
+      logo: string;
+      colors: string[];
+      companyName: string;
+    };
+  };
+
+  // Report Content
+  content: {
+    summary: {
+      field: string;
+      date: string;
+      area: number;
+      crop: string;
+      growthStage: string;
+    };
+    maps: {
+      title: string;
+      type: 'orthomosaic' | 'ndvi' | 'thermal' | 'prescription';
+      legend: { label: string; color: string; range: string }[];
+    }[];
+    statistics: {
+      metric: string;
+      value: number;
+      unit: string;
+      comparison?: string;
+    }[];
+    recommendations: {
+      priority: 'high' | 'medium' | 'low';
+      issue: string;
+      action: string;
+      area: number;
+    }[];
+  };
+
+  // Distribution
+  distribution: {
+    email: string[];
+    cloudStorage: string;
+    fmisIntegration?: string;
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>This chapter covered the complete data processing pipeline from photogrammetry and orthomosaic generation to vegetation indices, AI-powered analytics, thermal analysis, prescription generation, and reporting. These processing capabilities transform raw drone imagery into actionable agricultural insights as specified by the WIA-AGRICULTURAL_DRONE standard.</p>
+    </div>
+</body>
+</html>

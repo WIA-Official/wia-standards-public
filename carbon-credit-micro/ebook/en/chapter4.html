@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Micro Carbon Credit Trading Standard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 { color: #10B981; margin-top: 2em; }
+        h1 { border-bottom: 3px solid #10B981; padding-bottom: 10px; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; border-left: 4px solid #10B981; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; color: #10B981; }
+        tr:nth-child(even) { background: #1e293b40; }
+        blockquote { border-left: 4px solid #ffd700; padding-left: 20px; margin: 20px 0; background: #1e293b; padding: 20px; border-radius: 0 8px 8px 0; }
+        .highlight { background: #10B98120; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .warning { background: #f59e0b20; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
+        .success { background: #10b98120; border-left: 4px solid #10b981; padding: 15px; margin: 15px 0; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        footer .philosophy { color: #ffd700; font-size: 1.2em; margin-bottom: 10px; }
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Protocol Specification</h1>
+
+    <blockquote>
+        <p><strong>Standardizing Carbon Credit Operations</strong></p>
+        <p>Protocols ensure interoperability and trust. The WIA Micro Carbon Credit protocol defines how credits are tokenized, verified, and transacted across the ecosystem.</p>
+    </blockquote>
+
+    <hr>
+
+    <h2>4.1 Credit Tokenization Protocol</h2>
+
+    <h3>4.1.1 ERC-20 Compatible Token Standard</h3>
+
+    <p>Micro carbon credits are implemented as blockchain tokens following the ERC-20 standard with extensions:</p>
+
+    <pre>
+// Solidity Smart Contract Interface
+pragma solidity ^0.8.0;
+
+interface IWIAMicroCarbonCredit {
+    // Standard ERC-20 functions
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+
+    // WIA Extensions
+    function mintCredit(
+        address recipient,
+        uint256 amountMicroCO2e,  // Amount in micro-units (1e-6 tCO2e)
+        string calldata activityRecordId,
+        string calldata verificationId,
+        uint8 confidenceScore
+    ) external returns (bool);
+
+    function retireCredit(
+        uint256 amountMicroCO2e,
+        string calldata retirementPurpose
+    ) external returns (string memory retirementCertificateId);
+
+    function getCreditDetails(uint256 tokenId) external view returns (
+        string memory creditId,
+        uint256 amountMicroCO2e,
+        string memory activityType,
+        uint256 issuanceTimestamp,
+        uint8 verificationScore,
+        bool isRetired
+    );
+}
+    </pre>
+
+    <h3>4.1.2 Tokenization Parameters</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Parameter</th>
+                <th>Value</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Token Name</td>
+                <td>WIA Micro Carbon Credit</td>
+                <td>Full name of the token</td>
+            </tr>
+            <tr>
+                <td>Token Symbol</td>
+                <td>WMCC</td>
+                <td>Ticker symbol</td>
+            </tr>
+            <tr>
+                <td>Decimals</td>
+                <td>6</td>
+                <td>Allows 0.000001 tCO2e (1g CO2) precision</td>
+            </tr>
+            <tr>
+                <td>Base Unit</td>
+                <td>1 WMCC = 0.000001 tCO2e</td>
+                <td>Minimum tradeable unit</td>
+            </tr>
+            <tr>
+                <td>Blockchain</td>
+                <td>Ethereum (Layer 2)</td>
+                <td>Polygon, Arbitrum, Optimism</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>4.2 Verification Protocol</h2>
+
+    <h3>4.2.1 Multi-Factor Verification Flow</h3>
+
+    <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                   VERIFICATION PROTOCOL FLOW                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Activity Data Collection                                   │
+│     └─> IoT Device/Smart Meter/Manual Input                    │
+│           │                                                     │
+│           ▼                                                     │
+│  2. Initial Validation                                         │
+│     ├─> Data completeness check                               │
+│     ├─> Format validation                                      │
+│     └─> Range checks                                           │
+│           │                                                     │
+│           ▼                                                     │
+│  3. Anti-Fraud Analysis                                        │
+│     ├─> Velocity checks                                        │
+│     ├─> Pattern matching                                       │
+│     ├─> Duplicate detection                                    │
+│     └─> Geolocation verification                               │
+│           │                                                     │
+│           ▼                                                     │
+│  4. Carbon Calculation                                         │
+│     ├─> Apply methodology                                      │
+│     ├─> Use emission factors                                   │
+│     └─> Calculate CO2e reduction                               │
+│           │                                                     │
+│           ▼                                                     │
+│  5. Confidence Scoring                                         │
+│     ├─> Data quality score                                     │
+│     ├─> Device certification score                             │
+│     └─> Historical accuracy score                              │
+│           │                                                     │
+│           ▼                                                     │
+│  6. Approval Decision                                          │
+│     └─> If confidence ≥ 0.85: APPROVE                          │
+│         If confidence < 0.85: MANUAL_REVIEW                    │
+│           │                                                     │
+│           ▼                                                     │
+│  7. Credit Issuance                                            │
+│     ├─> Mint blockchain token                                  │
+│     ├─> Update registry                                        │
+│     └─> Notify user                                            │
+└─────────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h3>4.2.2 Verification Confidence Formula</h3>
+
+    <pre>
+Confidence Score = (Data_Quality × 0.4) +
+                   (Device_Certification × 0.3) +
+                   (Anti_Fraud_Score × 0.2) +
+                   (Historical_Accuracy × 0.1)
+
+Where:
+  Data_Quality = (Completeness + GPS_Accuracy + Sensor_Quality) / 3
+  Device_Certification = 1.0 if WIA certified, 0.7 otherwise
+  Anti_Fraud_Score = (Velocity_Check + Pattern_Match + Duplicate_Check) / 3
+  Historical_Accuracy = User's past verification success rate
+
+Minimum threshold for automatic approval: 0.85
+    </pre>
+
+    <hr>
+
+    <h2>4.3 Transaction Protocol</h2>
+
+    <h3>4.3.1 Credit Transfer Protocol</h3>
+
+    <pre>
+// Transaction Flow
+1. Initiate Transfer
+   POST /transfers
+   {
+     "from": "0x742d35Cc...",
+     "to": "0x9f3c21Aa...",
+     "amount_tco2e": 0.00234
+   }
+
+2. Validate Transfer
+   - Check sender balance
+   - Verify recipient wallet
+   - Calculate gas fees
+   - Check transfer limits
+
+3. Execute Blockchain Transaction
+   - Call smart contract transfer()
+   - Pay gas fees
+   - Wait for confirmation
+
+4. Update Registry
+   - Record ownership change
+   - Update wallet balances
+   - Log transaction
+
+5. Notify Parties
+   - Send confirmation to sender
+   - Notify recipient
+   - Update UI in real-time
+    </pre>
+
+    <h3>4.3.2 Atomic Swap Protocol</h3>
+
+    <div class="highlight">
+        <p><strong>Atomic Swap:</strong> Exchange carbon credits for cryptocurrency in a single, trustless transaction.</p>
+    </div>
+
+    <pre>
+// Hashed Timelock Contract (HTLC) Implementation
+contract WIACarbonCreditSwap {
+    struct Swap {
+        address payable initiator;
+        address payable participant;
+        uint256 carbonCreditAmount;
+        uint256 cryptoAmount;
+        bytes32 secretHash;
+        uint256 timelock;
+        bool initiated;
+        bool redeemed;
+        bool refunded;
+    }
+
+    mapping(bytes32 => Swap) public swaps;
+
+    function initiateSwap(
+        bytes32 swapId,
+        address participant,
+        uint256 carbonCreditAmount,
+        bytes32 secretHash,
+        uint256 timelock
+    ) external payable {
+        require(!swaps[swapId].initiated, "Swap already exists");
+        require(msg.value > 0, "Must send crypto");
+
+        swaps[swapId] = Swap({
+            initiator: payable(msg.sender),
+            participant: payable(participant),
+            carbonCreditAmount: carbonCreditAmount,
+            cryptoAmount: msg.value,
+            secretHash: secretHash,
+            timelock: timelock,
+            initiated: true,
+            redeemed: false,
+            refunded: false
+        });
+    }
+
+    function redeemSwap(bytes32 swapId, bytes32 secret) external {
+        Swap storage swap = swaps[swapId];
+        require(swap.initiated, "Swap not initiated");
+        require(sha256(abi.encodePacked(secret)) == swap.secretHash, "Invalid secret");
+        require(block.timestamp < swap.timelock, "Swap expired");
+        require(!swap.redeemed, "Already redeemed");
+
+        swap.redeemed = true;
+        swap.participant.transfer(swap.cryptoAmount);
+        // Transfer carbon credits to initiator
+    }
+}
+    </pre>
+
+    <hr>
+
+    <h2>4.4 Retirement Protocol</h2>
+
+    <h3>4.4.1 Permanent Retirement Process</h3>
+
+    <pre>
+// Credit Retirement Flow
+1. Initiate Retirement
+   POST /retirement
+   {
+     "user_id": "WIA-CORP-2024-TECHCORP",
+     "amount_tco2e": 2.125,
+     "purpose": "CORPORATE_OFFSET",
+     "reporting_period": "2024-Q4"
+   }
+
+2. Verify Ownership
+   - Confirm user owns credits
+   - Check credits are not locked
+   - Validate retirement eligibility
+
+3. Execute Retirement
+   - Burn tokens on blockchain
+   - Mark credits as RETIRED in registry
+   - Create permanent record
+
+4. Issue Certificate
+   - Generate retirement certificate
+   - Assign certificate ID
+   - Store on IPFS
+   - Record on blockchain
+
+5. Update Public Registry
+   - Add to public retirement ledger
+   - Update corporate carbon accounting
+   - Publish to transparency portal
+    </pre>
+
+    <h3>4.4.2 Retirement Certificate Structure</h3>
+
+    <pre>
+{
+    "certificate_id": "WIA-RETIRE-CERT-2024-001234",
+    "certificate_type": "CARBON_CREDIT_RETIREMENT",
+    "issued_date": "2024-12-20T16:00:00Z",
+    "retired_by": {
+        "entity_id": "WIA-CORP-2024-TECHCORP",
+        "entity_name": "TechCorp Inc.",
+        "entity_type": "CORPORATION"
+    },
+    "credits_retired": {
+        "total_amount_tco2e": 2.125,
+        "credit_ids": [
+            "WIA-MCC-2024-XYZ111111",
+            "WIA-MCC-2024-XYZ222222"
+        ],
+        "activity_breakdown": {
+            "bicycle_commute": 0.945,
+            "solar_generation": 1.180
+        }
+    },
+    "retirement_purpose": {
+        "category": "CORPORATE_CARBON_OFFSET",
+        "reporting_period": "2024-Q4",
+        "associated_emissions_tco2e": 2.125,
+        "scope": "SCOPE_3_EMPLOYEE_COMMUTE"
+    },
+    "verification": {
+        "blockchain_tx_hash": "0xd9e4b2c7f3a1d5e8f2c6b9a4d7e3f1c8b5a2d9e6",
+        "ipfs_certificate_hash": "QmX7f8d9c2b5a3e1f4d7c9a6b2e5f8c1a4d7e9b3c6f2",
+        "public_registry_url": "https://registry.wia.live/retirement/001234",
+        "permanent_record": true
+    },
+    "environmental_impact": {
+        "co2_offset_kg": 2125,
+        "equivalent_trees_planted": 96,
+        "equivalent_car_km_offset": 9239
+    }
+}
+    </pre>
+
+    <hr>
+
+    <h2>4.5 Messaging Protocol (MQTT)</h2>
+
+    <h3>4.5.1 IoT Device Communication</h3>
+
+    <pre>
+// MQTT Topic Structure
+wia/carbon-credits/devices/{device_id}/activity
+wia/carbon-credits/devices/{device_id}/status
+wia/carbon-credits/devices/{device_id}/commands
+
+// Example: Bicycle GPS Tracker Publishes Activity
+Topic: wia/carbon-credits/devices/WIA-DEVICE-2024-GPS-BIKE-123/activity
+QoS: 1 (At least once delivery)
+Retain: false
+
+Payload:
+{
+    "device_id": "WIA-DEVICE-2024-GPS-BIKE-123",
+    "user_id": "WIA-USER-2024-SARAH",
+    "activity_type": "bicycle_commute",
+    "timestamp_start": "2024-12-20T08:00:00Z",
+    "timestamp_end": "2024-12-20T08:35:00Z",
+    "gps_data": {
+        "start": {"lat": 37.7749, "lon": -122.4194},
+        "end": {"lat": 37.7849, "lon": -122.4094},
+        "distance_km": 10.2,
+        "waypoints": [...]
+    },
+    "verification": {
+        "gps_quality": "HIGH",
+        "accelerometer_match": 0.96
+    }
+}
+
+// Server Response
+Topic: wia/carbon-credits/devices/WIA-DEVICE-2024-GPS-BIKE-123/commands
+Payload:
+{
+    "command": "ACTIVITY_ACKNOWLEDGED",
+    "activity_record_id": "WIA-ACT-2024-TRANS-789456",
+    "estimated_credits_tco2e": 0.00234,
+    "verification_status": "PENDING"
+}
+    </pre>
+
+    <h3>4.5.2 Real-Time Credit Updates</h3>
+
+    <pre>
+// WebSocket Protocol for Real-Time Updates
+wss://api.wia.live/v1/carbon-credits/stream
+
+// Subscribe to User Wallet Updates
+{
+    "action": "subscribe",
+    "channel": "wallet_updates",
+    "user_id": "WIA-USER-2024-SARAH",
+    "auth_token": "Bearer {access_token}"
+}
+
+// Server Pushes Credit Issuance Notification
+{
+    "event": "CREDIT_ISSUED",
+    "timestamp": "2024-12-20T08:36:00Z",
+    "data": {
+        "credit_id": "WIA-MCC-2024-ABC123456",
+        "amount_tco2e": 0.00234,
+        "activity_type": "bicycle_commute",
+        "new_balance_tco2e": 0.235,
+        "value_usd": 0.051
+    }
+}
+    </pre>
+
+    <hr>
+
+    <h2>4.6 Interoperability Protocol</h2>
+
+    <h3>4.6.1 Integration with Major Carbon Registries</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Registry</th>
+                <th>Integration Method</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Gold Standard</td>
+                <td>API Bridge + Manual Reporting</td>
+                <td>✅ Compatible</td>
+            </tr>
+            <tr>
+                <td>Verra (VCS)</td>
+                <td>API Integration</td>
+                <td>✅ Compatible</td>
+            </tr>
+            <tr>
+                <td>Climate Action Reserve</td>
+                <td>XML Export + API</td>
+                <td>✅ Compatible</td>
+            </tr>
+            <tr>
+                <td>American Carbon Registry</td>
+                <td>REST API</td>
+                <td>✅ Compatible</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>4.6.2 Cross-Chain Bridge Protocol</h3>
+
+    <pre>
+// Bridge WMCC tokens between chains
+Source Chain: Polygon (WMCC on Polygon)
+Target Chain: Arbitrum
+
+1. Lock tokens on source chain
+   lockTokens(amount, destinationChain, recipientAddress)
+
+2. Emit bridge event
+   event TokensLocked(sourceChain, amount, recipient, nonce)
+
+3. Bridge validators confirm
+   7 of 10 validators must sign
+
+4. Mint on destination chain
+   mintBridgedTokens(amount, recipient, proof)
+
+5. Update bridge registry
+   Record successful bridge operation
+    </pre>
+
+    <hr>
+
+    <h2>4.7 Chapter Summary</h2>
+
+    <div class="success">
+        <p><strong>Key Takeaways:</strong></p>
+        <ol>
+            <li><strong>Tokenization:</strong> ERC-20 compatible with WIA extensions for carbon credits</li>
+            <li><strong>Verification Protocol:</strong> Multi-factor verification with 0.85 confidence threshold</li>
+            <li><strong>Transaction Protocol:</strong> Atomic swaps, transfers, and blockchain confirmation</li>
+            <li><strong>Retirement Protocol:</strong> Permanent burning with IPFS certificate storage</li>
+            <li><strong>MQTT/WebSocket:</strong> Real-time IoT communication and wallet updates</li>
+            <li><strong>Interoperability:</strong> Cross-chain bridges and registry integrations</li>
+        </ol>
+    </div>
+</body>
+</html>

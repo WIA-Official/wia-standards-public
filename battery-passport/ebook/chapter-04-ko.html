@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 4: 건강 상태(SoH) 모니터링 - WIA-BATTERY_PASSPORT</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #bbb;
+            --accent: #00d4ff;
+            --accent-secondary: #00ff88;
+            --border-color: #333;
+            --code-bg: #0d1117;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Malgun Gothic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            line-height: 1.9;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 {
+            font-size: 2.5em;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.6em;
+            margin: 35px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--bg-tertiary);
+        }
+        h3 {
+            color: var(--accent-secondary);
+            font-size: 1.3em;
+            margin: 25px 0 15px 0;
+        }
+        p { margin: 15px 0; color: var(--text-secondary); text-align: justify; }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+            border-left: 4px solid var(--accent);
+            padding: 20px 25px;
+            margin: 25px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight strong { color: var(--accent); }
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+        code { color: var(--accent-secondary); }
+        ul, ol { margin: 15px 0 15px 30px; color: var(--text-secondary); }
+        li { margin: 10px 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th { background: var(--bg-tertiary); color: var(--accent); }
+        .chapter-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: var(--bg-primary);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .metric-box {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--accent-secondary);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .formula {
+            background: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: 'Consolas', monospace;
+            color: var(--accent);
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <span class="chapter-badge">챕터 4</span>
+
+        <h1>건강 상태(SoH) 모니터링</h1>
+
+        <div class="highlight">
+            <strong>챕터 개요:</strong> 이 챕터에서는 배터리의 건강 상태(SoH) 모니터링 방법론과 구현을 다룹니다. 정확한 SoH 평가는 안전성, 보증 관리, 2차 수명 적용 및 수명 종료 결정에 중요합니다.
+        </div>
+
+        <h2>건강 상태 이해하기</h2>
+
+        <p>건강 상태(SoH)는 배터리의 원래 사양 대비 상태를 측정하는 지표입니다. 배터리가 사용과 시간을 통해 노화됨에 따라 용량이 감소하고 내부 저항이 증가합니다. SoH는 이 열화를 정량화하며, 일반적으로 100%가 새 배터리를 나타내고 낮은 값이 점진적 노화를 나타내는 백분율로 표현됩니다.</p>
+
+        <p>EU 배터리 규정은 배터리 관리 시스템이 SoH 값을 결정하고 보고할 수 있어야 한다고 의무화합니다. 이 데이터는 배터리 여권 시스템을 통해 접근 가능해야 하며 배터리의 운영 수명 전체에 걸쳐 업데이트되어야 합니다.</p>
+
+        <h2>주요 건강 지표</h2>
+
+        <p>포괄적인 SoH 평가에는 배터리 노화 및 열화의 다양한 측면을 나타내는 여러 매개변수를 모니터링해야 합니다.</p>
+
+        <div class="metric-box">
+            <h3>건강 상태 - 용량 (SoH-C)</h3>
+            <p>초기 정격 용량 대비 남은 용량을 측정합니다. 대부분의 응용에서 주요 SoH 지표입니다.</p>
+            <div class="formula">SoH-C = (현재 용량 / 정격 용량) x 100%</div>
+        </div>
+
+        <div class="metric-box">
+            <h3>건강 상태 - 저항 (SoH-R)</h3>
+            <p>출력 능력과 효율성에 영향을 미치는 내부 저항의 증가를 추적합니다.</p>
+            <div class="formula">SoH-R = (초기 저항 / 현재 저항) x 100%</div>
+        </div>
+
+        <div class="metric-box">
+            <h3>건강 상태 - 출력 (SoH-P)</h3>
+            <p>고성능 응용에 중요한 남은 출력 공급 능력을 나타냅니다.</p>
+            <div class="formula">SoH-P = (현재 최대 출력 / 정격 최대 출력) x 100%</div>
+        </div>
+
+        <h2>SoH 추정 방법</h2>
+
+        <p>정확한 SoH 추정에는 사용 가능한 센서 데이터로 작동하고 실제 배터리 작동의 복잡성을 처리할 수 있는 정교한 알고리즘이 필요합니다.</p>
+
+        <h3>모델 기반 추정</h3>
+
+        <p>모델 기반 접근 방식은 전기화학적 또는 등가 회로 모델을 사용하여 건강 상태를 나타내는 내부 상태와 매개변수를 추정합니다.</p>
+
+        <pre><code>{
+  "sohEstimationConfig": {
+    "method": "확장 칼만 필터",
+    "modelType": "등가 회로 모델",
+    "modelParameters": {
+      "topology": "2RC",
+      "stateVector": ["SOC", "V_RC1", "V_RC2"],
+      "parameterVector": ["R0", "R1", "C1", "R2", "C2", "Q_capacity"],
+      "updateInterval": "1초",
+      "capacityEstimation": {
+        "method": "이중 추정",
+        "convergenceThreshold": 0.5,
+        "minimumDataPoints": 1000
+      }
+    },
+    "validationMetrics": {
+      "voltageRMSE": { "threshold": 20, "unit": "mV" },
+      "socAccuracy": { "threshold": 3, "unit": "퍼센트" },
+      "capacityConfidence": { "threshold": 95, "unit": "퍼센트" }
+    }
+  }
+}</code></pre>
+
+        <h3>데이터 기반 추정</h3>
+
+        <p>머신 러닝 접근 방식은 분석적으로 모델링하기 어려운 복잡한 열화 패턴을 캡처할 수 있습니다. 이러한 방법은 학습 데이터가 필요하지만 다양한 작동 조건에서 높은 정확도를 달성할 수 있습니다.</p>
+
+        <pre><code>{
+  "mlSohEstimator": {
+    "architecture": "LSTM 신경망",
+    "inputFeatures": [
+      "전압_시계열",
+      "전류_시계열",
+      "온도_시계열",
+      "누적_처리량",
+      "사이클_횟수",
+      "캘린더_수명_일수",
+      "평균_soc",
+      "soc_스윙_분포"
+    ],
+    "preprocessing": {
+      "normalization": "MinMax",
+      "sequenceLength": 100,
+      "samplingRate": "1 Hz"
+    },
+    "modelConfig": {
+      "lstmLayers": 2,
+      "hiddenUnits": [128, 64],
+      "dropout": 0.2,
+      "outputActivation": "sigmoid",
+      "lossFunction": "MSE"
+    },
+    "trainingData": {
+      "source": "실험실 사이클링 + 현장 데이터",
+      "samples": 50000,
+      "batteryTypes": ["NMC622", "NMC811", "LFP"],
+      "temperatureRange": [-20, 45],
+      "temperatureUnit": "섭씨"
+    },
+    "performance": {
+      "testMAE": 1.2,
+      "testRMSE": 1.8,
+      "unit": "퍼센트"
+    }
+  }
+}</code></pre>
+
+        <h2>실시간 모니터링 시스템</h2>
+
+        <p>WIA-BATTERY_PASSPORT 표준은 SoH 모니터링을 배터리 여권 시스템과 통합하기 위한 인터페이스를 정의합니다. 실시간 데이터는 배터리 관리 시스템에서 클라우드 기반 분석으로 흐르고 궁극적으로 여권 기록에 기록됩니다.</p>
+
+        <pre><code>// TypeScript: SoH 모니터링 서비스
+interface SoHMonitoringService {
+  readonly batteryId: string;
+  readonly bmsConnector: BMSDataConnector;
+  readonly estimationEngine: SoHEstimationEngine;
+  readonly passportClient: PassportAPIClient;
+
+  startMonitoring(): Promise&lt;void&gt;;
+  getCurrentSoH(): SoHSnapshot;
+  getSoHHistory(timeRange: TimeRange): SoHTimeSeries;
+  predictRemainingLife(): RULPrediction;
+}
+
+class WIASoHMonitor implements SoHMonitoringService {
+  private lastUpdate: Date;
+  private currentSnapshot: SoHSnapshot;
+
+  async startMonitoring(): Promise&lt;void&gt; {
+    // BMS 데이터 스트림 구독
+    this.bmsConnector.subscribe({
+      parameters: ['voltage', 'current', 'temperature', 'soc'],
+      interval: 1000, // 밀리초
+      callback: this.onBMSData.bind(this)
+    });
+
+    // 주기적 SoH 추정 시작
+    setInterval(() => this.performSoHEstimation(), 3600000); // 매시간
+  }
+
+  private async onBMSData(data: BMSDataPacket): void {
+    // 추정 알고리즘을 위한 데이터 버퍼링
+    this.dataBuffer.push({
+      timestamp: Date.now(),
+      voltage: data.packVoltage,
+      current: data.packCurrent,
+      temperature: data.averageTemperature,
+      cellVoltages: data.cellVoltages
+    });
+
+    // 이상 확인
+    const anomaly = this.anomalyDetector.analyze(data);
+    if (anomaly.detected) {
+      await this.handleAnomaly(anomaly);
+    }
+  }
+
+  private async performSoHEstimation(): Promise&lt;void&gt; {
+    // 추정 알고리즘 실행
+    const estimate = await this.estimationEngine.estimate(this.dataBuffer);
+
+    // 추정 품질 검증
+    if (estimate.confidence > 0.9) {
+      this.currentSnapshot = {
+        sohCapacity: estimate.sohC,
+        sohResistance: estimate.sohR,
+        sohPower: estimate.sohP,
+        timestamp: new Date(),
+        confidence: estimate.confidence,
+        method: estimate.method
+      };
+
+      // 여권 기록 업데이트
+      await this.updatePassportRecord(this.currentSnapshot);
+    }
+  }
+}</code></pre>
+
+        <h2>배터리 여권의 SoH 데이터</h2>
+
+        <p>배터리 여권은 현재 값, 과거 추세 및 남은 수명 예측을 포함한 포괄적인 SoH 정보를 저장합니다.</p>
+
+        <pre><code>{
+  "stateOfHealth": {
+    "batteryId": "WIA-BP-2024-EU-0001234567",
+    "lastUpdate": "2024-06-15T10:30:00Z",
+    "current": {
+      "sohCapacity": {
+        "value": 94.5,
+        "unit": "퍼센트",
+        "confidence": 0.95
+      },
+      "sohResistance": {
+        "value": 92.1,
+        "unit": "퍼센트",
+        "confidence": 0.93
+      },
+      "sohPower": {
+        "value": 93.8,
+        "unit": "퍼센트",
+        "confidence": 0.94
+      },
+      "estimationMethod": "하이브리드 EKF + ML",
+      "dataQuality": "높음"
+    },
+    "usageStatistics": {
+      "totalEnergyThroughput": {
+        "value": 15420,
+        "unit": "kWh"
+      },
+      "equivalentFullCycles": 154,
+      "calendarAge": {
+        "value": 458,
+        "unit": "일"
+      },
+      "operatingTimeHours": 3250,
+      "averageSOC": 62,
+      "averageTemperature": {
+        "value": 28,
+        "unit": "섭씨"
+      }
+    },
+    "degradationAnalysis": {
+      "capacityFadeRate": {
+        "value": 1.2,
+        "unit": "연간퍼센트",
+        "trend": "선형"
+      },
+      "resistanceGrowthRate": {
+        "value": 1.7,
+        "unit": "연간퍼센트"
+      },
+      "dominantMechanism": "SEI 층 성장",
+      "acceleratingFactors": ["고온 작동"]
+    },
+    "predictions": {
+      "remainingUsefulLife": {
+        "toEOL80": {
+          "value": 6.2,
+          "unit": "년",
+          "confidence": 0.85
+        },
+        "toEOL70": {
+          "value": 8.5,
+          "unit": "년",
+          "confidence": 0.80
+        }
+      },
+      "secondLifePotential": {
+        "eligible": true,
+        "recommendedApplication": "고정형 저장장치",
+        "estimatedSecondLifeYears": 5
+      }
+    }
+  }
+}</code></pre>
+
+        <h2>이상 감지 및 경고</h2>
+
+        <p>일상적인 SoH 추적 외에도 모니터링 시스템은 안전 문제 또는 가속화된 열화를 나타낼 수 있는 이상을 감지해야 합니다.</p>
+
+        <table>
+            <tr>
+                <th>이상 유형</th>
+                <th>감지 방법</th>
+                <th>대응 조치</th>
+            </tr>
+            <tr>
+                <td>급격한 용량 저하</td>
+                <td>통계적 편차 추적</td>
+                <td>서비스 알림, 진단 요청</td>
+            </tr>
+            <tr>
+                <td>셀 불균형</td>
+                <td>전압 편차 모니터링</td>
+                <td>밸런싱 증가, 조사</td>
+            </tr>
+            <tr>
+                <td>열 이상</td>
+                <td>온도 기울기 분석</td>
+                <td>출력 제한, 안전 경고</td>
+            </tr>
+            <tr>
+                <td>저항 급증</td>
+                <td>임피던스 분광법</td>
+                <td>연결 점검, 셀 분석</td>
+            </tr>
+        </table>
+
+        <div class="highlight">
+            <strong>안전 우선:</strong> SoH 모니터링 시스템은 다른 모든 고려 사항보다 안전을 우선시합니다. 안전 위험을 나타낼 수 있는 모든 이상은 즉각적인 경고를 트리거하고 배터리 관리 시스템을 통해 보호 조치를 시작할 수 있습니다.
+        </div>
+
+    </div>
+</body>
+</html>

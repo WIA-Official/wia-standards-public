@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 05: 음성 인식 - WIA-BIOMETRIC_AUTH</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --text: #e2e8f0;
+            --border: #334155;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 40px 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin: 2.5rem 0 1.2rem 0;
+            padding-left: 15px;
+            border-left: 4px solid var(--primary);
+        }
+        h3 {
+            color: #60a5fa;
+            font-size: 1.2rem;
+            margin: 2rem 0 1rem 0;
+        }
+        p {
+            margin: 1rem 0;
+            text-align: justify;
+        }
+        pre {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            font-family: 'D2Coding', monospace;
+            font-size: 0.95rem;
+            margin: 1.5rem 0;
+            line-height: 1.6;
+        }
+        .highlight {
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 1.5rem 0;
+        }
+        .highlight-title {
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #1e293b;
+            color: var(--primary);
+        }
+        .chapter-indicator {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        .copyright {
+            text-align: center;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="chapter-indicator">Chapter 05</div>
+    <h1>음성 인식</h1>
+    <p style="color: #94a3b8; font-size: 1.1rem;">화자 인증 및 검증 기술의 원리, 음성 특징 추출, 딥러닝 기반 방법론, 스푸핑 방지 기술을 학습합니다.</p>
+
+    <h2>화자 인식 개요</h2>
+    <p>화자 인식(Speaker Recognition)은 음성의 고유한 특성을 분석하여 발화자의 신원을 확인하는 생체인식 기술입니다. 음성은 성대, 구강, 비강 등 발성 기관의 물리적 특성과 말하는 습관, 억양 등 행동적 특성이 복합적으로 작용하여 형성됩니다.</p>
+
+    <p>화자 인식은 크게 화자 검증(Speaker Verification)과 화자 식별(Speaker Identification)로 구분됩니다. 화자 검증은 "이 음성이 특정인의 것이 맞는가?"라는 1:1 비교이고, 화자 식별은 "이 음성의 주인이 누구인가?"라는 1:N 검색입니다.</p>
+
+    <div class="highlight">
+        <span class="highlight-title">음성의 생체인식적 특성</span>
+        <pre>
+생리학적 특성 (해부학적 구조)
+──────────────────────────────
+- 성대의 길이와 두께
+- 성도(Vocal Tract)의 형태
+- 비강의 크기와 구조
+- 구강 및 인두의 형태
+→ 기본 주파수(F0), 포먼트 주파수 결정
+
+행동학적 특성 (말하는 습관)
+───────────────────────────
+- 말하는 속도
+- 억양 및 강세 패턴
+- 발음 습관
+- 어휘 선택
+→ 운율적 특성, 발화 패턴에 반영
+
+화자 인식의 장점:
+✓ 원격 인증 가능 (전화, 인터넷)
+✓ 자연스러운 사용자 경험
+✓ 추가 하드웨어 불필요 (마이크만)
+✓ 다른 생체인식과 융합 용이
+
+화자 인식의 한계:
+✗ 환경 소음에 민감
+✗ 건강 상태에 따른 변동
+✗ 녹음/합성 공격에 취약
+✗ 텍스트 의존성 문제
+        </pre>
+    </div>
+
+    <h2>음성 특징 추출</h2>
+    <p>음성 신호에서 화자 고유의 특성을 추출하는 과정은 화자 인식의 핵심입니다. 다양한 특징 추출 기법이 개발되어 왔으며, 현재는 MFCC와 딥러닝 기반 임베딩이 가장 널리 사용됩니다.</p>
+
+    <h3>MFCC (Mel-Frequency Cepstral Coefficients)</h3>
+    <p>MFCC는 인간의 청각 특성을 반영한 음성 특징으로, 화자 인식의 표준 특징으로 오랫동안 사용되어 왔습니다. 멜 스케일 필터뱅크를 적용하여 인간 청각의 비선형적 주파수 인지를 모사합니다.</p>
+
+    <pre>
+MFCC 추출 과정
+══════════════════════════════════════════════════════════════
+
+[원시 음성] → [전처리] → [프레이밍] → [윈도잉] → [FFT]
+                                                    │
+                                                    ▼
+              [MFCC] ← [DCT] ← [로그] ← [멜 필터뱅크]
+
+상세 단계:
+
+1. 전처리 (Pre-emphasis)
+   y[n] = x[n] - α·x[n-1],  α ≈ 0.97
+   - 고주파 성분 강조
+   - 신호 대 노이즈 비율 개선
+
+2. 프레이밍 (Framing)
+   - 프레임 길이: 20-30ms (일반적으로 25ms)
+   - 프레임 시프트: 10ms (50% 오버랩)
+   - 음성의 준정상(Quasi-stationary) 특성 활용
+
+3. 윈도잉 (Windowing)
+   - 해밍 윈도우 적용
+   w[n] = 0.54 - 0.46·cos(2πn/(N-1))
+   - 스펙트럼 누설 방지
+
+4. FFT (Fast Fourier Transform)
+   - 시간 도메인 → 주파수 도메인 변환
+   - 512 또는 1024 포인트
+
+5. 멜 필터뱅크 (Mel Filterbank)
+   - 멜 스케일: m = 2595·log₁₀(1 + f/700)
+   - 삼각 필터 26-40개 적용
+   - 저주파에서 높은 해상도
+
+6. 로그 압축
+   - 진폭의 로그 변환
+   - 인간 청각의 웨버-페흐너 법칙 모사
+
+7. DCT (Discrete Cosine Transform)
+   - 필터뱅크 출력의 상관 제거
+   - 최종 MFCC 12-13개 계수 추출
+   - Delta, Delta-Delta 추가 (39차원)
+    </pre>
+
+    <h3>딥러닝 기반 특징 (Speaker Embeddings)</h3>
+    <p>최근에는 딥러닝 네트워크가 자동으로 화자 구별에 최적화된 특징을 학습하는 방식이 주류가 되었습니다. d-vector, x-vector 등의 임베딩 방식이 대표적입니다.</p>
+
+    <div class="highlight">
+        <span class="highlight-title">주요 화자 임베딩 모델</span>
+        <pre>
+i-vector (2011)
+───────────────
+- 전통적 통계 모델 기반
+- GMM-UBM에서 파생
+- 총 변이 공간(Total Variability Space) 사용
+- PLDA 분류기와 함께 사용
+
+d-vector (2014, Google)
+───────────────────────
+- DNN 기반 화자 임베딩
+- 프레임 레벨 처리 후 평균
+- 텍스트 의존 시스템에 적합
+- 실시간 처리 가능
+
+x-vector (2018, JHU)
+────────────────────
+- TDNN (Time-Delay Neural Network) 기반
+- 통계 풀링 레이어
+- 텍스트 독립 시스템에 우수
+- 현재 가장 널리 사용
+
+ECAPA-TDNN (2020)
+─────────────────
+- Squeeze-Excitation 블록
+- 다중 스케일 특징 집계
+- Attentive Statistics Pooling
+- 현재 SOTA 성능
+        </pre>
+    </div>
+
+    <h2>화자 인증 시스템 아키텍처</h2>
+    <pre>
+화자 검증 시스템 구조
+══════════════════════════════════════════════════════════════
+
+[등록 단계]
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│ 등록 음성 │ -> │ 특징 추출 │ -> │ 임베딩   │ -> │ 화자     │
+│ 수집     │    │ (MFCC)   │    │ 네트워크 │    │ 프로파일 │
+└──────────┘    └──────────┘    └──────────┘    └────┬─────┘
+                                                      │
+                                                      ▼
+                                               ┌──────────┐
+                                               │ 데이터   │
+                                               │ 베이스   │
+                                               └──────────┘
+
+[검증 단계]
+┌──────────┐    ┌──────────┐    ┌──────────┐
+│ 테스트   │ -> │ 특징 추출 │ -> │ 임베딩   │
+│ 음성     │    │ (MFCC)   │    │ 네트워크 │
+└──────────┘    └──────────┘    └────┬─────┘
+                                      │
+                                      ▼
+                               ┌──────────┐    ┌──────────┐
+                               │ 스코어링 │ -> │  결정    │
+                               │ (코사인) │    │ (임계값) │
+                               └────┬─────┘    └──────────┘
+                                    │
+                                    ▼
+                               ┌──────────┐
+                               │ 화자     │
+                               │ 프로파일 │
+                               └──────────┘
+    </pre>
+
+    <h2>딥러닝 화자 인식 구현</h2>
+    <pre>
+import torch
+import torch.nn as nn
+import torchaudio
+import torchaudio.transforms as T
+
+class ECAPA_TDNN(nn.Module):
+    """ECAPA-TDNN 화자 인식 네트워크"""
+    
+    def __init__(self, input_dim=80, channels=1024, emb_dim=192):
+        super().__init__()
+        
+        # 특징 추출 프론트엔드
+        self.mel_spec = T.MelSpectrogram(
+            sample_rate=16000,
+            n_fft=512,
+            n_mels=input_dim,
+            hop_length=160
+        )
+        
+        # TDNN 레이어들
+        self.layer1 = self._make_tdnn_layer(input_dim, channels, 5, 1)
+        self.layer2 = self._make_se_res2block(channels, channels, 3, 2)
+        self.layer3 = self._make_se_res2block(channels, channels, 3, 3)
+        self.layer4 = self._make_se_res2block(channels, channels, 3, 4)
+        
+        # 다중 스케일 특징 집계
+        self.mfa = nn.Conv1d(channels * 3, channels * 3, 1)
+        
+        # Attentive Statistics Pooling
+        self.attention = nn.Sequential(
+            nn.Conv1d(channels * 3, 256, 1),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Conv1d(256, channels * 3, 1),
+            nn.Softmax(dim=2)
+        )
+        
+        # 임베딩 레이어
+        self.fc = nn.Linear(channels * 6, emb_dim)
+        self.bn = nn.BatchNorm1d(emb_dim)
+    
+    def _make_tdnn_layer(self, in_dim, out_dim, kernel_size, dilation):
+        return nn.Sequential(
+            nn.Conv1d(in_dim, out_dim, kernel_size, 
+                     dilation=dilation, padding=dilation*(kernel_size-1)//2),
+            nn.ReLU(),
+            nn.BatchNorm1d(out_dim)
+        )
+    
+    def _make_se_res2block(self, in_dim, out_dim, kernel_size, scale):
+        # Squeeze-Excitation Res2Block (간략화)
+        return nn.Sequential(
+            nn.Conv1d(in_dim, out_dim, kernel_size, padding=kernel_size//2),
+            nn.ReLU(),
+            nn.BatchNorm1d(out_dim)
+        )
+    
+    def forward(self, wav):
+        # 멜 스펙트로그램 추출
+        x = self.mel_spec(wav)
+        x = x.transpose(1, 2)  # (B, T, F) -> (B, F, T)
+        
+        # TDNN 레이어 통과
+        out1 = self.layer1(x)
+        out2 = self.layer2(out1) + out1
+        out3 = self.layer3(out2) + out2
+        out4 = self.layer4(out3) + out3
+        
+        # 다중 스케일 집계
+        out = torch.cat([out2, out3, out4], dim=1)
+        out = self.mfa(out)
+        
+        # Attentive Statistics Pooling
+        attn = self.attention(out)
+        mean = torch.sum(out * attn, dim=2)
+        std = torch.sqrt(torch.sum(attn * (out - mean.unsqueeze(2))**2, dim=2))
+        pooled = torch.cat([mean, std], dim=1)
+        
+        # 임베딩 생성
+        emb = self.bn(self.fc(pooled))
+        
+        return nn.functional.normalize(emb, p=2, dim=1)
+
+
+class SpeakerVerification:
+    """화자 검증 시스템"""
+    
+    def __init__(self, model_path=None, threshold=0.5):
+        self.model = ECAPA_TDNN()
+        if model_path:
+            self.model.load_state_dict(torch.load(model_path))
+        self.model.eval()
+        self.threshold = threshold
+        self.enrolled_speakers = {}
+    
+    def enroll(self, speaker_id, audio_samples):
+        """화자 등록 - 여러 샘플로 평균 임베딩 생성"""
+        embeddings = []
+        for audio in audio_samples:
+            with torch.no_grad():
+                emb = self.model(audio.unsqueeze(0))
+                embeddings.append(emb)
+        
+        # 평균 임베딩
+        mean_emb = torch.mean(torch.stack(embeddings), dim=0)
+        self.enrolled_speakers[speaker_id] = mean_emb
+        return True
+    
+    def verify(self, speaker_id, audio):
+        """화자 검증 - 코사인 유사도 기반"""
+        if speaker_id not in self.enrolled_speakers:
+            return False, 0.0
+        
+        with torch.no_grad():
+            probe_emb = self.model(audio.unsqueeze(0))
+        
+        enrolled_emb = self.enrolled_speakers[speaker_id]
+        
+        # 코사인 유사도
+        similarity = torch.nn.functional.cosine_similarity(
+            probe_emb, enrolled_emb
+        ).item()
+        
+        return similarity >= self.threshold, similarity
+    </pre>
+
+    <h2>스푸핑 방지 기술</h2>
+    <p>음성 기반 인증 시스템은 녹음 재생, 음성 합성, 음성 변환 등의 스푸핑 공격에 취약합니다. 이를 방지하기 위한 다양한 대응 기술이 개발되고 있습니다.</p>
+
+    <table>
+        <tr>
+            <th>공격 유형</th>
+            <th>설명</th>
+            <th>대응 기술</th>
+        </tr>
+        <tr>
+            <td>재생 공격</td>
+            <td>녹음된 음성 재생</td>
+            <td>채널 특성 분석, 환경 노이즈 검출</td>
+        </tr>
+        <tr>
+            <td>음성 합성 (TTS)</td>
+            <td>AI 생성 음성</td>
+            <td>합성 아티팩트 검출, 자연스러움 분석</td>
+        </tr>
+        <tr>
+            <td>음성 변환</td>
+            <td>다른 사람 음성을 타겟 화자로</td>
+            <td>변환 흔적 검출, 스펙트럼 분석</td>
+        </tr>
+        <tr>
+            <td>딥페이크</td>
+            <td>딥러닝 기반 음성 복제</td>
+            <td>미세 패턴 분석, 앙상블 검출기</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <span class="highlight-title">ASVspoof 챌린지와 대응 기술</span>
+        <pre>
+ASVspoof: 화자 검증 스푸핑 방지 챌린지
+──────────────────────────────────────
+
+ASVspoof 2019 LA (Logical Access)
+- 합성 및 변환 음성 검출
+- 17개 공격 시스템 대상
+- EER 기준 평가
+
+ASVspoof 2021
+- 재생 공격 포함
+- 인코딩/압축 변형 고려
+- 실제 환경 시뮬레이션
+
+대응 기술:
+1. LFCC (Linear Frequency Cepstral Coefficients)
+   - 합성 음성의 고주파 아티팩트 포착
+
+2. CQCC (Constant Q Cepstral Coefficients)
+   - 저주파 대역 세밀한 분석
+
+3. RawNet2
+   - 원시 파형 직접 처리
+   - End-to-End 검출
+
+4. AASIST
+   - Graph Attention Network
+   - 현재 SOTA 성능
+        </pre>
+    </div>
+
+    <h2>WIA 음성 인식 표준</h2>
+    <pre>
+WIA-BIOMETRIC_AUTH 음성 인식 요구사항
+══════════════════════════════════════════════════════════════
+
+성능 요구사항
+─────────────
+- 텍스트 의존: FAR ≤ 1%, FRR ≤ 1%
+- 텍스트 독립: FAR ≤ 2%, FRR ≤ 3%
+- 등록: 최소 3개 발화 샘플
+- 인증 시간: ≤ 3초 (발화 후)
+
+오디오 품질 요구사항
+────────────────────
+- 샘플링 레이트: 16kHz 이상
+- SNR: 15dB 이상
+- 발화 길이: 최소 2초
+
+스푸핑 방지 요구사항
+────────────────────
+- ASVspoof 2021 기준 EER ≤ 5%
+- 재생 공격 검출률 ≥ 95%
+- 합성 음성 검출률 ≥ 98%
+- 챌린지-응답 프로토콜 권장
+    </pre>
+
+    <div class="copyright">
+        <p>© 2025 World Industry Association (WIA). 弘益人間 - 널리 인간을 이롭게 하라</p>
+    </div>
+</body>
+</html>

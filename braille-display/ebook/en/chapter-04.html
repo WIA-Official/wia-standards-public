@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Phase 1 - Data Format - WIA Braille Display Standard</title>
+</head>
+<body>
+    <h1>Chapter 4: Phase 1 - Data Format</h1>
+
+    <p><em>"Data is the foundation. Get the data format right, and everything else—protocols, translation, user experience—follows naturally. Get it wrong, and you build castles on sand."</em></p>
+
+    <h2>4.1 Braille Cell Data Model</h2>
+
+    <h3>4.1.1 The Fundamental Unit: A Single Braille Cell</h3>
+
+    <p>At the heart of the WIA standard is a simple, elegant data model for representing a single Braille cell. Every Braille display, regardless of manufacturer or configuration, presents information as a series of tactile cells. The WIA standard defines how to represent these cells in digital form.</p>
+
+    <p>A Braille cell consists of:</p>
+
+    <ul>
+        <li><strong>Position:</strong> The cell's location on the display (0-indexed from left to right)</li>
+        <li><strong>Dots:</strong> Which dots are raised (numbered 1-8)</li>
+        <li><strong>Attributes:</strong> Optional metadata (cursor position, emphasis, etc.)</li>
+    </ul>
+
+    <h3>4.1.2 Dot Numbering Convention</h3>
+
+    <p>The WIA standard uses the international dot numbering convention:</p>
+
+    <pre>
+6-dot cell:          8-dot cell:
+    1 • • 4             1 • • 4
+    2 • • 5             2 • • 5
+    3 • • 6             3 • • 6
+                        7 • • 8
+    </pre>
+
+    <p>Dots are numbered 1 through 6 for traditional Braille, with dots 7 and 8 added for computer Braille and attributes.</p>
+
+    <h3>4.1.3 Cell Representation in JSON</h3>
+
+    <p>A single cell is represented as a JSON object:</p>
+
+    <pre>
+{
+  "position": 0,
+  "dots": [1, 2, 5],
+  "cursor": false,
+  "attributes": {
+    "bold": false,
+    "blink": false,
+    "emphasis": 0
+  }
+}
+    </pre>
+
+    <p><strong>Field Descriptions:</strong></p>
+
+    <table border="1">
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Required</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>position</td>
+            <td>integer</td>
+            <td>Yes</td>
+            <td>0-indexed position from left. Position 0 is leftmost cell.</td>
+        </tr>
+        <tr>
+            <td>dots</td>
+            <td>array of integers</td>
+            <td>Yes</td>
+            <td>Which dots are raised. Array contains 1-8. Empty array = blank cell. Must be sorted ascending.</td>
+        </tr>
+        <tr>
+            <td>cursor</td>
+            <td>boolean</td>
+            <td>No (default: false)</td>
+            <td>True if this cell should display the cursor indicator</td>
+        </tr>
+        <tr>
+            <td>attributes</td>
+            <td>object</td>
+            <td>No</td>
+            <td>Optional display attributes for emphasis, formatting, etc.</td>
+        </tr>
+    </table>
+
+    <h3>4.1.4 Examples of Common Characters</h3>
+
+    <table border="1">
+        <tr>
+            <th>Character</th>
+            <th>Dots Raised</th>
+            <th>JSON Representation</th>
+            <th>Unicode Braille</th>
+        </tr>
+        <tr>
+            <td>a</td>
+            <td>1</td>
+            <td>{"position": 0, "dots": [1]}</td>
+            <td>U+2801 (⠁)</td>
+        </tr>
+        <tr>
+            <td>b</td>
+            <td>1, 2</td>
+            <td>{"position": 0, "dots": [1, 2]}</td>
+            <td>U+2803 (⠃)</td>
+        </tr>
+        <tr>
+            <td>c</td>
+            <td>1, 4</td>
+            <td>{"position": 0, "dots": [1, 4]}</td>
+            <td>U+2809 (⠉)</td>
+        </tr>
+        <tr>
+            <td>1 (numeric)</td>
+            <td>2, 3, 4, 5, 6 then 1</td>
+            <td>Two cells needed</td>
+            <td>⠼⠁ (number sign + 'a')</td>
+        </tr>
+        <tr>
+            <td>A (capital)</td>
+            <td>6 then 1</td>
+            <td>Two cells or dot 7</td>
+            <td>⠠⠁ or ⡁ (8-dot)</td>
+        </tr>
+        <tr>
+            <td>(space)</td>
+            <td>(none)</td>
+            <td>{"position": 0, "dots": []}</td>
+            <td>U+2800 (⠀)</td>
+        </tr>
+        <tr>
+            <td>period</td>
+            <td>2, 5, 6</td>
+            <td>{"position": 0, "dots": [2, 5, 6]}</td>
+            <td>U+2826 (⠦)</td>
+        </tr>
+    </table>
+
+    <h3>4.1.5 Cell Array Representation</h3>
+
+    <p>An entire display line is represented as an array of cell objects:</p>
+
+    <pre>
+{
+  "command": "SET_BRAILLE",
+  "cells": [
+    {"position": 0, "dots": [1, 2, 3, 5]},      // 'h'
+    {"position": 1, "dots": [1, 5]},            // 'e'
+    {"position": 2, "dots": [1, 2, 4, 5]},      // 'l'
+    {"position": 3, "dots": [1, 2, 4, 5]},      // 'l'
+    {"position": 4, "dots": [1, 3, 5]},         // 'o'
+    {"position": 5, "dots": []}                 // (space)
+  ]
+}
+    </pre>
+
+    <p>This represents the word "hello " displayed in Grade 1 English Braille.</p>
+
+    <h2>4.2 JSON Schema Definitions</h2>
+
+    <h3>4.2.1 BrailleCell Schema</h3>
+
+    <pre>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia-standards.org/schemas/braille-cell-v1.json",
+  "title": "WIA Braille Cell",
+  "description": "Representation of a single Braille cell",
+  "type": "object",
+  "required": ["position", "dots"],
+  "properties": {
+    "position": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0-indexed position from left"
+    },
+    "dots": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 8
+      },
+      "uniqueItems": true,
+      "description": "Array of raised dots (1-8), must be sorted ascending"
+    },
+    "cursor": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether cursor indicator is shown at this cell"
+    },
+    "attributes": {
+      "type": "object",
+      "properties": {
+        "bold": {"type": "boolean", "default": false},
+        "italic": {"type": "boolean", "default": false},
+        "underline": {"type": "boolean", "default": false},
+        "blink": {"type": "boolean", "default": false},
+        "emphasis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 0,
+          "description": "Emphasis level: 0=none, 1=low, 2=medium, 3=high"
+        }
+      }
+    }
+  }
+}
+    </pre>
+
+    <h3>4.2.2 SetBraille Command Schema</h3>
+
+    <p>The most common command sent from screen reader to display:</p>
+
+    <pre>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia-standards.org/schemas/command-set-braille-v1.json",
+  "title": "WIA SET_BRAILLE Command",
+  "description": "Command to update Braille display cells",
+  "type": "object",
+  "required": ["command", "cells"],
+  "properties": {
+    "command": {
+      "type": "string",
+      "const": "SET_BRAILLE"
+    },
+    "cells": {
+      "type": "array",
+      "items": {
+        "$ref": "https://wia-standards.org/schemas/braille-cell-v1.json"
+      },
+      "description": "Array of cells to update"
+    },
+    "partial": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, only update specified cells; if false, clear all cells then update"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when command was issued"
+    },
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for tracking request/response pairs"
+    }
+  }
+}
+    </pre>
+
+    <h3>4.2.3 Device Capability Schema</h3>
+
+    <p>Announced by the display when it connects:</p>
+
+    <pre>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia-standards.org/schemas/device-capability-v1.json",
+  "title": "WIA Device Capability",
+  "description": "Braille display capability announcement",
+  "type": "object",
+  "required": ["device", "manufacturer", "model", "wia_version", "capabilities"],
+  "properties": {
+    "device": {
+      "type": "string",
+      "description": "Device class identifier"
+    },
+    "manufacturer": {
+      "type": "string",
+      "description": "Manufacturer name"
+    },
+    "model": {
+      "type": "string",
+      "description": "Model name/number"
+    },
+    "serial": {
+      "type": "string",
+      "description": "Serial number (optional)"
+    },
+    "firmware": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Firmware version (semantic versioning)"
+    },
+    "wia_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "WIA standard version supported (e.g., '1.0')"
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["cell_count", "cell_type"],
+      "properties": {
+        "cell_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of Braille cells"
+        },
+        "cell_type": {
+          "type": "string",
+          "enum": ["6-dot", "8-dot", "mixed"],
+          "description": "Type of Braille cells"
+        },
+        "status_cells": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of cells reserved for status display"
+        },
+        "cursor_routing": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether device has cursor routing buttons"
+        },
+        "multi_touch": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether device supports multi-touch gestures"
+        },
+        "gestures": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Supported gesture names"
+        },
+        "refresh_rate": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum refresh rate in Hz"
+        },
+        "connection": {
+          "type": "string",
+          "enum": ["usb", "bluetooth_classic", "bluetooth_le", "serial", "wifi"],
+          "description": "Connection type"
+        },
+        "battery": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether device is battery-powered"
+        },
+        "languages": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "ISO 639-1 language codes for supported Braille tables"
+        }
+      }
+    }
+  }
+}
+    </pre>
+
+    <h3>4.2.4 Complete Command Set</h3>
+
+    <p>The WIA Phase 1 protocol defines these standard commands:</p>
+
+    <table border="1">
+        <tr>
+            <th>Command</th>
+            <th>Direction</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td>HANDSHAKE</td>
+            <td>Display → Screen Reader</td>
+            <td>Announce device capabilities upon connection</td>
+        </tr>
+        <tr>
+            <td>ACKNOWLEDGE</td>
+            <td>Screen Reader → Display</td>
+            <td>Confirm receipt of handshake, announce screen reader capabilities</td>
+        </tr>
+        <tr>
+            <td>SET_BRAILLE</td>
+            <td>Screen Reader → Display</td>
+            <td>Update one or more cells</td>
+        </tr>
+        <tr>
+            <td>CLEAR_BRAILLE</td>
+            <td>Screen Reader → Display</td>
+            <td>Clear all cells to blank</td>
+        </tr>
+        <tr>
+            <td>GET_STATUS</td>
+            <td>Screen Reader → Display</td>
+            <td>Query display status (battery, errors, etc.)</td>
+        </tr>
+        <tr>
+            <td>STATUS_REPORT</td>
+            <td>Display → Screen Reader</td>
+            <td>Report status information</td>
+        </tr>
+        <tr>
+            <td>BUTTON_PRESS</td>
+            <td>Display → Screen Reader</td>
+            <td>Report button/key press event</td>
+        </tr>
+        <tr>
+            <td>CURSOR_ROUTE</td>
+            <td>Display → Screen Reader</td>
+            <td>Report cursor routing button press</td>
+        </tr>
+        <tr>
+            <td>GESTURE</td>
+            <td>Display → Screen Reader</td>
+            <td>Report touch gesture</td>
+        </tr>
+        <tr>
+            <td>ERROR</td>
+            <td>Both directions</td>
+            <td>Report error condition</td>
+        </tr>
+        <tr>
+            <td>PING</td>
+            <td>Both directions</td>
+            <td>Check connection liveness</td>
+        </tr>
+        <tr>
+            <td>PONG</td>
+            <td>Both directions</td>
+            <td>Respond to PING</td>
+        </tr>
+    </table>
+
+    <h2>4.3 Unicode Braille Mapping (U+2800 to U+28FF)</h2>
+
+    <h3>4.3.1 Unicode Braille Patterns Block</h3>
+
+    <p>Unicode allocates 256 code points (U+2800 through U+28FF) for Braille patterns, providing a one-to-one mapping for every possible 8-dot Braille cell combination.</p>
+
+    <p><strong>Encoding Logic:</strong></p>
+
+    <p>The Unicode value is calculated as: <code>U+2800 + bit_pattern</code></p>
+
+    <p>Where <code>bit_pattern</code> is an 8-bit value with bits representing dots:</p>
+
+    <pre>
+Bit 0 (LSB) = Dot 1
+Bit 1       = Dot 2
+Bit 2       = Dot 3
+Bit 3       = Dot 4
+Bit 4       = Dot 5
+Bit 5       = Dot 6
+Bit 6       = Dot 7
+Bit 7 (MSB) = Dot 8
+    </pre>
+
+    <h3>4.3.2 Conversion Examples</h3>
+
+    <p><strong>Example 1: Letter 'a' (dot 1 only)</strong></p>
+    <pre>
+Dots: [1]
+Bit pattern: 00000001 (binary) = 1 (decimal) = 0x01 (hex)
+Unicode: U+2800 + 0x01 = U+2801
+Character: ⠁
+    </pre>
+
+    <p><strong>Example 2: Letter 'w' (dots 2, 4, 5, 6)</strong></p>
+    <pre>
+Dots: [2, 4, 5, 6]
+Bits: 0 1 0 1 1 1 0 0 (reading right-to-left in dot order)
+Binary: 00111010 = 58 (decimal) = 0x3A (hex)
+Unicode: U+2800 + 0x3A = U+283A
+Character: ⠺
+    </pre>
+
+    <p><strong>Example 3: Full cell (all dots 1-8)</strong></p>
+    <pre>
+Dots: [1, 2, 3, 4, 5, 6, 7, 8]
+Bit pattern: 11111111 (binary) = 255 (decimal) = 0xFF (hex)
+Unicode: U+2800 + 0xFF = U+28FF
+Character: ⣿
+    </pre>
+
+    <h3>4.3.3 Conversion Algorithm (Pseudocode)</h3>
+
+    <pre>
+function dotsToUnicode(dots):
+    bit_value = 0
+    for dot in dots:
+        bit_value = bit_value OR (1 &lt;&lt; (dot - 1))
+    return 0x2800 + bit_value
+
+function unicodeToDots(unicode_char):
+    bit_value = unicode_char - 0x2800
+    dots = []
+    for i in range(1, 9):
+        if bit_value AND (1 &lt;&lt; (i - 1)):
+            dots.append(i)
+    return dots
+    </pre>
+
+    <h3>4.3.4 Lookup Table (Partial)</h3>
+
+    <table border="1">
+        <tr>
+            <th>Unicode</th>
+            <th>Hex</th>
+            <th>Dots</th>
+            <th>Character</th>
+            <th>Common Use (English)</th>
+        </tr>
+        <tr>
+            <td>U+2800</td>
+            <td>2800</td>
+            <td>[]</td>
+            <td>⠀</td>
+            <td>Space / blank cell</td>
+        </tr>
+        <tr>
+            <td>U+2801</td>
+            <td>2801</td>
+            <td>[1]</td>
+            <td>⠁</td>
+            <td>a</td>
+        </tr>
+        <tr>
+            <td>U+2803</td>
+            <td>2803</td>
+            <td>[1, 2]</td>
+            <td>⠃</td>
+            <td>b</td>
+        </tr>
+        <tr>
+            <td>U+2809</td>
+            <td>2809</td>
+            <td>[1, 4]</td>
+            <td>⠉</td>
+            <td>c</td>
+        </tr>
+        <tr>
+            <td>U+2819</td>
+            <td>2819</td>
+            <td>[1, 4, 5]</td>
+            <td>⠙</td>
+            <td>d</td>
+        </tr>
+        <tr>
+            <td>U+2811</td>
+            <td>2811</td>
+            <td>[1, 5]</td>
+            <td>⠑</td>
+            <td>e</td>
+        </tr>
+        <tr>
+            <td>U+280B</td>
+            <td>280B</td>
+            <td>[1, 2, 4]</td>
+            <td>⠋</td>
+            <td>f</td>
+        </tr>
+        <tr>
+            <td>U+281B</td>
+            <td>281B</td>
+            <td>[1, 2, 4, 5]</td>
+            <td>⠛</td>
+            <td>g</td>
+        </tr>
+        <tr>
+            <td>U+2813</td>
+            <td>2813</td>
+            <td>[1, 2, 5]</td>
+            <td>⠓</td>
+            <td>h</td>
+        </tr>
+    </table>
+
+    <h3>4.3.5 Using Unicode Braille in WIA Protocol</h3>
+
+    <p>The WIA standard allows three equivalent representations for efficiency:</p>
+
+    <p><strong>Method 1: Dot Array (Most Explicit)</strong></p>
+    <pre>
+{"position": 0, "dots": [1, 2, 5]}
+    </pre>
+
+    <p><strong>Method 2: Unicode Character (Most Compact)</strong></p>
+    <pre>
+{"position": 0, "unicode": "⠓"}  // U+2813
+    </pre>
+
+    <p><strong>Method 3: Unicode Hex Code (Most Compatible)</strong></p>
+    <pre>
+{"position": 0, "unicode": "U+2813"}
+    </pre>
+
+    <p>All three are valid and semantically identical. Implementations must support all three for maximum compatibility.</p>
+
+    <h2>4.4 6-Dot and 8-Dot Formats</h2>
+
+    <h3>4.4.1 6-Dot Cell Format</h3>
+
+    <p>For traditional 6-dot displays, only dots 1-6 are used:</p>
+
+    <pre>
+{
+  "cell_type": "6-dot",
+  "cell": {
+    "position": 0,
+    "dots": [1, 2, 5],  // Only values 1-6 allowed
+    "unicode": "⠓"      // U+2813 (dots 1, 2, 5)
+  }
+}
+    </pre>
+
+    <p><strong>Validation Rule:</strong> If <code>cell_type</code> is "6-dot", the dots array must not contain values 7 or 8. If present, the implementation should return an error.</p>
+
+    <h3>4.4.2 8-Dot Cell Format</h3>
+
+    <p>For computer Braille displays supporting 8 dots:</p>
+
+    <pre>
+{
+  "cell_type": "8-dot",
+  "cell": {
+    "position": 0,
+    "dots": [1, 2, 5, 7],  // Values 1-8 allowed
+    "unicode": "⡓"         // U+2853 (dots 1, 2, 5, 7)
+  }
+}
+    </pre>
+
+    <p><strong>Dot 7 and 8 Usage:</strong></p>
+    <ul>
+        <li><strong>Dot 7:</strong> Often indicates capitalization or bold in 8-dot Braille</li>
+        <li><strong>Dot 8:</strong> Often indicates italics or alternative character set</li>
+        <li><strong>Dots 7+8:</strong> Together can indicate special modes or underline</li>
+    </ul>
+
+    <h3>4.4.3 Mixed Cell Displays</h3>
+
+    <p>Some displays have different cell types in different positions (e.g., 6-dot for main text, 8-dot for status):</p>
+
+    <pre>
+{
+  "device_config": {
+    "cell_layout": [
+      {"range": [0, 1], "type": "8-dot", "purpose": "status"},
+      {"range": [2, 41], "type": "6-dot", "purpose": "text"}
+    ]
+  }
+}
+    </pre>
+
+    <p>The screen reader can query this configuration and send appropriate data to each cell type.</p>
+
+    <h3>4.4.4 Automatic Conversion</h3>
+
+    <p>When an 8-dot pattern must be displayed on a 6-dot cell:</p>
+
+    <pre>
+Input: {dots: [1, 2, 5, 7]}  // Capital 'h' in 8-dot
+6-dot display conversion:
+  Cell 1: {dots: [6]}        // Capital indicator
+  Cell 2: {dots: [1, 2, 5]}  // 'h'
+    </pre>
+
+    <p>The WIA standard defines conversion rules for all common 8-dot to 6-dot mappings.</p>
+
+    <h2>4.5 Multi-Language Braille Tables</h2>
+
+    <h3>4.5.1 Braille Table Structure</h3>
+
+    <p>A Braille table defines the mapping between text characters and Braille patterns. The WIA standard uses a JSON-based table format:</p>
+
+    <pre>
+{
+  "table_id": "en-US-g2",
+  "language": "en",
+  "region": "US",
+  "grade": 2,
+  "description": "English (US) Grade 2 Braille",
+  "version": "1.2.0",
+  "cell_type": "6-dot",
+  "based_on": "liblouis/en-us-g2.ctb",
+  "character_mappings": {
+    "a": {"dots": [1], "unicode": "⠁"},
+    "b": {"dots": [1, 2], "unicode": "⠃"},
+    "c": {"dots": [1, 4], "unicode": "⠉"},
+    ...
+  },
+  "contractions": {
+    "and": {"dots": [1, 2, 3, 4, 6], "unicode": "⠯", "rules": ["not-in-word"]},
+    "the": {"dots": [2, 3, 4, 6], "unicode": "⠮", "rules": ["standalone"]},
+    ...
+  },
+  "special_rules": [
+    {
+      "context": "number",
+      "prefix": {"dots": [3, 4, 5, 6], "unicode": "⠼"},
+      "applies_to": ["0-9"]
+    },
+    {
+      "context": "capital",
+      "prefix": {"dots": [6], "unicode": "⠠"},
+      "applies_to": ["A-Z"]
+    }
+  ]
+}
+    </pre>
+
+    <h3>4.5.2 Language Coverage</h3>
+
+    <p>The WIA standard includes reference tables for:</p>
+
+    <table border="1">
+        <tr>
+            <th>Language</th>
+            <th>ISO 639-1</th>
+            <th>Grade 1</th>
+            <th>Grade 2</th>
+            <th>Computer Braille</th>
+        </tr>
+        <tr>
+            <td>English (US)</td>
+            <td>en-US</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>English (UK)</td>
+            <td>en-GB</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Spanish</td>
+            <td>es</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>French</td>
+            <td>fr</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>German</td>
+            <td>de</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Arabic</td>
+            <td>ar</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Chinese (Mandarin)</td>
+            <td>zh</td>
+            <td>✓</td>
+            <td>Partial</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Japanese</td>
+            <td>ja</td>
+            <td>✓</td>
+            <td>N/A</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Korean</td>
+            <td>ko</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Russian</td>
+            <td>ru</td>
+            <td>✓</td>
+            <td>Partial</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Hindi</td>
+            <td>hi</td>
+            <td>✓</td>
+            <td>Partial</td>
+            <td>✓</td>
+        </tr>
+        <tr>
+            <td>Portuguese</td>
+            <td>pt</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+        </tr>
+    </table>
+
+    <p><em>Note: "Partial" indicates work in progress; Grade 2 Braille does not exist for all languages.</em></p>
+
+    <h3>4.5.3 Multi-Language Text Handling</h3>
+
+    <p>When text contains multiple languages, the WIA protocol supports language tagging:</p>
+
+    <pre>
+{
+  "command": "SET_BRAILLE",
+  "text": "Hello mundo 你好",
+  "language_segments": [
+    {"start": 0, "end": 5, "language": "en", "table": "en-US-g2"},
+    {"start": 6, "end": 11, "language": "es", "table": "es-g2"},
+    {"start": 12, "end": 14, "language": "zh", "table": "zh-g1"}
+  ]
+}
+    </pre>
+
+    <p>The display or screen reader can then apply the correct Braille table for each segment.</p>
+
+    <h3>4.5.4 Table Selection Priority</h3>
+
+    <p>When multiple tables could apply, the WIA standard defines selection priority:</p>
+
+    <ol>
+        <li><strong>Explicit user override:</strong> User has manually selected a table (highest priority)</li>
+        <li><strong>Document metadata:</strong> Document declares its language (e.g., HTML lang attribute)</li>
+        <li><strong>Language detection:</strong> Automatic detection based on content</li>
+        <li><strong>System locale:</strong> Operating system language setting</li>
+        <li><strong>Fallback default:</strong> en-US-g1 (lowest priority)</li>
+    </ol>
+
+    <h2>4.6 Validation Rules</h2>
+
+    <h3>4.6.1 Cell Data Validation</h3>
+
+    <p>All cell data must pass these validation checks:</p>
+
+    <table border="1">
+        <tr>
+            <th>Rule</th>
+            <th>Check</th>
+            <th>Error if Violated</th>
+        </tr>
+        <tr>
+            <td>Position Range</td>
+            <td>0 ≤ position &lt; cell_count</td>
+            <td>INVALID_POSITION</td>
+        </tr>
+        <tr>
+            <td>Dots Range</td>
+            <td>All values in dots array must be 1-6 (6-dot) or 1-8 (8-dot)</td>
+            <td>INVALID_DOT_NUMBER</td>
+        </tr>
+        <tr>
+            <td>Dots Unique</td>
+            <td>No duplicate values in dots array</td>
+            <td>DUPLICATE_DOTS</td>
+        </tr>
+        <tr>
+            <td>Dots Sorted</td>
+            <td>Dots array must be in ascending order</td>
+            <td>UNSORTED_DOTS</td>
+        </tr>
+        <tr>
+            <td>Unicode Match</td>
+            <td>If both dots and unicode provided, they must match</td>
+            <td>UNICODE_MISMATCH</td>
+        </tr>
+        <tr>
+            <td>One Cursor</td>
+            <td>Only one cell per display can have cursor=true</td>
+            <td>MULTIPLE_CURSORS</td>
+        </tr>
+    </table>
+
+    <h3>4.6.2 Protocol Message Validation</h3>
+
+    <p>All protocol messages must be valid JSON and conform to their schema:</p>
+
+    <pre>
+// Invalid: Missing required field
+{
+  "command": "SET_BRAILLE"
+  // ERROR: Missing "cells" field
+}
+
+// Invalid: Wrong type
+{
+  "command": "SET_BRAILLE",
+  "cells": "hello"  // ERROR: "cells" must be array, not string
+}
+
+// Invalid: Unknown command
+{
+  "command": "FANCY_ANIMATION",
+  "cells": []
+  // ERROR: Unknown command
+}
+
+// Valid
+{
+  "command": "SET_BRAILLE",
+  "cells": [
+    {"position": 0, "dots": [1, 2]}
+  ]
+}
+    </pre>
+
+    <h3>4.6.3 Error Response Format</h3>
+
+    <p>When validation fails, the device returns a structured error:</p>
+
+    <pre>
+{
+  "status": "ERROR",
+  "error_code": "INVALID_DOT_NUMBER",
+  "message": "Dot number 9 is invalid for 8-dot cell (must be 1-8)",
+  "details": {
+    "field": "cells[2].dots[3]",
+    "value": 9,
+    "expected": "1-8"
+  },
+  "documentation_url": "https://wia-standards.org/docs/errors#INVALID_DOT_NUMBER",
+  "timestamp": "2025-01-15T14:23:11Z"
+}
+    </pre>
+
+    <h2>4.7 Code Examples</h2>
+
+    <h3>4.7.1 Python Example: Sending Braille to Display</h3>
+
+    <pre>
+import json
+import serial
+
+class WIABrailleDisplay:
+    def __init__(self, port='/dev/ttyUSB0'):
+        self.serial = serial.Serial(port, 9600)
+        self.capabilities = self.handshake()
+
+    def handshake(self):
+        """Perform initial handshake and get capabilities"""
+        # Display sends HANDSHAKE automatically on connect
+        response = json.loads(self.serial.readline())
+        if response['command'] == 'HANDSHAKE':
+            # Send ACKNOWLEDGE
+            ack = {
+                "command": "ACKNOWLEDGE",
+                "screen_reader": "ExampleReader",
+                "version": "1.0.0"
+            }
+            self.serial.write(json.dumps(ack).encode() + b'\n')
+            return response['capabilities']
+        else:
+            raise Exception("Handshake failed")
+
+    def set_braille(self, text):
+        """Convert text to Braille and send to display"""
+        cells = []
+        for i, char in enumerate(text):
+            dots = self.char_to_dots(char)
+            cells.append({
+                "position": i,
+                "dots": dots
+            })
+
+        command = {
+            "command": "SET_BRAILLE",
+            "cells": cells
+        }
+
+        self.serial.write(json.dumps(command).encode() + b'\n')
+        response = json.loads(self.serial.readline())
+        return response
+
+    def char_to_dots(self, char):
+        """Simple Grade 1 English Braille mapping"""
+        braille_map = {
+            'a': [1], 'b': [1,2], 'c': [1,4], 'd': [1,4,5],
+            'e': [1,5], 'f': [1,2,4], 'g': [1,2,4,5],
+            'h': [1,2,5], 'i': [2,4], 'j': [2,4,5],
+            # ... (rest of alphabet)
+            ' ': []
+        }
+        return braille_map.get(char.lower(), [])
+
+# Usage
+display = WIABrailleDisplay('/dev/ttyUSB0')
+print(f"Connected to: {display.capabilities['manufacturer']} {display.capabilities['model']}")
+print(f"Cell count: {display.capabilities['cell_count']}")
+
+display.set_braille("hello")
+    </pre>
+
+    <h3>4.7.2 JavaScript Example: Web-Based Braille Display Simulator</h3>
+
+    <pre>
+class BrailleCell {
+    constructor(position) {
+        this.position = position;
+        this.dots = [];
+    }
+
+    setDots(dots) {
+        // Validate
+        if (!Array.isArray(dots)) {
+            throw new Error('Dots must be array');
+        }
+        if (dots.some(d =&gt; d &lt; 1 || d &gt; 8)) {
+            throw new Error('Dot values must be 1-8');
+        }
+        if (dots.length !== new Set(dots).size) {
+            throw new Error('Duplicate dots not allowed');
+        }
+
+        this.dots = [...dots].sort((a, b) =&gt; a - b);
+        this.render();
+    }
+
+    toUnicode() {
+        let bitValue = 0;
+        for (let dot of this.dots) {
+            bitValue |= (1 &lt;&lt; (dot - 1));
+        }
+        return String.fromCodePoint(0x2800 + bitValue);
+    }
+
+    render() {
+        // Render to HTML canvas or DOM
+        const unicode = this.toUnicode();
+        document.getElementById(`cell-${this.position}`).textContent = unicode;
+    }
+}
+
+class WIABrailleSimulator {
+    constructor(cellCount) {
+        this.cells = [];
+        for (let i = 0; i &lt; cellCount; i++) {
+            this.cells.push(new BrailleCell(i));
+        }
+    }
+
+    handleCommand(command) {
+        switch(command.command) {
+            case 'SET_BRAILLE':
+                this.setBraille(command.cells);
+                return {status: 'OK'};
+
+            case 'CLEAR_BRAILLE':
+                this.clear();
+                return {status: 'OK'};
+
+            default:
+                return {
+                    status: 'ERROR',
+                    error_code: 'UNKNOWN_COMMAND',
+                    message: `Command ${command.command} not recognized`
+                };
+        }
+    }
+
+    setBraille(cellData) {
+        for (let data of cellData) {
+            if (data.position &gt;= this.cells.length) {
+                throw new Error(`Position ${data.position} out of range`);
+            }
+            this.cells[data.position].setDots(data.dots);
+        }
+    }
+
+    clear() {
+        for (let cell of this.cells) {
+            cell.setDots([]);
+        }
+    }
+}
+
+// Usage
+const simulator = new WIABrailleSimulator(40);
+
+const command = {
+    command: 'SET_BRAILLE',
+    cells: [
+        {position: 0, dots: [1, 2, 5]},      // 'h'
+        {position: 1, dots: [1, 5]},         // 'e'
+        {position: 2, dots: [1, 2, 4, 5]},   // 'l'
+        {position: 3, dots: [1, 2, 4, 5]},   // 'l'
+        {position: 4, dots: [1, 3, 5]}       // 'o'
+    ]
+};
+
+simulator.handleCommand(command);
+    </pre>
+
+    <h3>4.7.3 C Example: Embedded Device Implementation</h3>
+
+    <pre>
+#include &lt;stdio.h&gt;
+#include &lt;stdint.h&gt;
+#include &lt;stdbool.h&gt;
+
+#define MAX_CELLS 80
+#define MAX_DOTS 8
+
+typedef struct {
+    uint8_t position;
+    uint8_t dots[MAX_DOTS];
+    uint8_t dot_count;
+    bool cursor;
+} BrailleCell;
+
+typedef struct {
+    BrailleCell cells[MAX_CELLS];
+    uint8_t cell_count;
+    uint8_t cell_type; // 6 or 8
+} BrailleDisplay;
+
+// Convert dots array to Unicode Braille pattern
+uint16_t dots_to_unicode(uint8_t *dots, uint8_t dot_count) {
+    uint8_t bit_value = 0;
+    for (int i = 0; i &lt; dot_count; i++) {
+        bit_value |= (1 &lt;&lt; (dots[i] - 1));
+    }
+    return 0x2800 + bit_value;
+}
+
+// Set a cell's dots
+int set_cell_dots(BrailleDisplay *display, uint8_t position,
+                  uint8_t *dots, uint8_t dot_count) {
+    if (position &gt;= display-&gt;cell_count) {
+        return -1; // Invalid position
+    }
+
+    // Validate dots
+    for (int i = 0; i &lt; dot_count; i++) {
+        if (dots[i] &lt; 1 || dots[i] &gt; display-&gt;cell_type) {
+            return -2; // Invalid dot number
+        }
+    }
+
+    // Set the dots
+    BrailleCell *cell = &display-&gt;cells[position];
+    cell-&gt;position = position;
+    cell-&gt;dot_count = dot_count;
+    for (int i = 0; i &lt; dot_count; i++) {
+        cell-&gt;dots[i] = dots[i];
+    }
+
+    // Update hardware (piezoelectric actuators)
+    update_hardware_cell(position, dots, dot_count);
+
+    return 0; // Success
+}
+
+// Clear all cells
+void clear_display(BrailleDisplay *display) {
+    for (int i = 0; i &lt; display-&gt;cell_count; i++) {
+        display-&gt;cells[i].dot_count = 0;
+        update_hardware_cell(i, NULL, 0);
+    }
+}
+
+// Initialize display
+void init_display(BrailleDisplay *display, uint8_t cell_count, uint8_t cell_type) {
+    display-&gt;cell_count = cell_count;
+    display-&gt;cell_type = cell_type;
+    clear_display(display);
+}
+
+// Example usage
+int main() {
+    BrailleDisplay display;
+    init_display(&display, 40, 8);
+
+    // Display "hi"
+    uint8_t h_dots[] = {1, 2, 5};
+    uint8_t i_dots[] = {2, 4};
+
+    set_cell_dots(&display, 0, h_dots, 3);
+    set_cell_dots(&display, 1, i_dots, 2);
+
+    printf("Unicode for 'h': U+%04X\n", dots_to_unicode(h_dots, 3));
+    printf("Unicode for 'i': U+%04X\n", dots_to_unicode(i_dots, 2));
+
+    return 0;
+}
+    </pre>
+
+    <h2>Chapter Summary</h2>
+
+    <p>This chapter provided a comprehensive technical exploration of Phase 1 of the WIA Braille Display Standard—the Data Format and Communication layer. Key takeaways include:</p>
+
+    <ol>
+        <li><strong>The Braille cell data model</strong> uses a simple, elegant JSON representation with position, dots array, and optional attributes. This human-readable format is self-documenting and extensible while remaining efficient for machine processing.</li>
+
+        <li><strong>JSON schemas</strong> provide formal definitions for all protocol messages, enabling automatic validation, code generation, and consistent implementation across platforms and programming languages. The schema-based approach ensures interoperability.</li>
+
+        <li><strong>Unicode Braille Patterns (U+2800 to U+28FF)</strong> provide a standardized character encoding for all 256 possible 8-dot Braille patterns. The WIA standard leverages Unicode as the canonical representation, ensuring compatibility with modern text processing systems.</li>
+
+        <li><strong>Support for both 6-dot and 8-dot formats</strong> ensures the standard works with traditional literary Braille displays and modern computer Braille displays. Automatic conversion rules enable seamless operation across device types.</li>
+
+        <li><strong>Multi-language Braille tables</strong> cover 100+ languages with Grade 1, Grade 2, and Computer Braille variants. The JSON-based table format is human-readable, version-controlled, and based on the proven liblouis library while remaining implementation-agnostic.</li>
+
+        <li><strong>Comprehensive validation rules</strong> catch errors at the data level before they reach hardware, preventing undefined behavior and providing clear, actionable error messages that accelerate debugging.</li>
+
+        <li><strong>Working code examples</strong> in Python, JavaScript, and C demonstrate that the standard is practical and implementable across all major platforms—from embedded devices to web applications.</li>
+    </ol>
+
+    <p>Phase 1 establishes the foundational data layer that makes all higher-level features possible. By standardizing how Braille cells are represented, transmitted, and validated, the WIA standard creates a common language that manufacturers, screen reader developers, and operating system vendors can all speak. This foundation is essential for achieving the mission of universal Braille accessibility.</p>
+
+    <h2>Review Questions</h2>
+
+    <ol>
+        <li>Given the Unicode Braille character ⠿ (U+283F), determine which dots are raised. Show your calculation step-by-step, converting from hex to binary to dot numbers.</li>
+
+        <li>Write pseudocode for a function that validates a SET_BRAILLE command according to all the validation rules in Section 4.6. Your function should return either success or a specific error code.</li>
+
+        <li>A user wants to display the text "Hello!" on a 40-cell 6-dot display. Create the complete JSON command using the WIA protocol, showing the dot patterns for each character using Grade 1 English Braille. (You may need to reference a Braille chart.)</li>
+
+        <li>Explain why the WIA standard allows three equivalent representations for cell data (dot array, Unicode character, Unicode hex). What are the advantages of each format in different scenarios?</li>
+
+        <li>A manufacturer produces a display with 2 status cells (8-dot) and 38 text cells (6-dot). Design the device capability announcement JSON that this display would send during handshake. Include all required and relevant optional fields.</li>
+
+        <li>The phrase "COVID-19" contains letters, numbers, and a hyphen. Describe step-by-step how this would be translated to Grade 2 English Braille, including the use of special prefixes for capitalization and numbers. Then show the resulting JSON cell array.</li>
+    </ol>
+
+    <h2>Looking Ahead</h2>
+
+    <p>With Phase 1's data format foundation established, future chapters of this eBook series will explore:</p>
+
+    <ul>
+        <li><strong>Chapter 5: Phase 2 - Hardware Integration</strong> - Button layouts, cursor routing, gestures, firmware updates</li>
+        <li><strong>Chapter 6: Phase 3 - Translation & Intelligence</strong> - Context-aware translation, automatic table switching, mathematical notation</li>
+        <li><strong>Chapter 7: Phase 4 - Advanced Features</strong> - Graphical displays, cloud sync, collaborative editing, AI optimization</li>
+        <li><strong>Chapter 8: Implementation Guide</strong> - Step-by-step instructions for manufacturers and developers</li>
+        <li><strong>Chapter 9: Testing & Certification</strong> - How to validate compliance and achieve WIA certification</li>
+        <li><strong>Chapter 10: The Future of Braille</strong> - Emerging technologies, research directions, and the roadmap ahead</li>
+    </ul>
+
+    <p>The data format is where theory becomes reality. The JSON schemas, Unicode mappings, and validation rules defined in this chapter provide the concrete foundation upon which the entire WIA ecosystem will be built. Every Braille display implementing this standard, every screen reader adopting this protocol, and every blind user benefiting from universal accessibility—all begin here, with clean data structures and clear specifications.</p>
+
+    <p>The journey from fragmentation to standardization, from exclusion to accessibility, from 弘益人間's philosophical ideal to practical reality, continues with each line of code that implements these specifications.</p>
+
+    <hr>
+
+    <p><strong>Navigation:</strong></p>
+    <ul>
+        <li><a href="chapter-03.html">Previous: Chapter 3 - WIA Standard Overview</a></li>
+        <li><a href="index.html">Table of Contents</a></li>
+        <li>Next: Chapter 5 - Phase 2 - Hardware Integration (Coming Soon)</li>
+    </ul>
+
+    <hr>
+
+    <p><em>WIA Braille Display Standard - Educational eBook Series</em></p>
+    <p><em>弘益人間 (Hongik Ingan) - Benefit All Humanity</em></p>
+    <p><em>© 2025 WIA (World Certification Industry Association)</em></p>
+</body>
+</html>

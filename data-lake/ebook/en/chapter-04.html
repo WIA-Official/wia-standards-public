@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Phase 1 - Data Format Standard</title>
+</head>
+<body>
+
+<p><a href="index.html">[DATA-002] WIA Data Lake Standard Ebook</a> | Chapter 4 (of 8)</p>
+
+<hr>
+
+<h1>Chapter 4: Phase 1 - Data Format Standard</h1>
+
+<blockquote>
+<p><strong>The format is the foundation.</strong> Choose wisely, for it determines performance, compatibility, and longevity.</p>
+</blockquote>
+
+<hr>
+
+<h2>4.1 File Format Selection Guide</h2>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Format</th>
+            <th>Type</th>
+            <th>Compression</th>
+            <th>Schema Evolution</th>
+            <th>Best Use Case</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Parquet</strong></td>
+            <td>Columnar</td>
+            <td>Excellent</td>
+            <td>✅ Yes</td>
+            <td>Analytics, OLAP queries</td>
+        </tr>
+        <tr>
+            <td><strong>ORC</strong></td>
+            <td>Columnar</td>
+            <td>Excellent</td>
+            <td>✅ Yes</td>
+            <td>Hive/Spark ecosystems</td>
+        </tr>
+        <tr>
+            <td><strong>Avro</strong></td>
+            <td>Row-based</td>
+            <td>Good</td>
+            <td>✅✅ Excellent</td>
+            <td>Streaming, schema evolution</td>
+        </tr>
+        <tr>
+            <td><strong>JSON</strong></td>
+            <td>Row-based</td>
+            <td>Poor</td>
+            <td>✅ Flexible</td>
+            <td>Semi-structured, APIs</td>
+        </tr>
+        <tr>
+            <td><strong>CSV</strong></td>
+            <td>Row-based</td>
+            <td>Poor</td>
+            <td>❌ No</td>
+            <td>Legacy, human-readable</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>4.2 Apache Parquet Deep Dive</h2>
+
+<h3>4.2.1 Why Parquet?</h3>
+
+<ul>
+    <li><strong>Columnar Storage:</strong> Only read columns needed for query</li>
+    <li><strong>Efficient Compression:</strong> Similar data grouped together compresses better</li>
+    <li><strong>Predicate Pushdown:</strong> Skip row groups based on statistics</li>
+    <li><strong>Wide Ecosystem Support:</strong> Spark, Hive, Presto, Pandas, Arrow</li>
+</ul>
+
+<h3>4.2.2 Parquet File Structure</h3>
+
+<pre>
+Parquet File Layout:
+┌─────────────────────────────┐
+│ 4-byte Magic: PAR1          │
+├─────────────────────────────┤
+│ Row Group 1                 │
+│  ├─ Column Chunk A          │
+│  │   ├─ Page 1 (data)       │
+│  │   ├─ Page 2 (data)       │
+│  │   └─ Statistics          │
+│  ├─ Column Chunk B          │
+│  └─ Column Chunk C          │
+├─────────────────────────────┤
+│ Row Group 2                 │
+│  └─ ...                     │
+├─────────────────────────────┤
+│ File Metadata               │
+│  ├─ Schema                  │
+│  ├─ Row Group Metadata      │
+│  └─ Column Statistics       │
+├─────────────────────────────┤
+│ 4-byte Footer Length        │
+├─────────────────────────────┤
+│ 4-byte Magic: PAR1          │
+└─────────────────────────────┘
+</pre>
+
+<h3>4.2.3 Parquet Configuration Best Practices</h3>
+
+<pre>
+# Python (PySpark)
+df.write.format("parquet") \
+    .option("compression", "snappy") \
+    .option("parquet.block.size", 134217728) \  # 128 MB
+    .option("parquet.page.size", 1048576) \      # 1 MB
+    .mode("append") \
+    .save("s3://lake/data/")
+
+# Key Parameters:
+# - compression: snappy (default), gzip, zstd, none
+# - block.size: Row group size (default 128 MB)
+# - page.size: Page size within row group (default 1 MB)
+</pre>
+
+<hr>
+
+<h2>4.3 Apache ORC Deep Dive</h2>
+
+<h3>4.3.1 ORC vs Parquet</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Feature</th>
+            <th>ORC</th>
+            <th>Parquet</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Compression</strong></td>
+            <td>Slightly better</td>
+            <td>Excellent</td>
+        </tr>
+        <tr>
+            <td><strong>Read Performance</strong></td>
+            <td>Faster for Hive</td>
+            <td>Faster for Spark</td>
+        </tr>
+        <tr>
+            <td><strong>Write Performance</strong></td>
+            <td>Faster</td>
+            <td>Good</td>
+        </tr>
+        <tr>
+            <td><strong>Ecosystem</strong></td>
+            <td>Hive-native</td>
+            <td>Broader support</td>
+        </tr>
+        <tr>
+            <td><strong>Predicate Pushdown</strong></td>
+            <td>✅ Excellent</td>
+            <td>✅ Excellent</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>Recommendation:</strong> Use Parquet for general-purpose analytics. Use ORC if deeply integrated with Hive ecosystem.</p>
+
+<hr>
+
+<h2>4.4 Partitioning Strategies</h2>
+
+<h3>4.4.1 Date-Based Partitioning</h3>
+
+<pre>
+s3://lake/events/
+├── year=2025/
+│   ├── month=01/
+│   │   ├── day=15/
+│   │   │   ├── part-00000.parquet
+│   │   │   └── part-00001.parquet
+
+# Benefits:
+- Time-series queries optimized
+- Easy to implement retention policies
+- Natural data lifecycle management
+
+# Query with partition pruning:
+SELECT * FROM events
+WHERE year = 2025 AND month = 01 AND day = 15;
+-- Only scans year=2025/month=01/day=15/ partition
+</pre>
+
+<h3>4.4.2 Hash-Based Partitioning</h3>
+
+<pre>
+s3://lake/users/
+├── hash_bucket=0/
+├── hash_bucket=1/
+├── hash_bucket=2/
+...
+├── hash_bucket=255/
+
+# Benefits:
+- Evenly distributed data
+- Prevents hot partitions
+- Good for high-cardinality keys
+
+# Implementation:
+hash_bucket = hash(user_id) % 256
+</pre>
+
+<h3>4.4.3 Range-Based Partitioning</h3>
+
+<pre>
+s3://lake/transactions/
+├── amount_range=0-100/
+├── amount_range=100-500/
+├── amount_range=500-1000/
+└── amount_range=1000-plus/
+
+# Benefits:
+- Logical data grouping
+- Business-friendly partitions
+- Optimized for range queries
+</pre>
+
+<hr>
+
+<h2>4.5 Compression Codecs</h2>
+
+<h3>4.5.1 Compression Comparison</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Codec</th>
+            <th>Compression Ratio</th>
+            <th>Encode Speed</th>
+            <th>Decode Speed</th>
+            <th>CPU Usage</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>None</strong></td>
+            <td>1.0x</td>
+            <td>Fastest</td>
+            <td>Fastest</td>
+            <td>None</td>
+        </tr>
+        <tr>
+            <td><strong>Snappy</strong></td>
+            <td>2-3x</td>
+            <td>Very Fast</td>
+            <td>Very Fast</td>
+            <td>Low</td>
+        </tr>
+        <tr>
+            <td><strong>LZ4</strong></td>
+            <td>2-3x</td>
+            <td>Very Fast</td>
+            <td>Fastest</td>
+            <td>Very Low</td>
+        </tr>
+        <tr>
+            <td><strong>ZSTD</strong></td>
+            <td>3-5x</td>
+            <td>Fast</td>
+            <td>Fast</td>
+            <td>Medium</td>
+        </tr>
+        <tr>
+            <td><strong>GZIP</strong></td>
+            <td>3-4x</td>
+            <td>Slow</td>
+            <td>Medium</td>
+            <td>High</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>WIA Recommendation:</strong> Use ZSTD for best balance of compression and performance.</p>
+
+<hr>
+
+<h2>4.6 Schema Design Best Practices</h2>
+
+<h3>4.6.1 Column Order Optimization</h3>
+
+<pre>
+# Good: Frequently filtered columns first
+CREATE TABLE events (
+  date        DATE,      -- Often filtered
+  user_id     BIGINT,    -- Often filtered
+  event_type  STRING,    -- Often filtered
+  properties  MAP,       -- Rarely filtered
+  metadata    STRUCT     -- Rarely filtered
+);
+
+# Bad: Random order
+CREATE TABLE events (
+  metadata    STRUCT,
+  date        DATE,
+  properties  MAP,
+  event_type  STRING,
+  user_id     BIGINT
+);
+</pre>
+
+<h3>4.6.2 Data Type Selection</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Use Case</th>
+            <th>❌ Avoid</th>
+            <th>✅ Use</th>
+            <th>Why</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Timestamps</td>
+            <td>STRING</td>
+            <td>TIMESTAMP</td>
+            <td>Native time operations, smaller size</td>
+        </tr>
+        <tr>
+            <td>IDs</td>
+            <td>STRING</td>
+            <td>BIGINT</td>
+            <td>8 bytes vs variable</td>
+        </tr>
+        <tr>
+            <td>Booleans</td>
+            <td>STRING ('true'/'false')</td>
+            <td>BOOLEAN</td>
+            <td>1 bit vs 4-5 bytes</td>
+        </tr>
+        <tr>
+            <td>Decimals</td>
+            <td>DOUBLE</td>
+            <td>DECIMAL(p,s)</td>
+            <td>Precision guarantees</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>4.7 Format Migration Strategies</h2>
+
+<h3>4.7.1 CSV to Parquet Migration</h3>
+
+<pre>
+# PySpark migration
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+# Read CSV
+df = spark.read.format("csv") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .load("s3://lake/raw/data.csv")
+
+# Write as Parquet
+df.write.format("parquet") \
+    .option("compression", "zstd") \
+    .mode("overwrite") \
+    .save("s3://lake/curated/data.parquet")
+</pre>
+
+<h3>4.7.2 Schema Evolution Example</h3>
+
+<pre>
+# Initial schema
+CREATE TABLE users (
+  id BIGINT,
+  name STRING,
+  email STRING
+);
+
+# Add column (safe, backward compatible)
+ALTER TABLE users ADD COLUMN phone STRING;
+
+# Rename column (requires rewriting in Parquet)
+-- Use views for backward compatibility:
+CREATE VIEW users_new AS
+SELECT id, name AS full_name, email FROM users;
+</pre>
+
+<hr>
+
+<h2>Summary</h2>
+
+<p>In this chapter, we covered:</p>
+
+<ul>
+    <li>Parquet and ORC as primary columnar formats for analytics</li>
+    <li>Partitioning strategies: date-based, hash-based, range-based</li>
+    <li>Compression codecs: ZSTD recommended for best balance</li>
+    <li>Schema design: column order, data types, evolution</li>
+    <li>Migration from legacy formats to modern formats</li>
+</ul>
+
+<p><strong>Next Chapter:</strong> <a href="chapter-05.html">Chapter 5: Phase 2 - API Interface Standard</a></p>
+
+<hr>
+
+<p><a href="chapter-03.html">← Previous</a> | <a href="index.html">Contents</a> | <a href="chapter-05.html">Next →</a></p>
+
+<hr>
+
+<p><strong>弘益人間 · Benefit All Humanity</strong></p>
+<p>© 2025 WIA Standards / MIT License</p>
+</body>
+</html>

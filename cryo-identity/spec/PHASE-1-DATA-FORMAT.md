@@ -1,598 +1,621 @@
-# WIA Cryo-Identity Data Format Standard
-## Phase 1 Specification
+# CRYO-IDENTITY Phase 1: Data Format Specification
 
----
+## 1. Core Identity Document
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Terminology](#terminology)
-3. [Base Structure](#base-structure)
-4. [Data Schema](#data-schema)
-5. [Field Specifications](#field-specifications)
-6. [Data Types](#data-types)
-7. [Validation Rules](#validation-rules)
-8. [Examples](#examples)
-9. [Version History](#version-history)
-
----
-
-## Overview
-
-### 1.1 Purpose
-
-The WIA Cryo-Identity Data Format Standard defines a unified format for managing and verifying the identity of cryopreserved individuals across their preservation lifecycle, including pre-mortem registration, preservation, and potential future revival.
-
-**Core Objectives**:
-- Ensure unique and persistent identification of cryopreserved subjects
-- Support multiple verification methods (biometric, cryptographic, biological)
-- Enable identity continuity from pre-mortem through potential revival
-- Maintain privacy while enabling necessary data access
-
-### 1.2 Scope
-
-This standard covers:
-
-| Domain | Description |
-|--------|-------------|
-| Identity Registration | Initial identity capture and verification |
-| Biometric Data | Fingerprints, DNA, facial features, retinal scans |
-| Cryptographic Identity | Digital signatures, key pairs, blockchain anchors |
-| Identity Verification | Methods for confirming identity at various stages |
-| Identity Recovery | Procedures for identity restoration post-revival |
-
-### 1.3 Design Principles
-
-1. **Persistence**: Identity must survive across centuries
-2. **Redundancy**: Multiple backup identification methods
-3. **Privacy**: Minimal disclosure, maximum security
-4. **Verifiability**: Cryptographic proof of identity
-5. **Interoperability**: Compatible with global identity standards
-
----
-
-## Terminology
-
-### 2.1 Core Terms
-
-| Term | Definition |
-|------|------------|
-| **Subject** | Individual whose identity is being managed |
-| **Identity Record** | Complete identity data package for a subject |
-| **Biometric Template** | Encoded biometric feature representation |
-| **Identity Anchor** | Immutable reference point for identity verification |
-| **Verification Level** | Confidence level of identity confirmation |
-| **Recovery Key** | Cryptographic key for identity restoration |
-
-### 2.2 Data Types
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `string` | UTF-8 encoded text | `"ID-2025-001"` |
-| `biometric_hash` | SHA-256 hash of biometric data | `"sha256:a1b2c3..."` |
-| `public_key` | Ed25519 public key | `"ed25519:abc..."` |
-| `dna_sequence` | Encoded DNA markers | `"ATCG..."` |
-| `timestamp` | ISO 8601 datetime | `"2025-01-15T10:30:00Z"` |
-
-### 2.3 Field Requirements
-
-| Marker | Meaning |
-|--------|---------|
-| **REQUIRED** | Must be present |
-| **OPTIONAL** | May be omitted |
-| **CONDITIONAL** | Required under specific conditions |
-
----
-
-## Base Structure
-
-### 3.1 Identity Record Format
-
-```json
-{
-  "$schema": "https://wia.live/cryo-identity/v1/schema.json",
-  "version": "1.0.0",
-  "identityId": "ID-2025-001",
-  "subjectId": "SUBJ-2025-001",
-  "status": "active",
-  "created": "2024-06-15T10:00:00Z",
-  "lastVerified": "2025-01-15T10:30:00Z",
-  "personal": {
-    "legalName": {
-      "given": "encrypted:...",
-      "family": "encrypted:...",
-      "hash": "sha256:..."
-    },
-    "dateOfBirth": "encrypted:...",
-    "placeOfBirth": "encrypted:...",
-    "nationality": ["KR"],
-    "governmentIds": []
-  },
-  "biometrics": {
-    "fingerprints": [],
-    "facial": {},
-    "dna": {},
-    "retinal": {},
-    "voice": {}
-  },
-  "cryptographic": {
-    "primaryKey": {},
-    "recoveryKeys": [],
-    "blockchainAnchors": []
-  },
-  "verification": {
-    "level": "biometric",
-    "methods": [],
-    "history": []
-  },
-  "meta": {
-    "hash": "sha256:...",
-    "signature": "...",
-    "previousHash": "..."
-  }
-}
-```
-
-### 3.2 Field Details
-
-#### 3.2.1 `identityId` (REQUIRED)
-
-```
-Type: string
-Format: ID-YYYY-NNNNNN
-Description: Unique identifier for this identity record
-Example: "ID-2025-000001"
-```
-
-#### 3.2.2 `status` (REQUIRED)
-
-```
-Type: string
-Valid values:
-  - "pending"     : Registration in progress
-  - "active"      : Identity verified and active
-  - "preserved"   : Subject is cryopreserved
-  - "suspended"   : Temporarily unavailable
-  - "revived"     : Subject has been revived
-  - "merged"      : Combined with another identity
-```
-
----
-
-## Data Schema
-
-### 4.1 Complete JSON Schema
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wia.live/cryo-identity/v1/schema.json",
-  "title": "WIA Cryo-Identity Record",
-  "type": "object",
-  "required": ["version", "identityId", "subjectId", "status", "created", "biometrics", "cryptographic"],
-  "properties": {
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "identityId": {
-      "type": "string",
-      "pattern": "^ID-\\d{4}-\\d{6}$"
-    },
-    "subjectId": {
-      "type": "string"
-    },
-    "status": {
-      "type": "string",
-      "enum": ["pending", "active", "preserved", "suspended", "revived", "merged"]
-    },
-    "created": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "personal": {
-      "type": "object",
-      "properties": {
-        "legalName": {
-          "type": "object",
-          "properties": {
-            "given": { "type": "string" },
-            "family": { "type": "string" },
-            "hash": { "type": "string" }
-          }
-        },
-        "dateOfBirth": { "type": "string" },
-        "nationality": {
-          "type": "array",
-          "items": { "type": "string", "pattern": "^[A-Z]{2}$" }
-        }
-      }
-    },
-    "biometrics": {
-      "type": "object",
-      "properties": {
-        "fingerprints": { "type": "array" },
-        "facial": { "type": "object" },
-        "dna": { "type": "object" },
-        "retinal": { "type": "object" },
-        "voice": { "type": "object" }
-      }
-    },
-    "cryptographic": {
-      "type": "object",
-      "required": ["primaryKey"],
-      "properties": {
-        "primaryKey": { "type": "object" },
-        "recoveryKeys": { "type": "array" },
-        "blockchainAnchors": { "type": "array" }
-      }
-    },
-    "verification": {
-      "type": "object",
-      "properties": {
-        "level": { "type": "string" },
-        "methods": { "type": "array" },
-        "history": { "type": "array" }
-      }
-    }
-  }
-}
-```
-
-### 4.2 Biometrics Schema
-
-```json
-{
-  "biometrics": {
-    "fingerprints": [
-      {
-        "finger": "right_index",
-        "template": "base64-encoded-template",
-        "templateFormat": "ISO-19794-2",
-        "quality": 0.95,
-        "capturedAt": "2024-06-15T10:00:00Z",
-        "hash": "sha256:..."
-      }
-    ],
-    "facial": {
-      "template": "base64-encoded-template",
-      "templateFormat": "ISO-19794-5",
-      "photos": [
-        {
-          "type": "frontal",
-          "hash": "sha256:...",
-          "capturedAt": "2024-06-15T10:00:00Z"
-        }
-      ]
-    },
-    "dna": {
-      "markers": [
-        { "locus": "D3S1358", "alleles": [15, 16] },
-        { "locus": "vWA", "alleles": [17, 18] },
-        { "locus": "FGA", "alleles": [22, 24] }
-      ],
-      "fullSequenceHash": "sha256:...",
-      "sequenceStorage": "ipfs://...",
-      "collectedAt": "2024-06-15T10:00:00Z"
-    },
-    "retinal": {
-      "template": "base64-encoded-template",
-      "eye": "both",
-      "capturedAt": "2024-06-15T10:00:00Z"
-    },
-    "voice": {
-      "template": "base64-encoded-template",
-      "sampleHash": "sha256:...",
-      "capturedAt": "2024-06-15T10:00:00Z"
-    }
-  }
-}
-```
-
-### 4.3 Cryptographic Identity Schema
-
-```json
-{
-  "cryptographic": {
-    "primaryKey": {
-      "algorithm": "Ed25519",
-      "publicKey": "ed25519:abc123...",
-      "created": "2024-06-15T10:00:00Z",
-      "expires": null,
-      "status": "active"
-    },
-    "recoveryKeys": [
-      {
-        "id": "recovery-1",
-        "type": "shamir_share",
-        "threshold": 3,
-        "totalShares": 5,
-        "shareHolders": [
-          { "holder": "facility", "shareHash": "sha256:..." },
-          { "holder": "family", "shareHash": "sha256:..." },
-          { "holder": "legal", "shareHash": "sha256:..." }
-        ]
-      }
-    ],
-    "blockchainAnchors": [
-      {
-        "network": "ethereum",
-        "transactionHash": "0x...",
-        "blockNumber": 12345678,
-        "timestamp": "2024-06-15T10:00:00Z",
-        "identityHash": "sha256:..."
-      }
-    ]
-  }
-}
-```
-
----
-
-## Field Specifications
-
-### 5.1 Biometric Fields
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `fingerprints[].finger` | string | REQUIRED | Finger identifier | `"right_index"` |
-| `fingerprints[].template` | string | REQUIRED | Base64 template | `"QmFzZTY0..."` |
-| `fingerprints[].quality` | number | REQUIRED | Quality score 0-1 | `0.95` |
-| `dna.markers` | array | REQUIRED | STR markers | `[{...}]` |
-| `dna.fullSequenceHash` | string | OPTIONAL | Full genome hash | `"sha256:..."` |
-| `facial.template` | string | REQUIRED | Face template | `"QmFzZTY0..."` |
-
-**Valid finger values:**
-
-| Value | Description |
-|-------|-------------|
-| `right_thumb` | Right thumb |
-| `right_index` | Right index finger |
-| `right_middle` | Right middle finger |
-| `right_ring` | Right ring finger |
-| `right_little` | Right little finger |
-| `left_thumb` | Left thumb |
-| `left_index` | Left index finger |
-| `left_middle` | Left middle finger |
-| `left_ring` | Left ring finger |
-| `left_little` | Left little finger |
-
-### 5.2 Verification Levels
-
-| Level | Requirements | Confidence |
-|-------|--------------|------------|
-| `basic` | Government ID only | 60% |
-| `enhanced` | ID + single biometric | 80% |
-| `biometric` | Multiple biometrics | 95% |
-| `cryptographic` | Biometric + key signature | 99% |
-| `full` | All methods + DNA | 99.9% |
-
-### 5.3 DNA Marker Loci
-
-| Locus | Chromosome | Use |
-|-------|------------|-----|
-| D3S1358 | 3 | Core identification |
-| vWA | 12 | Core identification |
-| FGA | 4 | Core identification |
-| D8S1179 | 8 | Extended profiling |
-| D21S11 | 21 | Extended profiling |
-| D18S51 | 18 | Extended profiling |
-| AMEL | X/Y | Sex determination |
-
----
-
-## Data Types
-
-### 6.1 Custom Types
+### 1.1 Master Identity Schema
 
 ```typescript
-type IdentityStatus =
-  | 'pending'
-  | 'active'
-  | 'preserved'
-  | 'suspended'
-  | 'revived'
-  | 'merged';
+interface CryoIdentityDocument {
+  // Document Metadata
+  "@context": string[];
+  "type": ["VerifiableCredential", "CryoIdentityCredential"];
+  "id": string;  // urn:uuid:cryo:identity:{uuid}
+  "issuer": string;
+  "issuanceDate": string;  // ISO 8601
+  "expirationDate"?: string;
 
-type VerificationLevel =
-  | 'basic'
-  | 'enhanced'
-  | 'biometric'
-  | 'cryptographic'
-  | 'full';
+  // Core Subject
+  "credentialSubject": {
+    "subjectId": string;  // Links to CRYO-PRESERVATION subject
+    "identityId": string;  // CRYOID-{year}-{facility}-{sequence}
 
-type FingerType =
-  | 'right_thumb' | 'right_index' | 'right_middle' | 'right_ring' | 'right_little'
-  | 'left_thumb' | 'left_index' | 'left_middle' | 'left_ring' | 'left_little';
+    // Legal Identity
+    "legalIdentity": LegalIdentityRecord;
 
-interface BiometricTemplate {
-  template: string;        // Base64 encoded
-  templateFormat: string;  // ISO standard
-  quality: number;         // 0.0 - 1.0
-  capturedAt: string;      // ISO 8601
-  hash: string;            // SHA-256
+    // Personal Identity
+    "personalIdentity": PersonalIdentityRecord;
+
+    // Digital Identity
+    "digitalIdentity": DigitalIdentityRecord;
+
+    // Biometric Identity
+    "biometricIdentity": BiometricIdentityRecord;
+  };
+
+  // Cryptographic Proof
+  "proof": ProofObject;
 }
 ```
 
-### 6.2 Enum Values
+### 1.2 Legal Identity Record
 
-#### Template Formats
+```typescript
+interface LegalIdentityRecord {
+  // Primary Name
+  "legalName": {
+    "givenName": string;
+    "middleName"?: string;
+    "familyName": string;
+    "suffix"?: string;
+    "prefix"?: string;
+  };
 
-| Code | Standard | Description |
-|------|----------|-------------|
-| `ISO-19794-2` | ISO/IEC 19794-2 | Fingerprint minutiae |
-| `ISO-19794-4` | ISO/IEC 19794-4 | Fingerprint image |
-| `ISO-19794-5` | ISO/IEC 19794-5 | Face image |
-| `ISO-19794-6` | ISO/IEC 19794-6 | Iris image |
-| `ANSI-NIST` | ANSI/NIST-ITL | Multi-biometric |
+  // Alternative Names
+  "alternativeNames"?: {
+    "type": "MAIDEN" | "ALIAS" | "NICKNAME" | "PROFESSIONAL" | "PREVIOUS";
+    "name": string;
+    "validFrom"?: string;
+    "validTo"?: string;
+  }[];
 
----
+  // Birth Record
+  "birthRecord": {
+    "dateOfBirth": string;  // YYYY-MM-DD
+    "placeOfBirth": {
+      "country": string;  // ISO 3166-1 alpha-3
+      "region"?: string;
+      "city"?: string;
+    };
+    "birthCertificateRef"?: string;
+  };
 
-## Validation Rules
+  // Citizenship
+  "citizenship": {
+    "country": string;  // ISO 3166-1 alpha-3
+    "type": "BIRTH" | "NATURALIZED" | "DUAL" | "STATELESS";
+    "documentNumber"?: string;
+    "issueDate"?: string;
+    "expiryDate"?: string;
+  }[];
 
-### 7.1 Required Field Validation
+  // Government Identifications
+  "governmentIds": GovernmentIdRecord[];
 
-| Rule ID | Field | Validation |
-|---------|-------|------------|
-| VAL-001 | `identityId` | Must match `^ID-\d{4}-\d{6}$` |
-| VAL-002 | `biometrics.fingerprints` | At least 2 fingerprints required |
-| VAL-003 | `biometrics.dna.markers` | At least 13 core markers |
-| VAL-004 | `cryptographic.primaryKey` | Must be valid Ed25519 key |
-| VAL-005 | `verification.level` | Must match biometric evidence |
+  // Family Relationships
+  "familyRelationships": FamilyRelationshipRecord[];
 
-### 7.2 Business Logic Validation
+  // Marital Status
+  "maritalStatus": {
+    "status": "SINGLE" | "MARRIED" | "DIVORCED" | "WIDOWED" | "SEPARATED";
+    "spouse"?: PersonReference;
+    "marriageDate"?: string;
+    "marriagePlace"?: string;
+  };
+}
 
-| Rule ID | Description | Error Code |
-|---------|-------------|------------|
-| BUS-001 | DNA markers must be unique within system | `ERR_DUPLICATE_DNA` |
-| BUS-002 | Fingerprints must have quality > 0.7 | `ERR_LOW_QUALITY` |
-| BUS-003 | Recovery keys must have threshold ≤ total | `ERR_INVALID_THRESHOLD` |
-| BUS-004 | Blockchain anchor must be verified | `ERR_UNVERIFIED_ANCHOR` |
+interface GovernmentIdRecord {
+  "idType": "PASSPORT" | "NATIONAL_ID" | "DRIVERS_LICENSE" | "SSN" | "TAX_ID" | "OTHER";
+  "country": string;
+  "number": string;  // Encrypted
+  "issueDate": string;
+  "expiryDate"?: string;
+  "issuer": string;
+  "documentHash": string;  // Hash of original document
+}
 
-### 7.3 Error Codes
+interface FamilyRelationshipRecord {
+  "relationship": "PARENT" | "CHILD" | "SIBLING" | "SPOUSE" | "GRANDPARENT" | "GRANDCHILD";
+  "person": PersonReference;
+  "biological": boolean;
+  "legal": boolean;
+  "verificationStatus": "VERIFIED" | "UNVERIFIED" | "CLAIMED";
+}
 
-| Code | Message | Description |
-|------|---------|-------------|
-| `ERR_INVALID_IDENTITY` | Invalid identity format | ID format violation |
-| `ERR_DUPLICATE_DNA` | DNA already registered | Duplicate detection |
-| `ERR_LOW_QUALITY` | Biometric quality too low | Quality threshold failed |
-| `ERR_INVALID_KEY` | Invalid cryptographic key | Key validation failed |
-| `ERR_VERIFICATION_FAILED` | Identity verification failed | Match failed |
+interface PersonReference {
+  "name": string;
+  "cryoId"?: string;  // If also preserved
+  "externalId"?: string;
+  "dateOfBirth"?: string;
+  "status": "LIVING" | "DECEASED" | "PRESERVED" | "UNKNOWN";
+}
+```
 
----
+### 1.3 Personal Identity Record
 
-## Examples
+```typescript
+interface PersonalIdentityRecord {
+  // Life Timeline
+  "lifeTimeline": LifeEventRecord[];
 
-### 8.1 Valid Identity Record
+  // Personality Profile
+  "personalityProfile"?: {
+    "assessmentType": "MBTI" | "BIG_FIVE" | "ENNEAGRAM" | "CUSTOM";
+    "assessmentDate": string;
+    "results": Record<string, any>;
+    "assessor"?: string;
+  }[];
 
-```json
-{
-  "$schema": "https://wia.live/cryo-identity/v1/schema.json",
-  "version": "1.0.0",
-  "identityId": "ID-2025-000001",
-  "subjectId": "SUBJ-2025-001",
-  "status": "active",
-  "created": "2024-06-15T10:00:00Z",
-  "lastVerified": "2025-01-15T10:30:00Z",
-  "personal": {
-    "legalName": {
-      "given": "encrypted:aes256:...",
-      "family": "encrypted:aes256:...",
-      "hash": "sha256:abc123def456..."
-    },
-    "dateOfBirth": "encrypted:aes256:...",
-    "nationality": ["KR"]
-  },
-  "biometrics": {
-    "fingerprints": [
-      {
-        "finger": "right_index",
-        "template": "QmFzZTY0RW5jb2RlZFRlbXBsYXRl...",
-        "templateFormat": "ISO-19794-2",
-        "quality": 0.95,
-        "capturedAt": "2024-06-15T10:00:00Z",
-        "hash": "sha256:fingerprint_hash_1..."
-      },
-      {
-        "finger": "left_index",
-        "template": "QmFzZTY0RW5jb2RlZFRlbXBsYXRl...",
-        "templateFormat": "ISO-19794-2",
-        "quality": 0.92,
-        "capturedAt": "2024-06-15T10:00:00Z",
-        "hash": "sha256:fingerprint_hash_2..."
-      }
-    ],
-    "dna": {
-      "markers": [
-        { "locus": "D3S1358", "alleles": [15, 16] },
-        { "locus": "vWA", "alleles": [17, 18] },
-        { "locus": "FGA", "alleles": [22, 24] }
-      ],
-      "fullSequenceHash": "sha256:dna_full_sequence_hash...",
-      "collectedAt": "2024-06-15T10:00:00Z"
-    }
-  },
-  "cryptographic": {
-    "primaryKey": {
-      "algorithm": "Ed25519",
-      "publicKey": "ed25519:abc123def456...",
-      "created": "2024-06-15T10:00:00Z",
-      "status": "active"
-    },
-    "blockchainAnchors": [
-      {
-        "network": "ethereum",
-        "transactionHash": "0xabc123...",
-        "blockNumber": 12345678,
-        "timestamp": "2024-06-15T10:00:00Z"
-      }
-    ]
-  },
+  // Values and Beliefs
+  "valuesAndBeliefs": {
+    "coreValues": string[];
+    "religiousAffiliation"?: string;
+    "politicalViews"?: string;
+    "ethicalPrinciples"?: string[];
+  };
+
+  // Preferences
+  "preferences": {
+    "languages": {
+      "language": string;  // ISO 639-1
+      "proficiency": "NATIVE" | "FLUENT" | "INTERMEDIATE" | "BASIC";
+    }[];
+    "cultural": string[];
+    "lifestyle": string[];
+  };
+
+  // Skills and Expertise
+  "skillsAndExpertise": SkillRecord[];
+
+  // Education
+  "education": EducationRecord[];
+
+  // Career
+  "career": CareerRecord[];
+
+  // Memory Archives
+  "memoryArchives"?: MemoryArchiveReference[];
+}
+
+interface LifeEventRecord {
+  "eventId": string;
+  "eventType": "BIRTH" | "EDUCATION" | "CAREER" | "RELATIONSHIP" |
+               "ACHIEVEMENT" | "HEALTH" | "TRAVEL" | "OTHER";
+  "date": string;
+  "description": string;
+  "location"?: string;
+  "significance": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  "attachments"?: AttachmentReference[];
+}
+
+interface SkillRecord {
+  "skillName": string;
+  "category": "PROFESSIONAL" | "TECHNICAL" | "CREATIVE" | "PHYSICAL" | "SOCIAL";
+  "proficiencyLevel": 1 | 2 | 3 | 4 | 5;  // 1=Novice, 5=Expert
+  "yearsExperience": number;
+  "certifications"?: string[];
+  "lastPracticed": string;
+}
+
+interface EducationRecord {
+  "institution": string;
+  "degree": string;
+  "field": string;
+  "startDate": string;
+  "endDate"?: string;
+  "status": "COMPLETED" | "IN_PROGRESS" | "INCOMPLETE";
+  "gpa"?: number;
+  "achievements"?: string[];
+}
+
+interface CareerRecord {
+  "employer": string;
+  "position": string;
+  "industry": string;
+  "startDate": string;
+  "endDate"?: string;
+  "responsibilities": string[];
+  "achievements"?: string[];
+}
+
+interface MemoryArchiveReference {
+  "archiveId": string;
+  "archiveType": "JOURNAL" | "PHOTO" | "VIDEO" | "AUDIO" | "DOCUMENT" | "DIGITAL";
+  "description": string;
+  "dateRange": {
+    "from": string;
+    "to": string;
+  };
+  "storageLocation": string;
+  "accessCredentials"?: string;  // Encrypted
+  "format": string;
+  "sizeBytes": number;
+  "integrityHash": string;
+}
+```
+
+### 1.4 Digital Identity Record
+
+```typescript
+interface DigitalIdentityRecord {
+  // Decentralized Identifiers
+  "dids": {
+    "primary": string;  // did:wia:cryo:{identifier}
+    "secondary"?: string[];
+    "recovery": string[];
+  };
+
+  // Credential Wallet
+  "credentialWallet": {
+    "walletId": string;
+    "walletType": "HARDWARE" | "SOFTWARE" | "CUSTODIAL";
+    "provider": string;
+    "publicKey": string;
+    "recoveryMechanism": "SEED_PHRASE" | "SOCIAL_RECOVERY" | "GUARDIAN" | "MULTI_SIG";
+    "guardians"?: GuardianRecord[];
+  };
+
+  // Online Accounts
+  "onlineAccounts": OnlineAccountRecord[];
+
+  // Digital Asset Registry
+  "digitalAssets": DigitalAssetRecord[];
+
+  // Communication Channels
+  "communicationChannels": {
+    "email": string[];
+    "phone": string[];
+    "messaging": {
+      "platform": string;
+      "identifier": string;
+    }[];
+    "social": {
+      "platform": string;
+      "username": string;
+      "url"?: string;
+    }[];
+  };
+
+  // Cryptographic Keys
+  "cryptographicKeys": {
+    "keyId": string;
+    "keyType": "RSA" | "ECDSA" | "ED25519" | "PQC";
+    "purpose": "SIGNING" | "ENCRYPTION" | "AUTHENTICATION";
+    "publicKey": string;
+    "privateKeyLocation": "VAULT" | "HARDWARE" | "ESCROW";
+    "rotationPolicy": string;
+  }[];
+}
+
+interface GuardianRecord {
+  "guardianId": string;
+  "guardianType": "PERSON" | "ORGANIZATION" | "SMART_CONTRACT";
+  "name": string;
+  "contactInfo": string;  // Encrypted
+  "threshold": number;  // Required for recovery
+  "relationshipToSubject": string;
+}
+
+interface OnlineAccountRecord {
+  "accountId": string;
+  "platform": string;
+  "username": string;
+  "email"?: string;
+  "url"?: string;
+  "accountType": "SOCIAL" | "FINANCIAL" | "PROFESSIONAL" | "ENTERTAINMENT" | "UTILITY";
+  "status": "ACTIVE" | "SUSPENDED" | "ARCHIVED" | "DELETED";
+  "createdDate"?: string;
+  "lastAccess"?: string;
+  "recoveryOptions": string[];
+  "accessCredentialVault": string;  // Reference to credential storage
+}
+
+interface DigitalAssetRecord {
+  "assetId": string;
+  "assetType": "CRYPTOCURRENCY" | "NFT" | "DOMAIN" | "VIRTUAL_PROPERTY" |
+               "DIGITAL_CONTENT" | "SOFTWARE_LICENSE" | "DATA";
+  "name": string;
+  "description"?: string;
+  "platform"?: string;
+  "walletAddress"?: string;
+  "contractAddress"?: string;
+  "tokenId"?: string;
+  "quantity": number | string;
+  "estimatedValue"?: {
+    "amount": number;
+    "currency": string;
+    "asOfDate": string;
+  };
+  "accessMethod": string;
+  "legalOwnership": "SOLE" | "JOINT" | "TRUST" | "ESTATE";
+}
+```
+
+### 1.5 Biometric Identity Record
+
+```typescript
+interface BiometricIdentityRecord {
+  // DNA Profile
+  "dnaProfile": {
+    "profileId": string;
+    "sequenceType": "FULL_GENOME" | "EXOME" | "SNP_PANEL" | "STR";
+    "sequenceDate": string;
+    "laboratory": string;
+    "storageFormat": "FASTQ" | "BAM" | "VCF" | "FASTA";
+    "storageLocation": string;
+    "integrityHash": string;
+    "markers": {
+      "marker": string;
+      "value": string;
+    }[];
+  };
+
+  // Fingerprints
+  "fingerprints"?: {
+    "digit": "RIGHT_THUMB" | "RIGHT_INDEX" | "RIGHT_MIDDLE" | "RIGHT_RING" | "RIGHT_PINKY" |
+             "LEFT_THUMB" | "LEFT_INDEX" | "LEFT_MIDDLE" | "LEFT_RING" | "LEFT_PINKY";
+    "template": string;  // Encrypted biometric template
+    "format": "ISO_19794_2" | "ANSI_378" | "PROPRIETARY";
+    "quality": number;  // 0-100
+    "captureDate": string;
+  }[];
+
+  // Facial Geometry
+  "facialGeometry"?: {
+    "templateId": string;
+    "template": string;  // Encrypted
+    "format": "ISO_19794_5" | "FERET" | "PROPRIETARY";
+    "captureDate": string;
+    "lightingCondition": string;
+    "pose": "FRONTAL" | "PROFILE_LEFT" | "PROFILE_RIGHT";
+    "referencePhotos": string[];  // Encrypted references
+  };
+
+  // Iris Patterns
+  "irisPatterns"?: {
+    "eye": "LEFT" | "RIGHT";
+    "template": string;  // Encrypted
+    "format": "ISO_19794_6" | "PROPRIETARY";
+    "captureDate": string;
+    "quality": number;
+  }[];
+
+  // Voice Print
+  "voicePrint"?: {
+    "templateId": string;
+    "template": string;  // Encrypted
+    "captureDate": string;
+    "language": string;
+    "duration": number;  // seconds
+    "sampleRate": number;
+    "format": string;
+  };
+
+  // Physical Characteristics
+  "physicalCharacteristics": {
+    "height": number;  // cm
+    "weight": number;  // kg at preservation
+    "bloodType": string;
+    "eyeColor": string;
+    "hairColor": string;
+    "skinTone": string;
+    "distinguishingMarks": {
+      "type": "SCAR" | "BIRTHMARK" | "TATTOO" | "PIERCING" | "OTHER";
+      "location": string;
+      "description": string;
+      "imageRef"?: string;
+    }[];
+  };
+}
+```
+
+## 2. Identity Vault Structure
+
+### 2.1 Vault Configuration
+
+```typescript
+interface IdentityVault {
+  "vaultId": string;
+  "subjectId": string;
+  "identityId": string;
+
+  "configuration": {
+    "encryptionScheme": "AES-256-GCM" | "CHACHA20-POLY1305";
+    "keyManagement": "THRESHOLD" | "MULTI_SIG" | "GUARDIAN";
+    "redundancy": number;  // Number of copies
+    "storageLocations": StorageLocationRecord[];
+    "accessPolicy": AccessPolicyRecord;
+  };
+
+  "contents": {
+    "coreIdentity": EncryptedPayload;
+    "legalDocuments": EncryptedPayload[];
+    "personalRecords": EncryptedPayload[];
+    "digitalCredentials": EncryptedPayload[];
+    "biometricData": EncryptedPayload[];
+    "memoryArchives": EncryptedPayload[];
+  };
+
+  "accessLog": AccessLogEntry[];
+  "integrityProofs": IntegrityProof[];
+}
+
+interface StorageLocationRecord {
+  "locationId": string;
+  "locationType": "PRIMARY" | "BACKUP" | "COLD_STORAGE";
+  "provider": string;
+  "geographic": {
+    "region": string;
+    "jurisdiction": string;
+  };
+  "status": "ACTIVE" | "SYNCING" | "OFFLINE" | "RETIRED";
+  "lastSync": string;
+  "integrityVerified": string;
+}
+
+interface AccessPolicyRecord {
+  "defaultAccess": "NONE" | "READ_ONLY" | "FULL";
+
+  "authorizedAccessors": {
+    "accessorId": string;
+    "accessorType": "GUARDIAN" | "FACILITY" | "LEGAL_REP" | "FAMILY" | "SYSTEM";
+    "accessLevel": "METADATA" | "PARTIAL" | "FULL";
+    "permissions": string[];
+    "validFrom": string;
+    "validUntil"?: string;
+    "conditions"?: string[];
+  }[];
+
+  "emergencyAccess": {
+    "enabled": boolean;
+    "threshold": number;  // Number of guardians required
+    "waitingPeriod": number;  // Hours
+    "notificationRequired": boolean;
+  };
+
+  "revivalAccess": {
+    "automaticGrant": boolean;
+    "verificationRequired": string[];
+    "integrationProtocol": string;
+  };
+}
+
+interface EncryptedPayload {
+  "payloadId": string;
+  "contentType": string;
+  "encryptedData": string;
+  "encryptionKeyId": string;
+  "nonce": string;
+  "createdAt": string;
+  "lastModified": string;
+  "integrityHash": string;
+}
+```
+
+## 3. Identity Continuity Records
+
+### 3.1 Status Tracking
+
+```typescript
+interface IdentityContinuityRecord {
+  "recordId": string;
+  "identityId": string;
+  "subjectId": string;
+
+  "currentStatus": {
+    "identityState": "ACTIVE" | "PRESERVED" | "SUSPENDED" | "REVIVED" | "TERMINATED";
+    "preservationDate": string;
+    "lastVerification": string;
+    "nextScheduledVerification": string;
+  };
+
+  "legalStatus": {
+    "jurisdictions": {
+      "jurisdiction": string;
+      "status": "RECOGNIZED" | "SUSPENDED" | "UNRECOGNIZED";
+      "legalDocuments": string[];
+      "notes": string;
+    }[];
+    "powerOfAttorney": {
+      "grantee": PersonReference;
+      "scope": string[];
+      "validUntil": string;
+      "documentRef": string;
+    }[];
+  };
+
+  "assetStatus": {
+    "financialAssets": "FROZEN" | "MANAGED" | "TRUST" | "ESTATE";
+    "propertyAssets": "FROZEN" | "MANAGED" | "TRUST" | "ESTATE";
+    "digitalAssets": "FROZEN" | "MANAGED" | "TRUST" | "ESTATE";
+    "managingEntity"?: string;
+    "trustDocument"?: string;
+  };
+
+  "relationshipStatus": {
+    "activeRelationships": number;
+    "designatedContacts": PersonReference[];
+    "communicationProxy"?: string;
+  };
+}
+```
+
+### 3.2 Update History
+
+```typescript
+interface IdentityUpdateRecord {
+  "updateId": string;
+  "identityId": string;
+  "timestamp": string;
+
+  "updateType": "SCHEDULED_VERIFICATION" | "LEGAL_UPDATE" | "ASSET_UPDATE" |
+                "RELATIONSHIP_UPDATE" | "SYSTEM_MIGRATION" | "EMERGENCY";
+
+  "changes": {
+    "field": string;
+    "previousValue": any;
+    "newValue": any;
+    "reason": string;
+  }[];
+
+  "authorizedBy": {
+    "authorizer": string;
+    "authorizerType": "GUARDIAN" | "LEGAL_REP" | "SYSTEM" | "COURT";
+    "authorization": string;
+  };
+
   "verification": {
-    "level": "biometric",
-    "methods": ["fingerprint", "dna", "cryptographic"],
-    "history": [
-      {
-        "timestamp": "2025-01-15T10:30:00Z",
-        "method": "fingerprint",
-        "result": "verified",
-        "confidence": 0.98
-      }
-    ]
-  },
-  "meta": {
-    "hash": "sha256:record_hash...",
-    "signature": "ed25519:signature...",
-    "version": 1
-  }
+    "method": string;
+    "verifiedBy": string;
+    "verificationProof": string;
+  };
 }
 ```
 
-### 8.2 Invalid Example - Missing Biometrics
+## 4. Revival Identity Package
 
-```json
-{
-  "version": "1.0.0",
-  "identityId": "ID-2025-000002",
-  "subjectId": "SUBJ-2025-002",
-  "status": "active",
-  "biometrics": {
-    "fingerprints": []
-  }
+### 4.1 Revival Preparation
+
+```typescript
+interface RevivalIdentityPackage {
+  "packageId": string;
+  "identityId": string;
+  "subjectId": string;
+
+  "preparationDate": string;
+  "preparedBy": string;
+
+  "coreIdentityBundle": {
+    "legalName": string;
+    "dateOfBirth": string;
+    "primaryCitizenship": string;
+    "governmentIds": GovernmentIdRecord[];
+    "biometricVerification": string[];
+  };
+
+  "restorationGuidance": {
+    "priorityDocuments": string[];
+    "recommendedSequence": {
+      "step": number;
+      "action": string;
+      "dependencies": string[];
+      "estimatedDuration": string;
+    }[];
+    "potentialChallenges": {
+      "challenge": string;
+      "mitigation": string;
+    }[];
+  };
+
+  "integrationSupport": {
+    "languagePreferences": string[];
+    "culturalContext": string;
+    "familyContacts": PersonReference[];
+    "professionalNetwork": PersonReference[];
+    "financialAdvisors": string[];
+    "legalRepresentation": string[];
+  };
+
+  "personalContext": {
+    "lifeSnapshot": string;  // Summary of life at preservation
+    "personalMessages": {
+      "from": string;
+      "message": string;  // Encrypted
+      "deliveryCondition": string;
+    }[];
+    "orientationMaterials": string[];
+  };
 }
 ```
 
-**Error**: `ERR_VALIDATION_FAILED` - At least 2 fingerprints required
-
 ---
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial release |
-
----
-
-<div align="center">
-
-**WIA Cryo-Identity Data Format Standard v1.0.0**
-
-**弘益人間 (홍익인간)** - Benefit All Humanity
-
----
-
-**© 2025 WIA Standards Committee**
-
-**MIT License**
-
-</div>
+*CRYO-IDENTITY Phase 1 Specification v1.0.0*

@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제6장 - Phase 3: 통신 프로토콜 | WIA 점자 디스플레이 표준</title>
+</head>
+<body>
+
+<h1>제6장: Phase 3 - 통신 프로토콜</h1>
+
+<h2>6.1 개요</h2>
+
+<p>통신 프로토콜은 점자 디스플레이 하드웨어와 호스트 컴퓨터 간의 데이터 교환을 정의합니다. WIA 점자 디스플레이 표준은 세 가지 주요 통신 방식을 지원합니다:</p>
+
+<ul>
+    <li><strong>USB HID</strong>: 가장 일반적인 연결 방식, 드라이버 불필요</li>
+    <li><strong>Bluetooth LE</strong>: 무선 연결, 모바일 기기 지원</li>
+    <li><strong>시리얼 통신</strong>: 레거시 시스템 호환성</li>
+</ul>
+
+<p>이 장에서는 각 프로토콜의 세부사항, 메시지 형식, 보안 고려사항, 성능 최적화 방법을 다룹니다.</p>
+
+<h2>6.2 USB HID 프로토콜</h2>
+
+<p>USB HID (Human Interface Device)는 점자 디스플레이를 위한 표준 통신 프로토콜입니다. HID를 사용하면 별도의 드라이버 없이도 대부분의 운영체제에서 기기를 인식할 수 있습니다.</p>
+
+<h3>6.2.1 HID 디스크립터</h3>
+
+<p>점자 디스플레이를 위한 HID 디스크립터는 다음과 같이 정의됩니다:</p>
+
+<pre>
+// USB HID 디스크립터 (C 구조체)
+static const uint8_t braille_hid_descriptor[] = {
+    // Usage Page (Braille Display)
+    0x05, 0x41,
+
+    // Usage (Braille Display)
+    0x09, 0x01,
+
+    // Collection (Application)
+    0xA1, 0x01,
+
+        // Usage (Braille Row)
+        0x09, 0x20,
+
+        // Logical Minimum (0)
+        0x15, 0x00,
+
+        // Logical Maximum (255)
+        0x26, 0xFF, 0x00,
+
+        // Report Size (8 bits)
+        0x75, 0x08,
+
+        // Report Count (40 cells)
+        0x95, 0x28,
+
+        // Output (Data, Variable, Absolute)
+        0x91, 0x02,
+
+        // Usage (Router Set 1)
+        0x09, 0x21,
+
+        // Report Count (40 routing keys)
+        0x95, 0x28,
+
+        // Input (Data, Variable, Absolute)
+        0x81, 0x02,
+
+    // End Collection
+    0xC0
+};
+</pre>
+
+<h3>6.2.2 HID 리포트 구조</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>리포트 타입</th>
+            <th>ID</th>
+            <th>크기</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Output Report</td>
+            <td>0x01</td>
+            <td>N+2 바이트</td>
+            <td>점자 셀 데이터 쓰기 (N=셀 개수)</td>
+        </tr>
+        <tr>
+            <td>Input Report</td>
+            <td>0x02</td>
+            <td>N+2 바이트</td>
+            <td>라우팅 키 상태 읽기</td>
+        </tr>
+        <tr>
+            <td>Feature Report</td>
+            <td>0x03</td>
+            <td>64 바이트</td>
+            <td>기기 정보 및 설정</td>
+        </tr>
+        <tr>
+            <td>Input Report</td>
+            <td>0x04</td>
+            <td>4 바이트</td>
+            <td>버튼 이벤트</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.2.3 Output Report (셀 데이터 쓰기)</h3>
+
+<pre>
+/*
+ * Output Report 형식 (점자 셀 쓰기)
+ *
+ * Byte 0: Report ID (0x01)
+ * Byte 1: Start Cell Index (0-based)
+ * Byte 2-N: Braille Cell Data (각 바이트는 하나의 셀)
+ */
+
+struct BrailleOutputReport {
+    uint8_t reportId;        // 0x01
+    uint8_t startCell;       // 시작 셀 인덱스
+    uint8_t cellData[MAX_CELLS];  // 점자 셀 데이터
+} __attribute__((packed));
+
+// 예제: "안녕" 쓰기
+BrailleOutputReport report = {
+    .reportId = 0x01,
+    .startCell = 0,
+    .cellData = {
+        0b00110101,  // 안 (한글 점자)
+        0b00011011,  // 녕
+        0b00000000,  // 빈 셀
+        // ... 나머지 셀
+    }
+};
+
+// USB를 통해 전송
+hid_write(device, (uint8_t*)&amp;report, sizeof(report));
+</pre>
+
+<h3>6.2.4 Input Report (라우팅 키)</h3>
+
+<pre>
+/*
+ * Input Report 형식 (라우팅 키 상태)
+ *
+ * Byte 0: Report ID (0x02)
+ * Byte 1: Key State Flags
+ * Byte 2-N: Routing Key Bitmap (비트 단위로 각 키 상태)
+ */
+
+struct RoutingKeyReport {
+    uint8_t reportId;        // 0x02
+    uint8_t flags;           // 플래그 (예약됨)
+    uint8_t keyBitmap[(MAX_CELLS + 7) / 8];  // 비트맵
+} __attribute__((packed));
+
+// 라우팅 키 읽기
+RoutingKeyReport report;
+hid_read(device, (uint8_t*)&amp;report, sizeof(report));
+
+// 특정 키가 눌렸는지 확인
+bool isKeyPressed(const RoutingKeyReport* report, int keyIndex) {
+    int byteIndex = keyIndex / 8;
+    int bitIndex = keyIndex % 8;
+    return (report-&gt;keyBitmap[byteIndex] &amp; (1 &lt;&lt; bitIndex)) != 0;
+}
+</pre>
+
+<h3>6.2.5 Feature Report (기기 정보)</h3>
+
+<pre>
+/*
+ * Feature Report 형식 (기기 정보 및 설정)
+ */
+
+struct BrailleDeviceInfo {
+    uint8_t reportId;              // 0x03
+    char manufacturer[16];         // 제조사 이름
+    char model[16];                // 모델명
+    char serialNumber[16];         // 시리얼 번호
+    uint8_t firmwareVersion[3];    // 펌웨어 버전 (major, minor, patch)
+    uint8_t cellCount;             // 셀 개수
+    uint8_t dotConfig;             // 점 설정 (6 또는 8)
+    uint8_t reserved[10];          // 예약됨
+} __attribute__((packed));
+
+// 기기 정보 읽기
+BrailleDeviceInfo info;
+hid_get_feature_report(device, (uint8_t*)&amp;info, sizeof(info));
+
+printf("제조사: %s\n", info.manufacturer);
+printf("모델: %s\n", info.model);
+printf("셀 개수: %d\n", info.cellCount);
+</pre>
+
+<h3>6.2.6 USB HID 구현 예제</h3>
+
+<pre>
+#include &lt;hidapi.h&gt;
+
+class UsbHidBrailleDisplay {
+private:
+    hid_device* device;
+    uint8_t cellCount;
+
+public:
+    // 디바이스 열기
+    bool open(uint16_t vendorId, uint16_t productId) {
+        device = hid_open(vendorId, productId, NULL);
+        if (!device) {
+            return false;
+        }
+
+        // 논블로킹 모드 설정
+        hid_set_nonblocking(device, 1);
+
+        // 기기 정보 읽기
+        BrailleDeviceInfo info;
+        hid_get_feature_report(device, (uint8_t*)&amp;info, sizeof(info));
+        cellCount = info.cellCount;
+
+        return true;
+    }
+
+    // 셀 쓰기
+    bool writeCells(uint8_t startCell, const uint8_t* data, uint8_t length) {
+        BrailleOutputReport report;
+        report.reportId = 0x01;
+        report.startCell = startCell;
+        memcpy(report.cellData, data, length);
+
+        int result = hid_write(device, (uint8_t*)&amp;report, length + 2);
+        return result &gt; 0;
+    }
+
+    // 라우팅 키 읽기
+    bool readRoutingKeys(bool* keys) {
+        RoutingKeyReport report;
+        int result = hid_read(device, (uint8_t*)&amp;report, sizeof(report));
+
+        if (result &gt; 0 &amp;&amp; report.reportId == 0x02) {
+            for (int i = 0; i &lt; cellCount; i++) {
+                keys[i] = isKeyPressed(&amp;report, i);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    // 닫기
+    void close() {
+        if (device) {
+            hid_close(device);
+            device = nullptr;
+        }
+    }
+};
+</pre>
+
+<h2>6.3 Bluetooth LE GATT 서비스</h2>
+
+<p>Bluetooth Low Energy (BLE)는 모바일 기기와의 무선 연결을 위한 표준입니다. WIA 점자 디스플레이는 GATT (Generic Attribute Profile)를 사용하여 BLE 통신을 구현합니다.</p>
+
+<h3>6.3.1 GATT 서비스 구조</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>서비스/특성</th>
+            <th>UUID</th>
+            <th>속성</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td colspan="4"><strong>WIA Braille Display Service</strong></td>
+        </tr>
+        <tr>
+            <td>Service</td>
+            <td>0000FE60-0000-1000-8000-00805F9B34FB</td>
+            <td>-</td>
+            <td>메인 서비스</td>
+        </tr>
+        <tr>
+            <td>Cell Data</td>
+            <td>0000FE61-0000-1000-8000-00805F9B34FB</td>
+            <td>Write</td>
+            <td>점자 셀 데이터</td>
+        </tr>
+        <tr>
+            <td>Routing Keys</td>
+            <td>0000FE62-0000-1000-8000-00805F9B34FB</td>
+            <td>Read, Notify</td>
+            <td>라우팅 키 상태</td>
+        </tr>
+        <tr>
+            <td>Buttons</td>
+            <td>0000FE63-0000-1000-8000-00805F9B34FB</td>
+            <td>Read, Notify</td>
+            <td>버튼 이벤트</td>
+        </tr>
+        <tr>
+            <td>Device Info</td>
+            <td>0000FE64-0000-1000-8000-00805F9B34FB</td>
+            <td>Read</td>
+            <td>기기 정보</td>
+        </tr>
+        <tr>
+            <td>Configuration</td>
+            <td>0000FE65-0000-1000-8000-00805F9B34FB</td>
+            <td>Read, Write</td>
+            <td>설정</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.3.2 Cell Data 특성 (쓰기)</h3>
+
+<pre>
+/*
+ * Cell Data Characteristic 데이터 형식
+ *
+ * Byte 0: Start Cell Index
+ * Byte 1: Cell Count
+ * Byte 2-N: Cell Data
+ */
+
+struct BleCell Data {
+    uint8_t startCell;
+    uint8_t cellCount;
+    uint8_t cellData[20];  // BLE MTU 제한 고려
+} __attribute__((packed));
+
+// JavaScript 예제 (Web Bluetooth API)
+async function writeBrailleCells(characteristic, startCell, cellData) {
+    const data = new Uint8Array(cellData.length + 2);
+    data[0] = startCell;
+    data[1] = cellData.length;
+    data.set(cellData, 2);
+
+    await characteristic.writeValue(data);
+}
+</pre>
+
+<h3>6.3.3 Routing Keys 특성 (알림)</h3>
+
+<pre>
+/*
+ * Routing Keys Characteristic 데이터 형식
+ *
+ * Byte 0: Event Type (0x01 = Press, 0x02 = Release)
+ * Byte 1: Cell Index
+ * Byte 2-5: Timestamp (32-bit, milliseconds)
+ */
+
+struct BleRoutingKeyEvent {
+    uint8_t eventType;
+    uint8_t cellIndex;
+    uint32_t timestamp;
+} __attribute__((packed));
+
+// JavaScript 예제
+async function setupRoutingKeyNotifications(characteristic) {
+    await characteristic.startNotifications();
+
+    characteristic.addEventListener('characteristicvaluechanged', (event) =&gt; {
+        const value = event.target.value;
+        const eventType = value.getUint8(0);
+        const cellIndex = value.getUint8(1);
+        const timestamp = value.getUint32(2, true);
+
+        console.log(`라우팅 키 ${cellIndex} ${eventType === 1 ? '눌림' : '떼짐'}`);
+    });
+}
+</pre>
+
+<h3>6.3.4 Device Info 특성 (읽기)</h3>
+
+<pre>
+/*
+ * Device Info Characteristic 데이터 형식
+ */
+
+struct BleDeviceInfo {
+    char manufacturer[16];
+    char model[16];
+    uint8_t firmwareVersion[3];
+    uint8_t cellCount;
+    uint8_t dotConfig;
+} __attribute__((packed));
+
+// JavaScript 예제
+async function readDeviceInfo(characteristic) {
+    const value = await characteristic.readValue();
+    const decoder = new TextDecoder('utf-8');
+
+    const info = {
+        manufacturer: decoder.decode(value.buffer.slice(0, 16)).replace(/\0/g, ''),
+        model: decoder.decode(value.buffer.slice(16, 32)).replace(/\0/g, ''),
+        firmwareVersion: `${value.getUint8(32)}.${value.getUint8(33)}.${value.getUint8(34)}`,
+        cellCount: value.getUint8(35),
+        dotConfig: value.getUint8(36)
+    };
+
+    return info;
+}
+</pre>
+
+<h3>6.3.5 BLE 연결 예제 (Web Bluetooth)</h3>
+
+<pre>
+// Web Bluetooth API를 사용한 점자 디스플레이 연결
+
+class BleBrailleDisplay {
+    constructor() {
+        this.device = null;
+        this.server = null;
+        this.service = null;
+        this.characteristics = {};
+    }
+
+    async connect() {
+        // 기기 스캔 및 연결
+        this.device = await navigator.bluetooth.requestDevice({
+            filters: [{
+                services: ['0000FE60-0000-1000-8000-00805F9B34FB']
+            }]
+        });
+
+        // GATT 서버 연결
+        this.server = await this.device.gatt.connect();
+
+        // 서비스 가져오기
+        this.service = await this.server.getPrimaryService(
+            '0000FE60-0000-1000-8000-00805F9B34FB'
+        );
+
+        // 특성 가져오기
+        this.characteristics.cellData = await this.service.getCharacteristic(
+            '0000FE61-0000-1000-8000-00805F9B34FB'
+        );
+        this.characteristics.routingKeys = await this.service.getCharacteristic(
+            '0000FE62-0000-1000-8000-00805F9B34FB'
+        );
+        this.characteristics.deviceInfo = await this.service.getCharacteristic(
+            '0000FE64-0000-1000-8000-00805F9B34FB'
+        );
+
+        // 라우팅 키 알림 설정
+        await this.setupNotifications();
+    }
+
+    async setupNotifications() {
+        await this.characteristics.routingKeys.startNotifications();
+
+        this.characteristics.routingKeys.addEventListener(
+            'characteristicvaluechanged',
+            this.handleRoutingKey.bind(this)
+        );
+    }
+
+    handleRoutingKey(event) {
+        const value = event.target.value;
+        const eventType = value.getUint8(0);
+        const cellIndex = value.getUint8(1);
+
+        if (eventType === 1) {  // Press
+            this.onRoutingKeyPress(cellIndex);
+        }
+    }
+
+    async write(text) {
+        const brailleCells = this.textToBraille(text);
+        await this.writeCells(0, brailleCells);
+    }
+
+    async writeCells(startCell, cellData) {
+        const data = new Uint8Array(cellData.length + 2);
+        data[0] = startCell;
+        data[1] = cellData.length;
+        data.set(cellData, 2);
+
+        await this.characteristics.cellData.writeValue(data);
+    }
+
+    async disconnect() {
+        if (this.device &amp;&amp; this.device.gatt.connected) {
+            await this.device.gatt.disconnect();
+        }
+    }
+}
+
+// 사용 예제
+const display = new BleBrailleDisplay();
+await display.connect();
+await display.write("안녕하세요!");
+</pre>
+
+<h2>6.4 직렬 통신 (레거시 지원)</h2>
+
+<p>일부 레거시 점자 디스플레이는 RS-232 직렬 통신을 사용합니다. WIA 표준은 하위 호환성을 위해 직렬 통신도 지원합니다.</p>
+
+<h3>6.4.1 직렬 통신 설정</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>매개변수</th>
+            <th>기본값</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Baud Rate</td>
+            <td>9600</td>
+            <td>초당 비트 수</td>
+        </tr>
+        <tr>
+            <td>Data Bits</td>
+            <td>8</td>
+            <td>데이터 비트</td>
+        </tr>
+        <tr>
+            <td>Parity</td>
+            <td>None</td>
+            <td>패리티 검사</td>
+        </tr>
+        <tr>
+            <td>Stop Bits</td>
+            <td>1</td>
+            <td>정지 비트</td>
+        </tr>
+        <tr>
+            <td>Flow Control</td>
+            <td>None</td>
+            <td>흐름 제어</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.4.2 직렬 프로토콜 메시지 형식</h3>
+
+<pre>
+/*
+ * 직렬 프로토콜 패킷 형식
+ *
+ * Byte 0: Start Marker (0xFF)
+ * Byte 1: Command ID
+ * Byte 2: Data Length
+ * Byte 3-N: Data
+ * Byte N+1: Checksum (XOR of all bytes)
+ * Byte N+2: End Marker (0xFE)
+ */
+
+struct SerialPacket {
+    uint8_t startMarker;     // 0xFF
+    uint8_t commandId;
+    uint8_t dataLength;
+    uint8_t data[256];
+    uint8_t checksum;
+    uint8_t endMarker;       // 0xFE
+} __attribute__((packed));
+
+// 명령 ID
+enum SerialCommand {
+    CMD_WRITE_CELLS = 0x01,
+    CMD_READ_KEYS = 0x02,
+    CMD_GET_INFO = 0x03,
+    CMD_RESET = 0x04,
+    CMD_ACK = 0x80,
+    CMD_NACK = 0x81
+};
+</pre>
+
+<h3>6.4.3 체크섬 계산</h3>
+
+<pre>
+uint8_t calculateChecksum(const uint8_t* data, size_t length) {
+    uint8_t checksum = 0;
+    for (size_t i = 0; i &lt; length; i++) {
+        checksum ^= data[i];
+    }
+    return checksum;
+}
+
+bool verifyChecksum(const SerialPacket* packet) {
+    uint8_t calculated = 0;
+    calculated ^= packet-&gt;startMarker;
+    calculated ^= packet-&gt;commandId;
+    calculated ^= packet-&gt;dataLength;
+
+    for (int i = 0; i &lt; packet-&gt;dataLength; i++) {
+        calculated ^= packet-&gt;data[i];
+    }
+
+    return calculated == packet-&gt;checksum;
+}
+</pre>
+
+<h3>6.4.4 직렬 통신 구현 예제</h3>
+
+<pre>
+#include &lt;termios.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+
+class SerialBrailleDisplay {
+private:
+    int fd;
+
+    bool sendPacket(const SerialPacket* packet) {
+        size_t totalSize = 5 + packet-&gt;dataLength;
+        ssize_t written = write(fd, packet, totalSize);
+        return written == totalSize;
+    }
+
+    bool receivePacket(SerialPacket* packet, int timeoutMs) {
+        // 타임아웃 설정
+        fd_set readfds;
+        struct timeval timeout;
+        timeout.tv_sec = timeoutMs / 1000;
+        timeout.tv_usec = (timeoutMs % 1000) * 1000;
+
+        FD_ZERO(&amp;readfds);
+        FD_SET(fd, &amp;readfds);
+
+        if (select(fd + 1, &amp;readfds, NULL, NULL, &amp;timeout) &lt;= 0) {
+            return false;  // 타임아웃
+        }
+
+        // 패킷 읽기
+        if (read(fd, packet, sizeof(SerialPacket)) &lt; 5) {
+            return false;
+        }
+
+        return verifyChecksum(packet);
+    }
+
+public:
+    bool open(const char* portName, int baudRate = 9600) {
+        fd = ::open(portName, O_RDWR | O_NOCTTY);
+        if (fd &lt; 0) {
+            return false;
+        }
+
+        // 직렬 포트 설정
+        struct termios tty;
+        memset(&amp;tty, 0, sizeof(tty));
+
+        if (tcgetattr(fd, &amp;tty) != 0) {
+            return false;
+        }
+
+        // Baud rate 설정
+        cfsetospeed(&amp;tty, B9600);
+        cfsetispeed(&amp;tty, B9600);
+
+        // 8N1 설정
+        tty.c_cflag &amp;= ~PARENB;   // 패리티 없음
+        tty.c_cflag &amp;= ~CSTOPB;   // 정지 비트 1
+        tty.c_cflag &amp;= ~CSIZE;
+        tty.c_cflag |= CS8;        // 데이터 비트 8
+
+        // Raw 모드
+        tty.c_lflag &amp;= ~(ICANON | ECHO | ECHOE | ISIG);
+        tty.c_iflag &amp;= ~(IXON | IXOFF | IXANY);
+        tty.c_oflag &amp;= ~OPOST;
+
+        // 적용
+        if (tcsetattr(fd, TCSANOW, &amp;tty) != 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool writeCells(uint8_t startCell, const uint8_t* data, uint8_t length) {
+        SerialPacket packet;
+        packet.startMarker = 0xFF;
+        packet.commandId = CMD_WRITE_CELLS;
+        packet.dataLength = length + 1;
+        packet.data[0] = startCell;
+        memcpy(&amp;packet.data[1], data, length);
+        packet.checksum = calculateChecksum((uint8_t*)&amp;packet, 3 + packet.dataLength);
+        packet.endMarker = 0xFE;
+
+        if (!sendPacket(&amp;packet)) {
+            return false;
+        }
+
+        // ACK 대기
+        SerialPacket ack;
+        if (!receivePacket(&amp;ack, 1000)) {
+            return false;
+        }
+
+        return ack.commandId == CMD_ACK;
+    }
+
+    void close() {
+        if (fd &gt;= 0) {
+            ::close(fd);
+            fd = -1;
+        }
+    }
+};
+</pre>
+
+<h2>6.5 BRLTTY 통합</h2>
+
+<p>BRLTTY는 Linux 시스템에서 널리 사용되는 점자 디스플레이 드라이버입니다. WIA 표준은 BRLTTY와의 호환성을 보장합니다.</p>
+
+<h3>6.5.1 BRLTTY 드라이버 구조</h3>
+
+<pre>
+// BRLTTY 드라이버 인터페이스
+
+#include &lt;brlapi.h&gt;
+
+typedef struct {
+    const char* name;
+    const char* code;
+    const char* comment;
+    int (*brl_construct)(BrailleDisplay *brl, char **parameters, const char *device);
+    void (*brl_destruct)(BrailleDisplay *brl);
+    int (*brl_writeWindow)(BrailleDisplay *brl, const wchar_t *text);
+    int (*brl_readCommand)(BrailleDisplay *brl, KeyTableCommandContext context);
+} BrailleDriver;
+
+// WIA 드라이버 등록
+static const BrailleDriver wia_driver = {
+    .name = "WIA Braille Display",
+    .code = "wia",
+    .comment = "WIA Standard Braille Display Driver",
+    .brl_construct = wia_construct,
+    .brl_destruct = wia_destruct,
+    .brl_writeWindow = wia_writeWindow,
+    .brl_readCommand = wia_readCommand
+};
+</pre>
+
+<h3>6.5.2 BRLTTY 프로토콜 매핑</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>BRLTTY 함수</th>
+            <th>WIA API</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>brl_construct</td>
+            <td>WiaBrailleDisplay.connect()</td>
+            <td>디바이스 초기화</td>
+        </tr>
+        <tr>
+            <td>brl_destruct</td>
+            <td>WiaBrailleDisplay.disconnect()</td>
+            <td>디바이스 정리</td>
+        </tr>
+        <tr>
+            <td>brl_writeWindow</td>
+            <td>WiaBrailleDisplay.write()</td>
+            <td>텍스트 표시</td>
+        </tr>
+        <tr>
+            <td>brl_readCommand</td>
+            <td>이벤트 리스너</td>
+            <td>키 입력 읽기</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.5.3 BRLTTY 드라이버 구현 예제</h3>
+
+<pre>
+// WIA BRLTTY 드라이버 구현
+
+static int wia_construct(BrailleDisplay *brl, char **parameters, const char *device) {
+    // WIA 디바이스 초기화
+    WiaDevice *wia = malloc(sizeof(WiaDevice));
+    if (!wia) return 0;
+
+    if (!wia_open(wia, device)) {
+        free(wia);
+        return 0;
+    }
+
+    brl-&gt;data = wia;
+    brl-&gt;textColumns = wia-&gt;cellCount;
+    brl-&gt;textRows = 1;
+
+    return 1;
+}
+
+static void wia_destruct(BrailleDisplay *brl) {
+    WiaDevice *wia = brl-&gt;data;
+    if (wia) {
+        wia_close(wia);
+        free(wia);
+    }
+}
+
+static int wia_writeWindow(BrailleDisplay *brl, const wchar_t *text) {
+    WiaDevice *wia = brl-&gt;data;
+    uint8_t brailleCells[MAX_CELLS];
+
+    // 유니코드 텍스트를 점자로 변환
+    int length = textToBraille(text, brailleCells, wia-&gt;cellCount);
+
+    // 디스플레이에 쓰기
+    return wia_writeCells(wia, 0, brailleCells, length);
+}
+
+static int wia_readCommand(BrailleDisplay *brl, KeyTableCommandContext context) {
+    WiaDevice *wia = brl-&gt;data;
+    WiaEvent event;
+
+    // 이벤트 읽기 (논블로킹)
+    if (!wia_readEvent(wia, &amp;event, 0)) {
+        return EOF;
+    }
+
+    // 이벤트를 BRLTTY 명령으로 변환
+    switch (event.type) {
+        case WIA_EVENT_ROUTING_KEY:
+            return BRL_CMD_BLK(ROUTE) | event.data.routingKey.cellIndex;
+
+        case WIA_EVENT_BUTTON:
+            return mapButtonToCommand(event.data.button.buttonId);
+
+        default:
+            return EOF;
+    }
+}
+</pre>
+
+<h2>6.6 메시지 형식 및 명령</h2>
+
+<h3>6.6.1 명령 코드 정의</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>명령 코드</th>
+            <th>이름</th>
+            <th>방향</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>0x01</td>
+            <td>WRITE_CELLS</td>
+            <td>Host → Device</td>
+            <td>점자 셀 쓰기</td>
+        </tr>
+        <tr>
+            <td>0x02</td>
+            <td>READ_CELLS</td>
+            <td>Host ← Device</td>
+            <td>점자 셀 읽기</td>
+        </tr>
+        <tr>
+            <td>0x03</td>
+            <td>CLEAR_CELLS</td>
+            <td>Host → Device</td>
+            <td>셀 지우기</td>
+        </tr>
+        <tr>
+            <td>0x10</td>
+            <td>KEY_EVENT</td>
+            <td>Host ← Device</td>
+            <td>키 이벤트</td>
+        </tr>
+        <tr>
+            <td>0x11</td>
+            <td>ROUTING_EVENT</td>
+            <td>Host ← Device</td>
+            <td>라우팅 키 이벤트</td>
+        </tr>
+        <tr>
+            <td>0x20</td>
+            <td>GET_INFO</td>
+            <td>Host ↔ Device</td>
+            <td>기기 정보 요청/응답</td>
+        </tr>
+        <tr>
+            <td>0x21</td>
+            <td>SET_CONFIG</td>
+            <td>Host → Device</td>
+            <td>설정 변경</td>
+        </tr>
+        <tr>
+            <td>0x22</td>
+            <td>GET_CONFIG</td>
+            <td>Host ↔ Device</td>
+            <td>설정 조회</td>
+        </tr>
+        <tr>
+            <td>0xF0</td>
+            <td>RESET</td>
+            <td>Host → Device</td>
+            <td>디바이스 리셋</td>
+        </tr>
+        <tr>
+            <td>0xFE</td>
+            <td>ACK</td>
+            <td>양방향</td>
+            <td>확인 응답</td>
+        </tr>
+        <tr>
+            <td>0xFF</td>
+            <td>NACK</td>
+            <td>양방향</td>
+            <td>오류 응답</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.6.2 데이터 인코딩</h3>
+
+<pre>
+/*
+ * 점자 셀 인코딩
+ *
+ * 6점식 점자:
+ * Bit 0: 점 1
+ * Bit 1: 점 2
+ * Bit 2: 점 3
+ * Bit 3: 점 4
+ * Bit 4: 점 5
+ * Bit 5: 점 6
+ * Bit 6-7: 예약됨 (0)
+ *
+ * 8점식 점자:
+ * Bit 0: 점 1
+ * Bit 1: 점 2
+ * Bit 2: 점 3
+ * Bit 3: 점 4
+ * Bit 4: 점 5
+ * Bit 5: 점 6
+ * Bit 6: 점 7
+ * Bit 7: 점 8
+ */
+
+// 점자 셀 인코딩 예제
+uint8_t encodeBraille6(bool dots[6]) {
+    uint8_t cell = 0;
+    for (int i = 0; i &lt; 6; i++) {
+        if (dots[i]) {
+            cell |= (1 &lt;&lt; i);
+        }
+    }
+    return cell;
+}
+
+uint8_t encodeBraille8(bool dots[8]) {
+    uint8_t cell = 0;
+    for (int i = 0; i &lt; 8; i++) {
+        if (dots[i]) {
+            cell |= (1 &lt;&lt; i);
+        }
+    }
+    return cell;
+}
+
+// 점자 셀 디코딩
+void decodeBraille(uint8_t cell, bool dots[8], int dotCount) {
+    for (int i = 0; i &lt; dotCount; i++) {
+        dots[i] = (cell &amp; (1 &lt;&lt; i)) != 0;
+    }
+}
+</pre>
+
+<h2>6.7 보안 고려사항</h2>
+
+<h3>6.7.1 데이터 암호화</h3>
+
+<p>민감한 정보를 다루는 경우, 점자 디스플레이 통신을 암호화해야 합니다:</p>
+
+<pre>
+// AES-128 암호화 예제
+
+#include &lt;openssl/aes.h&gt;
+#include &lt;openssl/rand.h&gt;
+
+class SecureBrailleProtocol {
+private:
+    AES_KEY encryptKey;
+    AES_KEY decryptKey;
+    uint8_t iv[AES_BLOCK_SIZE];
+
+public:
+    bool initialize(const uint8_t* key) {
+        // 암호화 키 설정
+        if (AES_set_encrypt_key(key, 128, &amp;encryptKey) != 0) {
+            return false;
+        }
+
+        // 복호화 키 설정
+        if (AES_set_decrypt_key(key, 128, &amp;decryptKey) != 0) {
+            return false;
+        }
+
+        // IV 생성
+        RAND_bytes(iv, AES_BLOCK_SIZE);
+
+        return true;
+    }
+
+    void encrypt(const uint8_t* plaintext, uint8_t* ciphertext, size_t length) {
+        uint8_t ivCopy[AES_BLOCK_SIZE];
+        memcpy(ivCopy, iv, AES_BLOCK_SIZE);
+
+        AES_cbc_encrypt(plaintext, ciphertext, length, &amp;encryptKey, ivCopy, AES_ENCRYPT);
+    }
+
+    void decrypt(const uint8_t* ciphertext, uint8_t* plaintext, size_t length) {
+        uint8_t ivCopy[AES_BLOCK_SIZE];
+        memcpy(ivCopy, iv, AES_BLOCK_SIZE);
+
+        AES_cbc_encrypt(ciphertext, plaintext, length, &amp;decryptKey, ivCopy, AES_DECRYPT);
+    }
+};
+</pre>
+
+<h3>6.7.2 기기 인증</h3>
+
+<pre>
+/*
+ * 기기 인증 프로토콜
+ *
+ * 1. 호스트가 챌린지 (난수) 전송
+ * 2. 디바이스가 개인 키로 서명하여 응답
+ * 3. 호스트가 공개 키로 검증
+ */
+
+struct AuthenticationChallenge {
+    uint8_t commandId;       // 0x30
+    uint8_t challenge[32];   // 난수
+};
+
+struct AuthenticationResponse {
+    uint8_t commandId;       // 0x31
+    uint8_t signature[64];   // ECDSA 서명
+};
+
+bool authenticateDevice(int fd) {
+    // 1. 챌린지 생성
+    AuthenticationChallenge challenge;
+    challenge.commandId = 0x30;
+    RAND_bytes(challenge.challenge, 32);
+
+    // 2. 챌린지 전송
+    write(fd, &amp;challenge, sizeof(challenge));
+
+    // 3. 응답 수신
+    AuthenticationResponse response;
+    read(fd, &amp;response, sizeof(response));
+
+    // 4. 서명 검증
+    return verifySignature(challenge.challenge, response.signature);
+}
+</pre>
+
+<h3>6.7.3 접근 제어</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>보안 레벨</th>
+            <th>요구사항</th>
+            <th>사용 사례</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>공개</td>
+            <td>인증 불필요</td>
+            <td>일반 텍스트 표시</td>
+        </tr>
+        <tr>
+            <td>제한</td>
+            <td>기기 인증</td>
+            <td>개인 문서</td>
+        </tr>
+        <tr>
+            <td>기밀</td>
+            <td>인증 + 암호화</td>
+            <td>금융 정보</td>
+        </tr>
+        <tr>
+            <td>최고기밀</td>
+            <td>인증 + 암호화 + 감사</td>
+            <td>의료 기록</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>6.8 지연 시간 요구사항</h2>
+
+<p>점자 디스플레이의 사용성을 위해서는 낮은 지연 시간이 중요합니다.</p>
+
+<h3>6.8.1 지연 시간 목표</h3>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>작업</th>
+            <th>목표 지연 시간</th>
+            <th>최대 허용 지연 시간</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>셀 업데이트</td>
+            <td>&lt; 50ms</td>
+            <td>&lt; 100ms</td>
+        </tr>
+        <tr>
+            <td>라우팅 키 응답</td>
+            <td>&lt; 20ms</td>
+            <td>&lt; 50ms</td>
+        </tr>
+        <tr>
+            <td>버튼 입력</td>
+            <td>&lt; 20ms</td>
+            <td>&lt; 50ms</td>
+        </tr>
+        <tr>
+            <td>연결 설정</td>
+            <td>&lt; 1s</td>
+            <td>&lt; 3s</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.8.2 성능 최적화</h3>
+
+<pre>
+// 배치 업데이트로 지연 시간 최소화
+
+class OptimizedBrailleDisplay {
+private:
+    uint8_t cellBuffer[MAX_CELLS];
+    bool dirtyFlags[MAX_CELLS];
+    uint64_t lastUpdateTime;
+
+    const uint64_t UPDATE_INTERVAL_MS = 16;  // 60 FPS
+
+public:
+    void setCell(int index, uint8_t value) {
+        if (cellBuffer[index] != value) {
+            cellBuffer[index] = value;
+            dirtyFlags[index] = true;
+        }
+    }
+
+    void flush() {
+        uint64_t now = getCurrentTimeMs();
+
+        // 프레임 레이트 제한
+        if (now - lastUpdateTime &lt; UPDATE_INTERVAL_MS) {
+            return;
+        }
+
+        // 변경된 셀만 전송
+        int startIndex = -1;
+        for (int i = 0; i &lt;= MAX_CELLS; i++) {
+            if (i &lt; MAX_CELLS &amp;&amp; dirtyFlags[i]) {
+                if (startIndex == -1) {
+                    startIndex = i;
+                }
+            } else {
+                if (startIndex != -1) {
+                    // 연속된 더티 셀 전송
+                    int length = i - startIndex;
+                    writeCells(startIndex, &amp;cellBuffer[startIndex], length);
+
+                    // 플래그 초기화
+                    memset(&amp;dirtyFlags[startIndex], 0, length);
+                    startIndex = -1;
+                }
+            }
+        }
+
+        lastUpdateTime = now;
+    }
+};
+</pre>
+
+<h3>6.8.3 지연 시간 측정</h3>
+
+<pre>
+// 지연 시간 프로파일링
+
+class LatencyProfiler {
+private:
+    struct LatencyStats {
+        uint64_t min;
+        uint64_t max;
+        uint64_t avg;
+        uint64_t count;
+    };
+
+    std::map&lt;std::string, LatencyStats&gt; stats;
+
+public:
+    void measureOperation(const std::string&amp; name, std::function&lt;void()&gt; operation) {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        operation();
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast&lt;std::chrono::microseconds&gt;(end - start);
+
+        updateStats(name, duration.count());
+    }
+
+    void updateStats(const std::string&amp; name, uint64_t latency) {
+        auto&amp; stat = stats[name];
+
+        if (stat.count == 0) {
+            stat.min = stat.max = stat.avg = latency;
+            stat.count = 1;
+        } else {
+            stat.min = std::min(stat.min, latency);
+            stat.max = std::max(stat.max, latency);
+            stat.avg = (stat.avg * stat.count + latency) / (stat.count + 1);
+            stat.count++;
+        }
+    }
+
+    void printStats() {
+        for (const auto&amp; [name, stat] : stats) {
+            printf("%s:\n", name.c_str());
+            printf("  Min: %lu μs\n", stat.min);
+            printf("  Max: %lu μs\n", stat.max);
+            printf("  Avg: %lu μs\n", stat.avg);
+            printf("  Count: %lu\n", stat.count);
+        }
+    }
+};
+
+// 사용 예제
+LatencyProfiler profiler;
+
+profiler.measureOperation("writeCells", [&]() {
+    display.writeCells(0, brailleCells, 40);
+});
+
+profiler.printStats();
+</pre>
+
+<h2>6.9 장 요약</h2>
+
+<p>이 장에서는 WIA 점자 디스플레이의 통신 프로토콜을 상세히 다루었습니다:</p>
+
+<ul>
+    <li><strong>USB HID</strong>: 표준 HID 프로토콜을 사용한 드라이버 없는 연결</li>
+    <li><strong>Bluetooth LE</strong>: GATT 서비스를 통한 무선 연결 및 모바일 지원</li>
+    <li><strong>직렬 통신</strong>: 레거시 시스템과의 하위 호환성</li>
+    <li><strong>BRLTTY 통합</strong>: Linux 스크린 리더와의 원활한 통합</li>
+    <li><strong>메시지 형식</strong>: 명령 코드, 데이터 인코딩, 프로토콜 구조</li>
+    <li><strong>보안</strong>: 암호화, 인증, 접근 제어</li>
+    <li><strong>성능</strong>: 지연 시간 최적화 및 측정</li>
+</ul>
+
+<p>이러한 프로토콜은 弘益人間의 정신에 따라, 모든 사용자가 어떤 플랫폼에서든 점자 디스플레이를 사용할 수 있도록 설계되었습니다.</p>
+
+<h2>6.10 복습 문제</h2>
+
+<ol>
+    <li>USB HID를 사용하는 장점과 단점은 무엇인가요?</li>
+    <li>HID 디스크립터에서 Usage Page 0x41이 의미하는 것은 무엇인가요?</li>
+    <li>Bluetooth LE GATT의 Characteristic과 Service의 차이를 설명하세요.</li>
+    <li>직렬 통신에서 체크섬이 필요한 이유는 무엇인가요?</li>
+    <li>BRLTTY 드라이버의 주요 함수 4가지를 나열하고 설명하세요.</li>
+    <li>6점식 점자와 8점식 점자의 인코딩 차이를 설명하세요.</li>
+    <li>점자 디스플레이 통신에서 암호화가 필요한 경우는 언제인가요?</li>
+    <li>라우팅 키 응답의 목표 지연 시간이 20ms 미만이어야 하는 이유는?</li>
+    <li>배치 업데이트를 사용하여 성능을 최적화하는 방법을 설명하세요.</li>
+    <li>세 가지 통신 방식(USB, BLE, 직렬) 중 어떤 상황에 어떤 방식이 적합한지 논하세요.</li>
+</ol>
+
+<h2>6.11 다음 장 미리보기</h2>
+
+<p>다음 장에서는 <strong>Phase 4: 통합</strong>을 다룹니다. 점자 디스플레이를 다양한 스크린 리더 및 플랫폼과 통합하는 방법을 살펴볼 것입니다:</p>
+
+<ul>
+    <li>스크린 리더 통합의 일반적인 패턴과 아키텍처</li>
+    <li>Windows NVDA를 위한 점자 디스플레이 드라이버 개발</li>
+    <li>JAWS와의 호환성 보장 방법</li>
+    <li>iOS VoiceOver 통합 및 접근성 API</li>
+    <li>Android TalkBack 지원 구현</li>
+    <li>Linux Orca와의 통합</li>
+    <li>웹 접근성을 위한 ARIA 지원</li>
+    <li>弘益人間 철학을 반영한 포용적 설계</li>
+</ul>
+
+<p>통합 방법을 익히면 점자 디스플레이가 모든 플랫폼에서 원활하게 작동하도록 만들 수 있습니다.</p>
+</body>
+</html>

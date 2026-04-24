@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: IoT and Sensor Networks | WIA-AGRICULTURAL_DATA_EXCHANGE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: IoT and Sensor Networks</h1>
+
+    <p>Agricultural Internet of Things (IoT) systems generate continuous streams of environmental, equipment, and crop data that enable precision agriculture and real-time decision support. This chapter covers sensor types, connectivity protocols, edge computing architectures, and the data standards that enable interoperable agricultural IoT ecosystems across diverse farming environments.</p>
+
+    <h2>6.1 Agricultural Sensor Types</h2>
+
+    <table>
+        <tr>
+            <th>Category</th>
+            <th>Sensor Types</th>
+            <th>Parameters</th>
+            <th>Deployment</th>
+        </tr>
+        <tr>
+            <td>Soil</td>
+            <td>Capacitance, TDR, resistive</td>
+            <td>Moisture, temperature, EC, pH</td>
+            <td>In-ground probes</td>
+        </tr>
+        <tr>
+            <td>Weather</td>
+            <td>Thermometer, hygrometer, anemometer</td>
+            <td>Temp, humidity, wind, rain, solar</td>
+            <td>Weather stations</td>
+        </tr>
+        <tr>
+            <td>Crop</td>
+            <td>NDVI, chlorophyll, canopy temp</td>
+            <td>Health, stress, growth stage</td>
+            <td>Proximal, aerial</td>
+        </tr>
+        <tr>
+            <td>Water</td>
+            <td>Flow meters, level sensors</td>
+            <td>Flow rate, pressure, quality</td>
+            <td>Irrigation systems</td>
+        </tr>
+        <tr>
+            <td>Equipment</td>
+            <td>GPS, CAN bus, telematics</td>
+            <td>Position, speed, fuel, diagnostics</td>
+            <td>Mounted on machinery</td>
+        </tr>
+        <tr>
+            <td>Livestock</td>
+            <td>RFID, accelerometer, GPS</td>
+            <td>ID, activity, location, health</td>
+            <td>Tags, collars, boluses</td>
+        </tr>
+    </table>
+
+    <h2>6.2 Sensor Data Model</h2>
+
+    <pre>
+// OGC SensorThings API Data Model
+interface SensorThingsDataModel {
+  // Thing - Physical device or object
+  Thing: {
+    id: string;
+    name: string;
+    description: string;
+    properties: Record&lt;string, any&gt;;
+    Locations: Location[];
+    Datastreams: Datastream[];
+  };
+
+  // Location - Geospatial position
+  Location: {
+    id: string;
+    name: string;
+    description: string;
+    encodingType: 'application/geo+json';
+    location: GeoJSON.Point | GeoJSON.Polygon;
+  };
+
+  // Sensor - Measurement procedure
+  Sensor: {
+    id: string;
+    name: string;
+    description: string;
+    encodingType: 'application/pdf' | 'http://www.opengis.net/doc/IS/SensorML/2.0';
+    metadata: string;            // Link to sensor description
+  };
+
+  // ObservedProperty - What is being measured
+  ObservedProperty: {
+    id: string;
+    name: string;
+    definition: string;          // URI to vocabulary
+    description: string;
+  };
+
+  // Datastream - Series of observations
+  Datastream: {
+    id: string;
+    name: string;
+    description: string;
+    observationType: string;
+    unitOfMeasurement: {
+      name: string;
+      symbol: string;
+      definition: string;
+    };
+    observedArea?: GeoJSON.Polygon;
+    phenomenonTime?: string;     // Time extent
+    resultTime?: string;
+    Thing: Thing;
+    Sensor: Sensor;
+    ObservedProperty: ObservedProperty;
+  };
+
+  // Observation - Individual measurement
+  Observation: {
+    id: string;
+    phenomenonTime: ISO8601DateTime;
+    resultTime: ISO8601DateTime;
+    result: number | object;
+    resultQuality?: QualityElement[];
+    validTime?: string;
+    parameters?: Record&lt;string, any&gt;;
+    Datastream: Datastream;
+    FeatureOfInterest: FeatureOfInterest;
+  };
+}
+    </pre>
+
+    <h2>6.3 Connectivity Protocols</h2>
+
+    <pre>
+// Agricultural IoT Connectivity Options
+interface ConnectivityProtocols {
+  // Short Range
+  shortRange: {
+    bluetooth: {
+      range: '10-100m',
+      power: 'low',
+      dataRate: '1-3 Mbps',
+      useCase: 'Wearables, proximal sensors'
+    };
+    zigbee: {
+      range: '10-100m',
+      power: 'very_low',
+      dataRate: '250 kbps',
+      useCase: 'Mesh sensor networks'
+    };
+    wifi: {
+      range: '50-100m',
+      power: 'medium',
+      dataRate: '150+ Mbps',
+      useCase: 'High-bandwidth, near structures'
+    };
+  };
+
+  // Long Range Low Power (LPWAN)
+  lpwan: {
+    lorawan: {
+      range: '2-15 km',
+      power: 'ultra_low',
+      dataRate: '0.3-50 kbps',
+      useCase: 'Remote soil sensors, wide area'
+    };
+    nbiot: {
+      range: '1-10 km',
+      power: 'low',
+      dataRate: '20-250 kbps',
+      useCase: 'Cellular coverage areas'
+    };
+    sigfox: {
+      range: '3-50 km',
+      power: 'ultra_low',
+      dataRate: '100 bps',
+      useCase: 'Simple telemetry, alerts'
+    };
+  };
+
+  // Cellular
+  cellular: {
+    lte_m: {
+      range: 'cellular_coverage',
+      power: 'medium',
+      dataRate: '1 Mbps',
+      useCase: 'Mobile equipment, asset tracking'
+    };
+    '5g': {
+      range: 'cellular_coverage',
+      power: 'medium',
+      dataRate: '100+ Mbps',
+      useCase: 'Real-time video, autonomous'
+    };
+  };
+
+  // Satellite
+  satellite: {
+    leo: {
+      coverage: 'global',
+      latency: '20-40 ms',
+      cost: 'decreasing',
+      useCase: 'Remote areas, backup'
+    };
+  };
+}
+    </pre>
+
+    <h2>6.4 MQTT for Agricultural IoT</h2>
+
+    <div class="highlight">
+        <h3>MQTT Protocol Characteristics</h3>
+        <ul>
+            <li><strong>Lightweight:</strong> Minimal overhead for constrained devices</li>
+            <li><strong>Publish/Subscribe:</strong> Decoupled producers and consumers</li>
+            <li><strong>QoS Levels:</strong> Delivery guarantees (0, 1, 2)</li>
+            <li><strong>Retained Messages:</strong> Latest value always available</li>
+            <li><strong>Last Will:</strong> Notification on unexpected disconnect</li>
+        </ul>
+    </div>
+
+    <pre>
+// MQTT Topic Structure for Agriculture
+const mqttTopicStructure = {
+  // Hierarchical topic design
+  pattern: 'wia/{farmId}/{fieldId}/{deviceType}/{deviceId}/{measurement}',
+
+  examples: [
+    'wia/farm123/field456/soil_sensor/ss001/moisture',
+    'wia/farm123/field456/weather_station/ws001/temperature',
+    'wia/farm123/+/irrigation/+/flow_rate',  // Wildcards
+    'wia/farm123/#'  // All farm data
+  ],
+
+  // Message payload (JSON)
+  payload: {
+    timestamp: '2025-06-15T10:30:00Z',
+    value: 0.32,
+    unit: 'm3/m3',
+    quality: 'good',
+    location: { lat: 42.123, lng: -93.234 }
+  },
+
+  // Sparkplug B specification for industrial IoT
+  sparkplugB: {
+    namespace: 'spBv1.0',
+    groupId: 'farm123',
+    edgeNodeId: 'gateway001',
+    deviceId: 'soil_sensor_001',
+    messageTypes: ['NBIRTH', 'NDATA', 'NDEATH', 'DBIRTH', 'DDATA', 'DDEATH']
+  }
+};
+
+// MQTT Client Configuration
+interface MQTTClientConfig {
+  broker: string;
+  port: 8883;                    // TLS
+  clientId: string;
+  username: string;
+  password: string;
+  cleanSession: boolean;
+  keepAlive: 60;                 // seconds
+  will: {
+    topic: string;
+    payload: string;
+    qos: 1;
+    retain: true;
+  };
+  tls: {
+    ca: string;
+    cert?: string;
+    key?: string;
+  };
+}
+    </pre>
+
+    <h2>6.5 Edge Computing Architecture</h2>
+
+    <pre>
+// Agricultural Edge Computing
+interface EdgeArchitecture {
+  // Edge Gateway Functions
+  gateway: {
+    dataAggregation: {
+      description: 'Collect from multiple sensors';
+      protocols: ['Modbus', 'BLE', 'LoRa', 'SDI-12'];
+      buffering: 'local_storage';
+    };
+    preprocessing: {
+      description: 'Clean and transform data';
+      operations: ['validation', 'calibration', 'unit_conversion', 'filtering'];
+    };
+    localAnalytics: {
+      description: 'Time-critical computations';
+      algorithms: ['threshold_alerts', 'moving_average', 'anomaly_detection'];
+    };
+    storeAndForward: {
+      description: 'Handle connectivity gaps';
+      storage: 'SQLite | time_series_db';
+      sync: 'on_reconnect';
+    };
+  };
+
+  // Edge Device Specifications
+  devices: {
+    microcontroller: {
+      examples: ['ESP32', 'Arduino', 'STM32'];
+      useCase: 'Simple sensors, battery powered';
+      compute: 'minimal';
+    };
+    singleBoardComputer: {
+      examples: ['Raspberry Pi', 'BeagleBone', 'NVIDIA Jetson'];
+      useCase: 'Gateway, local ML inference';
+      compute: 'moderate';
+    };
+    industrialGateway: {
+      examples: ['Dell Edge', 'Advantech', 'Moxa'];
+      useCase: 'Harsh environment, protocol translation';
+      compute: 'high';
+    };
+  };
+
+  // Edge-Cloud Continuum
+  dataFlow: {
+    raw: 'sensor → gateway (local storage)',
+    aggregated: 'gateway → cloud (periodic sync)',
+    alerts: 'gateway → cloud (immediate)',
+    commands: 'cloud → gateway → actuator'
+  };
+}
+
+// Edge Analytics Example
+const irrigationEdgeLogic = {
+  inputs: ['soil_moisture', 'weather_forecast', 'crop_stage'],
+  rules: [
+    {
+      condition: 'soil_moisture < threshold AND no_rain_forecast',
+      action: 'start_irrigation',
+      localExecution: true
+    },
+    {
+      condition: 'soil_moisture > saturation_point',
+      action: 'stop_irrigation',
+      localExecution: true
+    }
+  ],
+  cloudSync: 'decision_log_and_actuals'
+};
+    </pre>
+
+    <h2>6.6 Sensor Calibration and Quality</h2>
+
+    <pre>
+// Sensor Calibration Management
+interface SensorCalibration {
+  sensorId: string;
+  sensorType: string;
+
+  // Calibration Record
+  calibration: {
+    date: ISO8601Date;
+    method: 'factory' | 'field' | 'lab';
+    reference: {
+      standardId: string;
+      value: number;
+      uncertainty: number;
+    };
+    coefficients: {
+      offset: number;
+      gain: number;
+      polynomial?: number[];
+    };
+    validUntil: ISO8601Date;
+  };
+
+  // Drift Monitoring
+  driftMonitoring: {
+    checkInterval: string;       // e.g., 'monthly'
+    threshold: number;           // Acceptable drift
+    history: {
+      date: ISO8601Date;
+      referenceValue: number;
+      measuredValue: number;
+      drift: number;
+    }[];
+  };
+
+  // Data Quality Flags
+  qualityFlags: {
+    good: 'Within specifications';
+    suspect: 'Outside normal range';
+    bad: 'Sensor malfunction';
+    missing: 'No data received';
+    estimated: 'Gap-filled or interpolated';
+  };
+}
+
+// Quality Control Pipeline
+const qcPipeline = {
+  steps: [
+    { name: 'range_check', description: 'Value within physical limits' },
+    { name: 'rate_of_change', description: 'Change rate within expected' },
+    { name: 'spatial_consistency', description: 'Consistent with neighbors' },
+    { name: 'temporal_consistency', description: 'Consistent with history' },
+    { name: 'cross_validation', description: 'Consistent across sensors' }
+  ],
+  output: {
+    value: number,
+    quality: 'good' | 'suspect' | 'bad',
+    flags: string[]
+  }
+};
+    </pre>
+
+    <h2>6.7 Time Series Data Management</h2>
+
+    <div class="highlight">
+        <h3>Time Series Database Requirements</h3>
+        <p>Agricultural IoT generates massive volumes of time-stamped data requiring specialized storage solutions optimized for high write throughput, efficient compression, and fast time-range queries.</p>
+    </div>
+
+    <pre>
+// Time Series Data Architecture
+interface TimeSeriesArchitecture {
+  databases: {
+    influxDB: {
+      model: 'tags + fields + timestamp';
+      query: 'InfluxQL / Flux';
+      retention: 'configurable policies';
+    };
+    timescaleDB: {
+      model: 'PostgreSQL extension';
+      query: 'SQL';
+      features: 'hypertables, continuous aggregates';
+    };
+    questDB: {
+      model: 'column-oriented';
+      query: 'SQL';
+      performance: 'high ingestion rate';
+    };
+  };
+
+  // Data Retention Policies
+  retention: {
+    raw: { duration: '7d', resolution: 'original' },
+    hourly: { duration: '90d', aggregation: 'avg, min, max' },
+    daily: { duration: '2y', aggregation: 'avg, min, max' },
+    monthly: { duration: 'forever', aggregation: 'avg, min, max' }
+  };
+
+  // Downsampling Functions
+  aggregations: [
+    'mean', 'min', 'max', 'sum', 'count',
+    'first', 'last', 'median', 'percentile',
+    'spread', 'stddev'
+  ];
+
+  // Query Patterns
+  queries: {
+    latest: 'SELECT last(*) FROM soil_moisture WHERE device=$1',
+    timeSeries: 'SELECT * FROM soil_moisture WHERE time > now() - 24h',
+    aggregate: 'SELECT mean(value) FROM soil_moisture GROUP BY time(1h)',
+    compare: 'SELECT * FROM soil_moisture WHERE time > now() - 7d GROUP BY field'
+  };
+}
+    </pre>
+
+    <h2>6.8 IoT Security</h2>
+
+    <pre>
+// Agricultural IoT Security Framework
+interface IoTSecurity {
+  // Device Identity
+  identity: {
+    provisioning: 'X.509 certificates' | 'TPM' | 'secure_element';
+    authentication: 'mutual_TLS' | 'token_based';
+    rotation: 'automatic_key_rotation';
+  };
+
+  // Communication Security
+  transport: {
+    encryption: 'TLS 1.3';
+    protocols: ['MQTTS', 'HTTPS', 'CoAPS'];
+    vpn: 'site_to_site_optional';
+  };
+
+  // Access Control
+  authorization: {
+    model: 'RBAC' | 'ABAC';
+    policies: {
+      device: 'can only publish to own topics';
+      gateway: 'can publish/subscribe to farm topics';
+      application: 'read-only or read-write per scope';
+    };
+  };
+
+  // Firmware Security
+  firmware: {
+    signing: 'code_signing_certificates';
+    updates: 'OTA_with_verification';
+    rollback: 'automatic_on_failure';
+  };
+
+  // Monitoring
+  monitoring: {
+    anomalyDetection: 'behavioral_baseline';
+    logging: 'centralized_audit_log';
+    alerts: 'unauthorized_access_attempts';
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>This chapter covered agricultural IoT and sensor networks including sensor types, data models, connectivity protocols, edge computing, calibration, time series management, and security. These systems enable the real-time data collection and processing that powers precision agriculture as defined by the WIA-AGRICULTURAL_DATA_EXCHANGE standard.</p>
+    </div>
+</body>
+</html>

@@ -2,9 +2,9 @@
 //!
 //! Exports WIA Security data to Splunk via HEC API.
 
+use super::{ExportError, ExportResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{ExportResult, ExportError, ExportStatus};
 
 /// Splunk HEC configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ pub struct SplunkEventData {
 
 /// WIA Security event for Splunk export
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WiaSecurityEvent {
+pub struct SplunkSecurityEvent {
     pub event_id: String,
     pub timestamp: String,
     pub event_type: String,
@@ -112,23 +112,39 @@ impl SplunkExporter {
     }
 
     /// Convert WIA security event to Splunk format
-    pub fn convert_event(&self, event: &WiaSecurityEvent) -> SplunkEvent {
+    pub fn convert_event(&self, event: &SplunkSecurityEvent) -> SplunkEvent {
         let mut details = HashMap::new();
 
         if let Some(ref src) = event.source_ip {
             details.insert("src_ip".to_string(), serde_json::Value::String(src.clone()));
         }
         if let Some(ref dst) = event.dest_ip {
-            details.insert("dest_ip".to_string(), serde_json::Value::String(dst.clone()));
+            details.insert(
+                "dest_ip".to_string(),
+                serde_json::Value::String(dst.clone()),
+            );
         }
         if let Some(ref user) = event.user {
             details.insert("user".to_string(), serde_json::Value::String(user.clone()));
         }
-        details.insert("action".to_string(), serde_json::Value::String(event.action.clone()));
-        details.insert("result".to_string(), serde_json::Value::String(event.result.clone()));
-        details.insert("tags".to_string(), serde_json::Value::Array(
-            event.tags.iter().map(|t| serde_json::Value::String(t.clone())).collect()
-        ));
+        details.insert(
+            "action".to_string(),
+            serde_json::Value::String(event.action.clone()),
+        );
+        details.insert(
+            "result".to_string(),
+            serde_json::Value::String(event.result.clone()),
+        );
+        details.insert(
+            "tags".to_string(),
+            serde_json::Value::Array(
+                event
+                    .tags
+                    .iter()
+                    .map(|t| serde_json::Value::String(t.clone()))
+                    .collect(),
+            ),
+        );
 
         // Parse timestamp to epoch
         let time = chrono::DateTime::parse_from_rfc3339(&event.timestamp)
@@ -158,26 +174,51 @@ impl SplunkExporter {
     }
 
     /// Convert vulnerability finding to Splunk format
-    pub fn convert_vulnerability(&self, vuln: &super::super::importers::WiaFinding, host: &str) -> SplunkEvent {
+    pub fn convert_vulnerability(
+        &self,
+        vuln: &super::super::importers::WiaFinding,
+        host: &str,
+    ) -> SplunkEvent {
         let mut details = HashMap::new();
 
-        details.insert("vuln_id".to_string(), serde_json::Value::String(vuln.id.clone()));
-        details.insert("title".to_string(), serde_json::Value::String(vuln.title.clone()));
+        details.insert(
+            "vuln_id".to_string(),
+            serde_json::Value::String(vuln.id.clone()),
+        );
+        details.insert(
+            "title".to_string(),
+            serde_json::Value::String(vuln.title.clone()),
+        );
 
         if let Some(score) = vuln.cvss_score {
-            details.insert("cvss_score".to_string(), serde_json::Value::Number(
-                serde_json::Number::from_f64(score).unwrap_or(serde_json::Number::from(0))
-            ));
+            details.insert(
+                "cvss_score".to_string(),
+                serde_json::Value::Number(
+                    serde_json::Number::from_f64(score).unwrap_or(serde_json::Number::from(0)),
+                ),
+            );
         }
         if let Some(ref port) = vuln.port {
-            details.insert("port".to_string(), serde_json::Value::Number(serde_json::Number::from(*port)));
+            details.insert(
+                "port".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(*port)),
+            );
         }
         if !vuln.cve.is_empty() {
-            details.insert("cve".to_string(), serde_json::Value::Array(
-                vuln.cve.iter().map(|c| serde_json::Value::String(c.clone())).collect()
-            ));
+            details.insert(
+                "cve".to_string(),
+                serde_json::Value::Array(
+                    vuln.cve
+                        .iter()
+                        .map(|c| serde_json::Value::String(c.clone()))
+                        .collect(),
+                ),
+            );
         }
-        details.insert("exploit_available".to_string(), serde_json::Value::Bool(vuln.exploit_available));
+        details.insert(
+            "exploit_available".to_string(),
+            serde_json::Value::Bool(vuln.exploit_available),
+        );
 
         SplunkEvent {
             time: Some(chrono::Utc::now().timestamp() as f64),
@@ -210,7 +251,10 @@ impl SplunkExporter {
     /// Build HEC request headers
     pub fn build_headers(&self) -> HashMap<String, String> {
         let mut headers = HashMap::new();
-        headers.insert("Authorization".to_string(), format!("Splunk {}", self.config.token));
+        headers.insert(
+            "Authorization".to_string(),
+            format!("Splunk {}", self.config.token),
+        );
         headers.insert("Content-Type".to_string(), "application/json".to_string());
         headers
     }
@@ -226,9 +270,9 @@ impl SplunkExporter {
     }
 
     /// Create sample events for testing
-    pub fn sample_events() -> Vec<WiaSecurityEvent> {
+    pub fn sample_events() -> Vec<SplunkSecurityEvent> {
         vec![
-            WiaSecurityEvent {
+            SplunkSecurityEvent {
                 event_id: "evt-001".to_string(),
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 event_type: "authentication".to_string(),
@@ -242,7 +286,7 @@ impl SplunkExporter {
                 tags: vec!["brute-force".to_string(), "suspicious".to_string()],
                 metadata: HashMap::new(),
             },
-            WiaSecurityEvent {
+            SplunkSecurityEvent {
                 event_id: "evt-002".to_string(),
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 event_type: "access_control".to_string(),
@@ -296,6 +340,9 @@ mod tests {
         let exporter = SplunkExporter::new(config);
 
         let headers = exporter.build_headers();
-        assert_eq!(headers.get("Authorization"), Some(&"Splunk test-token".to_string()));
+        assert_eq!(
+            headers.get("Authorization"),
+            Some(&"Splunk test-token".to_string())
+        );
     }
 }

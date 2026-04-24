@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Design and Implementation | WIA-AGRI-020</title>
+    <style>
+        :root{--primary:#84CC16;--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-muted:#94a3b8;--border:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:800px;margin:0 auto}
+        nav{margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+        nav a{color:var(--text-muted);text-decoration:none;margin-right:15px;font-size:0.9rem}
+        nav a:hover{color:var(--primary)}
+        h1{font-size:2.5rem;margin-bottom:20px}
+        .chapter-number{color:var(--primary);font-size:0.9rem;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px}
+        .chapter-intro{font-size:1.1rem;color:var(--text-muted);margin:20px 0 30px;padding:20px;background:var(--bg-card);border-left:4px solid var(--primary);border-radius:8px}
+        h2{font-size:1.8rem;margin:40px 0 20px;color:var(--primary)}
+        h3{font-size:1.3rem;margin:30px 0 15px}
+        p{margin-bottom:20px;color:var(--text-muted)}
+        .code-block{background:var(--bg-card);padding:20px;border-radius:8px;border:1px solid var(--border);margin:25px 0;overflow-x:auto}
+        pre{color:var(--text);font-size:0.9rem}
+        code{color:var(--primary);font-family:'Courier New',monospace}
+        ul,ol{margin:0 0 20px 25px;color:var(--text-muted)}
+        li{margin-bottom:10px}
+        table{width:100%;border-collapse:collapse;margin:25px 0;background:var(--bg-card)}
+        th,td{padding:12px;text-align:left;border-bottom:1px solid var(--border)}
+        th{background:rgba(132,204,22,0.1);color:var(--primary)}
+        .highlight-box{background:rgba(132,204,22,0.1);border-left:4px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}
+        .nav-buttons{display:flex;justify-content:space-between;margin-top:50px;padding-top:30px;border-top:1px solid var(--border)}
+        .btn{padding:12px 24px;background:var(--primary);color:white;text-decoration:none;border-radius:8px}
+        .btn-secondary{background:var(--bg-card);border:1px solid var(--border)}
+        footer{margin-top:60px;padding-top:30px;border-top:1px solid var(--border);text-align:center;color:var(--text-muted);font-size:0.9rem}
+        .philosophy{color:#ffd700;margin-bottom:10px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 3</div>
+            <h1>API Design and Implementation</h1>
+            <div class="chapter-intro">
+                This chapter explores the RESTful API architecture of WIA-AGRI-020, covering authentication, endpoints, request/response patterns, error handling, and best practices for building robust agricultural data APIs.
+            </div>
+        </header>
+
+        <main>
+            <h2>RESTful API Architecture</h2>
+
+            <p>The WIA-AGRI-020 API follows RESTful principles, making it intuitive for developers familiar with modern web services. The API is organized around resources (farms, sensors, data) and uses standard HTTP methods (GET, POST, PUT, DELETE) for operations.</p>
+
+            <h3>Base URL Structure</h3>
+
+            <p>All API requests are made to a base URL with versioning in the path:</p>
+
+            <div class="code-block"><pre>Production: https://api.wia-agri.org/v1
+Testing:    https://api-test.wia-agri.org/v1
+Sandbox:    https://sandbox.wia-agri.org/v1</pre></div>
+
+            <p>The version number (v1) in the URL ensures backward compatibility. When breaking changes are introduced, a new version (v2) is released while maintaining support for previous versions.</p>
+
+            <h2>Authentication</h2>
+
+            <h3>API Key Authentication</h3>
+
+            <p>The simplest authentication method uses API keys passed in request headers:</p>
+
+            <div class="code-block"><pre>GET /api/v1/data/query HTTP/1.1
+Host: api.wia-agri.org
+X-API-Key: wia_live_abc123def456ghi789
+Content-Type: application/json</pre></div>
+
+            <p>API keys come in two types:</p>
+
+            <ul>
+                <li><strong>Test Keys:</strong> Prefix wia_test_ - Limited to sandbox environments, rate-limited, and work with sample data only.</li>
+                <li><strong>Live Keys:</strong> Prefix wia_live_ - Full production access with standard rate limits based on your subscription tier.</li>
+            </ul>
+
+            <h3>OAuth 2.0 Flow</h3>
+
+            <p>For third-party integrations and applications accessing data on behalf of farmers, OAuth 2.0 provides secure delegated access:</p>
+
+            <div class="code-block"><pre>POST /oauth/token HTTP/1.1
+Host: auth.wia-agri.org
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&
+client_id=YOUR_CLIENT_ID&
+client_secret=YOUR_CLIENT_SECRET&
+scope=data:read data:write</pre></div>
+
+            <p>Response:</p>
+
+            <div class="code-block"><pre>{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "data:read data:write"
+}</pre></div>
+
+            <h3>Scopes and Permissions</h3>
+
+            <table>
+                <tr>
+                    <th>Scope</th>
+                    <th>Description</th>
+                    <th>Typical Use</th>
+                </tr>
+                <tr>
+                    <td>data:read</td>
+                    <td>Read sensor data and queries</td>
+                    <td>Analytics dashboards</td>
+                </tr>
+                <tr>
+                    <td>data:write</td>
+                    <td>Submit new data</td>
+                    <td>IoT sensors, equipment</td>
+                </tr>
+                <tr>
+                    <td>farm:manage</td>
+                    <td>Manage farm profiles and settings</td>
+                    <td>Farm management software</td>
+                </tr>
+                <tr>
+                    <td>device:register</td>
+                    <td>Register and manage IoT devices</td>
+                    <td>Sensor installation apps</td>
+                </tr>
+                <tr>
+                    <td>analytics:access</td>
+                    <td>Access advanced analytics</td>
+                    <td>AI/ML platforms</td>
+                </tr>
+            </table>
+
+            <h2>Core API Endpoints</h2>
+
+            <h3>Data Submission</h3>
+
+            <p>Submit a single data record:</p>
+
+            <div class="code-block"><pre>POST /api/v1/data/submit
+Content-Type: application/json
+X-API-Key: wia_live_abc123def456ghi789
+
+{
+  "standardVersion": "WIA-AGRI-020-v1.0",
+  "farmId": "FARM-2025-001",
+  "dataType": "SOIL_SENSOR",
+  "timestamp": "2025-12-26T10:30:00.000Z",
+  "readings": {
+    "soilMoisture": {"value": 45.5},
+    "soilPH": {"value": 6.8}
+  }
+}</pre></div>
+
+            <p>Success Response (201 Created):</p>
+
+            <div class="code-block"><pre>{
+  "status": "success",
+  "dataId": "DATA-20251226-001",
+  "timestamp": "2025-12-26T10:30:00.000Z",
+  "validationResult": {
+    "isValid": true,
+    "warnings": [],
+    "errors": []
+  },
+  "receivedAt": "2025-12-26T10:30:01.234Z"
+}</pre></div>
+
+            <h3>Batch Submission</h3>
+
+            <p>Submit multiple records in one request for efficiency:</p>
+
+            <div class="code-block"><pre>POST /api/v1/data/batch
+Content-Type: application/json
+
+{
+  "batchId": "BATCH-20251226-001",
+  "farmId": "FARM-2025-001",
+  "data": [
+    {"dataId": "SOIL-001", "dataType": "SOIL_SENSOR", "readings": {...}},
+    {"dataId": "WEATHER-001", "dataType": "WEATHER", "current": {...}},
+    {"dataId": "CROP-001", "dataType": "CROP_HEALTH", "healthMetrics": {...}}
+  ]
+}</pre></div>
+
+            <p>The API processes all records atomically - either all succeed or all fail together, preventing partial data corruption.</p>
+
+            <h3>Data Retrieval</h3>
+
+            <p>Query historical data with flexible filtering:</p>
+
+            <div class="code-block"><pre>GET /api/v1/data/query?farmId=FARM-2025-001&dataType=SOIL_SENSOR&from=2025-12-20&to=2025-12-26&limit=100</pre></div>
+
+            <p>Response includes pagination for large datasets:</p>
+
+            <div class="code-block"><pre>{
+  "status": "success",
+  "query": {
+    "farmId": "FARM-2025-001",
+    "dataType": "SOIL_SENSOR",
+    "dateRange": {
+      "from": "2025-12-20T00:00:00.000Z",
+      "to": "2025-12-26T23:59:59.999Z"
+    }
+  },
+  "results": {
+    "count": 45,
+    "data": [...]
+  },
+  "pagination": {
+    "page": 1,
+    "pageSize": 100,
+    "totalPages": 1,
+    "totalRecords": 45,
+    "nextCursor": null
+  }
+}</pre></div>
+
+            <h3>Get Latest Reading</h3>
+
+            <p>Retrieve the most recent data point for quick status checks:</p>
+
+            <div class="code-block"><pre>GET /api/v1/data/latest?farmId=FARM-2025-001&dataType=SOIL_SENSOR&fieldId=FIELD-NORTH-01</pre></div>
+
+            <h2>Rate Limiting</h2>
+
+            <p>To ensure fair usage and system stability, the API implements rate limiting. Each response includes headers showing your current status:</p>
+
+            <div class="code-block"><pre>HTTP/1.1 200 OK
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1703592000</pre></div>
+
+            <h3>Rate Limits by Tier</h3>
+
+            <table>
+                <tr>
+                    <th>Tier</th>
+                    <th>Requests/Hour</th>
+                    <th>Burst Limit</th>
+                    <th>Concurrent Connections</th>
+                </tr>
+                <tr>
+                    <td>Free</td>
+                    <td>1,000</td>
+                    <td>100</td>
+                    <td>2</td>
+                </tr>
+                <tr>
+                    <td>Basic</td>
+                    <td>10,000</td>
+                    <td>500</td>
+                    <td>10</td>
+                </tr>
+                <tr>
+                    <td>Pro</td>
+                    <td>100,000</td>
+                    <td>2,000</td>
+                    <td>50</td>
+                </tr>
+                <tr>
+                    <td>Enterprise</td>
+                    <td>Unlimited</td>
+                    <td>Unlimited</td>
+                    <td>Unlimited</td>
+                </tr>
+            </table>
+
+            <p>When rate limits are exceeded, the API returns a 429 status code with retry information:</p>
+
+            <div class="code-block"><pre>HTTP/1.1 429 Too Many Requests
+Retry-After: 3600
+
+{
+  "status": "error",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "message": "Rate limit exceeded. Try again in 3600 seconds.",
+  "limit": 1000,
+  "remaining": 0,
+  "resetAt": "2025-12-26T11:00:00.000Z"
+}</pre></div>
+
+            <h2>Error Handling</h2>
+
+            <p>The API uses standard HTTP status codes and provides detailed error information in responses:</p>
+
+            <h3>Error Response Format</h3>
+
+            <div class="code-block"><pre>{
+  "status": "error",
+  "code": "VALIDATION_ERROR",
+  "message": "Data validation failed",
+  "details": [
+    {
+      "field": "readings.soilMoisture.value",
+      "error": "Value 150 exceeds maximum allowed (100)",
+      "constraint": "range"
+    }
+  ],
+  "requestId": "req_abc123",
+  "timestamp": "2025-12-26T10:30:00.000Z"
+}</pre></div>
+
+            <h3>Common Error Codes</h3>
+
+            <table>
+                <tr>
+                    <th>Code</th>
+                    <th>HTTP Status</th>
+                    <th>Description</th>
+                    <th>Solution</th>
+                </tr>
+                <tr>
+                    <td>VALIDATION_ERROR</td>
+                    <td>400</td>
+                    <td>Invalid data format</td>
+                    <td>Check field types and ranges</td>
+                </tr>
+                <tr>
+                    <td>AUTHENTICATION_FAILED</td>
+                    <td>401</td>
+                    <td>Invalid API key</td>
+                    <td>Verify your API key is correct</td>
+                </tr>
+                <tr>
+                    <td>AUTHORIZATION_FAILED</td>
+                    <td>403</td>
+                    <td>Insufficient permissions</td>
+                    <td>Request appropriate scopes</td>
+                </tr>
+                <tr>
+                    <td>NOT_FOUND</td>
+                    <td>404</td>
+                    <td>Resource not found</td>
+                    <td>Check farmId, dataId exists</td>
+                </tr>
+                <tr>
+                    <td>RATE_LIMIT_EXCEEDED</td>
+                    <td>429</td>
+                    <td>Too many requests</td>
+                    <td>Wait and retry, upgrade tier</td>
+                </tr>
+                <tr>
+                    <td>INTERNAL_ERROR</td>
+                    <td>500</td>
+                    <td>Server error</td>
+                    <td>Contact support with requestId</td>
+                </tr>
+            </table>
+
+            <h2>Real-Time Data Streaming</h2>
+
+            <h3>WebSocket Connections</h3>
+
+            <p>For real-time data, establish a WebSocket connection:</p>
+
+            <div class="code-block"><pre>const ws = new WebSocket('wss://stream.wia-agri.org/v1/stream');
+
+ws.onopen = function() {
+  // Authenticate
+  ws.send(JSON.stringify({
+    action: 'authenticate',
+    token: 'wia_live_abc123def456ghi789'
+  }));
+
+  // Subscribe to data streams
+  ws.send(JSON.stringify({
+    action: 'subscribe',
+    farmId: 'FARM-2025-001',
+    dataTypes: ['SOIL_SENSOR', 'WEATHER']
+  }));
+};
+
+ws.onmessage = function(event) {
+  const data = JSON.parse(event.data);
+  console.log('Real-time data:', data);
+};
+</pre></div>
+
+            <h2>Webhooks</h2>
+
+            <p>Configure webhooks to receive notifications when events occur:</p>
+
+            <div class="code-block"><pre>POST /api/v1/webhooks
+Content-Type: application/json
+
+{
+  "url": "https://your-server.com/webhook",
+  "events": ["data.submitted", "device.offline"],
+  "farmId": "FARM-2025-001",
+  "secret": "whsec_abc123xyz789"
+}</pre></div>
+
+            <p>When events occur, the API sends POST requests to your webhook URL with the event payload.</p>
+
+            <h2>SDK Examples</h2>
+
+            <h3>JavaScript/Node.js</h3>
+
+            <div class="code-block"><pre>const WIAAgri = require('wia-agri-sdk');
+
+const client = new WIAAgri({
+  apiKey: 'wia_live_abc123def456ghi789'
+});
+
+// Submit data
+await client.data.submit({
+  farmId: 'FARM-2025-001',
+  dataType: 'SOIL_SENSOR',
+  readings: {
+    soilMoisture: {value: 45.5}
+  }
+});
+
+// Query data
+const results = await client.data.query({
+  farmId: 'FARM-2025-001',
+  dataType: 'SOIL_SENSOR',
+  from: '2025-12-20',
+  to: '2025-12-26'
+});</pre></div>
+
+            <h3>Python</h3>
+
+            <div class="code-block"><pre>from wia_agri import WIAAgriClient
+
+client = WIAAgriClient(api_key='wia_live_abc123def456ghi789')
+
+# Submit data
+client.data.submit(
+    farm_id='FARM-2025-001',
+    data_type='SOIL_SENSOR',
+    readings={'soilMoisture': {'value': 45.5}}
+)
+
+# Query data
+results = client.data.query(
+    farm_id='FARM-2025-001',
+    data_type='SOIL_SENSOR',
+    from_date='2025-12-20',
+    to_date='2025-12-26'
+)</pre></div>
+
+            <div class="highlight-box">
+                <h3>🎯 Best Practices</h3>
+                <ul>
+                    <li>Use batch endpoints for bulk operations to reduce API calls</li>
+                    <li>Implement exponential backoff for retries after rate limit errors</li>
+                    <li>Cache authentication tokens and reuse them until expiration</li>
+                    <li>Always validate data client-side before API submission</li>
+                    <li>Monitor rate limit headers to avoid hitting limits</li>
+                    <li>Use webhooks instead of polling for event-driven updates</li>
+                    <li>Include requestId in support tickets for faster debugging</li>
+                </ul>
+            </div>
+
+            <h2>Chapter Summary</h2>
+
+            <p>The WIA-AGRI-020 API provides a robust, RESTful interface for agricultural data exchange. It supports multiple authentication methods, comprehensive error handling, rate limiting, real-time streaming via WebSocket, and webhook notifications. Official SDKs for major programming languages simplify integration and follow API best practices.</p>
+        </main>
+
+        </div>
+</body>
+</html>

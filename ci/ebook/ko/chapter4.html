@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4장: 프로토콜 사양 - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI 표준</h1>
+    <p class="subtitle">4장: 프로토콜 사양</p>
+  </header>
+
+  <main class="container">
+    <h1>4장: 프로토콜 사양</h1>
+
+    <h2>4.1 통신 아키텍처</h2>
+    <p>WIA-CI는 RF(프로세서 ↔ 임플란트)와 Bluetooth LE(프로세서 ↔ 모바일 앱) 프로토콜을 모두 지원하는 다층 통신 아키텍처를 정의합니다.</p>
+
+    <h2>4.2 RF 통신 프로토콜</h2>
+    <p>RF 링크는 외부 사운드 프로세서를 피부를 통과하여 이식된 장치에 연결합니다.</p>
+
+    <h3>RF 링크 사양</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>파라미터</th>
+          <th>값</th>
+          <th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>캐리어 주파수</td>
+          <td>49 MHz</td>
+          <td>ISM 대역</td>
+        </tr>
+        <tr>
+          <td>대역폭</td>
+          <td>2 MHz</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>변조</td>
+          <td>ASK / FSK</td>
+          <td>진폭 또는 주파수 편이 변조</td>
+        </tr>
+        <tr>
+          <td>데이터 전송률</td>
+          <td>1 Mbps</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>전력 전송</td>
+          <td>최대 40 mW</td>
+          <td>유도 결합</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4.3 Bluetooth LE 프로토콜</h2>
+    <p>BLE는 CI 프로세서와 모바일 장치 간의 무선 통신을 가능하게 합니다.</p>
+
+    <h3>GATT 서비스 정의</h3>
+    <pre><code>WIA-CI GATT 서비스
+UUID: 0000FE01-0000-1000-8000-00805F9B34FB
+
+특성:
+├─ STATUS (FE02)
+│  속성: Read, Notify
+│  설명: CI 프로세서 상태
+│
+├─ AUDIO_STREAM (FE03)
+│  속성: Notify
+│  설명: 실시간 오디오 데이터
+│
+├─ CONFIG_WRITE (FE04)
+│  속성: Write
+│  설명: 설정 업데이트
+│
+└─ WIA_EXTENDED (FE10)
+   속성: Read, Write, Notify
+   설명: WIA 옥타브 향상</code></pre>
+
+    <h2>4.4 실시간 오디오 처리</h2>
+    <p>WIA-CI는 엄격한 지연 요구사항으로 실시간으로 오디오를 처리합니다.</p>
+
+    <h3>처리 파이프라인</h3>
+    <pre><code>오디오 입력 (16ms 프레임)
+    ↓
+[1] 전처리 (1ms)
+    - AGC (자동 게인 제어)
+    - 프리엠퍼시스
+    ↓
+[2] 주파수 분석 (5ms)
+    - FFT
+    - Gammatone 필터뱅크
+    ↓
+[3] F0 및 옥타브 감지 (10ms)
+    - YIN 알고리즘
+    - 하모닉 분석
+    - 옥타브 분류
+    ↓
+[4] 엔벨로프 추출 (2ms)
+    - Hilbert 변환
+    - 평활화
+    - 옥타브 변조
+    ↓
+[5] 채널 선택 (1ms)
+    - ACE (n-of-m)
+    - 하모닉 우선순위
+    ↓
+[6] 자극 생성 (1ms)
+    - 진폭 매핑
+    - 인터리빙
+    ↓
+총 지연: ~20ms</code></pre>
+
+    <h2>4.5 신호 인코딩</h2>
+
+    <h3>옥타브 감지 알고리즘</h3>
+    <pre><code>function detectOctave(audioFrame: Float32Array) {
+  // 1. F0 추정 (YIN 알고리즘)
+  const f0Result = yinEstimateF0(audioFrame, sampleRate);
+
+  // 2. 옥타브 분류
+  const octaveInfo = classifyOctave(f0Result.f0);
+
+  // 3. 하모닉 분석
+  const spectrum = fft(audioFrame);
+  const harmonics = analyzeHarmonics(spectrum, f0Result.f0);
+
+  // 4. 신뢰도 계산
+  const confidence = calculateConfidence(f0Result, harmonics);
+
+  return {
+    f0: f0Result.f0,
+    octave: octaveInfo,
+    harmonics: harmonics,
+    confidence: confidence
+  };
+}</code></pre>
+
+    <h2>4.6 성능 지표</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>지표</th>
+          <th>요구사항</th>
+          <th>목표</th>
+          <th>측정</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>종단간 지연</td>
+          <td>&lt; 50 ms</td>
+          <td>&lt; 20 ms</td>
+          <td>오디오 입력 → 자극 출력</td>
+        </tr>
+        <tr>
+          <td>F0 추정</td>
+          <td>&lt; 20 ms</td>
+          <td>&lt; 10 ms</td>
+          <td>프레임당</td>
+        </tr>
+        <tr>
+          <td>패킷 손실</td>
+          <td>&lt; 1%</td>
+          <td>&lt; 0.1%</td>
+          <td>1시간 이상</td>
+        </tr>
+        <tr>
+          <td>처리량</td>
+          <td>&gt; 100 fps</td>
+          <td>&gt; 200 fps</td>
+          <td>초당 프레임 수</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      <h3>안전 제한</h3>
+      <ul>
+        <li><strong>최대 전류:</strong> 모든 전극에서 총 5 mA</li>
+        <li><strong>전극당 전류:</strong> 최대 2 mA</li>
+        <li><strong>펄스 레이트:</strong> 최대 32,000 펄스/초 (모든 채널 합계)</li>
+        <li><strong>온도:</strong> 임플란트는 41°C 이하 유지</li>
+      </ul>
+    </div>
+
+    </main>
+</body>
+</html>

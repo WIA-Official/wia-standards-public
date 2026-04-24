@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 보안 및 프라이버시 | WIA-AGRICULTURAL_DATA_EXCHANGE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>7장: 보안 및 프라이버시</h1>
+
+    <p>농업 데이터에는 농업 운영, 토지 자산, 비즈니스 관행에 대한 민감한 정보가 포함되어 있어 강력한 보호가 필요합니다. 이 장에서는 데이터 소유권 원칙, 동의 관리 프레임워크, 접근 제어 메커니즘, 프라이버시 보존 기술, 규정 준수 요구사항을 다룹니다. 강력한 보안 및 프라이버시 제어를 통한 신뢰 구축은 농업 데이터 교환의 광범위한 채택에 필수적입니다.</p>
+
+    <h2>7.1 데이터 소유권 원칙</h2>
+
+    <div class="highlight">
+        <h3>핵심 소유권 원칙</h3>
+        <ul>
+            <li><strong>농부 중심:</strong> 농부가 자신의 운영에서 생성된 데이터를 소유</li>
+            <li><strong>투명성:</strong> 데이터 수집 및 사용에 대한 명확한 이해</li>
+            <li><strong>통제:</strong> 접근 권한 부여, 철회, 감사 능력</li>
+            <li><strong>이동성:</strong> 시스템 간 데이터 내보내기 및 이동 권리</li>
+            <li><strong>가치 공유:</strong> 데이터가 가치를 창출할 때 공정한 보상</li>
+            <li><strong>보안:</strong> 무단 접근 및 오용으로부터 보호</li>
+        </ul>
+    </div>
+
+    <pre>
+// 데이터 소유권 모델
+interface DataOwnership {
+  // 주요 소유자
+  owner: {
+    entityId: string;
+    entityType: 'farmer' | 'farm_business' | 'landowner';
+    rights: [
+      'access',        // 자신의 데이터 보기
+      'export',        // 표준 형식으로 다운로드
+      'delete',        // 삭제 요청
+      'share',         // 다른 사람에게 접근 권한 부여
+      'revoke',        // 이전에 부여한 접근 권한 제거
+      'audit'          // 접근 이력 검토
+    ];
+  };
+
+  // 데이터 자산
+  dataAsset: {
+    id: string;
+    type: 'field_boundary' | 'yield_data' | 'input_records' | 'imagery';
+    source: string;              // 데이터를 생성한 시스템
+    generatedAt: ISO8601DateTime;
+    location?: GeoJSON.Geometry;
+  };
+
+  // 소유권 결정
+  ownershipRules: {
+    farmOperationalData: '운영자가 통제';
+    landownerData: '토지 소유자가 접근 권한 보유';
+    aggregatedData: '기여 당사자가 공유';
+    derivedInsights: '계약 조건에 따름';
+    equipmentData: '운영자가 사용 데이터 소유';
+  };
+
+  // 분쟁
+  disputeResolution: {
+    mechanism: 'arbitration' | 'mediation' | 'court';
+    governing_law: string;
+  };
+}
+    </pre>
+
+    <h2>7.2 동의 관리</h2>
+
+    <pre>
+// 동의 관리 프레임워크
+interface ConsentManagement {
+  // 동의 기록
+  consent: {
+    id: string;
+    consentGiver: string;        // 동의하는 사람
+    consentReceiver: string;     // 허가를 받는 사람
+    dataScope: {
+      dataTypes: string[];       // 적용되는 데이터
+      fields?: string[];         // 특정 필드 (선택)
+      dateRange?: DateRange;     // 기간
+      purpose: string[];         // 데이터 사용 방법
+    };
+    permissions: {
+      read: boolean;
+      write: boolean;
+      share: boolean;
+      aggregate: boolean;
+      derive: boolean;
+    };
+    validity: {
+      startDate: ISO8601Date;
+      endDate?: ISO8601Date;     // Null = 무기한
+      autoRenew: boolean;
+    };
+    status: 'active' | 'revoked' | 'expired';
+  };
+
+  // 동의 수집
+  collection: {
+    method: 'explicit_opt_in' | 'terms_acceptance' | 'granular_settings';
+    ui: {
+      plainLanguage: true;
+      layeredNotice: true;
+      easyRevocation: true;
+    };
+    record: {
+      timestamp: ISO8601DateTime;
+      version: string;           // 약관 버전
+      channel: string;           // 동의 방법
+      evidence: string;          // 동의 증거
+    };
+  };
+
+  // 목적 제한
+  purposes: {
+    operational: '요청된 서비스 제공';
+    analytics: '제품 및 서비스 개선';
+    research: '농업 연구 (익명화됨)';
+    marketing: '프로모션 커뮤니케이션';
+    thirdParty: '지정된 파트너와 공유';
+  };
+}
+
+// 동의 API
+interface ConsentAPI {
+  // 동의 부여
+  'POST /consents': {
+    body: ConsentRequest;
+    response: ConsentRecord;
+  };
+
+  // 동의 조회
+  'GET /consents': {
+    query: { status?: string; dataType?: string };
+    response: ConsentRecord[];
+  };
+
+  // 동의 철회
+  'DELETE /consents/{consentId}': {
+    response: { success: boolean; revokedAt: ISO8601DateTime };
+  };
+
+  // 접근 감사
+  'GET /consents/{consentId}/audit': {
+    response: AccessAuditLog[];
+  };
+}
+    </pre>
+
+    <h2>7.3 접근 제어</h2>
+
+    <table>
+        <tr>
+            <th>모델</th>
+            <th>설명</th>
+            <th>용도</th>
+            <th>예시</th>
+        </tr>
+        <tr>
+            <td>RBAC</td>
+            <td>역할 기반 접근 제어</td>
+            <td>조직 계층</td>
+            <td>농장 관리자, 농학자, 열람자</td>
+        </tr>
+        <tr>
+            <td>ABAC</td>
+            <td>속성 기반 접근 제어</td>
+            <td>세분화된 정책</td>
+            <td>필드, 시간, 목적에 따른 접근</td>
+        </tr>
+        <tr>
+            <td>ReBAC</td>
+            <td>관계 기반 접근 제어</td>
+            <td>데이터 공유 관계</td>
+            <td>자문가가 자문 농장 접근 가능</td>
+        </tr>
+        <tr>
+            <td>PBAC</td>
+            <td>목적 기반 접근 제어</td>
+            <td>동의 시행</td>
+            <td>분석 vs. 마케팅 사용</td>
+        </tr>
+    </table>
+
+    <pre>
+// 접근 제어 구현
+interface AccessControl {
+  // 역할
+  roles: {
+    farm_owner: {
+      permissions: ['*'];        // 자신의 데이터에 전체 접근
+      scope: 'owned_farms';
+    };
+    farm_manager: {
+      permissions: ['read', 'write', 'share'];
+      scope: 'managed_farms';
+    };
+    agronomist: {
+      permissions: ['read', 'write:recommendations'];
+      scope: 'advised_farms';
+      expiry: 'contract_end';
+    };
+    equipment_provider: {
+      permissions: ['read:telematics', 'write:diagnostics'];
+      scope: 'contracted_equipment';
+    };
+    researcher: {
+      permissions: ['read:anonymized'];
+      scope: 'consented_data';
+      purpose: 'research_only';
+    };
+  };
+
+  // 정책 언어 (OPA/Rego 스타일 예시)
+  policies: {
+    allowFieldAccess: `
+      allow {
+        input.user.role == "agronomist"
+        input.resource.type == "field_data"
+        input.resource.farmId in input.user.advisedFarms
+        input.action == "read"
+      }
+    `;
+  };
+
+  // 접근 결정
+  accessDecision: {
+    request: {
+      subject: { id: string; roles: string[]; attributes: Record<string, any> };
+      resource: { id: string; type: string; owner: string };
+      action: 'read' | 'write' | 'delete' | 'share';
+      context: { purpose: string; timestamp: ISO8601DateTime };
+    };
+    response: {
+      decision: 'permit' | 'deny';
+      obligations?: string[];    // 필수 조치 (예: 로그, 알림)
+      advice?: string[];         // 권장사항
+    };
+  };
+}
+    </pre>
+
+    <h2>7.4 데이터 보안 제어</h2>
+
+    <pre>
+// 보안 제어 프레임워크
+interface SecurityControls {
+  // 암호화
+  encryption: {
+    atRest: {
+      algorithm: 'AES-256-GCM';
+      keyManagement: 'HSM' | 'KMS';
+      scope: '데이터베이스, 파일 저장소, 백업';
+    };
+    inTransit: {
+      protocol: 'TLS 1.3';
+      certificates: 'PKI_managed';
+      pinning: 'optional_for_mobile';
+    };
+    fieldLevel: {
+      algorithm: 'AES-256-GCM';
+      useCase: 'PII, 민감한 비즈니스 데이터';
+      keyPerTenant: true;
+    };
+  };
+
+  // 인증
+  authentication: {
+    methods: ['password', 'MFA', 'SSO', 'certificate'];
+    mfa: {
+      factors: ['TOTP', 'SMS', 'hardware_key'];
+      required: '관리자 접근';
+    };
+    session: {
+      timeout: '8h';
+      refresh: 'sliding_window';
+      concurrent: 'limited';
+    };
+  };
+
+  // 감사 로깅
+  auditLogging: {
+    events: [
+      '인증',
+      '인가 결정',
+      '데이터 접근',
+      '데이터 수정',
+      '동의 변경',
+      '내보내기',
+      '관리자 작업'
+    ];
+    retention: '7년';
+    tamperProof: 'append_only_with_integrity';
+    fields: {
+      timestamp: ISO8601DateTime;
+      actor: string;
+      action: string;
+      resource: string;
+      outcome: string;
+      ipAddress: string;
+      userAgent: string;
+    };
+  };
+
+  // 네트워크 보안
+  network: {
+    firewall: 'WAF_and_network';
+    ddos: 'protection_service';
+    segmentation: 'VPC_isolation';
+    monitoring: 'IDS/IPS';
+  };
+}
+    </pre>
+
+    <h2>7.5 프라이버시 보존 기술</h2>
+
+    <div class="highlight">
+        <h3>프라이버시를 보호하면서 데이터 사용 가능</h3>
+        <p>농업 데이터는 종종 연구, 벤치마킹, 시장 인사이트를 위해 여러 농장에 걸쳐 집계되거나 분석되어야 합니다. 프라이버시 보존 기술은 개별 농장의 기밀성을 보호하면서 이러한 사용 사례를 가능하게 합니다.</p>
+    </div>
+
+    <pre>
+// 프라이버시 보존 기술
+interface PrivacyTechniques {
+  // 익명화
+  anonymization: {
+    methods: {
+      suppression: '식별 필드 제거';
+      generalization: '정확한 값을 범위로 대체';
+      masking: '값의 부분 삭제';
+      pseudonymization: '식별자를 토큰으로 대체';
+    };
+    kAnonymity: {
+      description: '각 레코드가 k-1개의 다른 레코드와 구별 불가능';
+      threshold: 5;
+    };
+    lDiversity: {
+      description: '민감한 속성이 l개의 고유 값 보유';
+      threshold: 3;
+    };
+  };
+
+  // 집계
+  aggregation: {
+    minimumGroupSize: 5;         // 이보다 작은 그룹은 보고하지 않음
+    noisyAggregation: true;      // 통계적 노이즈 추가
+    suppressOutliers: true;      // 극단값이 농장을 식별할 수 있음
+  };
+
+  // 차등 프라이버시
+  differentialPrivacy: {
+    epsilon: 1.0;                // 프라이버시 예산
+    mechanism: 'Laplace' | 'Gaussian';
+    useCase: '민감한 데이터에 대한 통계 쿼리';
+  };
+
+  // 안전한 계산
+  secureComputation: {
+    federatedLearning: {
+      description: '데이터를 중앙화하지 않고 모델 학습';
+      useCase: '농장 전체의 수확량 예측';
+    };
+    secureMPC: {
+      description: '암호화된 데이터에서 계산';
+      useCase: '개별 값을 공개하지 않고 벤치마크';
+    };
+    homomorphicEncryption: {
+      description: '암호문에서 계산';
+      useCase: '민감한 데이터에 대한 클라우드 분석';
+    };
+  };
+}
+
+// 비식별화 파이프라인
+const deidentificationPipeline = {
+  steps: [
+    { field: 'farmId', method: 'pseudonymize', salt: 'per_use_case' },
+    { field: 'farmerName', method: 'suppress' },
+    { field: 'location', method: 'generalize', precision: 'county' },
+    { field: 'area', method: 'round', nearest: 10 },
+    { field: 'yield', method: 'noise', epsilon: 0.5 }
+  ],
+  verification: 'k_anonymity_check'
+};
+    </pre>
+
+    <h2>7.6 규제 준수</h2>
+
+    <pre>
+// 규정 준수 프레임워크
+interface ComplianceFramework {
+  regulations: {
+    GDPR: {
+      scope: 'EU 개인 데이터';
+      requirements: [
+        '적법한 근거',
+        '데이터 최소화',
+        '목적 제한',
+        '저장 제한',
+        '정보주체 권리',
+        '침해 통지'
+      ];
+      dataSubjectRights: [
+        '접근', '정정', '삭제', '제한',
+        '이동성', '반대'
+      ];
+    };
+
+    개인정보보호법: {
+      scope: '대한민국 개인정보';
+      requirements: [
+        '수집 및 이용 동의',
+        '제3자 제공 동의',
+        '정보주체 권리 보장',
+        '안전성 확보 조치'
+      ];
+    };
+
+    sectorSpecific: {
+      농식품안전법: '식품 안전 추적성 요구사항';
+      농업데이터보호: '농업 프로그램 데이터 보호';
+    };
+  };
+
+  // 데이터 처리 계약
+  dpa: {
+    parties: ['controller', 'processor'];
+    terms: [
+      '처리 목적',
+      '데이터 범주',
+      '보안 조치',
+      '하위처리자 요구사항',
+      '감사 권한',
+      '침해 통지',
+      '데이터 반환 삭제'
+    ];
+  };
+
+  // 국경 간 이전
+  crossBorder: {
+    mechanisms: [
+      '적정성 결정',
+      '표준계약조항',
+      '구속력 있는 기업규칙',
+      '명시적 동의'
+    ];
+    restrictions: '일부 관할권은 농업 데이터 수출 제한';
+  };
+}
+    </pre>
+
+    <h2>7.7 데이터 이동성</h2>
+
+    <pre>
+// 데이터 이동성 표준
+interface DataPortability {
+  // 내보내기 형식
+  formats: {
+    fieldBoundaries: ['GeoJSON', 'Shapefile', 'KML'];
+    operationalData: ['CSV', 'JSON', 'ISOXML'];
+    imagery: ['GeoTIFF', 'JPEG2000'];
+    complete: '매니페스트가 있는 ZIP 아카이브';
+  };
+
+  // 내보내기 API
+  exportAPI: {
+    'POST /exports': {
+      body: {
+        dataTypes: string[];
+        dateRange: DateRange;
+        format: string;
+        destination?: 'download' | 'transfer';
+      };
+      response: {
+        exportId: string;
+        status: 'queued';
+        estimatedTime: string;
+      };
+    };
+    'GET /exports/{exportId}': {
+      response: {
+        status: 'processing' | 'ready' | 'expired';
+        downloadUrl?: string;
+        expiresAt?: ISO8601DateTime;
+      };
+    };
+  };
+
+  // 직접 이전
+  directTransfer: {
+    protocol: 'OAuth2 + API';
+    steps: [
+      '1. 사용자가 소스 시스템 승인',
+      '2. 사용자가 대상 시스템 승인',
+      '3. 대상이 소스에 데이터 요청',
+      '4. 소스가 승인 검증',
+      '5. 데이터 직접 전송'
+    ];
+    standards: ['ADAPT', 'AgGateway SPADE'];
+  };
+
+  // 매니페스트
+  manifest: {
+    version: string;
+    exportDate: ISO8601DateTime;
+    source: string;
+    contents: {
+      file: string;
+      dataType: string;
+      recordCount: number;
+      checksum: string;
+    }[];
+  };
+}
+    </pre>
+
+    <h2>7.8 사고 대응</h2>
+
+    <pre>
+// 사고 대응 계획
+interface IncidentResponse {
+  // 탐지
+  detection: {
+    sources: [
+      '보안 모니터링',
+      '사용자 보고',
+      '자동 알림',
+      '제3자 통지'
+    ];
+    indicators: [
+      '무단 접근 시도',
+      '비정상적 데이터 내보내기',
+      '권한 상승',
+      '악성코드 탐지'
+    ];
+  };
+
+  // 분류
+  classification: {
+    severity: {
+      critical: '활성 침해, 민감한 데이터 노출';
+      high: '확인된 침입, 잠재적 데이터 접근';
+      medium: '보안 제어 실패, 접근 확인되지 않음';
+      low: '정책 위반, 보안 영향 없음';
+    };
+  };
+
+  // 대응 단계
+  response: {
+    immediate: [
+      '위협 억제',
+      '증거 보존',
+      '범위 평가',
+      '사고 팀 알림'
+    ];
+    shortTerm: [
+      '근본 원인 조사',
+      '취약점 수정',
+      '영향받은 데이터 확인',
+      '통지 준비'
+    ];
+    longTerm: [
+      '예방 조치 구현',
+      '정책 업데이트',
+      '교훈 도출',
+      '이해관계자 보고'
+    ];
+  };
+
+  // 통지
+  notification: {
+    regulators: {
+      개인정보보호법: '72시간 이내 개인정보 침해 신고';
+    };
+    affectedParties: {
+      timing: '합리적 지체 없이';
+      content: [
+        '침해 성격',
+        '관련 데이터',
+        '예상 결과',
+        '취한 조치',
+        '연락처 정보'
+      ];
+    };
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>장 요약</h3>
+        <p>이 장에서는 소유권 원칙, 동의 관리, 접근 제어, 보안 제어, 프라이버시 보존 기술, 규제 준수, 데이터 이동성, 사고 대응을 포함한 농업 데이터 교환의 보안 및 프라이버시를 다루었습니다. 이러한 프레임워크는 WIA-AGRICULTURAL_DATA_EXCHANGE 표준의 광범위한 채택에 필요한 신뢰 기반을 구축합니다.</p>
+    </div>
+</body>
+</html>

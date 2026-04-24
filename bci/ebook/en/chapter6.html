@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA BCI Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 6: Security & Privacy</h1>
+        <p class="subtitle">Neural Data Protection and Consent for Brain Data</p>
+        <p class="version">WIA BCI Standard v1.0.0</p>
+    </header>
+
+    <main>
+        <section>
+            <h1>6.1 Overview</h1>
+            <p>Brain data is among the most sensitive personal information. The WIA BCI standard incorporates privacy-by-design principles and security best practices to protect neural data throughout its lifecycle.</p>
+
+            <div class="warning-box">
+                <h3>Critical Importance</h3>
+                <p>Brain signals can reveal cognitive states, medical conditions, emotions, and potentially even thoughts. Protecting this data is not just a legal requirement—it's an ethical imperative.</p>
+            </div>
+        </section>
+
+        <section>
+            <h1>6.2 Threat Model</h1>
+
+            <h2>Attack Vectors</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Threat</th>
+                        <th>Description</th>
+                        <th>Mitigation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Data Interception</strong></td>
+                        <td>Eavesdropping on BCI streams</td>
+                        <td>End-to-end encryption</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Unauthorized Access</strong></td>
+                        <td>Access to stored recordings</td>
+                        <td>Authentication, access control</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Device Hijacking</strong></td>
+                        <td>Control of BCI device</td>
+                        <td>Secure pairing, authentication</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Leakage</strong></td>
+                        <td>Unintentional disclosure</td>
+                        <td>Data minimization, anonymization</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Re-identification</strong></td>
+                        <td>Linking anonymized data to individuals</td>
+                        <td>Differential privacy, k-anonymity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h1>6.3 Data Encryption</h1>
+
+            <h2>Transport Layer Security</h2>
+            <pre><code>// WebSocket with TLS
+const bci = new WiaBci();
+await bci.connect({
+  type: 'eeg_headset',
+  connection: {
+    protocol: 'websocket',
+    address: 'wss://secure-server.example.com',  // WSS (not WS)
+    tls: {
+      enabled: true,
+      version: 'TLSv1.3',
+      ciphers: ['TLS_AES_256_GCM_SHA384']
+    }
+  }
+});</code></pre>
+
+            <h2>End-to-End Encryption</h2>
+            <pre><code>// Enable E2E encryption for sensitive applications
+await bci.connect({
+  type: 'eeg_headset',
+  encryption: {
+    enabled: true,
+    algorithm: 'AES-256-GCM',
+    keyExchange: 'ECDHE',
+    publicKey: userPublicKey
+  }
+});
+
+// Data is encrypted before transmission
+// Only the recipient with the private key can decrypt</code></pre>
+
+            <h2>At-Rest Encryption</h2>
+            <pre><code>import { encryptRecording, decryptRecording } from 'wia-bci';
+
+// Encrypt recording before saving
+const encrypted = await encryptRecording({
+  recording: './raw-data',
+  algorithm: 'AES-256-GCM',
+  password: userPassword,  // Or use key management system
+  outputDir: './encrypted-data'
+});
+
+// Decrypt for analysis
+const decrypted = await decryptRecording({
+  recording: './encrypted-data',
+  password: userPassword,
+  outputDir: './decrypted-data'
+});</code></pre>
+        </section>
+
+        <section>
+            <h1>6.4 Authentication & Authorization</h1>
+
+            <h2>Device Pairing</h2>
+            <pre><code>import { WiaBci } from 'wia-bci';
+
+const bci = new WiaBci();
+
+// Secure pairing with PIN
+await bci.connect({
+  type: 'eeg_headset',
+  authentication: {
+    type: 'pin',
+    pin: '1234'  // Display on device screen
+  }
+});
+
+// Certificate-based authentication
+await bci.connect({
+  type: 'eeg_headset',
+  authentication: {
+    type: 'certificate',
+    certificate: deviceCertificate,
+    privateKey: devicePrivateKey
+  }
+});</code></pre>
+
+            <h2>User Authentication</h2>
+            <pre><code>// OAuth 2.0 authentication
+await bci.connect({
+  type: 'eeg_headset',
+  connection: {
+    protocol: 'websocket',
+    address: 'wss://server.example.com'
+  },
+  authentication: {
+    type: 'oauth2',
+    provider: 'https://auth.example.com',
+    clientId: 'bci-app-123',
+    scope: ['bci.read', 'bci.write']
+  }
+});</code></pre>
+
+            <h2>Role-Based Access Control</h2>
+            <pre><code>// Define roles
+enum Role {
+  PATIENT = 'patient',        // Can view own data
+  CLINICIAN = 'clinician',    // Can view assigned patients
+  RESEARCHER = 'researcher',  // Can access anonymized data
+  ADMIN = 'admin'             // Full access
+}
+
+// Check permissions
+function canAccessRecording(user: User, recording: Recording): boolean {
+  switch (user.role) {
+    case Role.PATIENT:
+      return recording.subjectId === user.id;
+    case Role.CLINICIAN:
+      return user.assignedPatients.includes(recording.subjectId);
+    case Role.RESEARCHER:
+      return recording.anonymized === true;
+    case Role.ADMIN:
+      return true;
+    default:
+      return false;
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>6.5 Consent Management</h1>
+
+            <h2>Informed Consent</h2>
+            <div class="info-box">
+                <h3>Required Elements</h3>
+                <ul>
+                    <li><strong>Purpose:</strong> Why brain data is being collected</li>
+                    <li><strong>Data Use:</strong> How data will be used, stored, shared</li>
+                    <li><strong>Risks:</strong> Potential privacy risks and mitigation</li>
+                    <li><strong>Rights:</strong> Right to withdraw, access, delete data</li>
+                    <li><strong>Duration:</strong> How long data will be retained</li>
+                    <li><strong>Third Parties:</strong> Who will have access to data</li>
+                </ul>
+            </div>
+
+            <h2>Consent Schema</h2>
+            <pre><code>interface Consent {
+  // Consent Information
+  consentId: string;
+  subjectId: string;
+  consentDate: string;  // ISO 8601
+  expiryDate?: string;
+  version: string;      // Consent form version
+
+  // Consent Scope
+  purposes: ConsentPurpose[];
+  dataTypes: DataType[];
+  sharingScope: SharingScope;
+
+  // Rights Acknowledged
+  rightsAcknowledged: {
+    rightToWithdraw: boolean;
+    rightToAccess: boolean;
+    rightToDelete: boolean;
+    rightToPortability: boolean;
+  };
+
+  // Legal Basis
+  legalBasis: 'consent' | 'contract' | 'legal_obligation' | 'vital_interests';
+  jurisdiction: string;  // e.g., "EU", "US-CA", "KR"
+
+  // Ethics Approval
+  ethicsApproval?: {
+    committee: string;
+    approvalNumber: string;
+    approvalDate: string;
+  };
+
+  // Signature
+  signature: {
+    type: 'electronic' | 'written';
+    timestamp: string;
+    ipAddress?: string;
+    witnessId?: string;
+  };
+}
+
+type ConsentPurpose =
+  | 'medical_treatment'
+  | 'clinical_research'
+  | 'product_improvement'
+  | 'academic_research'
+  | 'commercial_use';
+
+type SharingScope =
+  | 'no_sharing'
+  | 'anonymized_only'
+  | 'institution_only'
+  | 'trusted_partners'
+  | 'public_dataset';</code></pre>
+
+            <h2>Dynamic Consent</h2>
+            <pre><code>// Allow users to update consent
+class ConsentManager {
+  async updateConsent(
+    subjectId: string,
+    updates: Partial&lt;Consent&gt;
+  ): Promise&lt;void&gt; {
+    const currentConsent = await this.getConsent(subjectId);
+
+    // Validate updates
+    if (updates.sharingScope && updates.sharingScope !== currentConsent.sharingScope) {
+      // Re-anonymize or un-share data if scope reduced
+      await this.adjustDataSharing(subjectId, updates.sharingScope);
+    }
+
+    // Save updated consent
+    await this.saveConsent({
+      ...currentConsent,
+      ...updates,
+      lastUpdated: new Date().toISOString()
+    });
+
+    // Notify relevant parties
+    await this.notifyConsentChange(subjectId, updates);
+  }
+
+  async withdrawConsent(subjectId: string): Promise&lt;void&gt; {
+    // Stop any active data collection
+    await this.stopDataCollection(subjectId);
+
+    // Delete or anonymize existing data (per user request)
+    await this.handleDataDeletion(subjectId);
+
+    // Record withdrawal
+    await this.recordWithdrawal(subjectId);
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>6.6 Data Anonymization</h1>
+
+            <h2>De-identification Techniques</h2>
+            <pre><code>import { anonymizeRecording } from 'wia-bci';
+
+const anonymized = await anonymizeRecording({
+  recording: './raw-data',
+  method: 'k-anonymity',
+  k: 5,  // Each record indistinguishable from 4 others
+  techniques: [
+    'remove_identifiers',    // Remove name, ID, etc.
+    'generalize_age',        // Age ranges instead of exact age
+    'suppress_rare_values',  // Remove rare conditions
+    'perturb_timestamps',    // Add noise to timestamps
+    'aggregate_location'     // Generalize location data
+  ],
+  outputDir: './anonymized-data'
+});
+
+// Verify anonymization
+const report = await validateAnonymization('./anonymized-data');
+console.log('Re-identification risk:', report.riskScore);  // < 0.05 recommended</code></pre>
+
+            <h2>Differential Privacy</h2>
+            <pre><code>import { addDifferentialPrivacy } from 'wia-bci';
+
+// Add noise to protect individual records
+const privatized = await addDifferentialPrivacy({
+  data: aggregatedStatistics,
+  epsilon: 1.0,  // Privacy budget (lower = more private)
+  delta: 1e-5,
+  sensitivity: computeSensitivity(aggregatedStatistics)
+});
+
+// Query results are noisy but privacy-preserving
+console.log('Mean EEG power (private):', privatized.meanPower);</code></pre>
+        </section>
+
+        <section>
+            <h1>6.7 Secure Storage</h1>
+
+            <h2>Storage Best Practices</h2>
+            <ul>
+                <li><strong>Encryption:</strong> Encrypt all stored brain data</li>
+                <li><strong>Access Logs:</strong> Audit trail of all data access</li>
+                <li><strong>Backup Security:</strong> Encrypt backups separately</li>
+                <li><strong>Retention Policy:</strong> Delete data after retention period</li>
+                <li><strong>Secure Deletion:</strong> Overwrite data multiple times</li>
+            </ul>
+
+            <h2>Key Management</h2>
+            <pre><code>import { KeyManager } from 'wia-bci';
+
+const keyManager = new KeyManager({
+  provider: 'aws-kms',  // Or Azure Key Vault, Google KMS
+  region: 'us-east-1',
+  keyId: 'arn:aws:kms:...'
+});
+
+// Encrypt with managed key
+const encrypted = await keyManager.encrypt(sensitiveData);
+
+// Keys are rotated automatically
+await keyManager.rotateKeys();
+
+// Audit key usage
+const auditLog = await keyManager.getAuditLog();</code></pre>
+        </section>
+
+        <section>
+            <h1>6.8 Regulatory Compliance</h1>
+
+            <h2>GDPR (EU)</h2>
+            <div class="info-box">
+                <h3>Key Requirements</h3>
+                <ul>
+                    <li><strong>Lawful Basis:</strong> Explicit consent or legal basis for processing</li>
+                    <li><strong>Data Minimization:</strong> Collect only necessary data</li>
+                    <li><strong>Purpose Limitation:</strong> Use data only for stated purposes</li>
+                    <li><strong>Right to Access:</strong> Provide data upon request</li>
+                    <li><strong>Right to Erasure:</strong> Delete data upon request ("right to be forgotten")</li>
+                    <li><strong>Data Portability:</strong> Export data in machine-readable format</li>
+                    <li><strong>Breach Notification:</strong> Report breaches within 72 hours</li>
+                </ul>
+            </div>
+
+            <h2>HIPAA (US)</h2>
+            <div class="info-box">
+                <h3>Key Requirements</h3>
+                <ul>
+                    <li><strong>Protected Health Information (PHI):</strong> Brain data is PHI</li>
+                    <li><strong>Minimum Necessary:</strong> Access only what's needed</li>
+                    <li><strong>Administrative Safeguards:</strong> Policies, training, audits</li>
+                    <li><strong>Physical Safeguards:</strong> Secure facilities, device controls</li>
+                    <li><strong>Technical Safeguards:</strong> Encryption, access controls, audit logs</li>
+                    <li><strong>Business Associate Agreements:</strong> Contracts with third parties</li>
+                </ul>
+            </div>
+
+            <h2>Compliance Implementation</h2>
+            <pre><code>class ComplianceManager {
+  async handleDataRequest(request: DataRequest): Promise&lt;void&gt; {
+    switch (request.type) {
+      case 'access':
+        // GDPR Article 15: Right to access
+        return await this.provideDataCopy(request.subjectId);
+
+      case 'rectification':
+        // GDPR Article 16: Right to rectification
+        return await this.correctData(request.subjectId, request.corrections);
+
+      case 'erasure':
+        // GDPR Article 17: Right to erasure
+        return await this.deleteData(request.subjectId);
+
+      case 'portability':
+        // GDPR Article 20: Right to data portability
+        return await this.exportData(request.subjectId, 'json');
+
+      case 'restriction':
+        // GDPR Article 18: Right to restriction
+        return await this.restrictProcessing(request.subjectId);
+
+      default:
+        throw new Error('Unknown request type');
+    }
+  }
+
+  async reportBreach(breach: SecurityBreach): Promise&lt;void&gt; {
+    // GDPR Article 33: Breach notification
+    if (breach.severity === 'high') {
+      await this.notifySupervisoryAuthority(breach);  // Within 72 hours
+      await this.notifyDataSubjects(breach);         // Without undue delay
+    }
+
+    // Log breach
+    await this.logBreach(breach);
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h1>6.9 Audit Logging</h1>
+
+            <h2>Audit Log Schema</h2>
+            <pre><code>interface AuditLog {
+  id: string;
+  timestamp: string;
+  eventType: AuditEventType;
+  actor: {
+    userId: string;
+    role: string;
+    ipAddress: string;
+    userAgent?: string;
+  };
+  resource: {
+    type: 'recording' | 'device' | 'consent' | 'key';
+    id: string;
+  };
+  action: 'create' | 'read' | 'update' | 'delete' | 'export';
+  result: 'success' | 'failure';
+  details?: Record&lt;string, unknown&gt;;
+}
+
+type AuditEventType =
+  | 'data_access'
+  | 'data_modification'
+  | 'consent_change'
+  | 'encryption_key_use'
+  | 'authentication'
+  | 'authorization_failure'
+  | 'data_export'
+  | 'data_deletion';</code></pre>
+
+            <h2>Tamper-Proof Logging</h2>
+            <pre><code>import { AuditLogger } from 'wia-bci';
+
+const logger = new AuditLogger({
+  storage: 'blockchain',  // Immutable audit trail
+  encryption: true
+});
+
+// Log every data access
+bci.on('signal', (event) => {
+  logger.log({
+    eventType: 'data_access',
+    actor: { userId: currentUser.id, role: currentUser.role },
+    resource: { type: 'recording', id: recording.id },
+    action: 'read',
+    result: 'success'
+  });
+});
+
+// Query audit log
+const accessLog = await logger.query({
+  resource: { id: 'rec-001' },
+  dateRange: { start: '2025-01-01', end: '2025-01-31' }
+});</code></pre>
+        </section>
+
+        <section>
+            <h1>6.10 Security Checklist</h1>
+
+            <h2>Development Phase</h2>
+            <ul>
+                <li>☐ Use TLS 1.3 for all network connections</li>
+                <li>☐ Implement end-to-end encryption for sensitive data</li>
+                <li>☐ Validate all inputs to prevent injection attacks</li>
+                <li>☐ Use secure random number generators</li>
+                <li>☐ Implement proper error handling (no sensitive info in errors)</li>
+                <li>☐ Use parameterized queries to prevent SQL injection</li>
+                <li>☐ Sanitize all user inputs</li>
+                <li>☐ Implement rate limiting and throttling</li>
+            </ul>
+
+            <h2>Deployment Phase</h2>
+            <ul>
+                <li>☐ Enable audit logging</li>
+                <li>☐ Configure firewall rules</li>
+                <li>☐ Set up intrusion detection</li>
+                <li>☐ Enable automatic security updates</li>
+                <li>☐ Configure secure backup procedures</li>
+                <li>☐ Implement key rotation policies</li>
+                <li>☐ Set up monitoring and alerting</li>
+                <li>☐ Conduct penetration testing</li>
+            </ul>
+
+            <h2>Operational Phase</h2>
+            <ul>
+                <li>☐ Regular security audits</li>
+                <li>☐ Vulnerability scanning</li>
+                <li>☐ Review access logs monthly</li>
+                <li>☐ Update consent forms as needed</li>
+                <li>☐ Conduct staff security training</li>
+                <li>☐ Test incident response procedures</li>
+                <li>☐ Review and update retention policies</li>
+                <li>☐ Maintain compliance documentation</li>
+            </ul>
+        </section>
+
+        <section>
+            <h1>6.11 Incident Response</h1>
+
+            <h2>Incident Response Plan</h2>
+            <pre><code>class IncidentResponsePlan {
+  async handleSecurityIncident(incident: SecurityIncident): Promise&lt;void&gt; {
+    // 1. Contain
+    await this.containIncident(incident);
+
+    // 2. Assess
+    const assessment = await this.assessImpact(incident);
+
+    // 3. Notify
+    if (assessment.requiresNotification) {
+      await this.notifyAuthorities(assessment);
+      await this.notifyAffectedUsers(assessment);
+    }
+
+    // 4. Remediate
+    await this.remediateVulnerability(incident);
+
+    // 5. Document
+    await this.documentIncident(incident, assessment);
+
+    // 6. Review
+    await this.conductPostMortem(incident);
+  }
+}</code></pre>
+        </section>
+
+        <div class="navigation">
+            <a href="chapter5.html">← Previous: Chapter 5</a>
+            <a href="chapter7.html">Next: Chapter 7 (Examples) →</a>
+        </div>
+    </main>
+</body>
+</html>

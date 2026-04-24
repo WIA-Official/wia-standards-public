@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Healthcare System Integration | WIA-CAREBOT</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Healthcare System Integration</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong><br>
+        - Connect care robots to electronic health record systems<br>
+        - Implement smart home platform integration<br>
+        - Build caregiver notification and monitoring applications<br>
+        - Enable telemedicine and remote care capabilities
+    </div>
+
+    <h2>6.1 The Integration Imperative</h2>
+
+    <p>Care robots do not operate in isolation. To deliver maximum value, they must integrate seamlessly with the broader healthcare ecosystem including electronic health records (EHRs), smart home platforms, caregiver applications, and telemedicine systems. WIA-CAREBOT defines interoperability standards that enable these connections while maintaining security and privacy.</p>
+
+    <p>Effective integration transforms the care robot from a standalone device into a node in a comprehensive care network, enabling data sharing, coordinated care, and enhanced monitoring capabilities that benefit users, caregivers, and healthcare providers alike.</p>
+
+    <h3>Integration Architecture Overview</h3>
+
+    <pre><code>// WIA-CAREBOT Integration Architecture
+interface IntegrationArchitecture {
+    healthcareSystems: {
+        ehr: EHRIntegration;
+        pharmacy: PharmacyIntegration;
+        telemedicine: TelemedicineIntegration;
+        laboratory: LabResultsIntegration;
+    };
+
+    homeEnvironment: {
+        smartHome: SmartHomeIntegration;
+        medicalDevices: MedicalDeviceIntegration;
+        wearables: WearableIntegration;
+        voiceAssistants: VoiceAssistantIntegration;
+    };
+
+    careNetwork: {
+        caregiverApp: CaregiverAppIntegration;
+        familyPortal: FamilyPortalIntegration;
+        professionalCare: ProfessionalCareIntegration;
+        emergencyServices: EmergencyIntegration;
+    };
+
+    infrastructure: {
+        cloudPlatform: CloudPlatformIntegration;
+        analytics: AnalyticsIntegration;
+        maintenance: MaintenanceIntegration;
+    };
+}</code></pre>
+
+    <h2>6.2 Electronic Health Record Integration</h2>
+
+    <p>EHR integration enables care robots to access relevant patient information and contribute observations back to the medical record. This bidirectional data flow improves care coordination and provides healthcare providers with insights from continuous home monitoring.</p>
+
+    <h3>FHIR-Based EHR Integration</h3>
+
+    <pre><code>// FHIR R4 Integration Client
+class EHRIntegrationClient {
+    private fhirClient: Client;
+    private patientId: string;
+
+    async getCarePlan(): Promise<CarePlan | null> {
+        const bundle = await this.fhirClient.search({
+            resourceType: 'CarePlan',
+            searchParams: { patient: this.patientId, status: 'active' }
+        });
+        return bundle.entry?.[0]?.resource as CarePlan;
+    }
+
+    async getMedications(): Promise<MedicationRequest[]> {
+        const bundle = await this.fhirClient.search({
+            resourceType: 'MedicationRequest',
+            searchParams: { patient: this.patientId, status: 'active' }
+        });
+        return bundle.entry?.filter(e => e.resource?.resourceType === 'MedicationRequest')
+            .map(e => e.resource as MedicationRequest) || [];
+    }
+
+    async submitVitalSigns(vitals: VitalSignsReading): Promise<void> {
+        const bundle = { resourceType: 'Bundle', type: 'transaction', entry: [] };
+        if (vitals.heartRate) {
+            bundle.entry.push({
+                resource: this.createHeartRateObservation(vitals.heartRate),
+                request: { method: 'POST', url: 'Observation' }
+            });
+        }
+        await this.fhirClient.transaction({ body: bundle });
+    }
+}</code></pre>
+
+    <h3>Care Plan Synchronization</h3>
+
+    <p>Care plans from the EHR guide robot behavior, including medication schedules, activity recommendations, and care goals. The robot synchronizes with updated care plans and adapts its behavior accordingly.</p>
+
+    <pre><code>// Care Plan Interpreter
+class CarePlanInterpreter {
+    async synchronizeCarePlan(): Promise<void> {
+        const carePlan = await this.ehrClient.getCarePlan();
+        if (!carePlan) return;
+
+        for (const activity of carePlan.activity || []) {
+            const code = activity.detail?.code?.coding?.[0]?.code;
+            if (code === 'medication-reminder') await this.setupMedicationReminder(activity);
+            else if (code === 'vital-monitoring') await this.setupVitalMonitoring(activity);
+            else if (code === 'fall-prevention') await this.enableFallPrevention(activity);
+        }
+    }
+}</code></pre>
+
+    <h2>6.3 Smart Home Integration</h2>
+
+    <p>Care robots benefit from integration with smart home platforms to access environmental data, control home systems, and coordinate with other smart devices. This integration enhances safety, comfort, and convenience for users.</p>
+
+    <h3>Matter Protocol Integration</h3>
+
+    <pre><code>// Matter Smart Home Integration
+class SmartHomeIntegration {
+    private matterController: MatterController;
+    private devices: Map<string, MatterDevice>;
+
+    async discoverDevices(): Promise<void> {
+        const discovered = await this.matterController.discoverDevices();
+        for (const device of discovered) {
+            this.devices.set(device.nodeId, device);
+        }
+    }
+
+    async getEnvironmentalData(): Promise<EnvironmentalData> {
+        const tempSensors = this.getDevicesByType(DeviceTypes.TEMPERATURE_SENSOR);
+        const lights = this.getDevicesByType(DeviceTypes.DIMMABLE_LIGHT);
+        return {
+            temperatures: await Promise.all(tempSensors.map(s => s.read(Clusters.TemperatureMeasurement.temperature))),
+            lightLevels: await Promise.all(lights.map(l => l.read(Clusters.LevelControl.currentLevel)))
+        };
+    }
+
+    async respondToEmergency(event: EmergencyEvent): Promise<void> {
+        const lights = this.getDevicesByType(DeviceTypes.DIMMABLE_LIGHT);
+        await Promise.all(lights.map(l => l.setOn(true)));
+        if (event.emergencyServicesDispatched) {
+            const frontDoorLock = this.getDevicesByType(DeviceTypes.DOOR_LOCK).find(l => l.location === 'front_door');
+            if (frontDoorLock) await frontDoorLock.unlock();
+        }
+    }
+}</code></pre>
+
+    <h2>6.4 Caregiver Application Integration</h2>
+
+    <p>Family caregivers and professional care staff need real-time visibility into care robot operation and user status. WIA-CAREBOT specifies APIs and notification systems that keep caregivers informed without compromising user privacy.</p>
+
+    <h3>Caregiver API Specification</h3>
+
+    <pre><code>// Caregiver API - REST Endpoints
+// Base URL: https://api.carebot.wia.org/v1
+
+// GET /users/{userId}/status
+// Returns current user status and robot state
+interface UserStatusResponse {
+    user: {
+        id: string;
+        lastActivity: Date;
+        currentLocation: string;  // Zone name, not precise location
+        activityLevel: 'active' | 'resting' | 'sleeping' | 'unknown';
+        moodIndicator: 'positive' | 'neutral' | 'low' | 'unknown';
+    };
+    robot: {
+        status: 'operational' | 'charging' | 'maintenance';
+        batteryLevel: number;
+        currentTask: string | null;
+        lastInteraction: Date;
+    };
+    alerts: Alert[];
+}
+
+// GET /users/{userId}/health-summary
+// Returns health data summary (requires health data permission)
+interface HealthSummaryResponse {
+    period: { start: Date; end: Date };
+    vitals: {
+        averageHeartRate: number;
+        bloodPressureReadings: BloodPressureReading[];
+        sleepQuality: 'good' | 'fair' | 'poor';
+        activityMinutes: number;
+    };
+    medications: {
+        adherenceRate: number;
+        missedDoses: MissedDose[];
+    };
+    mobility: {
+        fallIncidents: number;
+        gaitTrend: 'improving' | 'stable' | 'declining';
+        dailySteps: number;
+    };
+}
+
+// POST /users/{userId}/messages
+// Send message to user through robot
+interface SendMessageRequest {
+    type: 'text' | 'audio' | 'video_call_request';
+    content: string;
+    priority: 'normal' | 'urgent';
+    scheduledTime?: Date;
+}
+
+// WebSocket /ws/users/{userId}/realtime
+// Real-time updates and notifications
+interface RealtimeEvent {
+    type: 'status_change' | 'alert' | 'activity' | 'health_event';
+    timestamp: Date;
+    data: any;
+}</code></pre>
+
+    <h3>Mobile Caregiver App Features</h3>
+
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Description</th>
+            <th>Update Frequency</th>
+        </tr>
+        <tr>
+            <td>Status Dashboard</td>
+            <td>Overview of user activity and robot status</td>
+            <td>Real-time</td>
+        </tr>
+        <tr>
+            <td>Alert Notifications</td>
+            <td>Push notifications for important events</td>
+            <td>Immediate</td>
+        </tr>
+        <tr>
+            <td>Health Trends</td>
+            <td>Charts showing vital signs and activity over time</td>
+            <td>Daily summary</td>
+        </tr>
+        <tr>
+            <td>Medication Tracking</td>
+            <td>Adherence reports and missed dose alerts</td>
+            <td>Per dose event</td>
+        </tr>
+        <tr>
+            <td>Video Check-in</td>
+            <td>Request video call through robot</td>
+            <td>On demand</td>
+        </tr>
+        <tr>
+            <td>Care Coordination</td>
+            <td>Share updates with care team</td>
+            <td>As needed</td>
+        </tr>
+    </table>
+
+    <h2>6.5 Telemedicine Integration</h2>
+
+    <p>Care robots serve as telemedicine endpoints, enabling remote consultations between users and healthcare providers. The robot facilitates the visit by positioning appropriately, capturing vital signs, and ensuring audio/video quality.</p>
+
+    <pre><code>// Telemedicine Session Manager
+class TelemedicineManager {
+    async conductTelemedicineVisit(session: TelemedicineSession): Promise<void> {
+        await this.prepareForVisit(session);
+        const connection = await this.connectToProvider(session);
+        await this.manageVisitSession(connection, session);
+    }
+
+    private async prepareForVisit(session: TelemedicineSession): Promise<void> {
+        await this.robotController.positionForVideoCall();
+        await this.announceToUser("Your appointment begins soon. Taking your vitals first.");
+        session.preVisitVitals = await this.vitalMonitor.captureVitals();
+    }
+
+    private async manageVisitSession(connection: TelemedicineConnection, session: TelemedicineSession): Promise<void> {
+        connection.onProviderRequest(async (request) => {
+            if (request.type === 'capture_vitals') {
+                await connection.sendData('vitals', await this.vitalMonitor.captureVitals());
+            } else if (request.type === 'zoom_camera') {
+                await this.robotController.adjustCamera(request.zoomLevel);
+            }
+        });
+    }
+}</code></pre>
+
+    <h2>6.6 Medical Device Interoperability</h2>
+
+    <p>Care robots integrate with medical devices in the home to collect health data and coordinate care. IEEE 11073 Personal Health Device standards enable interoperability with blood pressure monitors, glucose meters, scales, and other devices.</p>
+
+    <div class="highlight">
+        <strong>Supported Medical Devices:</strong><br>
+        - Blood pressure monitors (IEEE 11073-10407)<br>
+        - Pulse oximeters (IEEE 11073-10404)<br>
+        - Glucose meters (IEEE 11073-10417)<br>
+        - Weighing scales (IEEE 11073-10415)<br>
+        - Thermometers (IEEE 11073-10408)<br>
+        - Activity monitors (IEEE 11073-10441)
+    </div>
+
+    <pre><code>// IEEE 11073 Medical Device Integration
+class MedicalDeviceHub {
+    async discoverMedicalDevices(): Promise<void> {
+        const devices = await this.bleScanner.scan({
+            services: ['0x1810', '0x1822', '0x1808', '0x181D']  // BP, Pulse Ox, Glucose, Scale
+        });
+        for (const device of devices) await this.registerDevice(device);
+    }
+
+    async collectReading(deviceType: string): Promise<MedicalReading> {
+        const device = this.getDevice(deviceType);
+        await device.connect();
+        const reading = await device.collectMeasurement();
+        await device.disconnect();
+        await this.syncToEHR(this.validateReading(reading));
+        return reading;
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary:</strong> Healthcare system integration transforms care robots from standalone devices into connected nodes in the care ecosystem. EHR integration enables bidirectional data flow with medical records through FHIR standards. Smart home integration provides environmental awareness and control. Caregiver applications keep families and care staff informed through real-time APIs and notifications. Telemedicine integration enables remote consultations with healthcare providers. Medical device interoperability expands the robot's health monitoring capabilities. Together, these integrations maximize the value of care robots for users, caregivers, and healthcare providers.
+    </div>
+</body>
+</html>

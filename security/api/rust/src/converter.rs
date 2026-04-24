@@ -95,10 +95,7 @@ pub fn to_stix_bundle(event: &WiaSecurityEvent) -> Value {
 
 /// Convert indicator to STIX indicator
 pub fn to_stix_indicator(indicator: &Value, timestamp: &str) -> Value {
-    let ind_type = indicator
-        .get("type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let ind_type = indicator.get("type").and_then(|v| v.as_str()).unwrap_or("");
     let ind_value = indicator
         .get("value")
         .and_then(|v| v.as_str())
@@ -336,13 +333,15 @@ pub fn to_elastic_event(event: &WiaSecurityEvent, index_prefix: &str) -> Value {
         .map(|dt| dt.format("%Y.%m.%d").to_string())
         .unwrap_or_else(|_| chrono::Utc::now().format("%Y.%m.%d").to_string());
 
+    let mut source = to_ecs_event(event);
+    if let Some(obj) = source.as_object_mut() {
+        obj.insert("@timestamp".to_string(), json!(event.timestamp));
+    }
+
     json!({
         "_index": format!("{}-{}-{}", index_prefix, event.event_type, date_str),
         "_id": event.id.to_string(),
-        "_source": {
-            "@timestamp": event.timestamp,
-            ..to_ecs_event(event).as_object().cloned().unwrap_or_default()
-        }
+        "_source": source
     })
 }
 

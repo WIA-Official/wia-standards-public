@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 의사결정과 제어 | WIA-AUTO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        .highlight { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border); font-family: 'Consolas', monospace; font-size: 0.9rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: #1e3a5f; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>제3장: 의사결정과 제어</h1>
+
+    <div class="highlight">
+        <p>의사결정 및 제어 시스템은 환경 인지를 안전하고 효율적인 차량 움직임으로 변환합니다. 이 장에서는 경로 계획, 행동 예측, 모션 제어 및 자율주행 결정에서의 AI 통합에 대한 WIA-AUTO 요구사항을 자세히 설명합니다.</p>
+    </div>
+
+    <h2>3.1 의사결정 아키텍처</h2>
+    <p>자율주행차 의사결정은 전략적 경로 계획에서 전술적 기동 선택, 운영적 궤적 실행에 이르기까지 여러 계층적 레벨에서 작동합니다.</p>
+
+    <pre>
+의사결정 계층
+==============
+┌─────────────────────────────────────────────────────────────┐
+│                    전략 레이어                               │
+│    경로 계획 | 시간 범위: 분에서 시간                        │
+│    - 출발지에서 목적지까지 라우팅                            │
+│    - 교통 고려, ETA 최적화                                  │
+├─────────────────────────────────────────────────────────────┤
+│                    전술 레이어                               │
+│    행동 계획 | 시간 범위: 초                                 │
+│    - 차선 변경 결정                                         │
+│    - 교차로 협상                                            │
+│    - 합류/양보 결정                                         │
+├─────────────────────────────────────────────────────────────┤
+│                   운영 레이어                               │
+│    모션 계획 | 시간 범위: 밀리초                             │
+│    - 궤적 생성                                              │
+│    - 충돌 회피                                              │
+│    - 차량 동역학 제어                                       │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>3.2 경로 계획 알고리즘</h2>
+    <p>경로 계획 알고리즘은 차량 운동학적 제약, 교통 규칙 및 안전 마진을 준수하면서 환경을 통한 실행 가능한 경로를 생성합니다.</p>
+
+    <h3>계획 접근법</h3>
+    <ul>
+        <li><strong>그래프 기반 계획:</strong> A*, Dijkstra, D*는 이산화된 표현에서 작동</li>
+        <li><strong>샘플링 기반 계획:</strong> RRT와 PRM은 연속 구성 공간 탐색</li>
+        <li><strong>최적화 기반 계획:</strong> 모델 예측 제어는 계획을 제약 최적화로 공식화</li>
+    </ul>
+
+    <pre>
+// 모델 예측 제어 경로 계획
+class MPCPlanner {
+    Trajectory plan(State current, Goal goal, Obstacles obstacles) {
+        problem = OptimizationProblem();
+        N = 50;  // 계획 지평
+        dt = 0.1;  // 시간 스텝
+
+        states = problem.addVariables("x", N+1, state_dim);
+        controls = problem.addVariables("u", N, control_dim);
+
+        // 목표: 목표까지 거리 + 제어 노력 최소화
+        cost = 0;
+        for (k = 0; k < N; k++) {
+            cost += (states[k] - goal).norm() * Q;
+            cost += controls[k].norm() * R;
+        }
+        problem.minimize(cost);
+
+        // 동역학 및 장애물 제약
+        for (k = 0; k < N; k++) {
+            problem.addConstraint(
+                states[k+1] == vehicleDynamics(states[k], controls[k], dt)
+            );
+        }
+        return Trajectory(problem.solve());
+    }
+}
+    </pre>
+
+    <h2>3.3 행동 예측</h2>
+    <p>다른 도로 사용자의 미래 행동을 예측하는 것은 안전한 자율주행에 필수적입니다. WIA-AUTO는 예측 시스템이 미래 궤적에 대한 다중 모달 확률 분포를 생성하도록 요구합니다.</p>
+
+    <div class="highlight">
+        <h3>예측 요구사항</h3>
+        <ul>
+            <li>예측 지평: 고속도로 최소 5초, 도시 3초</li>
+            <li>업데이트 속도: 최소 10 Hz</li>
+            <li>다중 모달 출력: 확률이 있는 최소 3개 궤적 가설</li>
+            <li>불확실성 정량화: 예측 위치에 대한 신뢰 구간</li>
+        </ul>
+    </div>
+
+    <h2>3.4 모션 제어 시스템</h2>
+    <p>모션 제어는 계획된 궤적을 차량 액추에이터 명령으로 변환하여 조향, 스로틀 및 제동 시스템을 관리합니다.</p>
+
+    <pre>
+모션 제어 스택
+===============
+┌─────────────────────────────────────────────────────────────┐
+│              궤적 추적 컨트롤러                               │
+│    입력: 원하는 궤적 (x, y, θ, v, κ)                        │
+│    출력: 곡률 속도, 가속도 명령                              │
+├─────────────────────────────────────────────────────────────┤
+│              횡방향 컨트롤러                                  │
+│    Stanley / Pure Pursuit / MPC                             │
+│    출력: 조향각 명령                                        │
+├─────────────────────────────────────────────────────────────┤
+│              종방향 컨트롤러                                  │
+│    PID / MPC / 적응 제어                                    │
+│    출력: 스로틀/브레이크 명령                                │
+├─────────────────────────────────────────────────────────────┤
+│              저수준 액추에이터 제어                           │
+│    Steer-by-wire, Brake-by-wire, 전자 스로틀               │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>3.5 AI 및 머신러닝 통합</h2>
+    <p>현대 자율주행차는 의사결정 스택 전반에 걸쳐 AI와 머신러닝을 광범위하게 사용합니다. WIA-AUTO는 책임 있는 AI 배포를 위한 요구사항을 수립합니다:</p>
+
+    <table>
+        <tr><th>기능</th><th>AI 접근법</th><th>안전 고려사항</th></tr>
+        <tr><td>객체 탐지</td><td>딥 CNN (YOLO, Faster R-CNN)</td><td>이중화, 적대적 견고성</td></tr>
+        <tr><td>행동 예측</td><td>트랜스포머, 그래프 네트워크</td><td>불확실성 정량화</td></tr>
+        <tr><td>경로 계획</td><td>강화 학습</td><td>제한된 행동 공간, 모니터</td></tr>
+        <tr><td>장면 이해</td><td>시맨틱 세그멘테이션</td><td>분포 외 탐지</td></tr>
+    </table>
+
+    <h2>3.6 실시간 처리 요구사항</h2>
+    <pre>
+타이밍 요구사항
+================
+컴포넌트                  | 최대 지연 | 업데이트 속도
+--------------------------+----------+------------
+인지 파이프라인           | 100ms    | 10 Hz
+행동 예측                 | 50ms     | 10 Hz
+경로 계획                 | 100ms    | 10 Hz
+모션 제어                 | 10ms     | 100 Hz
+액추에이터 응답           | 20ms     | 100 Hz
+--------------------------+----------+------------
+총 엔드투엔드             | 200ms    | -
+
+참고: 긴급 제동은 50ms 이내에 실행되어야 함.
+    </pre>
+
+    <h2>3.7 최소 위험 조건</h2>
+    <p>자율주행 시스템이 더 이상 안전하게 작동할 수 없을 때, 최소 위험 조건으로 전환해야 합니다:</p>
+
+    <ul>
+        <li><strong>제어된 정지:</strong> 현재 차선에서 점진적 감속하여 정지</li>
+        <li><strong>갓길 정차:</strong> 갓길 또는 안전한 주차 구역으로 이동</li>
+        <li><strong>차선 유지:</strong> 감속하면서 운전자에게 경고</li>
+        <li><strong>긴급 정지:</strong> 충돌이 임박했을 때 최대 제동</li>
+    </ul>
+
+    <p style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: #94a3b8; font-size: 0.9rem;">
+        © 2025 World Industry Association (WIA). 弘益人間 - 널리 인간을 이롭게 하라
+    </p>
+</body>
+</html>

@@ -2,9 +2,8 @@
 //!
 //! Generates Grafana dashboard JSON for WIA Security metrics visualization.
 
+use super::{ExportError, ExportResult};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use super::{ExportResult, ExportError};
 
 /// Grafana dashboard configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -199,8 +198,10 @@ impl GrafanaGenerator {
 
     /// Generate security overview dashboard
     pub fn generate_security_dashboard(&self) -> GrafanaDashboard {
-        let uid = self.config.uid.clone()
-            .unwrap_or_else(|| format!("wia-security-{}", uuid::Uuid::new_v4().to_string()[..8].to_string()));
+        let uid =
+            self.config.uid.clone().unwrap_or_else(|| {
+                format!("wia-security-{}", &uuid::Uuid::new_v4().to_string()[..8])
+            });
 
         let ds_type = match self.config.datasource_type {
             DatasourceType::Elasticsearch => "elasticsearch",
@@ -222,7 +223,12 @@ impl GrafanaGenerator {
         panels.push(self.create_stat_panel(
             panel_id,
             "Total Findings",
-            GridPosition { h: 4, w: 6, x: 0, y: y_pos },
+            GridPosition {
+                h: 4,
+                w: 6,
+                x: 0,
+                y: y_pos,
+            },
             datasource.clone(),
             self.total_findings_query(),
         ));
@@ -231,7 +237,12 @@ impl GrafanaGenerator {
         panels.push(self.create_stat_panel(
             panel_id,
             "Critical Vulnerabilities",
-            GridPosition { h: 4, w: 6, x: 6, y: y_pos },
+            GridPosition {
+                h: 4,
+                w: 6,
+                x: 6,
+                y: y_pos,
+            },
             datasource.clone(),
             self.critical_count_query(),
         ));
@@ -240,7 +251,12 @@ impl GrafanaGenerator {
         panels.push(self.create_stat_panel(
             panel_id,
             "High Vulnerabilities",
-            GridPosition { h: 4, w: 6, x: 12, y: y_pos },
+            GridPosition {
+                h: 4,
+                w: 6,
+                x: 12,
+                y: y_pos,
+            },
             datasource.clone(),
             self.high_count_query(),
         ));
@@ -249,7 +265,12 @@ impl GrafanaGenerator {
         panels.push(self.create_stat_panel(
             panel_id,
             "Hosts Affected",
-            GridPosition { h: 4, w: 6, x: 18, y: y_pos },
+            GridPosition {
+                h: 4,
+                w: 6,
+                x: 18,
+                y: y_pos,
+            },
             datasource.clone(),
             self.hosts_affected_query(),
         ));
@@ -260,7 +281,12 @@ impl GrafanaGenerator {
         panels.push(self.create_piechart_panel(
             panel_id,
             "Severity Distribution",
-            GridPosition { h: 8, w: 8, x: 0, y: y_pos },
+            GridPosition {
+                h: 8,
+                w: 8,
+                x: 0,
+                y: y_pos,
+            },
             datasource.clone(),
             self.severity_distribution_query(),
         ));
@@ -269,7 +295,12 @@ impl GrafanaGenerator {
         panels.push(self.create_timeseries_panel(
             panel_id,
             "Findings Over Time",
-            GridPosition { h: 8, w: 16, x: 8, y: y_pos },
+            GridPosition {
+                h: 8,
+                w: 16,
+                x: 8,
+                y: y_pos,
+            },
             datasource.clone(),
             self.findings_over_time_query(),
         ));
@@ -280,7 +311,12 @@ impl GrafanaGenerator {
         panels.push(self.create_table_panel(
             panel_id,
             "Top Vulnerabilities",
-            GridPosition { h: 10, w: 12, x: 0, y: y_pos },
+            GridPosition {
+                h: 10,
+                w: 12,
+                x: 0,
+                y: y_pos,
+            },
             datasource.clone(),
             self.top_vulnerabilities_query(),
         ));
@@ -289,7 +325,12 @@ impl GrafanaGenerator {
         panels.push(self.create_table_panel(
             panel_id,
             "Most Affected Hosts",
-            GridPosition { h: 10, w: 12, x: 12, y: y_pos },
+            GridPosition {
+                h: 10,
+                w: 12,
+                x: 12,
+                y: y_pos,
+            },
             datasource.clone(),
             self.most_affected_hosts_query(),
         ));
@@ -300,7 +341,12 @@ impl GrafanaGenerator {
         panels.push(self.create_timeseries_panel(
             panel_id,
             "Security Events",
-            GridPosition { h: 8, w: 24, x: 0, y: y_pos },
+            GridPosition {
+                h: 8,
+                w: 24,
+                x: 0,
+                y: y_pos,
+            },
             datasource.clone(),
             self.security_events_query(),
         ));
@@ -320,24 +366,22 @@ impl GrafanaGenerator {
             },
             panels,
             templating: GrafanaTemplating {
-                list: vec![
-                    TemplateVariable {
-                        name: "severity".to_string(),
-                        label: Some("Severity".to_string()),
-                        var_type: "custom".to_string(),
-                        query: None,
-                        current: Some(serde_json::json!({"text": "All", "value": "$__all"})),
-                        options: vec![
-                            serde_json::json!({"text": "All", "value": "$__all"}),
-                            serde_json::json!({"text": "Critical", "value": "critical"}),
-                            serde_json::json!({"text": "High", "value": "high"}),
-                            serde_json::json!({"text": "Medium", "value": "medium"}),
-                            serde_json::json!({"text": "Low", "value": "low"}),
-                        ],
-                        multi: true,
-                        include_all: true,
-                    },
-                ],
+                list: vec![TemplateVariable {
+                    name: "severity".to_string(),
+                    label: Some("Severity".to_string()),
+                    var_type: "custom".to_string(),
+                    query: None,
+                    current: Some(serde_json::json!({"text": "All", "value": "$__all"})),
+                    options: vec![
+                        serde_json::json!({"text": "All", "value": "$__all"}),
+                        serde_json::json!({"text": "Critical", "value": "critical"}),
+                        serde_json::json!({"text": "High", "value": "high"}),
+                        serde_json::json!({"text": "Medium", "value": "medium"}),
+                        serde_json::json!({"text": "Low", "value": "low"}),
+                    ],
+                    multi: true,
+                    include_all: true,
+                }],
             },
             annotations: GrafanaAnnotations { list: vec![] },
         }
@@ -365,16 +409,27 @@ impl GrafanaGenerator {
             }],
             field_config: FieldConfig {
                 defaults: FieldDefaults {
-                    color: ColorConfig { mode: "thresholds".to_string() },
+                    color: ColorConfig {
+                        mode: "thresholds".to_string(),
+                    },
                     unit: None,
                     min: None,
                     max: None,
                     thresholds: Thresholds {
                         mode: "absolute".to_string(),
                         steps: vec![
-                            ThresholdStep { color: "green".to_string(), value: None },
-                            ThresholdStep { color: "yellow".to_string(), value: Some(10.0) },
-                            ThresholdStep { color: "red".to_string(), value: Some(50.0) },
+                            ThresholdStep {
+                                color: "green".to_string(),
+                                value: None,
+                            },
+                            ThresholdStep {
+                                color: "yellow".to_string(),
+                                value: Some(10.0),
+                            },
+                            ThresholdStep {
+                                color: "red".to_string(),
+                                value: Some(50.0),
+                            },
                         ],
                     },
                     mappings: vec![],
@@ -418,13 +473,18 @@ impl GrafanaGenerator {
             }],
             field_config: FieldConfig {
                 defaults: FieldDefaults {
-                    color: ColorConfig { mode: "palette-classic".to_string() },
+                    color: ColorConfig {
+                        mode: "palette-classic".to_string(),
+                    },
                     unit: None,
                     min: None,
                     max: None,
                     thresholds: Thresholds {
                         mode: "absolute".to_string(),
-                        steps: vec![ThresholdStep { color: "green".to_string(), value: None }],
+                        steps: vec![ThresholdStep {
+                            color: "green".to_string(),
+                            value: None,
+                        }],
                     },
                     mappings: vec![],
                 },
@@ -478,13 +538,18 @@ impl GrafanaGenerator {
             }],
             field_config: FieldConfig {
                 defaults: FieldDefaults {
-                    color: ColorConfig { mode: "palette-classic".to_string() },
+                    color: ColorConfig {
+                        mode: "palette-classic".to_string(),
+                    },
                     unit: None,
                     min: Some(0.0),
                     max: None,
                     thresholds: Thresholds {
                         mode: "absolute".to_string(),
-                        steps: vec![ThresholdStep { color: "green".to_string(), value: None }],
+                        steps: vec![ThresholdStep {
+                            color: "green".to_string(),
+                            value: None,
+                        }],
                     },
                     mappings: vec![],
                 },
@@ -519,13 +584,18 @@ impl GrafanaGenerator {
             }],
             field_config: FieldConfig {
                 defaults: FieldDefaults {
-                    color: ColorConfig { mode: "thresholds".to_string() },
+                    color: ColorConfig {
+                        mode: "thresholds".to_string(),
+                    },
                     unit: None,
                     min: None,
                     max: None,
                     thresholds: Thresholds {
                         mode: "absolute".to_string(),
-                        steps: vec![ThresholdStep { color: "green".to_string(), value: None }],
+                        steps: vec![ThresholdStep {
+                            color: "green".to_string(),
+                            value: None,
+                        }],
                     },
                     mappings: vec![],
                 },
@@ -684,7 +754,11 @@ mod tests {
 
         let dashboard = generator.generate_security_dashboard();
 
-        let panel_types: Vec<_> = dashboard.panels.iter().map(|p| p.panel_type.as_str()).collect();
+        let panel_types: Vec<_> = dashboard
+            .panels
+            .iter()
+            .map(|p| p.panel_type.as_str())
+            .collect();
         assert!(panel_types.contains(&"stat"));
         assert!(panel_types.contains(&"piechart"));
         assert!(panel_types.contains(&"timeseries"));

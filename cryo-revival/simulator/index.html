@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Cryo Revival - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #06B6D4;
+            --primary-dark: #0891B2;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; gap: 15px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #22D3EE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card h3 { color: var(--primary); margin-bottom: 15px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        input, select, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 15px; border-radius: 6px; font-size: 1rem; width: 100%; margin-bottom: 10px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+        label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--primary); }
+        .form-group { margin-bottom: 15px; }
+        .radio-group label { display: inline-block; margin-right: 20px; cursor: pointer; }
+        .radio-group input { width: auto; margin-right: 5px; }
+        .progress-bar { background: var(--bg); border-radius: 10px; height: 20px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); transition: width 0.3s; }
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .nav-left { flex-direction: column; gap: 10px; }
+            .hero h1 { font-size: 1.8rem; }
+            .tabs { flex-direction: column; }
+            .tab { width: 100%; text-align: center; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .breadcrumb { display: none; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/cryo-revival/" target="_blank">Cryo Revival</a>
+                    <span class="sep">›</span>
+                    <span class="current" data-en="Simulator" data-ko="시뮬레이터">Simulator</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <section class="hero">
+            <h1 data-en="🔄 WIA Cryo Revival" data-ko="🔄 WIA 냉동 소생">🔄 WIA Cryo Revival</h1>
+            <p data-en="Revival protocols and reintegration standards" data-ko="소생 프로토콜 및 재통합 표준">Revival protocols and reintegration standards</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔢 Algorithm" data-ko="🔢 알고리즘">🔢 Algorithm</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🧪 Test" data-ko="🧪 테스트">🧪 Test</div>
+        </div>
+
+        <div id="panel0" class="panel active">
+            <h2 data-en="📊 Procedure Initialization" data-ko="📊 절차 초기화">📊 Procedure Initialization</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Initialize a revival procedure" data-ko="소생 절차 초기화">Initialize a revival procedure</p>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-en="Subject Information" data-ko="피험자 정보">Subject Information</h3>
+                    <div class="form-group">
+                        <label data-en="Subject ID" data-ko="피험자 ID">Subject ID</label>
+                        <input type="text" id="subjectId" value="SUBJ-2075-001">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Identity ID" data-ko="신원 ID">Identity ID</label>
+                        <input type="text" id="identityId" value="CRYO-ID-2025-001">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Consent ID" data-ko="동의 ID">Consent ID</label>
+                        <input type="text" id="consentId" value="CONSENT-2025-001">
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 data-en="Procedure Setup" data-ko="절차 설정">Procedure Setup</h3>
+                    <div class="form-group">
+                        <label data-en="Facility ID" data-ko="시설 ID">Facility ID</label>
+                        <input type="text" id="facilityId" value="FAC-SEOUL-001">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="VQI Score" data-ko="VQI 점수">VQI Score</label>
+                        <input type="number" id="vqiScore" value="0.92" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Priority" data-ko="우선순위">Priority</label>
+                        <select id="priority">
+                            <option value="STANDARD">Standard</option>
+                            <option value="EXPEDITED">Expedited</option>
+                            <option value="EMERGENCY">Emergency</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="initializeProcedure()" data-en="🔄 Initialize Procedure" data-ko="🔄 절차 초기화">🔄 Initialize Procedure</button>
+            </div>
+            <div class="output" id="procedureOutput"></div>
+        </div>
+
+        <div id="panel1" class="panel">
+            <h2 data-en="🔢 Warming Protocol" data-ko="🔢 가온 프로토콜">🔢 Warming Protocol</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Simulate the warming phase" data-ko="가온 단계 시뮬레이션">Simulate warming phase</p>
+            <div class="card">
+                <h3 data-en="Warming Parameters" data-ko="가온 매개변수">Warming Parameters</h3>
+                <div class="grid-3">
+                    <div>
+                        <label data-en="Current Temp (°C)" data-ko="현재 온도">Current Temp</label>
+                        <input type="number" id="currentTemp" value="-196" readonly>
+                    </div>
+                    <div>
+                        <label data-en="Target Temp (°C)" data-ko="목표 온도">Target Temp</label>
+                        <input type="number" id="targetTemp" value="37" readonly>
+                    </div>
+                    <div>
+                        <label data-en="Phase" data-ko="단계">Phase</label>
+                        <input type="text" id="warmingPhase" value="VITRIFIED" readonly>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <p data-en="Progress:" data-ko="진행:">Progress:</p>
+                    <div class="progress-bar"><div class="progress-fill" id="warmingProgress" style="width: 0%"></div></div>
+                    <p id="warmingPercent" style="color: var(--text-muted);">0%</p>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateWarming()" data-en="🌡️ Simulate Warming" data-ko="🌡️ 가온 시뮬레이션">🌡️ Simulate</button>
+                <button class="btn btn-secondary" onclick="resetWarming()" data-en="↺ Reset" data-ko="↺ 초기화">↺ Reset</button>
+            </div>
+            <div class="output" id="algorithmOutput"></div>
+        </div>
+
+        <div id="panel2" class="panel">
+            <h2 data-en="📡 9-Stage Protocol" data-ko="📡 9단계 프로토콜">📡 9-Stage Protocol</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Simulate the 9-stage revival protocol" data-ko="9단계 소생 프로토콜 시뮬레이션">9-stage revival protocol</p>
+            <div class="card">
+                <h3 data-en="Stage Simulation" data-ko="단계 시뮬레이션">Stage Simulation</h3>
+                <div class="form-group">
+                    <label data-en="Select Stage" data-ko="단계 선택">Select Stage</label>
+                    <select id="revivalStage">
+                        <option value="1">1. PRE_REVIVAL (Assessment)</option>
+                        <option value="2">2. WARMING (Temperature)</option>
+                        <option value="3">3. CRYOPROTECTANT_REMOVAL</option>
+                        <option value="4">4. REHYDRATION</option>
+                        <option value="5">5. CARDIOVASCULAR_RESTART</option>
+                        <option value="6">6. RESPIRATORY_ACTIVATION</option>
+                        <option value="7">7. NEUROLOGICAL_RESTORATION</option>
+                        <option value="8">8. STABILIZATION</option>
+                        <option value="9">9. POST_REVIVAL_CARE</option>
+                    </select>
+                </div>
+                <div id="stageProgress" style="margin-top: 15px;">
+                    <p data-en="Stage Progress:" data-ko="단계 진행:">Stage Progress:</p>
+                    <div class="progress-bar"><div class="progress-fill" id="stageProgressBar" style="width: 0%"></div></div>
+                    <p id="stageProgressText" style="color: var(--text-muted);">0/9 stages</p>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateStage()" data-en="▶️ Simulate Stage" data-ko="▶️ 단계 시뮬레이션">▶️ Simulate</button>
+                <button class="btn btn-secondary" onclick="simulateFullRevival()" data-en="🔄 Full Revival" data-ko="🔄 전체 소생">🔄 Full Revival</button>
+            </div>
+            <div class="output" id="protocolOutput"></div>
+        </div>
+
+        <div id="panel3" class="panel">
+            <h2 data-en="🔗 Vital Signs & Alerts" data-ko="🔗 활력징후 및 알림">🔗 Vital Signs & Alerts</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Monitor vitals and manage alerts" data-ko="활력징후 모니터링 및 알림 관리">Vitals and alerts</p>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-en="Generate Vitals" data-ko="활력징후 생성">Generate Vitals</h3>
+                    <div class="btn-center" style="flex-direction: column; gap: 10px;">
+                        <button class="btn btn-primary" onclick="generateVitals('normal')" data-en="✅ Normal Vitals" data-ko="✅ 정상 활력징후">✅ Normal</button>
+                        <button class="btn btn-secondary" onclick="generateVitals('random')" data-en="🎲 Random Vitals" data-ko="🎲 무작위 활력징후">🎲 Random</button>
+                        <button class="btn btn-secondary" style="background: var(--danger);" onclick="generateVitals('critical')" data-en="⚠️ Critical Vitals" data-ko="⚠️ 위험 활력징후">⚠️ Critical</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 data-en="Alert Simulation" data-ko="알림 시뮬레이션">Alert Simulation</h3>
+                    <div class="form-group">
+                        <label data-en="Alert Type" data-ko="알림 유형">Alert Type</label>
+                        <select id="alertType">
+                            <option value="EMERGENCY">EMERGENCY</option>
+                            <option value="CRITICAL">CRITICAL</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="INFO">INFO</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="generateAlert()" data-en="🚨 Generate Alert" data-ko="🚨 알림 생성">🚨 Generate Alert</button>
+                </div>
+            </div>
+            <div class="output" id="integrationOutput"></div>
+        </div>
+
+        <div id="panel4" class="panel">
+            <h2 data-en="🧪 Reference & Re-Preservation" data-ko="🧪 참조 및 재보존">🧪 Reference & Re-Preservation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Reference tables and re-preservation evaluation" data-ko="참조 테이블 및 재보존 평가">Reference and re-preservation</p>
+            <div class="card">
+                <h3 data-en="Revival Stages" data-ko="소생 단계">Revival Stages</h3>
+                <table>
+                    <tr><th>#</th><th data-en="Stage" data-ko="단계">Stage</th><th data-en="Duration" data-ko="기간">Duration</th><th data-en="Critical" data-ko="중요">Critical</th></tr>
+                    <tr><td>1</td><td>PRE_REVIVAL</td><td>1-2 days</td><td>Yes</td></tr>
+                    <tr><td>2</td><td>WARMING</td><td>4-12 hours</td><td>Yes</td></tr>
+                    <tr><td>3</td><td>CRYOPROTECTANT_REMOVAL</td><td>6-24 hours</td><td>Yes</td></tr>
+                    <tr><td>4</td><td>REHYDRATION</td><td>2-6 hours</td><td>Yes</td></tr>
+                    <tr><td>5</td><td>CARDIOVASCULAR_RESTART</td><td>1-4 hours</td><td>Yes</td></tr>
+                    <tr><td>6</td><td>RESPIRATORY_ACTIVATION</td><td>1-2 hours</td><td>Yes</td></tr>
+                    <tr><td>7</td><td>NEUROLOGICAL_RESTORATION</td><td>Variable</td><td>Yes</td></tr>
+                    <tr><td>8</td><td>STABILIZATION</td><td>1-2 weeks</td><td>No</td></tr>
+                    <tr><td>9</td><td>POST_REVIVAL_CARE</td><td>Ongoing</td><td>No</td></tr>
+                </table>
+            </div>
+            <div class="card" style="margin-top: 20px;">
+                <h3 data-en="Re-Preservation Decision" data-ko="재보존 결정">Re-Preservation Decision</h3>
+                <div class="form-group">
+                    <label data-en="Trigger" data-ko="트리거">Trigger</label>
+                    <select id="represTrigger">
+                        <option value="CARDIAC_FAILURE">Irreversible Cardiac Failure</option>
+                        <option value="BRAIN_DAMAGE">Irreversible Brain Damage</option>
+                        <option value="ORGAN_FAILURE">Multiple Organ Failure</option>
+                        <option value="GUARDIAN_REQUEST">Guardian Request</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="evaluateRePreservation()" data-en="📋 Evaluate Re-Preservation" data-ko="📋 재보존 평가">📋 Evaluate</button>
+            </div>
+            <div class="output" id="testOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Cryo Revival: Bringing preserved individuals back to life" data-ko="WIA 냉동 소생: 보존된 개인을 생명으로 되살리기">WIA Cryo Revival: Bringing preserved individuals back</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let warmingTemp = -196;
+        let stageCompleted = 0;
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en'));
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function generateId() {
+            return 'xxxxxxxx'.replace(/[x]/g, () => Math.floor(Math.random() * 16).toString(16)).toUpperCase();
+        }
+
+        function initializeProcedure() {
+            const procedureId = `REVIVAL-${new Date().getFullYear()}-${generateId()}`;
+            const result = {
+                "@context": "https://wia.org/contexts/cryo-revival/v1",
+                "procedureId": procedureId,
+                "subjectId": document.getElementById('subjectId').value,
+                "identityId": document.getElementById('identityId').value,
+                "consentId": document.getElementById('consentId').value,
+                "facilityId": document.getElementById('facilityId').value,
+                "vqiScore": parseFloat(document.getElementById('vqiScore').value),
+                "priority": document.getElementById('priority').value,
+                "status": "SCHEDULED",
+                "currentStage": "PRE_REVIVAL",
+                "verifications": { "consent": "[OK]", "identity": "[OK]", "conditions": "[OK]", "facility": "[OK]" },
+                "createdAt": new Date().toISOString(),
+                "message": currentLang === 'ko' ? '절차 초기화 완료' : 'Procedure initialized'
+            };
+            document.getElementById('procedureOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function getWarmingPhase(temp) {
+            if (temp < -123) return 'VITRIFIED';
+            if (temp < -50) return 'GLASS_TRANSITION';
+            if (temp < -10) return 'ICE_RISK_ZONE';
+            if (temp < 0) return 'SUB_FREEZING';
+            if (temp < 30) return 'HYPOTHERMIC';
+            return 'NORMOTHERMIC';
+        }
+
+        function simulateWarming() {
+            if (warmingTemp >= 37) {
+                document.getElementById('algorithmOutput').textContent = JSON.stringify({
+                    "status": "[OK] Warming complete",
+                    "finalTemp": "37°C",
+                    "phase": "NORMOTHERMIC",
+                    "message": currentLang === 'ko' ? '가온 완료' : 'Warming complete'
+                }, null, 2);
+                return;
+            }
+
+            const rate = warmingTemp < -123 ? 5 : warmingTemp < -50 ? 1 : warmingTemp < -10 ? 0.5 : warmingTemp < 0 ? 1 : 2;
+            warmingTemp = Math.min(warmingTemp + rate * 5, 37);
+            const phase = getWarmingPhase(warmingTemp);
+            const progress = ((warmingTemp + 196) / (37 + 196) * 100);
+
+            document.getElementById('currentTemp').value = warmingTemp.toFixed(1);
+            document.getElementById('warmingPhase').value = phase;
+            document.getElementById('warmingProgress').style.width = progress + '%';
+            document.getElementById('warmingPercent').textContent = progress.toFixed(0) + '%';
+
+            const result = {
+                "temperature": warmingTemp.toFixed(1) + "°C",
+                "phase": phase,
+                "rate": rate + "°C/min",
+                "progress": progress.toFixed(1) + "%",
+                "message": currentLang === 'ko' ? '가온 중...' : 'Warming...'
+            };
+            document.getElementById('algorithmOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function resetWarming() {
+            warmingTemp = -196;
+            document.getElementById('currentTemp').value = '-196';
+            document.getElementById('warmingPhase').value = 'VITRIFIED';
+            document.getElementById('warmingProgress').style.width = '0%';
+            document.getElementById('warmingPercent').textContent = '0%';
+            document.getElementById('algorithmOutput').textContent = '';
+        }
+
+        const stageInfo = {
+            1: { name: "PRE_REVIVAL", duration: "1-2 days", tasks: ["Verify consent", "Check VQI", "Prepare team"] },
+            2: { name: "WARMING", duration: "4-12 hours", tasks: ["Gradual warming", "Monitor cracking"] },
+            3: { name: "CRYOPROTECTANT_REMOVAL", duration: "6-24 hours", tasks: ["Perfuse washout", "Remove CPA"] },
+            4: { name: "REHYDRATION", duration: "2-6 hours", tasks: ["Cellular rehydration", "Osmotic balance"] },
+            5: { name: "CARDIOVASCULAR_RESTART", duration: "1-4 hours", tasks: ["Heart restart", "ECMO support"] },
+            6: { name: "RESPIRATORY_ACTIVATION", duration: "1-2 hours", tasks: ["Lung function", "Ventilation"] },
+            7: { name: "NEUROLOGICAL_RESTORATION", duration: "Variable", tasks: ["Brain activity", "Consciousness"] },
+            8: { name: "STABILIZATION", duration: "1-2 weeks", tasks: ["Vital monitoring", "Infection control"] },
+            9: { name: "POST_REVIVAL_CARE", duration: "Ongoing", tasks: ["Rehabilitation", "Reintegration"] }
+        };
+
+        function simulateStage() {
+            const stage = parseInt(document.getElementById('revivalStage').value);
+            const info = stageInfo[stage];
+
+            stageCompleted = stage;
+            document.getElementById('stageProgressBar').style.width = (stage / 9 * 100) + '%';
+            document.getElementById('stageProgressText').textContent = stage + '/9 stages';
+
+            const result = {
+                "stage": stage,
+                "name": info.name,
+                "duration": info.duration,
+                "tasks": info.tasks,
+                "status": "COMPLETED",
+                "vitals": stage >= 5 ? { "heartRate": 72, "bp": "110/70", "spO2": 98 } : { "status": "N/A" },
+                "message": currentLang === 'ko' ? `단계 ${stage} 완료` : `Stage ${stage} completed`
+            };
+            document.getElementById('protocolOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function simulateFullRevival() {
+            const results = [];
+            for (let i = 1; i <= 9; i++) {
+                const success = Math.random() > 0.05;
+                results.push({ stage: i, name: stageInfo[i].name, status: success ? "COMPLETED" : "FAILED" });
+                if (!success) break;
+            }
+
+            const allSuccess = results.every(r => r.status === "COMPLETED");
+            stageCompleted = results.filter(r => r.status === "COMPLETED").length;
+            document.getElementById('stageProgressBar').style.width = (stageCompleted / 9 * 100) + '%';
+            document.getElementById('stageProgressText').textContent = stageCompleted + '/9 stages';
+
+            const result = {
+                "simulation": "FULL_REVIVAL",
+                "stages": results,
+                "finalStatus": allSuccess ? "SUCCESS" : "FAILED_AT_STAGE_" + (results.length),
+                "successRate": (stageCompleted / 9 * 100).toFixed(1) + "%",
+                "message": currentLang === 'ko' ? '전체 소생 시뮬레이션 완료' : 'Full revival simulation complete'
+            };
+            document.getElementById('protocolOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function generateVitals(type) {
+            let vitals;
+            if (type === 'normal') {
+                vitals = { temp: 36.8, hr: 75, sbp: 118, dbp: 72, spo2: 98, rr: 14 };
+            } else if (type === 'critical') {
+                vitals = { temp: 39.5, hr: 35, sbp: 75, dbp: 45, spo2: 82, rr: 28 };
+            } else {
+                vitals = {
+                    temp: 35 + Math.random() * 4,
+                    hr: 40 + Math.floor(Math.random() * 120),
+                    sbp: 70 + Math.floor(Math.random() * 100),
+                    dbp: 40 + Math.floor(Math.random() * 60),
+                    spo2: 80 + Math.floor(Math.random() * 20),
+                    rr: 8 + Math.floor(Math.random() * 20)
+                };
+            }
+
+            const alerts = [];
+            if (vitals.hr < 40 || vitals.hr > 150) alerts.push("HR_ABNORMAL");
+            if (vitals.sbp < 80) alerts.push("BP_LOW");
+            if (vitals.spo2 < 90) alerts.push("SPO2_LOW");
+            if (vitals.temp > 39) alerts.push("FEVER");
+
+            const status = alerts.length > 0 ? (vitals.spo2 < 85 || vitals.sbp < 70 ? "CRITICAL" : "WARNING") : "NORMAL";
+
+            const result = {
+                "vitals": {
+                    "temperature": vitals.temp.toFixed(1) + "°C",
+                    "heartRate": vitals.hr + " bpm",
+                    "bloodPressure": vitals.sbp + "/" + vitals.dbp + " mmHg",
+                    "spO2": vitals.spo2 + "%",
+                    "respiratoryRate": vitals.rr + "/min"
+                },
+                "status": status,
+                "alerts": alerts.length > 0 ? alerts : ["None"],
+                "timestamp": new Date().toISOString(),
+                "message": currentLang === 'ko' ? '활력징후 생성됨' : 'Vitals generated'
+            };
+            document.getElementById('integrationOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function generateAlert() {
+            const type = document.getElementById('alertType').value;
+            const messages = {
+                "EMERGENCY": "EMERGENCY: Immediate intervention required",
+                "CRITICAL": "Critical parameter deviation detected",
+                "WARNING": "Parameter approaching threshold",
+                "INFO": "Informational update"
+            };
+
+            const result = {
+                "alertId": `ALERT-${generateId()}`,
+                "severity": type,
+                "message": messages[type],
+                "source": "VITAL_SIGNS",
+                "acknowledged": false,
+                "timestamp": new Date().toISOString(),
+                "expectedResponse": type === "EMERGENCY" ? "5 min" : type === "CRITICAL" ? "15 min" : "1 hour",
+                "message_result": currentLang === 'ko' ? '알림 생성됨' : 'Alert generated'
+            };
+            document.getElementById('integrationOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function evaluateRePreservation() {
+            const trigger = document.getElementById('represTrigger').value;
+            const weights = { CARDIAC: 0.25, NEURO: 0.30, ORGAN: 0.20, TIME: 0.10, TISSUE: 0.15 };
+            const score = 0.3 + Math.random() * 0.5;
+
+            let decision;
+            if (score >= 0.7) decision = "REPRESERVE";
+            else if (score < 0.3) decision = "CONTINUE_REVIVAL";
+            else decision = "REVIEW_REQUIRED";
+
+            const result = {
+                "trigger": trigger,
+                "criteriaScore": score.toFixed(2),
+                "weights": weights,
+                "decision": decision,
+                "recommendation": decision === "REPRESERVE" ?
+                    "[!] Re-preservation recommended" :
+                    decision === "CONTINUE_REVIVAL" ?
+                    "[OK] Continue revival efforts" :
+                    "[i] Additional review required",
+                "message": currentLang === 'ko' ? '재보존 평가 완료' : 'Re-preservation evaluation complete'
+            };
+            document.getElementById('testOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedLang = localStorage.getItem('wiaLang') || 'en';
+            setLang(savedLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

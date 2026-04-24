@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 데이터 처리와 분석 | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>5장: 데이터 처리와 분석</h1>
+
+    <p>드론으로 수집된 이미지와 데이터를 활용 가능한 농업 정보로 변환하는 것은 정밀농업의 핵심입니다. 이 장에서는 사진측량 처리, 식생 지수 계산, AI 기반 분석, 처방 맵 생성을 다룹니다. 원시 센서 데이터에서 의사결정 지원까지의 데이터 파이프라인을 이해하는 것이 드론 기술의 가치를 실현하는 데 필수적입니다.</p>
+
+    <h2>5.1 사진측량 처리</h2>
+
+    <pre>
+// 사진측량 처리 파이프라인
+interface PhotogrammetryPipeline {
+  // 이미지 전처리
+  preprocessing: {
+    formatConversion: 'RAW to TIFF';
+    colorCorrection: boolean;
+    vignetteRemoval: boolean;
+    distortionCorrection: boolean;
+  };
+
+  // 정렬 및 매칭
+  alignment: {
+    featureDetection: 'SIFT' | 'SURF' | 'ORB';
+    keypoints: 'high' | 'medium' | 'low';
+    matching: 'exhaustive' | 'sequential' | 'reference';
+    bundleAdjustment: 'global' | 'incremental';
+  };
+
+  // 밀집 재구성
+  denseReconstruction: {
+    quality: 'ultra' | 'high' | 'medium' | 'low';
+    depthFiltering: 'aggressive' | 'moderate' | 'mild';
+    pointCloudDensity: number;   // 포인트/m²
+  };
+
+  // 메시 생성
+  meshGeneration: {
+    surfaceType: 'arbitrary' | 'height_field';
+    faceCount: number;
+    interpolation: boolean;
+  };
+
+  // 정사영상 생성
+  orthomosaic: {
+    resolution: number;          // cm/픽셀
+    blendingMode: 'mosaic' | 'average' | 'max';
+    surfaceSmoothing: boolean;
+    holeFilling: boolean;
+  };
+
+  // DSM/DTM 생성
+  elevationModel: {
+    dsm: boolean;                // 수치표면모델
+    dtm: boolean;                // 수치지형모델
+    resolution: number;          // cm/픽셀
+    filterVegetation: boolean;
+  };
+}
+
+// 처리 파라미터 예시
+const processingParams = {
+  surveyArea: 50,                // 헥타르
+  imageCount: 850,
+  gsd: 2.5,                      // cm
+  overlap: { forward: 80, side: 70 },
+  processingTime: {
+    alignment: '15분',
+    dense: '45분',
+    orthomosaic: '20분',
+    total: '약 90분'
+  },
+  output: {
+    orthomosaic: 'GeoTIFF, 2.5cm 해상도',
+    dsm: 'GeoTIFF, 5cm 해상도',
+    pointCloud: 'LAS, 100포인트/m²'
+  }
+};
+    </pre>
+
+    <h2>5.2 식생 지수</h2>
+
+    <table>
+        <tr>
+            <th>지수</th>
+            <th>공식</th>
+            <th>응용</th>
+        </tr>
+        <tr>
+            <td>NDVI</td>
+            <td>(NIR - Red) / (NIR + Red)</td>
+            <td>전반적인 식생 건강</td>
+        </tr>
+        <tr>
+            <td>NDRE</td>
+            <td>(NIR - RedEdge) / (NIR + RedEdge)</td>
+            <td>엽록소 함량, 질소 상태</td>
+        </tr>
+        <tr>
+            <td>GNDVI</td>
+            <td>(NIR - Green) / (NIR + Green)</td>
+            <td>엽록소 농도</td>
+        </tr>
+        <tr>
+            <td>SAVI</td>
+            <td>((NIR - Red) / (NIR + Red + L)) * (1 + L)</td>
+            <td>토양 영향 보정</td>
+        </tr>
+        <tr>
+            <td>CWSI</td>
+            <td>(Tc - Ta) / (Twet - Tdry)</td>
+            <td>작물 수분 스트레스</td>
+        </tr>
+    </table>
+
+    <pre>
+// 식생 지수 계산 인터페이스
+interface VegetationIndex {
+  name: string;
+  formula: string;
+  bands: string[];
+  range: { min: number; max: number };
+  interpretation: {
+    low: string;
+    medium: string;
+    high: string;
+  };
+}
+
+// 식생 지수 계산기
+class IndexCalculator {
+  // NDVI 계산
+  calculateNDVI(nir: number, red: number): number {
+    return (nir - red) / (nir + red);
+  }
+
+  // NDRE 계산
+  calculateNDRE(nir: number, redEdge: number): number {
+    return (nir - redEdge) / (nir + redEdge);
+  }
+
+  // GNDVI 계산
+  calculateGNDVI(nir: number, green: number): number {
+    return (nir - green) / (nir + green);
+  }
+
+  // SAVI 계산 (L = 0.5가 일반적)
+  calculateSAVI(nir: number, red: number, L: number = 0.5): number {
+    return ((nir - red) / (nir + red + L)) * (1 + L);
+  }
+
+  // 래스터 처리
+  processRaster(
+    multispectralImage: MultispectralImage,
+    indexType: string
+  ): GeoTIFF {
+    // 밴드별 처리 및 지수 맵 생성
+    return generatedIndexMap;
+  }
+}
+
+// 지수 해석 가이드
+const ndviInterpretation = {
+  range: { min: -1, max: 1 },
+  classes: [
+    { range: [-1, 0], label: '물/비식생', color: '#0000FF' },
+    { range: [0, 0.2], label: '나지/스트레스', color: '#964B00' },
+    { range: [0.2, 0.4], label: '희박한 식생', color: '#FFFF00' },
+    { range: [0.4, 0.6], label: '보통 식생', color: '#90EE90' },
+    { range: [0.6, 0.8], label: '건강한 식생', color: '#228B22' },
+    { range: [0.8, 1.0], label: '매우 건강한 식생', color: '#006400' }
+  ]
+};
+    </pre>
+
+    <h2>5.3 AI 기반 분석</h2>
+
+    <div class="highlight">
+        <h3>머신러닝 응용</h3>
+        <ul>
+            <li><strong>작물 분류:</strong> CNN을 사용한 작물 종류 및 잡초 식별</li>
+            <li><strong>병해 탐지:</strong> 딥러닝으로 질병 징후 조기 탐지</li>
+            <li><strong>수확량 예측:</strong> 회귀 모델을 통한 수확량 추정</li>
+            <li><strong>이상 탐지:</strong> 비정상 패턴 자동 식별</li>
+            <li><strong>객체 검출:</strong> 개별 식물, 해충, 과일 카운팅</li>
+        </ul>
+    </div>
+
+    <pre>
+// AI 분석 파이프라인
+interface AIAnalyticsPipeline {
+  // 이미지 분류
+  classification: {
+    model: 'ResNet' | 'EfficientNet' | 'custom';
+    classes: string[];
+    inputSize: { width: number; height: number };
+    preprocessing: {
+      normalization: 'imagenet' | 'custom';
+      augmentation: boolean;
+    };
+    output: {
+      classLabel: string;
+      confidence: number;
+      probabilities: Record&lt;string, number&gt;;
+    };
+  };
+
+  // 객체 검출
+  objectDetection: {
+    model: 'YOLO' | 'FasterRCNN' | 'SSD';
+    classes: string[];
+    confidenceThreshold: number;
+    nmsThreshold: number;
+    output: {
+      boundingBoxes: BoundingBox[];
+      counts: Record&lt;string, number&gt;;
+    };
+  };
+
+  // 시맨틱 세그멘테이션
+  segmentation: {
+    model: 'UNet' | 'DeepLab' | 'SegFormer';
+    classes: string[];
+    output: {
+      segmentationMask: GeoTIFF;
+      areaStatistics: Record&lt;string, number&gt;;
+    };
+  };
+
+  // 이상 탐지
+  anomalyDetection: {
+    method: 'autoencoder' | 'isolation_forest' | 'statistical';
+    threshold: number;
+    output: {
+      anomalyMap: GeoTIFF;
+      hotspots: GeoJSON.Point[];
+      severity: Record&lt;string, number&gt;;
+    };
+  };
+}
+
+// AI 모델 예시: 질병 탐지
+const diseaseDetectionModel = {
+  name: '작물 질병 탐지 v2.1',
+  architecture: 'EfficientNet-B4',
+  inputSize: { width: 512, height: 512 },
+  classes: [
+    '건강함',
+    '역병',
+    '탄저병',
+    '노균병',
+    '흰가루병',
+    '세균성 반점'
+  ],
+  accuracy: 0.94,
+  inferenceTime: '15ms/이미지',
+  deployment: 'edge' | 'cloud'
+};
+    </pre>
+
+    <h2>5.4 처방 맵 생성</h2>
+
+    <pre>
+// 처방 맵 생성 인터페이스
+interface PrescriptionMapGeneration {
+  // 입력 데이터
+  inputs: {
+    vegetationIndex: GeoTIFF;
+    fieldBoundary: GeoJSON.Polygon;
+    applicationZones?: GeoJSON.FeatureCollection;
+    constraints?: {
+      bufferZones: GeoJSON.Polygon[];
+      maxRate: number;
+      minRate: number;
+    };
+  };
+
+  // 존 생성
+  zoneGeneration: {
+    method: 'clustering' | 'threshold' | 'percentile' | 'custom';
+    zoneCount: number;
+    smoothing: boolean;
+    minimumZoneSize: number;     // m²
+  };
+
+  // 레이트 할당
+  rateAssignment: {
+    method: 'linear' | 'custom_function' | 'lookup_table';
+    baseRate: number;
+    unitType: 'L/ha' | 'kg/ha' | 'seeds/m²';
+    adjustmentFactor?: number;
+  };
+
+  // 출력
+  output: {
+    format: 'shapefile' | 'isoxml' | 'geojson';
+    attributes: ['zone_id', 'rate', 'area', 'index_mean'];
+    visualization: boolean;
+    equipmentCompatibility: string[];
+  };
+}
+
+// 처방 맵 생성 예시
+const prescriptionExample = {
+  field: '블록 A',
+  area: 25,                      // 헥타르
+  indexUsed: 'NDVI',
+  zones: [
+    { id: 1, ndviRange: [0.2, 0.4], rate: 180, area: 5, color: '#FF0000' },
+    { id: 2, ndviRange: [0.4, 0.6], rate: 150, area: 12, color: '#FFFF00' },
+    { id: 3, ndviRange: [0.6, 0.8], rate: 120, area: 6, color: '#00FF00' },
+    { id: 4, ndviRange: [0.8, 1.0], rate: 100, area: 2, color: '#006400' }
+  ],
+  totalProduct: 3450,            // L 또는 kg
+  savings: '균일 살포 대비 15% 절감'
+};
+    </pre>
+
+    <h2>5.5 시계열 분석</h2>
+
+    <table>
+        <tr>
+            <th>분석 유형</th>
+            <th>설명</th>
+            <th>응용</th>
+        </tr>
+        <tr>
+            <td>성장 모니터링</td>
+            <td>시간에 따른 NDVI 변화 추적</td>
+            <td>성장 이상 탐지, 관리 시기 결정</td>
+        </tr>
+        <tr>
+            <td>비교 분석</td>
+            <td>날짜 간 차이 계산</td>
+            <td>관리 효과 평가</td>
+        </tr>
+        <tr>
+            <td>트렌드 분석</td>
+            <td>장기 패턴 식별</td>
+            <td>다년간 수확량 트렌드</td>
+        </tr>
+        <tr>
+            <td>예측 모델링</td>
+            <td>과거 데이터 기반 예측</td>
+            <td>수확량 예측, 문제 조기 경고</td>
+        </tr>
+    </table>
+
+    <pre>
+// 시계열 분석 인터페이스
+interface TimeSeriesAnalysis {
+  // 데이터 수집
+  dataCollection: {
+    dateRange: { start: ISO8601Date; end: ISO8601Date };
+    frequency: 'weekly' | 'biweekly' | 'monthly' | 'custom';
+    datasets: {
+      date: ISO8601Date;
+      indexMap: GeoTIFF;
+      metadata: DatasetMetadata;
+    }[];
+  };
+
+  // 시계열 처리
+  processing: {
+    alignment: 'spatial_resampling';
+    normalization: 'min_max' | 'zscore' | 'none';
+    gapFilling: 'interpolation' | 'nearest' | 'none';
+    smoothing?: 'savgol' | 'moving_average';
+  };
+
+  // 분석 결과
+  analysis: {
+    growthCurve: {
+      metric: 'mean_ndvi_per_date';
+      trendType: 'linear' | 'polynomial' | 'phenological';
+    };
+    changeDetection: {
+      threshold: number;
+      significantChanges: ChangeEvent[];
+    };
+    anomalyPeriods: {
+      dates: ISO8601Date[];
+      severity: number;
+      description: string;
+    }[];
+  };
+}
+    </pre>
+
+    <h2>5.6 보고서 생성</h2>
+
+    <div class="highlight">
+        <h3>자동 보고서 구성요소</h3>
+        <ul>
+            <li><strong>요약:</strong> 핵심 지표, 주요 발견사항</li>
+            <li><strong>지도:</strong> 정사영상, 지수 맵, 이상 영역</li>
+            <li><strong>통계:</strong> 면적별 분포, 히스토그램, 트렌드</li>
+            <li><strong>권장사항:</strong> 관리 조치 제안</li>
+            <li><strong>비교:</strong> 이전 비행과의 비교</li>
+        </ul>
+    </div>
+
+    <pre>
+// 보고서 생성 인터페이스
+interface ReportGeneration {
+  // 보고서 유형
+  reportType: 'health_assessment' | 'spray_record' | 'yield_estimate' | 'comprehensive';
+
+  // 섹션
+  sections: {
+    executiveSummary: {
+      fieldName: string;
+      surveyDate: ISO8601Date;
+      totalArea: number;
+      keyFindings: string[];
+    };
+    maps: {
+      orthomosaic: ImageReference;
+      indexMap: ImageReference;
+      anomalyMap?: ImageReference;
+      prescriptionMap?: ImageReference;
+    };
+    statistics: {
+      indexHistogram: ChartData;
+      zoneBreakdown: TableData;
+      areaStatistics: Record&lt;string, number&gt;;
+    };
+    recommendations: {
+      immediate: string[];
+      shortTerm: string[];
+      monitoring: string[];
+    };
+    appendix?: {
+      flightDetails: FlightMetadata;
+      processingParameters: ProcessingParams;
+      dataQuality: QualityMetrics;
+    };
+  };
+
+  // 출력 형식
+  output: {
+    format: 'PDF' | 'HTML' | 'DOCX';
+    language: 'ko' | 'en';
+    branding: BrandingOptions;
+    delivery: 'email' | 'portal' | 'download';
+  };
+}
+    </pre>
+
+    <h2>5.7 클라우드 vs 엣지 처리</h2>
+
+    <table>
+        <tr>
+            <th>측면</th>
+            <th>클라우드 처리</th>
+            <th>엣지 처리</th>
+        </tr>
+        <tr>
+            <td>처리 속도</td>
+            <td>높은 연산 능력, 병렬 처리</td>
+            <td>즉각적 결과, 지연 없음</td>
+        </tr>
+        <tr>
+            <td>연결성</td>
+            <td>인터넷 필요</td>
+            <td>오프라인 가능</td>
+        </tr>
+        <tr>
+            <td>비용</td>
+            <td>사용량 기반</td>
+            <td>초기 하드웨어 투자</td>
+        </tr>
+        <tr>
+            <td>적합한 작업</td>
+            <td>대규모 정사영상, 딥러닝</td>
+            <td>실시간 결정, 즉각 살포</td>
+        </tr>
+    </table>
+
+    <pre>
+// 하이브리드 처리 아키텍처
+interface HybridProcessing {
+  // 엣지 처리 (온보드/현장)
+  edge: {
+    capabilities: [
+      '실시간 NDVI 계산',
+      '즉각적 이상 경고',
+      '살포 결정 지원',
+      '기본 품질 검사'
+    ];
+    hardware: 'Jetson' | 'Intel NCS' | 'Google Coral';
+    latency: '< 100ms';
+  };
+
+  // 클라우드 처리
+  cloud: {
+    capabilities: [
+      '고품질 정사영상 생성',
+      '딥러닝 모델 추론',
+      '대규모 시계열 분석',
+      '고급 보고서 생성'
+    ];
+    platform: 'AWS' | 'GCP' | 'Azure' | 'custom';
+    scalability: 'auto';
+  };
+
+  // 동기화
+  sync: {
+    previewOnEdge: true;
+    fullProcessingOnCloud: true;
+    resultsSyncBack: true;
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>장 요약</h3>
+        <p>이 장에서는 사진측량 처리, 식생 지수 계산, AI 기반 분석, 처방 맵 생성, 시계열 분석, 보고서 생성, 클라우드 vs 엣지 처리를 포함한 데이터 처리 및 분석을 다루었습니다. 이러한 데이터 처리 파이프라인은 WIA-AGRICULTURAL_DRONE 표준에 따라 드론 데이터를 활용 가능한 농업 인텔리전스로 변환합니다.</p>
+    </div>
+</body>
+</html>

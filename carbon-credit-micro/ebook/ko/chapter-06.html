@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 6: 통합 | WIA-CARBON_CREDIT_MICRO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 6: 통합 전략</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> IoT 장치 연동 방법을 마스터하고, 탄소 발자국 API의 활용법을 이해하며, 기업 시스템과의 통합 전략을 학습합니다.
+    </div>
+
+    <h2>IoT 장치 통합</h2>
+
+    <p>사물인터넷(IoT) 장치는 탄소 발자국 추적을 위한 자동화된 고정밀 데이터를 제공합니다. 시스템은 스마트 홈 장치, 웨어러블 기기, 환경 센서와의 통합을 지원합니다.</p>
+
+    <div class="highlight">
+        <strong>지원 IoT 프로토콜:</strong> 플랫폼은 장치 통신을 위해 MQTT, CoAP, HTTP REST, Bluetooth Low Energy를 지원합니다. 통합 장치 추상화 계층이 프로토콜 차이를 처리합니다.
+    </div>
+
+    <h3>스마트 홈 통합</h3>
+
+    <pre><code>// IoT 통합 프레임워크
+interface IoTDevice {
+    deviceId: string;
+    deviceType: DeviceType;
+    manufacturer: string;
+    protocol: 'mqtt' | 'coap' | 'rest' | 'ble';
+    capabilities: DeviceCapability[];
+    lastSeen: Date;
+    status: 'online' | 'offline' | 'error';
+}
+
+class IoTIntegrationHub {
+    private devices: Map&lt;string, IoTDevice&gt; = new Map();
+    private mqttClient: MQTTClient;
+    private dataProcessor: IoTDataProcessor;
+
+    async registerDevice(registration: DeviceRegistration): Promise&lt;IoTDevice&gt; {
+        // 장치 진위 확인
+        const verified = await this.verifyDevice(registration);
+        if (!verified) {
+            throw new Error('장치 검증 실패');
+        }
+
+        const device: IoTDevice = {
+            deviceId: registration.deviceId,
+            deviceType: registration.type,
+            manufacturer: registration.manufacturer,
+            protocol: registration.protocol,
+            capabilities: await this.discoverCapabilities(registration),
+            lastSeen: new Date(),
+            status: 'online'
+        };
+
+        this.devices.set(device.deviceId, device);
+
+        // 데이터 구독 설정
+        await this.subscribeToDevice(device);
+
+        return device;
+    }
+
+    private async subscribeToDevice(device: IoTDevice): Promise&lt;void&gt; {
+        switch (device.protocol) {
+            case 'mqtt':
+                await this.mqttClient.subscribe(
+                    `devices/${device.deviceId}/data`,
+                    (message) => this.handleDeviceData(device, message)
+                );
+                break;
+            case 'rest':
+                // REST 장치에 대한 폴링 설정
+                this.startPolling(device);
+                break;
+            case 'ble':
+                // Bluetooth를 통한 연결
+                await this.connectBLE(device);
+                break;
+        }
+    }
+
+    private async handleDeviceData(device: IoTDevice, data: DeviceData): Promise&lt;void&gt; {
+        // 장치 유형에 따른 처리
+        const processed = await this.dataProcessor.process(device, data);
+
+        // 탄소 관련 이벤트 확인
+        if (processed.carbonRelevant) {
+            await this.emitCarbonEvent({
+                deviceId: device.deviceId,
+                eventType: processed.eventType,
+                carbonImpact: processed.carbonImpact,
+                timestamp: data.timestamp
+            });
+        }
+    }
+}</code></pre>
+
+    <h2>스마트 미터 통합</h2>
+
+    <p>스마트 미터는 에너지 소비 추적의 핵심 데이터 소스입니다. 다양한 국가별 프로토콜을 지원합니다:</p>
+
+    <pre><code>// 스마트 미터 통합 예제
+class SmartMeterIntegration {
+    async connectMeter(config: MeterConfig): Promise&lt;MeterConnection&gt; {
+        // 다양한 스마트 미터 프로토콜 지원
+        const protocols = {
+            'SMETS2': new SMETS2Protocol(),      // 영국 스마트 미터
+            'P1': new P1Protocol(),               // 네덜란드
+            'DLMS': new DLMSProtocol(),          // 국제 표준
+            'ANSI_C12': new ANSIC12Protocol()    // 북미
+        };
+
+        const protocol = protocols[config.protocol];
+        if (!protocol) {
+            throw new Error(`지원되지 않는 프로토콜: ${config.protocol}`);
+        }
+
+        const connection = await protocol.connect(config);
+
+        // 실시간 모니터링 시작
+        connection.onReading((reading) => {
+            this.processReading(config.userId, reading);
+        });
+
+        return connection;
+    }
+
+    private async processReading(userId: string, reading: MeterReading): Promise&lt;void&gt; {
+        // 에너지 사용량에서 배출량 계산
+        const gridIntensity = await this.getGridIntensity(reading.location);
+        const emissions = reading.kwh * gridIntensity;
+
+        // 기준선과 비교
+        const baseline = await this.getBaseline(userId, reading.timestamp);
+        const savings = Math.max(0, baseline - emissions);
+
+        if (savings > 0) {
+            await this.generateCredit({
+                userId,
+                type: 'ENERGY_SAVINGS',
+                amount: savings,
+                source: 'smart_meter',
+                verification: 'automated'
+            });
+        }
+    }
+}</code></pre>
+
+    <h2>탄소 발자국 API</h2>
+
+    <p>WIA-CARBON_CREDIT_MICRO는 외부 애플리케이션이 탄소 크레딧 기능을 통합할 수 있는 포괄적인 API를 제공합니다:</p>
+
+    <pre><code>// 탄소 발자국 API 사용 예제
+import { CarbonFootprintAPI } from '@wia/carbon-credit-micro';
+
+const api = new CarbonFootprintAPI({
+    apiKey: process.env.WIA_API_KEY,
+    environment: 'production'
+});
+
+// 활동의 탄소 발자국 계산
+async function calculateActivityFootprint(activity: Activity) {
+    const result = await api.calculate({
+        type: activity.type,
+        parameters: {
+            distance: activity.distance,
+            mode: activity.transportMode,
+            duration: activity.duration
+        }
+    });
+
+    return {
+        footprint: result.emissions,          // g CO2e
+        potentialCredits: result.savings,     // g CO2e (기준선 대비)
+        methodology: result.methodology,
+        confidence: result.confidence
+    };
+}
+
+// 제품의 탄소 발자국 조회
+async function getProductFootprint(barcode: string) {
+    const product = await api.products.getByBarcode(barcode);
+
+    return {
+        productName: product.name,
+        carbonFootprint: product.emissions,    // g CO2e
+        breakdown: product.emissionBreakdown,
+        alternatives: product.lowerCarbonAlternatives
+    };
+}
+
+// 실시간 배출 요소 조회
+async function getEmissionFactors(location: GeoLocation) {
+    const factors = await api.emissionFactors.getByLocation(location);
+
+    return {
+        gridIntensity: factors.electricity,    // g CO2e / kWh
+        fuelFactors: factors.transportation,
+        lastUpdated: factors.timestamp
+    };
+}</code></pre>
+
+    <h2>기업 시스템 통합</h2>
+
+    <p>기업은 직원 참여 프로그램과 ESG 보고를 위해 마이크로 탄소 크레딧 시스템을 통합할 수 있습니다:</p>
+
+    <table>
+        <tr>
+            <th>통합 유형</th>
+            <th>사용 사례</th>
+            <th>데이터 흐름</th>
+        </tr>
+        <tr>
+            <td>HR 시스템</td>
+            <td>직원 인센티브 프로그램</td>
+            <td>양방향</td>
+        </tr>
+        <tr>
+            <td>ERP</td>
+            <td>공급망 탄소 추적</td>
+            <td>단방향 (수신)</td>
+        </tr>
+        <tr>
+            <td>ESG 플랫폼</td>
+            <td>지속가능성 보고</td>
+            <td>단방향 (송신)</td>
+        </tr>
+        <tr>
+            <td>복리후생 플랫폼</td>
+            <td>크레딧 보상 교환</td>
+            <td>양방향</td>
+        </tr>
+    </table>
+
+    <pre><code>// 기업 통합 SDK
+class EnterpriseIntegration {
+    async setupEmployeeProgram(config: EmployeeProgramConfig): Promise&lt;Program&gt; {
+        const program = await this.createProgram({
+            organizationId: config.organizationId,
+            name: config.programName,
+            incentiveStructure: {
+                creditMultiplier: config.multiplier || 1.5,
+                bonusCategories: config.bonusCategories,
+                milestoneRewards: config.milestones
+            },
+            reportingFrequency: config.reportingFrequency || 'monthly'
+        });
+
+        // SSO 통합 설정
+        if (config.ssoConfig) {
+            await this.configureSSOIntegration(program.id, config.ssoConfig);
+        }
+
+        // 급여 시스템 연동 (보상 지급용)
+        if (config.payrollIntegration) {
+            await this.configurePayrollIntegration(program.id, config.payrollIntegration);
+        }
+
+        return program;
+    }
+
+    async generateESGReport(
+        organizationId: string,
+        period: DateRange
+    ): Promise&lt;ESGReport&gt; {
+        const data = await this.collectESGData(organizationId, period);
+
+        return {
+            organization: organizationId,
+            period,
+            metrics: {
+                totalEmployeeCredits: data.totalCredits,
+                participationRate: data.participationRate,
+                co2Reduced: data.totalReduction,
+                topActions: data.actionBreakdown
+            },
+            compliance: {
+                frameworks: ['GRI', 'SASB', 'TCFD'],
+                dataQuality: data.verificationRate
+            },
+            visualizations: await this.generateCharts(data)
+        };
+    }
+}</code></pre>
+
+    <h2>모바일 애플리케이션 통합</h2>
+
+    <p>모바일 앱은 대부분의 사용자가 마이크로 탄소 크레딧 시스템과 상호작용하는 주요 인터페이스입니다:</p>
+
+    <pre><code>// 모바일 SDK 코어 구현
+import { MicroCarbonMobileSDK } from '@wia/carbon-credit-mobile';
+
+// 구성으로 SDK 초기화
+const sdk = new MicroCarbonMobileSDK({
+    apiKey: 'your-api-key',
+    environment: 'production',
+    options: {
+        enableBackgroundTracking: true,
+        locationAccuracy: 'high',
+        batteryOptimization: 'balanced',
+        offlineMode: true,
+        syncInterval: 300 // 초
+    }
+});
+
+// React Native 통합 예제
+import { useCarbonTracking } from '@wia/carbon-credit-mobile/react-native';
+
+function CarbonTrackingScreen() {
+    const {
+        isTracking,
+        currentActivity,
+        todayCredits,
+        startTracking,
+        stopTracking
+    } = useCarbonTracking();
+
+    return (
+        &lt;View&gt;
+            &lt;Text&gt;오늘의 크레딧: {todayCredits}g CO2&lt;/Text&gt;
+            &lt;Text&gt;상태: {isTracking ? '추적 중' : '일시정지'}&lt;/Text&gt;
+            &lt;Button
+                title={isTracking ? '중지' : '시작'}
+                onPress={isTracking ? stopTracking : startTracking}
+            /&gt;
+        &lt;/View&gt;
+    );
+}</code></pre>
+
+    <h2>소매업 통합</h2>
+
+    <p>소매 파트너십은 지속 가능한 구매 결정으로부터 크레딧 생성을 가능하게 하고 교환 기회를 제공합니다:</p>
+
+    <div class="highlight">
+        <strong>POS 통합:</strong> 시스템은 주요 POS 시스템과 통합하여 재사용 가방 선택이나 지역 제품 구매와 같은 지속 가능한 구매를 자동으로 감지하고 보상합니다.
+    </div>
+
+    <table>
+        <tr>
+            <th>소매 행동</th>
+            <th>크레딧 가치</th>
+            <th>검증 방법</th>
+        </tr>
+        <tr>
+            <td>재사용 가방 사용</td>
+            <td>사용당 33g</td>
+            <td>POS 거래 플래그</td>
+        </tr>
+        <tr>
+            <td>재사용 컵</td>
+            <td>사용당 60g</td>
+            <td>파트너 카페 API</td>
+        </tr>
+        <tr>
+            <td>지역 농산물</td>
+            <td>kg당 100g</td>
+            <td>제품 원산지 데이터</td>
+        </tr>
+        <tr>
+            <td>대용량 구매</td>
+            <td>kg당 50g</td>
+            <td>제품 SKU 매칭</td>
+        </tr>
+        <tr>
+            <td>식물성 선택</td>
+            <td>가변적</td>
+            <td>메뉴 항목 매핑</td>
+        </tr>
+    </table>
+
+    <pre><code>// 소매 크레딧 엔진
+class RetailCreditEngine {
+    async processTransaction(transaction: RetailTransaction): Promise&lt;TransactionCredits&gt; {
+        const eligibleItems: EligibleItem[] = [];
+
+        for (const item of transaction.items) {
+            // 항목이 크레딧 자격이 있는지 확인
+            const eligibility = await this.checkEligibility(item);
+
+            if (eligibility.eligible) {
+                eligibleItems.push({
+                    item,
+                    creditType: eligibility.creditType,
+                    creditAmount: eligibility.amount,
+                    reason: eligibility.reason
+                });
+            }
+        }
+
+        // 행동 크레딧 확인 (재사용 가방 등)
+        const behavioralCredits = await this.checkBehavioralCredits(transaction);
+
+        const totalCredits = eligibleItems.reduce((sum, i) => sum + i.creditAmount, 0)
+            + behavioralCredits.reduce((sum, c) => sum + c.amount, 0);
+
+        if (totalCredits > 0) {
+            // 사용자를 위한 크레딧 생성
+            await this.generateRetailCredits({
+                userId: transaction.customerId,
+                transactionId: transaction.id,
+                totalAmount: totalCredits
+            });
+        }
+
+        return {
+            transactionId: transaction.id,
+            eligibleItems,
+            behavioralCredits,
+            totalCredits
+        };
+    }
+}</code></pre>
+
+    <h2>요약</h2>
+
+    <p>마이크로 탄소 크레딧 시스템의 성공적인 통합은 IoT 연결성, 탄소 발자국 API, 기업 시스템 연동에 대한 세심한 주의가 필요합니다. 포괄적인 SDK, API, 통합 가이드를 제공함으로써 WIA-CARBON_CREDIT_MICRO 표준은 다양한 플랫폼과 사용 사례에서 광범위한 채택을 가능하게 합니다. 이러한 통합은 일상 활동을 탄소 크레딧 생성 기회로 전환하여 모든 사람에게 기후 행동을 접근 가능하게 만듭니다.</p>
+
+</body>
+</html>

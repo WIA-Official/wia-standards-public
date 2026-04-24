@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 7: 운영 | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 7: CI/CD 운영 및 최적화</h1>
+
+    <p>CI/CD 시스템 운영은 설정하고 잊어버리는 일이 아닙니다. 성능과 신뢰성을 유지하기 위해 지속적인 모니터링, 최적화, 문제 해결이 필요합니다. 이 챕터에서는 대규모 CI/CD 인프라 관리의 운영적 측면을 다룹니다.</p>
+
+    <h2>파이프라인 모니터링</h2>
+
+    <p>효과적인 모니터링은 파이프라인 상태, 성능 추세, 그리고 개발 팀에 영향을 미치기 전 잠재적 문제에 대한 가시성을 제공합니다.</p>
+
+    <h3>추적해야 할 핵심 메트릭</h3>
+
+    <table>
+        <tr>
+            <th>메트릭</th>
+            <th>설명</th>
+            <th>목표</th>
+            <th>알림 임계값</th>
+        </tr>
+        <tr>
+            <td>빌드 시간</td>
+            <td>트리거에서 완료까지 시간</td>
+            <td>10분 이내</td>
+            <td>20분 초과</td>
+        </tr>
+        <tr>
+            <td>성공률</td>
+            <td>성공한 빌드 비율</td>
+            <td>95% 초과</td>
+            <td>80% 미만</td>
+        </tr>
+        <tr>
+            <td>큐 대기 시간</td>
+            <td>러너 대기 시간</td>
+            <td>30초 이내</td>
+            <td>5분 초과</td>
+        </tr>
+        <tr>
+            <td>불안정 테스트율</td>
+            <td>일관성 없이 통과/실패하는 테스트</td>
+            <td>1% 미만</td>
+            <td>5% 초과</td>
+        </tr>
+        <tr>
+            <td>MTTR</td>
+            <td>실패 후 평균 복구 시간</td>
+            <td>30분 이내</td>
+            <td>2시간 초과</td>
+        </tr>
+    </table>
+
+    <h3>Prometheus 메트릭 구성</h3>
+
+    <pre><code># prometheus.yml - CI 메트릭 수집
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'github-actions'
+    static_configs:
+      - targets: ['github-exporter:9171']
+
+  - job_name: 'jenkins'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['jenkins:8080']
+
+  - job_name: 'gitlab-ci'
+    static_configs:
+      - targets: ['gitlab:9090']
+
+rule_files:
+  - 'ci_alerts.yml'</code></pre>
+
+    <pre><code># ci_alerts.yml - 알림 규칙
+groups:
+  - name: ci_pipeline_alerts
+    rules:
+      - alert: 높은빌드실패율
+        expr: |
+          sum(rate(ci_builds_failed_total[1h])) /
+          sum(rate(ci_builds_total[1h])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "높은 빌드 실패율 감지됨"
+          description: "빌드 실패율이 {{ $value | humanizePercentage }}입니다"
+
+      - alert: 긴빌드큐
+        expr: ci_builds_queued > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "빌드 큐가 밀리고 있습니다"
+          description: "{{ $value }}개의 빌드가 큐에서 대기 중입니다"
+
+      - alert: 느린빌드시간
+        expr: |
+          histogram_quantile(0.95, rate(ci_build_duration_seconds_bucket[1h])) > 1800
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "빌드 시간이 증가하고 있습니다"
+          description: "95번째 백분위 빌드 시간이 {{ $value | humanizeDuration }}입니다"</code></pre>
+
+    <div class="highlight">
+        <strong>DORA 메트릭:</strong> DevOps Research and Assessment(DORA) 팀은 고성과 조직과 상관관계가 있는 4가지 핵심 메트릭을 식별했습니다: 배포 빈도, 변경 리드 타임, 변경 실패율, 서비스 복구 시간. CI/CD 효과를 측정하기 위해 이를 추적하세요.
+    </div>
+
+    <h2>대시보드 설계</h2>
+
+    <pre><code># Grafana 대시보드 구성
+{
+  "title": "WIA-CI 파이프라인 대시보드",
+  "panels": [
+    {
+      "title": "빌드 성공률 (24시간)",
+      "type": "gauge",
+      "targets": [{
+        "expr": "sum(ci_builds_success_total) / sum(ci_builds_total) * 100"
+      }],
+      "thresholds": {
+        "steps": [
+          {"value": 0, "color": "red"},
+          {"value": 80, "color": "yellow"},
+          {"value": 95, "color": "green"}
+        ]
+      }
+    },
+    {
+      "title": "빌드 시간 추세",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "histogram_quantile(0.50, rate(ci_build_duration_seconds_bucket[5m]))",
+        "legendFormat": "p50"
+      }, {
+        "expr": "histogram_quantile(0.95, rate(ci_build_duration_seconds_bucket[5m]))",
+        "legendFormat": "p95"
+      }]
+    },
+    {
+      "title": "활성 러너",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(ci_runners_active)"
+      }]
+    },
+    {
+      "title": "상태별 빌드",
+      "type": "piechart",
+      "targets": [{
+        "expr": "sum by (status) (ci_builds_total)"
+      }]
+    }
+  ]
+}</code></pre>
+
+    <h2>성능 최적화</h2>
+
+    <p>파이프라인 성능은 개발자 생산성에 직접적인 영향을 미칩니다. 느린 파이프라인은 컨텍스트 전환, 배치 커밋, 지연된 피드백으로 이어집니다.</p>
+
+    <h3>빌드 시간 분석</h3>
+
+    <pre><code># GitHub Actions - 빌드 시간 분석
+name: 빌드 시간 분석
+on:
+  workflow_run:
+    workflows: ["CI 파이프라인"]
+    types: [completed]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 워크플로우 실행 데이터 가져오기
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+
+            // 단계별 시간 분석
+            const stepAnalysis = jobs.data.jobs.flatMap(job =>
+              job.steps.map(step => ({
+                job: job.name,
+                step: step.name,
+                duration: new Date(step.completed_at) - new Date(step.started_at)
+              }))
+            );
+
+            // 가장 느린 단계 찾기
+            const slowest = stepAnalysis
+              .sort((a, b) => b.duration - a.duration)
+              .slice(0, 5);
+
+            console.log('가장 느린 단계:', slowest);
+
+            // 모니터링으로 전송
+            // await sendMetrics(stepAnalysis);</code></pre>
+
+    <h3>최적화 전략</h3>
+
+    <pre><code># 최적화 체크리스트
+
+## 캐싱 최적화
+- [ ] 락 파일 해시로 의존성 캐시
+- [ ] 실행 간 빌드 출력 캐시
+- [ ] Docker 레이어 캐싱 활성화
+- [ ] 모노레포용 원격 캐시 (Turborepo, Nx)
+
+## 병렬화
+- [ ] 독립 작업 병렬 실행
+- [ ] 샤드 간 테스트 스위트 분할
+- [ ] 다중 플랫폼 테스트용 매트릭스 빌드
+- [ ] 가능한 곳에서 병렬 단계 실행
+
+## 리소스 최적화
+- [ ] 적절한 크기의 러너 인스턴스
+- [ ] 비중요 작업에 스팟/선점형 인스턴스
+- [ ] 오래된 아티팩트 정기 정리
+- [ ] 효율적인 베이스 이미지 (Alpine, distroless)
+
+## 파이프라인 설계
+- [ ] 빠른 피드백을 위한 fail-fast
+- [ ] 조건부 작업 실행
+- [ ] 모노레포용 경로 기반 필터링
+- [ ] 단계별 파이프라인 (빠른 피드백 우선)</code></pre>
+
+    <h3>캐싱 최적화 예시</h3>
+
+    <pre><code># 고급 캐싱 전략
+name: 최적화된 빌드
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 모든 캐시 병렬 복원
+      - name: 의존성 캐시 복원
+        uses: actions/cache/restore@v4
+        id: deps-cache
+        with:
+          path: node_modules
+          key: deps-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: 빌드 캐시 복원
+        uses: actions/cache/restore@v4
+        id: build-cache
+        with:
+          path: |
+            .next/cache
+            dist
+          key: build-${{ runner.os }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            build-${{ runner.os }}-
+
+      # 캐시 미스 시에만 설치
+      - name: 의존성 설치
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      # 증분 빌드
+      - name: 빌드
+        run: pnpm build
+
+      # 향후 실행을 위해 캐시 저장
+      - name: 의존성 캐시 저장
+        uses: actions/cache/save@v4
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: node_modules
+          key: deps-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: 빌드 캐시 저장
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .next/cache
+            dist
+          key: build-${{ runner.os }}-${{ hashFiles('src/**') }}</code></pre>
+
+    <div class="highlight">
+        <strong>10배 빌드 시간 개선:</strong> 일반적인 최적화 여정은 공격적인 캐싱, 병렬화, 증분 빌드를 구현하여 빌드 시간을 20분 이상에서 2분 이내로 줄일 수 있습니다. 빌드 시간을 핵심 엔지니어링 메트릭으로 추적하세요.
+    </div>
+
+    <h2>일반적인 문제 해결</h2>
+
+    <h3>불안정 테스트</h3>
+
+    <pre><code># 불안정 테스트 감지 및 격리
+name: 불안정 감지 테스트
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 재시도로 테스트 실행
+        run: |
+          npm test -- --retries=2 --reporter=json > test-results.json
+
+      - name: 불안정 테스트 분석
+        run: |
+          node << 'EOF'
+          const results = require('./test-results.json');
+          const flaky = results.testResults
+            .flatMap(f => f.assertionResults)
+            .filter(t => t.retryReasons && t.retryReasons.length > 0);
+
+          if (flaky.length > 0) {
+            console.log('불안정 테스트 감지됨:');
+            flaky.forEach(t => console.log(`  - ${t.fullName}`));
+
+            // 추적 시스템에 보고
+            // await reportFlakyTests(flaky);
+          }
+          EOF
+
+      - name: 불안정 테스트 보고서 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-test-report
+          path: test-results.json</code></pre>
+
+    <h3>리소스 소진</h3>
+
+    <pre><code># GitHub Actions - 리소스 모니터링
+name: 리소스 모니터링 빌드
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 리소스 모니터링 시작
+        run: |
+          # 백그라운드에서 리소스 모니터링
+          while true; do
+            echo "$(date) - 메모리: $(free -m | awk 'NR==2{print $3}')MB 사용"
+            echo "$(date) - 디스크: $(df -h / | awk 'NR==2{print $5}') 사용"
+            sleep 30
+          done &
+          echo $! > /tmp/monitor.pid
+
+      - name: 빌드
+        run: npm run build
+
+      - name: 모니터링 중지
+        if: always()
+        run: kill $(cat /tmp/monitor.pid) 2>/dev/null || true</code></pre>
+
+    <h3>실패한 빌드 디버깅</h3>
+
+    <pre><code># 디버그 로깅 활성화
+# GitHub Actions
+- name: 빌드 실패 디버그
+  if: failure()
+  run: |
+    echo "=== 환경 ==="
+    env | sort
+
+    echo "=== 디스크 공간 ==="
+    df -h
+
+    echo "=== 메모리 ==="
+    free -m
+
+    echo "=== 프로세스 목록 ==="
+    ps aux
+
+    echo "=== 최근 로그 ==="
+    cat ~/.npm/_logs/*.log 2>/dev/null || true
+
+# GitLab CI - SSH 디버그 세션
+debug-job:
+  script:
+    - sleep 3600  # SSH를 위해 작업 유지
+  when: manual
+  tags:
+    - debug</code></pre>
+
+    <h2>용량 계획</h2>
+
+    <pre><code># 용량 계획 모델
+"""
+WIA-CI 용량 계획 계산기
+
+입력:
+- daily_commits: 일일 평균 커밋
+- avg_build_time: 평균 빌드 시간 (분)
+- peak_multiplier: 피크 대 평균 비율
+- target_queue_time: 최대 허용 큐 대기 시간 (분)
+
+출력:
+- 필요한 러너 용량
+"""
+
+def calculate_runners(daily_commits, avg_build_time, peak_multiplier, target_queue_time):
+    # 시간당 비율로 변환
+    hourly_builds = daily_commits / 8  # 8 근무 시간 가정
+
+    # 피크 시간 빌드
+    peak_builds = hourly_builds * peak_multiplier
+
+    # 필요한 용량 (시간당 빌드)
+    builds_per_runner_hour = 60 / avg_build_time
+
+    # 피크 부하를 위한 최소 러너
+    min_runners = peak_builds / builds_per_runner_hour
+
+    # 큐 시간 목표를 위한 버퍼 추가
+    buffer_factor = 1 + (avg_build_time / (target_queue_time + avg_build_time))
+
+    return ceil(min_runners * buffer_factor)
+
+# 예시: 200 커밋/일, 10분 빌드, 2배 피크, 2분 큐 목표
+# calculate_runners(200, 10, 2, 2) = 10 러너</code></pre>
+
+    <div class="highlight">
+        <strong>WIA-CI 운영 성숙도:</strong>
+        <ul>
+            <li>레벨 1: 기본 모니터링, 수동 문제 해결</li>
+            <li>레벨 2: 대시보드, 알림, 문서화된 런북</li>
+            <li>레벨 3: 자동화된 최적화, 셀프서비스 디버깅</li>
+            <li>레벨 4: 예측적 용량, 자동화된 복구</li>
+        </ul>
+    </div>
+
+    <p>CI/CD의 운영 우수성은 지속적인 여정입니다. 메트릭의 정기적인 검토, 선제적 최적화, 도구에 대한 투자는 개발자 생산성과 시스템 신뢰성에서 배당금을 지불합니다.</p>
+
+</body>
+</html>

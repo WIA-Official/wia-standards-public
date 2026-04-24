@@ -2,10 +2,10 @@
 //!
 //! Implementation of TAXII 2.1 protocol for threat intelligence sharing.
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::Utc;
 
 // ============================================================================
 // TAXII Discovery
@@ -150,7 +150,9 @@ pub struct TaxiiCollections {
 impl TaxiiCollections {
     /// Create empty collections
     pub fn new() -> Self {
-        Self { collections: vec![] }
+        Self {
+            collections: vec![],
+        }
     }
 
     /// Add collection
@@ -239,7 +241,9 @@ impl StixObject {
         let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
         let id = format!(
             "{}--{}",
-            format!("{:?}", object_type).to_lowercase().replace("_", "-"),
+            format!("{:?}", object_type)
+                .to_lowercase()
+                .replace("_", "-"),
             Uuid::new_v4()
         );
 
@@ -367,12 +371,18 @@ impl StixIndicator {
     }
 
     /// Add kill chain phase
-    pub fn with_kill_chain(mut self, kill_chain_name: impl Into<String>, phase: impl Into<String>) -> Self {
+    pub fn with_kill_chain(
+        mut self,
+        kill_chain_name: impl Into<String>,
+        phase: impl Into<String>,
+    ) -> Self {
         let phase = KillChainPhase {
             kill_chain_name: kill_chain_name.into(),
             phase_name: phase.into(),
         };
-        self.kill_chain_phases.get_or_insert_with(Vec::new).push(phase);
+        self.kill_chain_phases
+            .get_or_insert_with(Vec::new)
+            .push(phase);
         self
     }
 }
@@ -593,11 +603,9 @@ mod tests {
 
     #[test]
     fn test_stix_bundle() {
-        let indicator = StixIndicator::domain("malware.example.com")
-            .with_name("Malicious Domain");
+        let indicator = StixIndicator::domain("malware.example.com").with_name("Malicious Domain");
 
-        let bundle = StixBundle::new()
-            .add_object(indicator);
+        let bundle = StixBundle::new().add_object(indicator);
 
         assert_eq!(bundle.objects.len(), 1);
         assert!(bundle.id.starts_with("bundle--"));

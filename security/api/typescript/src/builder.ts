@@ -12,6 +12,7 @@ import {
   Mitre,
   Meta,
   AlertData,
+  Indicator,
   ThreatIntelData,
   VulnerabilityData,
   IncidentData,
@@ -357,7 +358,7 @@ export class AlertBuilder extends EventBuilder<AlertEvent> {
   /**
    * Add indicator
    */
-  addIndicator(indicator: AlertData['indicators'][0]): this {
+  addIndicator(indicator: Indicator): this {
     if (!this.event.data) {
       this.event.data = {} as AlertData;
     }

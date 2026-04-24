@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Architecture | WIA-CARBON_CREDIT_MICRO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: System Architecture</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong> Master the blockchain-based ledger architecture, understand tokenization mechanisms, and learn how fractional credits are managed across the distributed system.
+    </div>
+
+    <h2>Architectural Overview</h2>
+
+    <p>The WIA-CARBON_CREDIT_MICRO system is built on a multi-layer architecture designed for scalability, security, and interoperability. The architecture follows a microservices pattern with clear interfaces between layers.</p>
+
+    <pre><code>// System Architecture Layers
+const ARCHITECTURE_LAYERS = {
+    presentation: { components: ['Mobile App', 'Web Portal', 'Partner APIs'] },
+    application: { components: ['Credit Engine', 'Verification Service', 'Trading Engine'] },
+    blockchain: { components: ['Smart Contracts', 'Token Registry', 'Oracle Network'] },
+    data: { components: ['IPFS', 'PostgreSQL', 'Redis Cache'] },
+    integration: { components: ['IoT Gateway', 'Payment Bridge', 'Third-party APIs'] }
+};</code></pre>
+
+    <h2>Blockchain-Based Ledger Design</h2>
+
+    <p>The blockchain ledger serves as the single source of truth for all micro carbon credit transactions, prioritizing immutability, scalability, and interoperability.</p>
+
+    <h3>Network Selection Criteria</h3>
+
+    <table>
+        <tr>
+            <th>Criteria</th>
+            <th>Minimum</th>
+            <th>Recommended</th>
+        </tr>
+        <tr>
+            <td>Throughput</td>
+            <td>1,000 TPS</td>
+            <td>10,000+ TPS</td>
+        </tr>
+        <tr>
+            <td>Finality</td>
+            <td>&lt; 60s</td>
+            <td>&lt; 5s</td>
+        </tr>
+        <tr>
+            <td>Cost</td>
+            <td>&lt; $0.01</td>
+            <td>&lt; $0.001</td>
+        </tr>
+    </table>
+
+    <h3>Ledger Data Structure</h3>
+
+    <p>Each micro carbon credit entry in the ledger contains comprehensive metadata to ensure traceability and verification:</p>
+
+    <pre><code>// On-chain Credit Record Structure
+struct MicroCreditRecord {
+    // Identification
+    bytes32 creditId;           // Unique identifier
+    bytes32 batchId;            // Aggregation batch reference
+
+    // Credit Details
+    uint256 amountGrams;        // CO2 equivalent in grams
+    uint8 actionCategory;       // Transport, Energy, Consumption, etc.
+    uint16 actionType;          // Specific action code
+
+    // Provenance
+    address generator;          // Original credit generator
+    address currentOwner;       // Current owner
+    uint256 generationTime;     // Unix timestamp
+    bytes32 locationHash;       // Hashed geolocation
+
+    // Verification
+    uint8 verificationTier;     // 1-5 verification level
+    address verifier;           // Verification oracle
+    bytes32 proofHash;          // IPFS hash of verification proof
+
+    // Status
+    CreditStatus status;        // Active, Retired, Transferred
+    uint256 retirementTime;     // If retired, when
+    address retiredBy;          // Who retired the credit
+}
+
+enum CreditStatus {
+    PENDING,     // Awaiting verification
+    ACTIVE,      // Verified and tradeable
+    LOCKED,      // In transfer or pending retirement
+    RETIRED,     // Permanently retired (offset claimed)
+    REVOKED      // Invalid, removed from circulation
+}</code></pre>
+
+    <h2>Token Architecture</h2>
+
+    <p>The system implements a dual-token architecture: a governance token for protocol decisions and the credit token (ERC1155) for carbon credit representation.</p>
+
+    <div class="highlight">
+        <strong>Token Design:</strong> Credits are fungible within action categories but carry rich metadata for traceability.
+    </div>
+
+    <pre><code>// MicroCarbonCredit ERC1155 Token
+contract MicroCarbonCredit is ERC1155, AccessControl {
+    uint256 public constant TRANSPORT_CREDITS = 1;
+    uint256 public constant ENERGY_CREDITS = 2;
+    uint256 public constant CONSUMPTION_CREDITS = 3;
+    uint256 public constant WASTE_CREDITS = 4;
+
+    mapping(uint256 => CreditMetadata) public categoryMetadata;
+
+    function mintCredits(address generator, uint256 category,
+        uint256 amountGrams, bytes32 verificationProof
+    ) external onlyRole(MINTER_ROLE) {
+        _mint(generator, category, amountGrams, "");
+        categoryMetadata[category].totalMinted += amountGrams;
+        emit CreditMinted(generator, category, amountGrams, verificationProof);
+    }
+
+    function retireCredits(uint256 category, uint256 amountGrams,
+        string calldata reason) external {
+        _burn(msg.sender, category, amountGrams);
+        categoryMetadata[category].totalRetired += amountGrams;
+        emit CreditRetired(msg.sender, category, amountGrams, reason);
+    }
+}</code></pre>
+
+    <h2>Fractional Credit Management</h2>
+
+    <p>Managing credits at the gram level requires sophisticated systems for aggregation and pooling:</p>
+
+    <pre><code>// Credit Pool Management
+interface CreditPool {
+    poolId: string;
+    category: ActionCategory;
+    totalCredits: number;
+    participants: PoolParticipant[];
+    lockPeriod: number;
+}
+
+class CreditPoolManager {
+    async contributeToPool(poolId: string, address: string, amount: number) {
+        const pool = this.pools.get(poolId);
+        await this.transferCreditsToPool(address, poolId, amount);
+        const newTotal = pool.totalCredits + amount;
+        pool.participants.forEach(p => p.sharePercentage = p.contribution / newTotal);
+        pool.totalCredits = newTotal;
+    }
+}</code></pre>
+
+    <h2>Layer 2 Scaling Solutions</h2>
+
+    <p>To handle the high volume of micro-transactions efficiently, the architecture incorporates Layer 2 scaling solutions:</p>
+
+    <div class="highlight">
+        <strong>Scaling Strategy:</strong> Micro credit generation and transfers occur on Layer 2 for speed and low cost. Periodic settlement and retirement events are anchored to Layer 1 for security.
+    </div>
+
+    <table>
+        <tr>
+            <th>Operation</th>
+            <th>Layer</th>
+            <th>Typical Cost</th>
+            <th>Finality</th>
+        </tr>
+        <tr>
+            <td>Credit Generation</td>
+            <td>Layer 2</td>
+            <td>&lt; $0.001</td>
+            <td>Instant</td>
+        </tr>
+        <tr>
+            <td>Credit Transfer</td>
+            <td>Layer 2</td>
+            <td>&lt; $0.001</td>
+            <td>Instant</td>
+        </tr>
+        <tr>
+            <td>Pool Contribution</td>
+            <td>Layer 2</td>
+            <td>&lt; $0.005</td>
+            <td>Instant</td>
+        </tr>
+        <tr>
+            <td>Credit Retirement</td>
+            <td>Layer 1</td>
+            <td>$0.05 - $0.50</td>
+            <td>1-5 minutes</td>
+        </tr>
+        <tr>
+            <td>Cross-chain Bridge</td>
+            <td>Layer 1</td>
+            <td>$0.10 - $1.00</td>
+            <td>5-30 minutes</td>
+        </tr>
+    </table>
+
+    <h2>Oracle Network Architecture</h2>
+
+    <p>Verification oracles bridge the physical world with the blockchain:</p>
+
+    <pre><code>// Oracle Network Implementation
+class OracleNetwork {
+    async submitVerificationRequest(actionData: ActionData): Promise&lt;string&gt; {
+        const request = {
+            requestId: generateRequestId(),
+            actionData,
+            requiredConfirmations: this.calculateRequiredConfirmations(actionData),
+            status: 'pending'
+        };
+        const selectedOracles = this.selectOracles(actionData.category);
+        await this.broadcastRequest(request, selectedOracles);
+        return request.requestId;
+    }
+
+    private selectOracles(category: ActionCategory): VerificationOracle[] {
+        return Array.from(this.oracles.values())
+            .filter(o => o.specializations.includes(category) && o.reputation >= 70)
+            .sort((a, b) => b.reputation - a.reputation);
+    }
+}</code></pre>
+
+    <h2>Data Storage Architecture</h2>
+
+    <p>The system uses hybrid storage: on-chain for ownership/transfers, IPFS for proofs, PostgreSQL for analytics, Redis for caching.</p>
+
+    <pre><code>// Hybrid Storage Manager
+class HybridStorageManager {
+    async storeCredit(credit: MicroCarbonCredit): Promise&lt;StorageResult&gt; {
+        const proofCid = await this.ipfs.add({ verification: credit.verification });
+        const txHash = await this.blockchain.mintCredit({
+            generator: credit.generator, amount: credit.amount,
+            category: credit.action.category, proofHash: proofCid
+        });
+        await this.postgres.query(`INSERT INTO credits VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [credit.id, credit.generator, credit.amount, credit.action.category, txHash]);
+        await this.redis.hincrby(`balance:${credit.generator}`, credit.action.category, credit.amount);
+        return { creditId: credit.id, txHash, proofCid };
+    }
+}</code></pre>
+
+    <h2>Summary</h2>
+
+    <p>The WIA-CARBON_CREDIT_MICRO architecture provides a robust, scalable foundation for managing billions of micro carbon credits. By leveraging blockchain for trust and transparency, Layer 2 solutions for scalability, oracle networks for verification, and hybrid storage for efficiency, the system can accommodate individual climate actions at a global scale while maintaining the integrity essential for carbon credit markets.</p>
+
+</body>
+</html>

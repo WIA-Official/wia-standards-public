@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Flight Operations | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Flight Operations</h1>
+
+    <p>Effective flight operations are critical for safe, efficient, and legally compliant agricultural drone missions. This chapter covers mission planning, autonomous navigation, safety protocols, and operational best practices. Understanding these procedures ensures consistent data quality, regulatory compliance, and safe operations in agricultural environments where obstacles, weather, and field conditions present unique challenges.</p>
+
+    <h2>4.1 Mission Planning Fundamentals</h2>
+
+    <pre>
+// Mission Planning Data Structure
+interface MissionPlan {
+  // Mission Identity
+  id: string;
+  name: string;
+  type: 'survey' | 'spray' | 'mapping' | 'inspection';
+  createdAt: ISO8601DateTime;
+  scheduledFor?: ISO8601DateTime;
+
+  // Field Information
+  field: {
+    id: string;
+    boundary: GeoJSON.Polygon;
+    area: number;                // hectares
+    obstacles: Obstacle[];
+    noFlyZones?: GeoJSON.Polygon[];
+  };
+
+  // Flight Parameters
+  flightParams: {
+    altitude: number;            // meters AGL
+    speed: number;               // m/s
+    pattern: 'grid' | 'crosshatch' | 'contour' | 'perimeter';
+    heading: number | 'auto';    // degrees or sun angle optimization
+    overlap: {
+      front: number;             // percent
+      side: number;              // percent
+    };
+    turnaroundMode: 'bank' | 'stop_and_turn' | 'curved';
+  };
+
+  // Sensor Configuration
+  sensorConfig: {
+    cameraModel: string;
+    triggerMode: 'distance' | 'time' | 'overlap';
+    triggerInterval: number;
+    exposureSettings: 'auto' | ExposureSettings;
+  };
+
+  // Safety Parameters
+  safety: {
+    minAltitude: number;
+    maxAltitude: number;
+    geofence: GeoJSON.Polygon;
+    rthAltitude: number;
+    lowBatteryAction: 'land' | 'rth' | 'continue';
+    signalLossAction: 'hover' | 'land' | 'rth' | 'continue';
+  };
+
+  // Computed Values
+  computed: {
+    estimatedDuration: number;   // minutes
+    estimatedImages: number;
+    batteryFlights: number;
+    gsd: number;                 // cm/pixel
+  };
+}
+    </pre>
+
+    <h2>4.2 Flight Patterns</h2>
+
+    <table>
+        <tr>
+            <th>Pattern</th>
+            <th>Description</th>
+            <th>Best For</th>
+            <th>Considerations</th>
+        </tr>
+        <tr>
+            <td>Grid (Lawn Mower)</td>
+            <td>Parallel lines, single direction</td>
+            <td>Flat terrain, basic mapping</td>
+            <td>Efficient, may miss 3D features</td>
+        </tr>
+        <tr>
+            <td>Crosshatch (Double Grid)</td>
+            <td>Two perpendicular grids</td>
+            <td>3D modeling, tall crops</td>
+            <td>Double flight time, better coverage</td>
+        </tr>
+        <tr>
+            <td>Contour</td>
+            <td>Follow terrain elevation</td>
+            <td>Hilly terrain</td>
+            <td>Consistent GSD, complex planning</td>
+        </tr>
+        <tr>
+            <td>Orbital</td>
+            <td>Circles around point of interest</td>
+            <td>Single tree, structure inspection</td>
+            <td>Limited area coverage</td>
+        </tr>
+        <tr>
+            <td>Perimeter</td>
+            <td>Follow field boundary</td>
+            <td>Boundary mapping, fencing</td>
+            <td>Quick overview, no interior coverage</td>
+        </tr>
+    </table>
+
+    <h2>4.3 Autonomous Navigation</h2>
+
+    <pre>
+// Autonomous Navigation System
+interface AutonomousNavigation {
+  // Waypoint Navigation
+  waypoints: {
+    position: { lat: number; lng: number; alt: number };
+    speed: number;
+    action?: WaypointAction;
+    radius: number;              // Acceptance radius
+  }[];
+
+  // Path Planning
+  pathPlanning: {
+    algorithm: 'shortest_path' | 'coverage' | 'terrain_following';
+    obstacleAvoidance: boolean;
+    terrainFollowing: {
+      enabled: boolean;
+      source: 'dem' | 'lidar' | 'barometer';
+      minClearance: number;      // meters
+    };
+  };
+
+  // Positioning
+  positioning: {
+    gnss: {
+      mode: 'standalone' | 'dgps' | 'rtk' | 'ppk';
+      accuracy: number;          // meters
+      constellations: string[];
+    };
+    visionPositioning: boolean;
+    terrainMatching: boolean;
+  };
+
+  // State Machine
+  flightState: 'idle' | 'preflight' | 'takeoff' | 'mission' |
+               'rth' | 'landing' | 'emergency';
+
+  // Mission Execution
+  missionExecution: {
+    currentWaypoint: number;
+    progress: number;            // percent
+    distanceTraveled: number;    // meters
+    estimatedRemaining: number;  // minutes
+  };
+}
+
+// Waypoint Actions
+type WaypointAction =
+  | { type: 'capture'; count: number }
+  | { type: 'hover'; duration: number }
+  | { type: 'speed_change'; speed: number }
+  | { type: 'gimbal'; pitch: number; yaw: number }
+  | { type: 'spray'; rate: number }
+  | { type: 'custom'; command: string };
+    </pre>
+
+    <h2>4.4 Pre-Flight Procedures</h2>
+
+    <div class="highlight">
+        <h3>Pre-Flight Checklist</h3>
+        <ul>
+            <li><strong>Regulatory:</strong> Airspace clearance, permits, notifications</li>
+            <li><strong>Weather:</strong> Wind speed, precipitation, visibility, temperature</li>
+            <li><strong>Aircraft:</strong> Structural integrity, propellers, batteries charged</li>
+            <li><strong>Sensors:</strong> Calibration, memory cards, lens cleaning</li>
+            <li><strong>Software:</strong> Firmware current, mission uploaded, geofence set</li>
+            <li><strong>Site:</strong> Obstacles identified, takeoff/landing zone clear</li>
+            <li><strong>Emergency:</strong> RTH point set, emergency procedures reviewed</li>
+        </ul>
+    </div>
+
+    <pre>
+// Pre-Flight Check API
+interface PreFlightCheck {
+  // System Checks
+  aircraft: {
+    batteryLevel: { value: number; status: 'ok' | 'low' | 'critical' };
+    batteryHealth: { value: number; status: 'ok' | 'degraded' };
+    motorsCheck: { status: 'ok' | 'warning' | 'fail' }[];
+    propellerCheck: boolean;
+    compassCalibration: { status: 'ok' | 'needed' };
+    imuCalibration: { status: 'ok' | 'needed' };
+    gnssLock: { satellites: number; accuracy: number };
+    storage: { available: number; required: number };
+  };
+
+  // Environmental Checks
+  environment: {
+    windSpeed: { value: number; limit: number; status: 'ok' | 'warning' | 'no_fly' };
+    temperature: { value: number; status: 'ok' | 'warning' };
+    precipitation: { detected: boolean };
+    visibility: { km: number; status: 'ok' | 'reduced' };
+    magneticInterference: { status: 'ok' | 'warning' | 'high' };
+  };
+
+  // Airspace Checks
+  airspace: {
+    classification: string;
+    restrictions: string[];
+    authorizationRequired: boolean;
+    authorizationStatus?: 'approved' | 'pending' | 'denied';
+    notams: NOTAM[];
+  };
+
+  // Mission Validation
+  mission: {
+    loaded: boolean;
+    validated: boolean;
+    warnings: string[];
+    estimatedDuration: number;
+    batteryFlights: number;
+  };
+
+  // Overall Status
+  overallStatus: 'go' | 'caution' | 'no_go';
+  blockers: string[];
+}
+    </pre>
+
+    <h2>4.5 In-Flight Monitoring</h2>
+
+    <pre>
+// Real-Time Flight Telemetry
+interface FlightTelemetry {
+  // Position
+  position: {
+    latitude: number;
+    longitude: number;
+    altitudeMSL: number;
+    altitudeAGL: number;
+    accuracy: number;
+  };
+
+  // Attitude
+  attitude: {
+    roll: number;                // degrees
+    pitch: number;
+    yaw: number;                 // heading
+    velocityN: number;           // m/s
+    velocityE: number;
+    velocityD: number;
+  };
+
+  // Aircraft Status
+  aircraft: {
+    batteryPercent: number;
+    batteryVoltage: number;
+    batteryCurrent: number;
+    estimatedFlightTime: number; // seconds
+    motorRPM: number[];
+    temperature: number;
+  };
+
+  // Communication
+  communication: {
+    signalStrength: number;      // percent
+    latency: number;             // ms
+    dataLinkStatus: 'connected' | 'weak' | 'lost';
+    videoLinkStatus: 'connected' | 'weak' | 'lost';
+  };
+
+  // Mission Progress
+  mission: {
+    currentWaypoint: number;
+    totalWaypoints: number;
+    distanceToWaypoint: number;
+    progress: number;            // percent
+    imagesCapture: number;
+  };
+
+  // Alerts
+  alerts: {
+    level: 'info' | 'warning' | 'critical';
+    message: string;
+    timestamp: ISO8601DateTime;
+  }[];
+}
+    </pre>
+
+    <h2>4.6 Safety Protocols</h2>
+
+    <pre>
+// Safety Protocol Configuration
+interface SafetyProtocols {
+  // Geofencing
+  geofencing: {
+    softGeofence: {
+      boundary: GeoJSON.Polygon;
+      action: 'alert' | 'brake';
+    };
+    hardGeofence: {
+      boundary: GeoJSON.Polygon;
+      action: 'brake' | 'rth' | 'land';
+    };
+    maxAltitude: number;
+    maxDistance: number;
+  };
+
+  // Return to Home
+  returnToHome: {
+    altitude: number;
+    speed: number;
+    triggers: [
+      'low_battery',
+      'signal_loss',
+      'geofence_breach',
+      'pilot_command'
+    ];
+    lowBatteryThreshold: number;
+    signalLossDelay: number;     // seconds before RTH
+  };
+
+  // Emergency Procedures
+  emergency: {
+    motorFailure: {
+      detection: 'rpm_monitoring';
+      response: 'controlled_descent' | 'emergency_land';
+    };
+    gpsLoss: {
+      detection: 'satellite_count';
+      response: 'hold_position' | 'atti_mode' | 'land';
+    };
+    lowBattery: {
+      warningLevel: number;
+      criticalLevel: number;
+      response: 'rth' | 'land_immediately';
+    };
+  };
+
+  // Obstacle Avoidance
+  obstacleAvoidance: {
+    enabled: boolean;
+    sensors: ('forward' | 'backward' | 'lateral' | 'upward' | 'downward')[];
+    minDistance: number;
+    response: 'stop' | 'avoid' | 'climb';
+  };
+}
+    </pre>
+
+    <h2>4.7 Battery Management</h2>
+
+    <table>
+        <tr>
+            <th>Battery Level</th>
+            <th>Status</th>
+            <th>Recommended Action</th>
+        </tr>
+        <tr>
+            <td>100% - 50%</td>
+            <td>Normal</td>
+            <td>Continue mission</td>
+        </tr>
+        <tr>
+            <td>50% - 30%</td>
+            <td>Planning</td>
+            <td>Plan RTH, complete current segment</td>
+        </tr>
+        <tr>
+            <td>30% - 20%</td>
+            <td>Warning</td>
+            <td>Initiate RTH</td>
+        </tr>
+        <tr>
+            <td>20% - 10%</td>
+            <td>Critical</td>
+            <td>Priority RTH, altitude reduction</td>
+        </tr>
+        <tr>
+            <td>Below 10%</td>
+            <td>Emergency</td>
+            <td>Immediate landing</td>
+        </tr>
+    </table>
+
+    <h2>4.8 Post-Flight Procedures</h2>
+
+    <div class="highlight">
+        <h3>Post-Flight Checklist</h3>
+        <ul>
+            <li><strong>Data Verification:</strong> Confirm images captured, check quality samples</li>
+            <li><strong>Data Download:</strong> Transfer images, flight logs, telemetry</li>
+            <li><strong>Battery Care:</strong> Cool down, storage charge if not flying again</li>
+            <li><strong>Aircraft Inspection:</strong> Check for damage, clean sensors and propellers</li>
+            <li><strong>Flight Log:</strong> Record flight details, issues, observations</li>
+            <li><strong>Maintenance:</strong> Track flight time, schedule maintenance</li>
+        </ul>
+    </div>
+
+    <pre>
+// Flight Log Record
+interface FlightLog {
+  flightId: string;
+  droneId: string;
+  pilotId: string;
+  missionId: string;
+
+  // Timing
+  timing: {
+    startTime: ISO8601DateTime;
+    endTime: ISO8601DateTime;
+    airTime: number;             // minutes
+    totalTime: number;           // including prep
+  };
+
+  // Location
+  location: {
+    takeoffPoint: GeoJSON.Point;
+    landingPoint: GeoJSON.Point;
+    operatingArea: GeoJSON.Polygon;
+    maxAltitude: number;
+    maxDistance: number;
+  };
+
+  // Performance
+  performance: {
+    batteryStart: number;
+    batteryEnd: number;
+    imagesCapture: number;
+    areaCovered: number;         // hectares
+    flightDistance: number;      // meters
+  };
+
+  // Conditions
+  conditions: {
+    weather: string;
+    windSpeed: number;
+    temperature: number;
+    visibility: string;
+  };
+
+  // Issues
+  issues: {
+    alerts: string[];
+    anomalies: string[];
+    maintenance: string[];
+  };
+
+  // Sign-off
+  pilotSignoff: boolean;
+  notes: string;
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>This chapter covered flight operations including mission planning, autonomous navigation, pre-flight and post-flight procedures, safety protocols, and battery management. Following these operational standards ensures safe, efficient, and legally compliant agricultural drone missions as specified by the WIA-AGRICULTURAL_DRONE standard.</p>
+    </div>
+</body>
+</html>

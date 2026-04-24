@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 사이버보안 프레임워크 | WIA-AUTO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        .highlight { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border); font-family: 'Consolas', monospace; font-size: 0.9rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: #1e3a5f; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>제6장: 사이버보안 프레임워크</h1>
+
+    <div class="highlight">
+        <p>자율주행차가 점점 더 연결되고 소프트웨어 정의가 됨에 따라, 사이버보안은 차량 안전에 필수적이 됩니다. 이 장에서는 전체 수명주기에 걸쳐 자율주행차를 사이버 위협으로부터 보호하기 위한 WIA-AUTO 요구사항을 수립합니다.</p>
+    </div>
+
+    <h2>6.1 사이버보안 현황</h2>
+    <pre>
+자율주행차 공격 표면
+=====================
+외부 인터페이스:
+├── V2X 통신 (DSRC/C-V2X)
+├── 셀룰러 연결 (4G/5G)
+├── Wi-Fi (업데이트, 진단용)
+├── 블루투스 (폰 연결)
+├── GPS/GNSS 신호
+├── 물리적 포트 (OBD-II, USB, 디버그)
+└── 센서 입력 (카메라, LiDAR 스푸핑)
+
+내부 시스템:
+├── 인포테인먼트 시스템
+├── 텔레매틱스 제어 유닛
+├── 바디 제어 모듈
+├── 자율주행 컴퓨터
+├── V2X 온보드 유닛
+├── 게이트웨이/방화벽
+└── 안전 중요 ECU
+    </pre>
+
+    <h2>6.2 위협 모델링</h2>
+    <table>
+        <tr><th>위협 카테고리</th><th>공격 예시</th><th>잠재적 영향</th></tr>
+        <tr><td>스푸핑</td><td>GPS 스푸핑, V2X 메시지 위조</td><td>잘못된 방향, 거짓 장애물</td></tr>
+        <tr><td>변조</td><td>펌웨어 수정, CAN 주입</td><td>시스템 오작동</td></tr>
+        <tr><td>부인</td><td>로그 조작, 이벤트 삭제</td><td>조사 방해</td></tr>
+        <tr><td>정보 유출</td><td>위치 추적, 데이터 도난</td><td>프라이버시 침해</td></tr>
+        <tr><td>서비스 거부</td><td>네트워크 플러딩, 리소스 고갈</td><td>시스템 불가용</td></tr>
+        <tr><td>권한 상승</td><td>취약점 악용</td><td>전체 시스템 침해</td></tr>
+    </table>
+
+    <h2>6.3 보안 아키텍처</h2>
+    <pre>
+보안 아키텍처 레이어
+====================
+┌─────────────────────────────────────────────────────────────┐
+│                   외부 경계                                  │
+│    방화벽, IDS/IPS, 프로토콜 검증                           │
+├─────────────────────────────────────────────────────────────┤
+│                   네트워크 분리                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
+│  │ 인포테인먼트 │  │  텔레매틱스   │  │   안전 도메인    │  │
+│  │   도메인     │  │   도메인     │  │  (ADS, 브레이크) │  │
+│  │  (낮은 신뢰) │  │   (중간)     │  │  (높은 신뢰)    │  │
+│  └──────────────┘  └──────────────┘  └──────────────────┘  │
+│         │                │                    │             │
+│         └────────────────┼────────────────────┘             │
+│                          ▼                                  │
+│              ┌─────────────────────┐                       │
+│              │    중앙 게이트웨이   │                       │
+│              └─────────────────────┘                       │
+├─────────────────────────────────────────────────────────────┤
+│                   ECU 하드닝                                 │
+│    보안 부팅, 런타임 무결성, 메모리 보호                    │
+├─────────────────────────────────────────────────────────────┤
+│                   암호화 기반                                │
+│    HSM, 키 관리, 인증된 암호화                              │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>6.4 보안 부팅 및 런타임 무결성</h2>
+    <pre>
+보안 부팅 체인
+===============
+단계 1: 하드웨어 신뢰 루트
+   └── 불변 부팅 ROM
+   └── 하드코딩된 루트 공개키 해시
+
+단계 2: 1단계 부트로더
+   └── 2단계 서명 검증
+   └── HSM을 사용한 암호화 검증
+
+단계 3: 2단계 부트로더
+   └── 커널/OS 서명 검증
+   └── 검증된 운영 체제 로드
+
+단계 4: 운영 체제
+   └── 애플리케이션 서명 검증
+   └── 검증된 애플리케이션 시작
+
+단계 5: 애플리케이션 런타임
+   └── 지속적인 무결성 모니터링
+   └── 코드 서명 검증
+
+모든 단계 실패 → 안전 복구 모드로 부팅
+    </pre>
+
+    <h2>6.5 네트워크 보안</h2>
+    <div class="highlight">
+        <h3>CAN 버스 보안 조치</h3>
+        <ul>
+            <li><strong>메시지 인증 코드:</strong> 중요 CAN 메시지에 MAC 추가</li>
+            <li><strong>게이트웨이 필터링:</strong> 경계에서 승인되지 않은 메시지 ID 차단</li>
+            <li><strong>침입 탐지:</strong> 비정상적인 메시지 패턴 모니터링</li>
+            <li><strong>암호화:</strong> 대역폭이 허용하는 경우 민감한 데이터 암호화</li>
+        </ul>
+    </div>
+
+    <h2>6.6 OTA 업데이트 보안</h2>
+    <pre>
+안전한 OTA 업데이트 프로세스
+============================
+1. 업데이트 패키지 생성
+   └── 제조업체 개인키로 서명
+   └── 버전 메타데이터 포함
+   └── 민감한 콘텐츠 암호화
+
+2. 안전한 배포
+   └── 인증된 HTTPS 서버
+   └── 인증서 피닝
+   └── 무결성 검증
+
+3. 차량 측 검증
+   └── 서명 검증
+   └── 버전 확인 (롤백 방지)
+   └── 호환성 검증
+
+4. 안전한 설치
+   └── A/B 파티션 체계
+   └── 설치 후 검증
+   └── 실패 시 자동 롤백
+    </pre>
+
+    <h2>6.7 사고 대응</h2>
+    <table>
+        <tr><th>단계</th><th>활동</th><th>요구사항</th></tr>
+        <tr><td>준비</td><td>대응팀 구성, 도구</td><td>24/7 SOC 역량</td></tr>
+        <tr><td>탐지</td><td>보안 이벤트 식별</td><td>1시간 미만 탐지</td></tr>
+        <tr><td>봉쇄</td><td>확산 제한, 증거 보존</td><td>원격 비활성화 기능</td></tr>
+        <tr><td>제거</td><td>위협 제거, 취약점 패치</td><td>빠른 OTA 배포</td></tr>
+        <tr><td>복구</td><td>정상 운영 복원</td><td>검증된 깨끗한 상태</td></tr>
+        <tr><td>교훈</td><td>분석, 방어 개선</td><td>사고 후 보고서</td></tr>
+    </table>
+
+    <h2>6.8 프라이버시 보호</h2>
+    <ul>
+        <li><strong>데이터 최소화:</strong> 필요한 데이터만 수집</li>
+        <li><strong>목적 제한:</strong> 명시된 목적으로만 데이터 사용</li>
+        <li><strong>익명화:</strong> 식별 정보 제거</li>
+        <li><strong>사용자 제어:</strong> 투명성과 제어 제공</li>
+        <li><strong>안전한 저장:</strong> 저장 및 전송 중 개인 데이터 암호화</li>
+    </ul>
+
+    <p style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: #94a3b8; font-size: 0.9rem;">
+        © 2025 World Industry Association (WIA). 弘益人間 - 널리 인간을 이롭게 하라
+    </p>
+</body>
+</html>

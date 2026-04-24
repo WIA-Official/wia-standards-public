@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Integration | WIA-CI</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Integration and Deployment Targets</h1>
+
+    <p>Modern CI/CD systems don't exist in isolation. They integrate with version control systems, container registries, cloud platforms, and numerous third-party services. This chapter explores how to build robust integrations that enable seamless software delivery across diverse deployment targets.</p>
+
+    <h2>Version Control System Integration</h2>
+
+    <p>VCS integration is the foundation of CI/CD. The pipeline must respond to code changes, branch events, and pull requests with appropriate actions.</p>
+
+    <h3>Git Hooks for Pre-Commit Validation</h3>
+
+    <pre><code># .husky/pre-commit - Client-side validation
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Lint staged files only
+npx lint-staged
+
+# Type check
+npm run type-check
+
+# Run affected tests
+npm test -- --onlyChanged --passWithNoTests</code></pre>
+
+    <pre><code>// package.json - lint-staged configuration
+{
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml}": [
+      "prettier --write"
+    ],
+    "*.{css,scss}": [
+      "stylelint --fix",
+      "prettier --write"
+    ]
+  }
+}</code></pre>
+
+    <h3>Webhook Configuration</h3>
+
+    <pre><code># GitHub Webhook Events for CI Triggers
+Webhook Events:
+├── push                    # Trigger builds on push
+├── pull_request
+│   ├── opened             # New PR created
+│   ├── synchronize        # PR updated with new commits
+│   ├── reopened           # PR reopened
+│   └── closed             # PR merged or closed
+├── release
+│   ├── published          # New release published
+│   └── created            # Release created
+├── workflow_dispatch      # Manual trigger
+└── schedule               # Cron-based triggers</code></pre>
+
+    <pre><code># GitHub Actions - Comprehensive Event Handling
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+    types: [opened, synchronize, reopened]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options: [development, staging, production]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npm run build
+
+  deploy:
+    needs: build
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - run: echo "Deploying to ${{ github.event.inputs.environment }}"</code></pre>
+
+    <div class="highlight">
+        <strong>Branch Protection Rules:</strong> Configure branch protection to require CI checks to pass before merging. This prevents broken code from entering main branches and enforces quality standards across the team.
+    </div>
+
+    <h2>Container Registry Integration</h2>
+
+    <p>Container registries store and distribute Docker images. Integrating with registries enables consistent deployments across environments.</p>
+
+    <h3>Multi-Registry Push Strategy</h3>
+
+    <pre><code># GitHub Actions - Multi-Registry Push
+name: Build and Push Container
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+env:
+  IMAGE_NAME: wia-ci-app
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to multiple registries
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to AWS ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Build and push to all registries
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max</code></pre>
+
+    <h2>Cloud Platform Deployments</h2>
+
+    <h3>Kubernetes Deployment</h3>
+
+    <pre><code># GitHub Actions - Kubernetes Deployment
+name: Deploy to Kubernetes
+on:
+  workflow_run:
+    workflows: ["Build and Push Container"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name production-cluster
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Update image tag in deployment
+          kubectl set image deployment/wia-ci-app \
+            wia-ci-app=${{ secrets.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -n production
+
+          # Wait for rollout
+          kubectl rollout status deployment/wia-ci-app -n production --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n production -l app=wia-ci-app
+          kubectl get services -n production -l app=wia-ci-app</code></pre>
+
+    <h3>Serverless Deployment</h3>
+
+    <pre><code># GitHub Actions - AWS Lambda Deployment
+name: Deploy Lambda Function
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Build function
+        run: npm run build
+        working-directory: functions
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy with Serverless Framework
+        run: npx serverless deploy --stage production
+        working-directory: functions
+        env:
+          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}</code></pre>
+
+    <h3>Platform-as-a-Service Deployment</h3>
+
+    <pre><code># GitHub Actions - Vercel Deployment
+name: Deploy to Vercel
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          # Preview for PRs, production for main
+          vercel-args: ${{ github.event_name == 'push' && '--prod' || '' }}
+
+      - name: Comment PR with preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Preview deployed to: ${{ steps.deploy.outputs.preview-url }}`
+            })</code></pre>
+
+    <div class="highlight">
+        <strong>Deployment Strategy Selection:</strong>
+        <ul>
+            <li><strong>Rolling:</strong> Gradual replacement, good for stateless apps</li>
+            <li><strong>Blue-Green:</strong> Instant cutover, easy rollback</li>
+            <li><strong>Canary:</strong> Risk mitigation, gradual traffic shift</li>
+            <li><strong>Feature Flags:</strong> Decouple deployment from release</li>
+        </ul>
+    </div>
+
+    <h2>Infrastructure as Code Integration</h2>
+
+    <pre><code># GitHub Actions - Terraform Integration
+name: Infrastructure Deployment
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+  pull_request:
+    paths:
+      - 'terraform/**'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Comment PR with plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = `${{ steps.plan.outputs.stdout }}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Terraform Plan\n\`\`\`\n${plan}\n\`\`\``
+            });
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan</code></pre>
+
+    <h2>Third-Party Service Integration</h2>
+
+    <h3>Notification Systems</h3>
+
+    <pre><code># GitHub Actions - Multi-Channel Notifications
+name: Build Notifications
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types: [completed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      # Slack notification
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ github.event.workflow_run.conclusion }}
+          channel: '#deployments'
+          fields: repo,message,commit,author,action,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      # Microsoft Teams notification
+      - name: Notify Teams
+        uses: jdcargile/ms-teams-notification@v1.4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK }}
+          notification-summary: "Build ${{ github.event.workflow_run.conclusion }}"
+
+      # Discord notification
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ github.event.workflow_run.conclusion }}</code></pre>
+
+    <h3>Issue Tracking Integration</h3>
+
+    <pre><code># GitHub Actions - Jira Integration
+name: Jira Integration
+on:
+  pull_request:
+    types: [opened, closed]
+
+jobs:
+  jira:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Jira
+        uses: atlassian/gajira-login@v3
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+      - name: Extract Jira issue key
+        id: jira-key
+        run: |
+          KEY=$(echo "${{ github.head_ref }}" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+          echo "key=$KEY" >> $GITHUB_OUTPUT
+
+      - name: Transition issue to In Review
+        if: github.event.action == 'opened' && steps.jira-key.outputs.key
+        uses: atlassian/gajira-transition@v3
+        with:
+          issue: ${{ steps.jira-key.outputs.key }}
+          transition: "In Review"
+
+      - name: Transition issue to Done
+        if: github.event.pull_request.merged && steps.jira-key.outputs.key
+        uses: atlassian/gajira-transition@v3
+        with:
+          issue: ${{ steps.jira-key.outputs.key }}
+          transition: "Done"</code></pre>
+
+    <h2>API and Webhook Best Practices</h2>
+
+    <table>
+        <tr>
+            <th>Practice</th>
+            <th>Description</th>
+            <th>Implementation</th>
+        </tr>
+        <tr>
+            <td>Idempotency</td>
+            <td>Handle duplicate webhook deliveries</td>
+            <td>Track processed event IDs</td>
+        </tr>
+        <tr>
+            <td>Signature Verification</td>
+            <td>Validate webhook authenticity</td>
+            <td>HMAC signature checking</td>
+        </tr>
+        <tr>
+            <td>Retry Logic</td>
+            <td>Handle transient failures</td>
+            <td>Exponential backoff</td>
+        </tr>
+        <tr>
+            <td>Rate Limiting</td>
+            <td>Respect API limits</td>
+            <td>Token bucket, queuing</td>
+        </tr>
+        <tr>
+            <td>Timeout Handling</td>
+            <td>Prevent hanging requests</td>
+            <td>Configurable timeouts</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>WIA-CI Integration Maturity:</strong>
+        <ul>
+            <li>Level 1: Basic VCS triggers, single deployment target</li>
+            <li>Level 2: Container registry integration, IaC deployment</li>
+            <li>Level 3: Multi-cloud deployment, feature flag integration</li>
+            <li>Level 4: GitOps, policy as code, full observability</li>
+        </ul>
+    </div>
+
+    <p>Robust integrations transform CI/CD from isolated automation into a connected ecosystem that streamlines the entire software delivery lifecycle. The patterns and practices in this chapter enable you to build flexible, maintainable integration architectures.</p>
+
+</body>
+</html>

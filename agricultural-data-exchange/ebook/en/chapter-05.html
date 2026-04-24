@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Supply Chain Integration | WIA-AGRICULTURAL_DATA_EXCHANGE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Supply Chain Integration</h1>
+
+    <p>Agricultural supply chains connect farms to consumers through complex networks of aggregators, processors, distributors, and retailers. This chapter covers traceability systems, quality and certification data, market connectivity, and the logistics integration that enable transparent, efficient food supply chains. Data exchange standards are essential for farm-to-fork visibility.</p>
+
+    <h2>5.1 Traceability Fundamentals</h2>
+
+    <div class="highlight">
+        <h3>Why Traceability Matters</h3>
+        <ul>
+            <li><strong>Food Safety:</strong> Rapid recall response, contamination tracking</li>
+            <li><strong>Consumer Trust:</strong> Origin verification, production practices</li>
+            <li><strong>Regulatory Compliance:</strong> FSMA, EU regulations, export requirements</li>
+            <li><strong>Premium Markets:</strong> Organic, non-GMO, sustainable certifications</li>
+            <li><strong>Supply Chain Efficiency:</strong> Inventory management, waste reduction</li>
+        </ul>
+    </div>
+
+    <pre>
+// Traceability Event Model (based on GS1 EPCIS)
+interface TraceabilityEvent {
+  eventId: string;
+  eventType: 'ObjectEvent' | 'AggregationEvent' |
+             'TransactionEvent' | 'TransformationEvent';
+  eventTime: ISO8601DateTime;
+  recordTime: ISO8601DateTime;
+  eventTimeZoneOffset: string;
+
+  // What
+  epcList?: string[];            // Electronic Product Codes
+  quantityList?: {
+    epcClass: string;
+    quantity: number;
+    uom: string;
+  }[];
+
+  // When
+  eventTime: ISO8601DateTime;
+
+  // Where
+  readPoint: string;             // URN of location
+  bizLocation?: string;          // Business location
+
+  // Why
+  bizStep: string;               // e.g., 'shipping', 'receiving', 'storing'
+  disposition?: string;          // e.g., 'in_transit', 'in_progress'
+  bizTransactionList?: {
+    type: string;                // 'po', 'inv', 'bol'
+    bizTransaction: string;
+  }[];
+
+  // Extensions
+  sourceList?: Source[];
+  destinationList?: Destination[];
+  sensorElementList?: SensorElement[];  // Temperature, humidity
+}
+
+// Example: Shipping Event
+const shippingEvent: TraceabilityEvent = {
+  eventId: 'evt-2025-ship-001',
+  eventType: 'ObjectEvent',
+  eventTime: '2025-06-15T08:00:00-05:00',
+  recordTime: '2025-06-15T08:00:05-05:00',
+  eventTimeZoneOffset: '-05:00',
+  epcList: ['urn:epc:id:sscc:0614141.1234567890'],
+  readPoint: 'urn:epc:id:sgln:0614141.12345.0',
+  bizLocation: 'urn:epc:id:sgln:0614141.12345.0',
+  bizStep: 'urn:epcglobal:cbv:bizstep:shipping',
+  disposition: 'urn:epcglobal:cbv:disp:in_transit'
+};
+    </pre>
+
+    <h2>5.2 Product Identification</h2>
+
+    <pre>
+// GS1 Identification Standards for Agriculture
+interface ProductIdentification {
+  // Global Trade Item Number
+  gtin: {
+    format: 'GTIN-14' | 'GTIN-13' | 'GTIN-12';
+    value: string;
+    description: 'Unique product identifier';
+  };
+
+  // Global Location Number
+  gln: {
+    format: '13-digit';
+    value: string;
+    description: 'Identifies parties and locations';
+  };
+
+  // Serial Shipping Container Code
+  sscc: {
+    format: '18-digit';
+    value: string;
+    description: 'Unique logistics unit identifier';
+  };
+
+  // Lot/Batch Number
+  lot: {
+    ai: '10';                    // GS1 Application Identifier
+    value: string;
+    description: 'Production batch identifier';
+  };
+
+  // Harvest Date
+  harvestDate: {
+    ai: '13';
+    format: 'YYMMDD';
+    value: string;
+  };
+
+  // Best Before Date
+  bestBefore: {
+    ai: '15';
+    format: 'YYMMDD';
+    value: string;
+  };
+
+  // Country of Origin
+  countryOfOrigin: {
+    ai: '422';
+    format: 'ISO 3166';
+    value: string;
+  };
+}
+
+// Data Matrix / QR Code Content
+const barcodeExample = {
+  humanReadable: '(01)00614141123452(10)LOT456(13)250615',
+  parsed: {
+    gtin: '00614141123452',
+    lot: 'LOT456',
+    harvestDate: '2025-06-15'
+  }
+};
+    </pre>
+
+    <h2>5.3 Certification Data</h2>
+
+    <table>
+        <tr>
+            <th>Certification</th>
+            <th>Scope</th>
+            <th>Data Requirements</th>
+            <th>Verification</th>
+        </tr>
+        <tr>
+            <td>USDA Organic</td>
+            <td>Production practices</td>
+            <td>Input records, land history</td>
+            <td>Annual audit</td>
+        </tr>
+        <tr>
+            <td>Non-GMO Project</td>
+            <td>Genetic modification</td>
+            <td>Seed source, testing results</td>
+            <td>Testing, chain of custody</td>
+        </tr>
+        <tr>
+            <td>GlobalG.A.P.</td>
+            <td>Good agricultural practices</td>
+            <td>Comprehensive farm records</td>
+            <td>Third-party audit</td>
+        </tr>
+        <tr>
+            <td>Fair Trade</td>
+            <td>Social/economic</td>
+            <td>Labor, pricing, community</td>
+            <td>Certification body</td>
+        </tr>
+        <tr>
+            <td>Carbon Neutral</td>
+            <td>GHG emissions</td>
+            <td>Scope 1-3 emissions data</td>
+            <td>LCA, verification</td>
+        </tr>
+    </table>
+
+    <pre>
+// Certification Record Schema
+interface CertificationRecord {
+  id: string;
+  certificationBody: {
+    name: string;
+    accreditation: string;
+    gln?: string;
+  };
+
+  // Certificate Details
+  certificate: {
+    number: string;
+    type: string;
+    scope: string[];             // Products/processes covered
+    standard: string;            // e.g., 'USDA NOP', 'GlobalG.A.P.'
+    version: string;
+  };
+
+  // Validity
+  validity: {
+    issueDate: ISO8601Date;
+    expiryDate: ISO8601Date;
+    status: 'active' | 'suspended' | 'withdrawn' | 'expired';
+  };
+
+  // Certified Entity
+  certifiedEntity: {
+    name: string;
+    gln: string;
+    locations: string[];
+  };
+
+  // Verification
+  verification: {
+    url?: string;                // Online verification portal
+    qrCode?: string;
+    blockchain?: {
+      network: string;
+      transactionId: string;
+    };
+  };
+}
+    </pre>
+
+    <h2>5.4 Quality Data Exchange</h2>
+
+    <pre>
+// Quality Assessment Record
+interface QualityRecord {
+  id: string;
+  lotId: string;
+  productGtin: string;
+
+  // Sample Information
+  sample: {
+    id: string;
+    type: 'grab' | 'composite' | 'probe';
+    size: { value: number; unit: string };
+    collectedAt: ISO8601DateTime;
+    collectedBy: string;
+    location: string;
+  };
+
+  // Test Results
+  tests: {
+    parameter: string;
+    method: string;              // Reference method
+    value: number;
+    unit: string;
+    specification: {
+      min?: number;
+      max?: number;
+      target?: number;
+    };
+    result: 'pass' | 'fail' | 'marginal';
+  }[];
+
+  // Grading
+  grade?: {
+    system: string;              // e.g., 'USDA', 'EU'
+    value: string;               // e.g., 'US No. 1', 'Grade A'
+    factors: {
+      factor: string;
+      score: number;
+    }[];
+  };
+
+  // Laboratory
+  laboratory?: {
+    name: string;
+    accreditation: string;
+    reportNumber: string;
+  };
+
+  // Overall Assessment
+  disposition: 'accepted' | 'rejected' | 'hold' | 'rework';
+  notes?: string;
+}
+
+// Grain Quality Example
+const grainQuality: QualityRecord = {
+  id: 'qc-2025-001',
+  lotId: 'LOT-2025-CORN-456',
+  productGtin: '00614141123452',
+  sample: {
+    id: 'sample-001',
+    type: 'probe',
+    size: { value: 1, unit: 'kg' },
+    collectedAt: '2025-06-15T10:00:00Z',
+    collectedBy: 'QC-Operator-1',
+    location: 'Receiving Pit A'
+  },
+  tests: [
+    { parameter: 'moisture', method: 'ASAE S352.2', value: 14.2, unit: '%',
+      specification: { max: 15.0 }, result: 'pass' },
+    { parameter: 'test_weight', method: 'USDA GIPSA', value: 56.5, unit: 'lb/bu',
+      specification: { min: 56.0 }, result: 'pass' },
+    { parameter: 'damage', method: 'visual', value: 2.1, unit: '%',
+      specification: { max: 5.0 }, result: 'pass' }
+  ],
+  grade: { system: 'USDA', value: 'US No. 2 Yellow Corn', factors: [] },
+  disposition: 'accepted'
+};
+    </pre>
+
+    <h2>5.5 Logistics Integration</h2>
+
+    <div class="highlight">
+        <h3>Transportation Data Exchange</h3>
+        <p>Agricultural logistics involves specialized requirements including temperature control, regulatory compliance for perishables, and coordination across multiple transport modes. Standard data formats enable seamless handoffs between carriers and visibility across the supply chain.</p>
+    </div>
+
+    <pre>
+// Shipment Data Model
+interface Shipment {
+  id: string;
+  type: 'FTL' | 'LTL' | 'rail' | 'container' | 'bulk_vessel';
+
+  // Parties
+  shipper: PartyInfo;
+  consignee: PartyInfo;
+  carrier: PartyInfo;
+  broker?: PartyInfo;
+
+  // Cargo
+  cargo: {
+    description: string;
+    commodityCode: string;       // Harmonized System code
+    items: {
+      sscc?: string;
+      gtin: string;
+      lot: string;
+      quantity: number;
+      unit: string;
+      weight: { value: number; unit: 'kg' };
+    }[];
+    totalWeight: { value: number; unit: 'kg' };
+    totalVolume?: { value: number; unit: 'm3' };
+  };
+
+  // Schedule
+  schedule: {
+    pickupRequested: ISO8601DateTime;
+    pickupActual?: ISO8601DateTime;
+    deliveryRequested: ISO8601DateTime;
+    deliveryActual?: ISO8601DateTime;
+    transitTime: number;         // Hours
+  };
+
+  // Conditions
+  conditions?: {
+    temperature: { min: number; max: number; unit: 'C' };
+    humidity?: { min: number; max: number };
+    specialHandling?: string[];
+  };
+
+  // Documents
+  documents: {
+    type: 'BOL' | 'POD' | 'invoice' | 'phyto' | 'customs';
+    number: string;
+    url?: string;
+  }[];
+
+  // Tracking
+  tracking: {
+    currentStatus: string;
+    currentLocation?: GeoJSON.Point;
+    events: TrackingEvent[];
+  };
+}
+
+// Tracking Event
+interface TrackingEvent {
+  timestamp: ISO8601DateTime;
+  status: string;
+  location: string;
+  details?: string;
+  sensorData?: {
+    temperature?: number;
+    humidity?: number;
+    shock?: boolean;
+  };
+}
+    </pre>
+
+    <h2>5.6 Market Connectivity</h2>
+
+    <pre>
+// Market Data Integration
+interface MarketIntegration {
+  // Price Discovery
+  pricing: {
+    sources: ['CME', 'ICE', 'local_basis', 'contract'];
+    data: {
+      commodity: string;
+      market: string;
+      price: number;
+      currency: string;
+      unit: string;
+      timestamp: ISO8601DateTime;
+      type: 'spot' | 'futures' | 'basis';
+    };
+  };
+
+  // Contract Management
+  contracts: {
+    types: ['forward', 'basis', 'hedge_to_arrive', 'minimum_price'];
+    record: {
+      id: string;
+      buyer: PartyInfo;
+      seller: PartyInfo;
+      commodity: string;
+      quantity: { value: number; unit: string };
+      price: { value: number; unit: string; basis?: string };
+      delivery: {
+        location: string;
+        startDate: ISO8601Date;
+        endDate: ISO8601Date;
+      };
+      terms: string;
+      status: 'draft' | 'confirmed' | 'delivered' | 'settled';
+    };
+  };
+
+  // Electronic Trading
+  edi: {
+    standards: ['ANSI X12', 'EDIFACT', 'GS1 XML'];
+    transactions: {
+      '850': 'Purchase Order',
+      '856': 'Advance Ship Notice',
+      '810': 'Invoice',
+      '997': 'Functional Acknowledgment'
+    };
+  };
+}
+    </pre>
+
+    <h2>5.7 Recall Management</h2>
+
+    <pre>
+// Recall Event Structure
+interface RecallEvent {
+  id: string;
+  classification: 'Class_I' | 'Class_II' | 'Class_III';
+  status: 'initiated' | 'ongoing' | 'completed' | 'terminated';
+
+  // Product Information
+  product: {
+    name: string;
+    gtin: string;
+    lots: string[];
+    productionDates: { from: ISO8601Date; to: ISO8601Date };
+    quantity: { value: number; unit: string };
+  };
+
+  // Reason
+  reason: {
+    hazard: string;
+    description: string;
+    discoverySource: string;
+    discoveryDate: ISO8601Date;
+  };
+
+  // Distribution
+  distribution: {
+    channels: string[];
+    geography: string[];
+    retailers: string[];
+  };
+
+  // Actions
+  actions: {
+    consumerNotice: string;
+    retailerNotice: string;
+    returnInstructions: string;
+    disposalMethod: string;
+  };
+
+  // Traceability Query
+  traceQuery: {
+    upstream: TraceabilityEvent[];   // Back to farm
+    downstream: TraceabilityEvent[]; // To consumers
+    affectedLots: string[];
+    affectedLocations: string[];
+  };
+
+  // Timeline
+  timeline: {
+    initiated: ISO8601DateTime;
+    notified: ISO8601DateTime;
+    completed?: ISO8601DateTime;
+  };
+}
+    </pre>
+
+    <h2>5.8 Blockchain Integration</h2>
+
+    <div class="highlight">
+        <h3>Distributed Ledger for Traceability</h3>
+        <p>Blockchain technology provides immutable, transparent records for agricultural supply chains. While not required, blockchain integration offers enhanced trust and auditability for high-value or regulated supply chains.</p>
+    </div>
+
+    <pre>
+// Blockchain Integration Model
+interface BlockchainTraceability {
+  network: 'Hyperledger' | 'Ethereum' | 'IBM_Food_Trust' | 'private';
+
+  // On-chain Data (minimal, immutable)
+  onChain: {
+    transactionId: string;
+    timestamp: ISO8601DateTime;
+    eventHash: string;           // Hash of full event data
+    participants: string[];      // Public keys
+    signatures: string[];
+  };
+
+  // Off-chain Data (detailed, linked)
+  offChain: {
+    storageLocation: 'IPFS' | 'cloud' | 'enterprise';
+    eventData: TraceabilityEvent;
+    documents: string[];         // Hashes of supporting docs
+    sensorData: string[];        // Hashes of IoT data
+  };
+
+  // Smart Contract
+  smartContract: {
+    address: string;
+    functions: [
+      'recordEvent(bytes32 eventHash)',
+      'verifyChain(bytes32[] eventHashes)',
+      'transferOwnership(address newOwner)',
+      'certify(bytes32 certHash)'
+    ];
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>This chapter covered supply chain integration including traceability systems, product identification, certification data, quality exchange, logistics integration, market connectivity, recall management, and blockchain applications. These capabilities enable transparent, efficient agricultural supply chains as defined by the WIA-AGRICULTURAL_DATA_EXCHANGE standard.</p>
+    </div>
+</body>
+</html>

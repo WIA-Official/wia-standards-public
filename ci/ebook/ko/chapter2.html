@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2장: 데이터 스키마 - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI 표준</h1>
+    <p class="subtitle">2장: 데이터 스키마</p>
+  </header>
+
+  <main class="container">
+    <h1>2장: 데이터 스키마</h1>
+
+    <h2>2.1 오디오 입력 포맷</h2>
+    <p>WIA-CI는 품질과 실시간 처리 요구사항 사이의 균형을 맞추는 유연한 오디오 입력 포맷을 정의합니다.</p>
+
+    <h3>기본 오디오 사양</h3>
+    <pre><code>interface CIAudioInput {
+  sampleRate: 16000 | 22050 | 44100 | 48000;  // Hz
+  bitDepth: 16 | 24 | 32;
+  channels: 1;  // 모노 (CI는 단측)
+
+  frameSize: number;     // 샘플 수 (권장: 256 @ 16kHz)
+  hopSize: number;       // 프레임 이동 (권장: 128)
+
+  encoding: 'pcm_s16le' | 'pcm_f32le' | 'pcm_s24le';
+}</code></pre>
+
+    <h3>권장 설정</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>사용 사례</th>
+          <th>샘플 레이트</th>
+          <th>프레임 크기</th>
+          <th>홉 크기</th>
+          <th>지연</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>실시간 음성</td>
+          <td>16 kHz</td>
+          <td>256</td>
+          <td>128</td>
+          <td>16 ms</td>
+        </tr>
+        <tr>
+          <td>음악</td>
+          <td>44.1 kHz</td>
+          <td>1024</td>
+          <td>512</td>
+          <td>23 ms</td>
+        </tr>
+        <tr>
+          <td>저지연</td>
+          <td>16 kHz</td>
+          <td>128</td>
+          <td>64</td>
+          <td>8 ms</td>
+        </tr>
+        <tr>
+          <td>고품질</td>
+          <td>48 kHz</td>
+          <td>2048</td>
+          <td>1024</td>
+          <td>43 ms</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2.2 전극 매핑</h2>
+    <p>22채널 주파수 할당표(FAT)는 WIA-CI 전극 매핑의 핵심입니다.</p>
+
+    <h3>주파수 할당표 구조</h3>
+    <pre><code>interface FrequencyAllocationTable {
+  electrodeCount: 22;
+
+  // 전극별 중심 주파수 (Hz) - 기저부에서 첨단부
+  centerFrequencies: [
+    7438, 6500, 5688, 5000, 4375, 3813, 3313, 2875,
+    2500, 2188, 1938, 1688, 1438, 1250, 1125, 1000,
+    875, 750, 625, 500, 375, 250
+  ];
+
+  // 각 전극의 대역폭
+  bandwidths: number[];
+
+  // 로그 분포 파라미터
+  logarithmic: {
+    minFreq: 250;   // Hz
+    maxFreq: 8000;  // Hz
+    octaves: 5;     // 총 옥타브 범위
+  };
+}</code></pre>
+
+    <h2>2.3 엔벨로프 데이터 포맷</h2>
+    <p>엔벨로프는 시간 경과에 따른 각 주파수 채널의 진폭 변조를 나타냅니다.</p>
+
+    <h3>옥타브 정보가 포함된 확장 엔벨로프</h3>
+    <pre><code>interface ExtendedEnvelopeFrame extends EnvelopeFrame {
+  // WIA-CI 향상: 옥타브 정보
+  octaveInfo: {
+    fundamentalFreq: number;     // 추정 F0 (Hz)
+    octaveNumber: number;        // 0-8
+    octaveConfidence: number;    // 0.0-1.0
+
+    // 하모닉 분석 결과
+    harmonics: HarmonicInfo[];
+  };
+
+  // 시간 변조 파라미터
+  temporalModulation: {
+    pattern: 'AM' | 'FM' | 'mixed';
+    frequency: number;           // 변조 주파수 (Hz)
+    depth: number;               // 0.0-1.0
+  };
+}</code></pre>
+
+    <h2>2.4 자극 데이터 포맷</h2>
+    <p>자극 명령은 각 전극에 전달되는 전기 펄스를 지정합니다.</p>
+
+    <pre><code>interface StimulationCommand {
+  timestamp: number;          // μs (마이크로초 정밀도)
+  electrode: number;          // 1-22
+
+  // 자극 파라미터
+  amplitude: number;          // μA (0-2000)
+  pulseWidth: number;         // μs (일반적으로 25-50)
+  interphaseGap: number;      // μs (일반적으로 8)
+
+  // 극성
+  polarity: 'cathodic_first' | 'anodic_first';
+
+  // WIA-CI 확장: 옥타브 변조
+  octaveModulation?: {
+    enabled: boolean;
+    pattern: number[];
+    rate: number;
+  };
+}</code></pre>
+
+    <h2>2.5 스트림 포맷</h2>
+    <p>실시간 스트리밍은 효율적인 전송을 위해 패킷화된 포맷을 사용합니다.</p>
+
+    <pre><code>interface CIStreamPacket {
+  header: {
+    magic: 0x57494143;        // 'WIAC'
+    version: number;
+    packetType: PacketType;
+    sequenceNumber: number;
+    timestamp: number;        // μs
+    payloadLength: number;
+  };
+
+  payload: AudioPayload | EnvelopePayload | StimulationPayload;
+
+  checksum: number;           // CRC32
+}</code></pre>
+
+    <h2>2.6 제조사 호환성</h2>
+    <p>WIA-CI는 다른 제조사 포맷 간 변환 기능을 제공합니다.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>제조사</th>
+          <th>전극 수</th>
+          <th>변환 방법</th>
+          <th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cochlear</td>
+          <td>22</td>
+          <td>직접 매핑</td>
+          <td>기본 호환성</td>
+        </tr>
+        <tr>
+          <td>MED-EL</td>
+          <td>12</td>
+          <td>2:1 다운샘플링</td>
+          <td>주파수 보간</td>
+        </tr>
+        <tr>
+          <td>Advanced Bionics</td>
+          <td>16</td>
+          <td>보간</td>
+          <td>16 → 22 채널 매핑</td>
+        </tr>
+        <tr>
+          <td>Oticon Medical</td>
+          <td>20</td>
+          <td>거의 직접</td>
+          <td>최소 조정</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      <h3>성능 요구사항</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>지표</th>
+            <th>요구사항</th>
+            <th>목표</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>지연</td>
+            <td>&lt; 50 ms</td>
+            <td>&lt; 20 ms</td>
+          </tr>
+          <tr>
+            <td>처리량</td>
+            <td>&gt; 100 프레임/초</td>
+            <td>&gt; 200 프레임/초</td>
+          </tr>
+          <tr>
+            <td>메모리</td>
+            <td>&lt; 10 MB</td>
+            <td>&lt; 5 MB</td>
+          </tr>
+          <tr>
+            <td>CPU (모바일)</td>
+            <td>&lt; 20%</td>
+            <td>&lt; 10%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    </main>
+</body>
+</html>

@@ -2,9 +2,9 @@
 //!
 //! Send security findings to Google Cloud Security Command Center.
 
+use super::{CloudError, CloudResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{CloudResult, CloudError};
 
 /// GCP Security Command Center configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -353,52 +353,92 @@ impl GcpSccExporter {
         for part in vector.split('/') {
             if let Some((key, value)) = part.split_once(':') {
                 match key {
-                    "AV" => cvss.attack_vector = Some(match value {
-                        "N" => "ATTACK_VECTOR_NETWORK",
-                        "A" => "ATTACK_VECTOR_ADJACENT",
-                        "L" => "ATTACK_VECTOR_LOCAL",
-                        "P" => "ATTACK_VECTOR_PHYSICAL",
-                        _ => "ATTACK_VECTOR_UNSPECIFIED",
-                    }.to_string()),
-                    "AC" => cvss.attack_complexity = Some(match value {
-                        "L" => "ATTACK_COMPLEXITY_LOW",
-                        "H" => "ATTACK_COMPLEXITY_HIGH",
-                        _ => "ATTACK_COMPLEXITY_UNSPECIFIED",
-                    }.to_string()),
-                    "PR" => cvss.privileges_required = Some(match value {
-                        "N" => "PRIVILEGES_REQUIRED_NONE",
-                        "L" => "PRIVILEGES_REQUIRED_LOW",
-                        "H" => "PRIVILEGES_REQUIRED_HIGH",
-                        _ => "PRIVILEGES_REQUIRED_UNSPECIFIED",
-                    }.to_string()),
-                    "UI" => cvss.user_interaction = Some(match value {
-                        "N" => "USER_INTERACTION_NONE",
-                        "R" => "USER_INTERACTION_REQUIRED",
-                        _ => "USER_INTERACTION_UNSPECIFIED",
-                    }.to_string()),
-                    "S" => cvss.scope = Some(match value {
-                        "U" => "SCOPE_UNCHANGED",
-                        "C" => "SCOPE_CHANGED",
-                        _ => "SCOPE_UNSPECIFIED",
-                    }.to_string()),
-                    "C" => cvss.confidentiality_impact = Some(match value {
-                        "N" => "IMPACT_NONE",
-                        "L" => "IMPACT_LOW",
-                        "H" => "IMPACT_HIGH",
-                        _ => "IMPACT_UNSPECIFIED",
-                    }.to_string()),
-                    "I" => cvss.integrity_impact = Some(match value {
-                        "N" => "IMPACT_NONE",
-                        "L" => "IMPACT_LOW",
-                        "H" => "IMPACT_HIGH",
-                        _ => "IMPACT_UNSPECIFIED",
-                    }.to_string()),
-                    "A" => cvss.availability_impact = Some(match value {
-                        "N" => "IMPACT_NONE",
-                        "L" => "IMPACT_LOW",
-                        "H" => "IMPACT_HIGH",
-                        _ => "IMPACT_UNSPECIFIED",
-                    }.to_string()),
+                    "AV" => {
+                        cvss.attack_vector = Some(
+                            match value {
+                                "N" => "ATTACK_VECTOR_NETWORK",
+                                "A" => "ATTACK_VECTOR_ADJACENT",
+                                "L" => "ATTACK_VECTOR_LOCAL",
+                                "P" => "ATTACK_VECTOR_PHYSICAL",
+                                _ => "ATTACK_VECTOR_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
+                    "AC" => {
+                        cvss.attack_complexity = Some(
+                            match value {
+                                "L" => "ATTACK_COMPLEXITY_LOW",
+                                "H" => "ATTACK_COMPLEXITY_HIGH",
+                                _ => "ATTACK_COMPLEXITY_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
+                    "PR" => {
+                        cvss.privileges_required = Some(
+                            match value {
+                                "N" => "PRIVILEGES_REQUIRED_NONE",
+                                "L" => "PRIVILEGES_REQUIRED_LOW",
+                                "H" => "PRIVILEGES_REQUIRED_HIGH",
+                                _ => "PRIVILEGES_REQUIRED_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
+                    "UI" => {
+                        cvss.user_interaction = Some(
+                            match value {
+                                "N" => "USER_INTERACTION_NONE",
+                                "R" => "USER_INTERACTION_REQUIRED",
+                                _ => "USER_INTERACTION_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
+                    "S" => {
+                        cvss.scope = Some(
+                            match value {
+                                "U" => "SCOPE_UNCHANGED",
+                                "C" => "SCOPE_CHANGED",
+                                _ => "SCOPE_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
+                    "C" => {
+                        cvss.confidentiality_impact = Some(
+                            match value {
+                                "N" => "IMPACT_NONE",
+                                "L" => "IMPACT_LOW",
+                                "H" => "IMPACT_HIGH",
+                                _ => "IMPACT_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
+                    "I" => {
+                        cvss.integrity_impact = Some(
+                            match value {
+                                "N" => "IMPACT_NONE",
+                                "L" => "IMPACT_LOW",
+                                "H" => "IMPACT_HIGH",
+                                _ => "IMPACT_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
+                    "A" => {
+                        cvss.availability_impact = Some(
+                            match value {
+                                "N" => "IMPACT_NONE",
+                                "L" => "IMPACT_LOW",
+                                "H" => "IMPACT_HIGH",
+                                _ => "IMPACT_UNSPECIFIED",
+                            }
+                            .to_string(),
+                        )
+                    }
                     _ => {}
                 }
             }
@@ -408,7 +448,11 @@ impl GcpSccExporter {
     }
 
     /// Convert WIA finding to SCC Finding
-    pub fn convert_finding(&self, finding: &super::super::importers::WiaFinding, host: &str) -> SccFinding {
+    pub fn convert_finding(
+        &self,
+        finding: &super::super::importers::WiaFinding,
+        host: &str,
+    ) -> SccFinding {
         let now = chrono::Utc::now().to_rfc3339();
         let source_name = self.source_name();
         let finding_name = format!("{}/findings/{}", source_name, finding.id);
@@ -419,24 +463,45 @@ impl GcpSccExporter {
         );
 
         let mut source_properties = HashMap::new();
-        source_properties.insert("scanner".to_string(), serde_json::Value::String("WIA Security".to_string()));
-        source_properties.insert("findingId".to_string(), serde_json::Value::String(finding.id.clone()));
+        source_properties.insert(
+            "scanner".to_string(),
+            serde_json::Value::String("WIA Security".to_string()),
+        );
+        source_properties.insert(
+            "findingId".to_string(),
+            serde_json::Value::String(finding.id.clone()),
+        );
         if let Some(port) = finding.port {
-            source_properties.insert("port".to_string(), serde_json::Value::Number(serde_json::Number::from(port)));
+            source_properties.insert(
+                "port".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(port)),
+            );
         }
         if let Some(ref protocol) = finding.protocol {
-            source_properties.insert("protocol".to_string(), serde_json::Value::String(protocol.clone()));
+            source_properties.insert(
+                "protocol".to_string(),
+                serde_json::Value::String(protocol.clone()),
+            );
         }
-        source_properties.insert("exploitAvailable".to_string(), serde_json::Value::Bool(finding.exploit_available));
+        source_properties.insert(
+            "exploitAvailable".to_string(),
+            serde_json::Value::Bool(finding.exploit_available),
+        );
 
         let vulnerability = if !finding.cve.is_empty() {
             let cve_id = finding.cve.first().cloned().unwrap_or_default();
-            let references: Vec<SccReference> = finding.references.iter().map(|url| SccReference {
-                source: "WIA Security".to_string(),
-                uri: Some(url.clone()),
-            }).collect();
+            let references: Vec<SccReference> = finding
+                .references
+                .iter()
+                .map(|url| SccReference {
+                    source: "WIA Security".to_string(),
+                    uri: Some(url.clone()),
+                })
+                .collect();
 
-            let mut cvssv3 = finding.cvss_vector.as_ref()
+            let mut cvssv3 = finding
+                .cvss_vector
+                .as_ref()
                 .and_then(|v| Self::parse_cvss_vector(v));
 
             if let Some(ref mut cvss) = cvssv3 {
@@ -506,7 +571,10 @@ impl GcpSccExporter {
     }
 
     /// Convert scan results to SCC findings
-    pub fn convert_scan_results(&self, scan: &super::super::importers::WiaScanResult) -> Vec<SccFinding> {
+    pub fn convert_scan_results(
+        &self,
+        scan: &super::super::importers::WiaScanResult,
+    ) -> Vec<SccFinding> {
         let mut findings = Vec::new();
         for target in &scan.targets {
             for finding in &target.findings {
@@ -544,7 +612,7 @@ impl GcpSccExporter {
             "requests": findings.iter().map(|f| {
                 serde_json::json!({
                     "parent": f.parent,
-                    "findingId": f.name.split('/').last().unwrap_or(&f.name),
+                    "findingId": f.name.split('/').next_back().unwrap_or(&f.name),
                     "finding": f
                 })
             }).collect::<Vec<_>>()
@@ -603,11 +671,18 @@ mod tests {
 
     #[test]
     fn test_parse_cvss_vector() {
-        let cvss = GcpSccExporter::parse_cvss_vector("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N");
+        let cvss =
+            GcpSccExporter::parse_cvss_vector("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N");
         assert!(cvss.is_some());
 
         let cvss = cvss.unwrap();
-        assert_eq!(cvss.attack_vector, Some("ATTACK_VECTOR_NETWORK".to_string()));
-        assert_eq!(cvss.attack_complexity, Some("ATTACK_COMPLEXITY_LOW".to_string()));
+        assert_eq!(
+            cvss.attack_vector,
+            Some("ATTACK_VECTOR_NETWORK".to_string())
+        );
+        assert_eq!(
+            cvss.attack_complexity,
+            Some("ATTACK_COMPLEXITY_LOW".to_string())
+        );
     }
 }

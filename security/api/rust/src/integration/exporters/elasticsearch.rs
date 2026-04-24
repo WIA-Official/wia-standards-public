@@ -2,9 +2,9 @@
 //!
 //! Exports WIA Security data to Elasticsearch using ECS (Elastic Common Schema).
 
+use super::{ExportError, ExportResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{ExportResult, ExportError, ExportStatus};
 
 /// Elasticsearch configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -329,7 +329,11 @@ impl ElasticsearchExporter {
     }
 
     /// Convert WIA finding to ECS document
-    pub fn convert_vulnerability(&self, finding: &super::super::importers::WiaFinding, host: &str) -> EcsDocument {
+    pub fn convert_vulnerability(
+        &self,
+        finding: &super::super::importers::WiaFinding,
+        host: &str,
+    ) -> EcsDocument {
         let severity_num = Self::severity_to_numeric(&finding.severity);
 
         EcsDocument {
@@ -383,7 +387,10 @@ impl ElasticsearchExporter {
     }
 
     /// Convert security event to ECS document
-    pub fn convert_security_event(&self, event: &super::splunk::WiaSecurityEvent) -> EcsDocument {
+    pub fn convert_security_event(
+        &self,
+        event: &super::splunk::SplunkSecurityEvent,
+    ) -> EcsDocument {
         let severity_num = Self::severity_to_numeric(&event.severity);
 
         EcsDocument {
@@ -458,7 +465,13 @@ impl ElasticsearchExporter {
 
     /// Get bulk endpoint URL
     pub fn bulk_endpoint(&self) -> String {
-        format!("{}/_bulk", self.config.hosts.first().unwrap_or(&"http://localhost:9200".to_string()))
+        format!(
+            "{}/_bulk",
+            self.config
+                .hosts
+                .first()
+                .unwrap_or(&"http://localhost:9200".to_string())
+        )
     }
 
     /// Create index template for WIA Security

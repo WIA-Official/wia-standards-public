@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Table Format Protocol</title>
+</head>
+<body>
+
+<p><a href="index.html">[DATA-002] WIA Data Lake Standard Ebook</a> | Chapter 6 (of 8)</p>
+
+<hr>
+
+<h1>Chapter 6: Phase 3 - Table Format Protocol</h1>
+
+<blockquote>
+<p><strong>ACID on a data lake? That's the lakehouse revolution.</strong></p>
+</blockquote>
+
+<hr>
+
+<h2>6.1 Why Table Formats Matter</h2>
+
+<p>Traditional data lakes lack ACID guarantees. Table formats solve this:</p>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Challenge</th>
+            <th>Without Table Format</th>
+            <th>With Table Format</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Concurrent Writes</strong></td>
+            <td>Data corruption</td>
+            <td>ACID transactions</td>
+        </tr>
+        <tr>
+            <td><strong>Updates/Deletes</strong></td>
+            <td>Impossible or slow</td>
+            <td>Efficient MERGE/DELETE</td>
+        </tr>
+        <tr>
+            <td><strong>Schema Changes</strong></td>
+            <td>Rewrite all data</td>
+            <td>Schema evolution</td>
+        </tr>
+        <tr>
+            <td><strong>Time Travel</strong></td>
+            <td>Manual snapshots</td>
+            <td>Built-in versioning</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.2 Delta Lake Protocol</h2>
+
+<h3>6.2.1 Transaction Log</h3>
+
+<pre>
+Delta Lake Structure:
+s3://lake/events/
+├── _delta_log/
+│   ├── 00000000000000000000.json  # Version 0
+│   ├── 00000000000000000001.json  # Version 1
+│   ├── 00000000000000000002.json  # Version 2
+│   └── _last_checkpoint              # Optimization
+├── part-00000-v1.parquet
+├── part-00001-v1.parquet
+└── part-00002-v2.parquet
+</pre>
+
+<h3>6.2.2 Transaction Log Format</h3>
+
+<pre>
+// Example transaction log entry
+{
+  "commitInfo": {
+    "timestamp": 1705320000000,
+    "operation": "WRITE",
+    "operationMetrics": {
+      "numFiles": "2",
+      "numOutputRows": "1000000"
+    }
+  },
+  "add": {
+    "path": "part-00000-v1.parquet",
+    "size": 134217728,
+    "partitionValues": {"date": "2025-01-15"},
+    "stats": "{\"numRecords\": 500000, \"minValues\": {...}, \"maxValues\": {...}}"
+  }
+}
+</pre>
+
+<h3>6.2.3 Delta Lake Operations</h3>
+
+<pre>
+-- Time Travel
+SELECT * FROM events VERSION AS OF 10;
+SELECT * FROM events TIMESTAMP AS OF '2025-01-15 10:00:00';
+
+-- Describe History
+DESCRIBE HISTORY events LIMIT 10;
+
+-- MERGE (Upsert)
+MERGE INTO target
+USING source
+ON target.id = source.id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
+
+-- OPTIMIZE
+OPTIMIZE events WHERE date = '2025-01-15';
+OPTIMIZE events ZORDER BY (user_id, event_type);
+
+-- VACUUM (Clean old files)
+VACUUM events RETAIN 168 HOURS;  -- 7 days
+</pre>
+
+<hr>
+
+<h2>6.3 Apache Iceberg Protocol</h2>
+
+<h3>6.3.1 Metadata Hierarchy</h3>
+
+<pre>
+Iceberg Structure:
+s3://lake/events/
+├── metadata/
+│   ├── v1.metadata.json
+│   ├── v2.metadata.json
+│   ├── snap-12345.avro
+│   └── manifest-list-67890.avro
+└── data/
+    ├── 00001-1-data-file.parquet
+    └── 00002-2-data-file.parquet
+
+# Metadata JSON example
+{
+  "format-version": 2,
+  "table-uuid": "9c12d441-03fe-4693-9a96-a0705ddf69c1",
+  "location": "s3://lake/events",
+  "current-snapshot-id": 12345,
+  "properties": {
+    "write.format.default": "parquet"
+  },
+  "schemas": [...],
+  "partition-specs": [...]
+}
+</pre>
+
+<h3>6.3.2 Hidden Partitioning</h3>
+
+<pre>
+-- Traditional partitioning: User must know partition columns
+SELECT * FROM events WHERE year = 2025 AND month = 1 AND day = 15;
+
+-- Iceberg hidden partitioning: Automatic
+SELECT * FROM events WHERE timestamp = '2025-01-15';
+-- Iceberg automatically maps timestamp to partitions
+</pre>
+
+<h3>6.3.3 Partition Evolution</h3>
+
+<pre>
+-- Start with daily partitions
+CREATE TABLE events PARTITIONED BY (days(timestamp));
+
+-- Later, change to hourly (without rewriting data!)
+ALTER TABLE events SET PARTITION SPEC (hours(timestamp));
+
+-- Old data stays in daily partitions, new data in hourly
+</pre>
+
+<hr>
+
+<h2>6.4 Apache Hudi Protocol</h2>
+
+<h3>6.3.1 Table Types</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Write Latency</th>
+            <th>Query Latency</th>
+            <th>Use Case</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Copy-On-Write (COW)</strong></td>
+            <td>Higher</td>
+            <td>Lower</td>
+            <td>Read-heavy workloads</td>
+        </tr>
+        <tr>
+            <td><strong>Merge-On-Read (MOR)</strong></td>
+            <td>Lower</td>
+            <td>Higher</td>
+            <td>Write-heavy, real-time</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.4.2 Timeline and Commits</h3>
+
+<pre>
+Hudi Structure:
+s3://lake/events/
+├── .hoodie/
+│   ├── 20250115100000.commit
+│   ├── 20250115103000.deltacommit
+│   ├── 20250115110000.compaction
+│   └── hoodie.properties
+├── 2025/01/15/
+│   ├── base-file-1.parquet          # Base data
+│   └── log-file-1.log.1             # Delta logs (MOR only)
+</pre>
+
+<h3>6.4.3 Incremental Queries</h3>
+
+<pre>
+# Read only changed data since last read
+df = spark.read.format("hudi") \
+    .option("hoodie.datasource.query.type", "incremental") \
+    .option("hoodie.datasource.read.begin.instanttime", "20250115100000") \
+    .load("s3://lake/events/")
+
+# Only new/updated records returned
+</pre>
+
+<hr>
+
+<h2>6.5 Table Format Comparison</h2>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Feature</th>
+            <th>Delta Lake</th>
+            <th>Apache Iceberg</th>
+            <th>Apache Hudi</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>ACID Transactions</strong></td>
+            <td>✅</td>
+            <td>✅</td>
+            <td>✅</td>
+        </tr>
+        <tr>
+            <td><strong>Time Travel</strong></td>
+            <td>✅ Excellent</td>
+            <td>✅ Excellent</td>
+            <td>✅ Good</td>
+        </tr>
+        <tr>
+            <td><strong>Schema Evolution</strong></td>
+            <td>✅ Good</td>
+            <td>✅ Excellent</td>
+            <td>✅ Good</td>
+        </tr>
+        <tr>
+            <td><strong>Partition Evolution</strong></td>
+            <td>❌ No</td>
+            <td>✅ Yes</td>
+            <td>❌ No</td>
+        </tr>
+        <tr>
+            <td><strong>Hidden Partitioning</strong></td>
+            <td>❌ No</td>
+            <td>✅ Yes</td>
+            <td>❌ No</td>
+        </tr>
+        <tr>
+            <td><strong>Incremental Reads</strong></td>
+            <td>✅ Via CDF</td>
+            <td>✅ Via snapshots</td>
+            <td>✅✅ Native</td>
+        </tr>
+        <tr>
+            <td><strong>Streaming Support</strong></td>
+            <td>✅✅ Excellent</td>
+            <td>✅ Good</td>
+            <td>✅✅ Excellent</td>
+        </tr>
+        <tr>
+            <td><strong>Engine Support</strong></td>
+            <td>Spark, Presto, Trino</td>
+            <td>Widest (Spark, Presto, Flink, Hive, etc.)</td>
+            <td>Spark, Presto, Trino, Hive</td>
+        </tr>
+        <tr>
+            <td><strong>Maturity</strong></td>
+            <td>Very Mature</td>
+            <td>Mature</td>
+            <td>Mature</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>WIA Recommendation:</strong></p>
+
+<ul>
+    <li><strong>Delta Lake:</strong> Best for Databricks users, streaming workloads</li>
+    <li><strong>Iceberg:</strong> Best for multi-engine environments, partition evolution needs</li>
+    <li><strong>Hudi:</strong> Best for incremental processing, CDC workloads</li>
+</ul>
+
+<hr>
+
+<h2>6.6 ACID Transaction Semantics</h2>
+
+<h3>6.6.1 Atomicity</h3>
+
+<pre>
+-- All-or-nothing guarantee
+BEGIN TRANSACTION;
+  INSERT INTO events VALUES (...);  -- 1 million rows
+  UPDATE events SET status = 'processed' WHERE date = '2025-01-15';
+COMMIT;
+
+-- If any operation fails, entire transaction rolls back
+-- No partial writes visible to readers
+</pre>
+
+<h3>6.6.2 Consistency</h3>
+
+<pre>
+-- Schema enforcement
+INSERT INTO events (id, name, timestamp)
+VALUES (1, 'event', '2025-01-15');
+-- ✅ Succeeds
+
+INSERT INTO events (id, name, timestamp)
+VALUES (2, 123, 'invalid-date');
+-- ❌ Fails: type mismatch, invalid timestamp
+</pre>
+
+<h3>6.6.3 Isolation</h3>
+
+<pre>
+-- Snapshot isolation: readers see consistent snapshot
+-- Writer 1: Long-running transaction
+UPDATE events SET status = 'processing' WHERE ...;
+
+-- Reader 1 (concurrent): Sees pre-update snapshot
+SELECT * FROM events;  -- No partial updates visible
+
+-- Writer 1 commits
+COMMIT;
+
+-- Reader 2 (new query): Sees post-update snapshot
+SELECT * FROM events;  -- All updates visible
+</pre>
+
+<h3>6.6.4 Durability</h3>
+
+<pre>
+-- Once committed, data persists despite failures
+INSERT INTO events VALUES (...);
+COMMIT;  -- Transaction log entry written
+
+-- Even if Spark cluster crashes immediately after,
+-- the commit is durable and will be visible on restart
+</pre>
+
+<hr>
+
+<h2>6.7 Schema Evolution Patterns</h2>
+
+<h3>6.7.1 Adding Columns</h3>
+
+<pre>
+-- Initial schema
+CREATE TABLE users (id BIGINT, name STRING);
+
+-- Add column (backward compatible)
+ALTER TABLE users ADD COLUMNS (email STRING);
+
+-- Old queries still work
+SELECT id, name FROM users;  -- ✅ No changes needed
+
+-- New queries can use new column
+SELECT id, name, email FROM users;  -- ✅
+</pre>
+
+<h3>6.7.2 Renaming Columns</h3>
+
+<pre>
+-- Iceberg supports true column renaming
+ALTER TABLE users RENAME COLUMN name TO full_name;
+
+-- Delta Lake requires creating views for backward compatibility
+CREATE OR REPLACE VIEW users_legacy AS
+  SELECT id, full_name AS name FROM users;
+</pre>
+
+<h3>6.7.3 Changing Data Types</h3>
+
+<pre>
+-- Safe: INT -> BIGINT
+ALTER TABLE events ALTER COLUMN count SET DATA TYPE BIGINT;
+
+-- Unsafe: STRING -> INT (requires data validation)
+-- Use multi-step process:
+1. ADD COLUMN count_int INT
+2. UPDATE table SET count_int = CAST(count AS INT)
+3. Verify all values converted
+4. DROP COLUMN count
+5. RENAME COLUMN count_int TO count
+</pre>
+
+<hr>
+
+<h2>Summary</h2>
+
+<p>In this chapter, we learned:</p>
+
+<ul>
+    <li>Table formats enable ACID transactions on data lakes</li>
+    <li>Delta Lake: transaction log, time travel, Z-ordering</li>
+    <li>Iceberg: hidden partitioning, partition evolution, wide engine support</li>
+    <li>Hudi: incremental reads, COW/MOR tables, timeline service</li>
+    <li>ACID semantics: Atomicity, Consistency, Isolation, Durability</li>
+    <li>Schema evolution: adding, renaming, changing columns safely</li>
+</ul>
+
+<p><strong>Next Chapter:</strong> <a href="chapter-07.html">Chapter 7: Phase 4 - Ecosystem Integration</a></p>
+
+<hr>
+
+<p><a href="chapter-05.html">← Previous</a> | <a href="index.html">Contents</a> | <a href="chapter-07.html">Next →</a></p>
+
+<hr>
+
+<p><strong>弘益人間 · Benefit All Humanity</strong></p>
+<p>© 2025 WIA Standards / MIT License</p>
+</body>
+</html>

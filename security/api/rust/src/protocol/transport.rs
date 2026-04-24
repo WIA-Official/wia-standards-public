@@ -316,12 +316,7 @@ impl RateLimitStatus {
     }
 
     /// Create from HTTP headers
-    pub fn from_headers(
-        limit: u32,
-        remaining: u32,
-        reset: u64,
-        window: u32,
-    ) -> Self {
+    pub fn from_headers(limit: u32, remaining: u32, reset: u64, window: u32) -> Self {
         Self {
             limit,
             remaining,

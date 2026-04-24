@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 7: Implementation Examples - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI Standard</h1>
+    <p class="subtitle">Chapter 7: Implementation Examples</p>
+  </header>
+
+  <main class="container">
+    <h1>Chapter 7: Implementation Examples</h1>
+
+    <h2>7.1 Python Implementation</h2>
+    <p>Complete Python implementation of WIA-CI audio processing with octave detection.</p>
+
+    <h3>Installation</h3>
+    <pre><code>pip install wia-ci numpy scipy librosa</code></pre>
+
+    <h3>Basic CI Processor</h3>
+    <pre><code>import numpy as np
+from scipy import signal
+from wia_ci import WIACI, OctaveDetector
+
+class CIProcessor:
+    def __init__(self, sample_rate=16000, electrodes=22):
+        self.sample_rate = sample_rate
+        self.electrodes = electrodes
+
+        # Initialize WIA-CI engine
+        self.ci = WIACI(
+            electrodes=electrodes,
+            strategy='WIA-OCTAVE',
+            sample_rate=sample_rate
+        )
+
+        # Octave detector
+        self.octave_detector = OctaveDetector()
+
+    def process_frame(self, audio_frame):
+        """Process a single audio frame"""
+
+        # 1. F0 estimation
+        f0_result = self.octave_detector.estimate_f0(
+            audio_frame,
+            self.sample_rate
+        )
+
+        # 2. Octave classification
+        octave_info = self.octave_detector.classify_octave(f0_result['f0'])
+
+        # 3. Extract envelopes for 22 channels
+        envelopes = self.extract_envelopes(audio_frame)
+
+        # 4. Enhance with octave information
+        enhanced = self.enhance_with_octave(envelopes, octave_info)
+
+        # 5. Channel selection (ACE strategy)
+        selected = self.select_channels(enhanced, n=10)
+
+        # 6. Generate stimulation commands
+        stim_commands = self.generate_stimulation(selected)
+
+        return {
+            'f0': f0_result['f0'],
+            'octave': octave_info,
+            'envelopes': enhanced,
+            'stimulation': stim_commands
+        }
+
+    def extract_envelopes(self, audio_frame):
+        """Extract 22-channel envelopes using gammatone filterbank"""
+
+        # Frequency allocation table (22 channels)
+        center_freqs = [
+            7438, 6500, 5688, 5000, 4375, 3813, 3313, 2875,
+            2500, 2188, 1938, 1688, 1438, 1250, 1125, 1000,
+            875, 750, 625, 500, 375, 250
+        ]
+
+        envelopes = []
+        for freq in center_freqs:
+            # Gammatone filter
+            filtered = self.gammatone_filter(audio_frame, freq)
+
+            # Hilbert envelope
+            analytic = signal.hilbert(filtered)
+            envelope = np.abs(analytic)
+
+            # Smooth
+            envelope = self.smooth(envelope, window_ms=5)
+
+            envelopes.append(envelope)
+
+        return np.array(envelopes)
+
+    def enhance_with_octave(self, envelopes, octave_info):
+        """Add octave modulation to envelopes"""
+
+        if octave_info['confidence'] < 0.5:
+            return envelopes  # Low confidence, skip enhancement
+
+        # Generate octave-specific modulation
+        octave_num = octave_info['octave_number']
+        mod_freq = 4 + (octave_num - 3) * 2  # 4-14 Hz
+
+        t = np.arange(len(envelopes[0])) / self.sample_rate
+        modulation = 0.3 * np.sin(2 * np.pi * mod_freq * t)
+
+        # Apply to all channels
+        enhanced = envelopes * (1 + modulation)
+
+        return enhanced
+
+    def select_channels(self, envelopes, n=10):
+        """ACE channel selection - pick top n channels"""
+
+        # Calculate energy per channel
+        energy = np.sum(envelopes ** 2, axis=1)
+
+        # Select top n channels
+        top_indices = np.argsort(energy)[-n:]
+
+        return top_indices
+
+    def generate_stimulation(self, selected_channels):
+        """Generate stimulation commands for selected channels"""
+
+        commands = []
+        for electrode in selected_channels:
+            commands.append({
+                'electrode': int(electrode) + 1,  # 1-indexed
+                'amplitude': self.calculate_amplitude(electrode),
+                'pulse_width': 25,  # μs
+                'timestamp': 0
+            })
+
+        return commands
+
+    def calculate_amplitude(self, electrode):
+        """Map envelope to stimulation amplitude"""
+        # Simplified - would use T/C levels in practice
+        return 150  # μA
+
+# Example usage
+if __name__ == '__main__':
+    processor = CIProcessor()
+
+    # Load audio
+    import librosa
+    audio, sr = librosa.load('music.wav', sr=16000)
+
+    # Process frame
+    frame_size = 256
+    frame = audio[:frame_size]
+
+    result = processor.process_frame(frame)
+
+    print(f"F0: {result['f0']:.2f} Hz")
+    print(f"Octave: {result['octave']['octave_number']}")
+    print(f"Note: {result['octave']['note_name']}")
+    print(f"Stimulating {len(result['stimulation'])} electrodes")</code></pre>
+
+    <h3>Octave Detection Module</h3>
+    <pre><code>import numpy as np
+
+class OctaveDetector:
+    def estimate_f0(self, signal, sample_rate, min_f0=80, max_f0=600):
+        """YIN algorithm for F0 estimation"""
+
+        min_period = int(sample_rate / max_f0)
+        max_period = int(sample_rate / min_f0)
+
+        # Difference function
+        diff = self._difference_function(signal, max_period)
+
+        # Cumulative mean normalized difference
+        cmndf = self._cmnd_function(diff)
+
+        # Find period
+        period = self._find_period(cmndf, min_period, max_period)
+
+        # Parabolic interpolation
+        period = self._parabolic_interpolation(cmndf, period)
+
+        f0 = sample_rate / period
+        confidence = 1 - cmndf[int(period)]
+
+        return {
+            'f0': f0,
+            'confidence': confidence,
+            'period': period
+        }
+
+    def classify_octave(self, f0):
+        """Classify F0 into octave and note"""
+
+        # A0 = 27.5 Hz
+        A0 = 27.5
+
+        # Calculate octave: O = log2(f / A0)
+        octave_float = np.log2(f0 / A0)
+        octave_num = int(octave_float)
+
+        # Calculate note (0=A, 1=A#, ... 11=G#)
+        note_float = (octave_float - octave_num) * 12
+        note_num = int(round(note_float)) % 12
+
+        # Convert to C-based octave
+        note_from_c = (note_num + 3) % 12
+        c_octave = octave_num if note_from_c < 3 else octave_num + 1
+
+        # Note names
+        notes = ['C', 'C#', 'D', 'D#', 'E', 'F',
+                 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+        # Cents deviation
+        cents = (note_float - round(note_float)) * 100
+
+        return {
+            'octave_number': c_octave,
+            'note_name': notes[note_from_c],
+            'note_number': note_from_c,
+            'cents': cents,
+            'confidence': 0.95  # Would calculate from F0 confidence
+        }
+
+    def _difference_function(self, signal, max_period):
+        """YIN difference function"""
+        diff = np.zeros(max_period)
+        for tau in range(1, max_period):
+            diff[tau] = np.sum((signal[:-tau] - signal[tau:]) ** 2)
+        return diff
+
+    def _cmnd_function(self, diff):
+        """Cumulative mean normalized difference"""
+        cmndf = np.ones_like(diff)
+        cumsum = 0
+        for tau in range(1, len(diff)):
+            cumsum += diff[tau]
+            cmndf[tau] = diff[tau] / (cumsum / tau)
+        return cmndf
+
+    def _find_period(self, cmndf, min_period, max_period, threshold=0.1):
+        """Find period using threshold"""
+        for tau in range(min_period, max_period):
+            if cmndf[tau] < threshold:
+                return tau
+        return min_period
+
+    def _parabolic_interpolation(self, cmndf, tau):
+        """Refine period estimate"""
+        if tau == 0 or tau >= len(cmndf) - 1:
+            return tau
+
+        alpha = cmndf[tau - 1]
+        beta = cmndf[tau]
+        gamma = cmndf[tau + 1]
+
+        p = 0.5 * (alpha - gamma) / (alpha - 2*beta + gamma)
+        return tau + p</code></pre>
+
+    <h2>7.2 TypeScript Implementation</h2>
+    <p>TypeScript implementation for web and Node.js applications.</p>
+
+    <h3>CI Processor Class</h3>
+    <pre><code>import { FFT } from 'dsp.js';
+import { WIACIConfig, EnvelopeFrame, StimulationCommand } from './types';
+
+export class CIProcessor {
+  private config: WIACIConfig;
+  private fft: FFT;
+
+  constructor(config: WIACIConfig) {
+    this.config = config;
+    this.fft = new FFT(config.frameSize, config.sampleRate);
+  }
+
+  async processFrame(audioFrame: Float32Array): Promise<ProcessedFrame> {
+    // 1. F0 estimation
+    const f0Result = await this.estimateF0(audioFrame);
+
+    // 2. Octave classification
+    const octaveInfo = this.classifyOctave(f0Result.f0);
+
+    // 3. Extract envelopes
+    const envelopes = this.extractEnvelopes(audioFrame);
+
+    // 4. Channel selection
+    const selected = this.selectChannels(envelopes, octaveInfo);
+
+    // 5. Generate stimulation
+    const stimulation = this.generateStimulation(selected);
+
+    return {
+      f0: f0Result.f0,
+      octave: octaveInfo,
+      envelopes,
+      selectedChannels: selected,
+      stimulation,
+      timestamp: Date.now()
+    };
+  }
+
+  private extractEnvelopes(signal: Float32Array): Float32Array[] {
+    const envelopes: Float32Array[] = [];
+    const centerFreqs = [
+      7438, 6500, 5688, 5000, 4375, 3813, 3313, 2875,
+      2500, 2188, 1938, 1688, 1438, 1250, 1125, 1000,
+      875, 750, 625, 500, 375, 250
+    ];
+
+    for (const freq of centerFreqs) {
+      // Bandpass filter
+      const filtered = this.bandpassFilter(signal, freq);
+
+      // Hilbert envelope
+      const envelope = this.hilbertEnvelope(filtered);
+
+      envelopes.push(envelope);
+    }
+
+    return envelopes;
+  }
+
+  private selectChannels(
+    envelopes: Float32Array[],
+    octaveInfo: OctaveInfo
+  ): number[] {
+    const n = this.config.maxima; // e.g., 10
+
+    // Calculate energy per channel
+    const energy = envelopes.map(env =>
+      env.reduce((sum, val) => sum + val * val, 0)
+    );
+
+    // Create index-energy pairs
+    const pairs = energy.map((e, i) => ({ index: i, energy: e }));
+
+    // Sort by energy descending
+    pairs.sort((a, b) => b.energy - a.energy);
+
+    // Select top n
+    const selected = pairs.slice(0, n).map(p => p.index);
+
+    return selected;
+  }
+
+  private generateStimulation(
+    channels: number[]
+  ): StimulationCommand[] {
+    const commands: StimulationCommand[] = [];
+
+    for (const channel of channels) {
+      commands.push({
+        electrode: channel + 1,  // 1-indexed
+        amplitude: 150,          // μA
+        pulseWidth: 25,          // μs
+        timestamp: Date.now() * 1000,  // Convert to μs
+        polarity: 'cathodic_first'
+      });
+    }
+
+    return commands;
+  }
+}
+
+// Example usage
+const processor = new CIProcessor({
+  electrodes: 22,
+  strategy: 'WIA-OCTAVE',
+  sampleRate: 16000,
+  frameSize: 256,
+  maxima: 10
+});
+
+// Process audio stream
+audioStream.on('data', async (frame: Float32Array) => {
+  const result = await processor.processFrame(frame);
+
+  console.log(`F0: ${result.f0.toFixed(2)} Hz`);
+  console.log(`Octave: ${result.octave.octaveNumber}`);
+  console.log(`Note: ${result.octave.noteName}`);
+
+  // Send stimulation to device
+  await device.stimulate(result.stimulation);
+});</code></pre>
+
+    <h2>7.3 Bash Implementation</h2>
+    <p>Shell scripts for CI system administration and testing.</p>
+
+    <h3>CI Device Management Script</h3>
+    <pre><code>#!/bin/bash
+
+# WIA-CI Device Management Script
+# Usage: ./ci-manage.sh [command] [options]
+
+set -e
+
+API_BASE="https://api.wia.ci/v1"
+AUTH_TOKEN="${WIA_CI_TOKEN}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Helper functions
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# API call wrapper
+api_call() {
+    local method=$1
+    local endpoint=$2
+    local data=$3
+
+    curl -s -X "$method" \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$data" \
+        "$API_BASE$endpoint"
+}
+
+# List devices
+list_devices() {
+    log_info "Fetching devices..."
+
+    response=$(api_call GET "/processors" "")
+
+    echo "$response" | jq -r '.devices[] | "\(.id)\t\(.name)\t\(.status)"'
+}
+
+# Get device status
+get_status() {
+    local device_id=$1
+
+    log_info "Getting status for device: $device_id"
+
+    response=$(api_call GET "/processors/$device_id/status" "")
+
+    echo "$response" | jq '.'
+}
+
+# Enable octave enhancement
+enable_octave() {
+    local device_id=$1
+
+    log_info "Enabling octave enhancement for: $device_id"
+
+    data='{"enabled": true, "musicMode": "auto", "tfsEncoding": true}'
+
+    response=$(api_call PUT "/processors/$device_id/wia/octave" "$data")
+
+    if echo "$response" | jq -e '.status == "success"' > /dev/null; then
+        log_success "Octave enhancement enabled!"
+    else
+        log_error "Failed to enable octave enhancement"
+        echo "$response" | jq '.'
+    fi
+}
+
+# Run impedance check
+check_impedances() {
+    local device_id=$1
+
+    log_info "Checking electrode impedances..."
+
+    response=$(api_call GET "/processors/$device_id/electrodes/impedances" "")
+
+    # Check for outliers
+    outliers=$(echo "$response" | jq '.summary.outliers[]')
+
+    if [ -z "$outliers" ]; then
+        log_success "All electrodes within normal range"
+    else
+        log_error "Outlier electrodes detected:"
+        echo "$response" | jq '.summary.outliers'
+    fi
+
+    # Show summary
+    echo "$response" | jq '.summary'
+}
+
+# Main command dispatcher
+case "${1:-help}" in
+    list)
+        list_devices
+        ;;
+    status)
+        get_status "$2"
+        ;;
+    octave-on)
+        enable_octave "$2"
+        ;;
+    impedance)
+        check_impedances "$2"
+        ;;
+    help|*)
+        echo "WIA-CI Device Management"
+        echo ""
+        echo "Usage: $0 [command] [options]"
+        echo ""
+        echo "Commands:"
+        echo "  list                 List all devices"
+        echo "  status <device_id>   Get device status"
+        echo "  octave-on <id>       Enable octave enhancement"
+        echo "  impedance <id>       Check electrode impedances"
+        echo ""
+        echo "Environment:"
+        echo "  WIA_CI_TOKEN         API authentication token"
+        ;;
+esac</code></pre>
+
+    <h3>Audio Processing Test Script</h3>
+    <pre><code>#!/bin/bash
+
+# Test octave detection accuracy
+# Usage: ./test-octave.sh
+
+set -e
+
+log_info() {
+    echo "[INFO] $1"
+}
+
+# Test tones
+test_tones=(
+    "261.63:C4"
+    "293.66:D4"
+    "329.63:E4"
+    "349.23:F4"
+    "392.00:G4"
+    "440.00:A4"
+    "493.88:B4"
+    "523.25:C5"
+)
+
+total=0
+correct=0
+
+log_info "Testing octave detection accuracy..."
+
+for tone in "${test_tones[@]}"; do
+    IFS=':' read -r freq note <<< "$tone"
+
+    # Generate test tone
+    sox -n -r 16000 -c 1 tone.wav synth 1 sine "$freq"
+
+    # Process with WIA-CI
+    result=$(wia-ci process tone.wav --json)
+
+    detected_note=$(echo "$result" | jq -r '.octave.noteName')
+    detected_octave=$(echo "$result" | jq -r '.octave.octaveNumber')
+    detected_full="${detected_note}${detected_octave}"
+
+    total=$((total + 1))
+
+    if [ "$detected_full" == "$note" ]; then
+        correct=$((correct + 1))
+        echo "✓ $freq Hz → $note (correct)"
+    else
+        echo "✗ $freq Hz → Expected $note, got $detected_full"
+    fi
+
+    rm tone.wav
+done
+
+accuracy=$(echo "scale=2; $correct * 100 / $total" | bc)
+
+echo ""
+echo "Accuracy: $correct/$total ($accuracy%)"</code></pre>
+
+    <div class="success-box">
+      <h3>Code Examples Summary</h3>
+      <ul>
+        <li><strong>Python:</strong> Complete audio processing pipeline with octave detection</li>
+        <li><strong>TypeScript:</strong> Web/Node.js implementation for real-time processing</li>
+        <li><strong>Bash:</strong> Device management and testing automation</li>
+      </ul>
+      <p>All examples available at: <a href="https://github.com/WIA-Official/wia-ci">github.com/WIA-Official/wia-ci</a></p>
+    </div>
+
+    </main>
+</body>
+</html>

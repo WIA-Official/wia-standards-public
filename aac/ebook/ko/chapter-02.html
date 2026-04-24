@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 시스템 아키텍처 | WIA-AAC</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>2장: 시스템 아키텍처</h1>
+
+    <h2>2.1 아키텍처 개요</h2>
+    <p>WIA-AAC 표준은 관심사를 분리하고 상호운용성을 유지하면서 유연성을 가능하게 하는 계층화된 아키텍처를 정의합니다. 이 아키텍처는 모든 부분이 원활하게 함께 작동하도록 보장하면서 다른 구성요소를 독립적으로 개발, 업데이트 및 교체할 수 있게 합니다.</p>
+
+    <p>아키텍처는 각 계층이 명확하게 정의된 책임과 인터페이스를 갖는 모듈식 설계 철학을 따릅니다. 이 접근 방식은 제조업체가 더 넓은 AAC 생태계와의 호환성을 보장하면서 특정 구성요소에 전문화할 수 있게 합니다.</p>
+
+    <div class="highlight">
+        <strong>설계 원칙:</strong> WIA-AAC 아키텍처는 사용자 연속성을 우선시합니다. 사용자는 어휘, 사용자화 또는 의사소통 기록을 잃지 않고 기기, 앱 또는 서비스를 전환할 수 있어야 합니다.
+    </div>
+
+    <h2>2.2 5계층 모델</h2>
+    <p>WIA-AAC 시스템은 5개의 개별 계층으로 구성됩니다:</p>
+
+    <table>
+        <tr>
+            <th>계층</th>
+            <th>이름</th>
+            <th>책임</th>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td>애플리케이션 계층</td>
+            <td>사용자 인터페이스, 의사소통 디스플레이, 설정</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td>의사소통 엔진 계층</td>
+            <td>메시지 구성, 예측, 언어 처리</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td>콘텐츠 계층</td>
+            <td>상징, 어휘, 음성 데이터, 사용자 프로필</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>접근 계층</td>
+            <td>입력 방법, 선택 기술, 보정</td>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td>플랫폼 계층</td>
+            <td>하드웨어, OS, 기기 기능</td>
+        </tr>
+    </table>
+
+    <pre><code>// WIA-AAC 계층 아키텍처 구현
+interface WIAAACSystem {
+    // 계층 1: 플랫폼
+    platform: {
+        deviceType: 'dedicated' | 'tablet' | 'phone' | 'computer';
+        operatingSystem: string;
+        screenSize: { width: number; height: number };
+        capabilities: DeviceCapabilities;
+    };
+
+    // 계층 2: 접근
+    accessManager: {
+        availableMethods: AccessMethod[];
+        activeMethod: AccessMethod;
+        calibrationData: CalibrationProfile;
+    };
+
+    // 계층 3: 콘텐츠
+    contentRepository: {
+        symbolSets: SymbolSet[];
+        vocabularies: VocabularySet[];
+        userProfiles: UserProfile[];
+        voiceData: VoiceBank[];
+    };
+
+    // 계층 4: 의사소통 엔진
+    communicationEngine: {
+        messageComposer: MessageComposer;
+        predictor: PredictionEngine;
+        languageProcessor: LanguageProcessor;
+    };
+
+    // 계층 5: 애플리케이션
+    application: {
+        displays: CommunicationDisplay[];
+        settings: SystemSettings;
+        uiTheme: UITheme;
+    };
+}</code></pre>
+
+    <h2>2.3 계층 1: 플랫폼 계층</h2>
+    <p>플랫폼 계층은 AAC 시스템이 실행되는 물리적 하드웨어와 운영 체제를 나타냅니다. WIA-AAC는 플랫폼에 구애받지 않도록 설계되어 다음을 지원합니다:</p>
+
+    <h3>2.3.1 전용 AAC 기기</h3>
+    <p>AAC 사용에 최적화된 목적 제작 하드웨어로, 다음을 특징으로 합니다:</p>
+    <ul>
+        <li>내구성을 위한 견고한 구조</li>
+        <li>음성 출력을 위한 고품질 스피커</li>
+        <li>하루 종일 사용할 수 있는 긴 배터리 수명</li>
+        <li>통합 장착 옵션</li>
+        <li>환경 제어 통합</li>
+    </ul>
+
+    <h3>2.3.2 소비자 기기</h3>
+    <p>AAC 애플리케이션을 실행하는 주류 태블릿, 전화 및 컴퓨터:</p>
+    <ul>
+        <li>iOS 기기 (iPad, iPhone)</li>
+        <li>Android 태블릿 및 전화</li>
+        <li>Windows 컴퓨터</li>
+        <li>macOS 기기</li>
+        <li>Chrome OS 기기</li>
+    </ul>
+
+    <h3>2.3.3 플랫폼 추상화</h3>
+    <pre><code>// 플랫폼 기능 감지
+class PlatformAbstraction {
+    static detectCapabilities(): DeviceCapabilities {
+        return {
+            touchScreen: this.hasTouchScreen(),
+            eyeTracker: this.hasEyeTracker(),
+            switchPorts: this.detectSwitchPorts(),
+            speakers: this.detectAudioOutput(),
+            microphone: this.hasMicrophone(),
+            camera: this.hasCamera(),
+            bluetooth: this.hasBluetooth(),
+            wifi: this.hasWifi(),
+            cellularData: this.hasCellular(),
+            gps: this.hasGPS(),
+            accelerometer: this.hasAccelerometer()
+        };
+    }
+
+    static getOptimalConfiguration(): AccessRecommendation {
+        const caps = this.detectCapabilities();
+        // 사용 가능한 하드웨어를 기반으로 접근 방법 추천
+        return this.analyzeCapabilities(caps);
+    }
+}</code></pre>
+
+    <h2>2.4 계층 2: 접근 계층</h2>
+    <p>접근 계층은 사용자가 AAC 시스템과 물리적으로 상호작용하는 방법을 관리합니다. 다양한 입력 방법을 상위 계층이 특정 입력 메커니즘을 알 필요 없이 사용할 수 있는 통합 인터페이스로 추상화합니다.</p>
+
+    <h3>2.4.1 직접 선택 방법</h3>
+    <ul>
+        <li><strong>터치:</strong> 터치스크린과 손가락 또는 스타일러스 접촉</li>
+        <li><strong>시선 추적:</strong> 시선 추적 카메라로 감지된 시각적 고정</li>
+        <li><strong>머리 추적:</strong> 커서 위치를 제어하는 머리 움직임</li>
+        <li><strong>마우스/조이스틱:</strong> 전통적인 포인팅 장치</li>
+    </ul>
+
+    <h3>2.4.2 스캐닝 방법</h3>
+    <ul>
+        <li><strong>자동 스캐닝:</strong> 항목이 일정 간격으로 순차적으로 강조 표시됨</li>
+        <li><strong>단계 스캐닝:</strong> 사용자가 항목 간 진행을 제어</li>
+        <li><strong>그룹-항목 스캐닝:</strong> 계층적 선택으로 필요한 선택 수 감소</li>
+        <li><strong>역 스캐닝:</strong> 스위치를 누르는 동안 항목이 순환됨; 놓아서 선택</li>
+    </ul>
+
+    <h3>2.4.3 접근 방법 인터페이스</h3>
+    <pre><code>// 통합 접근 방법 인터페이스
+interface AccessMethod {
+    readonly type: 'direct' | 'scanning' | 'encoding';
+    readonly name: string;
+
+    initialize(): Promise&lt;void&gt;;
+    calibrate(): Promise&lt;CalibrationResult&gt;;
+
+    // 통합 선택 이벤트
+    onSelection(callback: (target: SelectionTarget) =&gt; void): void;
+
+    // 직접 선택 방법용
+    onPointerMove?(callback: (position: Point) =&gt; void): void;
+
+    // 스캐닝 방법용
+    onScanProgress?(callback: (current: ScanPosition) =&gt; void): void;
+
+    configure(settings: AccessSettings): void;
+    getStatus(): AccessStatus;
+    dispose(): void;
+}
+
+// 예: 시선 추적 구현
+class EyeGazeAccess implements AccessMethod {
+    readonly type = 'direct';
+    readonly name = '시선 추적';
+
+    private tracker: EyeTracker;
+    private dwellTime: number = 800; // ms
+
+    async initialize() {
+        this.tracker = await EyeTracker.connect();
+        await this.tracker.startTracking();
+    }
+
+    async calibrate() {
+        return await this.tracker.runCalibration({
+            points: 9,
+            animation: 'shrinking-circle'
+        });
+    }
+
+    configure(settings: AccessSettings) {
+        this.dwellTime = settings.dwellTime ?? 800;
+        this.tracker.setSmoothing(settings.smoothing ?? 'medium');
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>접근성 요구사항:</strong> 모든 WIA-AAC 시스템은 사용자가 주요 방법을 사용할 수 없게 될 경우 대안을 보장하기 위해 최소 두 가지 별개의 접근 방법을 지원해야 합니다.
+    </div>
+
+    <h2>2.5 계층 3: 콘텐츠 계층</h2>
+    <p>콘텐츠 계층은 AAC 시스템에서 사용하는 모든 언어적 및 개인화 리소스를 관리합니다:</p>
+
+    <h3>2.5.1 상징 관리</h3>
+    <p>상징은 다음을 포함하는 표준화된 패키지에 저장됩니다:</p>
+    <ul>
+        <li>여러 해상도의 벡터 및 래스터 이미지</li>
+        <li>상징을 개념에 연결하는 의미적 메타데이터</li>
+        <li>다국어 레이블 및 설명</li>
+        <li>사용 통계 및 빈도 데이터</li>
+        <li>라이선스 및 저작자 정보</li>
+    </ul>
+
+    <h3>2.5.2 어휘 조직</h3>
+    <pre><code>// 어휘 구조 정의
+interface Vocabulary {
+    id: string;
+    name: string;
+    version: string;
+    language: string;
+    organization: 'grid' | 'visual-scene' | 'hybrid';
+
+    pages: VocabularyPage[];
+    links: PageLink[];
+
+    coreWords: CoreWordSet;
+    fringeCategories: FringeCategory[];
+
+    metadata: {
+        targetAge: AgeRange;
+        languageLevel: LanguageLevel;
+        symbolSet: string;
+        author: string;
+        license: string;
+    };
+}
+
+interface VocabularyPage {
+    id: string;
+    name: string;
+    type: 'core' | 'fringe' | 'keyboard' | 'custom';
+    gridSize: { rows: number; columns: number };
+    cells: Cell[];
+    background?: BackgroundImage;
+}</code></pre>
+
+    <h3>2.5.3 사용자 프로필 저장</h3>
+    <p>사용자 프로필에는 개인화된 설정과 데이터가 포함됩니다:</p>
+    <ul>
+        <li>접근 방법 구성 및 보정 데이터</li>
+        <li>어휘 사용자화 및 개인 단어</li>
+        <li>음성 선호도 및 음성 뱅크 데이터</li>
+        <li>예측 최적화를 위한 사용 패턴</li>
+        <li>의사소통 기록 (선택사항, 개인정보 보호 제어 포함)</li>
+    </ul>
+
+    <h2>2.6 계층 4: 의사소통 엔진 계층</h2>
+    <p>의사소통 엔진은 사용자 선택을 의미 있는 의사소통으로 변환하는 지능적인 핵심입니다:</p>
+
+    <h3>2.6.1 메시지 구성</h3>
+    <p>메시지 작성기는 발화 구성을 관리합니다:</p>
+    <ul>
+        <li>상징을 구문으로 연결</li>
+        <li>메시지 버퍼 및 기록 관리</li>
+        <li>문법 및 형태론 처리</li>
+        <li>여러 구성 전략 지원</li>
+    </ul>
+
+    <h3>2.6.2 예측 엔진</h3>
+    <pre><code>// 예측 엔진 인터페이스
+interface PredictionEngine {
+    // 단어/상징 예측
+    predictNext(context: MessageContext): Prediction[];
+
+    // 문장 완성
+    completeSentence(partial: string): string[];
+
+    // 사용자 패턴에서 학습
+    learn(selection: SelectionEvent): void;
+
+    // 예측 동작 구성
+    configure(settings: PredictionSettings): void;
+}
+
+interface PredictionSettings {
+    maxPredictions: number;
+    includeRecent: boolean;
+    includeFrequent: boolean;
+    useLanguageModel: boolean;
+    personalWeight: number;  // 0-1, 개인화 대 일반 예측의 가중치
+    contextWindow: number;   // 고려할 이전 선택 수
+}
+
+// 예측 결과 예시
+interface Prediction {
+    symbol: Symbol;
+    confidence: number;
+    source: 'language-model' | 'personal-history' | 'recency' | 'frequency';
+}</code></pre>
+
+    <h3>2.6.3 언어 처리</h3>
+    <p>언어 프로세서는 언어적 변환을 처리합니다:</p>
+    <ul>
+        <li>형태론적 처리 (복수형, 시제, 활용)</li>
+        <li>상징의 구문적 배열</li>
+        <li>약어 및 축약어 확장</li>
+        <li>속도 향상 기술</li>
+    </ul>
+
+    <h2>2.7 계층 5: 애플리케이션 계층</h2>
+    <p>애플리케이션 계층은 사용자 대면 인터페이스를 제공합니다:</p>
+
+    <h3>2.7.1 의사소통 디스플레이</h3>
+    <p>여러 디스플레이 유형이 지원됩니다:</p>
+    <ul>
+        <li><strong>그리드 디스플레이:</strong> 전통적인 상징 행과 열</li>
+        <li><strong>시각적 장면 디스플레이:</strong> 대화형 사진 또는 일러스트레이션</li>
+        <li><strong>키보드 디스플레이:</strong> 예측과 함께 글자별 철자</li>
+        <li><strong>하이브리드 디스플레이:</strong> 여러 디스플레이 유형의 조합</li>
+    </ul>
+
+    <h3>2.7.2 사용자 인터페이스 구성요소</h3>
+    <pre><code>// UI 구성요소 사양
+interface CommunicationDisplay {
+    type: DisplayType;
+    layout: LayoutConfiguration;
+
+    // 상단 메시지 바
+    messageBar: {
+        visible: boolean;
+        height: number;
+        showPredictions: boolean;
+        speakOnSelect: boolean;
+    };
+
+    // 메인 콘텐츠 영역
+    contentArea: {
+        gridSize?: GridSize;
+        sceneImage?: string;
+        cells: UICell[];
+    };
+
+    // 도구 모음
+    toolbar: {
+        position: 'top' | 'bottom' | 'hidden';
+        buttons: ToolbarButton[];
+    };
+
+    // 접근성 기능
+    accessibility: {
+        highContrast: boolean;
+        largeText: boolean;
+        reducedMotion: boolean;
+        screenReaderOptimized: boolean;
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>UI 요구사항:</strong> 애플리케이션 계층은 일관된 기능을 유지하면서 기본 플랫폼의 기능에 적응해야 합니다. WIA-AAC 호환 앱은 전용 기기에서 실행되든 소비자 태블릿에서 실행되든 동등한 기능을 제공해야 합니다.
+    </div>
+
+    <h2>2.8 계층 간 통신</h2>
+    <p>계층은 잘 정의된 인터페이스와 이벤트를 통해 통신합니다:</p>
+
+    <h3>2.8.1 이벤트 흐름</h3>
+    <p>일반적인 선택은 다음과 같이 시스템을 통해 흐릅니다:</p>
+    <ol>
+        <li>플랫폼 계층이 원시 입력 감지 (터치, 스위치 누름, 시선 고정)</li>
+        <li>접근 계층이 입력을 해석하고 선택된 대상 식별</li>
+        <li>애플리케이션 계층이 시각적 피드백 업데이트</li>
+        <li>의사소통 엔진이 선택 처리</li>
+        <li>콘텐츠 계층이 상징 및 어휘 데이터 제공</li>
+        <li>의사소통 엔진이 메시지 및 예측 업데이트</li>
+        <li>애플리케이션 계층이 업데이트된 디스플레이 렌더링 및 구성된 경우 발화</li>
+    </ol>
+
+    <h3>2.8.2 이벤트 버스 아키텍처</h3>
+    <pre><code>// 계층 간 통신을 위한 중앙 이벤트 버스
+class AACEventBus {
+    private listeners: Map&lt;string, Set&lt;EventHandler&gt;&gt; = new Map();
+
+    emit(event: AACEvent): void {
+        const handlers = this.listeners.get(event.type);
+        if (handlers) {
+            handlers.forEach(handler => handler(event));
+        }
+    }
+
+    on(eventType: string, handler: EventHandler): Unsubscribe {
+        if (!this.listeners.has(eventType)) {
+            this.listeners.set(eventType, new Set());
+        }
+        this.listeners.get(eventType)!.add(handler);
+        return () => this.listeners.get(eventType)?.delete(handler);
+    }
+}
+
+// 이벤트 유형
+type AACEvent =
+    | { type: 'selection'; target: SelectionTarget }
+    | { type: 'message-update'; message: Message }
+    | { type: 'speak'; text: string }
+    | { type: 'prediction-update'; predictions: Prediction[] }
+    | { type: 'page-change'; page: VocabularyPage }
+    | { type: 'access-change'; method: AccessMethod };</code></pre>
+
+    <h2>2.9 확장성 포인트</h2>
+    <p>WIA-AAC 아키텍처는 여러 확장성 포인트를 제공합니다:</p>
+
+    <ul>
+        <li><strong>사용자 정의 접근 방법:</strong> 새로운 입력 기술이 AccessMethod 인터페이스를 구현할 수 있음</li>
+        <li><strong>상징 세트 플러그인:</strong> 콘텐츠 계층을 통해 추가 상징 시스템을 추가할 수 있음</li>
+        <li><strong>예측 엔진:</strong> 대체 예측 알고리즘을 교체할 수 있음</li>
+        <li><strong>음성 엔진:</strong> 다른 TTS 엔진을 통합할 수 있음</li>
+        <li><strong>디스플레이 템플릿:</strong> 사용자 정의 UI 레이아웃을 만들 수 있음</li>
+    </ul>
+
+    <p>이 계층화되고 확장 가능한 아키텍처는 WIA-AAC 시스템이 호환성과 사용자 연속성을 유지하면서 발전하는 기술과 함께 진화할 수 있도록 보장합니다.</p>
+</body>
+</html>

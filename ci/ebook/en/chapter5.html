@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 5: Integration Guide - WIA-CI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>WIA-CI Standard</h1>
+    <p class="subtitle">Chapter 5: Integration Guide</p>
+  </header>
+
+  <main class="container">
+    <h1>Chapter 5: Integration Guide</h1>
+
+    <h2>5.1 Speech Processor Integration</h2>
+    <p>Integrating WIA-CI with existing cochlear implant sound processors.</p>
+
+    <h3>Quick Start</h3>
+    <pre><code>import { WIACI } from '@anthropic/wia-ci';
+
+// Initialize CI processor
+const ci = new WIACI({
+  electrodes: 22,
+  strategy: 'WIA-OCTAVE',
+  sampleRate: 16000,
+  frameSize: 256
+});
+
+// Connect to device
+await ci.connect('BLE:XX:XX:XX:XX:XX:XX');
+
+// Enable octave enhancement
+await ci.wia.enableOctaveEnhancement();
+
+// Process audio
+ci.on('audio', (frame) => {
+  const processed = ci.process(frame);
+  console.log('Octave:', processed.octaveInfo.octaveNumber);
+});</code></pre>
+
+    <h3>Processor Configuration</h3>
+    <pre><code>const config = {
+  processor: {
+    sensitivity: 75,           // Microphone sensitivity
+    volume: 80,                // Output volume
+    noiseReduction: 'medium',  // 'off' | 'low' | 'medium' | 'high'
+    directionalMic: true       // Beamforming
+  },
+
+  mapping: {
+    strategy: 'WIA-OCTAVE',
+    maxima: 10,                // n-of-m (select top 10)
+    stimulationRate: 900,      // pulses per second per channel
+    pulseWidth: 25             // μs
+  },
+
+  wia: {
+    octaveEnhancement: true,
+    musicMode: 'auto',         // Auto-detect music
+    tfsEncoding: true,         // Temporal Fine Structure
+    harmonicPriority: true     // Prioritize harmonics
+  }
+};
+
+await ci.setConfig(config);</code></pre>
+
+    <h2>5.2 Mobile App Integration</h2>
+    <p>Building mobile applications for CI control and monitoring.</p>
+
+    <h3>iOS Integration</h3>
+    <pre><code>import WIACI
+
+class CIViewController: UIViewController {
+    let ci = WIACIManager.shared
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        // Scan for CI processors
+        ci.startScanning { devices in
+            self.showDeviceList(devices)
+        }
+    }
+
+    func connect(to device: CIDevice) {
+        ci.connect(device) { result in
+            switch result {
+            case .success:
+                self.setupControls()
+                self.startMonitoring()
+            case .failure(let error):
+                self.showError(error)
+            }
+        }
+    }
+
+    @IBAction func volumeChanged(_ sender: UISlider) {
+        ci.setVolume(Int(sender.value))
+    }
+
+    @IBAction func enableMusic(_ sender: UISwitch) {
+        ci.wia.setOctaveEnhancement(enabled: sender.isOn)
+    }
+}</code></pre>
+
+    <h3>Android Integration</h3>
+    <pre><code>import com.wia.ci.sdk.*
+
+class CIActivity : AppCompatActivity() {
+    private lateinit var ci: WIACIManager
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        ci = WIACIManager.getInstance(this)
+
+        // Request permissions
+        if (checkBlePermissions()) {
+            scanForDevices()
+        }
+    }
+
+    private fun scanForDevices() {
+        ci.startScanning(object : ScanCallback {
+            override fun onDeviceFound(device: CIDevice) {
+                deviceAdapter.add(device)
+            }
+        })
+    }
+
+    private fun connectToDevice(device: CIDevice) {
+        ci.connect(device, object : ConnectionCallback {
+            override fun onConnected(device: CIDevice) {
+                setupUI(device)
+                monitorStatus()
+            }
+
+            override fun onError(error: CIError) {
+                showError(error)
+            }
+        })
+    }
+}</code></pre>
+
+    <h2>5.3 Music Optimization</h2>
+    <p>Configuring WIA-CI for optimal music listening experience.</p>
+
+    <h3>Music Mode Configuration</h3>
+    <pre><code>const musicConfig = {
+  // Audio processing
+  sampleRate: 44100,          // Higher for music
+  frameSize: 1024,            // Larger for better frequency resolution
+
+  // Octave enhancement
+  octaveEnhancement: {
+    enabled: true,
+    f0Range: [80, 600],       // Expected F0 range for music
+    modulationRate: 8,        // Hz (octave modulation)
+    depth: 0.4                // 40% modulation depth
+  },
+
+  // TFS encoding
+  tfs: {
+    enabled: true,
+    channels: [17, 18, 19, 20, 21, 22],  // Low freq channels
+    maxRate: 500              // Hz (phase locking limit)
+  },
+
+  // Channel selection
+  channelSelection: {
+    maxima: 12,               // More channels for music
+    harmonicPriority: true,   // Preserve harmonics
+    preserveF0: true          // Always include F0 channel
+  },
+
+  // Noise reduction
+  noiseReduction: 'low'       // Minimal for music clarity
+};
+
+await ci.setConfig(musicConfig);</code></pre>
+
+    <h3>Genre-Specific Tuning</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Genre</th>
+          <th>Sample Rate</th>
+          <th>Maxima</th>
+          <th>TFS</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Classical</td>
+          <td>44.1 kHz</td>
+          <td>12</td>
+          <td>Enabled</td>
+          <td>Full harmonic richness</td>
+        </tr>
+        <tr>
+          <td>Pop/Rock</td>
+          <td>44.1 kHz</td>
+          <td>10</td>
+          <td>Enabled</td>
+          <td>Balanced for rhythm & melody</td>
+        </tr>
+        <tr>
+          <td>Jazz</td>
+          <td>48 kHz</td>
+          <td>12</td>
+          <td>Enabled</td>
+          <td>Preserve complex harmonics</td>
+        </tr>
+        <tr>
+          <td>Electronic</td>
+          <td>48 kHz</td>
+          <td>10</td>
+          <td>Partial</td>
+          <td>Focus on rhythm and bass</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5.4 WIA Ecosystem Integration</h2>
+    <p>WIA-CI integrates seamlessly with the WIA family of standards.</p>
+
+    <h3>WIA-INTENT Integration</h3>
+    <pre><code>import { WIAIntent } from '@anthropic/wia-intent';
+import { WIACI } from '@anthropic/wia-ci';
+
+const intent = new WIAIntent();
+const ci = new WIACI();
+
+// Voice control for CI
+intent.on('command', async (cmd) => {
+  switch (cmd.intent) {
+    case 'music.play':
+      // Auto-enable music mode
+      await ci.setMode('music');
+      await ci.wia.enableOctaveEnhancement();
+      break;
+
+    case 'volume.adjust':
+      await ci.setVolume(cmd.parameters.level);
+      break;
+
+    case 'program.switch':
+      await ci.switchProgram(cmd.parameters.program);
+      break;
+
+    case 'environment.adapt':
+      await ci.adaptToEnvironment(cmd.parameters.environment);
+      break;
+  }
+});
+
+// Example usage:
+// User: "Switch to music mode"
+// → CI enables octave enhancement automatically</code></pre>
+
+    <h3>WIA-OMNI-API Integration</h3>
+    <pre><code>import { OmniAPI } from '@anthropic/wia-omni-api';
+import { CochlearAdapter, MedElAdapter } from '@anthropic/wia-ci';
+
+// Unified interface for all manufacturers
+const omni = new OmniAPI();
+
+omni.registerAdapter('cochlear', new CochlearAdapter());
+omni.registerAdapter('medel', new MedElAdapter());
+
+// Same API regardless of manufacturer
+const ci = await omni.getDevice('cochlear', deviceId);
+await ci.setVolume(80);                    // Works for all
+await ci.getElectrodeImpedances();         // Auto-mapped</code></pre>
+
+    <h3>WIA-AIR-POWER Integration</h3>
+    <pre><code>import { AirPower } from '@anthropic/wia-air-power';
+
+const power = new AirPower();
+
+// Optimize for battery life
+power.optimize(ci, {
+  mode: 'battery_saver',
+
+  processing: {
+    octaveDetection: 'onDevice',      // Local processing
+    advancedMusic: 'cloud'            // Offload heavy tasks
+  },
+
+  powerSaving: {
+    reduceSamplingInQuiet: true,
+    adaptiveProcessing: true
+  }
+});
+
+// Battery monitoring
+power.on('battery_low', async (level) => {
+  if (level < 10) {
+    await ci.setMode('essential');
+    await ci.wia.disableOctaveEnhancement();
+  }
+});</code></pre>
+
+    <h2>5.5 Music Streaming Services</h2>
+    <p>Integration with popular music streaming platforms.</p>
+
+    <h3>Spotify Integration</h3>
+    <pre><code>import SpotifyWebApi from 'spotify-web-api-node';
+import { WIACI } from '@anthropic/wia-ci';
+
+const spotify = new SpotifyWebApi();
+const ci = new WIACI();
+
+// Optimize playback for CI
+spotify.on('track.play', async (track) => {
+  // Get audio analysis
+  const analysis = await spotify.getAudioAnalysis(track.id);
+
+  // Adjust CI based on track characteristics
+  if (analysis.track.tempo > 120) {
+    await ci.wia.setTFSStrength(0.8);  // Fast tempo
+  }
+
+  if (analysis.track.key !== null) {
+    await ci.wia.setKeyHint(analysis.track.key);
+  }
+
+  // Enable music mode
+  await ci.setMode('music');
+});
+
+// CI-optimized EQ
+const ciEQ = {
+  bass: +2,        // Boost low frequencies
+  mid: 0,          // Neutral
+  treble: -1       // Slight reduction
+};
+await spotify.setEQ(ciEQ);</code></pre>
+
+    <h2>5.6 Smart Home Integration</h2>
+    <p>Connect CI to smart home ecosystems for enhanced accessibility.</p>
+
+    <h3>HomeKit Integration</h3>
+    <pre><code>import { HomeKit } from 'homekit-sdk';
+
+const homekit = new HomeKit();
+
+// Register CI as accessory
+homekit.addAccessory({
+  name: 'My CI',
+  category: 'hearing_aid',
+  services: [
+    {
+      type: 'hearing_aid',
+      characteristics: [
+        { name: 'volume', type: 'int', min: 0, max: 100 },
+        { name: 'program', type: 'string' },
+        { name: 'battery', type: 'int', read_only: true }
+      ]
+    }
+  ]
+});
+
+// Automations
+homekit.createAutomation({
+  trigger: 'doorbell.ring',
+  action: 'ci.alert.doorbell'
+});
+
+homekit.createAutomation({
+  trigger: 'tv.power.on',
+  action: 'ci.program.switch:tv'
+});
+
+// Siri commands:
+// "Hey Siri, increase CI volume"
+// "Hey Siri, switch to music mode"</code></pre>
+
+    <h2>5.7 Wearable Integration</h2>
+    <p>Integration with smartwatches for convenient CI control.</p>
+
+    <h3>Apple Watch</h3>
+    <pre><code>import WatchKit
+import WIACI
+
+class CIWatchController: WKInterfaceController {
+    @IBOutlet var volumeSlider: WKInterfaceSlider!
+    @IBOutlet var batteryLabel: WKInterfaceLabel!
+    @IBOutlet var modeLabel: WKInterfaceLabel!
+
+    let ci = WIACIManager.shared
+
+    override func awake(withContext context: Any?) {
+        super.awake(withContext: context)
+
+        // Monitor CI status
+        ci.subscribe { status in
+            self.batteryLabel.setText("\(status.battery)%")
+            self.modeLabel.setText(status.mode)
+        }
+    }
+
+    @IBAction func volumeChanged(_ value: Float) {
+        ci.setVolume(Int(value))
+        WKInterfaceDevice.current().play(.success)
+    }
+
+    @IBAction func switchProgram() {
+        ci.nextProgram()
+    }
+}</code></pre>
+
+    <h2>5.8 Clinical Integration</h2>
+    <p>Integration with audiologist fitting software and clinical systems.</p>
+
+    <h3>Fitting Software Integration</h3>
+    <pre><code>import { ClinicalWorkstation } from '@wia/ci-clinical';
+
+const workstation = new ClinicalWorkstation();
+
+// Patient session
+async function conductFitting(patientId) {
+  // 1. Measure impedances
+  const impedances = await workstation.measureImpedances();
+  console.log('Electrode status:', impedances);
+
+  // 2. Neural Response Telemetry
+  const nrt = await workstation.measureNRT();
+  console.log('NRT responses:', nrt.amplitudes);
+
+  // 3. Adjust T/C levels
+  await workstation.adjustTCLevels({
+    thresholds: nrt.suggestedT,
+    comforts: nrt.suggestedC
+  });
+
+  // 4. Test octave perception
+  const octaveTest = await workstation.testOctavePerception();
+  console.log('Octave accuracy:', octaveTest.accuracy);
+
+  // 5. Optimize music mode
+  if (octaveTest.accuracy > 0.7) {
+    await workstation.optimizeMusicMode();
+  }
+
+  // 6. Save session
+  await workstation.saveSession({
+    patientId,
+    date: new Date(),
+    results: { impedances, nrt, octaveTest }
+  });
+}</code></pre>
+
+    <h3>EHR/FHIR Integration</h3>
+    <pre><code>// Export session to FHIR format
+const fhirDevice = {
+  resourceType: 'Device',
+  identifier: [{
+    system: 'urn:wia:ci:serial',
+    value: 'CI-2025-001234'
+  }],
+  type: {
+    coding: [{
+      system: 'http://snomed.info/sct',
+      code: '43252007',
+      display: 'Cochlear implant'
+    }]
+  },
+  property: [
+    {
+      type: { text: 'electrodeCount' },
+      valueQuantity: { value: 22 }
+    },
+    {
+      type: { text: 'wiaOctaveEnhancement' },
+      valueCode: [{ code: 'enabled' }]
+    }
+  ]
+};
+
+// Send to EHR system
+await ehr.createResource(fhirDevice);</code></pre>
+
+    <h2>5.9 Cloud Services Integration</h2>
+    <p>Leverage cloud services for analytics, backup, and remote support.</p>
+
+    <h3>Configuration Backup & Sync</h3>
+    <pre><code>import { WIACloud } from '@anthropic/wia-ci';
+
+const cloud = new WIACloud();
+
+// Backup configuration
+const backupId = await cloud.config.backup(ci.getConfig());
+console.log('Backup ID:', backupId);
+
+// Restore from cloud
+const config = await cloud.config.restore(backupId);
+await ci.setConfig(config);
+
+// Sync across devices
+await cloud.config.sync(deviceId, {
+  autoSync: true,
+  interval: 3600  // Sync every hour
+});</code></pre>
+
+    <h3>Analytics & Insights</h3>
+    <pre><code>// Get listening statistics
+const stats = await cloud.analytics.getListeningStats({
+  period: 'last_30_days'
+});
+
+console.log('Total listening:', stats.totalHours, 'hours');
+console.log('Music:', stats.musicPercentage, '%');
+console.log('Octave improvement:', stats.octaveImprovement);</code></pre>
+
+    <div class="success-box">
+      <h3>Integration Checklist</h3>
+      <ul>
+        <li>✓ Speech processor connectivity (RF/BLE)</li>
+        <li>✓ Mobile app (iOS/Android)</li>
+        <li>✓ Music streaming optimization</li>
+        <li>✓ WIA ecosystem integration</li>
+        <li>✓ Smart home automation</li>
+        <li>✓ Wearable device control</li>
+        <li>✓ Clinical system integration</li>
+        <li>✓ Cloud backup & analytics</li>
+      </ul>
+    </div>
+
+    </main>
+</body>
+</html>

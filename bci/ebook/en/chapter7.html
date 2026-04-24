@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA BCI Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Chapter 7: Implementation Examples</h1>
+        <p class="subtitle">Python, TypeScript, and Bash for BCI Systems</p>
+        <p class="version">WIA BCI Standard v1.0.0</p>
+    </header>
+
+    <main>
+        <section>
+            <h1>7.1 Installation</h1>
+
+            <h2>TypeScript/JavaScript (npm)</h2>
+            <pre><code># Install via npm
+npm install wia-bci
+
+# Or via yarn
+yarn add wia-bci
+
+# TypeScript types included
+import { WiaBci, SignalProcessor } from 'wia-bci';</code></pre>
+
+            <h2>Python (pip)</h2>
+            <pre><code># Install via pip
+pip install wia-bci
+
+# Or via conda
+conda install -c conda-forge wia-bci
+
+# Import
+from wia_bci import WiaBci, SignalProcessor</code></pre>
+
+            <h2>System Requirements</h2>
+            <ul>
+                <li><strong>Node.js:</strong> v18+ (for TypeScript/JavaScript)</li>
+                <li><strong>Python:</strong> 3.8+ (for Python)</li>
+                <li><strong>Operating Systems:</strong> Windows 10+, macOS 11+, Linux (Ubuntu 20.04+)</li>
+                <li><strong>Optional:</strong> CUDA for GPU-accelerated signal processing</li>
+            </ul>
+        </section>
+
+        <section>
+            <h1>7.2 Basic Connection (TypeScript)</h1>
+
+            <h2>Simple Connection Example</h2>
+            <pre><code>import { WiaBci } from 'wia-bci';
+
+async function main() {
+  // Create BCI instance
+  const bci = new WiaBci({
+    logLevel: 'info',
+    autoReconnect: true
+  });
+
+  try {
+    // List available devices
+    console.log('Searching for devices...');
+    const devices = await bci.listDevices();
+    console.log('Found devices:', devices);
+
+    // Connect to first device
+    if (devices.length > 0) {
+      await bci.connect({
+        type: 'eeg_headset',
+        device: {
+          manufacturer: devices[0].manufacturer,
+          model: devices[0].model
+        }
+      });
+
+      console.log('Connected:', bci.isConnected());
+      console.log('Device info:', bci.getDeviceInfo());
+
+      // Start streaming
+      await bci.startStream();
+      console.log('Streaming started');
+
+      // Collect data for 10 seconds
+      setTimeout(async () => {
+        await bci.stopStream();
+        await bci.disconnect();
+        console.log('Session complete');
+      }, 10000);
+
+    } else {
+      console.log('No devices found');
+    }
+
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+
+main();</code></pre>
+
+            <h2>Event Handling</h2>
+            <pre><code>import { WiaBci } from 'wia-bci';
+
+const bci = new WiaBci();
+
+// Connection events
+bci.on('connected', () => {
+  console.log('Device connected');
+});
+
+bci.on('disconnected', () => {
+  console.log('Device disconnected');
+});
+
+// Data events
+bci.on('signal', (event) => {
+  console.log(`Sample ${event.sampleIndex}:`, event.data);
+});
+
+// Quality events
+bci.on('quality', (event) => {
+  console.log('Signal quality:', event.overallQuality);
+  event.channelQualities.forEach(ch => {
+    console.log(`  ${ch.label}: ${ch.signalQuality} (impedance: ${ch.impedance}kΩ)`);
+  });
+});
+
+// Error events
+bci.on('error', (error) => {
+  console.error('Error:', error.message);
+});
+
+await bci.connect({ type: 'eeg_headset' });
+await bci.startStream();</code></pre>
+        </section>
+
+        <section>
+            <h1>7.3 Motor Imagery Classification (TypeScript)</h1>
+
+            <h2>Complete Motor Imagery System</h2>
+            <pre><code>import { WiaBci, SignalProcessor, FeatureExtractor } from 'wia-bci';
+import { MLPClassifier } from 'wia-bci/ml';
+
+class MotorImageryBCI {
+  private bci: WiaBci;
+  private classifier: MLPClassifier;
+  private buffer: Float32Array[] = [];
+  private readonly EPOCH_SIZE = 250; // 1 second @ 250Hz
+
+  constructor() {
+    this.bci = new WiaBci();
+    this.classifier = new MLPClassifier({
+      inputSize: 32,  // Number of features
+      hiddenLayers: [64, 32],
+      outputSize: 4,  // rest, left, right, feet
+      activation: 'relu'
+    });
+  }
+
+  async initialize(): Promise&lt;void&gt; {
+    await this.bci.connect({
+      type: 'eeg_headset',
+      acquisition: {
+        samplingRate: 250,
+        channels: ['C3', 'Cz', 'C4'],  // Motor cortex channels
+        filters: [
+          { type: 'bandpass', frequency: [8, 30] }  // Mu/Beta bands
+        ]
+      }
+    });
+
+    // Load pre-trained model or train new one
+    await this.loadModel('./models/motor-imagery.json');
+  }
+
+  async start(): Promise&lt;void&gt; {
+    this.bci.on('signal', (event) => this.processSignal(event));
+    this.bci.on('classification', (result) => this.handleClassification(result));
+    await this.bci.startStream();
+  }
+
+  private processSignal(event: SignalEvent): void {
+    this.buffer.push(event.data);
+
+    if (this.buffer.length >= this.EPOCH_SIZE) {
+      const epoch = this.concatenateBuffers(this.buffer.splice(0, this.EPOCH_SIZE));
+
+      // Preprocessing
+      const filtered = SignalProcessor.bandpass(epoch, 8, 30, 250);
+
+      // Feature extraction
+      const bandPowers = SignalProcessor.allBandPowers(filtered, 250);
+      const hjorth = FeatureExtractor.hjorthParameters(filtered);
+      const features = [
+        bandPowers.alpha,
+        bandPowers.beta,
+        hjorth.activity,
+        hjorth.mobility,
+        hjorth.complexity,
+        ...this.extractChannelFeatures(filtered)
+      ];
+
+      // Classify
+      const prediction = this.classifier.predict(features);
+
+      // Emit classification event
+      this.bci.emit('classification', {
+        timestamp: Date.now(),
+        classId: prediction.classIndex,
+        className: ['rest', 'left_hand', 'right_hand', 'feet'][prediction.classIndex],
+        confidence: prediction.confidence,
+        probabilities: {
+          rest: prediction.probabilities[0],
+          left_hand: prediction.probabilities[1],
+          right_hand: prediction.probabilities[2],
+          feet: prediction.probabilities[3]
+        }
+      });
+    }
+  }
+
+  private handleClassification(result: ClassificationEvent): void {
+    console.log(`Classified: ${result.className} (${(result.confidence * 100).toFixed(1)}%)`);
+
+    // Trigger action if confidence is high
+    if (result.confidence > 0.7) {
+      this.executeCommand(result.className);
+    }
+  }
+
+  private executeCommand(command: string): void {
+    switch (command) {
+      case 'left_hand':
+        console.log('Command: Move cursor left');
+        break;
+      case 'right_hand':
+        console.log('Command: Move cursor right');
+        break;
+      case 'feet':
+        console.log('Command: Click');
+        break;
+    }
+  }
+
+  private concatenateBuffers(buffers: Float32Array[]): Float32Array {
+    const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
+    const result = new Float32Array(totalLength);
+    let offset = 0;
+    for (const buf of buffers) {
+      result.set(buf, offset);
+      offset += buf.length;
+    }
+    return result;
+  }
+
+  private extractChannelFeatures(data: Float32Array): number[] {
+    // Extract per-channel features
+    return [];  // Implement based on your needs
+  }
+
+  private async loadModel(path: string): Promise&lt;void&gt; {
+    // Load pre-trained weights
+    const weights = await fetch(path).then(r => r.json());
+    this.classifier.loadWeights(weights);
+  }
+}
+
+// Usage
+const mi = new MotorImageryBCI();
+await mi.initialize();
+await mi.start();</code></pre>
+        </section>
+
+        <section>
+            <h1>7.4 Python Examples</h1>
+
+            <h2>Basic Connection (Python)</h2>
+            <pre><code>import asyncio
+from wia_bci import WiaBci
+
+async def main():
+    # Create BCI instance
+    bci = WiaBci(log_level='info', auto_reconnect=True)
+
+    try:
+        # List devices
+        print('Searching for devices...')
+        devices = await bci.list_devices()
+        print(f'Found {len(devices)} devices')
+
+        if devices:
+            # Connect to first device
+            await bci.connect(
+                type='eeg_headset',
+                device={
+                    'manufacturer': devices[0].manufacturer,
+                    'model': devices[0].model
+                }
+            )
+
+            print(f'Connected: {bci.is_connected()}')
+            print(f'Device: {bci.get_device_info()}')
+
+            # Event handler
+            @bci.on('signal')
+            def on_signal(event):
+                print(f'Sample {event.sample_index}: {event.data[:4]}...')
+
+            # Start streaming
+            await bci.start_stream()
+            print('Streaming...')
+
+            # Run for 10 seconds
+            await asyncio.sleep(10)
+
+            # Cleanup
+            await bci.stop_stream()
+            await bci.disconnect()
+            print('Complete')
+
+        else:
+            print('No devices found')
+
+    except Exception as e:
+        print(f'Error: {e}')
+
+# Run
+asyncio.run(main())</code></pre>
+
+            <h2>Real-time Signal Processing (Python)</h2>
+            <pre><code>import asyncio
+import numpy as np
+from wia_bci import WiaBci, SignalProcessor
+from collections import deque
+
+class RealtimeProcessor:
+    def __init__(self):
+        self.bci = WiaBci()
+        self.buffer = deque(maxlen=250)  # 1 second @ 250Hz
+        self.fs = 250  # Sampling rate
+
+    async def initialize(self):
+        await self.bci.connect(
+            type='eeg_headset',
+            acquisition={
+                'sampling_rate': self.fs,
+                'channels': ['Fp1', 'Fp2', 'C3', 'C4']
+            }
+        )
+
+        @self.bci.on('signal')
+        def on_signal(event):
+            self.process_signal(event)
+
+    def process_signal(self, event):
+        # Add to buffer
+        self.buffer.append(event.data)
+
+        # Process when buffer is full
+        if len(self.buffer) == self.buffer.maxlen:
+            # Convert to numpy array
+            epoch = np.array(list(self.buffer))
+
+            # Apply bandpass filter (8-30 Hz for motor imagery)
+            filtered = SignalProcessor.bandpass(epoch, 8, 30, self.fs)
+
+            # Compute band powers
+            powers = SignalProcessor.all_band_powers(filtered, self.fs)
+
+            # Display
+            print(f'Alpha: {powers.alpha:.2f}, Beta: {powers.beta:.2f}')
+
+            # Check for high alpha (relaxed state)
+            if powers.alpha > 15:
+                print('Relaxed state detected')
+
+    async def start(self):
+        await self.bci.start_stream()
+        print('Processing started...')
+
+        # Run indefinitely
+        while True:
+            await asyncio.sleep(1)
+
+# Usage
+processor = RealtimeProcessor()
+asyncio.run(processor.initialize())
+asyncio.run(processor.start())</code></pre>
+        </section>
+
+        <section>
+            <h1>7.5 Data Recording & Export</h1>
+
+            <h2>Recording Session Data</h2>
+            <pre><code>import { WiaBci, createRecording } from 'wia-bci';
+
+const bci = new WiaBci();
+await bci.connect({ type: 'eeg_headset' });
+
+// Create recording
+const recording = createRecording({
+  recordingId: `rec-${Date.now()}`,
+  device: bci.getDeviceInfo(),
+  channels: bci.getChannels(),
+  session: {
+    paradigm: 'motor_imagery',
+    description: 'Motor imagery training session'
+  },
+  outputDir: './recordings/session-001'
+});
+
+// Start recording
+await recording.start();
+console.log('Recording started');
+
+// Record signal data
+bci.on('signal', (event) => {
+  recording.addSample(event);
+});
+
+// Record markers
+bci.on('marker', (event) => {
+  recording.addMarker(event);
+});
+
+// Start streaming
+await bci.startStream();
+
+// Record for 5 minutes
+setTimeout(async () => {
+  await bci.stopStream();
+  await recording.stop();
+  await recording.save();
+
+  console.log('Recording saved to:', recording.getPath());
+  console.log('Duration:', recording.getDuration(), 'seconds');
+  console.log('Samples:', recording.getSampleCount());
+
+  await bci.disconnect();
+}, 5 * 60 * 1000);</code></pre>
+
+            <h2>Export to Different Formats</h2>
+            <pre><code>import { convertWiaToBids, convertWiaToEdf, exportToCSV } from 'wia-bci';
+
+// Export to BIDS
+await convertWiaToBids(
+  './recordings/session-001',
+  './bids-dataset',
+  {
+    participant: { participant_id: 'sub-001', age: 35, sex: 'M' }
+  }
+);
+
+// Export to EDF+
+await convertWiaToEdf(
+  './recordings/session-001',
+  './exports/session-001.edf'
+);
+
+// Export to CSV (for spreadsheet analysis)
+await exportToCSV(
+  './recordings/session-001',
+  './exports/session-001.csv',
+  {
+    includeHeaders: true,
+    includeTimestamps: true
+  }
+);</code></pre>
+        </section>
+
+        <section>
+            <h1>7.6 Bash Scripts</h1>
+
+            <h2>Device Discovery Script</h2>
+            <pre><code>#!/bin/bash
+# discover-bci-devices.sh
+
+# List all BCI devices
+echo "Searching for BCI devices..."
+
+wia-bci list-devices --format json > devices.json
+
+# Parse and display
+cat devices.json | jq '.[] | "\(.manufacturer) \(.model) (\(.type))"'
+
+echo "Found $(cat devices.json | jq 'length') devices"</code></pre>
+
+            <h2>Automated Recording Script</h2>
+            <pre><code>#!/bin/bash
+# record-session.sh
+
+SUBJECT_ID=$1
+SESSION_ID=$2
+DURATION=$3  # in seconds
+
+if [ -z "$SUBJECT_ID" ] || [ -z "$SESSION_ID" ] || [ -z "$DURATION" ]; then
+  echo "Usage: $0 <subject_id> <session_id> <duration_seconds>"
+  exit 1
+fi
+
+OUTPUT_DIR="./data/sub-${SUBJECT_ID}/ses-${SESSION_ID}"
+mkdir -p "$OUTPUT_DIR"
+
+echo "Starting recording..."
+echo "  Subject: $SUBJECT_ID"
+echo "  Session: $SESSION_ID"
+echo "  Duration: $DURATION seconds"
+echo "  Output: $OUTPUT_DIR"
+
+# Start recording
+wia-bci record \
+  --device auto \
+  --duration "$DURATION" \
+  --output "$OUTPUT_DIR" \
+  --paradigm motor_imagery \
+  --subject-id "$SUBJECT_ID" \
+  --session-id "$SESSION_ID"
+
+echo "Recording complete"
+
+# Validate recording
+wia-bci validate "$OUTPUT_DIR"
+
+# Generate summary
+wia-bci summary "$OUTPUT_DIR" > "$OUTPUT_DIR/summary.txt"
+
+echo "Summary saved to $OUTPUT_DIR/summary.txt"</code></pre>
+
+            <h2>Batch Processing Script</h2>
+            <pre><code>#!/bin/bash
+# process-all-recordings.sh
+
+# Process all recordings in data directory
+for SUBJECT_DIR in ./data/sub-*/; do
+  SUBJECT_ID=$(basename "$SUBJECT_DIR")
+
+  for SESSION_DIR in "$SUBJECT_DIR"/ses-*/; do
+    SESSION_ID=$(basename "$SESSION_DIR")
+
+    echo "Processing $SUBJECT_ID / $SESSION_ID..."
+
+    # Apply preprocessing
+    wia-bci preprocess \
+      --input "$SESSION_DIR" \
+      --output "$SESSION_DIR/derivatives/preprocessed" \
+      --highpass 0.5 \
+      --lowpass 50 \
+      --notch 60
+
+    # Extract features
+    wia-bci extract-features \
+      --input "$SESSION_DIR/derivatives/preprocessed" \
+      --output "$SESSION_DIR/derivatives/features" \
+      --window 1.0 \
+      --overlap 0.5
+
+    # Export to CSV
+    wia-bci export \
+      --input "$SESSION_DIR/derivatives/features" \
+      --output "$SESSION_DIR/derivatives/features.csv" \
+      --format csv
+
+    echo "  Complete"
+  done
+done
+
+echo "All recordings processed"</code></pre>
+        </section>
+
+        <section>
+            <h1>7.7 Web Application Integration</h1>
+
+            <h2>React Component</h2>
+            <pre><code>import React, { useState, useEffect } from 'react';
+import { WiaBci } from 'wia-bci';
+
+function BCIMonitor() {
+  const [bci, setBci] = useState&lt;WiaBci | null&gt;(null);
+  const [connected, setConnected] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [bandPowers, setBandPowers] = useState&lt;BandPowers | null&gt;(null);
+
+  useEffect(() => {
+    const bciInstance = new WiaBci();
+    setBci(bciInstance);
+
+    return () => {
+      bciInstance.dispose();
+    };
+  }, []);
+
+  const handleConnect = async () => {
+    if (!bci) return;
+
+    try {
+      await bci.connect({ type: 'eeg_headset' });
+      setConnected(true);
+    } catch (error) {
+      console.error('Connection failed:', error);
+    }
+  };
+
+  const handleStartStream = async () => {
+    if (!bci) return;
+
+    bci.on('signal', (event) => {
+      const powers = SignalProcessor.allBandPowers(event.data, 250);
+      setBandPowers(powers);
+    });
+
+    await bci.startStream();
+    setStreaming(true);
+  };
+
+  const handleStopStream = async () => {
+    if (!bci) return;
+    await bci.stopStream();
+    setStreaming(false);
+  };
+
+  return (
+    &lt;div className="bci-monitor"&gt;
+      &lt;h2&gt;BCI Monitor&lt;/h2&gt;
+
+      &lt;div className="controls"&gt;
+        &lt;button onClick={handleConnect} disabled={connected}&gt;
+          {connected ? 'Connected' : 'Connect'}
+        &lt;/button&gt;
+
+        &lt;button onClick={handleStartStream} disabled={!connected || streaming}&gt;
+          Start Stream
+        &lt;/button&gt;
+
+        &lt;button onClick={handleStopStream} disabled={!streaming}&gt;
+          Stop Stream
+        &lt;/button&gt;
+      &lt;/div&gt;
+
+      {bandPowers && (
+        &lt;div className="band-powers"&gt;
+          &lt;h3&gt;Brain Activity&lt;/h3&gt;
+          &lt;div&gt;Delta: {bandPowers.delta.toFixed(2)} µV²&lt;/div&gt;
+          &lt;div&gt;Theta: {bandPowers.theta.toFixed(2)} µV²&lt;/div&gt;
+          &lt;div&gt;Alpha: {bandPowers.alpha.toFixed(2)} µV²&lt;/div&gt;
+          &lt;div&gt;Beta: {bandPowers.beta.toFixed(2)} µV²&lt;/div&gt;
+          &lt;div&gt;Gamma: {bandPowers.gamma.toFixed(2)} µV²&lt;/div&gt;
+        &lt;/div&gt;
+      )}
+    &lt;/div&gt;
+  );
+}
+
+export default BCIMonitor;</code></pre>
+        </section>
+
+        <section>
+            <h1>7.8 Testing & Simulation</h1>
+
+            <h2>Using the Simulator</h2>
+            <pre><code>import { WiaBci } from 'wia-bci';
+
+// Connect to simulator (no hardware required)
+const bci = new WiaBci();
+await bci.connect({
+  type: 'simulator',
+  simulation: {
+    paradigm: 'motor_imagery',
+    samplingRate: 250,
+    channels: 8,
+    noiseLevel: 0.1,  // Add realistic noise
+    artifacts: true   // Simulate blinks, movements
+  }
+});
+
+// Simulator generates realistic BCI data
+bci.on('signal', (event) => {
+  console.log('Simulated signal:', event.data);
+});
+
+// Trigger simulated events
+await bci.sendCommand({
+  command: 'trigger_event',
+  params: { code: 10, label: 'left_hand' }
+});
+
+await bci.startStream();</code></pre>
+
+            <h2>Unit Testing</h2>
+            <pre><code>import { describe, it, expect, beforeEach } from 'vitest';
+import { WiaBci, SignalProcessor } from 'wia-bci';
+
+describe('Motor Imagery BCI', () => {
+  let bci: WiaBci;
+
+  beforeEach(async () => {
+    bci = new WiaBci();
+    await bci.connect({ type: 'simulator' });
+  });
+
+  it('should connect to simulator', () => {
+    expect(bci.isConnected()).toBe(true);
+  });
+
+  it('should stream data', async () => {
+    let dataReceived = false;
+
+    bci.once('signal', () => {
+      dataReceived = true;
+    });
+
+    await bci.startStream();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    expect(dataReceived).toBe(true);
+  });
+
+  it('should classify motor imagery', async () => {
+    const classifications: string[] = [];
+
+    bci.on('classification', (event) => {
+      classifications.push(event.className);
+    });
+
+    await bci.startStream();
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    expect(classifications.length).toBeGreaterThan(0);
+    expect(classifications).toContain('left_hand');
+  });
+});</code></pre>
+        </section>
+
+        <div class="navigation">
+            <a href="chapter6.html">← Previous: Chapter 6</a>
+            <a href="chapter8.html">Next: Chapter 8 (Certification) →</a>
+        </div>
+    </main>
+</body>
+</html>

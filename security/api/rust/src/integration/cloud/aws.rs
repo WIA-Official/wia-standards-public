@@ -2,9 +2,9 @@
 //!
 //! Send security findings to AWS Security Hub using ASFF format.
 
+use super::{CloudError, CloudResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{CloudResult, CloudError};
 
 /// AWS Security Hub configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -303,9 +303,7 @@ impl AwsSecurityHubExporter {
         self.config.product_arn.clone().unwrap_or_else(|| {
             format!(
                 "arn:aws:securityhub:{}:{}:product/{}/wia-security",
-                self.config.region,
-                self.config.account_id,
-                self.config.account_id
+                self.config.region, self.config.account_id, self.config.account_id
             )
         })
     }
@@ -323,14 +321,15 @@ impl AwsSecurityHubExporter {
     }
 
     /// Convert WIA finding to ASFF format
-    pub fn convert_finding(&self, finding: &super::super::importers::WiaFinding, host: &str) -> AsffFinding {
+    pub fn convert_finding(
+        &self,
+        finding: &super::super::importers::WiaFinding,
+        host: &str,
+    ) -> AsffFinding {
         let now = chrono::Utc::now().to_rfc3339();
         let finding_id = format!(
             "arn:aws:securityhub:{}:{}:finding/{}/wia/{}",
-            self.config.region,
-            self.config.account_id,
-            self.config.account_id,
-            finding.id
+            self.config.region, self.config.account_id, self.config.account_id, finding.id
         );
 
         let severity_label = super::map_severity_to_label(&finding.severity);
@@ -354,25 +353,32 @@ impl AwsSecurityHubExporter {
         });
 
         let vulnerabilities = if !finding.cve.is_empty() {
-            finding.cve.iter().map(|cve| AsffVulnerability {
-                id: cve.clone(),
-                vulnerable_packages: vec![],
-                cvss: finding.cvss_score.map(|score| vec![AsffCvss {
-                    version: "3.1".to_string(),
-                    base_score: score,
-                    base_vector: finding.cvss_vector.clone(),
-                }]).unwrap_or_default(),
-                related_vulnerabilities: vec![],
-                vendor: None,
-                reference_urls: finding.references.clone(),
-            }).collect()
+            finding
+                .cve
+                .iter()
+                .map(|cve| AsffVulnerability {
+                    id: cve.clone(),
+                    vulnerable_packages: vec![],
+                    cvss: finding
+                        .cvss_score
+                        .map(|score| {
+                            vec![AsffCvss {
+                                version: "3.1".to_string(),
+                                base_score: score,
+                                base_vector: finding.cvss_vector.clone(),
+                            }]
+                        })
+                        .unwrap_or_default(),
+                    related_vulnerabilities: vec![],
+                    vendor: None,
+                    reference_urls: finding.references.clone(),
+                })
+                .collect()
         } else {
             vec![]
         };
 
-        let types = vec![
-            "Software and Configuration Checks/Vulnerabilities/CVE".to_string(),
-        ];
+        let types = vec!["Software and Configuration Checks/Vulnerabilities/CVE".to_string()];
 
         AsffFinding {
             schema_version: "2018-10-08".to_string(),
@@ -420,7 +426,10 @@ impl AwsSecurityHubExporter {
     }
 
     /// Convert scan results to ASFF findings
-    pub fn convert_scan_results(&self, scan: &super::super::importers::WiaScanResult) -> Vec<AsffFinding> {
+    pub fn convert_scan_results(
+        &self,
+        scan: &super::super::importers::WiaScanResult,
+    ) -> Vec<AsffFinding> {
         let mut findings = Vec::new();
         for target in &scan.targets {
             for finding in &target.findings {
@@ -517,7 +526,10 @@ mod tests {
 
     #[test]
     fn test_severity_mapping() {
-        assert_eq!(AwsSecurityHubExporter::severity_to_normalized("critical"), 90);
+        assert_eq!(
+            AwsSecurityHubExporter::severity_to_normalized("critical"),
+            90
+        );
         assert_eq!(AwsSecurityHubExporter::severity_to_normalized("high"), 70);
         assert_eq!(AwsSecurityHubExporter::severity_to_normalized("medium"), 50);
     }

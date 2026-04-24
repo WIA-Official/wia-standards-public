@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: IoT 및 센서 네트워크 | WIA-AGRICULTURAL_DATA_EXCHANGE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>6장: IoT 및 센서 네트워크</h1>
+
+    <p>농업 사물인터넷(IoT) 시스템은 정밀 농업과 실시간 의사결정 지원을 가능하게 하는 환경, 장비, 작물 데이터의 연속 스트림을 생성합니다. 이 장에서는 센서 유형, 연결 프로토콜, 엣지 컴퓨팅 아키텍처, 다양한 농업 환경에서 상호운용 가능한 농업 IoT 생태계를 가능하게 하는 데이터 표준을 다룹니다.</p>
+
+    <h2>6.1 농업용 센서 유형</h2>
+
+    <table>
+        <tr>
+            <th>범주</th>
+            <th>센서 유형</th>
+            <th>매개변수</th>
+            <th>배치</th>
+        </tr>
+        <tr>
+            <td>토양</td>
+            <td>정전용량, TDR, 저항성</td>
+            <td>수분, 온도, EC, pH</td>
+            <td>지중 프로브</td>
+        </tr>
+        <tr>
+            <td>기상</td>
+            <td>온도계, 습도계, 풍속계</td>
+            <td>온도, 습도, 바람, 강수, 일사</td>
+            <td>기상관측소</td>
+        </tr>
+        <tr>
+            <td>작물</td>
+            <td>NDVI, 엽록소, 군락 온도</td>
+            <td>건강, 스트레스, 생육 단계</td>
+            <td>근접, 항공</td>
+        </tr>
+        <tr>
+            <td>수분</td>
+            <td>유량계, 수위 센서</td>
+            <td>유량, 압력, 수질</td>
+            <td>관개 시스템</td>
+        </tr>
+        <tr>
+            <td>장비</td>
+            <td>GPS, CAN 버스, 텔레매틱스</td>
+            <td>위치, 속도, 연료, 진단</td>
+            <td>기계 장착</td>
+        </tr>
+        <tr>
+            <td>가축</td>
+            <td>RFID, 가속도계, GPS</td>
+            <td>ID, 활동, 위치, 건강</td>
+            <td>태그, 목걸이, 볼루스</td>
+        </tr>
+    </table>
+
+    <h2>6.2 센서 데이터 모델</h2>
+
+    <pre>
+// OGC SensorThings API 데이터 모델
+interface SensorThingsDataModel {
+  // Thing - 물리적 장치 또는 객체
+  Thing: {
+    id: string;
+    name: string;
+    description: string;
+    properties: Record&lt;string, any&gt;;
+    Locations: Location[];
+    Datastreams: Datastream[];
+  };
+
+  // Location - 지리공간 위치
+  Location: {
+    id: string;
+    name: string;
+    description: string;
+    encodingType: 'application/geo+json';
+    location: GeoJSON.Point | GeoJSON.Polygon;
+  };
+
+  // Sensor - 측정 절차
+  Sensor: {
+    id: string;
+    name: string;
+    description: string;
+    encodingType: 'application/pdf' | 'http://www.opengis.net/doc/IS/SensorML/2.0';
+    metadata: string;            // 센서 설명 링크
+  };
+
+  // ObservedProperty - 측정 대상
+  ObservedProperty: {
+    id: string;
+    name: string;
+    definition: string;          // 어휘에 대한 URI
+    description: string;
+  };
+
+  // Datastream - 관측 시리즈
+  Datastream: {
+    id: string;
+    name: string;
+    description: string;
+    observationType: string;
+    unitOfMeasurement: {
+      name: string;
+      symbol: string;
+      definition: string;
+    };
+    observedArea?: GeoJSON.Polygon;
+    phenomenonTime?: string;     // 시간 범위
+    resultTime?: string;
+    Thing: Thing;
+    Sensor: Sensor;
+    ObservedProperty: ObservedProperty;
+  };
+
+  // Observation - 개별 측정
+  Observation: {
+    id: string;
+    phenomenonTime: ISO8601DateTime;
+    resultTime: ISO8601DateTime;
+    result: number | object;
+    resultQuality?: QualityElement[];
+    validTime?: string;
+    parameters?: Record&lt;string, any&gt;;
+    Datastream: Datastream;
+    FeatureOfInterest: FeatureOfInterest;
+  };
+}
+    </pre>
+
+    <h2>6.3 연결 프로토콜</h2>
+
+    <pre>
+// 농업 IoT 연결 옵션
+interface ConnectivityProtocols {
+  // 근거리
+  shortRange: {
+    bluetooth: {
+      range: '10-100m',
+      power: '저',
+      dataRate: '1-3 Mbps',
+      useCase: '웨어러블, 근접 센서'
+    };
+    zigbee: {
+      range: '10-100m',
+      power: '초저',
+      dataRate: '250 kbps',
+      useCase: '메시 센서 네트워크'
+    };
+    wifi: {
+      range: '50-100m',
+      power: '중',
+      dataRate: '150+ Mbps',
+      useCase: '고대역폭, 건물 근처'
+    };
+  };
+
+  // 장거리 저전력 (LPWAN)
+  lpwan: {
+    lorawan: {
+      range: '2-15 km',
+      power: '초저',
+      dataRate: '0.3-50 kbps',
+      useCase: '원격 토양 센서, 광역'
+    };
+    nbiot: {
+      range: '1-10 km',
+      power: '저',
+      dataRate: '20-250 kbps',
+      useCase: '셀룰러 커버리지 지역'
+    };
+  };
+
+  // 셀룰러
+  cellular: {
+    lte_m: {
+      range: '셀룰러 커버리지',
+      power: '중',
+      dataRate: '1 Mbps',
+      useCase: '이동 장비, 자산 추적'
+    };
+    '5g': {
+      range: '셀룰러 커버리지',
+      power: '중',
+      dataRate: '100+ Mbps',
+      useCase: '실시간 비디오, 자율'
+    };
+  };
+
+  // 위성
+  satellite: {
+    leo: {
+      coverage: '글로벌',
+      latency: '20-40 ms',
+      cost: '하락 중',
+      useCase: '원격 지역, 백업'
+    };
+  };
+}
+    </pre>
+
+    <h2>6.4 농업 IoT용 MQTT</h2>
+
+    <div class="highlight">
+        <h3>MQTT 프로토콜 특성</h3>
+        <ul>
+            <li><strong>경량:</strong> 제한된 장치를 위한 최소 오버헤드</li>
+            <li><strong>발행/구독:</strong> 생산자와 소비자의 분리</li>
+            <li><strong>QoS 레벨:</strong> 전달 보장 (0, 1, 2)</li>
+            <li><strong>보존 메시지:</strong> 최신 값 항상 사용 가능</li>
+            <li><strong>유언:</strong> 예기치 않은 연결 끊김 시 알림</li>
+        </ul>
+    </div>
+
+    <pre>
+// 농업용 MQTT 토픽 구조
+const mqttTopicStructure = {
+  // 계층적 토픽 설계
+  pattern: 'wia/{farmId}/{fieldId}/{deviceType}/{deviceId}/{measurement}',
+
+  examples: [
+    'wia/farm123/field456/soil_sensor/ss001/moisture',
+    'wia/farm123/field456/weather_station/ws001/temperature',
+    'wia/farm123/+/irrigation/+/flow_rate',  // 와일드카드
+    'wia/farm123/#'  // 모든 농장 데이터
+  ],
+
+  // 메시지 페이로드 (JSON)
+  payload: {
+    timestamp: '2025-06-15T10:30:00Z',
+    value: 0.32,
+    unit: 'm3/m3',
+    quality: 'good',
+    location: { lat: 37.123, lng: 127.234 }
+  },
+
+  // 산업 IoT용 Sparkplug B 사양
+  sparkplugB: {
+    namespace: 'spBv1.0',
+    groupId: 'farm123',
+    edgeNodeId: 'gateway001',
+    deviceId: 'soil_sensor_001',
+    messageTypes: ['NBIRTH', 'NDATA', 'NDEATH', 'DBIRTH', 'DDATA', 'DDEATH']
+  }
+};
+
+// MQTT 클라이언트 구성
+interface MQTTClientConfig {
+  broker: string;
+  port: 8883;                    // TLS
+  clientId: string;
+  username: string;
+  password: string;
+  cleanSession: boolean;
+  keepAlive: 60;                 // 초
+  will: {
+    topic: string;
+    payload: string;
+    qos: 1;
+    retain: true;
+  };
+  tls: {
+    ca: string;
+    cert?: string;
+    key?: string;
+  };
+}
+    </pre>
+
+    <h2>6.5 엣지 컴퓨팅 아키텍처</h2>
+
+    <pre>
+// 농업 엣지 컴퓨팅
+interface EdgeArchitecture {
+  // 엣지 게이트웨이 기능
+  gateway: {
+    dataAggregation: {
+      description: '여러 센서에서 수집';
+      protocols: ['Modbus', 'BLE', 'LoRa', 'SDI-12'];
+      buffering: 'local_storage';
+    };
+    preprocessing: {
+      description: '데이터 정리 및 변환';
+      operations: ['validation', 'calibration', 'unit_conversion', 'filtering'];
+    };
+    localAnalytics: {
+      description: '시간 결정적 계산';
+      algorithms: ['threshold_alerts', 'moving_average', 'anomaly_detection'];
+    };
+    storeAndForward: {
+      description: '연결 끊김 처리';
+      storage: 'SQLite | time_series_db';
+      sync: 'on_reconnect';
+    };
+  };
+
+  // 엣지 장치 사양
+  devices: {
+    microcontroller: {
+      examples: ['ESP32', 'Arduino', 'STM32'];
+      useCase: '단순 센서, 배터리 전원';
+      compute: '최소';
+    };
+    singleBoardComputer: {
+      examples: ['Raspberry Pi', 'BeagleBone', 'NVIDIA Jetson'];
+      useCase: '게이트웨이, 로컬 ML 추론';
+      compute: '중간';
+    };
+    industrialGateway: {
+      examples: ['Dell Edge', 'Advantech', 'Moxa'];
+      useCase: '가혹한 환경, 프로토콜 변환';
+      compute: '높음';
+    };
+  };
+
+  // 엣지-클라우드 연속체
+  dataFlow: {
+    raw: '센서 → 게이트웨이 (로컬 저장)',
+    aggregated: '게이트웨이 → 클라우드 (주기적 동기화)',
+    alerts: '게이트웨이 → 클라우드 (즉시)',
+    commands: '클라우드 → 게이트웨이 → 액추에이터'
+  };
+}
+
+// 엣지 분석 예시
+const irrigationEdgeLogic = {
+  inputs: ['soil_moisture', 'weather_forecast', 'crop_stage'],
+  rules: [
+    {
+      condition: 'soil_moisture < threshold AND no_rain_forecast',
+      action: 'start_irrigation',
+      localExecution: true
+    },
+    {
+      condition: 'soil_moisture > saturation_point',
+      action: 'stop_irrigation',
+      localExecution: true
+    }
+  ],
+  cloudSync: 'decision_log_and_actuals'
+};
+    </pre>
+
+    <h2>6.6 센서 교정 및 품질</h2>
+
+    <pre>
+// 센서 교정 관리
+interface SensorCalibration {
+  sensorId: string;
+  sensorType: string;
+
+  // 교정 기록
+  calibration: {
+    date: ISO8601Date;
+    method: 'factory' | 'field' | 'lab';
+    reference: {
+      standardId: string;
+      value: number;
+      uncertainty: number;
+    };
+    coefficients: {
+      offset: number;
+      gain: number;
+      polynomial?: number[];
+    };
+    validUntil: ISO8601Date;
+  };
+
+  // 드리프트 모니터링
+  driftMonitoring: {
+    checkInterval: string;       // 예: 'monthly'
+    threshold: number;           // 허용 드리프트
+    history: {
+      date: ISO8601Date;
+      referenceValue: number;
+      measuredValue: number;
+      drift: number;
+    }[];
+  };
+
+  // 데이터 품질 플래그
+  qualityFlags: {
+    good: '사양 내';
+    suspect: '정상 범위 외';
+    bad: '센서 오작동';
+    missing: '데이터 수신 없음';
+    estimated: '갭 채움 또는 보간됨';
+  };
+}
+
+// 품질 관리 파이프라인
+const qcPipeline = {
+  steps: [
+    { name: 'range_check', description: '물리적 한계 내 값' },
+    { name: 'rate_of_change', description: '예상 범위 내 변화율' },
+    { name: 'spatial_consistency', description: '이웃과 일관성' },
+    { name: 'temporal_consistency', description: '이력과 일관성' },
+    { name: 'cross_validation', description: '센서 간 일관성' }
+  ],
+  output: {
+    value: number,
+    quality: 'good' | 'suspect' | 'bad',
+    flags: string[]
+  }
+};
+    </pre>
+
+    <h2>6.7 시계열 데이터 관리</h2>
+
+    <div class="highlight">
+        <h3>시계열 데이터베이스 요구사항</h3>
+        <p>농업 IoT는 높은 쓰기 처리량, 효율적인 압축, 빠른 시간 범위 쿼리에 최적화된 특수 저장 솔루션이 필요한 대량의 타임스탬프 데이터를 생성합니다.</p>
+    </div>
+
+    <pre>
+// 시계열 데이터 아키텍처
+interface TimeSeriesArchitecture {
+  databases: {
+    influxDB: {
+      model: '태그 + 필드 + 타임스탬프';
+      query: 'InfluxQL / Flux';
+      retention: '구성 가능한 정책';
+    };
+    timescaleDB: {
+      model: 'PostgreSQL 확장';
+      query: 'SQL';
+      features: '하이퍼테이블, 연속 집계';
+    };
+    questDB: {
+      model: '컬럼 지향';
+      query: 'SQL';
+      performance: '높은 수집률';
+    };
+  };
+
+  // 데이터 보존 정책
+  retention: {
+    raw: { duration: '7d', resolution: 'original' },
+    hourly: { duration: '90d', aggregation: 'avg, min, max' },
+    daily: { duration: '2y', aggregation: 'avg, min, max' },
+    monthly: { duration: 'forever', aggregation: 'avg, min, max' }
+  };
+
+  // 다운샘플링 함수
+  aggregations: [
+    'mean', 'min', 'max', 'sum', 'count',
+    'first', 'last', 'median', 'percentile',
+    'spread', 'stddev'
+  ];
+
+  // 쿼리 패턴
+  queries: {
+    latest: 'SELECT last(*) FROM soil_moisture WHERE device=$1',
+    timeSeries: 'SELECT * FROM soil_moisture WHERE time > now() - 24h',
+    aggregate: 'SELECT mean(value) FROM soil_moisture GROUP BY time(1h)',
+    compare: 'SELECT * FROM soil_moisture WHERE time > now() - 7d GROUP BY field'
+  };
+}
+    </pre>
+
+    <h2>6.8 IoT 보안</h2>
+
+    <pre>
+// 농업 IoT 보안 프레임워크
+interface IoTSecurity {
+  // 장치 ID
+  identity: {
+    provisioning: 'X.509 인증서' | 'TPM' | 'secure_element';
+    authentication: 'mutual_TLS' | 'token_based';
+    rotation: 'automatic_key_rotation';
+  };
+
+  // 통신 보안
+  transport: {
+    encryption: 'TLS 1.3';
+    protocols: ['MQTTS', 'HTTPS', 'CoAPS'];
+    vpn: 'site_to_site_optional';
+  };
+
+  // 접근 제어
+  authorization: {
+    model: 'RBAC' | 'ABAC';
+    policies: {
+      device: '자신의 토픽에만 게시 가능';
+      gateway: '농장 토픽에 게시/구독 가능';
+      application: '범위별 읽기 전용 또는 읽기-쓰기';
+    };
+  };
+
+  // 펌웨어 보안
+  firmware: {
+    signing: 'code_signing_certificates';
+    updates: 'OTA_with_verification';
+    rollback: 'automatic_on_failure';
+  };
+
+  // 모니터링
+  monitoring: {
+    anomalyDetection: 'behavioral_baseline';
+    logging: 'centralized_audit_log';
+    alerts: 'unauthorized_access_attempts';
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>장 요약</h3>
+        <p>이 장에서는 센서 유형, 데이터 모델, 연결 프로토콜, 엣지 컴퓨팅, 교정, 시계열 관리, 보안을 포함한 농업 IoT 및 센서 네트워크를 다루었습니다. 이러한 시스템은 WIA-AGRICULTURAL_DATA_EXCHANGE 표준에서 정의한 대로 정밀 농업을 구동하는 실시간 데이터 수집 및 처리를 가능하게 합니다.</p>
+    </div>
+</body>
+</html>

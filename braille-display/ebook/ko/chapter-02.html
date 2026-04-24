@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 2: 현재 과제 - WIA 점자 디스플레이 표준</title>
+</head>
+<body>
+    <header>
+        <h1>챕터 2: 현재 과제</h1>
+        <h2>점자 디스플레이 산업이 직면한 장벽들</h2>
+    </header>
+
+    <section>
+        <h2>학습 목표</h2>
+        <p>이 챕터를 마친 후, 독자는 다음을 이해할 수 있습니다:</p>
+        <ol>
+            <li>제조업체별 기기 파편화의 근본 원인과 영향</li>
+            <li>드라이버 및 소프트웨어 호환성 문제의 기술적 세부 사항</li>
+            <li>점자 디스플레이의 높은 비용 구조와 경제적 장벽</li>
+            <li>스크린 리더와의 통합 어려움</li>
+            <li>표준화 부재가 사용자, 개발자, 제조업체에 미치는 영향</li>
+            <li>실제 사용자들이 겪는 구체적인 불편 사례</li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>2.1 제조업체별 기기 파편화</h2>
+
+        <h3>2.1.1 문제의 본질</h3>
+        <p>점자 디스플레이 산업은 심각한 파편화를 겪고 있습니다. 각 제조업체는 독자적인 통신 프로토콜, 명령 세트, 데이터 형식을 사용하며, 이는 사용자와 개발자 모두에게 큰 부담이 됩니다.</p>
+
+        <table border="1">
+            <tr>
+                <th>제조업체</th>
+                <th>통신 프로토콜</th>
+                <th>명령 형식</th>
+                <th>공개 여부</th>
+            </tr>
+            <tr>
+                <td>Freedom Scientific</td>
+                <td>독점 HID 기반</td>
+                <td>바이너리 명령 세트</td>
+                <td>부분 공개 (NDA 필요)</td>
+            </tr>
+            <tr>
+                <td>HumanWare</td>
+                <td>HID + 독점 확장</td>
+                <td>자체 바이너리 포맷</td>
+                <td>제한적</td>
+            </tr>
+            <tr>
+                <td>HIMS</td>
+                <td>Bluetooth SPP</td>
+                <td>텍스트/바이너리 혼합</td>
+                <td>일부 문서화</td>
+            </tr>
+            <tr>
+                <td>Baum Retec</td>
+                <td>HID Braille 표준</td>
+                <td>HID 명령 + 확장</td>
+                <td>HID 부분만 공개</td>
+            </tr>
+            <tr>
+                <td>Handy Tech</td>
+                <td>USB Bulk Transfer</td>
+                <td>자체 바이트 프로토콜</td>
+                <td>SDK로 제한 공개</td>
+            </tr>
+        </table>
+
+        <h3>2.1.2 프로토콜 불일치 예시</h3>
+
+        <h4>예시 1: 점자 셀에 "Hello" 표시하기</h4>
+
+        <p><strong>Freedom Scientific Focus 40:</strong></p>
+        <pre>
+// 독점 HID 패킷
+byte[] packet = new byte[84];
+packet[0] = 0x01;  // 리포트 ID
+packet[1] = 0x02;  // 쓰기 명령
+packet[2] = 40;    // 셀 수
+// 점자 데이터 (각 문자를 1급 점자로 변환)
+packet[3] = 0x1B;  // H = ⠓
+packet[4] = 0x05;  // e = ⠑
+packet[5] = 0x0B;  // l = ⠇
+packet[6] = 0x0B;  // l = ⠇
+packet[7] = 0x0F;  // o = ⠕
+// HID 전송
+device.SendHidReport(packet);
+        </pre>
+
+        <p><strong>HIMS Braille Edge:</strong></p>
+        <pre>
+// Bluetooth Serial Port Profile
+String command = "BR";  // Braille 명령
+command += "Hello";     // UTF-8 텍스트
+command += "\r\n";      // 종료자
+// Bluetooth 전송
+serialPort.Write(command);
+        </pre>
+
+        <p><strong>Baum VarioUltra:</strong></p>
+        <pre>
+// HID Braille 표준 + 확장
+byte[] hidPacket = new byte[64];
+hidPacket[0] = 0x02;  // HID Braille 리포트
+hidPacket[1] = 0x01;  // 표시 데이터
+hidPacket[2] = 0x00;  // 셀 오프셋
+hidPacket[3] = 0x05;  // 데이터 길이
+// Unicode 점자 패턴 (U+2800 기반)
+hidPacket[4] = 0x13;  // ⠓ (U+2813 → 0x13)
+hidPacket[5] = 0x05;  // ⠑
+hidPacket[6] = 0x07;  // ⠇
+hidPacket[7] = 0x07;  // ⠇
+hidPacket[8] = 0x0F;  // ⠕
+device.SendReport(hidPacket);
+        </pre>
+
+        <p>동일한 작업을 위해 완전히 다른 코드가 필요합니다. 이는 소프트웨어 개발을 복잡하게 만들고 버그의 원인이 됩니다.</p>
+
+        <h3>2.1.3 커서 라우팅 버튼 불일치</h3>
+        <p>점자 디스플레이에는 각 셀 위에 라우팅 버튼이 있어 사용자가 해당 위치로 커서를 이동할 수 있습니다. 그러나 이 버튼의 이벤트 보고 방식이 제조업체마다 다릅니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>제조업체</th>
+                <th>이벤트 형식</th>
+                <th>좌표 시스템</th>
+            </tr>
+            <tr>
+                <td>Freedom Scientific</td>
+                <td>HID 입력 리포트 0x03</td>
+                <td>0-based, 왼쪽에서 오른쪽</td>
+            </tr>
+            <tr>
+                <td>HumanWare</td>
+                <td>독점 키 이벤트</td>
+                <td>1-based, 커스텀 맵핑</td>
+            </tr>
+            <tr>
+                <td>HIMS</td>
+                <td>"RC[n]" 문자열</td>
+                <td>1-based, 왼쪽에서 오른쪽</td>
+            </tr>
+            <tr>
+                <td>Baum</td>
+                <td>HID 입력 리포트 0x01</td>
+                <td>0-based, 비트 필드</td>
+            </tr>
+        </table>
+
+        <p>예를 들어, 40셀 디스플레이의 10번째 셀 버튼을 누른 경우:</p>
+        <ul>
+            <li><strong>Focus 40</strong>: <code>InputReport[0]=0x03, InputReport[1]=0x09</code> (0-based)</li>
+            <li><strong>Brailliant</strong>: <code>KEY_ROUTING_10</code> (커스텀 상수)</li>
+            <li><strong>Braille Edge</strong>: <code>"RC10\r\n"</code> (1-based 문자열)</li>
+            <li><strong>VarioUltra</strong>: <code>InputReport[0]=0x01, InputReport[2]=0x01, InputReport[3]=0x09</code> (비트필드)</li>
+        </ul>
+
+        <h3>2.1.4 펌웨어 업데이트 메커니즘</h3>
+        <p>펌웨어 업데이트 방법도 표준화되지 않았습니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>제조업체</th>
+                <th>업데이트 방법</th>
+                <th>운영체제 요구사항</th>
+            </tr>
+            <tr>
+                <td>Freedom Scientific</td>
+                <td>전용 Windows 도구</td>
+                <td>Windows만 지원</td>
+            </tr>
+            <tr>
+                <td>HumanWare</td>
+                <td>장치 내 메뉴</td>
+                <td>OS 독립적</td>
+            </tr>
+            <tr>
+                <td>HIMS</td>
+                <td>Android 앱 / PC 유틸리티</td>
+                <td>Android 또는 Windows</td>
+            </tr>
+            <tr>
+                <td>Baum</td>
+                <td>USB DFU 모드</td>
+                <td>Linux/Mac 호환</td>
+            </tr>
+        </table>
+
+        <h3>2.1.5 파편화의 결과</h3>
+
+        <p><strong>사용자 관점:</strong></p>
+        <ul>
+            <li>디스플레이를 변경할 때마다 새로운 워크플로우 학습 필요</li>
+            <li>특정 소프트웨어가 특정 제조업체만 지원하는 경우 선택권 제한</li>
+            <li>여러 디스플레이를 사용하는 전문가는 각각의 단축키 기억 필요</li>
+        </ul>
+
+        <p><strong>개발자 관점:</strong></p>
+        <ul>
+            <li>각 제조업체마다 별도 드라이버/플러그인 개발 필요</li>
+            <li>테스트 비용 증가 (모든 주요 모델 테스트 필요)</li>
+            <li>유지보수 부담 (각 제조업체의 펌웨어 업데이트마다 코드 수정)</li>
+        </ul>
+
+        <p><strong>제조업체 관점:</strong></p>
+        <ul>
+            <li>독점 프로토콜 유지 비용</li>
+            <li>소프트웨어 벤더와의 개별 파트너십 필요</li>
+            <li>신규 시장 진입 장벽 (기존 소프트웨어 지원 확보 어려움)</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>2.2 드라이버 호환성 문제</h2>
+
+        <h3>2.2.1 운영체제별 드라이버 지원 현황</h3>
+
+        <table border="1">
+            <tr>
+                <th>제조업체/모델</th>
+                <th>Windows</th>
+                <th>macOS</th>
+                <th>Linux</th>
+                <th>iOS</th>
+                <th>Android</th>
+            </tr>
+            <tr>
+                <td>Focus 40 Blue</td>
+                <td>공식 드라이버</td>
+                <td>부분 지원</td>
+                <td>커뮤니티 드라이버</td>
+                <td>VoiceOver</td>
+                <td>TalkBack</td>
+            </tr>
+            <tr>
+                <td>Brailliant BI 40X</td>
+                <td>공식</td>
+                <td>공식</td>
+                <td>brltty</td>
+                <td>공식</td>
+                <td>공식</td>
+            </tr>
+            <tr>
+                <td>Braille Edge 40</td>
+                <td>공식</td>
+                <td>제한적</td>
+                <td>brltty</td>
+                <td>부분</td>
+                <td>완전</td>
+            </tr>
+            <tr>
+                <td>VarioUltra 40</td>
+                <td>공식</td>
+                <td>제한적</td>
+                <td>brltty</td>
+                <td>HID만</td>
+                <td>HID만</td>
+            </tr>
+            <tr>
+                <td>Orbit Reader 20</td>
+                <td>HID 표준</td>
+                <td>HID 표준</td>
+                <td>HID 표준</td>
+                <td>제한적</td>
+                <td>제한적</td>
+            </tr>
+        </table>
+
+        <h3>2.2.2 Windows 드라이버 문제</h3>
+
+        <p><strong>충돌하는 드라이버 스택:</strong></p>
+        <p>여러 점자 디스플레이를 소유한 사용자는 드라이버 충돌을 경험합니다:</p>
+
+        <pre>
+// 일반적인 Windows 드라이버 문제
+문제 1: Focus 40과 Brailliant 40을 모두 설치하면...
+- JAWS는 Focus 드라이버를 먼저 로드
+- Brailliant 연결 시 JAWS가 잘못된 프로토콜 사용
+- 결과: 깨진 점자 출력 또는 인식 실패
+
+문제 2: Windows 업데이트 후...
+- 제조업체 서명된 드라이버가 "호환되지 않음"으로 표시
+- 사용자는 수동으로 드라이버 재설치 필요
+- 때때로 관리자 권한 및 보안 설정 변경 필요
+
+문제 3: USB 포트 변경 시...
+- Windows가 새 "장치 인스턴스"로 인식
+- 드라이버 재설치 또는 재구성 필요
+- COM 포트 번호 변경으로 스크린 리더 설정 깨짐
+        </pre>
+
+        <h3>2.2.3 macOS VoiceOver 통합</h3>
+
+        <p>macOS는 VoiceOver에 통합된 점자 지원을 제공하지만, 제한 사항이 있습니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>기능</th>
+                <th>HID 표준 장치</th>
+                <th>독점 프로토콜 장치</th>
+            </tr>
+            <tr>
+                <td>자동 인식</td>
+                <td>즉시 작동</td>
+                <td>수동 구성 필요</td>
+            </tr>
+            <tr>
+                <td>점자 테이블</td>
+                <td>시스템 제공</td>
+                <td>제조업체 번들 필요</td>
+            </tr>
+            <tr>
+                <td>펌웨어 업데이트</td>
+                <td>장치 독립적</td>
+                <td>Windows PC 필요 (많은 경우)</td>
+            </tr>
+            <tr>
+                <td>커스텀 키</td>
+                <td>제한적</td>
+                <td>제조업체 지원 의존</td>
+            </tr>
+        </table>
+
+        <p><strong>실제 이슈 예시:</strong></p>
+        <ul>
+            <li><strong>Bluetooth 페어링 반복</strong>: macOS 업데이트 후 Bluetooth 점자 디스플레이 재페어링 필요 (HIMS, HumanWare 제품)</li>
+            <li><strong>키 맵핑 손실</strong>: 일부 모델(Baum VarioUltra)은 macOS에서 커스텀 키가 작동하지 않음</li>
+            <li><strong>다중 디스플레이 전환</strong>: VoiceOver는 한 번에 하나의 디스플레이만 활성화, 전환 시 시스템 환경설정 변경 필요</li>
+        </ul>
+
+        <h3>2.2.4 Linux와 BRLTTY</h3>
+
+        <p>Linux에서 점자 디스플레이 지원은 주로 <strong>BRLTTY (Braille TTY)</strong> 오픈소스 프로젝트에 의존합니다.</p>
+
+        <p><strong>BRLTTY 장점:</strong></p>
+        <ul>
+            <li>180개 이상의 점자 디스플레이 모델 지원</li>
+            <li>커뮤니티 주도 개발로 신속한 업데이트</li>
+            <li>고도로 커스터마이징 가능</li>
+        </ul>
+
+        <p><strong>BRLTTY 단점:</strong></p>
+        <ul>
+            <li>복잡한 설정 파일 (<code>/etc/brltty.conf</code>)</li>
+            <li>장치 자동 감지 불안정 (특히 Bluetooth)</li>
+            <li>일부 최신 모델은 커뮤니티 기여 필요 (공식 지원 없음)</li>
+            <li>일반 사용자에게 높은 학습 곡선</li>
+        </ul>
+
+        <p><strong>일반적인 BRLTTY 구성 문제:</strong></p>
+        <pre>
+# /etc/brltty.conf 예시
+braille-driver auto
+braille-device usb:
+text-table en-us-g2.ctb
+
+# 문제: "auto" 드라이버가 잘못된 모델 감지
+# 해결: 명시적으로 지정 필요
+braille-driver fs  # Freedom Scientific Focus
+braille-device usb:0403:6001  # USB Vendor:Product ID
+
+# 문제: Bluetooth 연결 불안정
+# 해결: 명시적 Bluetooth 주소 사용
+braille-device bluetooth:00:07:80:XX:XX:XX
+        </pre>
+
+        <h3>2.2.5 모바일 플랫폼 (iOS/Android) 도전</h3>
+
+        <p><strong>iOS VoiceOver:</strong></p>
+        <table border="1">
+            <tr>
+                <th>장점</th>
+                <th>단점</th>
+            </tr>
+            <tr>
+                <td>- 70개 이상 모델 기본 지원<br>- Bluetooth 자동 페어링<br>- 일관된 사용자 경험</td>
+                <td>- 새 모델 지원은 iOS 업데이트 필요<br>- 독점 프로토콜 제한적 지원<br>- 사용자 정의 드라이버 불가</td>
+            </tr>
+        </table>
+
+        <p><strong>Android TalkBack:</strong></p>
+        <table border="1">
+            <tr>
+                <th>장점</th>
+                <th>단점</th>
+            </tr>
+            <tr>
+                <td>- BrailleBack 오픈소스<br>- 제조업체 앱 허용<br>- HID over GATT 지원</td>
+                <td>- 기본 지원 모델 적음 (iOS보다)<br>- 제조업체 앱 필요 (많은 모델)<br>- Android 버전별 호환성 차이</td>
+            </tr>
+        </table>
+
+        <h3>2.2.6 드라이버 유지보수 부담</h3>
+
+        <p>제조업체와 오픈소스 개발자 모두 드라이버 유지보수에 큰 부담을 느낍니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>플랫폼</th>
+                <th>드라이버 형태</th>
+                <th>업데이트 주기</th>
+                <th>테스트 복잡도</th>
+            </tr>
+            <tr>
+                <td>Windows</td>
+                <td>KMDF/UMDF 드라이버</td>
+                <td>Windows 메이저 업데이트마다</td>
+                <td>높음 (서명, 인증 필요)</td>
+            </tr>
+            <tr>
+                <td>macOS</td>
+                <td>IOKit 드라이버 (제조업체)<br>VoiceOver 통합 (Apple)</td>
+                <td>macOS 버전마다</td>
+                <td>중간 (Apple 승인 필요)</td>
+            </tr>
+            <tr>
+                <td>Linux</td>
+                <td>BRLTTY 드라이버</td>
+                <td>커뮤니티 주도</td>
+                <td>낮음 (오픈소스)</td>
+            </tr>
+            <tr>
+                <td>iOS</td>
+                <td>VoiceOver 내장</td>
+                <td>Apple 주도</td>
+                <td>N/A (사용자 제어 불가)</td>
+            </tr>
+            <tr>
+                <td>Android</td>
+                <td>BrailleBack + 제조업체 앱</td>
+                <td>불규칙</td>
+                <td>높음 (파편화된 Android)</td>
+            </tr>
+        </table>
+    </section>
+
+    <section>
+        <h2>2.3 비용 장벽</h2>
+
+        <h3>2.3.1 가격 구조 분석</h3>
+
+        <table border="1">
+            <tr>
+                <th>셀 수</th>
+                <th>가격 범위</th>
+                <th>셀당 비용</th>
+                <th>대표 모델</th>
+            </tr>
+            <tr>
+                <td>12-14셀</td>
+                <td>$600 - $1,200</td>
+                <td>$50 - $100/셀</td>
+                <td>Focus 14, Orbit Reader 20</td>
+            </tr>
+            <tr>
+                <td>20셀</td>
+                <td>$900 - $1,800</td>
+                <td>$45 - $90/셀</td>
+                <td>Brailliant 20, Active Braille 20</td>
+            </tr>
+            <tr>
+                <td>32-40셀</td>
+                <td>$2,000 - $4,500</td>
+                <td>$50 - $112/셀</td>
+                <td>Focus 40, VarioUltra 40</td>
+            </tr>
+            <tr>
+                <td>80셀</td>
+                <td>$8,000 - $15,000</td>
+                <td>$100 - $188/셀</td>
+                <td>Focus 80, Braillex Live 80</td>
+            </tr>
+            <tr>
+                <td>노트테이커 (32셀)</td>
+                <td>$3,000 - $6,000</td>
+                <td>$94 - $188/셀</td>
+                <td>BrailleSense 6, Mantis Q40</td>
+            </tr>
+        </table>
+
+        <p><strong>비교 관점:</strong></p>
+        <ul>
+            <li>40셀 점자 디스플레이 ($3,000) = 아이폰 5대 또는 맥북 프로 1대</li>
+            <li>80셀 디스플레이 ($10,000) = 중고 자동차 가격</li>
+            <li>노트테이커 ($5,000) = 고급 노트북 + 태블릿 + 스마트폰</li>
+        </ul>
+
+        <h3>2.3.2 비용 구성 요소</h3>
+
+        <p>점자 디스플레이가 비싼 이유는 복잡한 제조 과정 때문입니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>구성 요소</th>
+                <th>비용 비율</th>
+                <th>설명</th>
+            </tr>
+            <tr>
+                <td>피에조 전기 액추에이터</td>
+                <td>40-50%</td>
+                <td>각 셀에 6-8개 필요, 정밀 세라믹 부품</td>
+            </tr>
+            <tr>
+                <td>전자 제어 회로</td>
+                <td>15-20%</td>
+                <td>각 핀의 독립 제어를 위한 복잡한 회로</td>
+            </tr>
+            <tr>
+                <td>기계 조립</td>
+                <td>10-15%</td>
+                <td>수작업 조립, 품질 관리</td>
+            </tr>
+            <tr>
+                <td>R&D 및 특허</td>
+                <td>10-15%</td>
+                <td>연구 개발, 특허 라이선스</td>
+            </tr>
+            <tr>
+                <td>펌웨어/소프트웨어</td>
+                <td>5-10%</td>
+                <td>드라이버 개발, 유지보수</td>
+            </tr>
+            <tr>
+                <td>유통 및 마진</td>
+                <td>10-15%</td>
+                <td>소매상 마진, 마케팅</td>
+            </tr>
+        </table>
+
+        <h3>2.3.3 피에조 액추에이터의 문제</h3>
+
+        <p>피에조 전기 액추에이터는 전기 신호를 기계적 움직임으로 변환하는 핵심 부품입니다:</p>
+
+        <ul>
+            <li><strong>재료 비용</strong>: 특수 세라믹 (PZT: 티탄산 지르코늄 납) 사용</li>
+            <li><strong>정밀 제조</strong>: 마이크로미터 단위 정밀도 필요</li>
+            <li><strong>작은 시장 규모</strong>: 연간 전 세계 수요 약 50,000-70,000개 (대량 생산 불가)</li>
+            <li><strong>공급업체 독점</strong>: 전 세계 3-4개 주요 공급업체만 존재</li>
+            <li><strong>긴 수명 요구</strong>: 수백만 회 동작 보장 필요</li>
+        </ul>
+
+        <p><strong>대안 기술 연구:</strong></p>
+        <table border="1">
+            <tr>
+                <th>기술</th>
+                <th>장점</th>
+                <th>단점</th>
+                <th>상태</th>
+            </tr>
+            <tr>
+                <td>형상 기억 합금 (SMA)</td>
+                <td>저렴, 큰 변위</td>
+                <td>느린 응답, 열 발생</td>
+                <td>연구 단계</td>
+            </tr>
+            <tr>
+                <td>전기활성 폴리머 (EAP)</td>
+                <td>매우 저렴, 유연</td>
+                <td>낮은 힘, 수명 문제</td>
+                <td>프로토타입</td>
+            </tr>
+            <tr>
+                <td>정전기 방식</td>
+                <td>초소형, 저전력</td>
+                <td>약한 촉각 피드백</td>
+                <td>실험적</td>
+            </tr>
+            <tr>
+                <td>유체 기반 (마이크로플루이딕)</td>
+                <td>부드러운 느낌</td>
+                <td>복잡한 제어, 누출 위험</td>
+                <td>연구 단계</td>
+            </tr>
+        </table>
+
+        <h3>2.3.4 경제적 접근성 문제</h3>
+
+        <p>높은 비용은 접근성을 심각하게 제한합니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>국가/지역</th>
+                <th>평균 연소득</th>
+                <th>40셀 디스플레이 ($3,000)</th>
+                <th>접근성</th>
+            </tr>
+            <tr>
+                <td>미국</td>
+                <td>$63,000</td>
+                <td>연소득의 4.8%</td>
+                <td>중간 (정부 보조 일부)</td>
+            </tr>
+            <tr>
+                <td>한국</td>
+                <td>$42,000</td>
+                <td>연소득의 7.1%</td>
+                <td>양호 (건강보험 지원)</td>
+            </tr>
+            <tr>
+                <td>인도</td>
+                <td>$2,200</td>
+                <td>연소득의 136%</td>
+                <td>매우 낮음</td>
+            </tr>
+            <tr>
+                <td>나이지리아</td>
+                <td>$2,100</td>
+                <td>연소득의 143%</td>
+                <td>거의 불가능</td>
+            </tr>
+            <tr>
+                <td>독일</td>
+                <td>$53,000</td>
+                <td>연소득의 5.7%</td>
+                <td>높음 (전액 보험 지원)</td>
+            </tr>
+        </table>
+
+        <h3>2.3.5 정부 보조금 및 보험 지원</h3>
+
+        <table border="1">
+            <tr>
+                <th>국가</th>
+                <th>지원 프로그램</th>
+                <th>지원 범위</th>
+                <th>제한 사항</th>
+            </tr>
+            <tr>
+                <td>미국</td>
+                <td>Vocational Rehabilitation<br>Medicaid (일부 주)</td>
+                <td>부분~전액</td>
+                <td>고용 관련 필요성 입증 필요</td>
+            </tr>
+            <tr>
+                <td>독일</td>
+                <td>국가 건강보험</td>
+                <td>전액</td>
+                <td>의료적 필요성 인정 시</td>
+            </tr>
+            <tr>
+                <td>영국</td>
+                <td>Access to Work<br>NHS (드물게)</td>
+                <td>직장용 전액<br>개인용 제한적</td>
+                <td>고용 상태 필요</td>
+            </tr>
+            <tr>
+                <td>한국</td>
+                <td>국민건강보험<br>장애인보조기기</td>
+                <td>80-100%</td>
+                <td>장애 등급 기준</td>
+            </tr>
+            <tr>
+                <td>개발도상국</td>
+                <td>NGO 기부<br>국제 지원</td>
+                <td>매우 제한적</td>
+                <td>대기자 명단 길고 경쟁 치열</td>
+            </tr>
+        </table>
+
+        <p>많은 시각장애인이 보조금을 받더라도, 승인 과정은 복잡하고 시간이 오래 걸립니다 (보통 6개월~2년).</p>
+    </section>
+
+    <section>
+        <h2>2.4 스크린 리더 통합 문제</h2>
+
+        <h3>2.4.1 주요 스크린 리더</h3>
+
+        <table border="1">
+            <tr>
+                <th>스크린 리더</th>
+                <th>플랫폼</th>
+                <th>점자 지원</th>
+                <th>비용</th>
+            </tr>
+            <tr>
+                <td>JAWS</td>
+                <td>Windows</td>
+                <td>우수 (가장 많은 모델 지원)</td>
+                <td>$1,200 (전문가 버전)</td>
+            </tr>
+            <tr>
+                <td>NVDA</td>
+                <td>Windows</td>
+                <td>양호 (BRLTTY 기반)</td>
+                <td>무료 (오픈소스)</td>
+            </tr>
+            <tr>
+                <td>VoiceOver</td>
+                <td>macOS, iOS</td>
+                <td>우수 (70개 모델 내장)</td>
+                <td>무료 (OS 포함)</td>
+            </tr>
+            <tr>
+                <td>TalkBack</td>
+                <td>Android</td>
+                <td>중간 (BrailleBack 별도)</td>
+                <td>무료 (OS 포함)</td>
+            </tr>
+            <tr>
+                <td>Orca</td>
+                <td>Linux</td>
+                <td>양호 (BRLTTY 통합)</td>
+                <td>무료 (오픈소스)</td>
+            </tr>
+        </table>
+
+        <h3>2.4.2 통합 문제 사례</h3>
+
+        <h4>문제 1: JAWS와 NVDA 동시 사용</h4>
+        <pre>
+시나리오: 사용자가 JAWS(유료)와 NVDA(무료)를 모두 설치
+
+JAWS 실행 시:
+- JAWS가 Focus 40 전용 드라이버 로드
+- 점자 디스플레이 정상 작동
+
+NVDA로 전환 시:
+- NVDA는 BRLTTY 드라이버 사용
+- JAWS 드라이버와 충돌
+- 결과: 디스플레이 응답 없음 또는 깨진 출력
+
+해결책:
+- JAWS 완전 종료 필요 (백그라운드 서비스도)
+- 때로는 디스플레이 재연결 필요
+        </pre>
+
+        <h4>문제 2: 점자 테이블 불일치</h4>
+        <p>동일한 텍스트를 다른 점자로 표시하는 경우:</p>
+
+        <table border="1">
+            <tr>
+                <th>텍스트</th>
+                <th>JAWS (영어 2급)</th>
+                <th>NVDA (영어 2급)</th>
+                <th>일치 여부</th>
+            </tr>
+            <tr>
+                <td>"the"</td>
+                <td>⠮ (단일 셀)</td>
+                <td>⠮ (단일 셀)</td>
+                <td>✓</td>
+            </tr>
+            <tr>
+                <td>"about"</td>
+                <td>⠁⠃ (ab 축약)</td>
+                <td>⠁⠃⠳⠞ (축약 안 함)</td>
+                <td>✗</td>
+            </tr>
+            <tr>
+                <td>"ing" (어미)</td>
+                <td>⠬ (단일 셀)</td>
+                <td>⠬ (단일 셀)</td>
+                <td>✓</td>
+            </tr>
+            <tr>
+                <td>"first"</td>
+                <td>⠋⠌ (fst 축약)</td>
+                <td>⠋⠊⠗⠎⠞ (전체 철자)</td>
+                <td>✗</td>
+            </tr>
+        </table>
+
+        <p>이러한 불일치는 사용자 혼란을 야기하며, 특히 여러 스크린 리더를 사용하는 전문가에게 문제가 됩니다.</p>
+
+        <h4>문제 3: 속성 표시 차이</h4>
+        <p>텍스트 서식(굵게, 링크 등)을 점자로 표시하는 방법이 다릅니다:</p>
+
+        <table border="1">
+            <tr>
+                <th>속성</th>
+                <th>JAWS</th>
+                <th>NVDA</th>
+                <th>VoiceOver</th>
+            </tr>
+            <tr>
+                <td>굵은 텍스트</td>
+                <td>셀 7-8점 추가</td>
+                <td>별도 표시 없음 (설정 가능)</td>
+                <td>점 7 추가</td>
+            </tr>
+            <tr>
+                <td>링크</td>
+                <td>"lnk" 접두사</td>
+                <td>점 8 추가</td>
+                <td>"link" 표시</td>
+            </tr>
+            <tr>
+                <td>헤딩</td>
+                <td>"h1", "h2" 등</td>
+                <td>점 7-8 조합</td>
+                <td>"heading level 1" 등</td>
+            </tr>
+        </table>
+
+        <h3>2.4.3 API 부재의 영향</h3>
+
+        <p>표준 API가 없어 각 스크린 리더는 독자적으로 점자 디스플레이와 통신합니다:</p>
+
+        <pre>
+// 의사 코드: 스크린 리더의 점자 출력
+
+// JAWS 방식 (가상)
+JAWSBrailleDriver.Initialize();
+JAWSBrailleDriver.SendText("Hello", Grade2);
+JAWSBrailleDriver.SetCursor(5);
+
+// NVDA 방식 (실제 BRLTTY 기반)
+import brltty
+brl = brltty.Connection()
+brl.write("Hello")
+brl.setCursor(5)
+
+// VoiceOver 방식 (시스템 API)
+NSAccessibility.brailleDisplay.setText("Hello")
+NSAccessibility.brailleDisplay.setCursorPosition(5)
+
+// 문제: 동일한 작업을 위해 완전히 다른 코드
+// 결과: 점자 디스플레이 제조업체는 각 스크린 리더마다
+//       별도 드라이버 작성 필요
+        </pre>
+
+        <h3>2.4.4 웹 브라우저 통합 문제</h3>
+
+        <p>웹 콘텐츠를 점자로 표시할 때 추가 문제 발생:</p>
+
+        <table border="1">
+            <tr>
+                <th>문제</th>
+                <th>설명</th>
+                <th>영향</th>
+            </tr>
+            <tr>
+                <td>동적 콘텐츠</td>
+                <td>JavaScript로 업데이트되는 영역이 점자에 반영 안 됨</td>
+                <td>실시간 채팅, 알림 놓침</td>
+            </tr>
+            <tr>
+                <td>ARIA 레이블 누락</td>
+                <td>접근성 레이블 없는 요소는 "버튼" 등으로만 표시</td>
+                <td>기능 파악 어려움</td>
+            </tr>
+            <tr>
+                <td>복잡한 테이블</td>
+                <td>병합 셀, 중첩 테이블 구조 손실</td>
+                <td>데이터 이해 불가</td>
+            </tr>
+            <tr>
+                <td>수학 표기</td>
+                <td>MathML을 Nemeth 점자로 변환 불완전</td>
+                <td>STEM 콘텐츠 접근 어려움</td>
+            </tr>
+        </table>
+    </section>
+
+    <section>
+        <h2>2.5 표준화 부재</h2>
+
+        <h3>2.5.1 기존 표준의 한계</h3>
+
+        <table border="1">
+            <tr>
+                <th>표준</th>
+                <th>범위</th>
+                <th>채택 현황</th>
+                <th>한계</th>
+            </tr>
+            <tr>
+                <td>USB HID Braille (Usage Page 0x41)</td>
+                <td>USB HID 프로토콜 정의</td>
+                <td>부분적 (일부 제조업체)</td>
+                <td>기본 기능만, Bluetooth 미지원</td>
+            </tr>
+            <tr>
+                <td>ISO/FDIS 17049</td>
+                <td>점자 문자 인코딩</td>
+                <td>널리 사용</td>
+                <td>데이터 형식만, 프로토콜 없음</td>
+            </tr>
+            <tr>
+                <td>Unicode Braille (U+2800-U+28FF)</td>
+                <td>점자 문자 코드</td>
+                <td>보편적</td>
+                <td>6점만, 하드웨어 제어 없음</td>
+            </tr>
+            <tr>
+                <td>BAUM Protocol</td>
+                <td>Baum 디스플레이 통신</td>
+                <td>Baum 제품만</td>
+                <td>독점, 다른 제조업체 미지원</td>
+            </tr>
+        </table>
+
+        <h3>2.5.2 표준 부재의 결과</h3>
+
+        <p><strong>1. 공급업체 종속 (Vendor Lock-in)</strong></p>
+        <ul>
+            <li>특정 스크린 리더가 특정 제조업체 제품만 잘 지원</li>
+            <li>예: JAWS는 Freedom Scientific 제품과 가장 잘 통합 (같은 회사)</li>
+            <li>사용자는 소프트웨어와 하드웨어를 함께 변경해야 할 수 있음</li>
+        </ul>
+
+        <p><strong>2. 혁신 저해</strong></p>
+        <ul>
+            <li>신규 제조업체는 기존 스크린 리더 지원 확보 어려움</li>
+            <li>저가형 혁신(예: Orbit Reader)도 소프트웨어 지원 한계로 채택 저조</li>
+            <li>새로운 기능(그래픽 점자 등) 표준 없어 각자 개발</li>
+        </ul>
+
+        <p><strong>3. 유지보수 부담</strong></p>
+        <table border="1">
+            <tr>
+                <th>역할</th>
+                <th>부담</th>
+            </tr>
+            <tr>
+                <td>제조업체</td>
+                <td>각 OS, 스크린 리더마다 드라이버 유지</td>
+            </tr>
+            <tr>
+                <td>스크린 리더 개발자</td>
+                <td>100개 이상 디스플레이 모델 지원 코드</td>
+            </tr>
+            <tr>
+                <td>OS 벤더 (Apple, Microsoft)</td>
+                <td>제조업체와 개별 협력 필요</td>
+            </tr>
+            <tr>
+                <td>오픈소스 커뮤니티 (BRLTTY)</td>
+                <td>신규 모델마다 리버스 엔지니어링</td>
+            </tr>
+        </table>
+    </section>
+
+    <section>
+        <h2>2.6 실제 사용자 불편 사례 연구</h2>
+
+        <h3>사례 1: 개발자 마리아의 80셀 디스플레이 구매 여정</h3>
+
+        <p><strong>배경:</strong> 마리아는 시각장애인 파이썬 개발자로, 코딩을 위해 80셀 디스플레이가 필요했습니다.</p>
+
+        <p><strong>문제 경험:</strong></p>
+        <ol>
+            <li>
+                <strong>선택의 어려움</strong>
+                <ul>
+                    <li>80셀 옵션: Focus 80 ($10,995), VarioUltra 80 ($11,500), Braillex Live 80 ($9,500)</li>
+                    <li>각 제품의 Linux 지원 여부 불분명 (공식 문서 부족)</li>
+                    <li>온라인 리뷰 거의 없음 (틈새 시장)</li>
+                </ul>
+            </li>
+            <li>
+                <strong>구매 후 문제</strong>
+                <ul>
+                    <li>VarioUltra 80 구매 ($11,500 - 직업 재활 기금)</li>
+                    <li>Ubuntu 22.04에서 BRLTTY 설정 시도</li>
+                    <li>자동 감지 실패, 수동 설정도 불안정</li>
+                    <li>제조업체 기술 지원: "Linux는 공식 지원 안 함, BRLTTY 커뮤니티 문의하세요"</li>
+                </ul>
+            </li>
+            <li>
+                <strong>해결 과정</strong>
+                <ul>
+                    <li>BRLTTY 메일링 리스트에 도움 요청</li>
+                    <li>커뮤니티 자원봉사자가 설정 파일 작성 도움 (1주 소요)</li>
+                    <li>일부 커스텀 키는 여전히 작동 안 함</li>
+                    <li>펌웨어 업데이트를 위해 Windows PC 빌려야 함 (본인은 Linux만 사용)</li>
+                </ul>
+            </li>
+            <li>
+                <strong>결과</strong>
+                <ul>
+                    <li>기본 기능은 작동하지만, $11,500 투자 대비 기대 이하</li>
+                    <li>제조업체 간 통일된 Linux 지원이 있었다면 피할 수 있었던 문제</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>사례 2: 학생 제임스의 노트테이커 호환성 문제</h3>
+
+        <p><strong>배경:</strong> 제임스는 대학생으로 BrailleSense 6 노트테이커를 사용합니다.</p>
+
+        <p><strong>문제 경험:</strong></p>
+        <ol>
+            <li>
+                <strong>학교 도서관 컴퓨터 연결</strong>
+                <ul>
+                    <li>도서관 Windows 10 PC에 BrailleSense를 Bluetooth 디스플레이로 사용 시도</li>
+                    <li>Windows는 장치 인식하지만 JAWS는 인식 실패</li>
+                    <li>HIMS 드라이버 설치 시도하지만 관리자 권한 없음</li>
+                    <li>IT 부서에 요청했으나 "보안 정책상 불가" 응답</li>
+                </ul>
+            </li>
+            <li>
+                <strong>온라인 시험 문제</strong>
+                <ul>
+                    <li>대학의 온라인 시험 플랫폼(Proctorio)이 특정 소프트웨어만 허용</li>
+                    <li>BrailleSense의 내장 브라우저는 차단됨</li>
+                    <li>PC 연결 모드를 사용해야 하지만 위의 호환성 문제로 불가</li>
+                    <li>결국 시험 시 대필자(scribe) 사용 - 독립성 상실</li>
+                </ul>
+            </li>
+            <li>
+                <strong>다중 장치 관리</strong>
+                <ul>
+                    <li>BrailleSense (학교), Focus 40 (집), iPhone + Orbit Reader (이동)</li>
+                    <li>각 장치마다 다른 단축키, 설정</li>
+                    <li>점자 테이블 설정이 장치 간 동기화 안 됨</li>
+                    <li>같은 문서를 다른 장치에서 열면 다른 점자 출력 (축약 설정 차이)</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>사례 3: IT 관리자 사라의 접근성 구현 좌절</h3>
+
+        <p><strong>배경:</strong> 사라는 대기업의 IT 접근성 담당자로, 시각장애인 직원을 위한 환경 구축 책임</p>
+
+        <p><strong>문제 경험:</strong></p>
+        <ol>
+            <li>
+                <strong>표준화 부재</strong>
+                <ul>
+                    <li>회사의 3명 시각장애인 직원이 각각 다른 디스플레이 선호 (Focus, Brailliant, VarioUltra)</li>
+                    <li>각 디스플레이마다 별도 드라이버, 소프트웨어 설치 필요</li>
+                    <li>회사 보안 정책과 일부 드라이버 충돌</li>
+                </ul>
+            </li>
+            <li>
+                <strong>원격 근무 지원</strong>
+                <ul>
+                    <li>VPN을 통한 점자 디스플레이 사용 시 지연 발생</li>
+                    <li>일부 원격 데스크톱 솔루션(Citrix)이 점자 신호 전달 안 함</li>
+                    <li>각 직원 집에서 IT 지원 제공 어려움 (각기 다른 설정)</li>
+                </ul>
+            </li>
+            <li>
+                <strong>비용 관리</strong>
+                <ul>
+                    <li>3개 디스플레이 구매: $25,000</li>
+                    <li>JAWS 라이선스 3개: $3,600</li>
+                    <li>IT 지원 시간: 연 100시간 이상 (표준화되었다면 20시간 이하 예상)</li>
+                    <li>총 소유 비용이 예상의 3배</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>사례 4: 신흥 시장 사용자 압둘의 접근 불가</h3>
+
+        <p><strong>배경:</strong> 압둘은 나이지리아의 시각장애 대학생입니다.</p>
+
+        <p><strong>문제 경험:</strong></p>
+        <ol>
+            <li>
+                <strong>경제적 장벽</strong>
+                <ul>
+                    <li>가족 연소득: $3,000</li>
+                    <li>가장 저렴한 디스플레이 (Orbit Reader 20): $449 + 배송 $150 = $599</li>
+                    <li>연소득의 20% - 감당 불가</li>
+                </ul>
+            </li>
+            <li>
+                <strong>지역 지원 부족</strong>
+                <ul>
+                    <li>나이지리아에 점자 디스플레이 판매점/수리점 없음</li>
+                    <li>고장 시 미국/유럽으로 배송해야 함 (비용 및 시간)</li>
+                    <li>현지 NGO 지원도 대기자 명단 100명 이상</li>
+                </ul>
+            </li>
+            <li>
+                <strong>기술 인프라</strong>
+                <ul>
+                    <li>불안정한 전력 공급 (장치 손상 위험)</li>
+                    <li>인터넷 속도 느려 펌웨어 업데이트 어려움</li>
+                    <li>현지어(Hausa) 점자 테이블 지원 없음</li>
+                </ul>
+            </li>
+            <li>
+                <strong>결과</strong>
+                <ul>
+                    <li>스마트폰 음성 합성만 사용</li>
+                    <li>STEM 과목 수강 불가 (점자 없이 수학/과학 어려움)</li>
+                    <li>고용 전망 제한됨</li>
+                </ul>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>2.7 챕터 요약: 5가지 핵심 포인트</h2>
+        <ol>
+            <li>
+                <strong>제조업체 파편화는 생태계 전체에 부담을 줍니다</strong>
+                <p>각 제조업체의 독자 프로토콜로 인해 사용자는 유연성을 잃고, 개발자는 여러 드라이버를 유지해야 하며, 혁신이 저해됩니다. Freedom Scientific, HumanWare, HIMS, Baum 각각이 다른 통신 방식을 사용합니다.</p>
+            </li>
+            <li>
+                <strong>드라이버 호환성은 운영체제 복권입니다</strong>
+                <p>Windows는 제조업체 드라이버에 의존, macOS는 선별 지원, Linux는 커뮤니티 노력(BRLTTY)에 의존합니다. 같은 디스플레이도 플랫폼마다 기능이 다릅니다.</p>
+            </li>
+            <li>
+                <strong>$2,000-$15,000의 비용은 접근성을 부정합니다</strong>
+                <p>피에조 액추에이터 비용과 작은 시장 규모로 인해 점자 디스플레이는 스마트폰보다 비쌉니다. 개발도상국에서는 연소득의 100% 이상으로 사실상 불가능합니다. 弘益人間 철학과 상충됩니다.</p>
+            </li>
+            <li>
+                <strong>스크린 리더 통합은 표준 API 없이 혼란스럽습니다</strong>
+                <p>JAWS, NVDA, VoiceOver, TalkBack 각각이 다른 방식으로 점자를 처리하여 점자 테이블 불일치, 속성 표시 차이, 드라이버 충돌을 야기합니다.</p>
+            </li>
+            <li>
+                <strong>실제 사용자는 매일 이 문제들과 씨름합니다</strong>
+                <p>개발자 마리아의 Linux 설정 고생, 학생 제임스의 시험 접근 불가, IT 관리자 사라의 3배 비용, 나이지리아 압둘의 완전 배제 - 이들 모두 통일된 표준으로 해결 가능한 문제들입니다.</p>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>2.8 복습 문제</h2>
+        <ol>
+            <li>
+                <strong>같은 작업("Hello" 표시)을 수행하기 위해 Freedom Scientific Focus와 HIMS Braille Edge가 사용하는 프로토콜의 주요 차이점은 무엇입니까?</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>Focus는 독점 HID 바이너리 패킷을 사용하며, 각 문자를 1급 점자 바이트로 변환하여 HID 리포트로 전송합니다. Braille Edge는 Bluetooth Serial Port Profile로 텍스트 명령("BR" + "Hello" + "\r\n")을 UTF-8로 전송합니다. 이 근본적인 차이로 인해 각 디스플레이마다 완전히 다른 드라이버 코드가 필요합니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>BRLTTY란 무엇이며, Linux 점자 디스플레이 지원에서 어떤 역할을 합니까? 장단점을 설명하세요.</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>BRLTTY는 Linux용 오픈소스 점자 디스플레이 드라이버로 180개 이상 모델을 지원합니다. 장점: (1) 넓은 장치 지원, (2) 커뮤니티 주도 신속 업데이트, (3) 고도 커스터마이징 가능. 단점: (1) 복잡한 설정 파일, (2) 자동 감지 불안정(특히 Bluetooth), (3) 일반 사용자에게 높은 학습 곡선, (4) 신규 모델은 커뮤니티 기여 필요. 마리아 사례처럼 전문가도 설정에 1주 이상 소요될 수 있습니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>점자 디스플레이의 비용 구조를 분석하세요. 피에조 액추에이터가 전체 비용의 몇 %를 차지하며, 왜 그렇게 비쌉니까?</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>피에조 전기 액추에이터는 전체 비용의 40-50%를 차지합니다. 비싼 이유: (1) 특수 세라믹(PZT) 재료, (2) 마이크로미터 단위 정밀 제조, (3) 작은 시장(연 5-7만개)으로 대량 생산 불가, (4) 전 세계 3-4개 공급업체만 존재(독점), (5) 수백만 회 동작 수명 보장 필요. 나머지 비용: 전자 회로 15-20%, 조립 10-15%, R&D/특허 10-15%, 소프트웨어 5-10%, 유통 10-15%. 대안 기술(SMA, EAP)은 아직 연구 단계입니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>JAWS와 NVDA가 동일한 텍스트를 점자로 표시할 때 발생할 수 있는 불일치 문제를 예를 들어 설명하세요.</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>영어 2급 점자에서 "about"은 JAWS가 ⠁⠃(ab 축약)으로 표시하지만 NVDA는 ⠁⠃⠳⠞(전체 철자)로 표시할 수 있습니다. "first"는 JAWS가 ⠋⠌(fst 축약)이지만 NVDA는 ⠋⠊⠗⠎⠞(전체)입니다. 또한 속성 표시도 다릅니다: 굵은 텍스트를 JAWS는 점 7-8 추가, NVDA는 설정에 따라 표시 안 함, VoiceOver는 점 7만 추가합니다. 링크는 JAWS "lnk" 접두사, NVDA 점 8, VoiceOver "link" 표시로 각각 다릅니다. 이는 여러 스크린 리더 사용자에게 혼란을 줍니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>학생 제임스가 겪은 "온라인 시험 문제"를 상세히 설명하고, 이것이 표준화 부재와 어떻게 연결되는지 논하세요.</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>제임스는 BrailleSense 6 노트테이커를 사용하지만, 대학의 온라인 시험 플랫폼(Proctorio)이 그의 내장 브라우저를 차단했습니다. PC 연결 모드를 사용하려 했으나, 도서관 컴퓨터가 BrailleSense를 Bluetooth 디스플레이로 인식하지 못했고(드라이버 문제), 관리자 권한 없이 드라이버 설치 불가했습니다. 결국 독립적 시험 불가능. 표준화된 프로토콜이 있었다면: (1) OS 기본 드라이버로 즉시 작동, (2) 관리자 권한 불필요, (3) 모든 브라우저/플랫폼 호환. 이는 교육 접근성과 직결되며, 弘益人間 철학의 실천을 위해 표준이 필수적임을 보여줍니다.</p>
+                </details>
+            </li>
+            <li>
+                <strong>나이지리아 사용자 압둘이 직면한 장벽들을 나열하고, 이 중 어떤 것들이 WIA 표준으로 완화될 수 있는지 분석하세요.</strong>
+                <details>
+                    <summary>답안 보기</summary>
+                    <p>압둘의 장벽: (1) 경제적 - Orbit Reader $599가 연소득 20%, (2) 지역 지원 부족 - 판매/수리점 없음, (3) 배송 비용, (4) 불안정한 전력, (5) 느린 인터넷, (6) 현지어 점자 테이블 없음. <strong>WIA 표준으로 완화 가능:</strong> (1) 표준화로 제조 비용 절감 → 저가 디스플레이 증가 ($100-200 목표), (2) 통일된 펌웨어로 원격 지원 용이, (3) 오픈소스 드라이버로 현지 개발자가 현지어 테이블 추가 가능, (4) 표준 부품으로 현지 수리 가능. <strong>WIA로 불가능:</strong> 전력/인터넷 인프라는 별도 해결 필요. 그러나 표준은 기술적 장벽을 크게 낮춰 2억 8,500만 중 더 많은 사람에게 접근성 제공할 것입니다.</p>
+                </details>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>2.9 다음 챕터 미리보기</h2>
+        <p><strong>챕터 3: WIA 표준 개요</strong>에서는 이러한 과제들을 해결하기 위한 WIA의 비전과 접근 방식을 소개합니다:</p>
+        <ul>
+            <li><strong>미션</strong>: 弘益人間 철학을 바탕으로 한 보편적 점자 접근성</li>
+            <li><strong>4단계 아키텍처</strong>: 데이터 형식 → 프로토콜 → 드라이버 → API로 구성된 레이어드 접근</li>
+            <li><strong>설계 원칙</strong>: 상호운용성, 확장성, 하위 호환성, 개방성</li>
+            <li><strong>점자 코드 지원</strong>: 1급, 2급, 6점, 8점, 다국어 테이블 포괄</li>
+            <li><strong>기존 표준 통합</strong>: USB HID, Bluetooth, Unicode와의 호환성</li>
+            <li><strong>구현 로드맵</strong>: 단계별 채택 전략</li>
+        </ul>
+
+        <p>챕터 2에서 본 마리아, 제임스, 사라, 압둘의 문제들이 어떻게 해결될 수 있는지 구체적으로 살펴보겠습니다.</p>
+
+        <p><strong><a href="chapter-03.html">챕터 3로 계속 →</a></strong></p>
+    </section>
+</body>
+</html>

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04: 홍채 및 망막 인식 - WIA-BIOMETRIC_AUTH</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --text: #e2e8f0;
+            --border: #334155;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 40px 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin: 2.5rem 0 1.2rem 0;
+            padding-left: 15px;
+            border-left: 4px solid var(--primary);
+        }
+        h3 {
+            color: #60a5fa;
+            font-size: 1.2rem;
+            margin: 2rem 0 1rem 0;
+        }
+        p {
+            margin: 1rem 0;
+            text-align: justify;
+        }
+        pre {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            font-family: 'D2Coding', monospace;
+            font-size: 0.95rem;
+            margin: 1.5rem 0;
+            line-height: 1.6;
+        }
+        .highlight {
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 1.5rem 0;
+        }
+        .highlight-title {
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #1e293b;
+            color: var(--primary);
+        }
+        .chapter-indicator {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        .copyright {
+            text-align: center;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="chapter-indicator">Chapter 04</div>
+    <h1>홍채 및 망막 인식</h1>
+    <p style="color: #94a3b8; font-size: 1.1rem;">눈 기반 생체인식 기술의 원리, 하드웨어 구성, 알고리즘, 그리고 뛰어난 정확도의 비밀을 탐구합니다.</p>
+
+    <h2>홍채 인식 개요</h2>
+    <p>홍채(Iris)는 눈의 동공과 공막(흰자) 사이에 위치한 색깔 있는 고리 모양의 조직입니다. 홍채의 복잡한 패턴은 생후 약 2년 안에 형성되어 평생 변하지 않으며, 일란성 쌍둥이조차 서로 다른 홍채 패턴을 가집니다. 심지어 한 사람의 왼쪽 눈과 오른쪽 눈의 홍채도 완전히 다릅니다.</p>
+
+    <p>홍채 인식은 모든 생체인식 기술 중 가장 높은 정확도를 제공합니다. 지문이 약 40개의 고유 특징을 가지는 반면, 홍채는 200개 이상의 고유 특징점을 포함합니다. 이론적으로 FAR(오수락률)이 10^-78에 달할 수 있어, 사실상 오인식이 불가능합니다.</p>
+
+    <div class="highlight">
+        <span class="highlight-title">홍채의 해부학적 특성</span>
+        <pre>
+홍채 구조
+═════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────┐
+│                        공막 (흰자)                        │
+│    ┌─────────────────────────────────────────────┐      │
+│    │              홍채 (Iris)                     │      │
+│    │    ┌─────────────────────────────────┐     │      │
+│    │    │     섬유주 (Trabeculae)          │     │      │
+│    │    │   - 방사상 섬유 패턴             │     │      │
+│    │    │   - 동심원 주름                  │     │      │
+│    │    │   - 암점 (Crypts)               │     │      │
+│    │    │   - 색소 반점                    │     │      │
+│    │    │    ┌───────────────────┐        │     │      │
+│    │    │    │     동공          │        │     │      │
+│    │    │    │   (Pupil)        │        │     │      │
+│    │    │    │   - 크기 가변    │        │     │      │
+│    │    │    │   - 빛에 반응    │        │     │      │
+│    │    │    └───────────────────┘        │     │      │
+│    │    └─────────────────────────────────┘     │      │
+│    │              동공 경계                       │      │
+│    └─────────────────────────────────────────────┘      │
+│                    홍채 경계                             │
+└─────────────────────────────────────────────────────────┘
+
+홍채 패턴 구성 요소:
+- 섬유주 (Trabecular Meshwork): 방사상 결합 조직 구조
+- 암점 (Crypts): 홍채 표면의 작은 구멍들
+- 주름 (Furrows): 동심원 및 방사상 주름
+- 관상 (Collarette): 동공과 섬모 영역의 경계선
+- 색소 반점 (Pigment Spots): 멜라닌 침착 부위
+        </pre>
+    </div>
+
+    <h2>홍채 인식 시스템 구조</h2>
+    <p>홍채 인식 시스템은 이미지 획득, 전처리, 특징 추출, 매칭의 4단계로 구성됩니다. 각 단계는 높은 정확도를 달성하기 위해 정교하게 설계되어야 합니다.</p>
+
+    <pre>
+홍채 인식 파이프라인
+══════════════════════════════════════════════════════════════
+
+[이미지 획득]     [전처리]        [특징 추출]     [매칭]
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│ NIR 카메라 │ -> │ 홍채 검출 │ -> │ Gabor    │ -> │ 해밍     │
+│ 조명 제어  │    │ 동공 검출 │    │ 필터링   │    │ 거리     │
+│ 초점 조정  │    │ 정규화   │    │ 인코딩   │    │ 비교     │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘
+                    │
+                    ▼
+               품질 평가
+               - 흐림 검출
+               - 가림 검출
+               - 동공 확장 확인
+
+1. 이미지 획득
+   - 근적외선(NIR) 카메라 사용 (700-900nm)
+   - 멜라닌 색소 영향 최소화
+   - 동공/홍채 경계 명확히 촬영
+
+2. 전처리
+   - 홍채 내경/외경 검출 (Daugman's Integro-differential)
+   - 극좌표 변환 (Rubber Sheet Model)
+   - 조명 정규화
+
+3. 특징 추출
+   - 2D Gabor 웨이블릿 필터 적용
+   - 위상 정보 추출
+   - IrisCode 생성 (2048비트)
+
+4. 매칭
+   - 해밍 거리 계산
+   - 회전 보정 (여러 시프트 비교)
+   - 임계값 비교 (일반적으로 0.32)
+    </pre>
+
+    <h2>홍채 이미지 획득</h2>
+    <p>고품질 홍채 이미지 획득은 정확한 인식의 기초입니다. 근적외선(NIR) 조명을 사용하면 홍채의 섬세한 구조가 명확히 드러나며, 어두운 색 홍채도 밝은 색 홍채와 동등하게 처리할 수 있습니다.</p>
+
+    <table>
+        <tr>
+            <th>요소</th>
+            <th>사양</th>
+            <th>목적</th>
+        </tr>
+        <tr>
+            <td>파장</td>
+            <td>700-900nm (NIR)</td>
+            <td>멜라닌 투과, 텍스처 강조</td>
+        </tr>
+        <tr>
+            <td>해상도</td>
+            <td>200+ 픽셀 (홍채 직경)</td>
+            <td>충분한 특징 추출</td>
+        </tr>
+        <tr>
+            <td>거리</td>
+            <td>10-40cm (일반), 1-3m (원거리)</td>
+            <td>사용 편의성</td>
+        </tr>
+        <tr>
+            <td>조명</td>
+            <td>균일한 NIR LED 배열</td>
+            <td>반사 방지, 균일 조명</td>
+        </tr>
+        <tr>
+            <td>프레임률</td>
+            <td>15+ fps</td>
+            <td>최적 프레임 선택</td>
+        </tr>
+    </table>
+
+    <h2>Daugman의 홍채 인식 알고리즘</h2>
+    <p>John Daugman 교수가 1993년에 개발한 알고리즘은 현재까지 가장 널리 사용되는 홍채 인식 방법론입니다. 이 알고리즘은 전 세계 공항과 국경 통제 시스템의 표준이 되었습니다.</p>
+
+    <div class="highlight">
+        <span class="highlight-title">Daugman 알고리즘의 핵심 단계</span>
+        <pre>
+1. 홍채 세그멘테이션 (Integro-differential Operator)
+────────────────────────────────────────────────────
+
+             ∂
+max(r,x₀,y₀) ── | G_σ(r) * ∮  I(x,y) ds |
+             ∂r           r,x₀,y₀
+
+- 원형 경계(동공, 홍채)를 검출하는 연산자
+- 가우시안 스무딩으로 노이즈 완화
+- 반경과 중심을 최적화
+
+2. 정규화 (Rubber Sheet Model)
+─────────────────────────────
+
+I(x,y) → I(r,θ)  where  0 ≤ r ≤ 1, 0 ≤ θ ≤ 2π
+
+- 홍채 영역을 직사각형 좌표로 변환
+- 동공 크기 변화에 강건
+- 고정 크기 템플릿 생성
+
+3. 특징 인코딩 (2D Gabor Wavelets)
+─────────────────────────────────
+
+h(Re,Im) = sgn{Re(∫∫ I(ρ,φ) e^(-iω(θ₀-φ)) e^(-(r₀-ρ)²/α²) 
+              e^(-(θ₀-φ)²/β²) ρ dρ dφ}
+
+- 복소 Gabor 필터로 로컬 텍스처 분석
+- 위상 정보만 사용 (진폭 무시)
+- 2비트 양자화 (4개 사분면)
+- 결과: 2048비트 IrisCode
+
+4. 매칭 (Hamming Distance)
+──────────────────────────
+
+HD = (1/N) Σ (codeA[i] ⊕ codeB[i]) ∩ mask[i]
+
+- XOR 연산으로 차이 비트 계산
+- 가림 영역(눈꺼풀, 속눈썹) 마스킹
+- 회전 보정을 위한 시프트 테스트
+- 결정 임계값: 일반적으로 0.32
+        </pre>
+    </div>
+
+    <h2>홍채 인식 구현</h2>
+    <pre>
+import numpy as np
+from scipy import ndimage
+from scipy.signal import convolve2d
+
+class IrisRecognition:
+    """Daugman 알고리즘 기반 홍채 인식 시스템"""
+    
+    def __init__(self):
+        self.normalized_width = 512
+        self.normalized_height = 64
+        self.gabor_wavelength = 18
+        
+    def segment_iris(self, eye_image):
+        """홍채 세그멘테이션 - 동공과 홍채 경계 검출"""
+        # 동공 검출 (더 어두운 영역)
+        pupil_center, pupil_radius = self._find_circle(
+            eye_image, 
+            r_range=(20, 80),
+            edge_type='inner'
+        )
+        
+        # 홍채 경계 검출
+        iris_center, iris_radius = self._find_circle(
+            eye_image,
+            r_range=(60, 150),
+            edge_type='outer',
+            center_hint=pupil_center
+        )
+        
+        return {
+            'pupil': (pupil_center, pupil_radius),
+            'iris': (iris_center, iris_radius)
+        }
+    
+    def _find_circle(self, image, r_range, edge_type, center_hint=None):
+        """Integro-differential operator로 원형 경계 검출"""
+        max_response = 0
+        best_params = None
+        
+        # 가우시안 블러 적용
+        blurred = ndimage.gaussian_filter(image, sigma=2)
+        
+        for r in range(r_range[0], r_range[1]):
+            for x0 in range(image.shape[1]):
+                for y0 in range(image.shape[0]):
+                    # 원주 상의 픽셀 합 계산
+                    response = self._circular_integral(blurred, x0, y0, r)
+                    if response > max_response:
+                        max_response = response
+                        best_params = ((x0, y0), r)
+        
+        return best_params
+    
+    def normalize(self, image, pupil, iris):
+        """Rubber Sheet 정규화"""
+        pupil_center, pupil_r = pupil
+        iris_center, iris_r = iris
+        
+        normalized = np.zeros((self.normalized_height, self.normalized_width))
+        
+        for i in range(self.normalized_height):
+            for j in range(self.normalized_width):
+                theta = 2 * np.pi * j / self.normalized_width
+                r = i / self.normalized_height
+                
+                # 동공에서 홍채 경계까지 선형 보간
+                x = int(pupil_center[0] + r * (iris_r * np.cos(theta)))
+                y = int(pupil_center[1] + r * (iris_r * np.sin(theta)))
+                
+                if 0 <= x < image.shape[1] and 0 <= y < image.shape[0]:
+                    normalized[i, j] = image[y, x]
+        
+        return normalized
+    
+    def encode(self, normalized_iris):
+        """2D Gabor 웨이블릿으로 IrisCode 생성"""
+        code_real = []
+        code_imag = []
+        
+        # 여러 스케일과 방향의 Gabor 필터 적용
+        for scale in [1, 2]:
+            wavelength = self.gabor_wavelength * scale
+            for orientation in range(8):
+                theta = orientation * np.pi / 8
+                
+                # Gabor 필터 생성
+                kernel = self._create_gabor_kernel(wavelength, theta)
+                
+                # 컨볼루션
+                response = convolve2d(normalized_iris, kernel, mode='same')
+                
+                # 위상 양자화 (2비트)
+                code_real.extend((response.real > 0).flatten().astype(int))
+                code_imag.extend((response.imag > 0).flatten().astype(int))
+        
+        return np.array(code_real + code_imag)
+    
+    def match(self, code1, code2, mask1=None, mask2=None):
+        """해밍 거리 기반 매칭"""
+        min_hd = 1.0
+        
+        # 회전 보정을 위한 시프트 테스트
+        for shift in range(-10, 11):
+            shifted_code2 = np.roll(code2, shift * 16)
+            
+            # XOR로 차이 계산
+            xor_result = np.logical_xor(code1, shifted_code2)
+            
+            # 마스크 적용 (가림 영역 제외)
+            if mask1 is not None and mask2 is not None:
+                shifted_mask2 = np.roll(mask2, shift * 16)
+                valid_bits = np.logical_and(mask1, shifted_mask2)
+                hd = np.sum(xor_result[valid_bits]) / np.sum(valid_bits)
+            else:
+                hd = np.mean(xor_result)
+            
+            min_hd = min(min_hd, hd)
+        
+        # 임계값 비교 (0.32가 일반적)
+        is_match = min_hd < 0.32
+        
+        return is_match, min_hd
+    </pre>
+
+    <h2>망막 인식</h2>
+    <p>망막 인식(Retina Recognition)은 눈 안쪽 망막의 혈관 패턴을 분석합니다. 망막의 혈관 패턴은 개인마다 고유하며 질병이나 노화에도 거의 변하지 않습니다. 홍채 인식보다도 높은 정확도를 제공하지만, 스캔 과정이 불편하여 제한적으로 사용됩니다.</p>
+
+    <div class="highlight">
+        <span class="highlight-title">홍채 vs 망막 인식 비교</span>
+        <table>
+            <tr>
+                <th>특성</th>
+                <th>홍채 인식</th>
+                <th>망막 인식</th>
+            </tr>
+            <tr>
+                <td>스캔 대상</td>
+                <td>눈 표면 (홍채)</td>
+                <td>눈 안쪽 (망막 혈관)</td>
+            </tr>
+            <tr>
+                <td>정확도</td>
+                <td>매우 높음</td>
+                <td>극히 높음</td>
+            </tr>
+            <tr>
+                <td>스캔 거리</td>
+                <td>10cm ~ 수 미터</td>
+                <td>접안 필요</td>
+            </tr>
+            <tr>
+                <td>사용자 편의성</td>
+                <td>양호</td>
+                <td>불편함</td>
+            </tr>
+            <tr>
+                <td>비용</td>
+                <td>중간</td>
+                <td>높음</td>
+            </tr>
+            <tr>
+                <td>적용 분야</td>
+                <td>공항, 스마트폰, 출입통제</td>
+                <td>최고 보안 시설, 군사</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2>WIA 홍채 인식 표준</h2>
+    <pre>
+WIA-BIOMETRIC_AUTH 홍채 인식 요구사항
+══════════════════════════════════════════════════════════════
+
+성능 요구사항
+─────────────
+- FAR ≤ 0.0001% (1:1,000,000)
+- FRR ≤ 0.2%
+- 등록 시간 ≤ 5초
+- 인증 시간 ≤ 2초
+- 템플릿 크기 ≤ 512 바이트
+
+이미지 품질 요구사항
+────────────────────
+- 홍채 직경: 200+ 픽셀
+- 가림률: 50% 미만 (눈꺼풀, 속눈썹)
+- 초점: 선명도 지표 통과
+- 동공 확장: 20-70% 범위
+
+라이브니스 요구사항
+───────────────────
+- ISO/IEC 30107-3 PAD Level 2 이상
+- 인쇄된 홍채 이미지 차단
+- 콘택트렌즈 검출
+- 인공 눈 검출
+
+호환성 요구사항
+───────────────
+- ISO/IEC 19794-6 이미지 포맷
+- ISO/IEC 29794-6 품질 평가
+- NIST IREX 상호운용성
+    </pre>
+
+    <h2>응용 분야</h2>
+    <p>홍채 인식은 최고 수준의 보안이 요구되는 환경에서 주로 사용됩니다.</p>
+
+    <div class="highlight">
+        <span class="highlight-title">주요 응용 사례</span>
+        <p><strong>국경 통제:</strong> UAE, 싱가포르, 영국 등 공항 자동 출입국 심사</p>
+        <p><strong>국가 신원확인:</strong> 인도 Aadhaar (12억 명 이상 등록)</p>
+        <p><strong>금융 서비스:</strong> ATM 인증, 고액 거래 승인</p>
+        <p><strong>고보안 시설:</strong> 데이터센터, 원자력 시설, 군사 기지</p>
+        <p><strong>모바일 기기:</strong> 삼성 Galaxy 시리즈 (일부 모델)</p>
+    </div>
+
+    <div class="copyright">
+        <p>© 2025 World Industry Association (WIA). 弘益人間 - 널리 인간을 이롭게 하라</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Chapter 5: Phase 2 - API Interface Standard | WIA Braille Display</title>
+</head>
+<body>
+
+<h1>⠿ Chapter 5: Phase 2 - API Interface Standard</h1>
+
+<p><em>Part III: Technical Specification</em></p>
+
+<hr>
+
+<h2>Introduction</h2>
+
+<p>The API Interface Standard (Phase 2) defines how software applications interact with Braille displays at the programmatic level. This chapter covers the complete WIA Braille Display API, providing developers with everything needed to integrate Braille display support into applications, screen readers, and operating systems.</p>
+
+<p>Building upon Phase 1's data format foundation, this API layer abstracts the complexity of device communication while maintaining fine-grained control when needed. The design philosophy emphasizes simplicity for common use cases while providing advanced features for specialized applications.</p>
+
+<blockquote>
+<p><strong>Design Principle:</strong> The API should be simple enough for a beginner to send "Hello World" to a Braille display in five lines of code, yet powerful enough to support professional screen reader implementations.</p>
+</blockquote>
+
+<hr>
+
+<h2>5.1 Core API Design Philosophy</h2>
+
+<h3>5.1.1 Design Goals</h3>
+
+<p>The WIA Braille Display API is built around five core principles:</p>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Principle</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Simplicity First</strong></td>
+<td>Common operations require minimal code</td>
+<td>3 lines to display text</td>
+</tr>
+<tr>
+<td><strong>Type Safety</strong></td>
+<td>Leverage TypeScript for compile-time checking</td>
+<td>No magic strings or numbers</td>
+</tr>
+<tr>
+<td><strong>Async by Default</strong></td>
+<td>All I/O operations return Promises</td>
+<td>Modern async/await patterns</td>
+</tr>
+<tr>
+<td><strong>Event-Driven</strong></td>
+<td>Subscribe to device events (keys, routing)</td>
+<td>Standard EventEmitter pattern</td>
+</tr>
+<tr>
+<td><strong>Graceful Degradation</strong></td>
+<td>Works with partial device features</td>
+<td>Detect and adapt to capabilities</td>
+</tr>
+</tbody>
+</table>
+
+<h3>5.1.2 API Layers</h3>
+
+<p>The API is structured in three layers, each building upon the previous:</p>
+
+<ol>
+<li><strong>High-Level API</strong> - Simple methods for common tasks (90% of use cases)</li>
+<li><strong>Mid-Level API</strong> - Direct cell and cursor control</li>
+<li><strong>Low-Level API</strong> - Raw protocol access for advanced implementations</li>
+</ol>
+
+<p>Most developers will only need the high-level API. Screen reader developers may use mid-level. Hardware manufacturers may need low-level access.</p>
+
+<h3>5.1.3 Language Bindings</h3>
+
+<p>The reference implementation is TypeScript/JavaScript, but the API design supports bindings in:</p>
+
+<ul>
+<li>TypeScript/JavaScript (primary)</li>
+<li>Python (via PyPI)</li>
+<li>Rust (via crates.io)</li>
+<li>C/C++ (native library)</li>
+<li>Java/Kotlin (Android)</li>
+<li>Swift (iOS/macOS)</li>
+</ul>
+
+<p>This chapter uses TypeScript for examples, but concepts translate directly to other languages.</p>
+
+<hr>
+
+<h2>5.2 WiaBrailleDisplay Class</h2>
+
+<h3>5.2.1 Class Overview</h3>
+
+<p>The <code>WiaBrailleDisplay</code> class is the primary entry point for all API interactions. It represents a single connected Braille display device.</p>
+
+<pre>
+import { WiaBrailleDisplay } from '@wia/braille-display';
+
+// Create instance (does not auto-connect)
+const display = new WiaBrailleDisplay();
+
+// Connect to first available device
+await display.connect();
+
+// Display text
+await display.write('Hello World');
+
+// Disconnect when done
+await display.disconnect();
+</pre>
+
+<h3>5.2.2 Constructor Options</h3>
+
+<p>The constructor accepts optional configuration:</p>
+
+<pre>
+interface WiaBrailleDisplayOptions {
+    // Auto-connect to first available device
+    autoConnect?: boolean;
+
+    // Preferred connection type
+    connectionType?: 'usb' | 'bluetooth' | 'serial' | 'any';
+
+    // Specific device identifier
+    deviceId?: string;
+
+    // Enable debug logging
+    debug?: boolean;
+
+    // Custom event handlers
+    onConnect?: () => void;
+    onDisconnect?: () => void;
+    onError?: (error: Error) => void;
+}
+
+// Example with options
+const display = new WiaBrailleDisplay({
+    autoConnect: true,
+    connectionType: 'bluetooth',
+    debug: true,
+    onConnect: () => console.log('Display connected!'),
+    onError: (err) => console.error('Display error:', err)
+});
+</pre>
+
+<h3>5.2.3 Device Information</h3>
+
+<p>Once connected, access device capabilities:</p>
+
+<pre>
+// Get device info
+const info = display.getDeviceInfo();
+
+console.log(info);
+// Output:
+// {
+//     manufacturer: 'HumanWare',
+//     model: 'Brailliant BI 40X',
+//     serialNumber: 'HW12345678',
+//     firmwareVersion: '2.1.3',
+//     cellCount: 40,
+//     dotFormat: '8dot',
+//     capabilities: {
+//         routingKeys: true,
+//         navigationKeys: true,
+//         perkinKeys: true,
+//         vibration: false,
+//         multiLine: false
+//     },
+//     connectionType: 'bluetooth'
+// }
+</pre>
+
+<h3>5.2.4 Capability Detection</h3>
+
+<p>Always check device capabilities before using features:</p>
+
+<pre>
+// Check for specific capability
+if (display.hasCapability('routingKeys')) {
+    // Enable cursor routing
+    display.on('routing', (cellIndex) => {
+        console.log(`Routing key pressed at cell ${cellIndex}`);
+    });
+}
+
+// Check cell count
+const cellCount = display.getCellCount();
+if (cellCount >= 40) {
+    // Display full line
+    await display.write(text);
+} else {
+    // Display with scrolling
+    await display.write(text, { scroll: true });
+}
+</pre>
+
+<hr>
+
+<h2>5.3 Device Discovery and Enumeration</h2>
+
+<h3>5.3.1 Discovering Devices</h3>
+
+<p>The <code>WiaBrailleDisplay.discover()</code> static method finds all available Braille displays:</p>
+
+<pre>
+import { WiaBrailleDisplay } from '@wia/braille-display';
+
+// Discover all available devices
+const devices = await WiaBrailleDisplay.discover();
+
+console.log(`Found ${devices.length} Braille display(s)`);
+
+devices.forEach((device, index) => {
+    console.log(`${index + 1}. ${device.manufacturer} ${device.model}`);
+    console.log(`   Connection: ${device.connectionType}`);
+    console.log(`   Cells: ${device.cellCount}`);
+});
+</pre>
+
+<h3>5.3.2 Filtering Devices</h3>
+
+<p>Filter discovery by connection type or manufacturer:</p>
+
+<pre>
+// Find only USB devices
+const usbDevices = await WiaBrailleDisplay.discover({
+    connectionType: 'usb'
+});
+
+// Find specific manufacturer
+const hwDevices = await WiaBrailleDisplay.discover({
+    manufacturer: 'HumanWare'
+});
+
+// Multiple filters
+const bluetoothHumanware = await WiaBrailleDisplay.discover({
+    connectionType: 'bluetooth',
+    manufacturer: 'HumanWare',
+    minCells: 40
+});
+</pre>
+
+<h3>5.3.3 Connecting to Specific Device</h3>
+
+<p>Connect to a specific device by ID or index:</p>
+
+<pre>
+// Discover devices
+const devices = await WiaBrailleDisplay.discover();
+
+// Connect to first device
+const display = new WiaBrailleDisplay();
+await display.connectToDevice(devices[0]);
+
+// Or use device ID directly
+await display.connect({ deviceId: 'hw-brailliant-bi40x-12345' });
+</pre>
+
+<h3>5.3.4 Device Events</h3>
+
+<p>Listen for device connection/disconnection events:</p>
+
+<pre>
+// Monitor for new devices
+WiaBrailleDisplay.on('deviceConnected', (device) => {
+    console.log(`New device: ${device.model}`);
+});
+
+WiaBrailleDisplay.on('deviceDisconnected', (device) => {
+    console.log(`Device removed: ${device.model}`);
+});
+
+// Start monitoring
+WiaBrailleDisplay.startMonitoring();
+
+// Stop when done
+WiaBrailleDisplay.stopMonitoring();
+</pre>
+
+<hr>
+
+<h2>5.4 Cell Management</h2>
+
+<h3>5.4.1 Writing to Cells</h3>
+
+<p>The primary operation is writing content to Braille cells:</p>
+
+<pre>
+// Simple text write
+await display.write('Hello World');
+
+// Write at specific position
+await display.write('World', { startCell: 6 });
+
+// Write with options
+await display.write(text, {
+    startCell: 0,           // Start position
+    clearBefore: true,      // Clear display first
+    scroll: false,          // Enable auto-scroll
+    scrollDelay: 500,       // MS between scrolls
+    showCursor: true,       // Show cursor position
+    cursorCell: 0          // Cursor cell index
+});
+</pre>
+
+<h3>5.4.2 Raw Cell Data</h3>
+
+<p>For advanced control, write raw cell patterns:</p>
+
+<pre>
+// Write raw dot patterns (8-bit values)
+const patterns = [
+    0b00100000,  // Dot 6 (capital indicator)
+    0b00010000,  // Dot 5
+    0b00001000,  // Dot 4
+    0b00000100,  // Dot 3
+    0b00000010,  // Dot 2
+    0b00000001   // Dot 1
+];
+
+await display.writeCells(patterns);
+
+// Or use cell objects
+const cells = [
+    { dots: [1, 2, 4], cursor: false },
+    { dots: [1, 3, 4, 5], cursor: true },
+    { dots: [1, 2, 3, 4, 5, 6], cursor: false }
+];
+
+await display.writeCellObjects(cells);
+</pre>
+
+<h3>5.4.3 Clearing Display</h3>
+
+<p>Clear all or specific cells:</p>
+
+<pre>
+// Clear entire display
+await display.clear();
+
+// Clear specific range
+await display.clearRange(10, 20);
+
+// Clear specific cells
+await display.clearCells([5, 10, 15, 20]);
+</pre>
+
+<h3>5.4.4 Reading Current State</h3>
+
+<p>Read what's currently displayed:</p>
+
+<pre>
+// Get current cell patterns
+const currentPatterns = display.getCurrentCells();
+
+// Get as text
+const currentText = display.getCurrentText();
+
+// Get specific cell
+const cellPattern = display.getCell(10);
+
+console.log(`Cell 10: ${cellPattern.toString(2).padStart(8, '0')}`);
+</pre>
+
+<h3>5.4.5 Scrolling</h3>
+
+<p>Implement panning for long content:</p>
+
+<pre>
+// Auto-scroll long text
+await display.write(longText, {
+    scroll: true,
+    scrollDelay: 3000  // 3 seconds per page
+});
+
+// Manual scrolling
+await display.scrollTo(40);  // Scroll to character 40
+
+// Scroll by pages
+await display.scrollLeft();   // Previous page
+await display.scrollRight();  // Next page
+
+// Get scroll state
+const scrollState = display.getScrollState();
+console.log(`Position: ${scrollState.position}/${scrollState.totalLength}`);
+console.log(`Page: ${scrollState.currentPage}/${scrollState.totalPages}`);
+</pre>
+
+<hr>
+
+<h2>5.5 Cursor Routing</h2>
+
+<h3>5.5.1 Cursor Routing Overview</h3>
+
+<p>Cursor routing keys (also called routing buttons) are physical buttons above each Braille cell. Pressing a routing key typically moves the cursor to that position or activates an element.</p>
+
+<h3>5.5.2 Handling Routing Events</h3>
+
+<pre>
+// Basic routing event
+display.on('routing', (event) => {
+    console.log(`Routing key pressed at cell ${event.cellIndex}`);
+    console.log(`Physical cell: ${event.physicalCell}`);
+    console.log(`Logical position: ${event.logicalPosition}`);
+});
+
+// With modifier keys
+display.on('routing', (event) => {
+    if (event.modifiers.includes('space')) {
+        // Space + routing = select
+        console.log(`Select at position ${event.logicalPosition}`);
+    } else if (event.modifiers.includes('dot7')) {
+        // Dot 7 + routing = context menu
+        console.log(`Context menu at position ${event.logicalPosition}`);
+    } else {
+        // Normal routing = move cursor
+        console.log(`Move cursor to ${event.logicalPosition}`);
+    }
+});
+</pre>
+
+<h3>5.5.3 Routing Event Object</h3>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cellIndex</td>
+<td>number</td>
+<td>Physical cell index (0-based)</td>
+</tr>
+<tr>
+<td>logicalPosition</td>
+<td>number</td>
+<td>Position in scrolled content</td>
+</tr>
+<tr>
+<td>modifiers</td>
+<td>string[]</td>
+<td>Pressed modifier keys</td>
+</tr>
+<tr>
+<td>timestamp</td>
+<td>number</td>
+<td>Event timestamp (ms)</td>
+</tr>
+<tr>
+<td>device</td>
+<td>object</td>
+<td>Device information</td>
+</tr>
+</tbody>
+</table>
+
+<h3>5.5.4 Cursor Display</h3>
+
+<p>Show cursor at specific position:</p>
+
+<pre>
+// Show cursor at cell 10
+await display.setCursor(10, true);
+
+// Hide cursor
+await display.setCursor(10, false);
+
+// Move cursor
+await display.moveCursor(15);
+
+// Get cursor position
+const cursorPos = display.getCursorPosition();
+console.log(`Cursor at cell ${cursorPos}`);
+</pre>
+
+<h3>5.5.5 Advanced Routing Patterns</h3>
+
+<pre>
+// Double-tap detection
+let lastTap = { cell: -1, time: 0 };
+
+display.on('routing', (event) => {
+    const now = Date.now();
+    const isDoubleTap =
+        event.cellIndex === lastTap.cell &&
+        now - lastTap.time < 500;  // 500ms threshold
+
+    if (isDoubleTap) {
+        console.log(`Double-tap at cell ${event.cellIndex}`);
+        // Activate element
+    }
+
+    lastTap = { cell: event.cellIndex, time: now };
+});
+
+// Long press detection
+display.on('routingPress', (event) => {
+    console.log(`Long press at cell ${event.cellIndex}`);
+    // Show context menu
+});
+
+// Swipe detection (sequential routing keys)
+let swipeStart = null;
+
+display.on('routing', (event) => {
+    if (!swipeStart) {
+        swipeStart = { cell: event.cellIndex, time: Date.now() };
+        return;
+    }
+
+    const duration = Date.now() - swipeStart.time;
+    const distance = event.cellIndex - swipeStart.cell;
+
+    if (duration < 300 && Math.abs(distance) >= 3) {
+        console.log(`Swipe ${distance > 0 ? 'right' : 'left'}`);
+        swipeStart = null;
+    }
+});
+</pre>
+
+<hr>
+
+<h2>5.6 Key Event Handling</h2>
+
+<h3>5.6.1 Key Types</h3>
+
+<p>Braille displays have several types of keys:</p>
+
+<table border="1" cellpadding="10">
+<thead>
+<tr>
+<th>Key Type</th>
+<th>Description</th>
+<th>Example Keys</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Navigation Keys</td>
+<td>Arrow/panning buttons</td>
+<td>Left, Right, Up, Down</td>
+</tr>
+<tr>
+<td>Routing Keys</td>
+<td>One per cell</td>
+<td>Routing 0-39</td>
+</tr>
+<tr>
+<td>Perkin Keys</td>
+<td>Braille input dots</td>
+<td>Dot 1-8, Space, Enter</td>
+</tr>
+<tr>
+<td>Function Keys</td>
+<td>Device-specific</td>
+<td>F1-F4, Escape, Tab</td>
+</tr>
+<tr>
+<td>Modifier Keys</td>
+<td>Change other keys</td>
+<td>Shift, Control, Alt</td>
+</tr>
+</tbody>
+</table>
+
+<h3>5.6.2 Listening to Key Events</h3>
+
+<pre>
+// All key events
+display.on('key', (event) => {
+    console.log(`Key: ${event.key}`);
+    console.log(`Type: ${event.type}`);  // 'down' | 'up' | 'press'
+    console.log(`Modifiers: ${event.modifiers.join(', ')}`);
+});
+
+// Specific key types
+display.on('navigationKey', (event) => {
+    if (event.key === 'left') {
+        // Previous page
+    } else if (event.key === 'right') {
+        // Next page
+    }
+});
+
+display.on('functionKey', (event) => {
+    if (event.key === 'f1') {
+        // Help menu
+    }
+});
+</pre>
+
+<h3>5.6.3 Perkin Key Input</h3>
+
+<p>Perkin keys allow Braille input:</p>
+
+<pre>
+// Enable Braille input mode
+display.enableBrailleInput();
+
+// Listen for Braille character input
+display.on('brailleInput', (event) => {
+    console.log(`Dots: ${event.dots.join('')}`);
+    console.log(`Pattern: ${event.pattern.toString(2)}`);
+    console.log(`Character: ${event.character}`);
+
+    // Add to input buffer
+    inputBuffer += event.character;
+});
+
+// Chord detection (multiple dots pressed together)
+display.on('chord', (event) => {
+    if (event.dots.includes(1) && event.dots.includes(2) &&
+        event.dots.includes(3)) {
+        console.log('Command chord detected');
+    }
+});
+
+// Disable Braille input
+display.disableBrailleInput();
+</pre>
+
+<h3>5.6.4 Key Combinations</h3>
+
+<pre>
+// Key combination handler
+display.on('key', (event) => {
+    const combo = event.modifiers.concat([event.key]).join('+');
+
+    switch (combo) {
+        case 'space+dots1+2':
+            console.log('Select all');
+            break;
+        case 'space+dots2+3':
+            console.log('Copy');
+            break;
+        case 'space+dots1+3':
+            console.log('Paste');
+            break;
+    }
+});
+</pre>
+
+<h3>5.6.5 Preventing Default Actions</h3>
+
+<pre>
+// Prevent default behavior
+display.on('key', (event) => {
+    if (event.key === 'f1') {
+        event.preventDefault();  // Don't trigger default help
+        // Custom help implementation
+        showCustomHelp();
+    }
+});
+</pre>
+
+<hr>
+
+<h2>5.7 Error Handling</h2>
+
+<h3>5.7.1 Error Types</h3>
+
+<p>The API defines specific error types:</p>
+
+<pre>
+enum WiaBrailleErrorCode {
+    DEVICE_NOT_FOUND = 'DEVICE_NOT_FOUND',
+    CONNECTION_FAILED = 'CONNECTION_FAILED',
+    DEVICE_DISCONNECTED = 'DEVICE_DISCONNECTED',
+    INVALID_CELL_INDEX = 'INVALID_CELL_INDEX',
+    INVALID_DOT_PATTERN = 'INVALID_DOT_PATTERN',
+    UNSUPPORTED_FEATURE = 'UNSUPPORTED_FEATURE',
+    TIMEOUT = 'TIMEOUT',
+    PERMISSION_DENIED = 'PERMISSION_DENIED',
+    FIRMWARE_ERROR = 'FIRMWARE_ERROR'
+}
+
+class WiaBrailleError extends Error {
+    constructor(
+        public code: WiaBrailleErrorCode,
+        message: string,
+        public details?: any
+    ) {
+        super(message);
+        this.name = 'WiaBrailleError';
+    }
+}
+</pre>
+
+<h3>5.7.2 Try-Catch Pattern</h3>
+
+<pre>
+try {
+    await display.connect();
+    await display.write('Hello World');
+} catch (error) {
+    if (error instanceof WiaBrailleError) {
+        switch (error.code) {
+            case WiaBrailleErrorCode.DEVICE_NOT_FOUND:
+                console.error('No Braille display found');
+                // Prompt user to connect device
+                break;
+            case WiaBrailleErrorCode.CONNECTION_FAILED:
+                console.error('Failed to connect:', error.message);
+                // Retry connection
+                break;
+            case WiaBrailleErrorCode.PERMISSION_DENIED:
+                console.error('Permission denied. Check browser settings.');
+                break;
+            default:
+                console.error('Braille error:', error.message);
+        }
+    } else {
+        console.error('Unexpected error:', error);
+    }
+}
+</pre>
+
+<h3>5.7.3 Error Events</h3>
+
+<pre>
+// Listen for errors
+display.on('error', (error) => {
+    console.error('Display error:', error);
+
+    if (error.code === WiaBrailleErrorCode.DEVICE_DISCONNECTED) {
+        // Attempt reconnection
+        setTimeout(() => {
+            display.connect().catch(console.error);
+        }, 1000);
+    }
+});
+</pre>
+
+<h3>5.7.4 Validation</h3>
+
+<p>The API validates all inputs:</p>
+
+<pre>
+// Cell index validation
+try {
+    await display.write('Hello', { startCell: 50 });
+} catch (error) {
+    // WiaBrailleError: INVALID_CELL_INDEX
+    // Cell index 50 exceeds device capacity (40 cells)
+}
+
+// Dot pattern validation
+try {
+    await display.writeCells([0b100000000]);  // 9 bits (invalid)
+} catch (error) {
+    // WiaBrailleError: INVALID_DOT_PATTERN
+    // Pattern exceeds 8-dot format
+}
+
+// Feature support validation
+try {
+    await display.setVibration(true);
+} catch (error) {
+    // WiaBrailleError: UNSUPPORTED_FEATURE
+    // Device does not support vibration
+}
+</pre>
+
+<h3>5.7.5 Timeout Handling</h3>
+
+<pre>
+// Set operation timeout
+display.setTimeout(5000);  // 5 seconds
+
+try {
+    await display.write(text);
+} catch (error) {
+    if (error.code === WiaBrailleErrorCode.TIMEOUT) {
+        console.error('Operation timed out');
+        // Check device connection
+    }
+}
+
+// Or per-operation timeout
+await display.write(text, { timeout: 3000 });
+</pre>
+
+<hr>
+
+<h2>5.8 Code Examples</h2>
+
+<h3>5.8.1 Simple Text Display</h3>
+
+<pre>
+import { WiaBrailleDisplay } from '@wia/braille-display';
+
+async function displayText(text: string) {
+    const display = new WiaBrailleDisplay();
+
+    try {
+        await display.connect();
+        await display.write(text);
+
+        // Keep displayed for 5 seconds
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+    } finally {
+        await display.disconnect();
+    }
+}
+
+displayText('Hello, Braille World!');
+</pre>
+
+<h3>5.8.2 Interactive Reader</h3>
+
+<pre>
+class BrailleReader {
+    private display: WiaBrailleDisplay;
+    private content: string;
+    private position: number = 0;
+
+    async init(content: string) {
+        this.content = content;
+        this.display = new WiaBrailleDisplay();
+
+        await this.display.connect();
+
+        // Navigation handlers
+        this.display.on('navigationKey', (event) => {
+            if (event.key === 'left') this.previousPage();
+            if (event.key === 'right') this.nextPage();
+        });
+
+        // Routing for cursor positioning
+        this.display.on('routing', (event) => {
+            const globalPos = this.position + event.cellIndex;
+            console.log(`Cursor at character ${globalPos}`);
+        });
+
+        await this.displayCurrentPage();
+    }
+
+    async displayCurrentPage() {
+        const cellCount = this.display.getCellCount();
+        const page = this.content.substr(this.position, cellCount);
+        await this.display.write(page);
+    }
+
+    async nextPage() {
+        const cellCount = this.display.getCellCount();
+        if (this.position + cellCount < this.content.length) {
+            this.position += cellCount;
+            await this.displayCurrentPage();
+        }
+    }
+
+    async previousPage() {
+        const cellCount = this.display.getCellCount();
+        if (this.position > 0) {
+            this.position = Math.max(0, this.position - cellCount);
+            await this.displayCurrentPage();
+        }
+    }
+
+    async close() {
+        await this.display.disconnect();
+    }
+}
+
+// Usage
+const reader = new BrailleReader();
+await reader.init('Your long document content here...');
+</pre>
+
+<h3>5.8.3 Form Input with Braille</h3>
+
+<pre>
+class BrailleFormInput {
+    private display: WiaBrailleDisplay;
+    private inputBuffer: string = '';
+
+    async init(prompt: string) {
+        this.display = new WiaBrailleDisplay();
+        await this.display.connect();
+
+        // Show prompt
+        await this.display.write(prompt);
+
+        // Enable Braille input
+        this.display.enableBrailleInput();
+
+        // Handle character input
+        this.display.on('brailleInput', async (event) => {
+            this.inputBuffer += event.character;
+            await this.updateDisplay();
+        });
+
+        // Handle backspace (chord: dots 7+8)
+        this.display.on('chord', async (event) => {
+            if (event.dots.includes(7) && event.dots.includes(8)) {
+                this.inputBuffer = this.inputBuffer.slice(0, -1);
+                await this.updateDisplay();
+            }
+        });
+
+        // Handle submit (chord: dots 2+3+6)
+        this.display.on('chord', (event) => {
+            const dots = event.dots.sort().join('');
+            if (dots === '236') {
+                this.submit();
+            }
+        });
+    }
+
+    async updateDisplay() {
+        const prompt = 'Input: ';
+        await this.display.write(prompt + this.inputBuffer, {
+            cursorCell: prompt.length + this.inputBuffer.length,
+            showCursor: true
+        });
+    }
+
+    async submit() {
+        console.log('Submitted:', this.inputBuffer);
+        await this.display.write('Submitted!');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await this.display.disconnect();
+    }
+}
+
+// Usage
+const form = new BrailleFormInput();
+await form.init('Enter name:');
+</pre>
+
+<h3>5.8.4 Multi-Device Support</h3>
+
+<pre>
+class BrailleDeviceManager {
+    private devices: Map<string, WiaBrailleDisplay> = new Map();
+
+    async discoverAndConnect() {
+        const found = await WiaBrailleDisplay.discover();
+
+        for (const deviceInfo of found) {
+            const display = new WiaBrailleDisplay();
+            await display.connectToDevice(deviceInfo);
+
+            this.devices.set(deviceInfo.serialNumber, display);
+            console.log(`Connected: ${deviceInfo.model}`);
+        }
+
+        return this.devices.size;
+    }
+
+    async broadcastMessage(message: string) {
+        const promises = Array.from(this.devices.values()).map(
+            display => display.write(message)
+        );
+        await Promise.all(promises);
+    }
+
+    async disconnectAll() {
+        const promises = Array.from(this.devices.values()).map(
+            display => display.disconnect()
+        );
+        await Promise.all(promises);
+        this.devices.clear();
+    }
+}
+
+// Usage
+const manager = new BrailleDeviceManager();
+await manager.discoverAndConnect();
+await manager.broadcastMessage('Hello all displays!');
+</pre>
+
+<h3>5.8.5 Real-Time Terminal Display</h3>
+
+<pre>
+class BrailleTerminal {
+    private display: WiaBrailleDisplay;
+    private lines: string[] = [];
+    private topLine: number = 0;
+
+    async init() {
+        this.display = new WiaBrailleDisplay();
+        await this.display.connect();
+
+        // Check for multi-line support
+        const info = this.display.getDeviceInfo();
+        if (info.capabilities.multiLine) {
+            console.log('Multi-line display detected');
+        }
+
+        // Navigation
+        this.display.on('navigationKey', (event) => {
+            if (event.key === 'up') this.scrollUp();
+            if (event.key === 'down') this.scrollDown();
+        });
+    }
+
+    async println(line: string) {
+        this.lines.push(line);
+
+        // Auto-scroll to bottom
+        const maxVisible = this.getVisibleLineCount();
+        if (this.lines.length > maxVisible) {
+            this.topLine = this.lines.length - maxVisible;
+        }
+
+        await this.refresh();
+    }
+
+    getVisibleLineCount(): number {
+        const info = this.display.getDeviceInfo();
+        return info.capabilities.multiLine ? info.lineCount || 1 : 1;
+    }
+
+    async refresh() {
+        const visibleLines = this.getVisibleLineCount();
+        const cellCount = this.display.getCellCount();
+
+        const displayLines = this.lines
+            .slice(this.topLine, this.topLine + visibleLines)
+            .map(line => line.padEnd(cellCount).substr(0, cellCount));
+
+        await this.display.writeMultiLine(displayLines);
+    }
+
+    async scrollUp() {
+        if (this.topLine > 0) {
+            this.topLine--;
+            await this.refresh();
+        }
+    }
+
+    async scrollDown() {
+        const maxTop = this.lines.length - this.getVisibleLineCount();
+        if (this.topLine < maxTop) {
+            this.topLine++;
+            await this.refresh();
+        }
+    }
+}
+
+// Usage
+const terminal = new BrailleTerminal();
+await terminal.init();
+await terminal.println('Welcome to Braille Terminal');
+await terminal.println('Line 2');
+await terminal.println('Line 3');
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<p>Phase 2 of the WIA Braille Display Standard defines a comprehensive API for interacting with Braille displays programmatically. The key takeaways from this chapter are:</p>
+
+<ul>
+<li><strong>Simple by Design</strong> - The API prioritizes ease of use while maintaining power for advanced scenarios</li>
+<li><strong>WiaBrailleDisplay Class</strong> - Central entry point for all operations with clear, intuitive methods</li>
+<li><strong>Device Discovery</strong> - Robust enumeration and filtering of available devices</li>
+<li><strong>Cell Management</strong> - Comprehensive control over Braille cell content and display state</li>
+<li><strong>Cursor Routing</strong> - Event-driven handling of routing keys with support for gestures and modifiers</li>
+<li><strong>Key Events</strong> - Unified handling of navigation, Perkin, function, and routing keys</li>
+<li><strong>Error Handling</strong> - Typed errors with clear codes and graceful degradation</li>
+<li><strong>Code Examples</strong> - Practical patterns for common use cases from simple text to complex applications</li>
+</ul>
+
+<p>The API Layer provides the foundation for Phase 3 (Communication Protocol) and Phase 4 (Ecosystem Integration), enabling developers to build accessible applications without needing deep knowledge of hardware protocols.</p>
+
+<hr>
+
+<h2>Review Questions</h2>
+
+<ol>
+<li>What are the five core design principles of the WIA Braille Display API?</li>
+<li>Explain the difference between the high-level, mid-level, and low-level API layers.</li>
+<li>How do you discover all available Braille displays connected to a system?</li>
+<li>What is the purpose of cursor routing keys, and how are routing events handled?</li>
+<li>Describe the different types of keys found on Braille displays.</li>
+<li>How does the API handle devices with different capabilities?</li>
+<li>What error types are defined in the API, and how should they be handled?</li>
+<li>How would you implement auto-scrolling for content longer than the display's cell count?</li>
+<li>What is the purpose of Perkin keys, and how can they be used for Braille input?</li>
+<li>Explain how the API supports both synchronous and asynchronous operations.</li>
+</ol>
+
+<hr>
+
+<h2>Looking Ahead: Chapter 6</h2>
+
+<p>Now that we understand the API interface, Chapter 6 explores Phase 3: Communication Protocol. We'll dive into the low-level details of how the API communicates with physical devices through USB HID, Bluetooth LE, and serial connections. You'll learn about message formats, command structures, latency requirements, and how to integrate with BRLTTY for Linux systems.</p>
+
+<hr>
+
+<h2>Navigation</h2>
+
+<p>
+<a href="chapter-04.html">← Previous: Chapter 4 - Phase 1: Data Format Standard</a> |
+<a href="index.html">Table of Contents</a> |
+<a href="chapter-06.html">Next: Chapter 6 - Phase 3: Communication Protocol →</a>
+</p>
+
+<hr>
+
+<p><strong>弘益人間 (Hongik Ingan) - Benefit All Humanity</strong></p>
+
+<p><em>Copyright 2025 SmileStory Inc. / WIA - Released under MIT License</em></p>
+</body>
+</html>

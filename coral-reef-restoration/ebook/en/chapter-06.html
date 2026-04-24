@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Protocol | WIA-REEF</title>
+    <style>
+        :root { --primary-color: #EF4444; --secondary-color: #06b6d4; --accent-color: #F87171; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(6,182,212,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .alert-level { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; margin: 0.25rem; }
+        .critical { background: #dc2626; color: white; }
+        .warning { background: #f59e0b; color: #1a202c; }
+        .watch { background: #3b82f6; color: white; }
+        .info { background: #22c55e; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Phase 3 - Protocol</h1>
+
+    <div class="objectives-box">
+        <h3>Learning Objectives</h3>
+        <ul>
+            <li>Understand MQTT streaming for sensor data</li>
+            <li>Implement WebSocket real-time connections</li>
+            <li>Design alert routing and escalation</li>
+            <li>Configure inter-organization data sharing</li>
+            <li>Handle offline operation and sync</li>
+        </ul>
+    </div>
+
+    <h2>6.1 Streaming Architecture</h2>
+
+    <p>The WIA-REEF protocol layer enables real-time data streaming from underwater sensors, buoys, and monitoring stations to central systems and subscriber applications. This architecture supports both continuous monitoring and event-driven alerts.</p>
+
+    <pre><code>// Streaming Architecture
+{
+  "protocols": {
+    "mqtt": {
+      "broker": "mqtt.wia-reef.org",
+      "port": 8883,
+      "tls": true,
+      "qos_levels": [0, 1, 2],
+      "use_case": "IoT sensors, low bandwidth"
+    },
+    "websocket": {
+      "endpoint": "wss://stream.wia-reef.org",
+      "use_case": "Web dashboards, real-time viz"
+    },
+    "sse": {
+      "endpoint": "https://api.wia-reef.org/v1/events",
+      "use_case": "Server-sent events, alerts"
+    }
+  },
+  "message_format": "JSON with schema validation",
+  "compression": "gzip for large payloads"
+}</code></pre>
+
+    <h2>6.2 MQTT Topic Structure</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Topic Pattern</th>
+                <th>Description</th>
+                <th>QoS</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>wia/reef/{site_id}/sensors/+</td>
+                <td>All sensors for a site</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>wia/reef/{site_id}/sensors/temperature</td>
+                <td>Temperature readings</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>wia/reef/{site_id}/alerts/#</td>
+                <td>All alerts for a site</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <td>wia/reef/global/alerts/critical</td>
+                <td>Global critical alerts</td>
+                <td>2</td>
+            </tr>
+            <tr>
+                <td>wia/reef/{site_id}/restoration/+</td>
+                <td>Restoration updates</td>
+                <td>1</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <pre><code>// MQTT Sensor Message
+{
+  "topic": "wia/reef/reef-aus-gbr-001/sensors/temperature",
+  "payload": {
+    "sensor_id": "temp-001",
+    "site_id": "reef-aus-gbr-001",
+    "timestamp": "2024-03-15T14:30:00.000Z",
+    "value": 28.4,
+    "unit": "celsius",
+    "depth_m": 5,
+    "quality": "good",
+    "battery_pct": 85
+  },
+  "qos": 0,
+  "retain": false
+}</code></pre>
+
+    <h2>6.3 Alert System</h2>
+
+    <p>
+        <span class="alert-level critical">CRITICAL</span>
+        <span class="alert-level warning">WARNING</span>
+        <span class="alert-level watch">WATCH</span>
+        <span class="alert-level info">INFO</span>
+    </p>
+
+    <pre><code>// Alert Priority Levels
+{
+  "levels": {
+    "critical": {
+      "code": 1,
+      "response_time": "immediate",
+      "notification": ["sms", "email", "push", "webhook"],
+      "examples": ["mass_bleaching_detected", "equipment_failure"]
+    },
+    "warning": {
+      "code": 2,
+      "response_time": "< 1 hour",
+      "notification": ["email", "push", "webhook"],
+      "examples": ["temperature_threshold", "dhw_rising"]
+    },
+    "watch": {
+      "code": 3,
+      "response_time": "< 24 hours",
+      "notification": ["email", "webhook"],
+      "examples": ["forecast_concern", "unusual_pattern"]
+    },
+    "info": {
+      "code": 4,
+      "response_time": "daily digest",
+      "notification": ["email_digest"],
+      "examples": ["assessment_due", "report_available"]
+    }
+  }
+}</code></pre>
+
+    <h3>6.3.1 Alert Message Format</h3>
+
+    <pre><code>// Critical Alert Example
+{
+  "alert_id": "alert-2024-0315-001",
+  "level": "critical",
+  "type": "bleaching_event",
+  "site_id": "reef-aus-gbr-001",
+  "site_name": "Osprey Reef",
+  "timestamp": "2024-03-15T14:35:00Z",
+  "details": {
+    "current_temp": 30.2,
+    "threshold": 29.0,
+    "dhw": 5.8,
+    "duration_hours": 48,
+    "affected_area_pct": 35
+  },
+  "actions_required": [
+    "Deploy monitoring team",
+    "Initiate intervention protocol",
+    "Notify stakeholders"
+  ],
+  "escalation": {
+    "next_level": "regional_coordinator",
+    "escalate_after_minutes": 30
+  }
+}</code></pre>
+
+    <h2>6.4 Inter-Organization Protocol</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Protocol Feature</th>
+                <th>Description</th>
+                <th>Implementation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Data Sharing Agreements</td>
+                <td>Define what data can be shared</td>
+                <td>JSON-LD contracts</td>
+            </tr>
+            <tr>
+                <td>Federation</td>
+                <td>Cross-network data discovery</td>
+                <td>WIA Federation Protocol</td>
+            </tr>
+            <tr>
+                <td>Attribution</td>
+                <td>Track data provenance</td>
+                <td>Cryptographic signatures</td>
+            </tr>
+            <tr>
+                <td>Access Control</td>
+                <td>Role-based permissions</td>
+                <td>OAuth scopes + policies</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <pre><code>// Data Sharing Agreement
+{
+  "agreement_id": "dsa-2024-001",
+  "parties": [
+    {
+      "org_id": "org-marine-research",
+      "role": "data_provider"
+    },
+    {
+      "org_id": "org-conservation-ngo",
+      "role": "data_consumer"
+    }
+  ],
+  "data_scope": {
+    "sites": ["reef-aus-gbr-*"],
+    "data_types": ["health_assessments", "water_quality"],
+    "date_range": "2024-01-01/2024-12-31"
+  },
+  "permissions": {
+    "read": true,
+    "derive": true,
+    "publish": "with_attribution",
+    "commercial": false
+  },
+  "attribution_required": "Marine Research Institute (CC-BY-NC 4.0)"
+}</code></pre>
+
+    <h2>6.5 Offline Operation</h2>
+
+    <blockquote>
+        <h3>Field Operations</h3>
+        <p>Many reef monitoring activities occur in remote locations without reliable connectivity. The WIA-REEF protocol supports offline data collection with automatic synchronization when connectivity is restored.</p>
+    </blockquote>
+
+    <pre><code>// Offline Sync Protocol
+{
+  "offline_mode": {
+    "local_storage": "IndexedDB / SQLite",
+    "queue_limit": "10000 records",
+    "conflict_resolution": "server_wins_with_merge",
+    "sync_on_connect": true
+  },
+  "sync_process": {
+    "1_connect": "Establish secure connection",
+    "2_auth": "Refresh tokens if needed",
+    "3_pull": "Download pending updates",
+    "4_merge": "Resolve conflicts locally",
+    "5_push": "Upload queued records",
+    "6_confirm": "Acknowledge successful sync"
+  },
+  "conflict_types": {
+    "create_create": "Merge with UUIDs",
+    "update_update": "Timestamp comparison",
+    "delete_update": "Flag for review"
+  }
+}</code></pre>
+
+    <h2>6.6 Chapter Summary</h2>
+
+    <blockquote>
+        <h3>Key Takeaways</h3>
+        <ul>
+            <li>MQTT provides efficient IoT sensor streaming</li>
+            <li>WebSockets enable real-time dashboard updates</li>
+            <li>Four-level alert system ensures appropriate response</li>
+            <li>Inter-organization protocols enable data sharing with attribution</li>
+            <li>Offline mode supports remote field operations</li>
+        </ul>
+    </blockquote>
+
+    <h2>6.7 Review Questions</h2>
+
+    <ol>
+        <li>What QoS level should be used for critical alerts?</li>
+        <li>What is the MQTT topic pattern for temperature sensors?</li>
+        <li>What response time is expected for warning-level alerts?</li>
+        <li>How does the protocol handle data attribution?</li>
+        <li>What is the conflict resolution strategy for offline sync?</li>
+    </ol>
+
+    <h2>6.8 Next Chapter Preview</h2>
+
+    <p>Chapter 7 explores Phase 4: WIA Integration, covering how WIA-REEF connects with the broader WIA ecosystem, global certification programs, and international collaboration networks.</p>
+</body>
+</html>

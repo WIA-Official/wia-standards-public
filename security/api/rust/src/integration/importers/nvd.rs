@@ -3,8 +3,6 @@
 //! Fetches and converts CVE data from NIST NVD API 2.0.
 
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
-use super::{ImportResult, ImportError};
 
 /// NVD API configuration
 #[derive(Debug, Clone)]
@@ -335,11 +333,17 @@ impl NvdImporter {
     /// Convert NVD CVE to WIA format
     pub fn convert_to_wia(&self, cve: &NvdCve) -> WiaVulnerability {
         // Extract description (prefer English)
-        let description = cve.descriptions
+        let description = cve
+            .descriptions
             .iter()
             .find(|d| d.lang == "en")
             .map(|d| d.value.clone())
-            .unwrap_or_else(|| cve.descriptions.first().map(|d| d.value.clone()).unwrap_or_default());
+            .unwrap_or_else(|| {
+                cve.descriptions
+                    .first()
+                    .map(|d| d.value.clone())
+                    .unwrap_or_default()
+            });
 
         // Extract CVSS info
         let cvss = self.extract_cvss(&cve.metrics);
@@ -354,7 +358,8 @@ impl NvdImporter {
         let (exploit_available, patch_available) = self.check_references(&cve.references);
 
         // Extract reference URLs
-        let references = cve.references
+        let references = cve
+            .references
             .as_ref()
             .map(|refs| refs.iter().map(|r| r.url.clone()).collect())
             .unwrap_or_default();
@@ -435,7 +440,10 @@ impl NvdImporter {
     }
 
     /// Extract affected products from CPE
-    fn extract_affected_products(&self, configs: &Option<Vec<NvdConfiguration>>) -> Vec<WiaAffectedProduct> {
+    fn extract_affected_products(
+        &self,
+        configs: &Option<Vec<NvdConfiguration>>,
+    ) -> Vec<WiaAffectedProduct> {
         let mut products = Vec::new();
 
         if let Some(confs) = configs {
@@ -543,7 +551,8 @@ fn cvss_v2_severity(score: f64) -> String {
         s if s >= 7.0 => "HIGH",
         s if s >= 4.0 => "MEDIUM",
         _ => "LOW",
-    }.to_string()
+    }
+    .to_string()
 }
 
 fn parse_cpe(cpe: &str) -> Option<WiaAffectedProduct> {

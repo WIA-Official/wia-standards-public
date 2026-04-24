@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Operations | WIA-CARBON_CREDIT_MICRO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: Operations and Compliance</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong> Master credit lifecycle management, understand retirement procedures, learn reporting requirements, and navigate regulatory compliance frameworks for micro carbon credits.
+    </div>
+
+    <h2>Credit Lifecycle Management</h2>
+
+    <p>Credits follow defined lifecycle stages: Generation, Active (up to 5 years), Pending Retirement, Retired (permanent), or Expired.</p>
+
+    <table>
+        <tr>
+            <th>Stage</th>
+            <th>Duration</th>
+        </tr>
+        <tr>
+            <td>Generation</td>
+            <td>Instant-72h</td>
+        </tr>
+        <tr>
+            <td>Active</td>
+            <td>Up to 5 years</td>
+        </tr>
+        <tr>
+            <td>Retired</td>
+            <td>Permanent</td>
+        </tr>
+    </table>
+
+    <pre><code>// Credit Lifecycle Manager
+class CreditLifecycleManager {
+    async transitionCredit(creditId: string, targetState: CreditState, context: TransitionContext) {
+        const credit = await this.getCredit(creditId);
+        const allowedTransitions = this.stateTransitions.get(credit.state);
+        if (!allowedTransitions?.includes(targetState))
+            throw new Error(`Invalid transition: ${credit.state} -> ${targetState}`);
+
+        await this.preTransitionChecks(credit, targetState, context);
+        credit.state = targetState;
+        await this.saveCredit(credit);
+        await this.emitLifecycleEvent({ creditId, from: credit.state, to: targetState });
+        return { success: true, creditId, newState: targetState };
+    }
+}</code></pre>
+
+    <h2>Credit Retirement Process</h2>
+
+    <div class="highlight">
+        <strong>Retirement Finality:</strong> Retirement is irreversible. Credits are permanently recorded as offset claims.
+    </div>
+
+    <pre><code>// Credit Retirement Service
+class CreditRetirementService {
+    async retireCredits(request: RetirementRequest): Promise&lt;RetirementResult&gt; {
+        await this.validateRetirement(request);
+        const lockedCredits = await this.lockCreditsForRetirement(request.creditIds, request.owner);
+        const totalOffset = lockedCredits.reduce((sum, c) => sum + c.amount, 0);
+
+        const tx = await this.registryContract.retire({
+            owner: request.owner, credits: request.creditIds, totalAmount: totalOffset
+        });
+        await tx.wait();
+
+        const certificate = await this.certificateGenerator.generate({
+            retirementId: tx.events[0].args.retirementId, amount: totalOffset, txHash: tx.hash
+        });
+
+        for (const credit of lockedCredits) {
+            await this.lifecycleManager.transitionCredit(credit.id, 'retired', { actor: request.owner });
+        }
+
+        return { success: true, retirementId: certificate.id, totalOffset, txHash: tx.hash };
+    }
+}</code></pre>
+
+    <h2>Reporting and Analytics</h2>
+
+    <p>Comprehensive reporting for users, organizations, and regulators:</p>
+
+    <pre><code>// Personal Carbon Report
+class PersonalReportGenerator {
+    async generateMonthlyReport(userId: string, month: Date): Promise&lt;PersonalCarbonReport&gt; {
+        const [activities, credits, baseline] = await Promise.all([
+            this.getActivities(userId, month), this.getCredits(userId, month), this.getBaseline(userId)
+        ]);
+        const totalEmissions = this.calculateEmissions(activities);
+        const totalReductions = credits.generated.reduce((s, c) => s + c.amount, 0);
+        return {
+            summary: { totalEmissions, totalReductions, netEmissions: totalEmissions - totalReductions },
+            recommendations: this.generateRecommendations(activities, baseline)
+        };
+    }
+}
+
+// Corporate Report
+class CorporateReportGenerator {
+    async generateAnnualReport(orgId: string, year: number) {
+        const retirements = await this.getOrganizationRetirements(orgId, year);
+        const totalOffset = retirements.reduce((sum, r) => sum + r.amount, 0);
+        return {
+            totalCO2Offset: totalOffset,
+            equivalents: { treesPlanted: Math.round(totalOffset / 21000), carMiles: Math.round(totalOffset / 400) }
+        };
+    }
+}</code></pre>
+
+    <h2>Regulatory Compliance</h2>
+
+    <p>Compliant with Paris Agreement Article 6, CORSIA, EU ETS, VERRA VCS, and Gold Standard.</p>
+
+    <div class="highlight">
+        <strong>Corresponding Adjustment:</strong> Supports Article 6.2 corresponding adjustments to prevent double counting between jurisdictions.
+    </div>
+
+    <pre><code>// Compliance Manager
+class ComplianceManager {
+    async checkCompliance(credit: MicroCredit, targetFramework: string): Promise&lt;ComplianceCheck&gt; {
+        const framework = this.frameworks.get(targetFramework);
+        const checks = [
+            await this.checkAdditionality(credit, framework),
+            await this.checkVerificationStandard(credit, framework),
+            await this.checkVintage(credit, framework)
+        ];
+        return { compliant: checks.every(c => c.passed), score: checks.filter(c => c.passed).length / checks.length };
+    }
+
+    async requestCorrespondingAdjustment(credits: MicroCredit[], sourceCountry: string, destCountry: string) {
+        for (const credit of credits) {
+            if (!await this.checkInternationalTransferEligibility(credit))
+                throw new Error(`Credit ${credit.id} not eligible`);
+        }
+        return { credits: credits.map(c => c.id), sourceCountry, destCountry, status: 'pending' };
+    }
+}</code></pre>
+
+    <h2>Audit and Verification</h2>
+
+    <p>Quarterly internal audits, annual external verification, continuous on-chain monitoring, and random sampling audits.</p>
+
+    <pre><code>// Audit Trail System
+class AuditTrailSystem {
+    async createAuditEntry(event: AuditableEvent): Promise&lt;AuditEntry&gt; {
+        const entry = { id: generateAuditId(), timestamp: new Date(),
+            eventType: event.type, actor: event.actor, action: event.action };
+        entry.signature = await this.signEntry(entry);
+        await this.appendToLog(entry);
+        await this.updateMerkleTree(entry);
+        return entry;
+    }
+
+    async generateAuditProof(entryId: string): Promise&lt;AuditProof&gt; {
+        const entry = await this.getEntry(entryId);
+        return { entry, merkleProof: await this.getMerkleProof(entry), rootHash: await this.getCurrentRoot() };
+    }
+}</code></pre>
+
+    <h2>Summary</h2>
+
+    <p>Effective operations and compliance management are essential for the long-term success and credibility of the micro carbon credit system. Through rigorous lifecycle management, transparent retirement processes, comprehensive reporting, and adherence to regulatory frameworks, the WIA-CARBON_CREDIT_MICRO standard provides the operational foundation necessary for a trusted, scalable carbon credit ecosystem. These operational practices ensure that every micro credit represents genuine environmental benefit.</p>
+
+</body>
+</html>

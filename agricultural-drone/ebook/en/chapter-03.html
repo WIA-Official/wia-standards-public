@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Sensors and Payloads | WIA-AGRICULTURAL_DRONE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --bg-secondary: #1e293b; --text: #e2e8f0; --border: #334155; --success: #10b981; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--success); font-size: 1.75rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--warning); font-size: 1.25rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: linear-gradient(135deg, var(--bg-secondary), #1a365d); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: var(--bg-secondary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Sensors and Payloads</h1>
+
+    <p>Sensors and payloads transform drones from flying platforms into powerful agricultural data collection systems. This chapter covers the spectrum of imaging sensors used in agricultural applications, from standard RGB cameras to sophisticated multispectral, thermal, and LiDAR systems. Understanding sensor capabilities, spectral characteristics, and calibration requirements is essential for extracting actionable insights from drone-collected data.</p>
+
+    <h2>3.1 RGB Camera Systems</h2>
+
+    <pre>
+// RGB Camera Specifications for Agriculture
+interface RGBCameraSpecs {
+  // Sensor Specifications
+  sensor: {
+    type: 'CMOS' | 'CCD';
+    size: string;                // e.g., '1-inch', 'APS-C', 'Full-frame'
+    resolution: {
+      megapixels: number;
+      width: number;             // pixels
+      height: number;            // pixels
+    };
+    pixelSize: number;           // micrometers
+  };
+
+  // Lens Specifications
+  lens: {
+    focalLength: number;         // mm
+    fieldOfView: number;         // degrees diagonal
+    aperture: string;            // e.g., 'f/2.8'
+    distortion: string;          // e.g., 'rectilinear', 'fisheye'
+    focusType: 'fixed' | 'autofocus';
+  };
+
+  // Image Quality
+  quality: {
+    dynamicRange: number;        // stops
+    colorDepth: number;          // bits
+    formats: ('JPEG' | 'RAW' | 'DNG' | 'TIFF')[];
+    geotagging: boolean;
+  };
+
+  // Performance
+  performance: {
+    maxFrameRate: number;        // fps
+    minShutterSpeed: string;     // e.g., '1/8000'
+    isoRange: { min: number; max: number };
+    triggerInterval: number;     // seconds
+  };
+}
+
+// Example: Agricultural Survey Camera
+const surveyCamera: RGBCameraSpecs = {
+  sensor: {
+    type: 'CMOS',
+    size: '1-inch',
+    resolution: { megapixels: 20, width: 5472, height: 3648 },
+    pixelSize: 2.4
+  },
+  lens: {
+    focalLength: 8.8,
+    fieldOfView: 84,
+    aperture: 'f/2.8',
+    distortion: 'rectilinear',
+    focusType: 'fixed'
+  },
+  quality: {
+    dynamicRange: 12.8,
+    colorDepth: 12,
+    formats: ['JPEG', 'RAW', 'DNG'],
+    geotagging: true
+  },
+  performance: {
+    maxFrameRate: 30,
+    minShutterSpeed: '1/8000',
+    isoRange: { min: 100, max: 12800 },
+    triggerInterval: 0.7
+  }
+};
+    </pre>
+
+    <h2>3.2 Multispectral Imaging</h2>
+
+    <table>
+        <tr>
+            <th>Band</th>
+            <th>Wavelength (nm)</th>
+            <th>Application</th>
+            <th>Vegetation Index</th>
+        </tr>
+        <tr>
+            <td>Blue</td>
+            <td>450-495</td>
+            <td>Chlorophyll absorption, water</td>
+            <td>VARI, TGI</td>
+        </tr>
+        <tr>
+            <td>Green</td>
+            <td>495-570</td>
+            <td>Plant vigor, chlorophyll</td>
+            <td>GNDVI, GCI</td>
+        </tr>
+        <tr>
+            <td>Red</td>
+            <td>620-750</td>
+            <td>Chlorophyll absorption</td>
+            <td>NDVI, SAVI</td>
+        </tr>
+        <tr>
+            <td>Red Edge</td>
+            <td>700-730</td>
+            <td>Chlorophyll content, stress</td>
+            <td>NDRE, CI-RedEdge</td>
+        </tr>
+        <tr>
+            <td>NIR</td>
+            <td>750-900</td>
+            <td>Biomass, canopy structure</td>
+            <td>NDVI, LAI</td>
+        </tr>
+    </table>
+
+    <pre>
+// Multispectral Camera Specifications
+interface MultispectralCamera {
+  bands: {
+    name: string;
+    centerWavelength: number;    // nm
+    bandwidth: number;           // nm (FWHM)
+  }[];
+
+  sensor: {
+    resolution: number;          // MP per band
+    globalShutter: boolean;      // Essential for ag
+    sensorAlignment: 'aligned' | 'offset';
+    radiometricCalibration: boolean;
+  };
+
+  calibration: {
+    dls: boolean;                // Downwelling Light Sensor
+    reflectancePanel: boolean;
+    irradiance: boolean;
+    preFlightCalibration: boolean;
+  };
+
+  output: {
+    rawFormat: string;
+    calibratedReflectance: boolean;
+    geotags: boolean;
+  };
+}
+
+// Example: 5-Band Multispectral
+const multispectralSensor: MultispectralCamera = {
+  bands: [
+    { name: 'Blue', centerWavelength: 475, bandwidth: 32 },
+    { name: 'Green', centerWavelength: 560, bandwidth: 27 },
+    { name: 'Red', centerWavelength: 668, bandwidth: 14 },
+    { name: 'RedEdge', centerWavelength: 717, bandwidth: 12 },
+    { name: 'NIR', centerWavelength: 842, bandwidth: 57 }
+  ],
+  sensor: {
+    resolution: 1.2,
+    globalShutter: true,
+    sensorAlignment: 'aligned',
+    radiometricCalibration: true
+  },
+  calibration: {
+    dls: true,
+    reflectancePanel: true,
+    irradiance: true,
+    preFlightCalibration: true
+  },
+  output: {
+    rawFormat: 'TIFF',
+    calibratedReflectance: true,
+    geotags: true
+  }
+};
+    </pre>
+
+    <h2>3.3 Thermal Imaging</h2>
+
+    <div class="highlight">
+        <h3>Thermal Imaging Applications</h3>
+        <ul>
+            <li><strong>Water Stress Detection:</strong> Canopy temperature indicates transpiration</li>
+            <li><strong>Irrigation Management:</strong> Identify under/over-watered zones</li>
+            <li><strong>Disease Detection:</strong> Temperature anomalies from infections</li>
+            <li><strong>Drainage Assessment:</strong> Detect wet areas and drainage issues</li>
+            <li><strong>Frost Monitoring:</strong> Identify frost-prone microclimates</li>
+        </ul>
+    </div>
+
+    <pre>
+// Thermal Camera Specifications
+interface ThermalCamera {
+  detector: {
+    type: 'uncooled_VOx' | 'uncooled_aSi' | 'cooled';
+    resolution: { width: number; height: number };
+    pixelPitch: number;          // micrometers
+    spectralRange: { min: number; max: number }; // micrometers
+  };
+
+  performance: {
+    thermalSensitivity: number;  // mK (NETD)
+    temperatureRange: { min: number; max: number }; // Celsius
+    accuracy: number;            // ± Celsius
+    frameRate: number;           // Hz
+  };
+
+  calibration: {
+    nuc: boolean;                // Non-Uniformity Correction
+    shutterCalibration: boolean;
+    radiometric: boolean;
+    emissivityCorrection: boolean;
+  };
+
+  output: {
+    formats: ('R-JPEG' | 'TIFF' | 'radiometric_raw')[];
+    temperatureData: boolean;
+    geotags: boolean;
+  };
+}
+
+// Example: Agricultural Thermal Camera
+const agThermalCamera: ThermalCamera = {
+  detector: {
+    type: 'uncooled_VOx',
+    resolution: { width: 640, height: 512 },
+    pixelPitch: 17,
+    spectralRange: { min: 7.5, max: 13.5 }
+  },
+  performance: {
+    thermalSensitivity: 40,      // 40mK
+    temperatureRange: { min: -40, max: 550 },
+    accuracy: 2,                 // ±2°C
+    frameRate: 30
+  },
+  calibration: {
+    nuc: true,
+    shutterCalibration: true,
+    radiometric: true,
+    emissivityCorrection: true
+  },
+  output: {
+    formats: ['R-JPEG', 'TIFF', 'radiometric_raw'],
+    temperatureData: true,
+    geotags: true
+  }
+};
+    </pre>
+
+    <h2>3.4 LiDAR Systems</h2>
+
+    <pre>
+// LiDAR Specifications for Agriculture
+interface LiDARSystem {
+  // Scanner Specifications
+  scanner: {
+    type: 'mechanical' | 'solid_state' | 'MEMS' | 'flash';
+    wavelength: number;          // nm (typically 905 or 1550)
+    eyeSafe: boolean;
+    scanPattern: 'line' | 'rotating' | 'oscillating';
+  };
+
+  // Performance
+  performance: {
+    range: { min: number; max: number }; // meters
+    accuracy: number;            // cm
+    precision: number;           // cm
+    pointsPerSecond: number;
+    fieldOfView: { horizontal: number; vertical: number };
+    angularResolution: number;   // degrees
+  };
+
+  // Returns
+  returns: {
+    maxReturns: number;          // Multiple returns for vegetation
+    intensityData: boolean;
+    classification: boolean;
+  };
+
+  // Integration
+  integration: {
+    weight: number;              // grams
+    power: number;               // watts
+    imu: boolean;
+    gnss: boolean;
+  };
+}
+
+// Agricultural LiDAR Applications
+const lidarApplications = {
+  terrainMapping: {
+    use: 'Generate bare-earth DEMs',
+    pointDensity: '25-100 pts/m²',
+    accuracy: '2-5 cm vertical'
+  },
+  canopyAnalysis: {
+    use: 'Measure crop height, biomass',
+    multiReturn: 'Essential for penetration',
+    metrics: ['height', 'density', 'LAI']
+  },
+  drainageAnalysis: {
+    use: 'Identify drainage patterns',
+    bareEarth: 'Vegetation filtering required',
+    resolution: 'Sub-meter DEM'
+  },
+  orchardMapping: {
+    use: 'Individual tree metrics',
+    metrics: ['height', 'canopy_volume', 'trunk_location'],
+    timing: 'Leaf-off for structure, leaf-on for canopy'
+  }
+};
+    </pre>
+
+    <h2>3.5 Hyperspectral Sensors</h2>
+
+    <pre>
+// Hyperspectral Sensor Specifications
+interface HyperspectralSensor {
+  spectralCharacteristics: {
+    range: { min: number; max: number }; // nm
+    bands: number;
+    spectralResolution: number;  // nm (bandwidth)
+    samplingInterval: number;    // nm
+  };
+
+  spatialCharacteristics: {
+    pixels: number;              // across track
+    fov: number;                 // degrees
+    ifov: number;                // mrad
+  };
+
+  scanType: 'pushbroom' | 'whiskbroom' | 'snapshot';
+
+  performance: {
+    snr: number;                 // signal-to-noise ratio
+    dynamicRange: number;        // bits
+    frameRate: number;           // Hz
+  };
+
+  applications: {
+    nutrientMapping: 'N, P, K deficiency detection';
+    diseaseDetection: 'Spectral signatures of pathogens';
+    weedMapping: 'Species-level identification';
+    soilAnalysis: 'Organic matter, moisture, composition';
+  };
+}
+
+// Hyperspectral Data Volume
+const dataVolume = {
+  sensor: '272 bands, 640 pixels',
+  swathWidth: '400m at 120m AGL',
+  framerate: 100,                // fps
+  dataRate: '175 MB/s',
+  missionStorage: '100 GB per hour',
+  processingNeeds: 'Significant computing resources'
+};
+    </pre>
+
+    <h2>3.6 Gimbal and Stabilization</h2>
+
+    <table>
+        <tr>
+            <th>Specification</th>
+            <th>Survey Gimbal</th>
+            <th>Spray Camera Gimbal</th>
+            <th>Mapping Gimbal</th>
+        </tr>
+        <tr>
+            <td>Axes</td>
+            <td>3-axis</td>
+            <td>1-2 axis</td>
+            <td>3-axis with nadir lock</td>
+        </tr>
+        <tr>
+            <td>Stabilization</td>
+            <td>±0.01°</td>
+            <td>±0.5°</td>
+            <td>±0.005°</td>
+        </tr>
+        <tr>
+            <td>Payload Capacity</td>
+            <td>500g - 2kg</td>
+            <td>100-300g</td>
+            <td>1-5kg</td>
+        </tr>
+        <tr>
+            <td>Angular Range</td>
+            <td>360° pan, ±90° tilt</td>
+            <td>Fixed nadir</td>
+            <td>360° pan, -90° to +30°</td>
+        </tr>
+    </table>
+
+    <h2>3.7 Sensor Calibration</h2>
+
+    <div class="highlight">
+        <h3>Calibration Requirements</h3>
+        <ul>
+            <li><strong>Radiometric:</strong> Convert DN to reflectance using calibration panels</li>
+            <li><strong>Geometric:</strong> Lens distortion correction and camera alignment</li>
+            <li><strong>Thermal:</strong> Blackbody calibration for accurate temperature</li>
+            <li><strong>Spectral:</strong> Wavelength calibration for hyperspectral</li>
+            <li><strong>Temporal:</strong> Time synchronization between sensors</li>
+        </ul>
+    </div>
+
+    <pre>
+// Calibration Workflow
+interface CalibrationWorkflow {
+  preFlightCalibration: {
+    reflectancePanel: {
+      material: 'Spectralon' | 'gray_card';
+      knownReflectance: number[];  // Per band
+      captureConditions: 'Consistent lighting';
+    };
+    thermalReference: {
+      type: 'blackbody' | 'ambient';
+      knownTemperature: number;
+    };
+    imuAlignment: {
+      levelCalibration: boolean;
+      magnetometerCalibration: boolean;
+    };
+  };
+
+  inFlightCalibration: {
+    dls: {
+      purpose: 'Account for changing light conditions';
+      mounting: 'Top of aircraft, level';
+      synchronization: 'Time-matched to camera';
+    };
+    gcp: {
+      purpose: 'Accurate georeferencing';
+      distribution: 'Corners and center of field';
+      accuracy: 'Survey-grade GNSS';
+    };
+  };
+
+  postProcessingCalibration: {
+    radiometricCorrection: 'Apply DLS and panel data';
+    atmosphericCorrection: 'Optional for reflectance';
+    bandAlignment: 'For multi-sensor systems';
+  };
+}
+    </pre>
+
+    <h2>3.8 Payload Integration</h2>
+
+    <pre>
+// Payload Integration Standards
+interface PayloadIntegration {
+  mechanical: {
+    mountingInterface: 'quick_release' | 'fixed' | 'gimbal';
+    vibrationIsolation: boolean;
+    weight_cg_impact: 'Must maintain aircraft CG limits';
+  };
+
+  electrical: {
+    powerSupply: { voltage: number; current: number };
+    triggerInterface: 'PWM' | 'GPIO' | 'serial' | 'USB';
+    dataInterface: 'SD_card' | 'USB' | 'ethernet';
+  };
+
+  communication: {
+    flightController: 'MAVLink payload protocol';
+    groundStation: 'Video downlink, status telemetry';
+    synchronization: 'GPS time, trigger events';
+  };
+
+  software: {
+    missionPlanning: 'Camera settings in flight plan';
+    captureControl: 'Distance or time-based triggering';
+    dataManagement: 'Geotagging, metadata';
+  };
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>This chapter covered the spectrum of sensors and payloads used in agricultural drones, from RGB cameras to multispectral, thermal, LiDAR, and hyperspectral systems. Understanding sensor specifications, calibration requirements, and integration considerations is essential for collecting high-quality agricultural data as specified by the WIA-AGRICULTURAL_DRONE standard.</p>
+    </div>
+</body>
+</html>

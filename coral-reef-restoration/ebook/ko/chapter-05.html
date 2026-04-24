@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 2단계 - API 인터페이스 | WIA-REEF</title>
+    <style>
+        :root { --primary-color: #EF4444; --secondary-color: #06b6d4; --accent-color: #F87171; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(6,182,212,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .endpoint { background: var(--card-bg); padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid var(--secondary-color); }
+        .method { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: bold; margin-right: 0.5rem; }
+        .get { background: #22c55e; color: white; }
+        .post { background: #3b82f6; color: white; }
+        .put { background: #f59e0b; color: #1a202c; }
+        .delete { background: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+    <h1>제5장: 2단계 - API 인터페이스</h1>
+
+    <div class="objectives-box">
+        <h3>🎯 학습 목표</h3>
+        <ul>
+            <li>산호초 데이터를 위한 RESTful API 설계 숙달</li>
+            <li>인증 및 권한 부여 구현</li>
+            <li>실시간 모니터링 엔드포인트 사용</li>
+            <li>백화 예측 서비스 접근</li>
+            <li>API를 통한 복원 프로젝트 추적</li>
+        </ul>
+    </div>
+
+    <h2>5.1 API 아키텍처</h2>
+
+    <p>WIA-REEF API는 산호초 모니터링 데이터 접근, 평가 제출, 복원 노력 조정을 위한 종합 인터페이스를 제공합니다. API는 JSON 페이로드와 표준 HTTP 메서드를 사용하는 RESTful 원칙을 따릅니다.</p>
+
+    <pre><code>// API 구성
+{
+  "base_url": "https://api.wia-reef.org/v1",
+  "authentication": {
+    "methods": ["api_key", "oauth2"],
+    "header": "Authorization: Bearer {token}"
+  },
+  "rate_limits": {
+    "standard": "1000 요청/시간",
+    "premium": "10000 요청/시간",
+    "streaming": "구독 내 무제한"
+  },
+  "versioning": "URL 경로 (v1, v2)",
+  "formats": ["application/json", "application/geo+json"]
+}</code></pre>
+
+    <h2>5.2 핵심 엔드포인트</h2>
+
+    <h3>5.2.1 산호초 사이트</h3>
+
+    <div class="endpoint">
+        <span class="method get">GET</span>
+        <code>/sites</code> - 필터링으로 모든 산호초 사이트 목록
+    </div>
+
+    <div class="endpoint">
+        <span class="method get">GET</span>
+        <code>/sites/{site_id}</code> - 특정 사이트 상세 정보
+    </div>
+
+    <div class="endpoint">
+        <span class="method post">POST</span>
+        <code>/sites</code> - 새 산호초 사이트 등록
+    </div>
+
+    <pre><code>// GET /sites?country=AU&reef_type=barrier&limit=10
+{
+  "data": [
+    {
+      "id": "reef-aus-gbr-001",
+      "name": "오스프리 리프",
+      "location": {
+        "type": "Point",
+        "coordinates": [146.5567, -13.8842]
+      },
+      "reef_type": "barrier",
+      "area_km2": 25.4,
+      "protection_status": "mpa",
+      "latest_health": {
+        "coral_cover": 45.2,
+        "bleaching_extent": 8.4,
+        "assessed_at": "2024-03-15T10:30:00Z"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 2843,
+    "page": 1,
+    "per_page": 10
+  }
+}</code></pre>
+
+    <h3>5.2.2 건강 평가</h3>
+
+    <div class="endpoint">
+        <span class="method get">GET</span>
+        <code>/sites/{site_id}/assessments</code> - 평가 이력 조회
+    </div>
+
+    <div class="endpoint">
+        <span class="method post">POST</span>
+        <code>/sites/{site_id}/assessments</code> - 새 평가 제출
+    </div>
+
+    <div class="endpoint">
+        <span class="method get">GET</span>
+        <code>/assessments/{id}</code> - 평가 상세 정보
+    </div>
+
+    <h2>5.3 실시간 모니터링</h2>
+
+    <pre><code>// 실시간 센서 데이터 엔드포인트
+// GET /sites/{site_id}/sensors/realtime
+
+{
+  "site_id": "reef-aus-gbr-001",
+  "timestamp": "2024-03-15T14:30:00Z",
+  "sensors": [
+    {
+      "sensor_id": "temp-001",
+      "type": "temperature",
+      "value": 28.4,
+      "unit": "celsius",
+      "quality": "good"
+    },
+    {
+      "sensor_id": "ph-001",
+      "type": "ph",
+      "value": 8.09,
+      "quality": "good"
+    },
+    {
+      "sensor_id": "turb-001",
+      "type": "turbidity",
+      "value": 1.8,
+      "unit": "ntu",
+      "quality": "good"
+    }
+  ],
+  "alerts": [
+    {
+      "type": "temperature_warning",
+      "message": "온도가 백화 임계값에 근접",
+      "severity": "warning",
+      "value": 28.4,
+      "threshold": 29.0
+    }
+  ]
+}</code></pre>
+
+    <h2>5.4 백화 예측</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>엔드포인트</th>
+                <th>설명</th>
+                <th>응답</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>/predict/bleaching/{site_id}</td>
+                <td>7일 백화 예보</td>
+                <td>위험 수준, DHW 예측</td>
+            </tr>
+            <tr>
+                <td>/predict/dhw/{site_id}</td>
+                <td>누적 열 스트레스 주(DHW)</td>
+                <td>현재 DHW, 12주 이력</td>
+            </tr>
+            <tr>
+                <td>/alerts/bleaching</td>
+                <td>활성 백화 경보</td>
+                <td>영향받는 사이트, 심각도</td>
+            </tr>
+            <tr>
+                <td>/predict/recovery/{site_id}</td>
+                <td>회복 잠재력 추정</td>
+                <td>타임라인, 성공 확률</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <pre><code>// GET /predict/bleaching/reef-aus-gbr-001
+{
+  "site_id": "reef-aus-gbr-001",
+  "prediction_date": "2024-03-15",
+  "current_conditions": {
+    "temperature": 28.4,
+    "dhw": 3.2,
+    "bleaching_threshold": 29.0
+  },
+  "forecast": [
+    {
+      "date": "2024-03-16",
+      "predicted_temp": 28.6,
+      "bleaching_risk": "moderate",
+      "confidence": 0.85
+    },
+    {
+      "date": "2024-03-17",
+      "predicted_temp": 28.9,
+      "bleaching_risk": "high",
+      "confidence": 0.78
+    }
+  ],
+  "dhw_projection": {
+    "current": 3.2,
+    "7_day": 4.8,
+    "alert_threshold": 4.0,
+    "bleaching_threshold": 8.0
+  },
+  "recommendations": [
+    "모니터링 빈도 증가",
+    "차양 장비 준비",
+    "복원 팀 경보"
+  ]
+}</code></pre>
+
+    <h2>5.5 복원 API</h2>
+
+    <div class="endpoint">
+        <span class="method get">GET</span>
+        <code>/restoration/projects</code> - 복원 프로젝트 목록
+    </div>
+
+    <div class="endpoint">
+        <span class="method post">POST</span>
+        <code>/restoration/projects</code> - 새 프로젝트 생성
+    </div>
+
+    <div class="endpoint">
+        <span class="method post">POST</span>
+        <code>/restoration/projects/{id}/fragments</code> - 파편 배치 기록
+    </div>
+
+    <div class="endpoint">
+        <span class="method put">PUT</span>
+        <code>/restoration/fragments/{id}/monitoring</code> - 파편 상태 업데이트
+    </div>
+
+    <h2>5.6 인증</h2>
+
+    <pre><code>// OAuth 2.0 토큰 요청
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&client_id=YOUR_CLIENT_ID
+&client_secret=YOUR_CLIENT_SECRET
+&scope=read:sites write:assessments
+
+// 응답
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "read:sites write:assessments"
+}</code></pre>
+
+    <h2>5.7 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>WIA-REEF API는 JSON 페이로드를 사용하는 RESTful 설계 따름</li>
+            <li>핵심 엔드포인트는 사이트, 평가, 복원 커버</li>
+            <li>실시간 모니터링은 라이브 센서 데이터 및 경보 제공</li>
+            <li>백화 예측은 DHW 및 온도 예보 사용</li>
+            <li>OAuth 2.0 및 API 키가 유연한 인증 제공</li>
+        </ul>
+    </blockquote>
+
+    <h2>5.8 복습 문제</h2>
+
+    <ol>
+        <li>API가 지원하는 인증 방법은?</li>
+        <li>사이트의 실시간 센서 데이터를 어떻게 검색하나요?</li>
+        <li>DHW는 무엇이며 백화 예측에 어떻게 사용되나요?</li>
+        <li>새 복원 프로젝트 생성에 어떤 HTTP 메서드 사용?</li>
+        <li>API의 표준 속도 제한은?</li>
+    </ol>
+
+    <h2>5.9 다음 장 미리보기</h2>
+
+    <p>제6장에서는 3단계: 프로토콜을 다루며, 센서 데이터 스트리밍, 실시간 경보, 조직 간 조정을 위한 통신 프로토콜을 탐색합니다.</p>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 구현 가이드 | WIA-AUTO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        .highlight { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border); font-family: 'Consolas', monospace; font-size: 0.9rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: #1e3a5f; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>제8장: 구현 가이드</h1>
+
+    <div class="highlight">
+        <p>이 장에서는 WIA-AUTO 준수 자율주행 시스템 구현을 위한 실용적인 가이드를 제공하며, 배포 전략, 플릿 관리, 유지보수 프로토콜 및 인프라 통합 요구사항을 다룹니다.</p>
+    </div>
+
+    <h2>8.1 배포 로드맵</h2>
+    <pre>
+WIA-AUTO 구현 단계
+==================
+1단계: 기반 구축 (1-6개월)
+├── 다기능 팀 구성
+├── 목표 ODD 및 사용 사례 정의
+├── 안전 관리 시스템 구축
+├── 센서 선택 및 아키텍처 시작
+└── 규제 기관과 협의 시작
+
+2단계: 개발 (6-18개월)
+├── 인지 파이프라인 개발
+├── 의사결정 시스템 구현
+├── V2X 통신 스택 구축
+├── 시뮬레이션 환경 생성
+└── 컴포넌트 테스트 수행
+
+3단계: 통합 (18-24개월)
+├── 시스템 통합 및 캘리브레이션
+├── 폐쇄 코스 테스트
+├── SOTIF 분석 및 개선
+├── 사이버보안 평가
+└── 제한된 공공 도로 테스트 시작
+
+4단계: 검증 (24-36개월)
+├── 광범위한 공공 도로 테스트
+├── 시나리오 기반 검증
+├── 제3자 안전 평가
+├── 규제 인증 프로세스
+└── 파일럿 배포 준비
+
+5단계: 배포 (36개월+)
+├── 제한적 상업 배포
+├── 지속적 모니터링 및 개선
+├── 지리적 및 ODD 확장
+└── 전면 상업 운영
+    </pre>
+
+    <h2>8.2 하드웨어 아키텍처</h2>
+    <table>
+        <tr><th>컴포넌트</th><th>사양</th><th>이중화</th></tr>
+        <tr><td>메인 컴퓨트</td><td>500+ TOPS AI 가속기</td><td>이중 이중화</td></tr>
+        <tr><td>LiDAR</td><td>360° 커버리지, 200m 범위</td><td>다중 유닛</td></tr>
+        <tr><td>카메라</td><td>8개 이상, 서라운드 뷰</td><td>중첩 FOV</td></tr>
+        <tr><td>레이더</td><td>6개 이상, 360° 커버리지</td><td>다중 범위 유형</td></tr>
+        <tr><td>GNSS/IMU</td><td>RTK 지원, 6축 IMU</td><td>이중 수신기</td></tr>
+        <tr><td>V2X 유닛</td><td>DSRC 및 C-V2X 지원</td><td>선택적</td></tr>
+        <tr><td>전원 공급</td><td>이중 12V/48V</td><td>UPS 백업</td></tr>
+    </table>
+
+    <h2>8.3 소프트웨어 스택</h2>
+    <pre>
+소프트웨어 아키텍처
+===================
+┌─────────────────────────────────────────────────────────────┐
+│                   애플리케이션 레이어                        │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌─────────────┐ │
+│  │플릿 관리  │ │원격 운영  │ │  진단     │ │ OTA 업데이트│ │
+│  └───────────┘ └───────────┘ └───────────┘ └─────────────┘ │
+├─────────────────────────────────────────────────────────────┤
+│                   미들웨어 레이어                            │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │  ROS2 / 커스텀 프레임워크                             │ │
+│  │  - 노드 관리         - 시간 동기화                    │ │
+│  │  - 메시지 전달       - 진단                           │ │
+│  └───────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────────┤
+│                   운영 체제                                  │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │  실시간 Linux / QNX / AUTOSAR Adaptive               │ │
+│  └───────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────────┤
+│                   하드웨어 추상화                            │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
+│  │  센서    │ │ 액추에이터│ │  네트워크 │ │  컴퓨트 HW  │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>8.4 플릿 관리</h2>
+    <div class="highlight">
+        <h3>플릿 운영 센터 요구사항</h3>
+        <ul>
+            <li><strong>실시간 모니터링:</strong> 차량 위치, 상태 및 상태 대시보드</li>
+            <li><strong>원격 지원:</strong> 정지된 차량에 안내 제공 기능</li>
+            <li><strong>배차 시스템:</strong> 자동 및 수동 차량 할당</li>
+            <li><strong>사고 관리:</strong> 알림 처리 및 에스컬레이션 절차</li>
+            <li><strong>분석 플랫폼:</strong> 성능 메트릭 및 최적화 인사이트</li>
+        </ul>
+    </div>
+
+    <pre>
+플릿 메트릭 대시보드
+====================
+카테고리          | 메트릭                    | 목표
+------------------+---------------------------+--------
+안전              | 개입당 마일               | 50,000+
+                  | 충돌률                    | &lt; 0.1/M mi
+가용성            | 플릿 가동률               | 98%+
+                  | 일일 MRC 이벤트           | &lt; 0.5
+성능              | 정시 도착                 | 95%+
+                  | 승객 만족도               | 4.5+/5
+효율성            | kWh당 마일                | 4.0+
+                  | 이용률                    | 60%+
+    </pre>
+
+    <h2>8.5 유지보수 프로토콜</h2>
+    <table>
+        <tr><th>간격</th><th>유지보수 활동</th></tr>
+        <tr><td>매일</td><td>외관 검사, 센서 청소, 진단 확인</td></tr>
+        <tr><td>매주</td><td>캘리브레이션 검증, 소프트웨어 로그 검토</td></tr>
+        <tr><td>매월</td><td>전체 센서 캘리브레이션, 브레이크 검사, 타이어 점검</td></tr>
+        <tr><td>분기</td><td>종합 시스템 테스트, 사이버보안 스캔</td></tr>
+        <tr><td>연간</td><td>전체 시스템 재인증, 하드웨어 교체 평가</td></tr>
+    </table>
+
+    <h2>8.6 인프라 통합</h2>
+    <pre>
+V2I 인프라 컴포넌트
+===================
+노변 장치 (RSU):
+├── 신호 위상 및 타이밍 (SPaT) 브로드캐스트
+├── MAP 메시지 (교차로 기하)
+├── 도로 위험 경고
+└── 공사 구역 알림
+
+교통 관리 센터 통합:
+├── 실시간 교통 데이터 교환
+├── 사고 조정
+├── 경로 안내 최적화
+└── 긴급 차량 우선
+
+HD 맵 인프라:
+├── 맵 업데이트 배포
+├── 공사 구역 업데이트
+├── 동적 도로 상태 데이터
+└── 주차 가용성
+    </pre>
+
+    <h2>8.7 지속적 개선</h2>
+    <ul>
+        <li><strong>데이터 수집:</strong> 분석을 위한 운영 데이터의 체계적 캡처</li>
+        <li><strong>섀도우 모드 테스트:</strong> 프로덕션 동작과 비교하여 새 알고리즘 테스트</li>
+        <li><strong>A/B 테스트:</strong> 하위 집합에 대한 개선 사항의 통제된 출시</li>
+        <li><strong>회귀 테스트:</strong> 업데이트가 기존 기능을 저하시키지 않도록 보장</li>
+        <li><strong>피드백 통합:</strong> 승객 및 운영자 피드백 통합</li>
+    </ul>
+
+    <h2>8.8 인증 체크리스트</h2>
+    <div class="highlight">
+        <h3>WIA-AUTO 준수 요구사항</h3>
+        <pre>
+☐ 안전 관리 시스템 문서화
+☐ ODD 공식적으로 정의 및 검증
+☐ 기능 안전 분석 (ISO 26262) 완료
+☐ SOTIF 분석 (ISO 21448) 완료
+☐ 사이버보안 평가 (ISO 21434) 완료
+☐ V2X 상호운용성 테스트 통과
+☐ 공공 도로 테스트 마일스톤 달성
+☐ 제3자 안전 평가 완료
+☐ 데이터 기록 시스템 검증
+☐ 소비자 공개 문서 준비
+☐ 유지보수 절차 문서화
+☐ 사고 대응 계획 수립
+        </pre>
+    </div>
+
+    <p style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: #94a3b8; font-size: 0.9rem;">
+        © 2025 World Industry Association (WIA). 弘益人間 - 널리 인간을 이롭게 하라
+    </p>
+</body>
+</html>

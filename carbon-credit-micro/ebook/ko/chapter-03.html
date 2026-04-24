@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 3: 거래 메커니즘 | WIA-CARBON_CREDIT_MICRO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 3: 거래 메커니즘</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 마이크로 결제 시스템의 작동 원리를 이해하고, 자동 정산 프로세스를 마스터하며, 수수료 구조와 가격 책정 메커니즘을 학습합니다.
+    </div>
+
+    <h2>마이크로 결제 시스템</h2>
+
+    <p>마이크로 탄소 크레딧 거래는 그램 단위의 작은 금액을 효율적으로 처리할 수 있는 특수한 결제 시스템을 필요로 합니다. 전통적인 결제 시스템에서는 거래 수수료가 거래 금액보다 클 수 있어 마이크로 거래가 비실용적입니다.</p>
+
+    <p>WIA-CARBON_CREDIT_MICRO는 레이어 2 솔루션과 배치 처리를 활용하여 이 문제를 해결합니다:</p>
+
+    <pre><code>// 마이크로 결제 엔진
+class MicroPaymentEngine {
+    private paymentChannel: PaymentChannel;
+    private batchProcessor: BatchProcessor;
+    private settlementService: SettlementService;
+
+    constructor() {
+        this.paymentChannel = new PaymentChannel({
+            minBatch: 100,           // 최소 배치 크기
+            maxDelay: 3600,          // 최대 지연 시간 (초)
+            gasOptimization: true
+        });
+    }
+
+    async processPayment(payment: MicroPayment): Promise&lt;PaymentResult&gt; {
+        // 결제 유효성 검증
+        await this.validatePayment(payment);
+
+        // 즉시 처리가 필요한지 확인
+        if (payment.amount > this.paymentChannel.instantThreshold) {
+            return this.processInstantly(payment);
+        }
+
+        // 배치 처리를 위해 큐에 추가
+        const batchId = await this.batchProcessor.addToBatch(payment);
+
+        // 결제 채널 상태 업데이트
+        await this.paymentChannel.updateState({
+            sender: payment.from,
+            receiver: payment.to,
+            amount: payment.amount,
+            nonce: payment.nonce
+        });
+
+        return {
+            status: 'pending',
+            batchId,
+            estimatedSettlement: this.estimateSettlementTime(batchId),
+            channelBalance: await this.paymentChannel.getBalance(payment.from)
+        };
+    }
+
+    async processBatch(batchId: string): Promise&lt;BatchResult&gt; {
+        const batch = await this.batchProcessor.getBatch(batchId);
+
+        // 배치 내 모든 결제 집계
+        const aggregated = this.aggregatePayments(batch.payments);
+
+        // 단일 온체인 트랜잭션으로 정산
+        const tx = await this.settlementService.settleBatch(aggregated);
+
+        return {
+            batchId,
+            paymentsCount: batch.payments.length,
+            totalAmount: aggregated.totalAmount,
+            gasUsed: tx.gasUsed,
+            costPerPayment: tx.gasUsed / batch.payments.length,
+            txHash: tx.hash
+        };
+    }
+}</code></pre>
+
+    <h2>자동 정산 프로세스</h2>
+
+    <p>자동 정산은 거래의 신뢰성과 효율성을 보장하는 핵심 메커니즘입니다. 스마트 컨트랙트를 통해 인간의 개입 없이 거래가 자동으로 완료됩니다:</p>
+
+    <div class="highlight">
+        <strong>정산 유형:</strong> 즉시 정산 - 대량 거래에 사용, T+0 확정. 배치 정산 - 마이크로 거래를 묶어서 처리, 비용 효율적. 주기적 정산 - 정해진 간격으로 누적된 거래 처리.
+    </div>
+
+    <h3>정산 흐름</h3>
+
+    <pre><code>// 자동 정산 서비스
+class AutoSettlementService {
+    private settlementQueue: SettlementQueue;
+    private escrowContract: EscrowContract;
+    private scheduler: SettlementScheduler;
+
+    async initiateSettlement(trade: Trade): Promise&lt;SettlementProcess&gt; {
+        // 에스크로에 자산 잠금
+        const lockResult = await this.escrowContract.lockAssets({
+            seller: trade.seller,
+            buyer: trade.buyer,
+            credits: trade.creditIds,
+            payment: trade.paymentAmount
+        });
+
+        // 정산 프로세스 생성
+        const process: SettlementProcess = {
+            processId: generateProcessId(),
+            trade,
+            escrowId: lockResult.escrowId,
+            status: 'initiated',
+            steps: [
+                { name: '자산 잠금', status: 'completed', timestamp: new Date() },
+                { name: '검증', status: 'pending' },
+                { name: '이전', status: 'pending' },
+                { name: '확정', status: 'pending' }
+            ]
+        };
+
+        // 비동기 정산 시작
+        this.executeSettlement(process);
+
+        return process;
+    }
+
+    private async executeSettlement(process: SettlementProcess): Promise&lt;void&gt; {
+        try {
+            // 1단계: 검증
+            await this.verifyTradeConditions(process.trade);
+            this.updateStep(process, '검증', 'completed');
+
+            // 2단계: 자산 이전
+            await this.transferAssets(process);
+            this.updateStep(process, '이전', 'completed');
+
+            // 3단계: 최종 확정
+            await this.finalizeSettlement(process);
+            this.updateStep(process, '확정', 'completed');
+
+            process.status = 'completed';
+        } catch (error) {
+            process.status = 'failed';
+            await this.initiateRollback(process);
+        }
+    }
+
+    private async transferAssets(process: SettlementProcess): Promise&lt;void&gt; {
+        const trade = process.trade;
+
+        // 크레딧을 판매자에서 구매자로 이전
+        await this.escrowContract.releaseCredits({
+            escrowId: process.escrowId,
+            to: trade.buyer,
+            credits: trade.creditIds
+        });
+
+        // 결제금을 구매자에서 판매자로 이전
+        await this.escrowContract.releasePayment({
+            escrowId: process.escrowId,
+            to: trade.seller,
+            amount: trade.paymentAmount
+        });
+    }
+}</code></pre>
+
+    <h2>수수료 구조</h2>
+
+    <p>WIA-CARBON_CREDIT_MICRO의 수수료 구조는 시스템의 지속 가능성을 보장하면서 마이크로 거래의 경제적 실행 가능성을 유지하도록 설계되었습니다:</p>
+
+    <table>
+        <tr>
+            <th>거래 유형</th>
+            <th>수수료율</th>
+            <th>최소 수수료</th>
+            <th>최대 수수료</th>
+        </tr>
+        <tr>
+            <td>크레딧 생성</td>
+            <td>무료</td>
+            <td>-</td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>마켓 거래</td>
+            <td>0.3%</td>
+            <td>$0.001</td>
+            <td>$10</td>
+        </tr>
+        <tr>
+            <td>P2P 이전</td>
+            <td>0.1%</td>
+            <td>$0.0005</td>
+            <td>$5</td>
+        </tr>
+        <tr>
+            <td>크레딧 폐기</td>
+            <td>0.5%</td>
+            <td>$0.01</td>
+            <td>$50</td>
+        </tr>
+        <tr>
+            <td>출금 (법정화폐)</td>
+            <td>1.5%</td>
+            <td>$1</td>
+            <td>$100</td>
+        </tr>
+    </table>
+
+    <pre><code>// 수수료 계산기
+class FeeCalculator {
+    private readonly FEE_STRUCTURE = {
+        CREDIT_GENERATION: { rate: 0, min: 0, max: 0 },
+        MARKET_TRADE: { rate: 0.003, min: 0.001, max: 10 },
+        P2P_TRANSFER: { rate: 0.001, min: 0.0005, max: 5 },
+        CREDIT_RETIREMENT: { rate: 0.005, min: 0.01, max: 50 },
+        FIAT_WITHDRAWAL: { rate: 0.015, min: 1, max: 100 }
+    };
+
+    calculateFee(
+        transactionType: keyof typeof this.FEE_STRUCTURE,
+        amount: number
+    ): FeeCalculation {
+        const structure = this.FEE_STRUCTURE[transactionType];
+
+        // 기본 수수료 계산
+        let fee = amount * structure.rate;
+
+        // 최소/최대 적용
+        fee = Math.max(fee, structure.min);
+        fee = Math.min(fee, structure.max);
+
+        // 볼륨 할인 적용
+        const discount = this.calculateVolumeDiscount(amount);
+        fee = fee * (1 - discount);
+
+        return {
+            baseFee: amount * structure.rate,
+            appliedFee: fee,
+            discount: discount * 100,
+            netAmount: amount - fee
+        };
+    }
+
+    private calculateVolumeDiscount(amount: number): number {
+        if (amount >= 1000000) return 0.20;  // $1M+ = 20% 할인
+        if (amount >= 100000) return 0.15;   // $100K+ = 15% 할인
+        if (amount >= 10000) return 0.10;    // $10K+ = 10% 할인
+        if (amount >= 1000) return 0.05;     // $1K+ = 5% 할인
+        return 0;
+    }
+}</code></pre>
+
+    <h2>가격 책정 메커니즘</h2>
+
+    <p>마이크로 탄소 크레딧의 가격은 전통적인 탄소 시장과 연동되면서도 마이크로 규모에 특화된 요소를 반영합니다:</p>
+
+    <div class="highlight">
+        <strong>가격 발견:</strong> 마켓플레이스는 주요 탄소 크레딧 거래소의 가격 피드를 활용한 연속 이중 경매 메커니즘을 사용합니다. 이를 통해 마이크로 크레딧 가격이 글로벌 탄소 가격과 상관관계를 유지하면서도 카테고리별 프리미엄이 허용됩니다.
+    </div>
+
+    <pre><code>// 동적 가격 책정 엔진
+class DynamicPricingEngine {
+    private oracleService: PriceOracleService;
+    private basePrice: number = 0;
+
+    async updateBasePrice(): Promise&lt;void&gt; {
+        const feeds = await Promise.all([
+            this.oracleService.getPrice('EUA'),      // EU 배출권
+            this.oracleService.getPrice('CCA'),      // 캘리포니아 탄소
+            this.oracleService.getPrice('VCM'),      // 자발적 탄소 시장
+        ]);
+
+        // 가중 평균
+        this.basePrice = (feeds[0] * 0.4 + feeds[1] * 0.3 + feeds[2] * 0.3) / 1_000_000;
+        // 톤당에서 그램당으로 변환
+    }
+
+    calculatePrice(credit: MicroCredit): CreditPrice {
+        let price = this.basePrice;
+
+        // 검증 등급 조정
+        const tierMultipliers = { 1: 0.9, 2: 1.0, 3: 1.1, 4: 1.2, 5: 1.3 };
+        price *= tierMultipliers[credit.verificationTier] || 1.0;
+
+        // 카테고리 조정
+        const categoryMultipliers = {
+            TRANSPORT: 1.05,      // 쉽게 검증 가능 - 프리미엄
+            ENERGY: 1.10,         // 스마트 미터 검증 - 프리미엄
+            CONSUMPTION: 0.95,    // 검증 어려움 - 할인
+            WASTE: 1.00
+        };
+        price *= categoryMultipliers[credit.category] || 1.0;
+
+        // 빈티지 조정 (월당 0.5% 할인)
+        const ageMonths = this.getAgeInMonths(credit.generatedAt);
+        price *= Math.max(0.85, 1 - (ageMonths * 0.005));
+
+        return {
+            basePrice: this.basePrice,
+            adjustedPrice: price,
+            currency: 'USD',
+            validUntil: new Date(Date.now() + 300000) // 5분
+        };
+    }
+}</code></pre>
+
+    <h2>주문장 관리</h2>
+
+    <p>마이크로 탄소 크레딧 마켓플레이스는 분산형 거래소 원칙을 기반으로 구축된 효율적인 주문장 시스템을 운영합니다:</p>
+
+    <pre><code>// 거래 엔진
+class TradingEngine {
+    private orderBooks: Map&lt;CreditCategory, OrderBook&gt; = new Map();
+
+    async placeOrder(order: CreateOrderRequest): Promise&lt;Order&gt; {
+        // 주문 검증
+        await this.validateOrder(order);
+
+        // 판매 주문의 경우 잔액 확인
+        if (order.side === 'sell') {
+            await this.validateBalance(order.trader, order.category, order.amount);
+        }
+
+        // 자금/크레딧 잠금
+        await this.lockAssets(order);
+
+        // 주문 생성
+        const newOrder: Order = {
+            orderId: generateOrderId(),
+            trader: order.trader,
+            side: order.side,
+            category: order.category,
+            amount: order.amount,
+            pricePerGram: order.pricePerGram,
+            filled: 0,
+            status: 'open',
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + order.ttl)
+        };
+
+        // 즉시 매칭 시도
+        const matches = await this.matchOrder(newOrder);
+
+        // 매칭 실행
+        for (const match of matches) {
+            await this.executeMatch(newOrder, match);
+        }
+
+        // 남은 수량 주문장에 추가
+        if (newOrder.filled < newOrder.amount) {
+            this.addToOrderBook(newOrder);
+        }
+
+        return newOrder;
+    }
+
+    private async matchOrder(order: Order): Promise&lt;Order[]&gt; {
+        const orderBook = this.orderBooks.get(order.category);
+        if (!orderBook) return [];
+
+        const oppositeOrders = order.side === 'buy'
+            ? orderBook.sellOrders
+            : orderBook.buyOrders;
+
+        // 가격순 정렬 (최적 가격 우선)
+        const sorted = [...oppositeOrders].sort((a, b) => {
+            if (order.side === 'buy') return a.pricePerGram - b.pricePerGram;
+            return b.pricePerGram - a.pricePerGram;
+        });
+
+        return sorted.filter(o => this.isPriceMatch(order, o));
+    }
+}</code></pre>
+
+    <h2>결제 통합</h2>
+
+    <p>다양한 결제 수단을 지원하여 사용자 접근성을 극대화합니다:</p>
+
+    <ul>
+        <li><strong>암호화폐:</strong> ETH, USDC, USDT, 기타 ERC-20 토큰</li>
+        <li><strong>법정화폐:</strong> 신용카드, 은행 이체, 모바일 결제</li>
+        <li><strong>하이브리드:</strong> 암호화폐-법정화폐 브리지를 통한 원활한 전환</li>
+    </ul>
+
+    <h2>요약</h2>
+
+    <p>WIA-CARBON_CREDIT_MICRO의 거래 메커니즘은 마이크로 단위 거래의 경제적 실행 가능성을 보장하면서 높은 처리량과 낮은 지연 시간을 달성합니다. 마이크로 결제 시스템, 자동 정산, 투명한 수수료 구조, 동적 가격 책정을 통해 개인이 탄소 시장에 효과적으로 참여할 수 있는 인프라를 제공합니다.</p>
+
+</body>
+</html>

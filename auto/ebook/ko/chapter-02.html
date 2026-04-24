@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 센서 시스템과 인지 | WIA-AUTO</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        .highlight { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border); font-family: 'Consolas', monospace; font-size: 0.9rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: #1e3a5f; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>제2장: 센서 시스템과 인지</h1>
+
+    <div class="highlight">
+        <p>인지 시스템은 자율주행차의 눈과 귀 역할을 하며, 원시 센서 데이터를 실행 가능한 환경 이해로 변환합니다. 이 장에서는 센서 선택, 캘리브레이션, 융합 및 인지 알고리즘 성능에 대한 WIA-AUTO 요구사항을 정의합니다.</p>
+    </div>
+
+    <h2>2.1 인지 시스템 아키텍처</h2>
+    <p>견고한 인지 시스템은 모든 운영 조건에서 신뢰할 수 있는 환경 이해를 달성하기 위해 조화롭게 작동하는 여러 보완적인 센서가 필요합니다. WIA-AUTO 표준은 안전 등급 자율주행 시스템에 중요한 이중화 및 내결함성을 제공하는 다중 모달 센서 접근 방식을 의무화합니다.</p>
+
+    <pre>
+인지 파이프라인 아키텍처
+========================
+┌─────────────────────────────────────────────────────────────┐
+│                     원시 센서 데이터                         │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐           │
+│  │  LiDAR  │ │  레이더  │ │  카메라  │ │   IMU   │           │
+│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘           │
+├───────┴──────────┴──────────┴──────────┴────────────────────┤
+│                     전처리                                   │
+│  • 노이즈 필터링        • 왜곡 보정                          │
+│  • 좌표 변환            • 시간 동기화                        │
+├─────────────────────────────────────────────────────────────┤
+│                     센서 융합                                │
+│  ┌─────────────────┐  ┌─────────────────────────────────┐  │
+│  │ 초기 융합        │  │ 후기 융합                       │  │
+│  │ (원시 데이터)    │  │ (객체 레벨)                     │  │
+│  └─────────────────┘  └─────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                     인지 출력                                │
+│  • 객체 탐지           • 시맨틱 세그멘테이션                  │
+│  • 객체 추적           • 자유 공간 탐지                      │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>2.2 LiDAR 시스템</h2>
+    <p>LiDAR(Light Detection and Ranging) 센서는 레이저 펄스의 비행 시간 측정을 통해 정밀한 3D 환경 매핑을 제공하며 대부분의 자율주행차 인지 시스템의 중추를 형성합니다.</p>
+
+    <h3>LiDAR 기술 유형</h3>
+    <ul>
+        <li><strong>기계식 회전 LiDAR:</strong> 360도 커버리지를 제공하는 회전 레이저 어셈블리가 있는 전통적인 설계</li>
+        <li><strong>솔리드 스테이트 LiDAR:</strong> 움직이는 부품이 없으며 MEMS 미러 또는 광학 위상 배열 활용</li>
+        <li><strong>플래시 LiDAR:</strong> 전체 장면을 동시에 조명하여 단일 펄스로 3D 이미지 캡처</li>
+        <li><strong>FMCW LiDAR:</strong> 동시 범위 및 속도 제공하는 주파수 변조 연속파 기술</li>
+    </ul>
+
+    <div class="highlight">
+        <h3>WIA-AUTO LiDAR 요구사항</h3>
+        <table>
+            <tr><th>파라미터</th><th>최소</th><th>권장</th></tr>
+            <tr><td>범위</td><td>10% 반사율에서 150m</td><td>10%에서 200m</td></tr>
+            <tr><td>초당 포인트</td><td>300,000</td><td>1,000,000+</td></tr>
+            <tr><td>각도 해상도</td><td>0.2°</td><td>0.1°</td></tr>
+            <tr><td>범위 정확도</td><td>±3cm</td><td>±1cm</td></tr>
+            <tr><td>프레임 레이트</td><td>10 Hz</td><td>20 Hz</td></tr>
+        </table>
+    </div>
+
+    <h2>2.3 레이더 시스템</h2>
+    <p>레이더 센서는 모든 기상 조건에서 신뢰할 수 있는 객체 탐지 및 속도 측정을 제공하여 LiDAR와 카메라를 보완합니다. LiDAR보다 낮은 각도 해상도를 제공하지만, 레이더는 이동 객체 탐지와 악천후 투과에서 탁월합니다.</p>
+
+    <pre>
+레이더 탐지 사양
+================
+파라미터              | SRR      | MRR      | LRR
+----------------------+----------+----------+--------
+주파수 대역           | 24 GHz   | 77 GHz   | 77 GHz
+최대 범위             | 30m      | 100m     | 250m
+범위 해상도           | 0.3m     | 0.5m     | 1.0m
+속도 해상도           | 0.3 m/s  | 0.1 m/s  | 0.1 m/s
+시야각                | ±75°     | ±45°     | ±15°
+업데이트 속도         | 50 Hz    | 20 Hz    | 20 Hz
+    </pre>
+
+    <h2>2.4 카메라 시스템</h2>
+    <p>카메라는 교통 표지판 인식, 신호등 탐지, 차선 표시 식별 및 객체 분류를 포함한 장면 이해에 필수적인 풍부한 시각 정보를 제공합니다.</p>
+
+    <h3>카메라 유형 및 구성</h3>
+    <ul>
+        <li><strong>단안 카메라:</strong> 분류 및 탐지를 위한 2D 이미지를 제공하는 단일 카메라</li>
+        <li><strong>스테레오 카메라:</strong> 시차 기반 깊이 추정을 가능하게 하는 쌍 카메라</li>
+        <li><strong>서라운드 뷰:</strong> 360도 시각적 커버리지를 제공하는 다중 광각 카메라</li>
+        <li><strong>열화상/IR 카메라:</strong> 저조도 조건에서 보행자 탐지를 위한 적외선 카메라</li>
+    </ul>
+
+    <h2>2.5 센서 융합 접근법</h2>
+    <p>센서 융합은 개별 센서 한계를 극복하고 견고한 인지를 달성하기 위해 여러 센서의 데이터를 결합합니다. WIA-AUTO는 여러 융합 접근법을 인정합니다:</p>
+
+    <pre>
+// 다중 모달 센서 융합 예시
+class SensorFusion {
+    WorldModel fuse(LiDARData lidar, RadarData radar, CameraData cameras) {
+        // 각 모달리티에서 탐지 가져오기
+        lidar_objects = lidarDetector.detect(lidar);
+        radar_objects = radarDetector.detect(radar);
+        camera_objects = cameraDetector.detect(cameras);
+
+        // 모달리티 간 탐지 연관
+        associations = hungarianMatching(
+            lidar_objects, radar_objects, camera_objects
+        );
+
+        // 칼만 필터를 사용하여 연관된 객체 융합
+        fused_objects = [];
+        for (assoc in associations) {
+            fused = kalmanFuse(assoc.lidar, assoc.radar, assoc.camera);
+            fused_objects.append(fused);
+        }
+        return WorldModel(fused_objects);
+    }
+}
+    </pre>
+
+    <h2>2.6 객체 탐지 및 분류</h2>
+    <p>도로 사용자와 장애물의 정확한 탐지 및 분류는 안전한 자율주행의 기본입니다. WIA-AUTO는 최소 탐지 요구사항을 지정합니다:</p>
+
+    <table>
+        <tr><th>객체 클래스</th><th>탐지 범위</th><th>재현율</th><th>정밀도</th></tr>
+        <tr><td>차량</td><td>200m</td><td>99.5%</td><td>99%</td></tr>
+        <tr><td>보행자</td><td>100m</td><td>99.9%</td><td>99%</td></tr>
+        <tr><td>자전거 이용자</td><td>120m</td><td>99.5%</td><td>99%</td></tr>
+        <tr><td>교통 표지판</td><td>80m</td><td>99%</td><td>99.5%</td></tr>
+        <tr><td>신호등</td><td>150m</td><td>99.9%</td><td>99.9%</td></tr>
+    </table>
+
+    <h2>2.7 센서 캘리브레이션 요구사항</h2>
+    <p>정확한 센서 캘리브레이션은 신뢰할 수 있는 인지에 필수적입니다. WIA-AUTO는 내부 캘리브레이션(내부 센서 파라미터)과 외부 캘리브레이션(센서 간 상대적 자세) 모두에 대해 지정된 정확도 요구사항을 의무화합니다.</p>
+
+    <div class="highlight">
+        <h3>캘리브레이션 유지관리</h3>
+        <p>자율주행차는 캘리브레이션 품질을 지속적으로 모니터링하고 저하를 감지해야 합니다. 자연 특징을 사용한 온라인 캘리브레이션 검증은 캘리브레이션 드리프트가 허용 가능한 임계값을 초과할 때 경고를 트리거해야 합니다.</p>
+    </div>
+
+    <p style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: #94a3b8; font-size: 0.9rem;">
+        © 2025 World Industry Association (WIA). 弘益人間 - 널리 인간을 이롭게 하라
+    </p>
+</body>
+</html>

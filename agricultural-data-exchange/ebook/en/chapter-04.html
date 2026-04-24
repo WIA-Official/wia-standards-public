@@ -1,0 +1,175 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chapter 4: Communication Protocols | WIA-AGRI-020</title><style>:root{--primary:#84CC16;--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}.container{max-width:800px;margin:0 auto}nav{margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--border)}nav a{color:var(--text-muted);text-decoration:none;margin-right:15px;font-size:0.9rem}nav a:hover{color:var(--primary)}h1{font-size:2.5rem;margin-bottom:20px}.chapter-number{color:var(--primary);font-size:0.9rem;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px}.chapter-intro{font-size:1.1rem;color:var(--text-muted);margin:20px 0 30px;padding:20px;background:var(--bg-card);border-left:4px solid var(--primary);border-radius:8px}h2{font-size:1.8rem;margin:40px 0 20px;color:var(--primary)}h3{font-size:1.3rem;margin:30px 0 15px}p{margin-bottom:20px;color:var(--text-muted)}.code-block{background:var(--bg-card);padding:20px;border-radius:8px;border:1px solid var(--border);margin:25px 0;overflow-x:auto}pre{color:var(--text);font-size:0.9rem}ul,ol{margin:0 0 20px 25px;color:var(--text-muted)}li{margin-bottom:10px}table{width:100%;border-collapse:collapse;margin:25px 0;background:var(--bg-card)}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--border)}th{background:rgba(132,204,22,0.1);color:var(--primary)}.highlight-box{background:rgba(132,204,22,0.1);border-left:4px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.nav-buttons{display:flex;justify-content:space-between;margin-top:50px;padding-top:30px;border-top:1px solid var(--border)}.btn{padding:12px 24px;background:var(--primary);color:white;text-decoration:none;border-radius:8px}.btn-secondary{background:var(--bg-card);border:1px solid var(--border)}footer{margin-top:60px;padding-top:30px;border-top:1px solid var(--border);text-align:center;color:var(--text-muted);font-size:0.9rem}.philosophy{color:#ffd700;margin-bottom:10px}</style></head><body><div class="container"><header><div class="chapter-number">Chapter 4</div><h1>Communication Protocols</h1><div class="chapter-intro">This chapter explores the various communication protocols supported by WIA-AGRI-020, including HTTPS, MQTT, WebSocket, and CoAP. Learn when to use each protocol and how to optimize for different agricultural IoT scenarios.</div></header><main><h2>Understanding Protocol Selection</h2><p>Agricultural data exchange involves diverse scenarios with different requirements. A weather station with reliable power and broadband internet has very different needs from a battery-powered soil sensor in a remote field. WIA-AGRI-020 supports multiple protocols to accommodate this diversity.</p><h3>Protocol Selection Criteria</h3><ul><li><strong>Power Availability:</strong> Battery-powered sensors need low-power protocols like MQTT or CoAP.</li><li><strong>Network Reliability:</strong> Cellular or satellite connections work better with protocols designed for intermittent connectivity.</li><li><strong>Latency Requirements:</strong> Real-time applications like autonomous equipment need WebSocket or MQTT.</li><li><strong>Data Volume:</strong> High-frequency sensors benefit from efficient binary protocols.</li><li><strong>Implementation Complexity:</strong> Simple applications may prefer straightforward HTTPS REST APIs.</li></ul><h2>HTTPS (RESTful APIs)</h2><p>HTTPS is the most widely supported protocol, making it ideal for web applications, mobile apps, and systems with reliable internet connectivity.</p><h3>When to Use HTTPS</h3><ul><li>Web dashboards and farm management applications</li><li>Mobile apps for farmers and agronomists</li><li>Batch data uploads from desktop software</li><li>Integration with existing enterprise systems</li><li>Manual data entry and verification workflows</li></ul><h3>HTTPS Configuration</h3><div class="code-block"><pre>protocol: https
+endpoint: https://api.wia-agri.org/v1
+port: 443
+tls: 1.3
+compression: gzip
+timeout: 30000
+retryAttempts: 3
+keepAlive: true</pre></div><h3>Making HTTPS Requests</h3><p>Example POST request to submit soil sensor data:</p><div class="code-block"><pre>POST /api/v1/data/submit HTTP/1.1
+Host: api.wia-agri.org
+Content-Type: application/json
+Content-Encoding: gzip
+X-API-Key: wia_live_abc123def456ghi789
+
+{
+  "farmId": "FARM-2025-001",
+  "dataType": "SOIL_SENSOR",
+  "readings": {
+    "soilMoisture": {"value": 45.5}
+  }
+}</pre></div><h3>HTTPS Best Practices</h3><ul><li><strong>Use TLS 1.3:</strong> Ensures strongest encryption and best performance.</li><li><strong>Enable Compression:</strong> GZIP reduces bandwidth by 70-80% for JSON payloads.</li><li><strong>Implement Retry Logic:</strong> Network issues are common in rural areas; retry with exponential backoff.</li><li><strong>Connection Pooling:</strong> Reuse TCP connections to reduce overhead for multiple requests.</li><li><strong>Validate Certificates:</strong> Always verify SSL certificates to prevent man-in-the-middle attacks.</li></ul><h2>MQTT (Message Queuing Telemetry Transport)</h2><p>MQTT is designed for IoT devices with limited power and bandwidth. It's the preferred protocol for agricultural sensors, especially those running on batteries or solar power.</p><h3>Why MQTT for Agriculture</h3><ul><li><strong>Low Bandwidth:</strong> Minimal packet overhead, ideal for cellular connections</li><li><strong>Low Power:</strong> Optimized for battery-powered devices</li><li><strong>Quality of Service:</strong> Three QoS levels ensure reliable delivery</li><li><strong>Last Will:</strong> Automatic notifications when devices go offline</li><li><strong>Retained Messages:</strong> New subscribers receive last known state</li></ul><h3>MQTT Broker Configuration</h3><div class="code-block"><pre>protocol: mqtt
+broker: mqtt.wia-agri.org
+port: 1883 (TCP) / 8883 (TLS)
+qos: 1
+keepAlive: 60
+cleanSession: false
+username: farmId
+password: api_token</pre></div><h3>Topic Structure</h3><p>MQTT uses hierarchical topics for organizing messages:</p><div class="code-block"><pre>wia-agri/{farmId}/sensors/soil/{deviceId}/data
+wia-agri/{farmId}/sensors/weather/{deviceId}/data
+wia-agri/{farmId}/equipment/{equipmentId}/telemetry
+wia-agri/{farmId}/alerts/{alertType}</pre></div><h3>Publishing Data</h3><p>Python example for publishing soil sensor data:</p><div class="code-block"><pre>import paho.mqtt.client as mqtt
+import json
+
+client = mqtt.Client(client_id="SENSOR-SOIL-001")
+client.username_pw_set("FARM-2025-001", "api_token")
+client.tls_set()  # Enable TLS encryption
+client.connect("mqtt.wia-agri.org", 8883, 60)
+
+topic = "wia-agri/FARM-2025-001/sensors/soil/SENSOR-SOIL-001/data"
+payload = {
+    "timestamp": "2025-12-26T10:30:00.000Z",
+    "readings": {"soilMoisture": {"value": 45.5}}
+}
+
+client.publish(topic, json.dumps(payload), qos=1)
+client.disconnect()</pre></div><h3>Subscribing to Data</h3><div class="code-block"><pre>def on_message(client, userdata, msg):
+    data = json.loads(msg.payload)
+    print(f"Received from {msg.topic}: {data}")
+
+client.subscribe("wia-agri/FARM-2025-001/sensors/#")
+client.on_message = on_message
+client.loop_forever()</pre></div><h3>Quality of Service Levels</h3><table><tr><th>QoS</th><th>Guarantee</th><th>Use Case</th><th>Power Impact</th></tr><tr><td>0</td><td>At most once</td><td>Weather updates, non-critical data</td><td>Lowest</td></tr><tr><td>1</td><td>At least once</td><td>Sensor readings (recommended)</td><td>Medium</td></tr><tr><td>2</td><td>Exactly once</td><td>Critical commands, irrigation control</td><td>Highest</td></tr></table><h2>WebSocket (Real-Time Bidirectional)</h2><p>WebSocket provides full-duplex communication over a single TCP connection, perfect for real-time dashboards and interactive applications.</p><h3>WebSocket Use Cases</h3><ul><li>Live farm monitoring dashboards</li><li>Real-time alerts and notifications</li><li>Interactive crop health visualization</li><li>Collaborative farm planning tools</li><li>Live equipment tracking</li></ul><h3>Establishing Connection</h3><div class="code-block"><pre>const ws = new WebSocket('wss://stream.wia-agri.org/v1/stream');
+
+ws.onopen = () => {
+  // Authenticate
+  ws.send(JSON.stringify({
+    action: 'authenticate',
+    token: 'wia_live_abc123def456ghi789'
+  }));
+
+  // Subscribe to farm data
+  ws.send(JSON.stringify({
+    action: 'subscribe',
+    farmId: 'FARM-2025-001',
+    channels: ['sensors', 'alerts', 'equipment']
+  }));
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+
+  switch(message.type) {
+    case 'data':
+      updateDashboard(message.payload);
+      break;
+    case 'alert':
+      showNotification(message);
+      break;
+    case 'ping':
+      ws.send(JSON.stringify({type: 'pong'}));
+      break;
+  }
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+
+ws.onclose = () => {
+  console.log('Connection closed, reconnecting...');
+  setTimeout(reconnect, 5000);
+};</pre></div><h3>Message Types</h3><p><strong>Data Message:</strong></p><div class="code-block"><pre>{
+  "type": "data",
+  "timestamp": "2025-12-26T10:30:00.000Z",
+  "channel": "sensors",
+  "payload": {
+    "deviceId": "SENSOR-SOIL-001",
+    "dataType": "SOIL_SENSOR",
+    "readings": {"soilMoisture": {"value": 45.5}}
+  }
+}</pre></div><p><strong>Alert Message:</strong></p><div class="code-block"><pre>{
+  "type": "alert",
+  "severity": "HIGH",
+  "message": "Soil moisture below threshold in FIELD-NORTH-01",
+  "fieldId": "FIELD-NORTH-01",
+  "threshold": 30,
+  "currentValue": 25
+}</pre></div><h2>CoAP (Constrained Application Protocol)</h2><p>CoAP is designed for extremely resource-constrained devices. It's ideal for battery-powered sensors with minimal processing power.</p><h3>CoAP Characteristics</h3><ul><li>UDP-based (lightweight)</li><li>RESTful design like HTTP</li><li>Built-in discovery</li><li>Multicast support</li><li>4-byte header overhead</li></ul><h3>CoAP Request Example</h3><div class="code-block"><pre>CON POST coap://coap.wia-agri.org/data/submit
+Token: 0x7d38
+Content-Format: application/json
+
+{"farmId":"FARM-2025-001","readings":{"soilMoisture":{"value":45.5}}}</pre></div><p><strong>Response:</strong></p><div class="code-block"><pre>ACK 2.01 Created
+Token: 0x7d38
+Content-Format: application/json
+
+{"status":"success","dataId":"DATA-20251226-001"}</pre></div><h2>Protocol Comparison</h2><table><tr><th>Protocol</th><th>Latency</th><th>Bandwidth</th><th>Power</th><th>Complexity</th><th>Best For</th></tr><tr><td>HTTPS</td><td>Medium</td><td>High</td><td>High</td><td>Low</td><td>Web apps, APIs</td></tr><tr><td>MQTT</td><td>Low</td><td>Low</td><td>Low</td><td>Medium</td><td>IoT sensors</td></tr><tr><td>WebSocket</td><td>Very Low</td><td>Medium</td><td>Medium</td><td>Medium</td><td>Real-time dashboards</td></tr><tr><td>CoAP</td><td>Low</td><td>Very Low</td><td>Very Low</td><td>High</td><td>Battery sensors</td></tr></table><h2>Security Protocols</h2><h3>TLS/SSL Encryption</h3><p>All protocols support TLS encryption to protect data in transit:</p><ul><li><strong>HTTPS:</strong> TLS 1.3 mandatory</li><li><strong>MQTT:</strong> TLS over TCP (port 8883)</li><li><strong>WebSocket:</strong> WSS (WebSocket Secure)</li><li><strong>CoAP:</strong> DTLS (Datagram TLS)</li></ul><h3>Authentication Methods</h3><table><tr><th>Method</th><th>Protocols</th><th>Security Level</th><th>Use Case</th></tr><tr><td>API Key</td><td>HTTPS, MQTT</td><td>Medium</td><td>Simple integrations</td></tr><tr><td>OAuth 2.0</td><td>HTTPS, WebSocket</td><td>High</td><td>Third-party apps</td></tr><tr><td>Certificate</td><td>MQTT, CoAP</td><td>Very High</td><td>Device authentication</td></tr><tr><td>JWT Token</td><td>All</td><td>High</td><td>Distributed systems</td></tr></table><h2>Offline Operation</h2><h3>Store-and-Forward Pattern</h3><p>Agricultural sensors often operate in areas with intermittent connectivity. The store-and-forward pattern ensures no data is lost:</p><div class="code-block"><pre>class OfflineDataManager {
+  constructor() {
+    this.queue = [];
+    this.maxQueueSize = 10000;
+  }
+
+  async collectData(reading) {
+    this.queue.push(reading);
+
+    if (this.queue.length >= this.maxQueueSize) {
+      this.queue.shift(); // Remove oldest
+    }
+
+    await this.trySync();
+  }
+
+  async trySync() {
+    if (!this.isOnline()) return;
+
+    while (this.queue.length > 0) {
+      const batch = this.queue.splice(0, 100);
+
+      try {
+        await this.sendBatch(batch);
+      } catch (error) {
+        this.queue.unshift(...batch);
+        break; // Stop on failure
+      }
+    }
+  }
+
+  isOnline() {
+    return navigator.onLine;
+  }
+}</pre></div><h2>Connection Management</h2><h3>Reconnection Strategy</h3><p>Implement exponential backoff for reliable reconnection:</p><div class="code-block"><pre>function reconnectWithBackoff(maxAttempts = 10) {
+  let attempt = 0;
+  let delay = 1000; // 1 second
+
+  const tryConnect = async () => {
+    try {
+      await connect();
+      console.log('Connected successfully');
+      return true;
+    } catch (error) {
+      attempt++;
+
+      if (attempt >= maxAttempts) {
+        console.error('Max reconnection attempts reached');
+        return false;
+      }
+
+      const waitTime = Math.min(delay * Math.pow(2, attempt), 300000);
+      console.log(`Reconnecting in ${waitTime}ms (attempt ${attempt})`);
+
+      await sleep(waitTime);
+      return tryConnect();
+    }
+  };
+
+  return tryConnect();
+}</pre></div><div class="highlight-box"><h3>🎯 Best Practices</h3><ul><li>Choose protocol based on device capabilities and network conditions</li><li>Always use TLS encryption for production deployments</li><li>Implement keep-alive mechanisms to detect connection failures</li><li>Use QoS 1 for MQTT sensor data (at-least-once delivery)</li><li>Batch data submissions when possible to reduce overhead</li><li>Monitor connection health with heartbeat messages</li><li>Implement exponential backoff for reconnection attempts</li><li>Store data locally during offline periods</li></ul></div><h2>Chapter Summary</h2><p>WIA-AGRI-020 supports four main protocols: HTTPS for web applications, MQTT for IoT sensors, WebSocket for real-time dashboards, and CoAP for ultra-low-power devices. Each protocol is optimized for different scenarios, and proper selection based on power availability, network reliability, and latency requirements ensures efficient agricultural data exchange.</p></main></div></body></html>

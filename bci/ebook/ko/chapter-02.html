@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 신경 신호 획득 | WIA-BCI</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin: 1rem 0; }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a365d);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        pre {
+            background: #000;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
+            margin: 1rem 0;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+        .info-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .warning-box {
+            background: linear-gradient(135deg, var(--bg-secondary), #422006);
+            border-left: 4px solid var(--warning);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .tech-spec {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .spec-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+        .spec-title {
+            color: var(--primary);
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .philosophy {
+            font-size: 1.25rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>제2장: 신경 신호 획득</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 이 장에서는 뇌전도(EEG), 피질전도(ECoG), 피질내 기록을 포함한 신경 신호 획득 방법과 기술을 다룹니다. 각 획득 방법에 대한 WIA-BCI 사양과 인증 장치에 대한 기술적 요구사항을 배우게 됩니다.
+    </div>
+
+    <h2>2.1 신경 신호 생성의 기초</h2>
+    <p>신경 신호는 뉴런의 전기화학적 활동에서 발생합니다. 뉴런이 통신할 때 적절히 배치된 센서로 감지할 수 있는 전기 전위를 생성합니다. 이러한 신호를 이해하는 것은 효과적인 BCI 시스템 설계에 필수적입니다.</p>
+
+    <p>뇌에는 약 860억 개의 뉴런이 있으며, 각각은 수천 개의 시냅스 연결을 형성할 수 있습니다. 뉴런이 활동 전위를 발화하면 약 1밀리초 동안 지속되는 짧은 전기적 사건이 발생합니다. 뉴런 집단의 집합적 활동은 소스로부터 다양한 거리에서 측정할 수 있는 대규모 전기장을 생성합니다.</p>
+
+    <div class="info-box">
+        <h3>신경 신호의 유형</h3>
+        <ul>
+            <li><strong>활동 전위 (스파이크):</strong> 개별 뉴런 발화 사건, 침습적 전극으로만 감지 가능</li>
+            <li><strong>국소 장 전위:</strong> 인근 뉴런 집단의 합산 활동</li>
+            <li><strong>피질 표면 전위:</strong> 뇌 표면에서 기록된 전기 활동</li>
+            <li><strong>두피 전위:</strong> 두피 표면에 도달하는 감쇠된 신호</li>
+        </ul>
+    </div>
+
+    <h2>2.2 비침습적 획득 방법</h2>
+
+    <h3>뇌전도 (EEG)</h3>
+    <p>EEG는 가장 널리 사용되는 비침습적 BCI 신호 획득 방법입니다. 두피 표면에 배치된 전극에서 전기 활동을 기록하여 대규모 뉴런 집단의 합산 시냅스 후 전위를 캡처합니다.</p>
+
+    <pre>
+WIA-BCI EEG 사양
+=================
+
+전극_요구사항:
+  재료: Ag/AgCl 또는 건식 능동 전극
+  임피던스: &lt; 10 kΩ (습식), &lt; 100 kΩ (건식)
+  배치: 10-20 또는 10-10 시스템
+  최소_채널: 8 (레벨 1), 32 (레벨 2)
+
+증폭기_사양:
+  입력_임피던스: &gt; 100 MΩ
+  공통_모드_제거: &gt; 100 dB
+  잡음_레벨: &lt; 1 μVrms
+  대역폭: 0.1 - 100 Hz (구성 가능)
+  샘플링_레이트: ≥ 250 Hz (레벨 1), ≥ 500 Hz (레벨 2)
+
+ADC_요구사항:
+  해상도: ≥ 16 bits
+  동적_범위: ± 400 μV 일반적
+  안티_앨리어싱: 나이퀴스트에서 -40 dB
+
+안전_요구사항:
+  환자_누설: &lt; 10 μA
+  절연: 최소 4000V
+  전자기_호환성: IEC 60601-1-2
+    </pre>
+
+    <h3>EEG 신호 특성</h3>
+    <table>
+        <tr>
+            <th>리듬</th>
+            <th>주파수</th>
+            <th>뇌 상태</th>
+            <th>BCI 응용</th>
+        </tr>
+        <tr>
+            <td>델타</td>
+            <td>0.5-4 Hz</td>
+            <td>깊은 수면</td>
+            <td>수면 단계</td>
+        </tr>
+        <tr>
+            <td>세타</td>
+            <td>4-8 Hz</td>
+            <td>졸음, 명상</td>
+            <td>주의력 모니터링</td>
+        </tr>
+        <tr>
+            <td>알파</td>
+            <td>8-13 Hz</td>
+            <td>이완된 각성</td>
+            <td>이완 감지</td>
+        </tr>
+        <tr>
+            <td>베타</td>
+            <td>13-30 Hz</td>
+            <td>활동적 사고</td>
+            <td>운동 심상</td>
+        </tr>
+        <tr>
+            <td>감마</td>
+            <td>30-100 Hz</td>
+            <td>인지 처리</td>
+            <td>인지 상태</td>
+        </tr>
+    </table>
+
+    <h3>기능적 근적외선 분광법 (fNIRS)</h3>
+    <p>fNIRS는 근적외선 빛을 사용하여 대뇌 피질의 혈액 산소화 변화를 측정합니다. EEG에 대한 보완 정보를 제공하며 하이브리드 BCI 시스템을 위해 결합될 수 있습니다.</p>
+
+    <div class="tech-spec">
+        <div class="spec-card">
+            <div class="spec-title">광원</div>
+            <p>파장: 690-850 nm, 출력: &lt; 2 mW/cm²</p>
+        </div>
+        <div class="spec-card">
+            <div class="spec-title">검출기</div>
+            <p>실리콘 포토다이오드 또는 눈사태 포토다이오드</p>
+        </div>
+        <div class="spec-card">
+            <div class="spec-title">소스-검출기 거리</div>
+            <p>피질 감도를 위해 25-40 mm</p>
+        </div>
+        <div class="spec-card">
+            <div class="spec-title">시간 해상도</div>
+            <p>10-100 Hz 샘플링 레이트</p>
+        </div>
+    </div>
+
+    <h2>2.3 부분 침습적 방법</h2>
+
+    <h3>피질전도 (ECoG)</h3>
+    <p>ECoG는 두개골 아래에 배치된 전극 그리드 또는 스트립을 사용하여 대뇌 피질 표면에서 직접 전기 활동을 기록합니다. 이 접근법은 뇌 조직을 관통하지 않으면서 EEG보다 높은 신호 품질을 제공합니다.</p>
+
+    <div class="highlight">
+        <strong>ECoG의 장점:</strong> ECoG 신호는 두피 EEG보다 5-10배 높은 진폭, 더 넓은 대역폭(최대 500 Hz), 더 높은 공간 해상도(약 1 cm), 그리고 현저하게 더 나은 신호 대 잡음비를 가집니다. 이러한 특성은 ECoG를 고성능 BCI 응용에 특히 적합하게 만듭니다.
+    </div>
+
+    <pre>
+WIA-BCI ECoG 사양
+==================
+
+전극_어레이:
+  재료: 백금-이리듐 또는 스테인리스 스틸
+  전극_직경: 2-4 mm
+  전극간_간격: 5-10 mm
+  어레이_구성: 스트립 (1x4 ~ 1x8), 그리드 (4x4 ~ 8x8)
+  총_채널: 16-256
+
+생체적합성:
+  재료: ISO 10993 준수
+  멸균: 감마선 또는 에틸렌 옥사이드
+  이식_기간: 임시 (&lt; 30일) 또는 만성 (&gt; 30일)
+
+신호_사양:
+  진폭_범위: 50-200 μV 일반적
+  대역폭: 0.1-500 Hz
+  샘플링_레이트: ≥ 1000 Hz
+  해상도: ≥ 16 bits
+
+수술_요구사항:
+  개두술_크기: 최소화, 응용별
+  배치_확인: 수술 중 영상 필요
+  감염_예방: 엄격한 무균 프로토콜
+    </pre>
+
+    <h3>경막외 기록</h3>
+    <p>경막외 전극은 두개골과 경막 사이에 배치되어 두피 EEG보다 개선된 신호 품질을 제공하면서 경막하 ECoG보다 덜 침습적인 대안을 제공합니다. 이 접근법은 수술 위험 감소로 인해 만성 BCI 응용에 관심을 받고 있습니다.</p>
+
+    <h2>2.4 침습적 기록 방법</h2>
+
+    <h3>미세전극 어레이</h3>
+    <p>피질내 미세전극 어레이는 뇌 조직을 관통하여 개별 뉴런 또는 소규모 뉴런 집단에서 기록합니다. 이러한 장치는 최고 품질의 신경 신호를 제공하지만 신경외과적 이식이 필요하며 관련 위험이 있습니다.</p>
+
+    <div class="warning-box">
+        <strong>안전 고려사항:</strong> 침습적 신경 인터페이스는 레벨 4 WIA-BCI 인증, 포괄적인 생체적합성 테스트, 장기 안정성 평가 및 엄격한 수술 프로토콜이 필요합니다. 이러한 장치는 비침습적 대안이 임상적 필요에 충분하지 않을 때만 고려해야 합니다.
+    </div>
+
+    <pre>
+WIA-BCI 미세전극 어레이 사양
+============================
+
+어레이_유형:
+  유타_어레이:
+    전극_수: 96-128
+    전극_길이: 1.0-1.5 mm
+    피치: 400 μm
+    재료: 백금 팁이 있는 실리콘
+    
+  마이크로와이어_어레이:
+    전극_수: 16-256
+    와이어_직경: 25-50 μm
+    재료: 텅스텐 또는 백금-이리듐
+    
+  폴리머_프로브:
+    전극_수: 64-1024
+    기판: 폴리이미드 또는 파릴렌
+    두께: 10-25 μm
+
+기록_사양:
+  스파이크_감지: SNR ≥ 3:1
+  샘플링_레이트: ≥ 30 kHz
+  대역폭: 300-3000 Hz (스파이크), 1-300 Hz (LFP)
+  잡음_플로어: &lt; 5 μVrms
+
+수명_요구사항:
+  목표_수명: ≥ 5년
+  임피던스_안정성: 수명 동안 &lt; 50% 변화
+  신호_저하: 2년 시점에 &lt; 30% 채널 손실
+    </pre>
+
+    <h2>2.5 신호 품질 평가</h2>
+    <p>적절한 신호 품질을 보장하는 것은 BCI 성능에 중요합니다. WIA-BCI 표준은 신호 품질 평가를 위한 특정 메트릭과 방법을 정의합니다.</p>
+
+    <h3>품질 메트릭</h3>
+    <ul>
+        <li><strong>신호 대 잡음비 (SNR):</strong> 신호 전력 대 잡음 전력의 비율, dB로 측정</li>
+        <li><strong>인공물 오염:</strong> 움직임, EMG 또는 기타 인공물에 영향을 받는 데이터 비율</li>
+        <li><strong>전극 임피던스:</strong> 전극-조직 인터페이스 품질의 지표</li>
+        <li><strong>채널 상관관계:</strong> 브리지 또는 단락된 전극 감지</li>
+        <li><strong>스펙트럼 품질:</strong> 예상되는 생리적 리듬의 존재</li>
+    </ul>
+
+    <h2>2.6 데이터 형식 및 상호운용성</h2>
+    <p>다양한 BCI 시스템과 분석 도구 간의 상호운용성을 보장하기 위해 WIA-BCI 표준은 필수 데이터 형식과 메타데이터 표준을 지정합니다.</p>
+
+    <pre>
+WIA-NEURAL-CONTAINER (WNC) 형식
+================================
+
+파일_구조:
+  헤더:
+    버전: "WNC-1.0"
+    장치_정보: {...}
+    피험자_정보: {...}  # 익명화
+    기록_정보: {...}
+    채널_정보: [...]
+    
+  데이터:
+    형식: float32 또는 int16
+    레이아웃: 채널 x 샘플
+    타임스탬프: 마이크로초 정밀도
+    
+  주석:
+    이벤트: [...]
+    마커: [...]
+    인공물: [...]
+    
+  메타데이터:
+    획득_소프트웨어: "..."
+    처리_이력: [...]
+    WIA_인증: "..."
+
+필수_메타데이터:
+  - 샘플링_레이트 (Hz)
+  - 채널_수
+  - 전극_위치
+  - 기준_체계
+  - 필터_설정
+  - 하드웨어_일련번호
+    </pre>
+
+    <h2>2.7 요약</h2>
+    <p>신경 신호 획득은 모든 BCI 시스템의 기초를 형성합니다. 이 장에서는 비침습적 EEG부터 완전 침습적 미세전극 어레이까지 주요 획득 방법과 각 범주에 대한 WIA-BCI 사양을 다루었습니다. 적절한 신호 획득은 후속 장에서 설명하는 성능 요구사항을 달성하는 데 필수적입니다.</p>
+
+    <div class="footer">
+        <p class="philosophy">弘益人間 (홍익인간)</p>
+        <p>"널리 인간을 이롭게 하라"</p>
+        <p>© 2025 WIA (World Certification Industry Association)</p>
+    </div>
+</body>
+</html>

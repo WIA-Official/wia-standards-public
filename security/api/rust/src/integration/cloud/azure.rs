@@ -2,9 +2,9 @@
 //!
 //! Send security findings to Microsoft Defender for Cloud.
 
+use super::{CloudError, CloudResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{CloudResult, CloudError};
 
 /// Azure Defender configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -249,13 +249,15 @@ impl AzureDefenderExporter {
     }
 
     /// Convert WIA finding to Azure Security Alert
-    pub fn convert_to_alert(&self, finding: &super::super::importers::WiaFinding, host: &str) -> AzureSecurityAlert {
+    pub fn convert_to_alert(
+        &self,
+        finding: &super::super::importers::WiaFinding,
+        host: &str,
+    ) -> AzureSecurityAlert {
         let now = chrono::Utc::now().to_rfc3339();
         let alert_id = format!(
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Security/alerts/{}",
-            self.config.subscription_id,
-            self.config.resource_group,
-            finding.id
+            self.config.subscription_id, self.config.resource_group, finding.id
         );
 
         let mut extended_properties = HashMap::new();
@@ -268,9 +270,14 @@ impl AzureDefenderExporter {
         if !finding.cve.is_empty() {
             extended_properties.insert("cve".to_string(), finding.cve.join(", "));
         }
-        extended_properties.insert("exploitAvailable".to_string(), finding.exploit_available.to_string());
+        extended_properties.insert(
+            "exploitAvailable".to_string(),
+            finding.exploit_available.to_string(),
+        );
 
-        let remediation_steps = finding.solution.clone()
+        let remediation_steps = finding
+            .solution
+            .clone()
             .map(|s| vec![s])
             .unwrap_or_default();
 
@@ -278,21 +285,31 @@ impl AzureDefenderExporter {
 
         // Add host entity
         let mut host_props = HashMap::new();
-        host_props.insert("hostName".to_string(), serde_json::Value::String(host.to_string()));
+        host_props.insert(
+            "hostName".to_string(),
+            serde_json::Value::String(host.to_string()),
+        );
         if let Some(port) = finding.port {
-            host_props.insert("port".to_string(), serde_json::Value::Number(serde_json::Number::from(port)));
+            host_props.insert(
+                "port".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(port)),
+            );
         }
         entities.push(AzureAlertEntity {
             entity_type: "Host".to_string(),
             properties: host_props,
         });
 
-        let extended_links = finding.references.iter().map(|url| AzureExtendedLink {
-            category: "Reference".to_string(),
-            label: "More Information".to_string(),
-            href: url.clone(),
-            link_type: "WebLink".to_string(),
-        }).collect();
+        let extended_links = finding
+            .references
+            .iter()
+            .map(|url| AzureExtendedLink {
+                category: "Reference".to_string(),
+                label: "More Information".to_string(),
+                href: url.clone(),
+                link_type: "WebLink".to_string(),
+            })
+            .collect();
 
         AzureSecurityAlert {
             id: alert_id.clone(),
@@ -307,18 +324,15 @@ impl AzureDefenderExporter {
                 intent: Some("Exploitation".to_string()),
                 start_time_utc: now.clone(),
                 end_time_utc: None,
-                resource_identifiers: vec![
-                    AzureResourceIdentifier {
-                        id_type: "AzureResource".to_string(),
-                        azure_resource_id: Some(format!(
-                            "/subscriptions/{}/resourceGroups/{}",
-                            self.config.subscription_id,
-                            self.config.resource_group
-                        )),
-                        workspace_id: Some(self.config.workspace_id.clone()),
-                        agent_id: None,
-                    },
-                ],
+                resource_identifiers: vec![AzureResourceIdentifier {
+                    id_type: "AzureResource".to_string(),
+                    azure_resource_id: Some(format!(
+                        "/subscriptions/{}/resourceGroups/{}",
+                        self.config.subscription_id, self.config.resource_group
+                    )),
+                    workspace_id: Some(self.config.workspace_id.clone()),
+                    agent_id: None,
+                }],
                 compromised_entity: Some(host.to_string()),
                 remediation_steps,
                 vendor_name: "WIA Security".to_string(),
@@ -339,7 +353,11 @@ impl AzureDefenderExporter {
     }
 
     /// Convert WIA finding to Log Analytics entry
-    pub fn convert_to_log_entry(&self, finding: &super::super::importers::WiaFinding, host: &str) -> LogAnalyticsEntry {
+    pub fn convert_to_log_entry(
+        &self,
+        finding: &super::super::importers::WiaFinding,
+        host: &str,
+    ) -> LogAnalyticsEntry {
         LogAnalyticsEntry {
             time_generated: chrono::Utc::now().to_rfc3339(),
             record_type: "WIA_SecurityFinding".to_string(),
@@ -360,7 +378,10 @@ impl AzureDefenderExporter {
     }
 
     /// Convert scan results to Log Analytics entries
-    pub fn convert_scan_to_logs(&self, scan: &super::super::importers::WiaScanResult) -> Vec<LogAnalyticsEntry> {
+    pub fn convert_scan_to_logs(
+        &self,
+        scan: &super::super::importers::WiaScanResult,
+    ) -> Vec<LogAnalyticsEntry> {
         let mut entries = Vec::new();
         for target in &scan.targets {
             for finding in &target.findings {
@@ -398,14 +419,19 @@ impl AzureDefenderExporter {
 
     /// Serialize entries for Log Analytics
     pub fn to_log_analytics_json(&self, entries: &[LogAnalyticsEntry]) -> CloudResult<String> {
-        serde_json::to_string(entries)
-            .map_err(|e| CloudError::SerializationError(e.to_string()))
+        serde_json::to_string(entries).map_err(|e| CloudError::SerializationError(e.to_string()))
     }
 
     /// Generate authorization header for Log Analytics
     /// Note: In production, use the Azure SDK or implement HMAC-SHA256 signing
-    pub fn log_analytics_headers(&self, content_length: usize, log_type: &str) -> HashMap<String, String> {
-        let now = chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
+    pub fn log_analytics_headers(
+        &self,
+        content_length: usize,
+        log_type: &str,
+    ) -> HashMap<String, String> {
+        let now = chrono::Utc::now()
+            .format("%a, %d %b %Y %H:%M:%S GMT")
+            .to_string();
 
         let mut headers = HashMap::new();
         headers.insert("Content-Type".to_string(), "application/json".to_string());
@@ -428,7 +454,10 @@ mod tests {
         assert_eq!(AzureDefenderExporter::to_azure_severity("high"), "High");
         assert_eq!(AzureDefenderExporter::to_azure_severity("medium"), "Medium");
         assert_eq!(AzureDefenderExporter::to_azure_severity("low"), "Low");
-        assert_eq!(AzureDefenderExporter::to_azure_severity("info"), "Informational");
+        assert_eq!(
+            AzureDefenderExporter::to_azure_severity("info"),
+            "Informational"
+        );
     }
 
     #[test]
@@ -476,7 +505,9 @@ mod tests {
         };
         let exporter = AzureDefenderExporter::new(config);
 
-        assert!(exporter.log_analytics_endpoint().contains("opinsights.azure.com"));
+        assert!(exporter
+            .log_analytics_endpoint()
+            .contains("opinsights.azure.com"));
         assert!(exporter.alerts_endpoint().contains("management.azure.com"));
     }
 }
