@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: 데이터 수집과 저장 - WIA-BIG_DATA</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --text: #e2e8f0;
+            --border: #334155;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.4rem;
+            margin-bottom: 30px;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.7rem;
+            margin: 45px 0 20px 0;
+            padding-left: 15px;
+            border-left: 4px solid var(--primary);
+        }
+        h3 {
+            color: #60a5fa;
+            font-size: 1.3rem;
+            margin: 30px 0 15px 0;
+        }
+        p {
+            margin-bottom: 18px;
+            text-align: justify;
+        }
+        .highlight {
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .highlight-title {
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+        pre {
+            font-family: 'D2Coding', 'Fira Code', monospace;
+            background-color: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .info-box {
+            background: #1e293b;
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .warning-box {
+            background: linear-gradient(135deg, #7c2d12 0%, #1e293b 100%);
+            border-left: 4px solid #f97316;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .success-box {
+            background: linear-gradient(135deg, #14532d 0%, #1e293b 100%);
+            border-left: 4px solid #22c55e;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .footer-content {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: #64748b;
+        }
+        .philosophy {
+            font-size: 1.1rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .comparison-card {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .comparison-card h4 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 2: 데이터 수집과 저장</h1>
+
+        <p>
+            빅데이터 파이프라인의 시작점은 데이터 수집입니다. 다양한 소스에서 발생하는 데이터를 
+            효율적으로 수집하고, 적절한 저장 시스템에 안전하게 보관하는 것은 모든 빅데이터 
+            프로젝트의 성공을 위한 기반입니다. 본 장에서는 데이터 소스 유형, 수집 패턴, 
+            분산 스토리지 인프라, 그리고 데이터 레이크 아키텍처를 상세히 다룹니다.
+        </p>
+
+        <h2>2.1 데이터 소스 유형</h2>
+
+        <p>
+            현대 기업 환경에서 데이터는 다양한 소스에서 생성됩니다. 각 소스의 특성을 이해하고 
+            적절한 수집 전략을 수립하는 것이 중요합니다.
+        </p>
+
+        <div class="highlight">
+            <div class="highlight-title">데이터 소스 분류 체계</div>
+            <pre>
+데이터 소스 분류
+═══════════════════════════════════════════════════════════════
+
+1. 트랜잭션 시스템 (Transactional Systems)
+   ─────────────────────────────────────────
+   ┌─────────────────────────────────────────────────────────┐
+   │  소스          │ 특성              │ 수집 방식          │
+   ├─────────────────────────────────────────────────────────┤
+   │  ERP           │ 정형, 실시간      │ CDC, API           │
+   │  CRM           │ 정형, 이벤트      │ Webhook, Batch     │
+   │  POS           │ 정형, 고빈도      │ Streaming          │
+   │  Banking Core  │ 정형, 트랜잭션    │ CDC, Queue         │
+   └─────────────────────────────────────────────────────────┘
+
+2. 로그 및 이벤트 (Logs & Events)
+   ─────────────────────────────────────────
+   ┌─────────────────────────────────────────────────────────┐
+   │  소스          │ 특성              │ 수집 방식          │
+   ├─────────────────────────────────────────────────────────┤
+   │  웹 로그       │ 반정형, 대용량    │ Filebeat, Flume    │
+   │  앱 로그       │ 반정형, 스트림    │ Logstash, Kafka    │
+   │  시스템 로그   │ 반정형, 연속      │ Syslog, rsyslog    │
+   │  보안 로그     │ 반정형, 중요      │ SIEM, Splunk       │
+   └─────────────────────────────────────────────────────────┘
+
+3. IoT 및 센서 (IoT & Sensors)
+   ─────────────────────────────────────────
+   ┌─────────────────────────────────────────────────────────┐
+   │  소스          │ 특성              │ 수집 방식          │
+   ├─────────────────────────────────────────────────────────┤
+   │  산업용 센서   │ 시계열, 고빈도    │ MQTT, OPC-UA       │
+   │  스마트 미터   │ 시계열, 정기      │ AMQP, REST         │
+   │  웨어러블      │ 시계열, 개인      │ BLE, Mobile SDK    │
+   │  자율주행      │ 혼합, 초고빈도    │ ROS, Edge          │
+   └─────────────────────────────────────────────────────────┘
+
+4. 소셜 및 웹 (Social & Web)
+   ─────────────────────────────────────────
+   ┌─────────────────────────────────────────────────────────┐
+   │  소스          │ 특성              │ 수집 방식          │
+   ├─────────────────────────────────────────────────────────┤
+   │  Twitter/X     │ 비정형, 스트림    │ API, Firehose      │
+   │  Facebook      │ 반정형, 그래프    │ Graph API          │
+   │  웹 스크래핑   │ 비정형, 배치      │ Scrapy, Selenium   │
+   │  RSS/뉴스      │ 반정형, 정기      │ Feed Parser        │
+   └─────────────────────────────────────────────────────────┘
+
+5. 외부 데이터 (External Data)
+   ─────────────────────────────────────────
+   ┌─────────────────────────────────────────────────────────┐
+   │  소스          │ 특성              │ 수집 방식          │
+   ├─────────────────────────────────────────────────────────┤
+   │  공공 데이터   │ 정형, 정기        │ API, Download      │
+   │  날씨 데이터   │ 정형, 실시간      │ Weather API        │
+   │  금융 데이터   │ 정형, 실시간      │ Market Data Feed   │
+   │  지리 데이터   │ 공간, 정적        │ GIS API, Files     │
+   └─────────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+
+        <h2>2.2 데이터 수집 패턴</h2>
+
+        <p>
+            데이터 수집 방식은 크게 배치 수집과 실시간 수집으로 나뉩니다. 비즈니스 요구사항과 
+            데이터 특성에 따라 적절한 패턴을 선택해야 합니다.
+        </p>
+
+        <div class="highlight">
+            <div class="highlight-title">수집 패턴 비교</div>
+            <pre>
+배치 수집 vs 실시간 수집
+═══════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│                    배치 수집 (Batch Ingestion)               │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  정의: 일정 주기로 대량의 데이터를 한꺼번에 수집             │
+│                                                              │
+│  ┌──────────┐     ┌──────────┐     ┌──────────┐            │
+│  │  Source  │────▶│   ETL    │────▶│  Target  │            │
+│  │ (Files)  │     │ (Spark)  │     │  (Lake)  │            │
+│  └──────────┘     └──────────┘     └──────────┘            │
+│       ↑                                                      │
+│       │ Schedule (매일 밤, 매시간)                           │
+│                                                              │
+│  장점:                                                       │
+│  • 구현 단순                                                 │
+│  • 리소스 효율적 활용                                        │
+│  • 데이터 품질 검증 용이                                     │
+│                                                              │
+│  단점:                                                       │
+│  • 데이터 지연 (latency)                                     │
+│  • 실시간 인사이트 불가                                      │
+│                                                              │
+│  도구: Apache Sqoop, AWS Glue, Azure Data Factory            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                실시간 수집 (Real-time Ingestion)             │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  정의: 데이터 발생 즉시 연속적으로 수집                       │
+│                                                              │
+│  ┌──────────┐     ┌──────────┐     ┌──────────┐            │
+│  │  Source  │────▶│  Stream  │────▶│  Target  │            │
+│  │ (Events) │     │ (Kafka)  │     │  (Lake)  │            │
+│  └──────────┘     └──────────┘     └──────────┘            │
+│       │                │                                     │
+│       │ Continuous     │ Real-time                           │
+│       ▼                ▼                                     │
+│                                                              │
+│  장점:                                                       │
+│  • 낮은 지연 시간                                            │
+│  • 실시간 분석 가능                                          │
+│  • 즉각적 대응 가능                                          │
+│                                                              │
+│  단점:                                                       │
+│  • 구현 복잡도 높음                                          │
+│  • 인프라 비용 증가                                          │
+│  • 장애 처리 복잡                                            │
+│                                                              │
+│  도구: Apache Kafka, Apache Flink, AWS Kinesis               │
+└─────────────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+
+        <h3>Change Data Capture (CDC)</h3>
+
+        <p>
+            CDC는 소스 데이터베이스의 변경사항을 실시간으로 감지하여 타겟 시스템에 전파하는 
+            패턴입니다. 전체 데이터를 복사하는 것보다 효율적이며, 데이터 동기화에 널리 사용됩니다.
+        </p>
+
+        <div class="highlight">
+            <div class="highlight-title">CDC 아키텍처</div>
+            <pre>
+Change Data Capture 구현 패턴
+═══════════════════════════════════════════════════════════════
+
+1. 로그 기반 CDC (Log-based CDC)
+   ─────────────────────────────────────────
+   
+   ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+   │   MySQL      │     │  Debezium    │     │   Kafka      │
+   │  (binlog)    │────▶│  Connector   │────▶│   Topic      │
+   └──────────────┘     └──────────────┘     └──────────────┘
+                                                    │
+                        ┌───────────────────────────┘
+                        │
+                        ▼
+   ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+   │  Data Lake   │◀────│   Consumer   │◀────│   Kafka      │
+   │              │     │   (Flink)    │     │   Topic      │
+   └──────────────┘     └──────────────┘     └──────────────┘
+
+   장점:
+   • 소스 시스템 부하 최소화
+   • 모든 변경사항 캡처
+   • 삭제 작업도 추적 가능
+
+2. 트리거 기반 CDC (Trigger-based CDC)
+   ─────────────────────────────────────────
+   
+   ┌──────────────────────────────────────────────────────────┐
+   │  CREATE TRIGGER capture_changes                          │
+   │  AFTER INSERT OR UPDATE OR DELETE ON orders              │
+   │  FOR EACH ROW                                            │
+   │  BEGIN                                                    │
+   │      INSERT INTO change_log (                            │
+   │          table_name, operation, row_data, timestamp      │
+   │      ) VALUES (                                          │
+   │          'orders', TG_OP, row_to_json(NEW), NOW()        │
+   │      );                                                   │
+   │  END;                                                     │
+   └──────────────────────────────────────────────────────────┘
+
+   장점:
+   • 구현 단순
+   • 데이터베이스 독립적
+   
+   단점:
+   • 소스 DB 성능 영향
+   • 스키마 변경 추적 어려움
+
+3. 타임스탬프 기반 CDC (Timestamp-based CDC)
+   ─────────────────────────────────────────
+   
+   SELECT * FROM orders
+   WHERE updated_at > :last_sync_timestamp
+   ORDER BY updated_at;
+
+   장점:
+   • 가장 단순한 구현
+   
+   단점:
+   • 삭제 추적 불가
+   • 시계 동기화 이슈
+            </pre>
+        </div>
+
+        <h2>2.3 분산 스토리지 인프라</h2>
+
+        <p>
+            빅데이터는 단일 서버로 저장할 수 없는 규모입니다. 분산 파일 시스템과 객체 스토리지는 
+            대규모 데이터를 안정적으로 저장하기 위한 핵심 인프라입니다.
+        </p>
+
+        <div class="highlight">
+            <div class="highlight-title">HDFS (Hadoop Distributed File System)</div>
+            <pre>
+HDFS 아키텍처
+═══════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│                      NameNode (Master)                       │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  • 파일 시스템 메타데이터 관리                         │  │
+│  │  • 블록 위치 정보 유지                                 │  │
+│  │  • 클라이언트 요청 처리                                │  │
+│  │  • DataNode 상태 모니터링                              │  │
+│  └───────────────────────────────────────────────────────┘  │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ Heartbeat / Block Report
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│  DataNode 1   │   │  DataNode 2   │   │  DataNode 3   │
+├───────────────┤   ├───────────────┤   ├───────────────┤
+│ ┌─────┐┌─────┐│   │ ┌─────┐┌─────┐│   │ ┌─────┐┌─────┐│
+│ │ B1  ││ B2  ││   │ │ B2  ││ B3  ││   │ │ B1  ││ B3  ││
+│ └─────┘└─────┘│   │ └─────┘└─────┘│   │ └─────┘└─────┘│
+│ ┌─────┐┌─────┐│   │ ┌─────┐┌─────┐│   │ ┌─────┐┌─────┐│
+│ │ B4  ││ B5  ││   │ │ B4  ││ B6  ││   │ │ B5  ││ B6  ││
+│ └─────┘└─────┘│   │ └─────┘└─────┘│   │ └─────┘└─────┘│
+└───────────────┘   └───────────────┘   └───────────────┘
+
+핵심 특성:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• 블록 크기: 기본 128MB (대용량 파일에 최적화)
+• 복제 계수: 기본 3 (데이터 내구성 보장)
+• Write-Once-Read-Many: 한 번 쓰면 수정 불가
+• 랙 인식: 장애 도메인 분리를 위한 복제 배치
+• 고가용성: NameNode HA, Federation 지원
+
+HDFS 명령어 예시:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# 파일 업로드
+hdfs dfs -put local_file.csv /user/data/
+
+# 디렉토리 생성
+hdfs dfs -mkdir -p /user/data/raw/2025/01
+
+# 파일 목록 조회
+hdfs dfs -ls /user/data/
+
+# 파일 읽기
+hdfs dfs -cat /user/data/sample.txt
+
+# 복제 계수 변경
+hdfs dfs -setrep -w 5 /user/critical/important.parquet
+            </pre>
+        </div>
+
+        <div class="highlight">
+            <div class="highlight-title">객체 스토리지 (Object Storage)</div>
+            <pre>
+클라우드 객체 스토리지 비교
+═══════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│                     AWS S3                                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  특징:                                                       │
+│  • 무제한 확장성                                             │
+│  • 99.999999999% (11 9s) 내구성                              │
+│  • 스토리지 클래스 (Standard, IA, Glacier)                   │
+│  • 버전 관리, 암호화, 접근 제어                              │
+│                                                              │
+│  빅데이터 통합:                                              │
+│  • EMR (Spark, Hive) 네이티브 지원                          │
+│  • S3 Select: 서버사이드 필터링                             │
+│  • Athena: 서버리스 SQL 쿼리                                │
+│                                                              │
+│  S3 경로 예시:                                               │
+│  s3://my-bucket/data/year=2025/month=01/day=19/data.parquet │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                   Azure Blob Storage                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  특징:                                                       │
+│  • Hot/Cool/Archive 티어                                     │
+│  • Azure Data Lake Storage Gen2 통합                        │
+│  • 계층적 네임스페이스 지원                                  │
+│                                                              │
+│  빅데이터 통합:                                              │
+│  • Azure Synapse Analytics                                   │
+│  • HDInsight                                                 │
+│  • Databricks                                                │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                 Google Cloud Storage                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  특징:                                                       │
+│  • Standard/Nearline/Coldline/Archive 클래스                │
+│  • 강력한 일관성 보장                                        │
+│  • 멀티 리전 / 듀얼 리전 지원                                │
+│                                                              │
+│  빅데이터 통합:                                              │
+│  • BigQuery 외부 테이블                                      │
+│  • Dataproc (Spark, Hadoop)                                  │
+│  • Dataflow (Apache Beam)                                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+
+        <h2>2.4 데이터 레이크 아키텍처</h2>
+
+        <p>
+            데이터 레이크는 원시 형태의 데이터를 대규모로 저장하는 중앙 집중식 저장소입니다. 
+            정형, 반정형, 비정형 데이터를 모두 수용할 수 있으며, 분석 시 스키마를 적용하는 
+            "Schema-on-Read" 접근 방식을 사용합니다.
+        </p>
+
+        <div class="highlight">
+            <div class="highlight-title">데이터 레이크 존 아키텍처</div>
+            <pre>
+데이터 레이크 Zone 설계
+═══════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│                      DATA LAKE ZONES                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                   RAW ZONE (Bronze)                    │  │
+│  │  ─────────────────────────────────────────────────────  │  │
+│  │  • 원본 데이터 그대로 저장                             │  │
+│  │  • 변환 없음 (Immutable)                               │  │
+│  │  • 데이터 리니지 보존                                  │  │
+│  │  • 포맷: JSON, CSV, XML, Binary                        │  │
+│  │                                                         │  │
+│  │  예: /raw/source=erp/date=2025-01-19/orders_*.json     │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                            │                                 │
+│                            ▼                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                CLEANSED ZONE (Silver)                  │  │
+│  │  ─────────────────────────────────────────────────────  │  │
+│  │  • 데이터 정제 및 표준화                               │  │
+│  │  • 스키마 적용                                         │  │
+│  │  • 중복 제거, 타입 변환                                │  │
+│  │  • 포맷: Parquet, ORC, Delta                           │  │
+│  │                                                         │  │
+│  │  예: /cleansed/domain=sales/entity=orders/             │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                            │                                 │
+│                            ▼                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                CURATED ZONE (Gold)                     │  │
+│  │  ─────────────────────────────────────────────────────  │  │
+│  │  • 비즈니스 로직 적용                                  │  │
+│  │  • 집계 및 조인 완료                                   │  │
+│  │  • 분석 및 리포팅 최적화                               │  │
+│  │  • 포맷: Parquet, Delta, Iceberg                       │  │
+│  │                                                         │  │
+│  │  예: /curated/mart=sales_analytics/daily_summary/      │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                            │                                 │
+│                            ▼                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │               CONSUMPTION ZONE (Platinum)              │  │
+│  │  ─────────────────────────────────────────────────────  │  │
+│  │  • 최종 사용자용 데이터                                │  │
+│  │  • API 서빙 데이터                                     │  │
+│  │  • ML 피처 스토어                                      │  │
+│  │  • BI 도구 연동                                        │  │
+│  │                                                         │  │
+│  │  예: /serving/model=churn_prediction/features/         │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+
+        <h2>2.5 데이터 레이크하우스</h2>
+
+        <p>
+            데이터 레이크하우스는 데이터 레이크의 유연성과 데이터 웨어하우스의 성능 및 
+            관리 기능을 결합한 차세대 아키텍처입니다.
+        </p>
+
+        <div class="highlight">
+            <div class="highlight-title">레이크하우스 아키텍처</div>
+            <pre>
+Data Lakehouse 핵심 기술
+═══════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│                     LAKEHOUSE STACK                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │              BI Tools / ML Platforms                   │  │
+│  │         Tableau | Power BI | MLflow | Feast           │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                            │                                 │
+│                            ▼                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                 Query Engines                          │  │
+│  │       Spark SQL | Trino | Dremio | Photon             │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                            │                                 │
+│                            ▼                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │              Table Format Layer                        │  │
+│  │        Delta Lake | Apache Iceberg | Apache Hudi      │  │
+│  │  ───────────────────────────────────────────────────  │  │
+│  │  • ACID 트랜잭션                                       │  │
+│  │  • 스키마 진화                                         │  │
+│  │  • 타임 트래블                                         │  │
+│  │  • 파티션 진화                                         │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                            │                                 │
+│                            ▼                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                 Object Storage                         │  │
+│  │              S3 | ADLS | GCS | HDFS                    │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+Delta Lake 예시:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Delta 테이블 생성
+df.write.format("delta").mode("overwrite") \
+    .partitionBy("year", "month") \
+    .save("/lakehouse/sales/orders")
+
+# ACID 트랜잭션
+from delta.tables import DeltaTable
+
+deltaTable = DeltaTable.forPath(spark, "/lakehouse/sales/orders")
+
+# MERGE (Upsert)
+deltaTable.merge(
+    newData,
+    "target.order_id = source.order_id"
+).whenMatchedUpdate(set={
+    "amount": "source.amount",
+    "updated_at": "current_timestamp()"
+}).whenNotMatchedInsert(values={
+    "order_id": "source.order_id",
+    "amount": "source.amount",
+    "created_at": "current_timestamp()"
+}).execute()
+
+# 타임 트래블 (과거 데이터 조회)
+df_history = spark.read.format("delta") \
+    .option("timestampAsOf", "2025-01-18") \
+    .load("/lakehouse/sales/orders")
+            </pre>
+        </div>
+
+        <div class="success-box">
+            <h3>WIA-BIG_DATA 저장소 설계 권장사항</h3>
+            <p>
+                1. 원본 데이터는 항상 보존하고 절대 삭제하지 않습니다. 
+                2. 파티셔닝 전략을 데이터 접근 패턴에 맞게 설계합니다. 
+                3. 적절한 파일 포맷(Parquet, ORC)을 선택하여 저장 공간과 쿼리 성능을 최적화합니다. 
+                4. 메타데이터 관리를 자동화하여 데이터 카탈로그를 최신 상태로 유지합니다.
+            </p>
+        </div>
+
+        <div class="footer-content">
+            <p class="philosophy">弘益人間 - 널리 인간을 이롭게 하라</p>
+            <p>© 2025 World Industry Association (WIA). All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

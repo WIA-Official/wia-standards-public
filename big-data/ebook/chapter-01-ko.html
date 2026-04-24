@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1장: 빅데이터 아키텍처 패턴 - WIA-BIG_DATA</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin-bottom: 1rem; color: var(--text); }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a1a2e);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+        }
+        pre {
+            background: #0a0a0f;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        code {
+            color: var(--accent);
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .architecture-box {
+            background: linear-gradient(135deg, #1e3a5f, #0f172a);
+            border: 1px solid var(--primary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        .comparison-table th { background: var(--bg-secondary); color: var(--primary); }
+        .diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+            font-family: 'Fira Code', monospace;
+            white-space: pre;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>1장: 빅데이터 아키텍처 패턴</h1>
+
+    <div class="highlight">
+        <p><strong>학습 목표:</strong> 세 가지 주요 빅데이터 아키텍처 패턴(Lambda, Kappa, Delta)을 이해하고 조직의 요구사항에 따라 각 패턴을 언제 적용해야 하는지 학습합니다.</p>
+    </div>
+
+    <h2>빅데이터 아키텍처 소개</h2>
+    <p>빅데이터 아키텍처는 대용량 데이터를 처리하도록 설계된 시스템의 전체 구조를 의미합니다. 아키텍처 선택은 조직 내에서 데이터가 흐르는 방식, 인사이트를 도출하는 속도, 운영 오버헤드의 복잡성에 근본적인 영향을 미칩니다.</p>
+
+    <p>WIA-BIG_DATA 표준은 각각 고유한 장점과 트레이드오프가 있는 세 가지 주요 아키텍처 패턴을 인식합니다. 이러한 패턴을 이해하는 것은 특정 지연 시간, 처리량 및 복잡성 요구사항을 충족하는 시스템을 설계하는 데 필수적입니다.</p>
+
+    <h2>Lambda 아키텍처</h2>
+    <p>Nathan Marz가 소개한 Lambda 아키텍처는 포괄적인 정확성과 낮은 지연 시간을 모두 달성하기 위해 배치와 스트림 처리를 결합한 하이브리드 접근 방식입니다. 데이터의 완전한 뷰를 제공하기 위해 함께 작동하는 세 개의 레이어로 구성됩니다.</p>
+
+    <div class="architecture-box">
+        <h3>Lambda 아키텍처 구성 요소</h3>
+        <ul>
+            <li><strong>배치 레이어:</strong> 마스터 데이터셋을 저장하고 포괄적인 분석을 위한 배치 뷰를 사전 계산</li>
+            <li><strong>스피드 레이어:</strong> 배치 레이어 지연 시간을 보상하기 위해 실시간 데이터 처리</li>
+            <li><strong>서빙 레이어:</strong> 저지연 쿼리를 위해 배치 및 스피드 레이어 출력 인덱싱</li>
+        </ul>
+    </div>
+
+    <div class="diagram">
+                           Lambda 아키텍처
+    ┌─────────────────────────────────────────────────────────┐
+    │                                                         │
+    │    ┌──────────────────────────────────────────────┐    │
+    │    │              신규 데이터 스트림                │    │
+    │    └────────────────────┬─────────────────────────┘    │
+    │                         │                               │
+    │           ┌─────────────┼─────────────┐                │
+    │           │             │             │                │
+    │           ▼             │             ▼                │
+    │    ┌────────────┐       │      ┌────────────┐         │
+    │    │   배치     │       │      │   스피드   │         │
+    │    │   레이어   │       │      │   레이어   │         │
+    │    │            │       │      │            │         │
+    │    │ 마스터     │       │      │ 실시간    │         │
+    │    │ 데이터셋   │       │      │ 뷰        │         │
+    │    └─────┬──────┘       │      └─────┬──────┘         │
+    │          │              │            │                 │
+    │          ▼              │            ▼                 │
+    │    ┌────────────────────┴────────────────────┐        │
+    │    │            서빙 레이어                    │        │
+    │    │     (배치 + 실시간 뷰 병합)              │        │
+    │    └─────────────────────────────────────────┘        │
+    │                         │                              │
+    │                         ▼                              │
+    │                    ┌─────────┐                         │
+    │                    │  쿼리   │                         │
+    │                    └─────────┘                         │
+    └─────────────────────────────────────────────────────────┘
+    </div>
+
+    <h3>Lambda 아키텍처 구현</h3>
+    <pre>
+// Lambda 아키텍처 구성
+{
+  "architecture": {
+    "type": "lambda",
+    "batch_layer": {
+      "storage": {
+        "type": "hdfs",
+        "replication": 3,
+        "path": "/data/master"
+      },
+      "processing": {
+        "engine": "spark",
+        "schedule": "0 */4 * * *",
+        "job": "batch-aggregation-job"
+      },
+      "output": {
+        "format": "parquet",
+        "path": "/data/batch-views"
+      }
+    },
+    "speed_layer": {
+      "streaming": {
+        "engine": "kafka-streams",
+        "topics": ["events-raw"],
+        "checkpoint": "/data/checkpoints"
+      },
+      "state_store": {
+        "type": "rocksdb",
+        "ttl": "24h"
+      }
+    },
+    "serving_layer": {
+      "database": "apache-druid",
+      "segments": {
+        "granularity": "hour",
+        "retention": "90d"
+      },
+      "merge_strategy": "batch_preferred"
+    }
+  }
+}
+    </pre>
+
+    <h2>Kappa 아키텍처</h2>
+    <p>Jay Kreps가 제안한 Kappa 아키텍처는 모든 것을 스트림으로 처리하여 Lambda를 단순화합니다. 두 개의 별도 처리 경로를 유지하는 대신 Kappa는 모든 데이터에 대해 단일 스트림 처리 엔진을 사용합니다. 재처리가 필요할 때 과거 데이터는 동일한 스트림 프로세서를 통해 재생됩니다.</p>
+
+    <div class="highlight">
+        <h3>Kappa 아키텍처 원칙</h3>
+        <ul>
+            <li><strong>단일 처리 경로:</strong> 모든 데이터가 하나의 스트림 프로세서를 통과</li>
+            <li><strong>재생 가능한 로그:</strong> Kafka와 같은 불변 로그가 기록 시스템 역할</li>
+            <li><strong>재생을 통한 재처리:</strong> 로그를 재생하여 새로운 계산 실행</li>
+            <li><strong>단순화된 운영:</strong> 하나의 코드베이스, 하나의 처리 엔진 유지</li>
+        </ul>
+    </div>
+
+    <pre>
+// Apache Flink를 사용한 Kappa 아키텍처 구현
+import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.connectors.kafka._
+
+object KappaProcessor {
+  def main(args: Array[String]): Unit = {
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    // 정확히 한 번 처리 활성화
+    env.enableCheckpointing(60000)
+    env.getCheckpointConfig.setCheckpointingMode(
+      CheckpointingMode.EXACTLY_ONCE
+    )
+
+    // 재생을 위한 earliest 오프셋으로 Kafka 소스 구성
+    val kafkaSource = KafkaSource.builder[Event]()
+      .setBootstrapServers("kafka:9092")
+      .setTopics("events")
+      .setStartingOffsets(OffsetsInitializer.earliest())
+      .setValueOnlyDeserializer(new EventDeserializer())
+      .build()
+
+    // 단일 스트림 처리 파이프라인
+    val eventStream = env.fromSource(
+      kafkaSource,
+      WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(30)),
+      "Kafka Source"
+    )
+
+    // 통합 로직을 통한 모든 이벤트 처리
+    val aggregatedStream = eventStream
+      .keyBy(_.userId)
+      .window(TumblingEventTimeWindows.of(Time.minutes(5)))
+      .aggregate(new EventAggregator())
+
+    // 서빙 레이어로 싱크
+    aggregatedStream.addSink(new DruidSink())
+
+    env.execute("Kappa Pipeline")
+  }
+}
+    </pre>
+
+    <h2>Delta 아키텍처 (레이크하우스)</h2>
+    <p>레이크하우스 패턴으로도 알려진 Delta 아키텍처는 데이터 레이크의 유연성과 데이터 웨어하우스의 신뢰성을 결합합니다. Delta Lake와 같은 기술을 사용하여 데이터 레이크에 ACID 트랜잭션, 스키마 강제 및 타임 트래블 기능을 추가합니다.</p>
+
+    <div class="architecture-box">
+        <h3>Delta 아키텍처 레이어</h3>
+        <ul>
+            <li><strong>브론즈 레이어:</strong> 원시 데이터 수집, 최소한의 처리</li>
+            <li><strong>실버 레이어:</strong> 정제, 중복 제거, 스키마 강제된 데이터</li>
+            <li><strong>골드 레이어:</strong> 비즈니스 수준 집계 및 큐레이션된 데이터셋</li>
+        </ul>
+    </div>
+
+    <pre>
+# Python에서 Delta Lake 구현
+from delta import DeltaTable
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, current_timestamp
+
+# Delta Lake로 Spark 초기화
+spark = SparkSession.builder \
+    .appName("DeltaLakehouse") \
+    .config("spark.sql.extensions",
+            "io.delta.sql.DeltaSparkSessionExtension") \
+    .config("spark.sql.catalog.spark_catalog",
+            "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+    .getOrCreate()
+
+# 브론즈 레이어: 원시 데이터 수집
+raw_events = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka:9092") \
+    .option("subscribe", "events") \
+    .load()
+
+# append 모드로 브론즈에 쓰기
+raw_events.writeStream \
+    .format("delta") \
+    .outputMode("append") \
+    .option("checkpointLocation", "/checkpoints/bronze") \
+    .start("/data/bronze/events")
+
+# 실버 레이어: 정제 및 중복 제거
+bronze_df = spark.read.format("delta").load("/data/bronze/events")
+
+silver_df = bronze_df \
+    .dropDuplicates(["event_id"]) \
+    .filter(col("event_type").isNotNull()) \
+    .withColumn("processed_at", current_timestamp())
+
+silver_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("overwriteSchema", "true") \
+    .save("/data/silver/events")
+
+# 골드 레이어: 비즈니스 집계
+silver_events = spark.read.format("delta").load("/data/silver/events")
+
+daily_metrics = silver_events \
+    .groupBy("date", "product_category") \
+    .agg(
+        count("event_id").alias("total_events"),
+        sum("revenue").alias("total_revenue"),
+        countDistinct("user_id").alias("unique_users")
+    )
+
+daily_metrics.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .partitionBy("date") \
+    .save("/data/gold/daily_metrics")
+
+# 타임 트래블 쿼리
+historical_data = spark.read \
+    .format("delta") \
+    .option("versionAsOf", 10) \
+    .load("/data/silver/events")
+    </pre>
+
+    <h2>아키텍처 비교</h2>
+
+    <table class="comparison-table">
+        <tr>
+            <th>측면</th>
+            <th>Lambda</th>
+            <th>Kappa</th>
+            <th>Delta</th>
+        </tr>
+        <tr>
+            <td>복잡성</td>
+            <td>높음 (이중 경로)</td>
+            <td>중간 (단일 경로)</td>
+            <td>중간 (계층형)</td>
+        </tr>
+        <tr>
+            <td>지연 시간</td>
+            <td>낮음 (스피드 레이어)</td>
+            <td>낮음 (스트리밍)</td>
+            <td>낮음~중간</td>
+        </tr>
+        <tr>
+            <td>재처리</td>
+            <td>배치 레이어</td>
+            <td>로그 재생</td>
+            <td>타임 트래블</td>
+        </tr>
+        <tr>
+            <td>ACID 지원</td>
+            <td>제한적</td>
+            <td>Kafka 통해</td>
+            <td>완전한 ACID</td>
+        </tr>
+        <tr>
+            <td>적합한 용도</td>
+            <td>혼합 워크로드</td>
+            <td>스트림 우선 앱</td>
+            <td>분석 중심</td>
+        </tr>
+    </table>
+
+    <h2>적합한 아키텍처 선택</h2>
+
+    <div class="highlight">
+        <h3>의사 결정 프레임워크</h3>
+        <p><strong>Lambda 선택 시:</strong> 정확도 요구사항이 다른 배치 및 스트리밍 요구사항이 있고 운영 복잡성이 허용되는 경우.</p>
+        <p><strong>Kappa 선택 시:</strong> 스트림 처리가 모든 사용 사례를 처리할 수 있고 코드 중복 및 운영 오버헤드를 최소화하려는 경우.</p>
+        <p><strong>Delta 선택 시:</strong> 통합 배치 및 스트리밍 지원과 함께 ACID 트랜잭션, 스키마 진화 및 타임 트래블 기능이 필요한 경우.</p>
+    </div>
+
+    <h2>WIA-BIG_DATA 아키텍처 준수</h2>
+    <pre>
+// 아키텍처 준수 검사 구성
+{
+  "compliance": {
+    "standard": "WIA-BIG_DATA-v1.0",
+    "architecture_requirements": {
+      "data_immutability": true,
+      "processing_idempotency": true,
+      "lineage_tracking": true,
+      "fault_tolerance": {
+        "min_replication": 3,
+        "checkpointing": "required"
+      },
+      "latency_sla": {
+        "batch": "4h",
+        "stream": "1m"
+      },
+      "audit_logging": true
+    }
+  }
+}
+    </pre>
+
+    <div class="architecture-box">
+        <h3>핵심 요약</h3>
+        <ul>
+            <li>세 가지 아키텍처 모두 WIA-BIG_DATA 준수에 유효함</li>
+            <li>선택은 특정 지연 시간, 정확도 및 운영 요구사항에 따라 달라짐</li>
+            <li>새로운 구현에는 Delta 아키텍처가 선호되는 추세</li>
+            <li>각 패턴의 요소를 결합한 하이브리드 접근 방식도 허용됨</li>
+        </ul>
+    </div>
+</body>
+</html>

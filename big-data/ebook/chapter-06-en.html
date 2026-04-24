@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Machine Learning Pipelines - WIA-BIG_DATA</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin-bottom: 1rem; color: var(--text); }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a1a2e);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+        }
+        pre {
+            background: #0a0a0f;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        code {
+            color: var(--accent);
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        th { background: var(--bg-secondary); color: var(--primary); }
+        .ml-box {
+            background: linear-gradient(135deg, #1e3a5f, #0f172a);
+            border: 1px solid var(--primary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Machine Learning Pipelines</h1>
+
+    <div class="highlight">
+        <p><strong>Learning Objectives:</strong> Design and implement production-grade ML pipelines following WIA-BIG_DATA standards, including feature stores, model training, serving infrastructure, and MLOps best practices.</p>
+    </div>
+
+    <h2>ML Pipeline Architecture</h2>
+    <p>Machine learning pipelines in big data environments require careful orchestration of data preparation, feature engineering, model training, validation, and deployment. The WIA-BIG_DATA standard defines a comprehensive framework for building reproducible, scalable, and maintainable ML pipelines.</p>
+
+    <div class="ml-box">
+        <h3>ML Pipeline Components</h3>
+        <ul>
+            <li><strong>Data Ingestion:</strong> Collect and validate training data</li>
+            <li><strong>Feature Store:</strong> Centralized feature management</li>
+            <li><strong>Training Pipeline:</strong> Model training and hyperparameter tuning</li>
+            <li><strong>Model Registry:</strong> Version and track trained models</li>
+            <li><strong>Serving Infrastructure:</strong> Deploy and serve predictions</li>
+            <li><strong>Monitoring:</strong> Track model performance and drift</li>
+        </ul>
+    </div>
+
+    <h2>Feature Store Standards</h2>
+    <p>A feature store is a centralized repository for storing, managing, and serving machine learning features. It ensures consistency between training and serving, enables feature reuse, and reduces time-to-production for ML models.</p>
+
+    <pre>
+# Feature Store Implementation with Feast
+from feast import FeatureStore, Entity, Feature, FeatureView, FileSource
+from feast.types import Float32, Int64, String
+from datetime import timedelta
+
+# Define entities
+customer = Entity(
+    name="customer_id",
+    description="Customer identifier",
+    value_type=String
+)
+
+# Define feature views
+customer_features = FeatureView(
+    name="customer_features",
+    entities=["customer_id"],
+    ttl=timedelta(days=1),
+    features=[
+        Feature(name="lifetime_value", dtype=Float32),
+        Feature(name="total_orders", dtype=Int64),
+        Feature(name="avg_order_value", dtype=Float32),
+        Feature(name="days_since_last_order", dtype=Int64),
+        Feature(name="preferred_category", dtype=String),
+        Feature(name="churn_risk_score", dtype=Float32)
+    ],
+    online=True,
+    source=FileSource(
+        path="s3://feature-store/customer_features.parquet",
+        timestamp_field="event_timestamp",
+        created_timestamp_column="created_at"
+    ),
+    tags={"team": "customer-analytics", "version": "1.0"}
+)
+
+# Real-time feature computation
+transaction_stats = FeatureView(
+    name="transaction_stats_1h",
+    entities=["customer_id"],
+    ttl=timedelta(hours=1),
+    features=[
+        Feature(name="txn_count_1h", dtype=Int64),
+        Feature(name="txn_sum_1h", dtype=Float32),
+        Feature(name="txn_avg_1h", dtype=Float32),
+        Feature(name="unique_merchants_1h", dtype=Int64)
+    ],
+    online=True,
+    stream_source=KafkaSource(
+        kafka_bootstrap_servers="kafka:9092",
+        topic="transactions",
+        timestamp_field="transaction_time"
+    )
+)
+
+# Feature retrieval for training
+store = FeatureStore(repo_path="./feature_repo")
+
+# Get historical features for training
+training_df = store.get_historical_features(
+    entity_df=entity_df,  # DataFrame with customer_id and event_timestamp
+    features=[
+        "customer_features:lifetime_value",
+        "customer_features:total_orders",
+        "customer_features:avg_order_value",
+        "transaction_stats_1h:txn_count_1h"
+    ]
+).to_df()
+
+# Get online features for serving
+online_features = store.get_online_features(
+    features=[
+        "customer_features:churn_risk_score",
+        "transaction_stats_1h:txn_count_1h"
+    ],
+    entity_rows=[{"customer_id": "C12345"}]
+).to_dict()
+    </pre>
+
+    <h2>Training Pipeline Design</h2>
+    <p>Training pipelines must be reproducible, versioned, and scalable. The WIA-BIG_DATA standard recommends using orchestration frameworks like Apache Airflow, Kubeflow Pipelines, or MLflow for managing training workflows.</p>
+
+    <pre>
+# MLflow Training Pipeline
+import mlflow
+from mlflow.tracking import MlflowClient
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import pandas as pd
+
+class WIAMLPipeline:
+    def __init__(self, experiment_name):
+        mlflow.set_experiment(experiment_name)
+        self.client = MlflowClient()
+
+    def prepare_data(self, feature_store, entity_df, feature_list):
+        """Fetch features from feature store"""
+        df = feature_store.get_historical_features(
+            entity_df=entity_df,
+            features=feature_list
+        ).to_df()
+
+        # Split data
+        X = df.drop(columns=["target", "customer_id", "event_timestamp"])
+        y = df["target"]
+
+        return train_test_split(X, y, test_size=0.2, random_state=42)
+
+    def train_model(self, X_train, y_train, params=None):
+        """Train model with hyperparameter tuning"""
+        with mlflow.start_run() as run:
+            # Log parameters
+            mlflow.log_params(params or {})
+
+            # Hyperparameter tuning
+            param_grid = {
+                "n_estimators": [100, 200, 300],
+                "max_depth": [3, 5, 7],
+                "learning_rate": [0.01, 0.1, 0.2]
+            }
+
+            model = GradientBoostingClassifier()
+            grid_search = GridSearchCV(
+                model, param_grid, cv=5, scoring="f1", n_jobs=-1
+            )
+            grid_search.fit(X_train, y_train)
+
+            best_model = grid_search.best_estimator_
+
+            # Log best parameters
+            mlflow.log_params(grid_search.best_params_)
+
+            # Log model
+            mlflow.sklearn.log_model(
+                best_model,
+                "model",
+                registered_model_name="churn_prediction_model"
+            )
+
+            return run.info.run_id, best_model
+
+    def evaluate_model(self, model, X_test, y_test, run_id):
+        """Evaluate model and log metrics"""
+        with mlflow.start_run(run_id=run_id):
+            predictions = model.predict(X_test)
+
+            metrics = {
+                "accuracy": accuracy_score(y_test, predictions),
+                "precision": precision_score(y_test, predictions),
+                "recall": recall_score(y_test, predictions),
+                "f1": f1_score(y_test, predictions)
+            }
+
+            mlflow.log_metrics(metrics)
+
+            # Log confusion matrix as artifact
+            cm = confusion_matrix(y_test, predictions)
+            mlflow.log_artifact(self.plot_confusion_matrix(cm))
+
+            return metrics
+
+    def register_model(self, run_id, model_name, stage="Staging"):
+        """Register model for deployment"""
+        model_uri = f"runs:/{run_id}/model"
+
+        # Register model
+        model_version = mlflow.register_model(model_uri, model_name)
+
+        # Transition to staging
+        self.client.transition_model_version_stage(
+            name=model_name,
+            version=model_version.version,
+            stage=stage
+        )
+
+        return model_version
+
+# Pipeline execution
+pipeline = WIAMLPipeline("churn_prediction")
+X_train, X_test, y_train, y_test = pipeline.prepare_data(
+    feature_store, entity_df, feature_list
+)
+run_id, model = pipeline.train_model(X_train, y_train)
+metrics = pipeline.evaluate_model(model, X_test, y_test, run_id)
+pipeline.register_model(run_id, "churn_prediction_model")
+    </pre>
+
+    <h2>Model Serving Infrastructure</h2>
+
+    <table>
+        <tr>
+            <th>Serving Pattern</th>
+            <th>Latency</th>
+            <th>Use Case</th>
+        </tr>
+        <tr>
+            <td>Batch Prediction</td>
+            <td>Hours</td>
+            <td>Scheduled scoring, reports</td>
+        </tr>
+        <tr>
+            <td>Online Prediction</td>
+            <td>Milliseconds</td>
+            <td>Real-time APIs, web apps</td>
+        </tr>
+        <tr>
+            <td>Streaming Prediction</td>
+            <td>Seconds</td>
+            <td>Event-driven applications</td>
+        </tr>
+        <tr>
+            <td>Edge Prediction</td>
+            <td>Microseconds</td>
+            <td>IoT, mobile devices</td>
+        </tr>
+    </table>
+
+    <pre>
+# Model Serving with Seldon Core
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: churn-prediction
+  namespace: ml-serving
+spec:
+  predictors:
+  - name: default
+    replicas: 3
+    graph:
+      name: churn-model
+      implementation: SKLEARN_SERVER
+      modelUri: s3://models/churn/v1.0.0
+      envSecretRefName: s3-credentials
+      children: []
+    componentSpecs:
+    - spec:
+        containers:
+        - name: churn-model
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 20
+    traffic: 100
+    annotations:
+      seldon.io/rest-timeout: "5000"
+      seldon.io/grpc-timeout: "5000"
+  annotations:
+    seldon.io/engine-separate-pod: "true"
+---
+# A/B Testing Configuration
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: churn-prediction-ab
+spec:
+  predictors:
+  - name: model-a
+    replicas: 2
+    graph:
+      name: churn-model-v1
+      modelUri: s3://models/churn/v1.0.0
+    traffic: 80
+  - name: model-b
+    replicas: 2
+    graph:
+      name: churn-model-v2
+      modelUri: s3://models/churn/v2.0.0
+    traffic: 20
+    </pre>
+
+    <h2>Model Monitoring and Observability</h2>
+
+    <div class="ml-box">
+        <h3>Monitoring Dimensions</h3>
+        <ul>
+            <li><strong>Data Drift:</strong> Distribution changes in input features</li>
+            <li><strong>Concept Drift:</strong> Changes in relationship between features and target</li>
+            <li><strong>Model Performance:</strong> Accuracy, latency, throughput metrics</li>
+            <li><strong>Resource Utilization:</strong> CPU, memory, GPU usage</li>
+        </ul>
+    </div>
+
+    <pre>
+# Model Monitoring Implementation
+from evidently import ColumnMapping
+from evidently.report import Report
+from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
+from evidently.metrics import *
+
+class ModelMonitor:
+    def __init__(self, reference_data, model_name):
+        self.reference_data = reference_data
+        self.model_name = model_name
+        self.column_mapping = ColumnMapping(
+            target="target",
+            prediction="prediction",
+            numerical_features=["feature1", "feature2", "feature3"],
+            categorical_features=["category1", "category2"]
+        )
+
+    def detect_data_drift(self, current_data):
+        """Detect drift in input features"""
+        report = Report(metrics=[
+            DataDriftPreset(),
+            DatasetDriftMetric(),
+            DatasetMissingValuesMetric()
+        ])
+
+        report.run(
+            reference_data=self.reference_data,
+            current_data=current_data,
+            column_mapping=self.column_mapping
+        )
+
+        drift_results = report.as_dict()
+        return drift_results
+
+    def detect_prediction_drift(self, current_data):
+        """Detect drift in model predictions"""
+        report = Report(metrics=[
+            TargetDriftPreset(),
+            ColumnDriftMetric(column_name="prediction")
+        ])
+
+        report.run(
+            reference_data=self.reference_data,
+            current_data=current_data,
+            column_mapping=self.column_mapping
+        )
+
+        return report.as_dict()
+
+    def calculate_performance_metrics(self, predictions, actuals):
+        """Calculate model performance metrics"""
+        return {
+            "accuracy": accuracy_score(actuals, predictions),
+            "precision": precision_score(actuals, predictions, average="weighted"),
+            "recall": recall_score(actuals, predictions, average="weighted"),
+            "f1": f1_score(actuals, predictions, average="weighted")
+        }
+
+    def alert_on_drift(self, drift_score, threshold=0.1):
+        """Send alert if drift exceeds threshold"""
+        if drift_score > threshold:
+            send_alert(
+                title=f"Data Drift Detected - {self.model_name}",
+                message=f"Drift score {drift_score} exceeds threshold {threshold}",
+                severity="warning"
+            )
+            return True
+        return False
+
+# Monitoring dashboard metrics
+monitoring_metrics = {
+  "model_name": "churn_prediction_v2",
+  "timestamp": "2024-01-15T12:00:00Z",
+  "metrics": {
+    "data_drift": {
+      "overall_drift_score": 0.08,
+      "drifted_features": ["avg_order_value", "days_since_last_order"],
+      "feature_drift_scores": {
+        "lifetime_value": 0.02,
+        "total_orders": 0.05,
+        "avg_order_value": 0.15,
+        "days_since_last_order": 0.12
+      }
+    },
+    "performance": {
+      "accuracy": 0.89,
+      "precision": 0.87,
+      "recall": 0.91,
+      "f1": 0.89,
+      "auc_roc": 0.94
+    },
+    "latency": {
+      "p50": 12,
+      "p95": 45,
+      "p99": 120
+    },
+    "throughput": {
+      "requests_per_second": 1500,
+      "predictions_per_minute": 90000
+    }
+  }
+}
+    </pre>
+
+    <h2>MLOps Best Practices</h2>
+
+    <pre>
+// MLOps Pipeline Configuration
+{
+  "mlops_config": {
+    "version_control": {
+      "code": "git",
+      "data": "dvc",
+      "models": "mlflow",
+      "experiments": "mlflow"
+    },
+    "ci_cd": {
+      "training_trigger": ["data_change", "code_change", "schedule"],
+      "validation_gates": [
+        {"metric": "accuracy", "threshold": 0.85, "comparison": "gte"},
+        {"metric": "latency_p99", "threshold": 100, "comparison": "lte"}
+      ],
+      "deployment_strategy": "canary",
+      "rollback_on_drift": true
+    },
+    "feature_management": {
+      "store": "feast",
+      "versioning": true,
+      "lineage_tracking": true
+    },
+    "model_governance": {
+      "approval_required": true,
+      "bias_testing": true,
+      "explainability_report": true,
+      "documentation_required": true
+    },
+    "monitoring": {
+      "data_drift_check": "hourly",
+      "performance_check": "real_time",
+      "alert_channels": ["slack", "pagerduty"],
+      "auto_retrain_threshold": 0.1
+    }
+  }
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Key Takeaways</h3>
+        <ul>
+            <li>Use feature stores for consistent feature management</li>
+            <li>Implement versioning for code, data, and models</li>
+            <li>Design serving infrastructure for scalability and low latency</li>
+            <li>Monitor for data drift and model performance degradation</li>
+            <li>Automate the ML lifecycle with CI/CD pipelines</li>
+        </ul>
+    </div>
+</body>
+</html>

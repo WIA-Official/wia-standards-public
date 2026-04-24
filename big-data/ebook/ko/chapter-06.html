@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>6장: 3단계 - 프로토콜 설계</title>
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; line-height: 1.8; max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #34495e; margin-top: 30px; border-left: 4px solid #3498db; padding-left: 15px; }
+        h3 { color: #555; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #3498db; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        code { background-color: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background-color: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        blockquote { border-left: 4px solid #3498db; padding-left: 20px; margin: 20px 0; font-style: italic; color: #555; }
+        .highlight { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .success { background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .info { background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .warning { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+<p><a href="index.html">📊 WIA-DATA-001 빅데이터 표준 전자책</a> | 6장 / 8장</p>
+<hr>
+
+<h1>6장: 3단계 - 프로토콜 설계</h1>
+
+<blockquote>
+<p><strong>"견고한 프로토콜은 분산 시스템 전반에 걸쳐 신뢰할 수 있는 데이터 이동을 보장하여 빅데이터 인프라의 백본을 형성합니다."</strong></p>
+<p>WIA-DATA-001의 3단계에서는 데이터 파이프라인 아키텍처, 메시징 프로토콜, 스트리밍 처리, 그리고 장애 복구 메커니즘을 다룹니다. 이 단계를 완성하면 엔드투엔드 데이터 흐름을 구현하고 대규모 실시간 데이터 처리를 수행할 수 있습니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>6.1 데이터 파이프라인 아키텍처</h2>
+
+<h3>6.1.1 파이프라인 개념과 중요성</h3>
+
+<p>데이터 파이프라인은 데이터가 소스에서 목적지까지 이동하면서 거치는 일련의 처리 단계입니다. WIA-DATA-001은 확장 가능하고 유지보수 가능한 파이프라인 아키텍처를 표준화합니다.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>단계</th>
+            <th>목적</th>
+            <th>주요 작업</th>
+            <th>WIA 컴포넌트</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>1. 수집 (Ingestion)</strong></td>
+            <td>다양한 소스에서 데이터 수집</td>
+            <td>검증, 파싱, 포맷 변환, 라우팅</td>
+            <td>WIA Source Connectors</td>
+        </tr>
+        <tr>
+            <td><strong>2. 변환 (Transformation)</strong></td>
+            <td>비즈니스 로직 적용 및 데이터 처리</td>
+            <td>매핑, 필터링, 집계, 조인, 강화</td>
+            <td>WIA Transform Engine</td>
+        </tr>
+        <tr>
+            <td><strong>3. 저장 (Storage)</strong></td>
+            <td>처리된 데이터 영구 보관</td>
+            <td>쓰기, 파티셔닝, 복제, 인덱싱</td>
+            <td>WIA Storage Layer</td>
+        </tr>
+        <tr>
+            <td><strong>4. 서빙 (Serving)</strong></td>
+            <td>데이터를 소비자에게 제공</td>
+            <td>읽기, 쿼리, 필터링, 프로젝션</td>
+            <td>WIA Query API</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.1.2 파이프라인 패턴</h3>
+
+<p><strong>배치 파이프라인 (Batch Pipeline):</strong></p>
+<pre><code>┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐
+│ 데이터   │──▶│ 배치 수집 │──▶│ 배치 처리│──▶│ 데이터    │
+│ 소스    │   │ (일/시간)│   │ (Spark) │   │ 웨어하우스│
+└─────────┘   └──────────┘   └─────────┘   └──────────┘
+예: 일일 매출 집계, 월간 보고서 생성
+</code></pre>
+
+<p><strong>스트리밍 파이프라인 (Streaming Pipeline):</strong></p>
+<pre><code>┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐
+│ 이벤트   │──▶│ 스트리밍  │──▶│ 실시간   │──▶│ 대시보드 │
+│ 소스    │   │ 수집     │   │ 처리    │   │ / 알림   │
+└─────────┘   └──────────┘   └─────────┘   └──────────┘
+예: 실시간 사기 탐지, 실시간 추천 시스템
+</code></pre>
+
+<p><strong>람다 아키텍처 (Lambda Architecture):</strong></p>
+<pre><code>                    ┌─────────────────┐
+                    │  배치 레이어      │
+                    │  (정확성)        │
+┌─────────┐        ├─────────────────┤        ┌──────────┐
+│ 데이터   │───────▶│  스피드 레이어    │───────▶│ 서빙     │
+│ 소스    │        │  (지연시간)      │        │ 레이어   │
+└─────────┘        └─────────────────┘        └──────────┘
+</code></pre>
+
+<h3>6.1.3 파이프라인 설계 원칙</h3>
+
+<div class="info">
+<p><strong>WIA-DATA-001 파이프라인 설계 베스트 프랙티스:</strong></p>
+<ol>
+    <li><strong>멱등성 (Idempotency):</strong> 동일한 입력을 여러 번 처리해도 결과가 동일해야 함</li>
+    <li><strong>역압 (Backpressure):</strong> 다운스트림이 느릴 때 업스트림 속도 조절</li>
+    <li><strong>체크포인팅 (Checkpointing):</strong> 주기적으로 진행 상태 저장하여 장애 시 복구</li>
+    <li><strong>모니터링 (Monitoring):</strong> 모든 단계의 지연시간, 처리량, 오류율 추적</li>
+    <li><strong>스케일링 (Scaling):</strong> 부하에 따라 자동으로 리소스 조정</li>
+</ol>
+</div>
+
+<hr>
+
+<h2>6.2 메시징 프로토콜과 전달 보장</h2>
+
+<h3>6.2.1 전달 의미론 (Delivery Semantics)</h3>
+
+<p>분산 시스템에서 메시지 전달 보장 수준은 시스템의 신뢰성을 결정하는 핵심 요소입니다. WIA-DATA-001은 세 가지 전달 의미론을 모두 지원합니다.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>전달 보장</th>
+            <th>설명</th>
+            <th>장점</th>
+            <th>단점</th>
+            <th>사용 사례</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>At-most-once</strong><br>(최대 한 번)</td>
+            <td>메시지가 0번 또는 1번 전달됨. 손실 가능하지만 중복 없음</td>
+            <td>가장 빠름, 간단함</td>
+            <td>데이터 손실 가능</td>
+            <td>로그 수집, 센서 데이터</td>
+        </tr>
+        <tr>
+            <td><strong>At-least-once</strong><br>(최소 한 번)</td>
+            <td>메시지가 1번 이상 전달됨. 중복 가능하지만 손실 없음</td>
+            <td>데이터 손실 방지</td>
+            <td>중복 처리 필요</td>
+            <td>이벤트 로깅, 알림</td>
+        </tr>
+        <tr>
+            <td><strong>Exactly-once</strong><br>(정확히 한 번)</td>
+            <td>메시지가 정확히 1번만 전달됨. 손실도 중복도 없음</td>
+            <td>가장 정확함</td>
+            <td>성능 오버헤드, 복잡도 증가</td>
+            <td>금융 거래, 결제 처리</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.2.2 Exactly-Once 시맨틱스 구현</h3>
+
+<p>WIA-DATA-001은 분산 트랜잭션과 멱등성 키를 조합하여 정확히 한 번 전달을 보장합니다.</p>
+
+<pre><code>// WIA Exactly-Once Producer 예제
+const producer = new WIAProducer({
+  transactional: true,
+  idempotence: true,
+  transactionId: 'payment-processor-001'
+});
+
+await producer.beginTransaction();
+try {
+  // 1. 메시지 전송
+  await producer.send({
+    topic: 'payments',
+    key: orderId,
+    value: paymentData,
+    headers: {
+      'idempotency-key': generateIdempotencyKey(orderId)
+    }
+  });
+
+  // 2. 상태 업데이트
+  await updatePaymentStatus(orderId, 'completed');
+
+  // 3. 트랜잭션 커밋
+  await producer.commitTransaction();
+} catch (error) {
+  // 4. 실패 시 롤백
+  await producer.abortTransaction();
+  throw error;
+}
+</code></pre>
+
+<h3>6.2.3 메시지 순서 보장</h3>
+
+<div class="highlight">
+<p><strong>파티션 키 기반 순서 보장:</strong></p>
+<p>WIA-DATA-001은 동일한 파티션 키를 가진 메시지의 순서를 보장합니다. 파티션 내에서는 FIFO(First-In-First-Out) 순서가 유지되며, 서로 다른 파티션 간에는 순서가 보장되지 않습니다.</p>
+</div>
+
+<pre><code>// 사용자별 이벤트 순서 보장 예제
+await producer.send({
+  topic: 'user-events',
+  key: userId,  // 동일 사용자 이벤트는 동일 파티션으로
+  value: {
+    eventType: 'page_view',
+    timestamp: Date.now(),
+    page: '/products/123'
+  }
+});
+</code></pre>
+
+<hr>
+
+<h2>6.3 Kafka 및 Pulsar 통합</h2>
+
+<h3>6.3.1 Apache Kafka 통합</h3>
+
+<p>Apache Kafka는 가장 널리 사용되는 분산 이벤트 스트리밍 플랫폼입니다. WIA-DATA-001은 Kafka와의 네이티브 통합을 제공합니다.</p>
+
+<pre><code>// WIA-DATA-001 Kafka 커넥터 설정
+{
+  "connector.class": "io.wia.kafka.WIASourceConnector",
+  "topics": "user-events,transactions",
+  "wia.schema.registry.url": "http://schema-registry:8081",
+  "wia.serialization.format": "WBF",
+  "kafka.bootstrap.servers": "kafka1:9092,kafka2:9092,kafka3:9092",
+  "kafka.consumer.group": "wia-consumer-group",
+  "kafka.auto.offset.reset": "earliest",
+  "kafka.enable.auto.commit": false,
+  "wia.exactly.once.enabled": true
+}
+</code></pre>
+
+<h3>6.3.2 Apache Pulsar 통합</h3>
+
+<p>Apache Pulsar는 멀티 테넌시, 지역 복제, 계층형 스토리지를 지원하는 차세대 메시징 시스템입니다.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>기능</th>
+            <th>Kafka</th>
+            <th>Pulsar</th>
+            <th>WIA 권장사항</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>메시징 모델</strong></td>
+            <td>Pub-Sub, Log</td>
+            <td>Pub-Sub, Queue, Log</td>
+            <td>다양한 패턴 필요 시 Pulsar</td>
+        </tr>
+        <tr>
+            <td><strong>멀티 테넌시</strong></td>
+            <td>제한적</td>
+            <td>네이티브 지원</td>
+            <td>SaaS 환경에 Pulsar 유리</td>
+        </tr>
+        <tr>
+            <td><strong>지역 복제</strong></td>
+            <td>미러메이커 필요</td>
+            <td>내장 지원</td>
+            <td>글로벌 서비스에 Pulsar 유리</td>
+        </tr>
+        <tr>
+            <td><strong>성능</strong></td>
+            <td>초당 100만 메시지+</td>
+            <td>초당 100만 메시지+</td>
+            <td>비슷한 수준</td>
+        </tr>
+        <tr>
+            <td><strong>생태계</strong></td>
+            <td>매우 성숙</td>
+            <td>성장 중</td>
+            <td>기존 시스템 연동 시 Kafka</td>
+        </tr>
+    </tbody>
+</table>
+
+<pre><code>// WIA-DATA-001 Pulsar 커넥터 설정
+const pulsarClient = new WIAPulsarClient({
+  serviceUrl: 'pulsar://pulsar-broker:6650',
+  tenant: 'my-company',
+  namespace: 'production',
+  schemaRegistry: 'http://schema-registry:8081'
+});
+
+const consumer = await pulsarClient.subscribe({
+  topic: 'persistent://my-company/production/orders',
+  subscription: 'order-processor',
+  subscriptionType: 'Exclusive', // 또는 Shared, Failover, Key_Shared
+  schema: await getWIASchema('Order', 'v1.2.0')
+});
+</code></pre>
+
+<hr>
+
+<h2>6.4 스트리밍 vs 배치 처리</h2>
+
+<h3>6.4.1 처리 모델 비교</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>특성</th>
+            <th>배치 처리</th>
+            <th>스트리밍 처리</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>데이터 범위</strong></td>
+            <td>유한(Bounded) 데이터셋</td>
+            <td>무한(Unbounded) 데이터 스트림</td>
+        </tr>
+        <tr>
+            <td><strong>처리 지연</strong></td>
+            <td>분 ~ 시간</td>
+            <td>밀리초 ~ 초</td>
+        </tr>
+        <tr>
+            <td><strong>리소스 사용</strong></td>
+            <td>주기적으로 대량 사용</td>
+            <td>지속적으로 일정량 사용</td>
+        </tr>
+        <tr>
+            <td><strong>복잡도</strong></td>
+            <td>상대적으로 단순</td>
+            <td>상태 관리 등 복잡</td>
+        </tr>
+        <tr>
+            <td><strong>사용 사례</strong></td>
+            <td>ETL, 보고서, 백업</td>
+            <td>실시간 분석, 알림, 모니터링</td>
+        </tr>
+        <tr>
+            <td><strong>비용</strong></td>
+            <td>처리 시간에만 비용 발생</td>
+            <td>지속적인 인프라 비용</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.4.2 통합 처리 모델 (Unified Processing)</h3>
+
+<p>WIA-DATA-001은 Apache Beam과 유사한 통합 처리 모델을 제공하여 배치와 스트리밍을 동일한 API로 처리할 수 있습니다.</p>
+
+<pre><code>// WIA 통합 처리 API 예제
+const pipeline = WIA.createPipeline();
+
+pipeline
+  .read(source)  // 배치 또는 스트리밍 소스
+  .window(Window.sliding(Duration.minutes(5), Duration.minutes(1)))
+  .groupByKey('userId')
+  .aggregate({
+    pageViews: Sum.of('views'),
+    totalTime: Sum.of('duration'),
+    uniquePages: CountDistinct.of('pageId')
+  })
+  .write(sink);  // 배치 또는 스트리밍 싱크
+
+// 동일한 코드를 배치와 스트리밍에서 모두 실행 가능
+await pipeline.run({mode: 'batch'});     // 과거 데이터 처리
+await pipeline.run({mode: 'streaming'}); // 실시간 처리
+</code></pre>
+
+<hr>
+
+<h2>6.5 Change Data Capture (CDC)</h2>
+
+<h3>6.5.1 CDC 개념과 활용</h3>
+
+<p>CDC는 데이터베이스의 변경 사항(INSERT, UPDATE, DELETE)을 실시간으로 캡처하여 다른 시스템에 전파하는 기술입니다. WIA-DATA-001은 표준화된 CDC 프로토콜을 제공합니다.</p>
+
+<div class="info">
+<p><strong>CDC 활용 시나리오:</strong></p>
+<ul>
+    <li><strong>데이터 동기화:</strong> 운영 DB에서 분석 DB로 실시간 복제</li>
+    <li><strong>캐시 무효화:</strong> DB 변경 시 Redis/Memcached 캐시 자동 갱신</li>
+    <li><strong>검색 인덱스 업데이트:</strong> PostgreSQL 변경 사항을 Elasticsearch에 반영</li>
+    <li><strong>이벤트 소싱:</strong> 모든 변경 이력을 이벤트로 저장</li>
+    <li><strong>마이크로서비스 동기화:</strong> 서비스 간 데이터 일관성 유지</li>
+</ul>
+</div>
+
+<h3>6.5.2 WIA CDC 프로토콜</h3>
+
+<pre><code>// WIA CDC 이벤트 스키마
+{
+  "schema": "WIA.CDC.Event",
+  "version": "1.0",
+  "fields": {
+    "operation": "enum[INSERT, UPDATE, DELETE]",
+    "source": {
+      "database": "string",
+      "schema": "string",
+      "table": "string"
+    },
+    "before": "object?",  // UPDATE, DELETE에만 존재
+    "after": "object?",   // INSERT, UPDATE에만 존재
+    "timestamp": "timestamp",
+    "transactionId": "string",
+    "metadata": {
+      "user": "string",
+      "application": "string"
+    }
+  }
+}
+</code></pre>
+
+<h3>6.5.3 CDC 구현 예제</h3>
+
+<pre><code>// PostgreSQL CDC 설정
+const cdcConnector = new WIACDCConnector({
+  source: {
+    type: 'postgresql',
+    host: 'db.example.com',
+    port: 5432,
+    database: 'orders_db',
+    user: 'cdc_user',
+    password: process.env.DB_PASSWORD,
+    slotName: 'wia_cdc_slot'  // 논리적 복제 슬롯
+  },
+  target: {
+    type: 'kafka',
+    topic: 'cdc.orders_db.{schema}.{table}',
+    bootstrapServers: 'kafka:9092'
+  },
+  filters: {
+    schemas: ['public'],
+    tables: ['orders', 'order_items', 'customers'],
+    operations: ['INSERT', 'UPDATE', 'DELETE']
+  },
+  transformations: [
+    // 민감 정보 마스킹
+    {
+      field: 'customers.credit_card',
+      function: 'mask',
+      params: { preserveLength: true }
+    }
+  ]
+});
+
+await cdcConnector.start();
+</code></pre>
+
+<hr>
+
+<h2>6.6 윈도우 연산 (Windowing)</h2>
+
+<h3>6.6.1 윈도우 타입</h3>
+
+<p>스트리밍 처리에서 무한한 데이터를 유한한 청크로 나누기 위해 윈도우를 사용합니다.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>윈도우 타입</th>
+            <th>설명</th>
+            <th>사용 사례</th>
+            <th>예제</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Tumbling Window</strong><br>(고정 윈도우)</td>
+            <td>겹치지 않는 고정 크기 윈도우</td>
+            <td>시간별/일별 집계</td>
+            <td>매 시간 페이지뷰 수</td>
+        </tr>
+        <tr>
+            <td><strong>Sliding Window</strong><br>(슬라이딩 윈도우)</td>
+            <td>일정 간격으로 움직이는 윈도우</td>
+            <td>이동 평균, 실시간 추세</td>
+            <td>최근 5분간 평균 응답시간</td>
+        </tr>
+        <tr>
+            <td><strong>Session Window</strong><br>(세션 윈도우)</td>
+            <td>비활성 간격으로 구분되는 윈도우</td>
+            <td>사용자 세션 분석</td>
+            <td>30분 미활동 시 세션 종료</td>
+        </tr>
+        <tr>
+            <td><strong>Global Window</strong><br>(전역 윈도우)</td>
+            <td>모든 데이터를 하나의 윈도우로</td>
+            <td>전체 통계</td>
+            <td>서비스 시작 후 전체 이벤트 수</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.6.2 윈도우 연산 예제</h3>
+
+<pre><code>// Tumbling Window: 5분마다 페이지뷰 집계
+pipeline
+  .read('pageview-events')
+  .window(Window.tumbling(Duration.minutes(5)))
+  .groupByKey('pageUrl')
+  .count()
+  .write('pageview-stats');
+
+// Sliding Window: 최근 10분간 5분 간격으로 이동 평균
+pipeline
+  .read('response-time-events')
+  .window(Window.sliding(
+    size: Duration.minutes(10),
+    period: Duration.minutes(5)
+  ))
+  .average('responseTime')
+  .write('response-time-moving-avg');
+
+// Session Window: 사용자 세션 분석
+pipeline
+  .read('user-events')
+  .window(Window.session(
+    gapDuration: Duration.minutes(30)
+  ))
+  .groupByKey('userId')
+  .aggregate({
+    sessionDuration: Duration.between('first', 'last'),
+    eventCount: Count.all(),
+    pagesVisited: CountDistinct.of('pageId')
+  })
+  .write('user-sessions');
+</code></pre>
+
+<h3>6.6.3 늦게 도착하는 데이터 처리</h3>
+
+<div class="highlight">
+<p><strong>워터마크(Watermark)와 허용 지연(Allowed Lateness):</strong></p>
+<p>실제 환경에서는 네트워크 지연, 시스템 장애 등으로 이벤트가 늦게 도착할 수 있습니다. WIA-DATA-001은 워터마크 메커니즘을 사용하여 이를 처리합니다.</p>
+</div>
+
+<pre><code>pipeline
+  .read('events')
+  .withTimestamps('eventTime')  // 이벤트 시간 지정
+  .withWatermark(Duration.seconds(30))  // 최대 30초 지연 허용
+  .window(Window.tumbling(Duration.minutes(5)))
+  .allowedLateness(Duration.minutes(1))  // 윈도우 종료 후 1분까지 늦은 데이터 허용
+  .groupByKey('userId')
+  .sum('amount')
+  .write('aggregated-results', {
+    onLateData: 'UPDATE'  // 늦은 데이터로 결과 업데이트
+  });
+</code></pre>
+
+<hr>
+
+<h2>6.7 장애 복구 및 상태 관리</h2>
+
+<h3>6.7.1 체크포인팅 메커니즘</h3>
+
+<p>스트리밍 처리에서 장애 발생 시 처리를 재개하려면 주기적으로 상태를 저장해야 합니다. WIA-DATA-001은 분산 스냅샷 기반 체크포인팅을 제공합니다.</p>
+
+<pre><code>// WIA 체크포인팅 설정
+const streamingJob = pipeline.run({
+  mode: 'streaming',
+  checkpointing: {
+    enabled: true,
+    interval: Duration.minutes(1),      // 1분마다 체크포인트
+    timeout: Duration.minutes(5),       // 5분 내 완료되어야 함
+    minPauseBetween: Duration.seconds(30),
+    maxConcurrent: 1,                   // 동시 체크포인트 수
+    storage: {
+      type: 's3',
+      bucket: 'wia-checkpoints',
+      path: '/jobs/payment-processor'
+    },
+    retainedCheckpoints: 3              // 최근 3개 체크포인트 유지
+  },
+  stateBackend: {
+    type: 'rocksdb',                    // 로컬 상태 저장소
+    incrementalCheckpoints: true        // 증분 체크포인트
+  }
+});
+</code></pre>
+
+<h3>6.7.2 상태 관리 패턴</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>상태 타입</th>
+            <th>설명</th>
+            <th>사용 사례</th>
+            <th>메모리 사용</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>ValueState</strong></td>
+            <td>단일 값 저장</td>
+            <td>카운터, 플래그</td>
+            <td>낮음</td>
+        </tr>
+        <tr>
+            <td><strong>ListState</strong></td>
+            <td>값 목록 저장</td>
+            <td>이벤트 버퍼링</td>
+            <td>중간</td>
+        </tr>
+        <tr>
+            <td><strong>MapState</strong></td>
+            <td>키-값 맵 저장</td>
+            <td>집계, 조인</td>
+            <td>높음</td>
+        </tr>
+        <tr>
+            <td><strong>ReducingState</strong></td>
+            <td>집계 결과 저장</td>
+            <td>합계, 평균</td>
+            <td>낮음</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.7.3 장애 복구 시나리오</h3>
+
+<div class="success">
+<p><strong>자동 복구 프로세스:</strong></p>
+<ol>
+    <li><strong>장애 감지:</strong> 헬스체크 실패 또는 프로세스 종료 감지</li>
+    <li><strong>마지막 체크포인트 로드:</strong> 가장 최근의 성공한 체크포인트 복원</li>
+    <li><strong>소스 재설정:</strong> 체크포인트 시점의 오프셋으로 소스 리와인드</li>
+    <li><strong>상태 복원:</strong> 체크포인트에서 모든 상태 복원</li>
+    <li><strong>처리 재개:</strong> 체크포인트 이후 데이터부터 처리 시작</li>
+</ol>
+</div>
+
+<hr>
+
+<h2>6.8 성능 최적화 및 모니터링</h2>
+
+<h3>6.8.1 처리량 최적화</h3>
+
+<p><strong>병렬 처리 조정:</strong></p>
+<pre><code>// 파티션 수와 병렬도 설정
+const pipeline = WIA.createPipeline({
+  parallelism: 16,  // 16개 병렬 태스크
+  maxParallelism: 32  // 최대 32까지 확장 가능
+});
+
+// 동적 스케일링
+pipeline.autoScaling({
+  enabled: true,
+  minParallelism: 4,
+  maxParallelism: 64,
+  targetProcessingRate: 100000,  // 초당 10만 레코드 목표
+  scaleUpThreshold: 0.8,         // CPU 80% 이상 시 확장
+  scaleDownThreshold: 0.3,       // CPU 30% 이하 시 축소
+  cooldownPeriod: Duration.minutes(5)
+});
+</code></pre>
+
+<h3>6.8.2 모니터링 지표</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>카테고리</th>
+            <th>지표</th>
+            <th>목표 값</th>
+            <th>알림 조건</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan="2"><strong>처리량</strong></td>
+            <td>레코드/초</td>
+            <td>100,000+</td>
+            <td>&lt; 50,000</td>
+        </tr>
+        <tr>
+            <td>바이트/초</td>
+            <td>100 MB/s+</td>
+            <td>&lt; 50 MB/s</td>
+        </tr>
+        <tr>
+            <td rowspan="2"><strong>지연시간</strong></td>
+            <td>처리 지연 (p95)</td>
+            <td>&lt; 100ms</td>
+            <td>&gt; 500ms</td>
+        </tr>
+        <tr>
+            <td>엔드투엔드 지연 (p99)</td>
+            <td>&lt; 1초</td>
+            <td>&gt; 5초</td>
+        </tr>
+        <tr>
+            <td rowspan="2"><strong>안정성</strong></td>
+            <td>오류율</td>
+            <td>&lt; 0.1%</td>
+            <td>&gt; 1%</td>
+        </tr>
+        <tr>
+            <td>재시작 횟수</td>
+            <td>0/일</td>
+            <td>&gt; 3/시간</td>
+        </tr>
+        <tr>
+            <td rowspan="2"><strong>리소스</strong></td>
+            <td>CPU 사용률</td>
+            <td>50-70%</td>
+            <td>&gt; 90%</td>
+        </tr>
+        <tr>
+            <td>메모리 사용률</td>
+            <td>&lt; 80%</td>
+            <td>&gt; 95%</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.9 장 요약</h2>
+
+<div class="highlight">
+<h3>핵심 요점</h3>
+<ol>
+    <li><strong>데이터 파이프라인 아키텍처:</strong> WIA-DATA-001은 수집, 변환, 저장, 서빙의 4단계 파이프라인 아키텍처를 표준화합니다. 배치, 스트리밍, 람다 아키텍처 등 다양한 패턴을 지원하며, 멱등성, 역압, 체크포인팅 등의 설계 원칙을 준수해야 합니다.</li>
+
+    <li><strong>전달 보장 수준:</strong> At-most-once, At-least-once, Exactly-once의 세 가지 전달 보장 수준을 제공하며, 사용 사례에 따라 적절히 선택할 수 있습니다. 금융 거래 등 중요한 데이터는 Exactly-once를 사용하여 분산 트랜잭션과 멱등성 키로 정확성을 보장합니다.</li>
+
+    <li><strong>메시징 시스템 통합:</strong> Apache Kafka와 Apache Pulsar 모두와 네이티브 통합을 제공합니다. Kafka는 성숙한 생태계를, Pulsar는 멀티 테넌시와 지역 복제를 제공하므로, 요구사항에 따라 선택할 수 있습니다.</li>
+
+    <li><strong>통합 처리 모델:</strong> 동일한 API로 배치와 스트리밍 처리를 모두 수행할 수 있는 통합 처리 모델을 제공합니다. 이를 통해 코드 재사용성을 높이고 학습 곡선을 완화할 수 있습니다.</li>
+
+    <li><strong>CDC와 실시간 동기화:</strong> Change Data Capture를 통해 데이터베이스 변경 사항을 실시간으로 캡처하고 전파할 수 있습니다. 데이터 동기화, 캐시 무효화, 검색 인덱스 업데이트, 마이크로서비스 간 동기화 등 다양한 시나리오에 활용됩니다.</li>
+
+    <li><strong>윈도우 연산:</strong> Tumbling, Sliding, Session, Global 등 다양한 윈도우 타입을 지원하여 무한 스트림을 유한한 청크로 분할하고 집계할 수 있습니다. 워터마크를 사용하여 늦게 도착하는 데이터를 적절히 처리합니다.</li>
+
+    <li><strong>장애 복구 메커니즘:</strong> 분산 스냅샷 기반 체크포인팅으로 장애 발생 시 자동 복구를 지원합니다. RocksDB 상태 백엔드와 증분 체크포인트를 사용하여 대용량 상태도 효율적으로 관리할 수 있습니다.</li>
+
+    <li><strong>성능 최적화:</strong> 병렬 처리, 동적 스케일링, 메모리 관리 등을 통해 초당 10만 레코드 이상의 높은 처리량과 100ms 이하의 낮은 지연시간을 달성할 수 있습니다. 포괄적인 모니터링 지표로 시스템 건강도를 지속적으로 추적합니다.</li>
+</ol>
+</div>
+
+<hr>
+
+<h2>6.10 복습 문제</h2>
+
+<div class="info">
+<p><strong>문제 1:</strong> 배치 파이프라인과 스트리밍 파이프라인의 주요 차이점을 설명하고, 각각 어떤 상황에서 사용해야 하는지 실제 사례를 들어 설명하세요.</p>
+
+<p><strong>문제 2:</strong> At-most-once, At-least-once, Exactly-once 전달 보장 수준의 차이를 설명하고, 각각의 트레이드오프를 논하세요. 금융 결제 시스템에서는 어떤 수준을 선택해야 하며 그 이유는 무엇인가요?</p>
+
+<p><strong>문제 3:</strong> Apache Kafka와 Apache Pulsar의 주요 차이점을 비교하고, 멀티 테넌트 SaaS 플랫폼을 구축할 때 어느 것을 선택할지 근거를 제시하여 설명하세요.</p>
+
+<p><strong>문제 4:</strong> Tumbling Window와 Sliding Window의 차이를 설명하고, 실시간 대시보드에서 "최근 10분간 5분 간격으로 이동 평균 응답시간"을 계산하려면 어떤 윈도우를 사용해야 하는지 코드와 함께 설명하세요.</p>
+
+<p><strong>문제 5:</strong> CDC(Change Data Capture)의 개념과 활용 사례를 설명하고, PostgreSQL 데이터베이스의 변경 사항을 Elasticsearch에 실시간으로 동기화하는 파이프라인을 설계하세요.</p>
+
+<p><strong>문제 6:</strong> 스트리밍 처리에서 체크포인팅이 중요한 이유를 설명하고, 체크포인트 간격을 1분으로 설정했을 때와 10분으로 설정했을 때의 장단점을 비교하세요.</p>
+</div>
+
+<hr>
+
+<h2>6.11 다음 장 미리보기</h2>
+
+<div class="success">
+<p><strong>7장: 4단계 - 시스템 통합</strong></p>
+
+<p>다음 장에서는 WIA-DATA-001을 기존 빅데이터 생태계 및 클라우드 플랫폼과 통합하는 방법을 학습합니다:</p>
+
+<ul>
+    <li><strong>빅데이터 프레임워크 커넥터:</strong> Hadoop, Spark, Flink와의 네이티브 통합</li>
+    <li><strong>클라우드 플랫폼 연동:</strong> AWS, GCP, Azure 관리형 서비스 활용</li>
+    <li><strong>BI 도구 통합:</strong> Tableau, Power BI, Looker 연결</li>
+    <li><strong>워크플로우 오케스트레이션:</strong> Apache Airflow를 통한 파이프라인 자동화</li>
+    <li><strong>데이터 카탈로그 연동:</strong> 메타데이터 관리 및 데이터 거버넌스</li>
+    <li><strong>실전 통합 시나리오:</strong> 하이브리드 및 멀티클라우드 아키텍처</li>
+</ul>
+
+<p>7장을 통해 WIA-DATA-001을 실제 프로덕션 환경에 배포하고 기존 시스템과 원활히 통합하는 방법을 완전히 이해하게 됩니다.</p>
+</div>
+
+<hr>
+
+<p><strong>다음:</strong> <a href="chapter-07.html">7장: 4단계 - 시스템 통합 →</a></p>
+<hr>
+<p style="text-align: center; color: #7f8c8d; font-size: 0.9em;">
+    <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+    © 2025 WIA (World Certification Industry Association)<br>
+    본 자료는 WIA-DATA-001 표준의 일부이며 Apache 2.0 라이선스로 배포됩니다.
+</p>
+</body>
+</html>

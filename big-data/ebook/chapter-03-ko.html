@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 스트림 처리 프레임워크 - WIA-BIG_DATA</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin-bottom: 1rem; color: var(--text); }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a1a2e);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+        }
+        pre {
+            background: #0a0a0f;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        code {
+            color: var(--accent);
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        th { background: var(--bg-secondary); color: var(--primary); }
+        .stream-box {
+            background: linear-gradient(135deg, #1e3a5f, #0f172a);
+            border: 1px solid var(--primary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>3장: 스트림 처리 프레임워크</h1>
+
+    <div class="highlight">
+        <p><strong>학습 목표:</strong> 실시간 데이터 처리 패턴을 마스터하고, 스트림 처리의 의미론(at-least-once, exactly-once)을 이해하며, WIA-BIG_DATA 표준을 사용하여 프로덕션급 스트리밍 파이프라인을 구현합니다.</p>
+    </div>
+
+    <h2>스트림 처리 소개</h2>
+    <p>스트림 처리는 데이터가 도착하는 즉시 지속적으로 처리하여 실시간 분석, 모니터링 및 의사 결정을 가능하게 합니다. 바운디드 데이터셋에서 작동하는 배치 처리와 달리 스트림 처리는 최소한의 지연 시간으로 언바운디드, 지속적으로 흐르는 데이터를 처리합니다.</p>
+
+    <p>WIA-BIG_DATA 표준은 다양한 스트리밍 플랫폼 전반에서 신뢰성, 확장성 및 일관성을 보장하는 스트림 처리 구현에 대한 요구사항을 정의합니다.</p>
+
+    <h2>처리 시맨틱스</h2>
+
+    <div class="stream-box">
+        <h3>전달 보장</h3>
+        <ul>
+            <li><strong>At-most-once:</strong> 메시지 손실 가능, 절대 중복 안 됨 (가장 빠름)</li>
+            <li><strong>At-least-once:</strong> 메시지 절대 손실 안 됨, 중복 가능 (신뢰성)</li>
+            <li><strong>Exactly-once:</strong> 메시지가 정확히 한 번 처리 (가장 강력한 보장)</li>
+        </ul>
+    </div>
+
+    <p>WIA-BIG_DATA 표준은 최소 보장으로 at-least-once 시맨틱스를 요구하며, 금융 및 중요 애플리케이션에는 exactly-once를 권장합니다.</p>
+
+    <h2>Apache Kafka 표준</h2>
+    <p>Apache Kafka는 대부분의 WIA-BIG_DATA 스트리밍 구현의 백본 역할을 합니다. 표준은 프로덕션 배포를 위한 구성 요구사항을 정의합니다.</p>
+
+    <pre>
+# WIA-BIG_DATA Kafka 구성 표준
+# 프로듀서 구성
+bootstrap.servers=kafka-1:9092,kafka-2:9092,kafka-3:9092
+acks=all
+enable.idempotence=true
+max.in.flight.requests.per.connection=5
+retries=2147483647
+compression.type=lz4
+linger.ms=5
+batch.size=32768
+
+# 컨슈머 구성
+group.id=wia-consumer-group
+enable.auto.commit=false
+auto.offset.reset=earliest
+isolation.level=read_committed
+max.poll.records=500
+session.timeout.ms=30000
+heartbeat.interval.ms=10000
+
+# 토픽 구성 표준
+num.partitions=12
+replication.factor=3
+min.insync.replicas=2
+retention.ms=604800000
+cleanup.policy=delete
+segment.bytes=1073741824
+    </pre>
+
+    <h3>Kafka 프로듀서 구현</h3>
+    <pre>
+// WIA-BIG_DATA 준수 Kafka 프로듀서
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.serialization.StringSerializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+
+public class WIAKafkaProducer {
+    private final KafkaProducer&lt;String, GenericRecord&gt; producer;
+    private final String topic;
+
+    public WIAKafkaProducer(String bootstrapServers, String topic) {
+        this.topic = topic;
+
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
+
+        // Exactly-once 시맨틱스
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
+        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+
+        // 성능 튜닝
+        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
+        props.put(ProducerConfig.BATCH_SIZE_CONFIG, 32768);
+        props.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+
+        // 스키마 레지스트리
+        props.put("schema.registry.url", "http://schema-registry:8081");
+
+        this.producer = new KafkaProducer&lt;&gt;(props);
+    }
+
+    public void sendWithCallback(String key, GenericRecord value) {
+        ProducerRecord&lt;String, GenericRecord&gt; record =
+            new ProducerRecord&lt;&gt;(topic, key, value);
+
+        producer.send(record, (metadata, exception) -&gt; {
+            if (exception != null) {
+                // 실패 로깅 및 처리
+                logger.error("메시지 전송 실패", exception);
+                handleFailure(record, exception);
+            } else {
+                // 오프셋과 함께 성공 로깅
+                logger.debug("파티션 {}에 오프셋 {}로 메시지 전송",
+                    metadata.partition(), metadata.offset());
+            }
+        });
+    }
+
+    public void close() {
+        producer.flush();
+        producer.close();
+    }
+}
+    </pre>
+
+    <h2>Apache Flink 통합</h2>
+    <p>Apache Flink는 강력한 윈도잉, 상태 관리 및 exactly-once 보장을 갖춘 진정한 스트림 처리를 제공합니다. WIA-BIG_DATA 표준은 복합 이벤트 처리 및 상태 저장 연산에 Flink를 권장합니다.</p>
+
+    <pre>
+// WIA-BIG_DATA Flink 스트리밍 애플리케이션
+import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.windowing.time.Time
+import org.apache.flink.streaming.api.CheckpointingMode
+
+object WIAStreamProcessor {
+  def main(args: Array[String]): Unit = {
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    // Exactly-once 체크포인팅
+    env.enableCheckpointing(60000, CheckpointingMode.EXACTLY_ONCE)
+    env.getCheckpointConfig.setMinPauseBetweenCheckpoints(30000)
+    env.getCheckpointConfig.setCheckpointTimeout(120000)
+    env.getCheckpointConfig.setMaxConcurrentCheckpoints(1)
+    env.getCheckpointConfig.enableExternalizedCheckpoints(
+      ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION
+    )
+
+    // 상태 백엔드 구성
+    env.setStateBackend(new RocksDBStateBackend("hdfs:///checkpoints", true))
+
+    // 워터마크를 포함한 Kafka 소스
+    val kafkaSource = KafkaSource.builder[Event]()
+      .setBootstrapServers("kafka:9092")
+      .setTopics("events")
+      .setGroupId("wia-flink-consumer")
+      .setStartingOffsets(OffsetsInitializer.committedOffsets())
+      .setValueOnlyDeserializer(new EventDeserializer())
+      .build()
+
+    val eventStream = env.fromSource(
+      kafkaSource,
+      WatermarkStrategy
+        .forBoundedOutOfOrderness[Event](Duration.ofSeconds(10))
+        .withTimestampAssigner((event, _) => event.timestamp),
+      "Kafka Events"
+    )
+
+    // 윈도우 집계
+    val aggregatedStream = eventStream
+      .keyBy(_.userId)
+      .window(TumblingEventTimeWindows.of(Time.minutes(5)))
+      .allowedLateness(Time.minutes(1))
+      .sideOutputLateData(lateDataTag)
+      .aggregate(new EventAggregator(), new WindowResultFunction())
+
+    // 여러 출력으로 싱크
+    aggregatedStream.addSink(new KafkaSink("aggregated-events"))
+    aggregatedStream.addSink(new ElasticsearchSink(esConfig))
+
+    env.execute("WIA 스트림 프로세서")
+  }
+}
+    </pre>
+
+    <h2>윈도잉 전략</h2>
+
+    <table>
+        <tr>
+            <th>윈도우 유형</th>
+            <th>설명</th>
+            <th>사용 사례</th>
+        </tr>
+        <tr>
+            <td>텀블링</td>
+            <td>고정 크기, 비겹침 윈도우</td>
+            <td>시간별 집계</td>
+        </tr>
+        <tr>
+            <td>슬라이딩</td>
+            <td>고정 크기, 겹침 윈도우</td>
+            <td>이동 평균</td>
+        </tr>
+        <tr>
+            <td>세션</td>
+            <td>활동 기반, 갭 기반 윈도우</td>
+            <td>사용자 세션</td>
+        </tr>
+        <tr>
+            <td>글로벌</td>
+            <td>모든 요소가 하나의 윈도우</td>
+            <td>커스텀 트리거</td>
+        </tr>
+    </table>
+
+    <pre>
+// 윈도우 구현 예제
+// 텀블링 윈도우: 5분 집계
+val tumblingResults = events
+  .keyBy(_.customerId)
+  .window(TumblingEventTimeWindows.of(Time.minutes(5)))
+  .reduce((a, b) =&gt; a.merge(b))
+
+// 슬라이딩 윈도우: 10분 윈도우, 5분 슬라이드
+val slidingResults = events
+  .keyBy(_.customerId)
+  .window(SlidingEventTimeWindows.of(Time.minutes(10), Time.minutes(5)))
+  .aggregate(new AvgAggregator())
+
+// 세션 윈도우: 30분 갭
+val sessionResults = events
+  .keyBy(_.userId)
+  .window(EventTimeSessionWindows.withGap(Time.minutes(30)))
+  .process(new SessionAnalyzer())
+    </pre>
+
+    <h2>복합 이벤트 처리 (CEP)</h2>
+
+    <div class="highlight">
+        <h3>CEP 패턴 매칭</h3>
+        <p>복합 이벤트 처리는 이벤트 스트림에서 패턴 감지를 가능하게 하며, 이는 사기 탐지, 이상 식별 및 비즈니스 규칙 시행에 필수적입니다.</p>
+    </div>
+
+    <pre>
+// 사기 탐지를 위한 Flink CEP 패턴
+import org.apache.flink.cep.scala.CEP
+import org.apache.flink.cep.scala.pattern.Pattern
+
+// 의심스러운 활동 패턴 정의
+val fraudPattern = Pattern.begin[Transaction]("first")
+  .where(_.amount > 1000)
+  .next("second")
+  .where(_.amount > 1000)
+  .within(Time.minutes(10))
+  .next("third")
+  .where(tx => tx.amount > 5000 && tx.country != tx.homeCountry)
+  .within(Time.minutes(30))
+
+// 스트림에 패턴 적용
+val patternStream = CEP.pattern(transactionStream.keyBy(_.userId), fraudPattern)
+
+val alerts = patternStream.select(matches => {
+  val first = matches("first").head
+  val second = matches("second").head
+  val third = matches("third").head
+
+  FraudAlert(
+    userId = first.userId,
+    transactions = List(first, second, third),
+    totalAmount = first.amount + second.amount + third.amount,
+    riskScore = calculateRisk(first, second, third),
+    timestamp = System.currentTimeMillis()
+  )
+})
+
+alerts.addSink(new AlertNotificationSink())
+    </pre>
+
+    <h2>스트림 처리 모니터링</h2>
+
+    <div class="stream-box">
+        <h3>모니터링할 주요 메트릭</h3>
+        <ul>
+            <li><strong>처리량:</strong> 초당 처리되는 이벤트 수</li>
+            <li><strong>지연 시간:</strong> 종단 간 처리 시간</li>
+            <li><strong>컨슈머 랙:</strong> 최신 오프셋 대비 뒤처진 메시지 수</li>
+            <li><strong>체크포인트 기간:</strong> 체크포인트 완료 시간</li>
+            <li><strong>백프레셔:</strong> 큐 축적 지표</li>
+        </ul>
+    </div>
+
+    <pre>
+// 스트림 처리를 위한 Prometheus 메트릭
+stream_processing_events_total{job="flink", pipeline="orders"} 1234567
+stream_processing_latency_seconds{quantile="0.99"} 0.150
+stream_consumer_lag{topic="events", partition="0"} 1523
+stream_checkpoint_duration_seconds 12.5
+stream_backpressure_ratio{task="aggregation"} 0.05
+
+// 알림 규칙
+groups:
+  - name: stream-processing-alerts
+    rules:
+      - alert: HighConsumerLag
+        expr: stream_consumer_lag > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "컨슈머 랙이 임계값 초과"
+
+      - alert: ProcessingLatencyHigh
+        expr: stream_processing_latency_seconds{quantile="0.99"} > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P99 지연 시간이 1초 초과"
+    </pre>
+
+    <h2>모범 사례 요약</h2>
+
+    <div class="highlight">
+        <h3>WIA-BIG_DATA 스트림 처리 체크리스트</h3>
+        <ul>
+            <li>중요 데이터에 대해 exactly-once 시맨틱스 활성화</li>
+            <li>순서가 맞지 않는 이벤트에 대해 적절한 워터마크 구성</li>
+            <li>실패한 메시지를 위한 데드 레터 큐 구현</li>
+            <li>대규모 상태에 증분 체크포인팅 사용</li>
+            <li>컨슈머 랙 및 처리 지연 시간 모니터링</li>
+            <li>수평 확장성을 위한 설계</li>
+            <li>우아한 종료 및 재시작 구현</li>
+        </ul>
+    </div>
+</body>
+</html>

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Stream Processing Frameworks - WIA-BIG_DATA</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin-bottom: 1rem; color: var(--text); }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a1a2e);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+        }
+        pre {
+            background: #0a0a0f;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        code {
+            color: var(--accent);
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        th { background: var(--bg-secondary); color: var(--primary); }
+        .stream-box {
+            background: linear-gradient(135deg, #1e3a5f, #0f172a);
+            border: 1px solid var(--primary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Stream Processing Frameworks</h1>
+
+    <div class="highlight">
+        <p><strong>Learning Objectives:</strong> Master real-time data processing patterns, understand the semantics of stream processing (at-least-once, exactly-once), and implement production-grade streaming pipelines using WIA-BIG_DATA standards.</p>
+    </div>
+
+    <h2>Introduction to Stream Processing</h2>
+    <p>Stream processing is the continuous processing of data as it arrives, enabling real-time analytics, monitoring, and decision-making. Unlike batch processing that operates on bounded datasets, stream processing handles unbounded, continuously flowing data with minimal latency.</p>
+
+    <p>The WIA-BIG_DATA standard defines requirements for stream processing implementations that ensure reliability, scalability, and consistency across diverse streaming platforms.</p>
+
+    <h2>Processing Semantics</h2>
+
+    <div class="stream-box">
+        <h3>Delivery Guarantees</h3>
+        <ul>
+            <li><strong>At-most-once:</strong> Messages may be lost, never duplicated (fastest)</li>
+            <li><strong>At-least-once:</strong> Messages never lost, may be duplicated (reliable)</li>
+            <li><strong>Exactly-once:</strong> Messages processed exactly once (strongest guarantee)</li>
+        </ul>
+    </div>
+
+    <p>The WIA-BIG_DATA standard requires at-least-once semantics as the minimum guarantee, with exactly-once recommended for financial and critical applications.</p>
+
+    <h2>Apache Kafka Standards</h2>
+    <p>Apache Kafka serves as the backbone for most WIA-BIG_DATA streaming implementations. The standard defines configuration requirements for production deployments.</p>
+
+    <pre>
+# WIA-BIG_DATA Kafka Configuration Standards
+# Producer Configuration
+bootstrap.servers=kafka-1:9092,kafka-2:9092,kafka-3:9092
+acks=all
+enable.idempotence=true
+max.in.flight.requests.per.connection=5
+retries=2147483647
+compression.type=lz4
+linger.ms=5
+batch.size=32768
+
+# Consumer Configuration
+group.id=wia-consumer-group
+enable.auto.commit=false
+auto.offset.reset=earliest
+isolation.level=read_committed
+max.poll.records=500
+session.timeout.ms=30000
+heartbeat.interval.ms=10000
+
+# Topic Configuration Standards
+num.partitions=12
+replication.factor=3
+min.insync.replicas=2
+retention.ms=604800000
+cleanup.policy=delete
+segment.bytes=1073741824
+    </pre>
+
+    <h3>Kafka Producer Implementation</h3>
+    <pre>
+// WIA-BIG_DATA Compliant Kafka Producer
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.serialization.StringSerializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+
+public class WIAKafkaProducer {
+    private final KafkaProducer&lt;String, GenericRecord&gt; producer;
+    private final String topic;
+
+    public WIAKafkaProducer(String bootstrapServers, String topic) {
+        this.topic = topic;
+
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
+
+        // Exactly-once semantics
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
+        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+
+        // Performance tuning
+        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
+        props.put(ProducerConfig.BATCH_SIZE_CONFIG, 32768);
+        props.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+
+        // Schema Registry
+        props.put("schema.registry.url", "http://schema-registry:8081");
+
+        this.producer = new KafkaProducer&lt;&gt;(props);
+    }
+
+    public void sendWithCallback(String key, GenericRecord value) {
+        ProducerRecord&lt;String, GenericRecord&gt; record =
+            new ProducerRecord&lt;&gt;(topic, key, value);
+
+        producer.send(record, (metadata, exception) -&gt; {
+            if (exception != null) {
+                // Log and handle failure
+                logger.error("Failed to send message", exception);
+                handleFailure(record, exception);
+            } else {
+                // Log success with offset
+                logger.debug("Message sent to partition {} offset {}",
+                    metadata.partition(), metadata.offset());
+            }
+        });
+    }
+
+    public void close() {
+        producer.flush();
+        producer.close();
+    }
+}
+    </pre>
+
+    <h2>Apache Flink Integration</h2>
+    <p>Apache Flink provides true stream processing with powerful windowing, state management, and exactly-once guarantees. The WIA-BIG_DATA standard recommends Flink for complex event processing and stateful computations.</p>
+
+    <pre>
+// WIA-BIG_DATA Flink Streaming Application
+import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.windowing.time.Time
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow
+import org.apache.flink.streaming.api.CheckpointingMode
+
+object WIAStreamProcessor {
+  def main(args: Array[String]): Unit = {
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    // Exactly-once checkpointing
+    env.enableCheckpointing(60000, CheckpointingMode.EXACTLY_ONCE)
+    env.getCheckpointConfig.setMinPauseBetweenCheckpoints(30000)
+    env.getCheckpointConfig.setCheckpointTimeout(120000)
+    env.getCheckpointConfig.setMaxConcurrentCheckpoints(1)
+    env.getCheckpointConfig.enableExternalizedCheckpoints(
+      ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION
+    )
+
+    // State backend configuration
+    env.setStateBackend(new RocksDBStateBackend("hdfs:///checkpoints", true))
+
+    // Kafka source with watermarks
+    val kafkaSource = KafkaSource.builder[Event]()
+      .setBootstrapServers("kafka:9092")
+      .setTopics("events")
+      .setGroupId("wia-flink-consumer")
+      .setStartingOffsets(OffsetsInitializer.committedOffsets())
+      .setValueOnlyDeserializer(new EventDeserializer())
+      .build()
+
+    val eventStream = env.fromSource(
+      kafkaSource,
+      WatermarkStrategy
+        .forBoundedOutOfOrderness[Event](Duration.ofSeconds(10))
+        .withTimestampAssigner((event, _) => event.timestamp),
+      "Kafka Events"
+    )
+
+    // Windowed aggregation
+    val aggregatedStream = eventStream
+      .keyBy(_.userId)
+      .window(TumblingEventTimeWindows.of(Time.minutes(5)))
+      .allowedLateness(Time.minutes(1))
+      .sideOutputLateData(lateDataTag)
+      .aggregate(new EventAggregator(), new WindowResultFunction())
+
+    // Sink to multiple outputs
+    aggregatedStream.addSink(new KafkaSink("aggregated-events"))
+    aggregatedStream.addSink(new ElasticsearchSink(esConfig))
+
+    env.execute("WIA Stream Processor")
+  }
+}
+    </pre>
+
+    <h2>Windowing Strategies</h2>
+
+    <table>
+        <tr>
+            <th>Window Type</th>
+            <th>Description</th>
+            <th>Use Case</th>
+        </tr>
+        <tr>
+            <td>Tumbling</td>
+            <td>Fixed-size, non-overlapping windows</td>
+            <td>Hourly aggregations</td>
+        </tr>
+        <tr>
+            <td>Sliding</td>
+            <td>Fixed-size, overlapping windows</td>
+            <td>Moving averages</td>
+        </tr>
+        <tr>
+            <td>Session</td>
+            <td>Activity-based, gap-driven windows</td>
+            <td>User sessions</td>
+        </tr>
+        <tr>
+            <td>Global</td>
+            <td>All elements in one window</td>
+            <td>Custom triggers</td>
+        </tr>
+    </table>
+
+    <pre>
+// Window Implementation Examples
+// Tumbling Window: 5-minute aggregations
+val tumblingResults = events
+  .keyBy(_.customerId)
+  .window(TumblingEventTimeWindows.of(Time.minutes(5)))
+  .reduce((a, b) =&gt; a.merge(b))
+
+// Sliding Window: 10-minute window, 5-minute slide
+val slidingResults = events
+  .keyBy(_.customerId)
+  .window(SlidingEventTimeWindows.of(Time.minutes(10), Time.minutes(5)))
+  .aggregate(new AvgAggregator())
+
+// Session Window: 30-minute gap
+val sessionResults = events
+  .keyBy(_.userId)
+  .window(EventTimeSessionWindows.withGap(Time.minutes(30)))
+  .process(new SessionAnalyzer())
+    </pre>
+
+    <h2>Complex Event Processing (CEP)</h2>
+
+    <div class="highlight">
+        <h3>CEP Pattern Matching</h3>
+        <p>Complex Event Processing enables detection of patterns across event streams, essential for fraud detection, anomaly identification, and business rule enforcement.</p>
+    </div>
+
+    <pre>
+// Flink CEP Pattern for Fraud Detection
+import org.apache.flink.cep.scala.CEP
+import org.apache.flink.cep.scala.pattern.Pattern
+
+// Define suspicious activity pattern
+val fraudPattern = Pattern.begin[Transaction]("first")
+  .where(_.amount > 1000)
+  .next("second")
+  .where(_.amount > 1000)
+  .within(Time.minutes(10))
+  .next("third")
+  .where(tx => tx.amount > 5000 && tx.country != tx.homeCountry)
+  .within(Time.minutes(30))
+
+// Apply pattern to stream
+val patternStream = CEP.pattern(transactionStream.keyBy(_.userId), fraudPattern)
+
+val alerts = patternStream.select(matches => {
+  val first = matches("first").head
+  val second = matches("second").head
+  val third = matches("third").head
+
+  FraudAlert(
+    userId = first.userId,
+    transactions = List(first, second, third),
+    totalAmount = first.amount + second.amount + third.amount,
+    riskScore = calculateRisk(first, second, third),
+    timestamp = System.currentTimeMillis()
+  )
+})
+
+alerts.addSink(new AlertNotificationSink())
+    </pre>
+
+    <h2>Kafka Streams API</h2>
+    <p>For simpler streaming use cases, Kafka Streams provides a lightweight library that runs as a standard Java application without requiring a separate cluster.</p>
+
+    <pre>
+// Kafka Streams Topology for Order Processing
+import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.kstream.*;
+
+public class OrderProcessor {
+    public static void main(String[] args) {
+        Properties props = new Properties();
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "order-processor");
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka:9092");
+        props.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
+                  StreamsConfig.EXACTLY_ONCE_V2);
+
+        StreamsBuilder builder = new StreamsBuilder();
+
+        // Source: Orders topic
+        KStream&lt;String, Order&gt; orders = builder.stream(
+            "orders",
+            Consumed.with(Serdes.String(), orderSerde)
+        );
+
+        // Branch orders by type
+        Map&lt;String, KStream&lt;String, Order&gt;&gt; branches = orders.split(Named.as("branch-"))
+            .branch((key, order) -&gt; order.getType().equals("STANDARD"),
+                    Branched.as("standard"))
+            .branch((key, order) -&gt; order.getType().equals("EXPRESS"),
+                    Branched.as("express"))
+            .defaultBranch(Branched.as("other"));
+
+        // Process standard orders
+        branches.get("branch-standard")
+            .mapValues(order -&gt; enrichOrder(order))
+            .to("enriched-orders");
+
+        // Join with customer data
+        KTable&lt;String, Customer&gt; customers = builder.table("customers");
+
+        KStream&lt;String, EnrichedOrder&gt; enrichedOrders = orders
+            .selectKey((k, v) -&gt; v.getCustomerId())
+            .join(customers,
+                  (order, customer) -&gt; new EnrichedOrder(order, customer),
+                  Joined.with(Serdes.String(), orderSerde, customerSerde));
+
+        // Windowed aggregation
+        enrichedOrders
+            .groupBy((k, v) -&gt; v.getRegion())
+            .windowedBy(TimeWindows.ofSizeWithNoGrace(Duration.ofMinutes(15)))
+            .aggregate(
+                () -&gt; new RegionMetrics(),
+                (key, order, metrics) -&gt; metrics.add(order),
+                Materialized.as("region-metrics-store")
+            )
+            .toStream()
+            .to("region-metrics");
+
+        KafkaStreams streams = new KafkaStreams(builder.build(), props);
+        streams.start();
+    }
+}
+    </pre>
+
+    <h2>Stream Processing Monitoring</h2>
+
+    <div class="stream-box">
+        <h3>Key Metrics to Monitor</h3>
+        <ul>
+            <li><strong>Throughput:</strong> Events processed per second</li>
+            <li><strong>Latency:</strong> End-to-end processing time</li>
+            <li><strong>Consumer Lag:</strong> Messages behind latest offset</li>
+            <li><strong>Checkpoint Duration:</strong> Time to complete checkpoints</li>
+            <li><strong>Backpressure:</strong> Queue buildup indicators</li>
+        </ul>
+    </div>
+
+    <pre>
+// Prometheus Metrics for Stream Processing
+stream_processing_events_total{job="flink", pipeline="orders"} 1234567
+stream_processing_latency_seconds{quantile="0.99"} 0.150
+stream_consumer_lag{topic="events", partition="0"} 1523
+stream_checkpoint_duration_seconds 12.5
+stream_backpressure_ratio{task="aggregation"} 0.05
+
+// Alerting Rules
+groups:
+  - name: stream-processing-alerts
+    rules:
+      - alert: HighConsumerLag
+        expr: stream_consumer_lag > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer lag exceeds threshold"
+
+      - alert: ProcessingLatencyHigh
+        expr: stream_processing_latency_seconds{quantile="0.99"} > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P99 latency exceeds 1 second"
+    </pre>
+
+    <h2>Best Practices Summary</h2>
+
+    <div class="highlight">
+        <h3>WIA-BIG_DATA Stream Processing Checklist</h3>
+        <ul>
+            <li>Enable exactly-once semantics for critical data</li>
+            <li>Configure proper watermarks for out-of-order events</li>
+            <li>Implement dead-letter queues for failed messages</li>
+            <li>Use incremental checkpointing for large state</li>
+            <li>Monitor consumer lag and processing latency</li>
+            <li>Design for horizontal scalability</li>
+            <li>Implement graceful shutdown and restart</li>
+        </ul>
+    </div>
+</body>
+</html>

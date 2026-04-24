@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Privacy-Preserving Analytics - WIA-BIG_DATA</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin-bottom: 1rem; color: var(--text); }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a1a2e);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+        }
+        pre {
+            background: #0a0a0f;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        code {
+            color: var(--accent);
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        th { background: var(--bg-secondary); color: var(--primary); }
+        .privacy-box {
+            background: linear-gradient(135deg, #1e3a5f, #0f172a);
+            border: 1px solid var(--primary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Privacy-Preserving Analytics</h1>
+
+    <div class="highlight">
+        <p><strong>Learning Objectives:</strong> Master techniques for analyzing data while protecting individual privacy, including differential privacy, k-anonymity, data masking, and federated learning approaches compliant with global regulations.</p>
+    </div>
+
+    <h2>Privacy in Big Data</h2>
+    <p>As organizations collect and analyze increasingly large datasets, protecting individual privacy becomes paramount. The WIA-BIG_DATA standard mandates privacy-preserving techniques that enable valuable analytics while ensuring compliance with regulations like GDPR, CCPA, and HIPAA.</p>
+
+    <p>Privacy-preserving analytics balances two competing goals: extracting maximum value from data and protecting individuals from identification or sensitive attribute disclosure.</p>
+
+    <h2>Regulatory Compliance Framework</h2>
+
+    <table>
+        <tr>
+            <th>Regulation</th>
+            <th>Region</th>
+            <th>Key Requirements</th>
+        </tr>
+        <tr>
+            <td>GDPR</td>
+            <td>European Union</td>
+            <td>Consent, right to erasure, data minimization</td>
+        </tr>
+        <tr>
+            <td>CCPA/CPRA</td>
+            <td>California, USA</td>
+            <td>Opt-out rights, data disclosure, deletion</td>
+        </tr>
+        <tr>
+            <td>HIPAA</td>
+            <td>United States</td>
+            <td>PHI protection, de-identification standards</td>
+        </tr>
+        <tr>
+            <td>LGPD</td>
+            <td>Brazil</td>
+            <td>Consent, purpose limitation, data portability</td>
+        </tr>
+        <tr>
+            <td>POPIA</td>
+            <td>South Africa</td>
+            <td>Lawful processing, security safeguards</td>
+        </tr>
+    </table>
+
+    <h2>Differential Privacy</h2>
+    <p>Differential privacy provides mathematical guarantees that the output of an analysis does not reveal whether any individual's data was included in the input. It achieves this by adding carefully calibrated noise to query results.</p>
+
+    <div class="privacy-box">
+        <h3>Differential Privacy Guarantee</h3>
+        <p>A randomized algorithm M provides epsilon-differential privacy if for any two datasets D1 and D2 differing by at most one record, and for any output S:</p>
+        <p><code>Pr[M(D1) in S] &lt;= exp(epsilon) * Pr[M(D2) in S]</code></p>
+        <p>Lower epsilon values provide stronger privacy guarantees but reduce accuracy.</p>
+    </div>
+
+    <pre>
+# Differential Privacy Implementation with PySpark
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+import numpy as np
+
+class DifferentialPrivacyEngine:
+    def __init__(self, epsilon=1.0, delta=1e-5):
+        self.epsilon = epsilon
+        self.delta = delta
+
+    def laplace_mechanism(self, true_value, sensitivity):
+        """Add Laplace noise for epsilon-DP"""
+        scale = sensitivity / self.epsilon
+        noise = np.random.laplace(0, scale)
+        return true_value + noise
+
+    def gaussian_mechanism(self, true_value, sensitivity):
+        """Add Gaussian noise for (epsilon, delta)-DP"""
+        sigma = sensitivity * np.sqrt(2 * np.log(1.25 / self.delta)) / self.epsilon
+        noise = np.random.normal(0, sigma)
+        return true_value + noise
+
+    def private_count(self, df, condition=None):
+        """Compute differentially private count"""
+        if condition:
+            true_count = df.filter(condition).count()
+        else:
+            true_count = df.count()
+
+        # Sensitivity of count is 1
+        return self.laplace_mechanism(true_count, sensitivity=1)
+
+    def private_sum(self, df, column, clip_lower, clip_upper):
+        """Compute differentially private sum with clipping"""
+        # Clip values to bound sensitivity
+        clipped_df = df.withColumn(
+            column + "_clipped",
+            when(col(column) < clip_lower, clip_lower)
+            .when(col(column) > clip_upper, clip_upper)
+            .otherwise(col(column))
+        )
+
+        true_sum = clipped_df.agg(sum(column + "_clipped")).collect()[0][0]
+        sensitivity = clip_upper - clip_lower
+
+        return self.laplace_mechanism(true_sum, sensitivity)
+
+    def private_mean(self, df, column, clip_lower, clip_upper):
+        """Compute differentially private mean"""
+        # Split privacy budget between count and sum
+        count_engine = DifferentialPrivacyEngine(self.epsilon / 2, self.delta / 2)
+        sum_engine = DifferentialPrivacyEngine(self.epsilon / 2, self.delta / 2)
+
+        private_n = count_engine.private_count(df)
+        private_s = sum_engine.private_sum(df, column, clip_lower, clip_upper)
+
+        return private_s / private_n if private_n > 0 else 0
+
+# Usage example
+dp_engine = DifferentialPrivacyEngine(epsilon=0.5)
+
+# Private count of customers by region
+private_count = dp_engine.private_count(customers_df, "region = 'US'")
+
+# Private average order value
+private_avg = dp_engine.private_mean(
+    orders_df, "order_total",
+    clip_lower=0, clip_upper=1000
+)
+    </pre>
+
+    <h2>K-Anonymity and L-Diversity</h2>
+    <p>K-anonymity ensures that each record in a dataset is indistinguishable from at least k-1 other records with respect to quasi-identifier attributes. L-diversity extends this by ensuring diversity in sensitive attributes.</p>
+
+    <pre>
+# K-Anonymity Implementation
+from pyspark.sql.functions import col, count, collect_set, size
+
+class KAnonymizer:
+    def __init__(self, spark, k=5):
+        self.spark = spark
+        self.k = k
+
+    def generalize_age(self, age, level):
+        """Generalize age to ranges"""
+        if level == 0:
+            return age
+        elif level == 1:
+            return f"{(age // 5) * 5}-{(age // 5) * 5 + 4}"
+        elif level == 2:
+            return f"{(age // 10) * 10}-{(age // 10) * 10 + 9}"
+        else:
+            return f"{(age // 20) * 20}-{(age // 20) * 20 + 19}"
+
+    def generalize_zipcode(self, zipcode, level):
+        """Generalize zipcode by masking digits"""
+        if level == 0:
+            return zipcode
+        else:
+            return zipcode[:5-level] + "*" * level
+
+    def check_k_anonymity(self, df, quasi_identifiers):
+        """Check if dataset satisfies k-anonymity"""
+        group_sizes = df.groupBy(quasi_identifiers).count()
+        min_group_size = group_sizes.agg({"count": "min"}).collect()[0][0]
+        return min_group_size >= self.k
+
+    def anonymize(self, df, quasi_identifiers, generalizations):
+        """Apply generalizations until k-anonymity is achieved"""
+        current_df = df
+        current_levels = {qi: 0 for qi in quasi_identifiers}
+
+        while not self.check_k_anonymity(current_df, quasi_identifiers):
+            # Find quasi-identifier with most distinct values
+            most_distinct = None
+            max_distinct = 0
+
+            for qi in quasi_identifiers:
+                distinct_count = current_df.select(qi).distinct().count()
+                if distinct_count > max_distinct:
+                    max_distinct = distinct_count
+                    most_distinct = qi
+
+            # Increase generalization level
+            if most_distinct and current_levels[most_distinct] < 3:
+                current_levels[most_distinct] += 1
+                gen_func = generalizations[most_distinct]
+                current_df = current_df.withColumn(
+                    most_distinct,
+                    gen_func(col(most_distinct), current_levels[most_distinct])
+                )
+            else:
+                # Cannot achieve k-anonymity, suppress small groups
+                current_df = self.suppress_small_groups(
+                    current_df, quasi_identifiers
+                )
+                break
+
+        return current_df
+
+    def check_l_diversity(self, df, quasi_identifiers, sensitive_attr, l=3):
+        """Check if dataset satisfies l-diversity"""
+        diversity = df.groupBy(quasi_identifiers).agg(
+            size(collect_set(sensitive_attr)).alias("diversity")
+        )
+        min_diversity = diversity.agg({"diversity": "min"}).collect()[0][0]
+        return min_diversity >= l
+
+# Usage
+anonymizer = KAnonymizer(spark, k=5)
+anonymized_df = anonymizer.anonymize(
+    patient_df,
+    quasi_identifiers=["age", "zipcode", "gender"],
+    generalizations={
+        "age": anonymizer.generalize_age,
+        "zipcode": anonymizer.generalize_zipcode
+    }
+)
+    </pre>
+
+    <h2>Data Masking Techniques</h2>
+
+    <div class="privacy-box">
+        <h3>Masking Methods</h3>
+        <ul>
+            <li><strong>Substitution:</strong> Replace with realistic fake values</li>
+            <li><strong>Shuffling:</strong> Randomly reorder values within a column</li>
+            <li><strong>Encryption:</strong> Format-preserving encryption</li>
+            <li><strong>Tokenization:</strong> Replace with non-reversible tokens</li>
+            <li><strong>Nulling:</strong> Replace with NULL values</li>
+            <li><strong>Character Masking:</strong> Partially obscure values</li>
+        </ul>
+    </div>
+
+    <pre>
+// Data Masking API Configuration
+{
+  "masking_policy": {
+    "name": "pii_masking_policy",
+    "version": "1.0.0",
+    "rules": [
+      {
+        "column_pattern": ".*email.*",
+        "method": "format_preserving",
+        "config": {
+          "preserve_domain": true,
+          "example": "john.doe@company.com -> xxxx.xxx@company.com"
+        }
+      },
+      {
+        "column_pattern": ".*ssn.*|.*social_security.*",
+        "method": "tokenization",
+        "config": {
+          "token_vault": "vault://pii-tokens",
+          "format": "XXX-XX-{last4}"
+        }
+      },
+      {
+        "column_pattern": ".*phone.*",
+        "method": "character_mask",
+        "config": {
+          "preserve_first": 3,
+          "preserve_last": 4,
+          "mask_char": "*"
+        }
+      },
+      {
+        "column_pattern": ".*credit_card.*",
+        "method": "format_preserving_encryption",
+        "config": {
+          "key_id": "fpe-key-001",
+          "preserve_format": true,
+          "luhn_valid": true
+        }
+      },
+      {
+        "column_pattern": ".*address.*",
+        "method": "synthetic_substitution",
+        "config": {
+          "seed_column": "customer_id",
+          "locale": "en_US"
+        }
+      },
+      {
+        "column_pattern": ".*birth_date.*|.*dob.*",
+        "method": "date_shift",
+        "config": {
+          "min_days": -365,
+          "max_days": 365,
+          "consistent_per": "customer_id"
+        }
+      }
+    ],
+    "environments": {
+      "production": {
+        "apply": false,
+        "audit": true
+      },
+      "staging": {
+        "apply": true,
+        "audit": true
+      },
+      "development": {
+        "apply": true,
+        "audit": false
+      }
+    }
+  }
+}
+    </pre>
+
+    <h2>Federated Learning</h2>
+    <p>Federated learning enables training machine learning models across distributed datasets without centralizing the data. This approach preserves privacy by keeping data on local devices or servers.</p>
+
+    <pre>
+# Federated Learning Framework
+import numpy as np
+from typing import List, Dict
+
+class FederatedLearningServer:
+    def __init__(self, model_config):
+        self.model_config = model_config
+        self.global_model = self.initialize_model()
+        self.round_number = 0
+
+    def initialize_model(self):
+        """Initialize global model weights"""
+        return {
+            "weights": np.random.randn(self.model_config["input_dim"],
+                                       self.model_config["output_dim"]) * 0.01,
+            "bias": np.zeros(self.model_config["output_dim"])
+        }
+
+    def federated_averaging(self, client_updates: List[Dict],
+                           client_weights: List[float]):
+        """Aggregate client updates using FedAvg"""
+        total_weight = sum(client_weights)
+
+        new_weights = np.zeros_like(self.global_model["weights"])
+        new_bias = np.zeros_like(self.global_model["bias"])
+
+        for update, weight in zip(client_updates, client_weights):
+            new_weights += (weight / total_weight) * update["weights"]
+            new_bias += (weight / total_weight) * update["bias"]
+
+        self.global_model["weights"] = new_weights
+        self.global_model["bias"] = new_bias
+        self.round_number += 1
+
+        return self.global_model
+
+    def secure_aggregation(self, encrypted_updates: List[bytes]):
+        """Aggregate updates without seeing individual contributions"""
+        # Uses secure multi-party computation
+        pass
+
+class FederatedLearningClient:
+    def __init__(self, client_id, local_data):
+        self.client_id = client_id
+        self.local_data = local_data
+        self.local_model = None
+
+    def receive_global_model(self, global_model):
+        """Receive and apply global model weights"""
+        self.local_model = {
+            "weights": global_model["weights"].copy(),
+            "bias": global_model["bias"].copy()
+        }
+
+    def local_training(self, epochs=5, learning_rate=0.01):
+        """Train on local data"""
+        X, y = self.local_data
+
+        for epoch in range(epochs):
+            # Forward pass
+            predictions = X @ self.local_model["weights"] + self.local_model["bias"]
+
+            # Compute gradients
+            error = predictions - y
+            grad_weights = X.T @ error / len(X)
+            grad_bias = error.mean(axis=0)
+
+            # Update weights
+            self.local_model["weights"] -= learning_rate * grad_weights
+            self.local_model["bias"] -= learning_rate * grad_bias
+
+        return self.local_model
+
+    def compute_update_with_dp(self, epsilon=1.0):
+        """Compute model update with differential privacy"""
+        update = self.local_training()
+
+        # Clip gradients
+        clip_norm = 1.0
+        weights_norm = np.linalg.norm(update["weights"])
+        if weights_norm > clip_norm:
+            update["weights"] = update["weights"] * clip_norm / weights_norm
+
+        # Add noise
+        noise_scale = clip_norm * np.sqrt(2 * np.log(1.25 / 1e-5)) / epsilon
+        update["weights"] += np.random.normal(0, noise_scale,
+                                               update["weights"].shape)
+
+        return update
+
+# Federated training loop
+server = FederatedLearningServer({"input_dim": 100, "output_dim": 10})
+clients = [FederatedLearningClient(i, data) for i, data in enumerate(client_data)]
+
+for round in range(100):
+    # Distribute global model
+    for client in clients:
+        client.receive_global_model(server.global_model)
+
+    # Collect local updates
+    updates = [client.compute_update_with_dp(epsilon=0.5) for client in clients]
+    weights = [len(c.local_data[0]) for c in clients]
+
+    # Aggregate
+    server.federated_averaging(updates, weights)
+    </pre>
+
+    <h2>Privacy Budget Management</h2>
+
+    <pre>
+// Privacy Budget Tracking System
+{
+  "privacy_budget": {
+    "dataset": "customer_analytics",
+    "total_epsilon": 10.0,
+    "total_delta": 1e-5,
+    "consumed": {
+      "epsilon": 3.5,
+      "delta": 3e-6
+    },
+    "remaining": {
+      "epsilon": 6.5,
+      "delta": 7e-6
+    },
+    "queries": [
+      {
+        "query_id": "q-001",
+        "timestamp": "2024-01-15T10:00:00Z",
+        "user": "analyst@company.com",
+        "epsilon_used": 1.0,
+        "delta_used": 1e-6,
+        "query_type": "count",
+        "approved": true
+      },
+      {
+        "query_id": "q-002",
+        "timestamp": "2024-01-15T11:30:00Z",
+        "user": "data_scientist@company.com",
+        "epsilon_used": 2.5,
+        "delta_used": 2e-6,
+        "query_type": "histogram",
+        "approved": true
+      }
+    ],
+    "policies": {
+      "max_epsilon_per_query": 2.0,
+      "max_queries_per_day": 100,
+      "budget_refresh": "monthly",
+      "alert_threshold": 0.8
+    }
+  }
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Key Takeaways</h3>
+        <ul>
+            <li>Differential privacy provides mathematical privacy guarantees</li>
+            <li>K-anonymity and l-diversity protect against re-identification</li>
+            <li>Use appropriate masking techniques for different data types</li>
+            <li>Federated learning enables analytics without data centralization</li>
+            <li>Track and manage privacy budgets to prevent over-disclosure</li>
+        </ul>
+    </div>
+</body>
+</html>

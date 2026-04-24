@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Data Quality and Governance - WIA-BIG_DATA</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p { margin-bottom: 1rem; color: var(--text); }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a1a2e);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+        }
+        pre {
+            background: #0a0a0f;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        code {
+            color: var(--accent);
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        th { background: var(--bg-secondary); color: var(--primary); }
+        .quality-box {
+            background: linear-gradient(135deg, #1e3a5f, #0f172a);
+            border: 1px solid var(--primary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .metric-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Data Quality and Governance</h1>
+
+    <div class="highlight">
+        <p><strong>Learning Objectives:</strong> Implement comprehensive data quality frameworks, establish governance policies, and build automated quality gates that ensure data reliability across your big data infrastructure.</p>
+    </div>
+
+    <h2>Data Quality Dimensions</h2>
+    <p>Data quality is measured across multiple dimensions, each critical to ensuring that analytics and machine learning models produce reliable results. The WIA-BIG_DATA standard defines six core quality dimensions that must be monitored and maintained.</p>
+
+    <div class="quality-box">
+        <h3>Core Quality Dimensions</h3>
+        <ul>
+            <li><strong>Completeness:</strong> Percentage of non-null values in required fields</li>
+            <li><strong>Accuracy:</strong> Degree to which data correctly represents reality</li>
+            <li><strong>Consistency:</strong> Uniformity of data across systems and time</li>
+            <li><strong>Timeliness:</strong> Data availability relative to business needs</li>
+            <li><strong>Validity:</strong> Conformance to defined formats and constraints</li>
+            <li><strong>Uniqueness:</strong> Absence of unwanted duplicates</li>
+        </ul>
+    </div>
+
+    <h2>Data Quality Framework</h2>
+    <p>The WIA-BIG_DATA quality framework provides a structured approach to defining, measuring, and enforcing data quality standards across all data assets.</p>
+
+    <pre>
+// WIA-BIG_DATA Quality Rules Definition
+{
+  "quality_profile": {
+    "name": "customer_data_quality",
+    "version": "1.0.0",
+    "dataset": "curated.customers",
+    "rules": [
+      {
+        "id": "CQ001",
+        "dimension": "completeness",
+        "column": "email",
+        "check": "not_null",
+        "threshold": 0.99,
+        "severity": "critical",
+        "description": "Email must be present for 99% of records"
+      },
+      {
+        "id": "CQ002",
+        "dimension": "validity",
+        "column": "email",
+        "check": "regex",
+        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+        "threshold": 0.98,
+        "severity": "warning"
+      },
+      {
+        "id": "CQ003",
+        "dimension": "uniqueness",
+        "columns": ["customer_id"],
+        "check": "unique",
+        "threshold": 1.0,
+        "severity": "critical"
+      },
+      {
+        "id": "CQ004",
+        "dimension": "consistency",
+        "column": "country_code",
+        "check": "reference",
+        "reference_table": "reference.countries",
+        "reference_column": "iso_code",
+        "threshold": 1.0,
+        "severity": "critical"
+      },
+      {
+        "id": "CQ005",
+        "dimension": "accuracy",
+        "column": "birth_date",
+        "check": "range",
+        "min": "1900-01-01",
+        "max": "CURRENT_DATE",
+        "threshold": 1.0,
+        "severity": "critical"
+      },
+      {
+        "id": "CQ006",
+        "dimension": "freshness",
+        "column": "last_updated",
+        "check": "freshness",
+        "max_age_hours": 24,
+        "severity": "warning"
+      }
+    ],
+    "aggregated_score": {
+      "method": "weighted_average",
+      "weights": {
+        "completeness": 0.2,
+        "validity": 0.2,
+        "uniqueness": 0.2,
+        "consistency": 0.15,
+        "accuracy": 0.15,
+        "freshness": 0.1
+      },
+      "minimum_score": 0.95
+    }
+  }
+}
+    </pre>
+
+    <h2>Great Expectations Integration</h2>
+    <p>Great Expectations is the recommended tool for implementing data quality checks in WIA-BIG_DATA compliant systems. It provides a declarative approach to defining and validating data quality expectations.</p>
+
+    <pre>
+# Great Expectations Suite for Customer Data
+import great_expectations as gx
+from great_expectations.core.expectation_configuration import ExpectationConfiguration
+
+context = gx.get_context()
+
+# Create expectation suite
+suite = context.add_expectation_suite("customer_data_suite")
+
+# Completeness checks
+suite.add_expectation(
+    ExpectationConfiguration(
+        expectation_type="expect_column_values_to_not_be_null",
+        kwargs={"column": "customer_id"}
+    )
+)
+
+suite.add_expectation(
+    ExpectationConfiguration(
+        expectation_type="expect_column_values_to_not_be_null",
+        kwargs={"column": "email", "mostly": 0.99}
+    )
+)
+
+# Validity checks
+suite.add_expectation(
+    ExpectationConfiguration(
+        expectation_type="expect_column_values_to_match_regex",
+        kwargs={
+            "column": "email",
+            "regex": r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+            "mostly": 0.98
+        }
+    )
+)
+
+suite.add_expectation(
+    ExpectationConfiguration(
+        expectation_type="expect_column_values_to_be_in_set",
+        kwargs={
+            "column": "status",
+            "value_set": ["active", "inactive", "pending", "suspended"]
+        }
+    )
+)
+
+# Uniqueness checks
+suite.add_expectation(
+    ExpectationConfiguration(
+        expectation_type="expect_column_values_to_be_unique",
+        kwargs={"column": "customer_id"}
+    )
+)
+
+# Range checks
+suite.add_expectation(
+    ExpectationConfiguration(
+        expectation_type="expect_column_values_to_be_between",
+        kwargs={
+            "column": "age",
+            "min_value": 18,
+            "max_value": 120
+        }
+    )
+)
+
+# Statistical checks
+suite.add_expectation(
+    ExpectationConfiguration(
+        expectation_type="expect_column_mean_to_be_between",
+        kwargs={
+            "column": "order_count",
+            "min_value": 1,
+            "max_value": 100
+        }
+    )
+)
+
+# Save and run validation
+context.save_expectation_suite(suite)
+
+# Run checkpoint
+checkpoint = context.add_or_update_checkpoint(
+    name="customer_data_checkpoint",
+    validations=[
+        {
+            "batch_request": {
+                "datasource_name": "spark_datasource",
+                "data_connector_name": "default_inferred_data_connector",
+                "data_asset_name": "customers"
+            },
+            "expectation_suite_name": "customer_data_suite"
+        }
+    ]
+)
+
+results = checkpoint.run()
+    </pre>
+
+    <h2>Data Profiling</h2>
+    <p>Data profiling is the process of analyzing datasets to understand their structure, content, and quality. The WIA-BIG_DATA standard requires automated profiling for all datasets entering the curated zone.</p>
+
+    <pre>
+# Automated Data Profiling Pipeline
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+
+def profile_dataset(df, dataset_name):
+    """Generate comprehensive data profile for WIA-BIG_DATA compliance"""
+
+    profile = {
+        "dataset_name": dataset_name,
+        "profiled_at": datetime.now().isoformat(),
+        "row_count": df.count(),
+        "column_count": len(df.columns),
+        "columns": []
+    }
+
+    for column in df.columns:
+        col_type = str(df.schema[column].dataType)
+
+        # Basic statistics
+        col_stats = df.agg(
+            count(column).alias("count"),
+            countDistinct(column).alias("distinct_count"),
+            sum(when(col(column).isNull(), 1).otherwise(0)).alias("null_count")
+        ).collect()[0]
+
+        col_profile = {
+            "name": column,
+            "data_type": col_type,
+            "total_count": profile["row_count"],
+            "non_null_count": col_stats["count"],
+            "null_count": col_stats["null_count"],
+            "null_percentage": col_stats["null_count"] / profile["row_count"] * 100,
+            "distinct_count": col_stats["distinct_count"],
+            "uniqueness": col_stats["distinct_count"] / col_stats["count"] if col_stats["count"] > 0 else 0
+        }
+
+        # Numeric column statistics
+        if col_type in ["IntegerType", "LongType", "DoubleType", "DecimalType"]:
+            numeric_stats = df.agg(
+                min(column).alias("min"),
+                max(column).alias("max"),
+                avg(column).alias("mean"),
+                stddev(column).alias("stddev"),
+                expr(f"percentile_approx({column}, 0.5)").alias("median")
+            ).collect()[0]
+
+            col_profile.update({
+                "min": numeric_stats["min"],
+                "max": numeric_stats["max"],
+                "mean": numeric_stats["mean"],
+                "stddev": numeric_stats["stddev"],
+                "median": numeric_stats["median"]
+            })
+
+        # String column statistics
+        if col_type == "StringType":
+            string_stats = df.agg(
+                min(length(column)).alias("min_length"),
+                max(length(column)).alias("max_length"),
+                avg(length(column)).alias("avg_length")
+            ).collect()[0]
+
+            col_profile.update({
+                "min_length": string_stats["min_length"],
+                "max_length": string_stats["max_length"],
+                "avg_length": string_stats["avg_length"]
+            })
+
+            # Top values
+            top_values = df.groupBy(column)\
+                .count()\
+                .orderBy(desc("count"))\
+                .limit(10)\
+                .collect()
+
+            col_profile["top_values"] = [
+                {"value": row[column], "count": row["count"]}
+                for row in top_values
+            ]
+
+        profile["columns"].append(col_profile)
+
+    return profile
+    </pre>
+
+    <h2>Data Governance Framework</h2>
+
+    <table>
+        <tr>
+            <th>Governance Area</th>
+            <th>Description</th>
+            <th>Key Components</th>
+        </tr>
+        <tr>
+            <td>Data Ownership</td>
+            <td>Clear accountability for data assets</td>
+            <td>Data owners, stewards, custodians</td>
+        </tr>
+        <tr>
+            <td>Data Classification</td>
+            <td>Categorization by sensitivity</td>
+            <td>Public, internal, confidential, restricted</td>
+        </tr>
+        <tr>
+            <td>Access Control</td>
+            <td>Authorization and authentication</td>
+            <td>RBAC, ABAC, column-level security</td>
+        </tr>
+        <tr>
+            <td>Data Lineage</td>
+            <td>Tracking data flow and transformations</td>
+            <td>Source-to-target mapping, impact analysis</td>
+        </tr>
+        <tr>
+            <td>Data Retention</td>
+            <td>Lifecycle management policies</td>
+            <td>Archival, deletion, legal holds</td>
+        </tr>
+    </table>
+
+    <h2>Data Lineage Implementation</h2>
+
+    <pre>
+// Data Lineage Tracking Schema
+{
+  "lineage_record": {
+    "id": "lin-2024-001234",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "pipeline": "customer_etl_daily",
+    "execution_id": "exec-abc123",
+
+    "source_datasets": [
+      {
+        "name": "raw.crm_customers",
+        "type": "table",
+        "location": "s3://data-lake/raw/crm/customers/",
+        "version": "2024-01-15",
+        "row_count": 1500000
+      },
+      {
+        "name": "raw.order_history",
+        "type": "table",
+        "location": "s3://data-lake/raw/orders/",
+        "version": "2024-01-15",
+        "row_count": 5000000
+      }
+    ],
+
+    "target_dataset": {
+      "name": "curated.customer_360",
+      "type": "table",
+      "location": "s3://data-lake/curated/customer_360/",
+      "version": "2024-01-15",
+      "row_count": 1500000
+    },
+
+    "transformations": [
+      {
+        "type": "join",
+        "description": "Join customers with order history",
+        "columns": ["customer_id"]
+      },
+      {
+        "type": "aggregate",
+        "description": "Calculate customer metrics",
+        "columns": ["total_orders", "total_spend", "avg_order_value"]
+      },
+      {
+        "type": "filter",
+        "description": "Remove inactive customers",
+        "condition": "last_order_date >= date_sub(current_date, 365)"
+      }
+    ],
+
+    "column_lineage": [
+      {
+        "target_column": "customer_id",
+        "source_column": "raw.crm_customers.id",
+        "transformation": "direct_mapping"
+      },
+      {
+        "target_column": "total_spend",
+        "source_columns": ["raw.order_history.order_total"],
+        "transformation": "sum(order_total)"
+      },
+      {
+        "target_column": "customer_segment",
+        "source_columns": ["total_spend", "order_count"],
+        "transformation": "case_when(total_spend > 10000, 'premium', ...)"
+      }
+    ],
+
+    "quality_metrics": {
+      "input_quality_score": 0.98,
+      "output_quality_score": 0.99,
+      "records_processed": 1500000,
+      "records_rejected": 1523,
+      "rejection_reasons": {
+        "invalid_email": 823,
+        "duplicate_id": 500,
+        "missing_required": 200
+      }
+    }
+  }
+}
+    </pre>
+
+    <h2>Access Control Policies</h2>
+
+    <div class="quality-box">
+        <h3>Column-Level Security</h3>
+        <p>WIA-BIG_DATA requires fine-grained access control at the column level for sensitive data. This enables sharing datasets while protecting PII and confidential information.</p>
+    </div>
+
+    <pre>
+-- Row-Level and Column-Level Security Implementation
+-- Create security policies
+
+-- Column masking for PII
+CREATE MASKING POLICY pii_mask AS (val STRING)
+RETURNS STRING ->
+  CASE
+    WHEN CURRENT_ROLE() IN ('admin', 'pii_viewer') THEN val
+    ELSE '***MASKED***'
+  END;
+
+-- Apply to sensitive columns
+ALTER TABLE customers MODIFY COLUMN email
+  SET MASKING POLICY pii_mask;
+ALTER TABLE customers MODIFY COLUMN phone
+  SET MASKING POLICY pii_mask;
+ALTER TABLE customers MODIFY COLUMN ssn
+  SET MASKING POLICY pii_mask;
+
+-- Row-level security
+CREATE ROW ACCESS POLICY region_filter AS (region STRING)
+RETURNS BOOLEAN ->
+  CASE
+    WHEN CURRENT_ROLE() = 'admin' THEN TRUE
+    WHEN CURRENT_ROLE() = 'us_analyst' AND region = 'US' THEN TRUE
+    WHEN CURRENT_ROLE() = 'eu_analyst' AND region = 'EU' THEN TRUE
+    ELSE FALSE
+  END;
+
+ALTER TABLE sales ADD ROW ACCESS POLICY region_filter ON (region);
+
+-- Audit logging
+CREATE TABLE governance.access_audit (
+    audit_id STRING,
+    timestamp TIMESTAMP,
+    user_id STRING,
+    role STRING,
+    action STRING,
+    resource STRING,
+    columns_accessed ARRAY&lt;STRING&gt;,
+    row_count INT,
+    query_hash STRING,
+    client_ip STRING
+);
+    </pre>
+
+    <h2>Quality Dashboards</h2>
+
+    <pre>
+// Quality Dashboard API Response
+{
+  "dashboard": {
+    "generated_at": "2024-01-15T12:00:00Z",
+    "overall_score": 0.967,
+    "trend": "+0.02",
+
+    "dimensions": {
+      "completeness": {"score": 0.99, "trend": "+0.01"},
+      "accuracy": {"score": 0.95, "trend": "-0.01"},
+      "consistency": {"score": 0.97, "trend": "0.00"},
+      "timeliness": {"score": 0.98, "trend": "+0.02"},
+      "validity": {"score": 0.94, "trend": "+0.01"},
+      "uniqueness": {"score": 0.99, "trend": "0.00"}
+    },
+
+    "critical_issues": [
+      {
+        "dataset": "curated.transactions",
+        "rule": "CQ-TXN-005",
+        "dimension": "accuracy",
+        "description": "Amount validation failed",
+        "affected_records": 1523,
+        "severity": "high"
+      }
+    ],
+
+    "datasets_monitored": 247,
+    "rules_executed": 1834,
+    "rules_passed": 1798,
+    "rules_failed": 36
+  }
+}
+    </pre>
+
+    <div class="highlight">
+        <h3>Key Takeaways</h3>
+        <ul>
+            <li>Implement quality checks at every stage of the data pipeline</li>
+            <li>Use automated profiling to detect data drift and anomalies</li>
+            <li>Maintain comprehensive data lineage for impact analysis</li>
+            <li>Apply fine-grained access controls for sensitive data</li>
+            <li>Monitor quality metrics continuously with alerting</li>
+        </ul>
+    </div>
+</body>
+</html>

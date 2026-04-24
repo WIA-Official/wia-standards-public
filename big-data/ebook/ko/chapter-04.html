@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>4장: 1단계 - 데이터 형식</title>
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; line-height: 1.8; max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #34495e; margin-top: 30px; border-left: 4px solid #3498db; padding-left: 15px; }
+        h3 { color: #555; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #3498db; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        code { background-color: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background-color: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        blockquote { border-left: 4px solid #3498db; padding-left: 20px; margin: 20px 0; font-style: italic; color: #555; }
+        .highlight { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .success { background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .info { background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .warning { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+<p><a href="index.html">📊 WIA-DATA-001 빅데이터 표준 전자책</a> | 4장 / 8장</p>
+<hr>
+
+<h1>4장: 1단계 - 데이터 형식 스펙</h1>
+
+<blockquote>
+<p><strong>"데이터 형식의 표준화는 모든 상호 운용성의 출발점입니다"</strong></p>
+<p>WIA-DATA-001의 첫 번째 단계는 데이터를 어떻게 정의하고, 저장하고, 전송할 것인가를 다룹니다. SDL(Standard Data Layout) 스키마 정의 언어와 WBF(WIA Binary Format) 직렬화 형식은 빅데이터 생태계 전반의 공통 언어 역할을 합니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>4.1 SDL (Standard Data Layout) 스키마 정의 언어</h2>
+
+<h3>4.1.1 SDL 개요 및 설계 철학</h3>
+
+<p>SDL은 WIA-DATA-001의 핵심 스키마 정의 언어로, 데이터 구조를 명확하고 일관되게 표현합니다. JSON 기반의 직관적인 문법과 강력한 타입 시스템을 결합하여 개발자 친화성과 엄격성을 모두 확보했습니다.</p>
+
+<div class="info">
+<p><strong>SDL 설계 원칙:</strong></p>
+<ul>
+    <li><strong>가독성:</strong> 사람이 쉽게 읽고 작성할 수 있는 구조</li>
+    <li><strong>표현력:</strong> 복잡한 데이터 관계도 명확하게 표현</li>
+    <li><strong>호환성:</strong> JSON Schema, Avro, Protobuf와 양방향 변환 가능</li>
+    <li><strong>진화 가능성:</strong> 스키마 변경 시 하위 호환성 유지</li>
+    <li><strong>도구 친화성:</strong> IDE 자동완성, 검증 도구 지원</li>
+</ul>
+</div>
+
+<h3>4.1.2 SDL 기본 문법</h3>
+
+<p><strong>기본 스키마 구조:</strong></p>
+
+<pre><code>{
+  "namespace": "com.example.ecommerce",
+  "name": "Order",
+  "type": "record",
+  "version": "1.0.0",
+  "doc": "전자상거래 주문 데이터",
+  "fields": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "doc": "주문 고유 식별자 (UUID v4)",
+      "required": true,
+      "example": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    {
+      "name": "customer_id",
+      "type": "long",
+      "doc": "고객 ID (시스템 내부 일련번호)",
+      "required": true
+    },
+    {
+      "name": "order_date",
+      "type": "timestamp",
+      "doc": "주문 생성 시각 (UTC)",
+      "required": true,
+      "default": "now()"
+    },
+    {
+      "name": "total_amount",
+      "type": "decimal",
+      "precision": 10,
+      "scale": 2,
+      "doc": "총 주문 금액 (통화: KRW)",
+      "required": true
+    },
+    {
+      "name": "items",
+      "type": "array",
+      "items": "OrderItem",
+      "doc": "주문 항목 목록",
+      "required": true,
+      "minItems": 1
+    },
+    {
+      "name": "shipping_address",
+      "type": "Address",
+      "doc": "배송 주소",
+      "required": false
+    },
+    {
+      "name": "metadata",
+      "type": "map",
+      "values": "string",
+      "doc": "추가 메타데이터 (확장 가능)",
+      "required": false
+    }
+  ]
+}
+</code></pre>
+
+<h3>4.1.3 SDL 데이터 타입 시스템</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>카테고리</th>
+            <th>타입</th>
+            <th>설명</th>
+            <th>크기</th>
+            <th>범위/예시</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan="6"><strong>기본 타입</strong></td>
+            <td><code>boolean</code></td>
+            <td>참/거짓</td>
+            <td>1 byte</td>
+            <td>true, false</td>
+        </tr>
+        <tr>
+            <td><code>int</code></td>
+            <td>32비트 정수</td>
+            <td>4 bytes</td>
+            <td>-2,147,483,648 ~ 2,147,483,647</td>
+        </tr>
+        <tr>
+            <td><code>long</code></td>
+            <td>64비트 정수</td>
+            <td>8 bytes</td>
+            <td>-9,223,372,036,854,775,808 ~ 9,223,372,036,854,775,807</td>
+        </tr>
+        <tr>
+            <td><code>float</code></td>
+            <td>32비트 부동소수점</td>
+            <td>4 bytes</td>
+            <td>IEEE 754 단정밀도</td>
+        </tr>
+        <tr>
+            <td><code>double</code></td>
+            <td>64비트 부동소수점</td>
+            <td>8 bytes</td>
+            <td>IEEE 754 배정밀도</td>
+        </tr>
+        <tr>
+            <td><code>string</code></td>
+            <td>UTF-8 문자열</td>
+            <td>가변</td>
+            <td>"안녕하세요"</td>
+        </tr>
+        <tr>
+            <td rowspan="3"><strong>특수 타입</strong></td>
+            <td><code>decimal</code></td>
+            <td>정밀 소수 (금액)</td>
+            <td>가변</td>
+            <td>precision=10, scale=2 → 12345678.90</td>
+        </tr>
+        <tr>
+            <td><code>timestamp</code></td>
+            <td>시간 (마이크로초)</td>
+            <td>8 bytes</td>
+            <td>2025-01-15T10:30:00.123456Z</td>
+        </tr>
+        <tr>
+            <td><code>bytes</code></td>
+            <td>바이트 배열</td>
+            <td>가변</td>
+            <td>이미지, 파일 등</td>
+        </tr>
+        <tr>
+            <td rowspan="3"><strong>복합 타입</strong></td>
+            <td><code>array</code></td>
+            <td>배열</td>
+            <td>가변</td>
+            <td>[1, 2, 3, 4, 5]</td>
+        </tr>
+        <tr>
+            <td><code>map</code></td>
+            <td>키-값 맵</td>
+            <td>가변</td>
+            <td>{"key1": "value1", "key2": "value2"}</td>
+        </tr>
+        <tr>
+            <td><code>record</code></td>
+            <td>중첩 레코드</td>
+            <td>가변</td>
+            <td>사용자 정의 구조체</td>
+        </tr>
+        <tr>
+            <td rowspan="2"><strong>논리 타입</strong></td>
+            <td><code>enum</code></td>
+            <td>열거형</td>
+            <td>가변</td>
+            <td>["PENDING", "PROCESSING", "COMPLETED"]</td>
+        </tr>
+        <tr>
+            <td><code>union</code></td>
+            <td>여러 타입 중 하나</td>
+            <td>가변</td>
+            <td>["null", "string", "int"]</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.1.4 중첩 레코드와 참조</h3>
+
+<p><strong>OrderItem 스키마 정의:</strong></p>
+
+<pre><code>{
+  "namespace": "com.example.ecommerce",
+  "name": "OrderItem",
+  "type": "record",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "product_name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "int",
+      "required": true,
+      "minimum": 1
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "precision": 10,
+      "scale": 2,
+      "required": true
+    },
+    {
+      "name": "discount",
+      "type": ["null", "decimal"],
+      "precision": 5,
+      "scale": 2,
+      "required": false,
+      "doc": "할인율 (0.00 ~ 100.00)"
+    }
+  ]
+}
+</code></pre>
+
+<p><strong>Address 스키마 정의:</strong></p>
+
+<pre><code>{
+  "namespace": "com.example.ecommerce",
+  "name": "Address",
+  "type": "record",
+  "fields": [
+    {
+      "name": "street",
+      "type": "string",
+      "required": true,
+      "doc": "도로명 주소"
+    },
+    {
+      "name": "city",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "state",
+      "type": "string",
+      "required": false,
+      "doc": "시/도"
+    },
+    {
+      "name": "postal_code",
+      "type": "string",
+      "required": true,
+      "pattern": "^[0-9]{5}$"
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "required": true,
+      "default": "KR"
+    }
+  ]
+}
+</code></pre>
+
+<hr>
+
+<h2>4.2 WBF (WIA Binary Format) 직렬화 형식</h2>
+
+<h3>4.2.1 WBF 설계 목표</h3>
+
+<p>WBF는 빅데이터 워크로드에 최적화된 바이너리 직렬화 형식으로, 다음 목표를 달성하도록 설계되었습니다:</p>
+
+<div class="highlight">
+<p><strong>성능 목표:</strong></p>
+<ul>
+    <li><strong>압축률:</strong> 원본 JSON 대비 70-80% 크기 절감</li>
+    <li><strong>직렬화 속도:</strong> 1M 레코드/초 이상 (단일 코어)</li>
+    <li><strong>역직렬화 속도:</strong> 1.5M 레코드/초 이상</li>
+    <li><strong>메모리 효율:</strong> 제로 카피(zero-copy) 가능</li>
+    <li><strong>스트리밍 친화성:</strong> 청크 단위 점진적 처리</li>
+</ul>
+</div>
+
+<h3>4.2.2 WBF 바이너리 구조</h3>
+
+<pre><code>WBF 파일 구조:
+┌─────────────────────────────────────────────────────┐
+│ Header (고정 크기: 64 bytes)                         │
+├─────────────────────────────────────────────────────┤
+│ - Magic Number: 0x57424601 (4 bytes)                │
+│ - Version: 1.0.0 (3 bytes)                          │
+│ - Flags: 압축/암호화 설정 (1 byte)                   │
+│ - Schema ID: 스키마 레지스트리 참조 (8 bytes)         │
+│ - Record Count: 레코드 개수 (8 bytes)                │
+│ - Compressed Size: 압축 후 크기 (8 bytes)            │
+│ - Uncompressed Size: 압축 전 크기 (8 bytes)          │
+│ - Checksum: CRC32C (4 bytes)                        │
+│ - Reserved: 향후 확장 (20 bytes)                     │
+├─────────────────────────────────────────────────────┤
+│ Sync Marker (16 bytes)                              │
+├─────────────────────────────────────────────────────┤
+│ Data Block 1 (가변 크기, 기본 64KB)                  │
+│ - Block Header (16 bytes)                           │
+│ - Compressed Records (N bytes)                      │
+├─────────────────────────────────────────────────────┤
+│ Sync Marker (16 bytes)                              │
+├─────────────────────────────────────────────────────┤
+│ Data Block 2                                        │
+├─────────────────────────────────────────────────────┤
+│ ...                                                 │
+├─────────────────────────────────────────────────────┤
+│ Footer (가변 크기)                                   │
+│ - Schema (JSON)                                     │
+│ - Metadata (key-value pairs)                        │
+│ - Block Index (offset, size)                        │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+
+<h3>4.2.3 인코딩 기법</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>데이터 타입</th>
+            <th>인코딩 방식</th>
+            <th>설명</th>
+            <th>효율성</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>정수</strong></td>
+            <td>ZigZag + VarInt</td>
+            <td>작은 숫자는 1-2바이트로 인코딩</td>
+            <td>40-60% 절감</td>
+        </tr>
+        <tr>
+            <td><strong>부동소수점</strong></td>
+            <td>IEEE 754</td>
+            <td>표준 float/double 표현</td>
+            <td>고정 크기</td>
+        </tr>
+        <tr>
+            <td><strong>문자열</strong></td>
+            <td>Length + UTF-8</td>
+            <td>길이(VarInt) + UTF-8 바이트</td>
+            <td>최소 오버헤드</td>
+        </tr>
+        <tr>
+            <td><strong>배열</strong></td>
+            <td>Count + Elements</td>
+            <td>개수(VarInt) + 각 요소</td>
+            <td>최소 오버헤드</td>
+        </tr>
+        <tr>
+            <td><strong>맵</strong></td>
+            <td>Count + Key-Value Pairs</td>
+            <td>개수 + (키, 값) 쌍</td>
+            <td>최소 오버헤드</td>
+        </tr>
+        <tr>
+            <td><strong>Null</strong></td>
+            <td>Bit Flag</td>
+            <td>비트맵으로 null 표시</td>
+            <td>1 bit/필드</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.2.4 VarInt 인코딩 상세</h3>
+
+<p>VarInt(Variable-length Integer)는 작은 숫자를 효율적으로 저장하는 핵심 기법입니다:</p>
+
+<pre><code>VarInt 인코딩 예시:
+  0 (0x00)       → 1 byte:  0000 0000
+  127 (0x7F)     → 1 byte:  0111 1111
+  128 (0x80)     → 2 bytes: 1000 0000 0000 0001
+  16,383         → 2 bytes: 1111 1111 0111 1111
+  2,097,151      → 3 bytes: 1111 1111 1111 1111 0111 1111
+
+ZigZag 인코딩 (부호 있는 정수):
+  0   → 0
+  -1  → 1
+  1   → 2
+  -2  → 3
+  2   → 4
+  ...
+
+효율성 비교:
+  값 범위              | 고정 8바이트 | VarInt  | 절감률
+  -64 ~ 63            |  8 bytes     | 1 byte  | 87.5%
+  -8,192 ~ 8,191      |  8 bytes     | 2 bytes | 75%
+  -1M ~ 1M            |  8 bytes     | 3 bytes | 62.5%
+</code></pre>
+
+<hr>
+
+<h2>4.3 스키마 레지스트리</h2>
+
+<h3>4.3.1 스키마 레지스트리의 역할</h3>
+
+<p>스키마 레지스트리는 SDL 스키마의 중앙 저장소로, 버전 관리와 호환성 검증을 담당합니다:</p>
+
+<div class="info">
+<p><strong>주요 기능:</strong></p>
+<ul>
+    <li><strong>스키마 저장:</strong> 모든 스키마 버전을 영구 보관</li>
+    <li><strong>버전 관리:</strong> 시맨틱 버저닝 기반 버전 추적</li>
+    <li><strong>호환성 검증:</strong> 스키마 변경 시 호환성 자동 검사</li>
+    <li><strong>스키마 조회:</strong> ID 또는 이름으로 빠른 검색</li>
+    <li><strong>메타데이터 관리:</strong> 소유자, 생성일, 설명 등 추적</li>
+</ul>
+</div>
+
+<h3>4.3.2 스키마 진화 (Schema Evolution)</h3>
+
+<p>스키마는 시간이 지남에 따라 변경될 수 있습니다. WIA-DATA-001은 4가지 호환성 모드를 지원합니다:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>호환성 모드</th>
+            <th>설명</th>
+            <th>허용 변경</th>
+            <th>사용 사례</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>BACKWARD</strong></td>
+            <td>새 스키마로 이전 데이터 읽기</td>
+            <td>필드 삭제, 기본값 있는 필드 추가</td>
+            <td>Consumer 먼저 업그레이드</td>
+        </tr>
+        <tr>
+            <td><strong>FORWARD</strong></td>
+            <td>이전 스키마로 새 데이터 읽기</td>
+            <td>필드 추가, 기본값 있는 필드 삭제</td>
+            <td>Producer 먼저 업그레이드</td>
+        </tr>
+        <tr>
+            <td><strong>FULL</strong></td>
+            <td>양방향 호환</td>
+            <td>기본값 있는 필드만 추가/삭제</td>
+            <td>순서 무관 업그레이드</td>
+        </tr>
+        <tr>
+            <td><strong>NONE</strong></td>
+            <td>호환성 검사 없음</td>
+            <td>모든 변경 허용</td>
+            <td>개발 환경, 1회성 데이터</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.3.3 스키마 버전 관리 예시</h3>
+
+<pre><code>Order 스키마 진화 과정:
+
+v1.0.0 (초기 버전):
+{
+  "name": "Order",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "customer_id", "type": "long"},
+    {"name": "total_amount", "type": "decimal"}
+  ]
+}
+
+v1.1.0 (하위 호환 - 필드 추가):
+{
+  "name": "Order",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "customer_id", "type": "long"},
+    {"name": "total_amount", "type": "decimal"},
+    {"name": "status", "type": "string", "default": "PENDING"} // 추가
+  ]
+}
+
+v1.2.0 (하위 호환 - 선택 필드 추가):
+{
+  "name": "Order",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "customer_id", "type": "long"},
+    {"name": "total_amount", "type": "decimal"},
+    {"name": "status", "type": "string", "default": "PENDING"},
+    {"name": "notes", "type": ["null", "string"], "default": null} // 추가
+  ]
+}
+
+v2.0.0 (호환성 깨짐 - 타입 변경):
+{
+  "name": "Order",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "customer_id", "type": "string"}, // long → string (BREAKING)
+    {"name": "total_amount", "type": "decimal"},
+    {"name": "status", "type": "string", "default": "PENDING"},
+    {"name": "notes", "type": ["null", "string"], "default": null}
+  ]
+}
+</code></pre>
+
+<h3>4.3.4 스키마 레지스트리 API</h3>
+
+<pre><code># 스키마 등록
+POST /api/v1/schemas
+{
+  "name": "com.example.Order",
+  "schema": {...},
+  "compatibility": "FULL"
+}
+
+# 응답
+{
+  "id": 12345,
+  "version": "1.0.0",
+  "created_at": "2025-01-15T10:30:00Z"
+}
+
+# 스키마 조회
+GET /api/v1/schemas/12345
+GET /api/v1/schemas/com.example.Order/versions/latest
+
+# 호환성 검증
+POST /api/v1/schemas/com.example.Order/compatibility
+{
+  "schema": {...}  // 새 스키마
+}
+
+# 응답
+{
+  "is_compatible": true,
+  "messages": []
+}
+</code></pre>
+
+<hr>
+
+<h2>4.4 압축 알고리즘</h2>
+
+<h3>4.4.1 지원 압축 코덱</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>코덱</th>
+            <th>압축률</th>
+            <th>속도</th>
+            <th>CPU 사용</th>
+            <th>권장 용도</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>None</strong></td>
+            <td>1:1</td>
+            <td>가장 빠름</td>
+            <td>없음</td>
+            <td>이미 압축된 데이터, 개발/테스트</td>
+        </tr>
+        <tr>
+            <td><strong>Snappy</strong></td>
+            <td>1:2~3</td>
+            <td>매우 빠름</td>
+            <td>낮음</td>
+            <td>실시간 스트리밍, 로그</td>
+        </tr>
+        <tr>
+            <td><strong>LZ4</strong></td>
+            <td>1:2~3</td>
+            <td>매우 빠름</td>
+            <td>낮음</td>
+            <td>범용, 기본 권장</td>
+        </tr>
+        <tr>
+            <td><strong>Zstd (Level 3)</strong></td>
+            <td>1:3~5</td>
+            <td>빠름</td>
+            <td>중간</td>
+            <td>분석 워크로드, 장기 저장</td>
+        </tr>
+        <tr>
+            <td><strong>Zstd (Level 9)</strong></td>
+            <td>1:4~7</td>
+            <td>중간</td>
+            <td>높음</td>
+            <td>아카이빙, 백업</td>
+        </tr>
+        <tr>
+            <td><strong>Gzip</strong></td>
+            <td>1:3~4</td>
+            <td>느림</td>
+            <td>높음</td>
+            <td>레거시 호환, HTTP 전송</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.4.2 압축 성능 벤치마크</h3>
+
+<p>1GB 전자상거래 주문 데이터 기준 (JSON → WBF):</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>코덱</th>
+            <th>압축 시간</th>
+            <th>압축 후 크기</th>
+            <th>압축률</th>
+            <th>처리량</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>None</td>
+            <td>2초</td>
+            <td>450 MB</td>
+            <td>55%</td>
+            <td>500 MB/s</td>
+        </tr>
+        <tr>
+            <td>Snappy</td>
+            <td>3초</td>
+            <td>200 MB</td>
+            <td>80%</td>
+            <td>333 MB/s</td>
+        </tr>
+        <tr>
+            <td>LZ4</td>
+            <td>3.5초</td>
+            <td>195 MB</td>
+            <td>80.5%</td>
+            <td>285 MB/s</td>
+        </tr>
+        <tr>
+            <td>Zstd-3</td>
+            <td>5초</td>
+            <td>150 MB</td>
+            <td>85%</td>
+            <td>200 MB/s</td>
+        </tr>
+        <tr>
+            <td>Zstd-9</td>
+            <td>15초</td>
+            <td>120 MB</td>
+            <td>88%</td>
+            <td>67 MB/s</td>
+        </tr>
+        <tr>
+            <td>Gzip</td>
+            <td>20초</td>
+            <td>140 MB</td>
+            <td>86%</td>
+            <td>50 MB/s</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.4.3 압축 선택 가이드</h3>
+
+<div class="highlight">
+<p><strong>사용 시나리오별 권장 코덱:</strong></p>
+
+<p><strong>실시간 스트리밍 (Kafka, Pulsar):</strong></p>
+<ul>
+    <li>1순위: LZ4 (속도와 압축률 균형)</li>
+    <li>2순위: Snappy (최고 속도)</li>
+</ul>
+
+<p><strong>배치 분석 (Spark, Flink):</strong></p>
+<ul>
+    <li>1순위: Zstd-3 (우수한 압축률, 합리적 속도)</li>
+    <li>2순위: LZ4 (빠른 처리 필요 시)</li>
+</ul>
+
+<p><strong>장기 저장 (S3, HDFS):</strong></p>
+<ul>
+    <li>1순위: Zstd-9 (최고 압축률)</li>
+    <li>2순위: Zstd-3 (균형)</li>
+</ul>
+
+<p><strong>HTTP API 전송:</strong></p>
+<ul>
+    <li>1순위: Gzip (브라우저 호환)</li>
+    <li>2순위: Zstd (최신 브라우저)</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>4.5 파티셔닝 및 인덱싱</h2>
+
+<h3>4.5.1 파티셔닝 전략</h3>
+
+<p>WBF는 대규모 데이터셋의 효율적인 쿼리를 위해 파티셔닝을 지원합니다:</p>
+
+<pre><code>디렉토리 기반 파티셔닝:
+/data/orders/
+  year=2025/
+    month=01/
+      day=15/
+        part-00000.wbf
+        part-00001.wbf
+        ...
+    month=02/
+      day=01/
+        part-00000.wbf
+        ...
+
+Hive 스타일 파티션 경로:
+/data/orders/year=2025/month=01/region=ASIA/country=KR/part-00000.wbf
+
+쿼리 예시:
+SELECT * FROM orders
+WHERE year = 2025 AND month = 1 AND region = 'ASIA'
+-- 해당 파티션만 스캔 (파티션 프루닝)
+</code></pre>
+
+<h3>4.5.2 컬럼 통계 및 인덱스</h3>
+
+<p>각 WBF 파일은 푸터에 컬럼 통계를 포함하여 쿼리 최적화를 지원합니다:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>통계 항목</th>
+            <th>설명</th>
+            <th>활용</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Row Count</strong></td>
+            <td>총 레코드 수</td>
+            <td>COUNT(*) 쿼리 최적화</td>
+        </tr>
+        <tr>
+            <td><strong>Min/Max</strong></td>
+            <td>각 컬럼의 최소/최대값</td>
+            <td>범위 필터 프루닝</td>
+        </tr>
+        <tr>
+            <td><strong>Null Count</strong></td>
+            <td>NULL 값 개수</td>
+            <td>IS NULL 쿼리 최적화</td>
+        </tr>
+        <tr>
+            <td><strong>Distinct Count</strong></td>
+            <td>유니크 값 개수 (추정)</td>
+            <td>카디널리티 추정</td>
+        </tr>
+        <tr>
+            <td><strong>Bloom Filter</strong></td>
+            <td>값 존재 여부 확률</td>
+            <td>IN 절 필터 프루닝</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.5.3 쿼리 최적화 예시</h3>
+
+<pre><code>쿼리:
+SELECT * FROM orders
+WHERE order_date >= '2025-01-01'
+  AND order_date < '2025-02-01'
+  AND total_amount > 100000
+
+최적화 과정:
+1. 파티션 프루닝: year=2025/month=01/ 파티션만 스캔
+2. Min/Max 프루닝: order_date 범위 밖 파일 스킵
+3. Min/Max 프루닝: total_amount < 100000인 파일 스킵
+4. Bloom Filter: 특정 customer_id IN (...) 조건 시 활용
+
+결과:
+- 스캔 대상: 1000개 파일 → 50개 파일 (95% 감소)
+- 쿼리 시간: 120초 → 6초 (95% 단축)
+</code></pre>
+
+<hr>
+
+<h2>4.6 다른 형식과의 호환성</h2>
+
+<h3>4.6.1 레거시 형식 변환</h3>
+
+<p>WIA-DATA-001은 기존 형식과의 양방향 변환을 지원합니다:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>형식</th>
+            <th>읽기</th>
+            <th>쓰기</th>
+            <th>스키마 변환</th>
+            <th>성능 오버헤드</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>JSON</strong></td>
+            <td>✅</td>
+            <td>✅</td>
+            <td>자동 추론 가능</td>
+            <td>파싱: 중간</td>
+        </tr>
+        <tr>
+            <td><strong>CSV</strong></td>
+            <td>✅</td>
+            <td>✅</td>
+            <td>헤더 또는 스키마 필요</td>
+            <td>파싱: 낮음</td>
+        </tr>
+        <tr>
+            <td><strong>Avro</strong></td>
+            <td>✅</td>
+            <td>✅</td>
+            <td>직접 매핑</td>
+            <td>거의 없음 (5%)</td>
+        </tr>
+        <tr>
+            <td><strong>Parquet</strong></td>
+            <td>✅</td>
+            <td>✅</td>
+            <td>스키마 매핑</td>
+            <td>낮음 (10%)</td>
+        </tr>
+        <tr>
+            <td><strong>ORC</strong></td>
+            <td>✅</td>
+            <td>✅</td>
+            <td>스키마 매핑</td>
+            <td>낮음 (10%)</td>
+        </tr>
+        <tr>
+            <td><strong>Protobuf</strong></td>
+            <td>✅</td>
+            <td>✅</td>
+            <td>.proto → SDL 변환</td>
+            <td>낮음 (15%)</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.6.2 변환 도구 사용 예시</h3>
+
+<pre><code># JSON → WBF 변환
+wia-convert --from json --to wbf \
+  --input orders.json \
+  --output orders.wbf \
+  --schema order-schema.sdl \
+  --compress lz4
+
+# Parquet → WBF 변환
+wia-convert --from parquet --to wbf \
+  --input orders.parquet \
+  --output orders.wbf \
+  --infer-schema
+
+# WBF → JSON 변환 (디버깅용)
+wia-convert --from wbf --to json \
+  --input orders.wbf \
+  --output orders.json \
+  --pretty
+
+# 스키마 추출
+wia-schema extract \
+  --input orders.wbf \
+  --output order-schema.sdl
+</code></pre>
+
+<hr>
+
+<h2>4.7 SDK 활용 예시</h2>
+
+<h3>4.7.1 Python SDK</h3>
+
+<pre><code>from wia_data import WBFWriter, WBFReader, Schema
+
+# 스키마 로드
+schema = Schema.from_file('order-schema.sdl')
+
+# WBF 파일 쓰기
+with WBFWriter('orders.wbf', schema, codec='lz4') as writer:
+    writer.write({
+        'order_id': '550e8400-e29b-41d4-a716-446655440000',
+        'customer_id': 12345,
+        'order_date': '2025-01-15T10:30:00Z',
+        'total_amount': Decimal('150000.00'),
+        'items': [
+            {
+                'product_id': 'PROD-001',
+                'product_name': '노트북',
+                'quantity': 1,
+                'unit_price': Decimal('150000.00')
+            }
+        ]
+    })
+    writer.write({...})  # 다음 레코드
+
+# WBF 파일 읽기
+with WBFReader('orders.wbf') as reader:
+    for record in reader:
+        print(f"Order {record['order_id']}: {record['total_amount']}")
+
+# 스키마 진화 지원
+schema_v2 = schema.evolve()
+schema_v2.add_field('status', 'string', default='PENDING')
+schema_v2.validate_compatibility(schema)  # BACKWARD 호환성 검증
+</code></pre>
+
+<h3>4.7.2 Java SDK</h3>
+
+<pre><code>import com.wia.data.*;
+
+// 스키마 로드
+Schema schema = Schema.fromFile("order-schema.sdl");
+
+// WBF 파일 쓰기
+try (WBFWriter writer = new WBFWriter("orders.wbf", schema, Codec.LZ4)) {
+    GenericRecord record = new GenericRecord(schema);
+    record.put("order_id", "550e8400-e29b-41d4-a716-446655440000");
+    record.put("customer_id", 12345L);
+    record.put("order_date", Instant.parse("2025-01-15T10:30:00Z"));
+    record.put("total_amount", new BigDecimal("150000.00"));
+
+    List<GenericRecord> items = new ArrayList<>();
+    GenericRecord item = new GenericRecord(schema.getField("items").getSchema());
+    item.put("product_id", "PROD-001");
+    item.put("product_name", "노트북");
+    item.put("quantity", 1);
+    item.put("unit_price", new BigDecimal("150000.00"));
+    items.add(item);
+
+    record.put("items", items);
+    writer.write(record);
+}
+
+// WBF 파일 읽기
+try (WBFReader reader = new WBFReader("orders.wbf")) {
+    for (GenericRecord record : reader) {
+        System.out.println("Order " + record.get("order_id") + ": " + record.get("total_amount"));
+    }
+}
+</code></pre>
+
+<hr>
+
+<h2>4.8 모범 사례 및 안티 패턴</h2>
+
+<h3>4.8.1 스키마 설계 모범 사례</h3>
+
+<div class="success">
+<p><strong>DO (권장):</strong></p>
+<ul>
+    <li>✅ 명확하고 일관된 필드명 사용 (<code>customer_id</code>, <code>order_date</code>)</li>
+    <li>✅ 모든 필드에 <code>doc</code> 주석 추가</li>
+    <li>✅ 기본값 제공 (<code>default</code>) 으로 호환성 확보</li>
+    <li>✅ 적절한 타입 선택 (금액은 <code>decimal</code>, ID는 <code>long</code>)</li>
+    <li>✅ 네임스페이스 사용으로 충돌 방지</li>
+    <li>✅ 필드 추가는 선택 필드 또는 기본값 포함</li>
+</ul>
+</div>
+
+<div class="warning">
+<p><strong>DON'T (안티 패턴):</strong></p>
+<ul>
+    <li>❌ 모호한 약어 사용 (<code>cid</code>, <code>amt</code> 대신 전체 단어)</li>
+    <li>❌ 깊은 중첩 (3단계 이상)</li>
+    <li>❌ 필수 필드 삭제 (호환성 깨짐)</li>
+    <li>❌ 타입 변경 (메이저 버전 업그레이드 필요)</li>
+    <li>❌ 거대한 맵 타입 (<code>map&lt;string, any&gt;</code> 남용)</li>
+    <li>❌ 문서화 없이 스키마 배포</li>
+</ul>
+</div>
+
+<h3>4.8.2 성능 최적화 팁</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>항목</th>
+            <th>문제</th>
+            <th>해결책</th>
+            <th>성능 향상</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>압축</strong></td>
+            <td>압축 없음으로 스토리지 낭비</td>
+            <td>LZ4 또는 Zstd-3 사용</td>
+            <td>70-80% 크기 절감</td>
+        </tr>
+        <tr>
+            <td><strong>블록 크기</strong></td>
+            <td>기본값 사용</td>
+            <td>워크로드에 따라 조정 (32KB~256KB)</td>
+            <td>10-30% 향상</td>
+        </tr>
+        <tr>
+            <td><strong>파티셔닝</strong></td>
+            <td>단일 파일</td>
+            <td>날짜/지역 등으로 파티션</td>
+            <td>90%+ 쿼리 단축</td>
+        </tr>
+        <tr>
+            <td><strong>스키마 캐싱</strong></td>
+            <td>매번 레지스트리 조회</td>
+            <td>로컬 캐시 활용</td>
+            <td>레지스트리 부하 99% 감소</td>
+        </tr>
+        <tr>
+            <td><strong>배치 쓰기</strong></td>
+            <td>레코드별 flush</td>
+            <td>배치(1000-10000) 단위 쓰기</td>
+            <td>5-10배 속도 향상</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>4.9 장 요약</h2>
+
+<div class="highlight">
+<h3>핵심 요점</h3>
+<ol>
+    <li><strong>SDL 스키마 언어:</strong> WIA-DATA-001은 SDL(Standard Data Layout)이라는 JSON 기반의 직관적인 스키마 정의 언어를 제공합니다. 기본 타입(boolean, int, long, string 등), 특수 타입(decimal, timestamp), 복합 타입(array, map, record)을 지원하며, 중첩 레코드와 참조를 통해 복잡한 데이터 구조를 명확하게 표현할 수 있습니다.</li>
+
+    <li><strong>WBF 바이너리 형식:</strong> WBF는 빅데이터 워크로드에 최적화된 바이너리 직렬화 형식으로, VarInt/ZigZag 인코딩을 통해 작은 숫자를 1-2바이트로 압축합니다. 원본 JSON 대비 70-80% 크기 절감, 1M 레코드/초 이상의 직렬화 속도, 제로 카피 지원으로 메모리 효율성을 극대화합니다.</li>
+
+    <li><strong>스키마 레지스트리:</strong> 중앙 집중식 스키마 저장소를 통해 버전 관리와 호환성 검증을 자동화합니다. BACKWARD, FORWARD, FULL, NONE 4가지 호환성 모드를 지원하여 스키마 진화 시 이전 데이터와의 호환성을 보장하며, 시맨틱 버저닝으로 명확한 버전 추적이 가능합니다.</li>
+
+    <li><strong>압축 알고리즘:</strong> Snappy, LZ4, Zstd, Gzip 등 다양한 압축 코덱을 지원하며, 사용 시나리오에 따라 최적의 코덱을 선택할 수 있습니다. 실시간 스트리밍에는 LZ4, 배치 분석에는 Zstd-3, 장기 저장에는 Zstd-9를 권장하며, 1GB JSON 데이터를 120MB까지 압축 가능합니다.</li>
+
+    <li><strong>파티셔닝과 인덱싱:</strong> Hive 스타일 디렉토리 파티셔닝으로 쿼리 성능을 극적으로 향상시키며, 각 파일의 푸터에 Min/Max, Null Count, Bloom Filter 등의 통계를 포함하여 파티션 프루닝과 필터 프루닝을 지원합니다. 실제 사례에서 1000개 파일 스캔을 50개로 줄여 95% 쿼리 시간 단축을 달성했습니다.</li>
+
+    <li><strong>레거시 호환성:</strong> JSON, CSV, Avro, Parquet, ORC, Protobuf 등 모든 주요 형식과 양방향 변환을 지원하여 기존 시스템과의 통합이 용이합니다. 특히 Avro와는 거의 오버헤드 없이 (5% 이내) 직접 매핑이 가능하며, 변환 도구(wia-convert)를 통해 배치 변환을 자동화할 수 있습니다.</li>
+
+    <li><strong>다중 언어 SDK:</strong> Python, Java, Go, TypeScript용 공식 SDK를 제공하여 WBF 파일의 읽기/쓰기를 간단하게 구현할 수 있습니다. 스키마 검증, 압축, 스트리밍 처리 등 모든 기능을 SDK에서 직접 지원하며, 개발자는 비즈니스 로직에만 집중할 수 있습니다.</li>
+
+    <li><strong>모범 사례:</strong> 명확한 필드명 사용, 모든 필드에 문서 주석 추가, 기본값 제공으로 호환성 확보, 적절한 타입 선택, 네임스페이스 활용 등의 모범 사례를 따르면 유지보수성과 성능을 동시에 달성할 수 있습니다. 반대로 모호한 약어, 깊은 중첩, 필수 필드 삭제 등의 안티 패턴은 반드시 피해야 합니다.</li>
+</ol>
+</div>
+
+<hr>
+
+<h2>4.10 복습 문제</h2>
+
+<div class="info">
+<p><strong>문제 1:</strong> SDL 스키마에서 <code>decimal</code> 타입과 <code>double</code> 타입의 차이를 설명하고, 각각 어떤 상황에서 사용해야 하는지 예를 들어 설명하세요.</p>
+
+<p><strong>문제 2:</strong> WBF의 VarInt 인코딩이 일반 고정 크기 정수 인코딩보다 효율적인 이유를 설명하고, 값 127, 128, 16383을 VarInt로 인코딩했을 때 각각 몇 바이트가 필요한지 계산하세요.</p>
+
+<p><strong>문제 3:</strong> 스키마 레지스트리의 4가지 호환성 모드(BACKWARD, FORWARD, FULL, NONE)를 각각 설명하고, 실제 프로젝트에서 FULL 모드를 사용해야 하는 이유를 설명하세요.</p>
+
+<p><strong>문제 4:</strong> 다음 시나리오별로 최적의 압축 코덱을 선택하고 그 이유를 설명하세요: (1) 실시간 주문 처리 Kafka 토픽, (2) 월별 매출 분석 Spark 배치 작업, (3) 법적 의무 7년 보관 아카이브</p>
+
+<p><strong>문제 5:</strong> 전자상거래 주문 데이터를 <code>year</code>, <code>month</code>, <code>region</code>으로 파티셔닝했을 때, 다음 쿼리에서 스캔되는 파티션 수를 계산하세요: <code>SELECT * FROM orders WHERE year=2025 AND month IN (1,2) AND region='ASIA'</code></p>
+
+<p><strong>문제 6:</strong> 기존 Order 스키마(v1.0.0)에 새로운 필드 <code>payment_method</code>를 추가하려고 합니다. FULL 호환성을 유지하면서 추가하는 방법을 SDL 코드로 작성하고, 호환성 검증 과정을 설명하세요.</p>
+</div>
+
+<hr>
+
+<h2>4.11 다음 장 미리보기</h2>
+
+<div class="success">
+<p><strong>5장: 2단계 - API 인터페이스</strong></p>
+
+<p>데이터 형식 표준화를 마쳤다면, 이제 데이터에 접근하는 방법을 표준화할 차례입니다. 다음 장에서는:</p>
+
+<ul>
+    <li><strong>RESTful API 설계:</strong> WIA-DATA-001 표준 API 엔드포인트 및 HTTP 메서드</li>
+    <li><strong>WQL (WIA Query Language):</strong> SQL을 넘어선 빅데이터 쿼리 언어</li>
+    <li><strong>다중 언어 SDK:</strong> Python, Java, Go, TypeScript 클라이언트 라이브러리</li>
+    <li><strong>인증 및 인가:</strong> API Key, OAuth 2.0, RBAC 권한 관리</li>
+    <li><strong>성능 최적화:</strong> 페이지네이션, 필터링, 캐싱 전략</li>
+    <li><strong>실전 예제:</strong> 전자상거래 주문 API 구축</li>
+</ul>
+
+<p>API는 데이터와 애플리케이션을 연결하는 다리입니다. 5장에서 표준화된 API 설계의 모든 것을 배워봅시다.</p>
+</div>
+
+<hr>
+
+<p><strong>다음:</strong> <a href="chapter-05.html">5장: 2단계 - API 인터페이스 →</a></p>
+<p><a href="chapter-03.html">← 3장: 표준 개요</a> |</p>
+
+<hr>
+<p style="text-align: center; color: #7f8c8d; font-size: 0.9em;">
+    <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+    © 2025 WIA (World Certification Industry Association)<br>
+    본 자료는 WIA-DATA-001 표준의 일부이며 Apache 2.0 라이선스로 배포됩니다.
+</p>
+</body>
+</html>
