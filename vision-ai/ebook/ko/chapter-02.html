@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 2: 이미지 처리 기초 | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 2</div>
+            <h1>이미지 처리 기초</h1>
+            <p style="color: #0f172a; margin-top: 15px;">디지털 이미지의 이해와 기본 처리 기법</p>
+        </div>
+        <div class="content">
+            <h2>디지털 이미지의 구조</h2>
+            <p>디지털 이미지는 픽셀(pixel)의 2차원 배열로 표현됩니다. 각 픽셀은 이미지의 가장 작은 단위로, 색상과 밝기 정보를 담고 있습니다.</p>
+
+            <h3>이미지 표현 방식</h3>
+            <ul>
+                <li><strong>그레이스케일</strong> - 단일 채널, 0(검정)~255(흰색)</li>
+                <li><strong>RGB</strong> - 3개 채널 (빨강, 녹색, 파랑), 각 0~255</li>
+                <li><strong>RGBA</strong> - RGB + 알파(투명도) 채널</li>
+                <li><strong>HSV</strong> - 색조(Hue), 채도(Saturation), 명도(Value)</li>
+            </ul>
+
+            <pre><code>import cv2
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
+
+# 이미지 로드 (OpenCV는 BGR 순서로 로드)
+img_bgr = cv2.imread('image.jpg')
+img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+
+# 이미지 정보 출력
+print(f"이미지 shape: {img_rgb.shape}")  # (높이, 너비, 채널)
+print(f"데이터 타입: {img_rgb.dtype}")
+print(f"최소값: {img_rgb.min()}, 최대값: {img_rgb.max()}")
+
+# 그레이스케일 변환
+img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+print(f"그레이스케일 shape: {img_gray.shape}")</code></pre>
+
+            <h2>기본 이미지 연산</h2>
+
+            <h3>이미지 리사이징</h3>
+            <p>이미지 크기를 변경하는 것은 전처리의 기본입니다. 다양한 보간 방법이 있습니다.</p>
+
+            <pre><code># OpenCV로 리사이징
+# 보간 방법: INTER_LINEAR(기본), INTER_CUBIC, INTER_NEAREST
+resized = cv2.resize(img_rgb, (640, 480), interpolation=cv2.INTER_LINEAR)
+
+# 비율로 리사이징
+scale_percent = 50  # 원본의 50%
+width = int(img_rgb.shape[1] * scale_percent / 100)
+height = int(img_rgb.shape[0] * scale_percent / 100)
+resized = cv2.resize(img_rgb, (width, height))
+
+# PIL로 리사이징
+from PIL import Image
+pil_img = Image.fromarray(img_rgb)
+pil_resized = pil_img.resize((640, 480), Image.BICUBIC)</code></pre>
+
+            <h3>이미지 회전 및 변환</h3>
+            <pre><code># 회전 (중심 기준, 각도, 스케일)
+height, width = img_rgb.shape[:2]
+center = (width // 2, height // 2)
+
+# 45도 회전
+rotation_matrix = cv2.getRotationMatrix2D(center, 45, 1.0)
+rotated = cv2.warpAffine(img_rgb, rotation_matrix, (width, height))
+
+# 좌우 반전
+flipped_horizontal = cv2.flip(img_rgb, 1)
+
+# 상하 반전
+flipped_vertical = cv2.flip(img_rgb, 0)
+
+# 아핀 변환 (평행사변형 변환)
+pts1 = np.float32([[50, 50], [200, 50], [50, 200]])
+pts2 = np.float32([[10, 100], [200, 50], [100, 250]])
+affine_matrix = cv2.getAffineTransform(pts1, pts2)
+affine_img = cv2.warpAffine(img_rgb, affine_matrix, (width, height))</code></pre>
+
+            <h2>색상 공간 변환</h2>
+            <p>다양한 색상 공간으로 변환하여 특정 작업을 쉽게 수행할 수 있습니다.</p>
+
+            <pre><code># RGB to HSV (색상 기반 작업에 유용)
+img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+
+# 특정 색상 범위 마스킹 (예: 빨간색)
+lower_red = np.array([0, 120, 70])
+upper_red = np.array([10, 255, 255])
+mask = cv2.inRange(img_hsv, lower_red, upper_red)
+
+# 마스크 적용
+red_only = cv2.bitwise_and(img_rgb, img_rgb, mask=mask)
+
+# RGB to LAB (색상 보정에 유용)
+img_lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+
+# RGB to YCrCb (비디오 압축에 사용)
+img_ycrcb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)</code></pre>
+
+            <h2>필터링과 블러링</h2>
+
+            <h3>가우시안 블러</h3>
+            <p>노이즈 제거와 이미지 스무딩에 사용됩니다.</p>
+            <pre><code># 가우시안 블러 적용
+blurred = cv2.GaussianBlur(img_rgb, (5, 5), 0)
+
+# 커널 크기가 클수록 더 많이 블러됨
+heavily_blurred = cv2.GaussianBlur(img_rgb, (15, 15), 0)</code></pre>
+
+            <h3>미디언 필터</h3>
+            <p>솔트 앤 페퍼 노이즈 제거에 효과적입니다.</p>
+            <pre><code># 미디언 필터 (커널 크기는 홀수여야 함)
+median = cv2.medianBlur(img_rgb, 5)</code></pre>
+
+            <h3>양방향 필터</h3>
+            <p>엣지를 보존하면서 노이즈를 제거합니다.</p>
+            <pre><code># 양방향 필터 (직경, 색상 공간 시그마, 좌표 공간 시그마)
+bilateral = cv2.bilateralFilter(img_rgb, 9, 75, 75)</code></pre>
+
+            <h2>엣지 검출</h2>
+            <p>이미지에서 경계선을 찾는 것은 많은 비전 작업의 기초입니다.</p>
+
+            <h3>Canny 엣지 검출</h3>
+            <pre><code># Canny 엣지 검출 (가장 인기있는 방법)
+edges = cv2.Canny(img_gray, threshold1=100, threshold2=200)
+
+# 임계값 조정
+# threshold1: 약한 엣지 기준
+# threshold2: 강한 엣지 기준
+edges_sensitive = cv2.Canny(img_gray, 50, 150)
+edges_conservative = cv2.Canny(img_gray, 150, 250)</code></pre>
+
+            <h3>Sobel 연산자</h3>
+            <pre><code># x 방향 그래디언트
+sobelx = cv2.Sobel(img_gray, cv2.CV_64F, 1, 0, ksize=5)
+
+# y 방향 그래디언트
+sobely = cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=5)
+
+# 그래디언트 크기
+gradient_magnitude = np.sqrt(sobelx**2 + sobely**2)
+gradient_magnitude = np.uint8(gradient_magnitude)</code></pre>
+
+            <h3>Laplacian 연산자</h3>
+            <pre><code># Laplacian (2차 미분)
+laplacian = cv2.Laplacian(img_gray, cv2.CV_64F)
+laplacian = np.uint8(np.absolute(laplacian))</code></pre>
+
+            <h2>이미지 임계값 처리</h2>
+            <p>그레이스케일 이미지를 이진 이미지로 변환합니다.</p>
+
+            <h3>고정 임계값</h3>
+            <pre><code># 단순 임계값 (127보다 크면 255, 작으면 0)
+ret, binary = cv2.threshold(img_gray, 127, 255, cv2.THRESH_BINARY)
+
+# 역 임계값
+ret, binary_inv = cv2.threshold(img_gray, 127, 255, cv2.THRESH_BINARY_INV)
+
+# Truncate
+ret, trunc = cv2.threshold(img_gray, 127, 255, cv2.THRESH_TRUNC)
+
+# To Zero
+ret, tozero = cv2.threshold(img_gray, 127, 255, cv2.THRESH_TOZERO)</code></pre>
+
+            <h3>적응형 임계값</h3>
+            <p>조명 변화에 강건합니다.</p>
+            <pre><code># 적응형 임계값 (평균 기반)
+adaptive_mean = cv2.adaptiveThreshold(
+    img_gray, 255,
+    cv2.ADAPTIVE_THRESH_MEAN_C,
+    cv2.THRESH_BINARY,
+    blockSize=11,
+    C=2
+)
+
+# 적응형 임계값 (가우시안 기반)
+adaptive_gaussian = cv2.adaptiveThreshold(
+    img_gray, 255,
+    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+    cv2.THRESH_BINARY,
+    blockSize=11,
+    C=2
+)
+
+# Otsu의 이진화 (자동으로 최적 임계값 찾음)
+ret, otsu = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+print(f"Otsu 임계값: {ret}")</code></pre>
+
+            <h2>모폴로지 연산</h2>
+            <p>이진 이미지의 형태를 변경하는 연산입니다.</p>
+
+            <pre><code># 커널 정의
+kernel = np.ones((5, 5), np.uint8)
+
+# 침식 (Erosion) - 객체 축소, 노이즈 제거
+erosion = cv2.erode(binary, kernel, iterations=1)
+
+# 팽창 (Dilation) - 객체 확대, 구멍 채우기
+dilation = cv2.dilate(binary, kernel, iterations=1)
+
+# Opening - 침식 후 팽창 (작은 노이즈 제거)
+opening = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+
+# Closing - 팽창 후 침식 (작은 구멍 채우기)
+closing = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+
+# Gradient - 팽창과 침식의 차이 (윤곽선)
+gradient = cv2.morphologyEx(binary, cv2.MORPH_GRADIENT, kernel)
+
+# Top Hat - 원본과 Opening의 차이
+tophat = cv2.morphologyEx(binary, cv2.MORPH_TOPHAT, kernel)
+
+# Black Hat - Closing과 원본의 차이
+blackhat = cv2.morphologyEx(binary, cv2.MORPH_BLACKHAT, kernel)</code></pre>
+
+            <h2>히스토그램</h2>
+            <p>이미지의 밝기 분포를 분석합니다.</p>
+
+            <h3>히스토그램 계산 및 시각화</h3>
+            <pre><code># 그레이스케일 히스토그램
+hist = cv2.calcHist([img_gray], [0], None, [256], [0, 256])
+
+# 히스토그램 시각화
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)
+plt.imshow(img_gray, cmap='gray')
+plt.title('원본 이미지')
+plt.axis('off')
+
+plt.subplot(1, 2, 2)
+plt.plot(hist)
+plt.title('히스토그램')
+plt.xlabel('픽셀 값')
+plt.ylabel('빈도')
+plt.show()
+
+# 컬러 이미지의 각 채널 히스토그램
+colors = ('r', 'g', 'b')
+for i, color in enumerate(colors):
+    hist = cv2.calcHist([img_rgb], [i], None, [256], [0, 256])
+    plt.plot(hist, color=color)
+plt.title('RGB 히스토그램')
+plt.show()</code></pre>
+
+            <h3>히스토그램 평활화</h3>
+            <p>대비를 개선하여 이미지 품질을 향상시킵니다.</p>
+            <pre><code># 그레이스케일 히스토그램 평활화
+equalized = cv2.equalizeHist(img_gray)
+
+# 컬러 이미지의 히스토그램 평활화 (YCrCb 공간에서)
+img_ycrcb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
+img_ycrcb[:, :, 0] = cv2.equalizeHist(img_ycrcb[:, :, 0])
+equalized_color = cv2.cvtColor(img_ycrcb, cv2.COLOR_YCrCb2BGR)
+
+# CLAHE (Contrast Limited Adaptive Histogram Equalization)
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+clahe_img = clahe.apply(img_gray)</code></pre>
+
+            <h2>기하학적 변환</h2>
+
+            <h3>원근 변환</h3>
+            <pre><code># 원본 이미지의 4개 점 정의
+pts1 = np.float32([[56, 65], [368, 52], [28, 387], [389, 390]])
+
+# 변환 후 위치
+pts2 = np.float32([[0, 0], [300, 0], [0, 300], [300, 300]])
+
+# 원근 변환 행렬
+perspective_matrix = cv2.getPerspectiveTransform(pts1, pts2)
+
+# 변환 적용
+perspective_img = cv2.warpPerspective(img_rgb, perspective_matrix, (300, 300))</code></pre>
+
+            <h2>컨볼루션과 커널</h2>
+            <p>커스텀 필터를 만들어 다양한 효과를 적용할 수 있습니다.</p>
+
+            <pre><code># 샤프닝 커널
+sharpen_kernel = np.array([
+    [0, -1, 0],
+    [-1, 5, -1],
+    [0, -1, 0]
+])
+sharpened = cv2.filter2D(img_rgb, -1, sharpen_kernel)
+
+# 엠보싱 커널
+emboss_kernel = np.array([
+    [-2, -1, 0],
+    [-1, 1, 1],
+    [0, 1, 2]
+])
+embossed = cv2.filter2D(img_gray, -1, emboss_kernel)
+
+# 블러 커널 (박스 필터)
+box_kernel = np.ones((5, 5), np.float32) / 25
+box_blur = cv2.filter2D(img_rgb, -1, box_kernel)</code></pre>
+
+            <h2>이미지 증강</h2>
+            <p>머신러닝 학습을 위해 데이터를 확장하는 기법입니다.</p>
+
+            <pre><code>import albumentations as A
+
+# 증강 파이프라인 정의
+transform = A.Compose([
+    A.RandomRotate90(p=0.5),
+    A.Flip(p=0.5),
+    A.Transpose(p=0.5),
+    A.OneOf([
+        A.GaussNoise(p=1),
+        A.GaussianBlur(p=1),
+        A.MotionBlur(p=1),
+    ], p=0.5),
+    A.OneOf([
+        A.OpticalDistortion(p=1),
+        A.GridDistortion(p=1),
+        A.ElasticTransform(p=1),
+    ], p=0.3),
+    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.5),
+    A.OneOf([
+        A.CLAHE(clip_limit=2),
+        A.Sharpen(),
+        A.Emboss(),
+    ], p=0.3),
+    A.HueSaturationValue(p=0.3),
+])
+
+# 증강 적용
+augmented = transform(image=img_rgb)
+augmented_img = augmented['image']</code></pre>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>디지털 이미지는 픽셀의 배열로, RGB, 그레이스케일 등 다양한 형식이 있습니다</li>
+                    <li>기본 연산으로 리사이징, 회전, 반전 등의 변환을 수행합니다</li>
+                    <li>색상 공간 변환(RGB, HSV, LAB)으로 다양한 작업을 효율적으로 수행합니다</li>
+                    <li>필터링(가우시안, 미디언, 양방향)으로 노이즈를 제거하고 이미지를 개선합니다</li>
+                    <li>엣지 검출(Canny, Sobel)로 이미지의 경계를 찾습니다</li>
+                    <li>임계값 처리로 그레이스케일을 이진 이미지로 변환합니다</li>
+                    <li>모폴로지 연산으로 이진 이미지의 형태를 조정합니다</li>
+                    <li>히스토그램 분석 및 평활화로 이미지 대비를 개선합니다</li>
+                    <li>弘益人間 - 이미지 처리 기술로 의료 진단, 품질 검사 등 인류에 이로운 응용을 만듭니다</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>복습 문제</h2>
+                <ol>
+                    <li>RGB와 HSV 색상 공간의 차이점은 무엇이며, 각각 어떤 상황에서 유용한가요?</li>
+                    <li>가우시안 블러와 미디언 필터의 차이점을 설명하고, 각각 어떤 노이즈에 효과적인가요?</li>
+                    <li>Canny 엣지 검출의 주요 단계를 설명하세요.</li>
+                    <li>적응형 임계값이 고정 임계값보다 나은 경우는 언제인가요?</li>
+                    <li>모폴로지 연산 중 Opening과 Closing의 차이를 설명하고 각각의 용도를 제시하세요.</li>
+                    <li>CLAHE가 일반 히스토그램 평활화보다 나은 이유는 무엇인가요?</li>
+                    <li>이미지 증강이 머신러닝 모델 학습에 왜 중요한가요?</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

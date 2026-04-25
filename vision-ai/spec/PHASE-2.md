@@ -393,5 +393,85 @@ POST /api/v2/face/detect
 
 ---
 
+---
+
+## 11. Standards Alignment (Normative Grounding)
+
+### 11.1 AI Management and Trustworthiness
+
+WIA-AI-021 v1 deployments MUST be operated within an AI management framework conformant to ISO/IEC 42001:2023 *Artificial intelligence — Management system*. The AI management system scope statement covers:
+
+- The set of vision-AI models in production.
+- The data pipelines that feed them (training data, evaluation data, inference data).
+- The operator and engineer roles authorised to author, deploy, and decommission models.
+
+Model-trustworthiness practices follow ISO/IEC TR 24028:2020 *Overview of trustworthiness in artificial intelligence* and ISO/IEC 23053:2022 *Framework for AI systems using machine learning (ML)*.
+
+### 11.2 Biometric Data Formats
+
+Where the model performs face recognition, face verification, or other biometric-grade identification, the data interchange formats follow ISO/IEC 19794 (all parts) and the extensible profile of ISO/IEC 39794. Performance reporting follows ISO/IEC 19795-1:2021 *Biometric performance testing and reporting*.
+
+Models that issue biometric decisions on real persons MUST be evaluated for presentation-attack resilience per ISO/IEC 30107-3:2023 *Biometric presentation attack detection — Part 3: Testing and reporting* before being placed into production.
+
+### 11.3 Image and Video Coding
+
+Inference pipelines that operate on compressed video MUST be evaluated against the operating points of ISO/IEC 14496-10 (AVC) and ISO/IEC 23008-2 (HEVC) representative of the deployment. Evaluation reports MUST disclose the codec, profile, level, and bit-rate range used.
+
+### 11.4 Privacy
+
+Pipelines that process personal data MUST adopt privacy-by-design controls aligned with ISO/IEC 27701:2019 *Privacy information management*. Personal-data minimisation is required at every stage: capture, processing, retention, and export.
+
+### 11.5 ML Classification Performance Reporting
+
+Performance metrics (accuracy, precision, recall, F1, AUROC, equal-error rate) MUST be reported per ISO/IEC TS 4213:2022 *Information technology — Artificial intelligence — Assessment of machine learning classification performance*. Reports MUST disclose:
+
+- The evaluation dataset, with provenance per ISO 19115-1.
+- The class distribution and the prevalence of confounders.
+- The split methodology (holdout, k-fold, leave-one-out, time-respecting split).
+- Confidence intervals or the equivalent uncertainty bounds.
+
+### 11.6 AI System Concepts
+
+Where the API surfaces AI-system terminology, the terms follow ISO/IEC 22989:2022 *Artificial intelligence concepts and terminology* to avoid ambiguity across deployments.
+
+---
+
+## 12. API Surface Conformance
+
+### 12.1 Authorisation
+
+Endpoints that mutate model state, deploy models, or expose subject-level results MUST be gated by OAuth 2.1 (RFC 9700) tokens with audience and scope claims appropriate to the operation.
+
+### 12.2 Discovery
+
+A model registry root document `/.well-known/wia-vision-ai` returns the current set of deployable models with version, training data lineage hash, evaluation report URI, and the conformance tags from §11.
+
+### 12.3 Audit
+
+Every state-changing operation MUST be appended to an audit log per ISO/IEC 27001 A.8.16 (monitoring activities) and IEC 62443-3-3 SR 6.1 where the system is part of an industrial control or operational-technology environment.
+
+---
+
+## 13. References
+
+1. ISO/IEC 14496-10 — *Advanced video coding (AVC).*
+2. ISO/IEC 19794 (all parts) — *Biometric data interchange formats.*
+3. ISO/IEC 19795-1:2021 — *Biometric performance testing and reporting.*
+4. ISO/IEC 22989:2022 — *AI concepts and terminology.*
+5. ISO/IEC 23008-2 — *High-Efficiency Video Coding (HEVC).*
+6. ISO/IEC 23053:2022 — *AI / ML framework.*
+7. ISO/IEC 27001:2022; ISO/IEC 27002:2022; ISO/IEC 27701:2019.
+8. ISO/IEC 30107-3:2023 — *Biometric presentation attack detection.*
+9. ISO/IEC 39794 (all parts) — *Extensible biometric data interchange formats.*
+10. ISO/IEC TR 24028:2020 — *Trustworthiness in AI.*
+11. ISO/IEC TS 4213:2022 — *Assessment of ML classification performance.*
+12. ISO/IEC 42001:2023 — *AI management system.*
+13. ISO 19115-1:2014 — *Geographic information — Metadata* (data-provenance reference).
+14. RFC 9700 — *OAuth 2.1 (BCP).*
+15. RFC 8446 — *TLS 1.3.*
+16. IEC 62443-3-3:2013 — *System security requirements and security levels.*
+
+---
+
 © 2025 SmileStory Inc. / World Certification Industry Association
 弘益人間 · Benefit All Humanity

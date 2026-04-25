@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Video Analysis and Tracking | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 6</div>
+            <h1>Video Analysis and Tracking</h1>
+            <p style="color: #0f172a; margin-top: 15px;">Processing temporal visual data for motion understanding</p>
+        </div>
+        <div class="content">
+            <h2>Introduction to Video Processing</h2>
+            <p>Video adds the temporal dimension to vision, enabling understanding of motion, actions, and events over time. Video analysis tasks include object tracking, action recognition, video classification, and anomaly detection.</p>
+            <h3>Key Differences from Images</h3>
+            <ul>
+                <li><strong>Temporal coherence</strong> - Adjacent frames are highly correlated</li>
+                <li><strong>Motion information</strong> - Optical flow reveals object movement</li>
+                <li><strong>Computational cost</strong> - Processing 30 FPS requires real-time optimization</li>
+                <li><strong>Memory requirements</strong> - Videos consume significantly more storage</li>
+            </ul>
+            <h2>Object Tracking</h2>
+            <p>Object tracking maintains the identity of objects across video frames.</p>
+            <h3>Tracking Algorithms</h3>
+            <h4>1. Mean Shift and CAMShift</h4>
+            <pre><code>import cv2
+
+# Read video
+cap = cv2.VideoCapture('video.mp4')
+
+# Select ROI (Region of Interest)
+ret, frame = cap.read()
+bbox = cv2.selectROI(frame, False)
+
+# Initialize tracker
+tracker = cv2.TrackerCSRT_create()  # CSRT is most accurate
+# Other options: TrackerKCF, TrackerMOSSE, TrackerBoosting
+tracker.init(frame, bbox)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Update tracker
+    success, bbox = tracker.update(frame)
+
+    if success:
+        x, y, w, h = [int(v) for v in bbox]
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    cv2.imshow('Tracking', frame)
+    if cv2.waitKey(30) & 0xFF == ord('q'):
+        break</code></pre>
+            <h3>Deep Learning Tracking</h3>
+            <h4>DeepSORT</h4>
+            <p>Combines SORT (Simple Online Realtime Tracking) with deep appearance features.</p>
+            <pre><code>from deep_sort_realtime.deepsort_tracker import DeepSort
+
+# Initialize DeepSORT
+tracker = DeepSort(max_age=30, n_init=3, nms_max_overlap=1.0)
+
+# Detection + Tracking loop
+while True:
+    ret, frame = cap.read()
+    detections = detector.detect(frame)  # [[x1, y1, x2, y2, conf, cls], ...]
+
+    # Convert to DeepSORT format
+    det_list = []
+    for det in detections:
+        x1, y1, x2, y2, conf, cls = det
+        det_list.append(([x1, y1, x2-x1, y2-y1], conf, cls))
+
+    # Update tracker
+    tracks = tracker.update_tracks(det_list, frame=frame)
+
+    for track in tracks:
+        if not track.is_confirmed():
+            continue
+
+        track_id = track.track_id
+        ltrb = track.to_ltrb()
+        x1, y1, x2, y2 = [int(v) for v in ltrb]
+
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(frame, f"ID: {track_id}", (x1, y1-10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)</code></pre>
+            <h3>ByteTrack</h3>
+            <p>State-of-the-art multi-object tracking using low-confidence detections.</p>
+            <h2>Optical Flow</h2>
+            <p>Optical flow computes the motion vector field between consecutive frames.</p>
+            <h3>Lucas-Kanade Method</h3>
+            <pre><code>import cv2
+import numpy as np
+
+cap = cv2.VideoCapture('video.mp4')
+ret, old_frame = cap.read()
+old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+
+# Detect good features to track
+p0 = cv2.goodFeaturesToTrack(old_gray, mask=None,
+                              maxCorners=100, qualityLevel=0.3,
+                              minDistance=7, blockSize=7)
+
+# Create mask for drawing
+mask = np.zeros_like(old_frame)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Calculate optical flow
+    p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray,
+                                           p0, None)
+
+    # Select good points
+    good_new = p1[st==1]
+    good_old = p0[st==1]
+
+    # Draw tracks
+    for i, (new, old) in enumerate(zip(good_new, good_old)):
+        a, b = new.ravel()
+        c, d = old.ravel()
+        mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)),
+                       (0, 255, 0), 2)
+        frame = cv2.circle(frame, (int(a), int(b)), 5, (0, 0, 255), -1)
+
+    img = cv2.add(frame, mask)
+    cv2.imshow('Optical Flow', img)
+
+    # Update previous frame
+    old_gray = frame_gray.copy()
+    p0 = good_new.reshape(-1, 1, 2)</code></pre>
+            <h3>Farneback Dense Optical Flow</h3>
+            <pre><code># Compute dense optical flow
+flow = cv2.calcOpticalFlowFarneback(
+    prev_gray, curr_gray, None,
+    pyr_scale=0.5, levels=3, winsize=15,
+    iterations=3, poly_n=5, poly_sigma=1.2,
+    flags=0
+)
+
+# Visualize flow
+mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
+hsv = np.zeros_like(frame)
+hsv[...,1] = 255
+hsv[...,0] = ang * 180 / np.pi / 2
+hsv[...,2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+flow_rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)</code></pre>
+            <h2>Action Recognition</h2>
+            <p>Classify actions or activities in video clips.</p>
+            <h3>3D Convolutional Networks</h3>
+            <pre><code>import torch
+import torch.nn as nn
+
+class C3D(nn.Module):
+    """3D Convolutional Network for video understanding"""
+    def __init__(self, num_classes=101):
+        super(C3D, self).__init__()
+
+        self.conv1 = nn.Conv3d(3, 64, kernel_size=3, padding=1)
+        self.pool1 = nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2))
+
+        self.conv2 = nn.Conv3d(64, 128, kernel_size=3, padding=1)
+        self.pool2 = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        self.conv3a = nn.Conv3d(128, 256, kernel_size=3, padding=1)
+        self.conv3b = nn.Conv3d(256, 256, kernel_size=3, padding=1)
+        self.pool3 = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        self.fc1 = nn.Linear(256 * 4 * 7 * 7, 4096)
+        self.fc2 = nn.Linear(4096, 4096)
+        self.fc3 = nn.Linear(4096, num_classes)
+
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.5)
+
+    def forward(self, x):
+        # x shape: (batch, channels, depth, height, width)
+        x = self.relu(self.conv1(x))
+        x = self.pool1(x)
+
+        x = self.relu(self.conv2(x))
+        x = self.pool2(x)
+
+        x = self.relu(self.conv3a(x))
+        x = self.relu(self.conv3b(x))
+        x = self.pool3(x)
+
+        x = x.view(x.size(0), -1)
+
+        x = self.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)
+
+        return x</code></pre>
+            <h3>Two-Stream Networks</h3>
+            <p>Process spatial (RGB) and temporal (optical flow) information separately.</p>
+            <pre><code>class TwoStreamNetwork(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        # Spatial stream (RGB frames)
+        self.spatial_stream = models.resnet50(pretrained=True)
+        self.spatial_stream.fc = nn.Linear(2048, num_classes)
+
+        # Temporal stream (optical flow)
+        self.temporal_stream = models.resnet50(pretrained=True)
+        self.temporal_stream.conv1 = nn.Conv2d(
+            20, 64, kernel_size=7, stride=2, padding=3, bias=False
+        )  # 20 = 10 flow frames * 2 (x, y)
+        self.temporal_stream.fc = nn.Linear(2048, num_classes)
+
+    def forward(self, rgb, flow):
+        spatial_out = self.spatial_stream(rgb)
+        temporal_out = self.temporal_stream(flow)
+        return (spatial_out + temporal_out) / 2  # Average fusion</code></pre>
+            <h3>SlowFast Networks</h3>
+            <p>Dual pathway network processing at different frame rates.</p>
+            <h2>Video Classification</h2>
+            <pre><code>from torchvision.models.video import r3d_18, mc3_18, r2plus1d_18
+
+# Load pre-trained video classification model
+model = r3d_18(pretrained=True)
+model.eval()
+
+# Prepare video clip (e.g., 16 frames)
+video_tensor = torch.randn(1, 3, 16, 112, 112)
+# Shape: (batch, channels, frames, height, width)
+
+with torch.no_grad():
+    output = model(video_tensor)
+
+# Get predictions
+probs = torch.softmax(output, dim=1)
+top5 = torch.topk(probs, 5)</code></pre>
+            <h2>Temporal Action Detection</h2>
+            <p>Detect when and where actions occur in untrimmed videos.</p>
+            <h3>BMN (Boundary Matching Network)</h3>
+            <p>Generates temporal action proposals with precise boundaries.</p>
+            <h3>AFSD (Anchor-Free Single-Shot Detection)</h3>
+            <p>Detects actions without predefined anchors.</p>
+            <h2>Video Object Segmentation</h2>
+            <p>Segment objects across all frames in a video.</p>
+            <h3>STCN (Spatio-Temporal Correspondence Network)</h3>
+            <p>Propagates segmentation masks across frames using memory networks.</p>
+            <h2>Anomaly Detection in Video</h2>
+            <p>Identify unusual events or behaviors in surveillance footage.</p>
+            <pre><code># Simple frame difference for motion detection
+def detect_motion(prev_frame, curr_frame, threshold=30):
+    # Convert to grayscale
+    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+    curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
+
+    # Compute difference
+    diff = cv2.absdiff(prev_gray, curr_gray)
+
+    # Threshold
+    _, thresh = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
+
+    # Find contours
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
+                                   cv2.CHAIN_APPROX_SIMPLE)
+
+    # Filter by area
+    motion_detected = False
+    for contour in contours:
+        if cv2.contourArea(contour) > 500:
+            motion_detected = True
+            x, y, w, h = cv2.boundingRect(contour)
+            cv2.rectangle(curr_frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+    return motion_detected, curr_frame</code></pre>
+            <h2>Real-Time Video Processing</h2>
+            <h3>Optimization Techniques</h3>
+            <ul>
+                <li><strong>Frame skipping</strong> - Process every Nth frame</li>
+                <li><strong>Resolution reduction</strong> - Downscale frames before processing</li>
+                <li><strong>Model quantization</strong> - Use INT8 instead of FP32</li>
+                <li><strong>GPU acceleration</strong> - Leverage CUDA/TensorRT</li>
+                <li><strong>Batch processing</strong> - Process multiple frames simultaneously</li>
+            </ul>
+            <pre><code># Efficient video processing
+cap = cv2.VideoCapture('video.mp4')
+fps = cap.get(cv2.CAP_PROP_FPS)
+skip_frames = 2  # Process every 3rd frame
+
+frame_count = 0
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame_count += 1
+    if frame_count % skip_frames != 0:
+        continue
+
+    # Resize for faster processing
+    frame_small = cv2.resize(frame, (640, 480))
+
+    # Process frame
+    result = model(frame_small)
+
+    # Display result
+    cv2.imshow('Video', result)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break</code></pre>
+            <h2>Practical Applications</h2>
+            <h3>Surveillance Systems</h3>
+            <ul>
+                <li>Multi-object tracking across cameras</li>
+                <li>Activity recognition for security alerts</li>
+                <li>Crowd counting and flow analysis</li>
+            </ul>
+            <h3>Sports Analytics</h3>
+            <ul>
+                <li>Player tracking and performance metrics</li>
+                <li>Ball tracking and trajectory prediction</li>
+                <li>Action recognition for highlights generation</li>
+            </ul>
+            <h3>Healthcare</h3>
+            <ul>
+                <li>Gait analysis for rehabilitation</li>
+                <li>Fall detection for elderly care</li>
+                <li>Surgical video analysis</li>
+            </ul>
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Video analysis adds temporal dimension, enabling motion and action understanding</li>
+                    <li>Object tracking maintains object identities across frames using algorithms like DeepSORT and ByteTrack</li>
+                    <li>Optical flow computes motion vectors between frames for dense motion analysis</li>
+                    <li>3D CNNs and two-stream networks enable action recognition in videos</li>
+                    <li>Real-time processing requires optimization through frame skipping, resolution reduction, and GPU acceleration</li>
+                    <li>Applications span surveillance, sports analytics, healthcare, and autonomous systems</li>
+                </ul>
+            </div>
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>How does DeepSORT improve upon the original SORT algorithm?</li>
+                    <li>What's the difference between sparse and dense optical flow?</li>
+                    <li>Explain the two-stream network architecture for action recognition.</li>
+                    <li>What optimization techniques enable real-time video processing?</li>
+                    <li>How can video analysis improve surveillance security systems?</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

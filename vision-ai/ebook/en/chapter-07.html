@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 7: 3D Vision and Depth Estimation | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 7</div>
+            <h1>3D Vision and Depth Estimation</h1>
+            <p style="color: #0f172a; margin-top: 15px;">Understanding three-dimensional structure from images</p>
+        </div>
+        <div class="content">
+            <h2>Introduction to 3D Vision</h2>
+            <p>3D vision enables computers to understand the three-dimensional structure of the world from 2D images. This is crucial for robotics, autonomous vehicles, AR/VR, and scene understanding.</p>
+            <h3>Key Concepts</h3>
+            <ul>
+                <li><strong>Depth</strong> - Distance from camera to objects</li>
+                <li><strong>Disparity</strong> - Pixel offset between stereo image pairs</li>
+                <li><strong>Point cloud</strong> - 3D representation as collection of points</li>
+                <li><strong>Mesh</strong> - Surface representation with vertices and faces</li>
+                <li><strong>Voxels</strong> - 3D pixels representing volumetric data</li>
+            </ul>
+            <h2>Stereo Vision</h2>
+            <p>Stereo vision uses two cameras to triangulate depth, similar to human binocular vision.</p>
+            <h3>Stereo Calibration</h3>
+            <pre><code>import cv2
+import numpy as np
+
+# Prepare object points (e.g., chessboard corners)
+objp = np.zeros((6*9, 3), np.float32)
+objp[:,:2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)
+
+# Arrays to store points
+objpoints = []  # 3D points in real world
+imgpoints_left = []  # 2D points in left image
+imgpoints_right = []  # 2D points in right image
+
+# Find corners in calibration images
+for left_img, right_img in calibration_images:
+    gray_left = cv2.cvtColor(left_img, cv2.COLOR_BGR2GRAY)
+    gray_right = cv2.cvtColor(right_img, cv2.COLOR_BGR2GRAY)
+
+    ret_left, corners_left = cv2.findChessboardCorners(gray_left, (9,6))
+    ret_right, corners_right = cv2.findChessboardCorners(gray_right, (9,6))
+
+    if ret_left and ret_right:
+        objpoints.append(objp)
+        imgpoints_left.append(corners_left)
+        imgpoints_right.append(corners_right)
+
+# Stereo calibration
+retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = \
+    cv2.stereoCalibrate(objpoints, imgpoints_left, imgpoints_right,
+                        None, None, None, None, gray_left.shape[::-1])
+
+# Stereo rectification
+R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
+    cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2,
+    gray_left.shape[::-1], R, T
+)</code></pre>
+            <h3>Disparity Map Computation</h3>
+            <pre><code># Create StereoBM (Block Matching) or StereoSGBM
+stereo = cv2.StereoSGBM_create(
+    minDisparity=0,
+    numDisparities=16*10,  # Max disparity (must be divisible by 16)
+    blockSize=5,
+    P1=8 * 3 * 5**2,
+    P2=32 * 3 * 5**2,
+    disp12MaxDiff=1,
+    uniquenessRatio=10,
+    speckleWindowSize=100,
+    speckleRange=32
+)
+
+# Compute disparity
+disparity = stereo.compute(left_gray, right_gray).astype(np.float32) / 16.0
+
+# Compute depth from disparity
+# depth = (focal_length * baseline) / disparity
+focal_length = cameraMatrix1[0, 0]
+baseline = np.linalg.norm(T)
+depth_map = (focal_length * baseline) / (disparity + 1e-6)</code></pre>
+            <h2>Monocular Depth Estimation</h2>
+            <p>Estimate depth from a single image using deep learning.</p>
+            <h3>MiDaS (Towards Robust Monocular Depth Estimation)</h3>
+            <pre><code>import torch
+import cv2
+from torchvision.transforms import Compose
+
+# Load MiDaS model
+model_type = "DPT_Large"  # or "DPT_Hybrid", "MiDaS_small"
+midas = torch.hub.load("intel-isl/MiDaS", model_type)
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+midas.to(device)
+midas.eval()
+
+# Load transforms
+midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
+transform = midas_transforms.dpt_transform
+
+# Load image
+img = cv2.imread("image.jpg")
+img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+# Prepare input
+input_batch = transform(img_rgb).to(device)
+
+# Predict depth
+with torch.no_grad():
+    prediction = midas(input_batch)
+    prediction = torch.nn.functional.interpolate(
+        prediction.unsqueeze(1),
+        size=img_rgb.shape[:2],
+        mode="bicubic",
+        align_corners=False,
+    ).squeeze()
+
+depth_map = prediction.cpu().numpy()
+
+# Normalize for visualization
+depth_min = depth_map.min()
+depth_max = depth_map.max()
+depth_normalized = (depth_map - depth_min) / (depth_max - depth_min)
+depth_colored = cv2.applyColorMap((depth_normalized * 255).astype(np.uint8),
+                                  cv2.COLORMAP_MAGMA)</code></pre>
+            <h3>ZoeDepth</h3>
+            <p>Zero-shot transfer for metric depth estimation.</p>
+            <h3>Depth Anything</h3>
+            <p>Foundation model for monocular depth estimation with strong generalization.</p>
+            <h2>Structure from Motion (SfM)</h2>
+            <p>Reconstruct 3D structure from multiple images taken from different viewpoints.</p>
+            <h3>COLMAP</h3>
+            <pre><code># COLMAP pipeline for 3D reconstruction
+# 1. Feature extraction
+colmap feature_extractor \
+    --database_path database.db \
+    --image_path images/
+
+# 2. Feature matching
+colmap exhaustive_matcher \
+    --database_path database.db
+
+# 3. Sparse reconstruction
+colmap mapper \
+    --database_path database.db \
+    --image_path images/ \
+    --output_path sparse/
+
+# 4. Dense reconstruction
+colmap image_undistorter \
+    --image_path images/ \
+    --input_path sparse/0 \
+    --output_path dense/
+
+colmap patch_match_stereo \
+    --workspace_path dense/
+
+colmap stereo_fusion \
+    --workspace_path dense/ \
+    --output_path dense/fused.ply</code></pre>
+            <h2>Point Cloud Processing</h2>
+            <h3>Loading and Visualizing Point Clouds</h3>
+            <pre><code>import open3d as o3d
+
+# Load point cloud
+pcd = o3d.io.read_point_cloud("pointcloud.ply")
+
+# Visualize
+o3d.visualization.draw_geometries([pcd])
+
+# Get point cloud statistics
+print(f"Number of points: {len(pcd.points)}")
+print(f"Point cloud center: {pcd.get_center()}")
+print(f"Bounding box: {pcd.get_axis_aligned_bounding_box()}")
+
+# Downsample point cloud
+pcd_down = pcd.voxel_down_sample(voxel_size=0.05)
+
+# Estimate normals
+pcd.estimate_normals(
+    search_param=o3d.geometry.KDTreeSearchParamHybrid(
+        radius=0.1, max_nn=30
+    )
+)
+
+# Remove outliers
+cl, ind = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+pcd_clean = pcd.select_by_index(ind)</code></pre>
+            <h3>Point Cloud Registration</h3>
+            <pre><code># ICP (Iterative Closest Point) registration
+def register_point_clouds(source, target):
+    threshold = 0.02
+    trans_init = np.identity(4)
+
+    # Coarse registration with RANSAC
+    ransac_result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
+        source, target,
+        source_features, target_features,
+        True, threshold,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
+        3,
+        [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
+         o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(threshold)],
+        o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.999)
+    )
+
+    # Fine registration with ICP
+    icp_result = o3d.pipelines.registration.registration_icp(
+        source, target, threshold, ransac_result.transformation,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint()
+    )
+
+    return icp_result.transformation</code></pre>
+            <h2>3D Object Detection</h2>
+            <h3>PointNet</h3>
+            <p>Deep learning on point clouds for classification and segmentation.</p>
+            <pre><code>import torch
+import torch.nn as nn
+
+class PointNet(nn.Module):
+    def __init__(self, num_classes):
+        super(PointNet, self).__init__()
+
+        # Shared MLP
+        self.conv1 = nn.Conv1d(3, 64, 1)
+        self.conv2 = nn.Conv1d(64, 128, 1)
+        self.conv3 = nn.Conv1d(128, 1024, 1)
+
+        # Classification head
+        self.fc1 = nn.Linear(1024, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, num_classes)
+
+        self.bn1 = nn.BatchNorm1d(64)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.bn3 = nn.BatchNorm1d(1024)
+        self.bn4 = nn.BatchNorm1d(512)
+        self.bn5 = nn.BatchNorm1d(256)
+
+        self.dropout = nn.Dropout(0.3)
+
+    def forward(self, x):
+        # x: (batch, 3, num_points)
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+
+        # Max pooling for global feature
+        x = torch.max(x, 2, keepdim=True)[0]
+        x = x.view(-1, 1024)
+
+        # Classification
+        x = F.relu(self.bn4(self.fc1(x)))
+        x = F.relu(self.bn5(self.dropout(self.fc2(x))))
+        x = self.fc3(x)
+
+        return x</code></pre>
+            <h3>VoxelNet and SECOND</h3>
+            <p>Voxel-based 3D detection for autonomous driving.</p>
+            <h2>Neural Radiance Fields (NeRF)</h2>
+            <p>Novel view synthesis by representing scenes as continuous 5D functions.</p>
+            <pre><code># NeRF concept (simplified)
+class NeRF(nn.Module):
+    def __init__(self, D=8, W=256):
+        super(NeRF, self).__init__()
+
+        # Position encoding
+        self.pos_encoder = PositionalEncoder()
+
+        # MLP layers
+        self.layers = nn.ModuleList()
+        for i in range(D):
+            if i == 0:
+                self.layers.append(nn.Linear(63, W))  # 3*10*2 + 3
+            elif i == D//2:
+                self.layers.append(nn.Linear(W + 63, W))
+            else:
+                self.layers.append(nn.Linear(W, W))
+
+        self.rgb_layer = nn.Linear(W, 3)
+        self.density_layer = nn.Linear(W, 1)
+
+    def forward(self, x, d):
+        # x: position (batch, 3)
+        # d: viewing direction (batch, 3)
+
+        x = self.pos_encoder(x)
+        h = x
+
+        for i, layer in enumerate(self.layers):
+            h = layer(h)
+            h = F.relu(h)
+            if i == len(self.layers) // 2:
+                h = torch.cat([h, x], -1)
+
+        density = F.relu(self.density_layer(h))
+        rgb = torch.sigmoid(self.rgb_layer(h))
+
+        return rgb, density</code></pre>
+            <h2>3D Reconstruction from Images</h2>
+            <h3>Multi-View Stereo (MVS)</h3>
+            <p>Dense reconstruction from calibrated images.</p>
+            <h3>Photogrammetry</h3>
+            <p>Create 3D models from photographs.</p>
+            <h2>Depth Sensors</h2>
+            <h3>RGB-D Cameras</h3>
+            <ul>
+                <li><strong>Intel RealSense</strong> - Active stereo depth sensing</li>
+                <li><strong>Microsoft Kinect</strong> - Time-of-flight (ToF) sensing</li>
+                <li><strong>LiDAR</strong> - Laser-based ranging</li>
+            </ul>
+            <pre><code>import pyrealsense2 as rs
+import numpy as np
+
+# Configure RealSense pipeline
+pipeline = rs.pipeline()
+config = rs.config()
+config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+# Start streaming
+pipeline.start(config)
+
+try:
+    while True:
+        # Wait for frames
+        frames = pipeline.wait_for_frames()
+        depth_frame = frames.get_depth_frame()
+        color_frame = frames.get_color_frame()
+
+        if not depth_frame or not color_frame:
+            continue
+
+        # Convert to numpy arrays
+        depth_image = np.asanyarray(depth_frame.get_data())
+        color_image = np.asanyarray(color_frame.get_data())
+
+        # Process depth (in millimeters)
+        depth_colormap = cv2.applyColorMap(
+            cv2.convertScaleAbs(depth_image, alpha=0.03),
+            cv2.COLORMAP_JET
+        )
+
+        # Stack images side by side
+        images = np.hstack((color_image, depth_colormap))
+        cv2.imshow('RealSense', images)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+finally:
+    pipeline.stop()</code></pre>
+            <h2>Applications</h2>
+            <h3>Autonomous Vehicles</h3>
+            <ul>
+                <li>3D object detection and tracking</li>
+                <li>Obstacle avoidance</li>
+                <li>Road surface estimation</li>
+            </ul>
+            <h3>Augmented Reality</h3>
+            <ul>
+                <li>Depth-aware occlusion</li>
+                <li>Scene understanding for object placement</li>
+                <li>Real-time SLAM (Simultaneous Localization and Mapping)</li>
+            </ul>
+            <h3>Robotics</h3>
+            <ul>
+                <li>Grasp planning</li>
+                <li>Navigation and obstacle avoidance</li>
+                <li>3D scene reconstruction</li>
+            </ul>
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Stereo vision uses triangulation to compute depth from two cameras</li>
+                    <li>Monocular depth estimation uses deep learning to predict depth from single images</li>
+                    <li>Structure from Motion reconstructs 3D scenes from multiple viewpoints</li>
+                    <li>Point clouds represent 3D data and can be processed with PointNet and similar architectures</li>
+                    <li>NeRF enables novel view synthesis by learning continuous scene representations</li>
+                    <li>RGB-D sensors provide direct depth measurements for real-time applications</li>
+                    <li>3D vision is critical for autonomous vehicles, AR/VR, and robotics</li>
+                </ul>
+            </div>
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Explain how stereo vision computes depth from disparity.</li>
+                    <li>What are the advantages of monocular depth estimation over stereo?</li>
+                    <li>How does PointNet process unordered point clouds?</li>
+                    <li>What is the key innovation in NeRF for novel view synthesis?</li>
+                    <li>Compare active vs passive depth sensing methods.</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

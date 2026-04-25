@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 4: Object Detection | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 4</div>
+            <h1>Object Detection</h1>
+            <p style="color: #0f172a; margin-top: 15px;">Locating and classifying objects in images</p>
+        </div>
+        <div class="content">
+            <h2>Object Detection Overview</h2>
+            <p>Object detection combines two tasks: classification (what) and localization (where). Given an image, the goal is to identify all objects and draw bounding boxes around them. This is one of the most challenging and practically useful computer vision tasks, powering applications from autonomous vehicles to surveillance systems.</p>
+
+            <h3>Key Components</h3>
+            <ul>
+                <li><strong>Backbone</strong> - Feature extractor (ResNet, VGG, EfficientNet, etc.)</li>
+                <li><strong>Neck</strong> - Feature aggregation (FPN, PANet, BiFPN)</li>
+                <li><strong>Head</strong> - Detection predictions (bounding boxes, classes, confidence scores)</li>
+                <li><strong>Post-processing</strong> - NMS to filter overlapping boxes</li>
+            </ul>
+
+            <p>Detection models can be categorized into two main approaches:</p>
+            <ul>
+                <li><strong>Two-stage detectors</strong> - First propose regions, then classify (Faster R-CNN, Cascade R-CNN)</li>
+                <li><strong>One-stage detectors</strong> - Predict boxes and classes in one shot (YOLO, SSD, RetinaNet)</li>
+            </ul>
+
+            <h2>YOLO (You Only Look Once)</h2>
+            <p>YOLO revolutionized object detection by treating it as a regression problem, achieving real-time performance. Unlike traditional methods that apply a classifier to different regions, YOLO predicts bounding boxes and class probabilities directly from full images in one evaluation.</p>
+
+            <pre><code>from ultralytics import YOLO
+
+# Load YOLOv8 model
+model = YOLO('yolov8n.pt')  # nano, s, m, l, x variants
+
+# Run inference
+results = model('image.jpg')
+
+# Process results
+for result in results:
+    boxes = result.boxes
+    for box in boxes:
+        x1, y1, x2, y2 = box.xyxy[0]
+        conf = box.conf[0]
+        cls = box.cls[0]
+        print(f"Class: {cls}, Confidence: {conf:.2f}, Box: ({x1}, {y1}, {x2}, {y2})")</code></pre>
+
+            <h3>YOLO Architecture Evolution</h3>
+            <table>
+                <tr><th>Version</th><th>Year</th><th>Key Innovation</th><th>FPS</th><th>mAP</th></tr>
+                <tr><td>YOLOv1</td><td>2016</td><td>Single-stage detection</td><td>45</td><td>63.4</td></tr>
+                <tr><td>YOLOv3</td><td>2018</td><td>Multi-scale predictions</td><td>30</td><td>57.9</td></tr>
+                <tr><td>YOLOv5</td><td>2020</td><td>Auto-learning anchors</td><td>140</td><td>67.3</td></tr>
+                <tr><td>YOLOv7</td><td>2022</td><td>Trainable bag-of-freebies</td><td>160</td><td>69.7</td></tr>
+                <tr><td>YOLOv8</td><td>2023</td><td>Anchor-free, improved accuracy</td><td>280</td><td>72.4</td></tr>
+            </table>
+
+            <h3>Advanced YOLOv8 Usage</h3>
+            <pre><code># Multi-image batch inference
+results = model(['img1.jpg', 'img2.jpg', 'img3.jpg'], batch=8)
+
+# Video inference
+results = model('video.mp4', stream=True)
+for result in results:
+    # Process each frame
+    annotated_frame = result.plot()
+    cv2.imshow('YOLOv8', annotated_frame)
+
+# Custom confidence and IoU thresholds
+results = model('image.jpg', conf=0.25, iou=0.45)
+
+# Track objects across frames
+results = model.track('video.mp4', persist=True, tracker='botsort.yaml')</code></pre>
+
+            <h2>Faster R-CNN</h2>
+            <p>Two-stage detector with high accuracy but slower than YOLO. Faster R-CNN introduced the Region Proposal Network (RPN) which shares convolutional features with the detection network, making it much faster than previous R-CNN variants.</p>
+
+            <pre><code>import torchvision
+from torchvision.models.detection import fasterrcnn_resnet50_fpn
+
+# Load pre-trained Faster R-CNN
+model = fasterrcnn_resnet50_fpn(pretrained=True)
+model.eval()
+
+# Inference
+import torch
+from PIL import Image
+import torchvision.transforms as T
+
+image = Image.open('image.jpg')
+transform = T.Compose([T.ToTensor()])
+img_tensor = transform(image)
+
+with torch.no_grad():
+    predictions = model([img_tensor])
+
+# Extract predictions
+boxes = predictions[0]['boxes']
+scores = predictions[0]['scores']
+labels = predictions[0]['labels']
+
+# Filter by confidence threshold
+threshold = 0.5
+keep = scores > threshold
+boxes = boxes[keep]
+labels = labels[keep]
+scores = scores[keep]</code></pre>
+
+            <h3>Custom Faster R-CNN Training</h3>
+            <pre><code>from torchvision.models.detection import FasterRCNN
+from torchvision.models.detection.rpn import AnchorGenerator
+
+# Custom backbone
+backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+backbone.out_channels = 1280
+
+# Custom anchor generator
+anchor_generator = AnchorGenerator(
+    sizes=((32, 64, 128, 256, 512),),
+    aspect_ratios=((0.5, 1.0, 2.0),) * 5
+)
+
+# ROI pooler
+roi_pooler = torchvision.ops.MultiScaleRoIAlign(
+    featmap_names=['0'],
+    output_size=7,
+    sampling_ratio=2
+)
+
+# Create model
+model = FasterRCNN(
+    backbone,
+    num_classes=91,  # COCO classes
+    rpn_anchor_generator=anchor_generator,
+    box_roi_pool=roi_pooler
+)
+
+# Training loop
+optimizer = torch.optim.SGD(model.parameters(), lr=0.005, momentum=0.9, weight_decay=0.0005)
+
+for epoch in range(num_epochs):
+    for images, targets in data_loader:
+        images = list(image.to(device) for image in images)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+        loss_dict = model(images, targets)
+        losses = sum(loss for loss in loss_dict.values())
+
+        optimizer.zero_grad()
+        losses.backward()
+        optimizer.step()</code></pre>
+
+            <h2>Non-Maximum Suppression (NMS)</h2>
+            <p>NMS eliminates redundant overlapping bounding boxes. When multiple boxes detect the same object, NMS keeps only the box with the highest confidence score.</p>
+
+            <pre><code>import torch
+
+def nms(boxes, scores, iou_threshold=0.5):
+    """
+    boxes: [N, 4] tensor (x1, y1, x2, y2)
+    scores: [N] tensor
+    """
+    # Sort by scores
+    sorted_indices = torch.argsort(scores, descending=True)
+
+    keep = []
+    while len(sorted_indices) > 0:
+        # Pick box with highest score
+        current = sorted_indices[0]
+        keep.append(current.item())
+
+        if len(sorted_indices) == 1:
+            break
+
+        # Compute IoU with remaining boxes
+        current_box = boxes[current]
+        other_boxes = boxes[sorted_indices[1:]]
+
+        ious = box_iou(current_box.unsqueeze(0), other_boxes).squeeze(0)
+
+        # Keep boxes with IoU < threshold
+        sorted_indices = sorted_indices[1:][ious < iou_threshold]
+
+    return torch.tensor(keep)
+
+def box_iou(box1, box2):
+    """Compute IoU between two sets of boxes"""
+    area1 = (box1[:, 2] - box1[:, 0]) * (box1[:, 3] - box1[:, 1])
+    area2 = (box2[:, 2] - box2[:, 0]) * (box2[:, 3] - box2[:, 1])
+
+    # Intersection coordinates
+    lt = torch.max(box1[:, None, :2], box2[:, :2])
+    rb = torch.min(box1[:, None, 2:], box2[:, 2:])
+
+    wh = (rb - lt).clamp(min=0)
+    inter = wh[:, :, 0] * wh[:, :, 1]
+
+    iou = inter / (area1[:, None] + area2 - inter)
+    return iou</code></pre>
+
+            <h3>Soft-NMS</h3>
+            <p>Soft-NMS improves on traditional NMS by reducing scores of overlapping boxes instead of eliminating them entirely.</p>
+            <pre><code>def soft_nms(boxes, scores, sigma=0.5, threshold=0.001):
+    """Soft-NMS implementation"""
+    N = boxes.shape[0]
+    indexes = torch.arange(0, N)
+
+    for i in range(N):
+        # Get box with maximum score
+        max_idx = scores[i:].argmax()
+        max_idx += i
+
+        # Swap
+        boxes[[i, max_idx]] = boxes[[max_idx, i]]
+        scores[[i, max_idx]] = scores[[max_idx, i]]
+        indexes[[i, max_idx]] = indexes[[max_idx, i]]
+
+        # Compute IoU with remaining boxes
+        ious = box_iou(boxes[i].unsqueeze(0), boxes[i+1:]).squeeze(0)
+
+        # Apply Gaussian penalty
+        weights = torch.exp(-(ious ** 2) / sigma)
+        scores[i+1:] *= weights
+
+    # Filter low-scoring boxes
+    keep = scores > threshold
+    return boxes[keep], scores[keep], indexes[keep]</code></pre>
+
+            <h2>Evaluation Metrics</h2>
+            <h3>Intersection over Union (IoU)</h3>
+            <pre><code>def compute_iou(box1, box2):
+    """
+    box: [x1, y1, x2, y2]
+    """
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    intersection = max(0, x2 - x1) * max(0, y2 - y1)
+
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union = area1 + area2 - intersection
+
+    return intersection / union if union > 0 else 0</code></pre>
+
+            <h3>Mean Average Precision (mAP)</h3>
+            <p>Standard metric for object detection. mAP@0.5 means IoU threshold of 0.5. COCO uses mAP@[0.5:0.95] which averages over multiple IoU thresholds.</p>
+
+            <pre><code>def compute_ap(recall, precision):
+    """Compute Average Precision using 11-point interpolation"""
+    ap = 0.0
+    for t in np.arange(0., 1.1, 0.1):
+        if np.sum(recall >= t) == 0:
+            p = 0
+        else:
+            p = np.max(precision[recall >= t])
+        ap += p / 11.
+    return ap
+
+def compute_map(detections, ground_truths, num_classes, iou_threshold=0.5):
+    """Compute mean Average Precision across all classes"""
+    aps = []
+
+    for cls in range(num_classes):
+        # Get detections and ground truths for this class
+        cls_dets = [d for d in detections if d['class'] == cls]
+        cls_gts = [g for g in ground_truths if g['class'] == cls]
+
+        if len(cls_gts) == 0:
+            continue
+
+        # Sort detections by confidence
+        cls_dets = sorted(cls_dets, key=lambda x: x['score'], reverse=True)
+
+        tp = np.zeros(len(cls_dets))
+        fp = np.zeros(len(cls_dets))
+
+        matched = set()
+
+        for i, det in enumerate(cls_dets):
+            max_iou = 0
+            max_idx = -1
+
+            for j, gt in enumerate(cls_gts):
+                if j in matched:
+                    continue
+
+                iou = compute_iou(det['box'], gt['box'])
+                if iou > max_iou:
+                    max_iou = iou
+                    max_idx = j
+
+            if max_iou >= iou_threshold:
+                tp[i] = 1
+                matched.add(max_idx)
+            else:
+                fp[i] = 1
+
+        # Compute precision and recall
+        tp_cumsum = np.cumsum(tp)
+        fp_cumsum = np.cumsum(fp)
+
+        recall = tp_cumsum / len(cls_gts)
+        precision = tp_cumsum / (tp_cumsum + fp_cumsum)
+
+        ap = compute_ap(recall, precision)
+        aps.append(ap)
+
+    return np.mean(aps)</code></pre>
+
+            <h2>Training a Custom Detector</h2>
+            <h3>Dataset Preparation</h3>
+            <pre><code># YOLO format dataset.yaml
+# Structure:
+# dataset/
+#   images/
+#     train/
+#     val/
+#   labels/
+#     train/
+#     val/
+
+# dataset.yaml
+path: /path/to/dataset
+train: images/train
+val: images/val
+
+nc: 3  # number of classes
+names: ['person', 'car', 'truck']
+
+# Label format (one txt file per image):
+# class x_center y_center width height (normalized 0-1)
+# Example: 0 0.5 0.5 0.3 0.4</code></pre>
+
+            <h3>YOLOv8 Custom Training</h3>
+            <pre><code># YOLOv8 custom training
+from ultralytics import YOLO
+
+# Load base model
+model = YOLO('yolov8n.pt')
+
+# Train on custom dataset
+results = model.train(
+    data='dataset.yaml',  # Dataset config
+    epochs=100,
+    imgsz=640,
+    batch=16,
+    device=0,  # GPU
+    workers=8,
+    optimizer='AdamW',
+    lr0=0.01,
+    lrf=0.01,  # Final learning rate factor
+    momentum=0.937,
+    weight_decay=0.0005,
+    warmup_epochs=3,
+    warmup_momentum=0.8,
+    warmup_bias_lr=0.1,
+    box=7.5,  # Box loss weight
+    cls=0.5,  # Classification loss weight
+    dfl=1.5,  # Distribution focal loss weight
+    augment=True,
+    hsv_h=0.015,  # HSV-Hue augmentation
+    hsv_s=0.7,    # HSV-Saturation augmentation
+    hsv_v=0.4,    # HSV-Value augmentation
+    degrees=0.0,  # Rotation
+    translate=0.1,  # Translation
+    scale=0.5,    # Scaling
+    shear=0.0,    # Shear
+    perspective=0.0,  # Perspective
+    flipud=0.0,   # Vertical flip
+    fliplr=0.5,   # Horizontal flip
+    mosaic=1.0,   # Mosaic augmentation
+    mixup=0.0,    # Mixup augmentation
+    copy_paste=0.0  # Copy-paste augmentation
+)
+
+# Validate
+metrics = model.val()
+print(f"mAP@0.5: {metrics.box.map50}")
+print(f"mAP@0.5:0.95: {metrics.box.map}")
+print(f"Precision: {metrics.box.mp}")
+print(f"Recall: {metrics.box.mr}")
+
+# Export to ONNX
+model.export(format='onnx', dynamic=True, simplify=True)</code></pre>
+
+            <h2>Modern Detection Architectures</h2>
+
+            <h3>DETR (Detection Transformer)</h3>
+            <p>End-to-end transformer-based detector without NMS. DETR uses bipartite matching between predictions and ground truth objects.</p>
+            <pre><code>from transformers import DetrImageProcessor, DetrForObjectDetection
+import torch
+from PIL import Image
+
+processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50")
+
+image = Image.open("image.jpg")
+inputs = processor(images=image, return_tensors="pt")
+outputs = model(**inputs)
+
+# Convert outputs to COCO API
+target_sizes = torch.tensor([image.size[::-1]])
+results = processor.post_process_object_detection(
+    outputs, target_sizes=target_sizes, threshold=0.9
+)[0]
+
+for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+    box = [round(i, 2) for i in box.tolist()]
+    print(f"Detected {model.config.id2label[label.item()]} with confidence "
+          f"{round(score.item(), 3)} at location {box}")</code></pre>
+
+            <h3>EfficientDet</h3>
+            <p>Scales detection models efficiently using compound scaling of backbone, BiFPN, and box/class prediction networks.</p>
+            <pre><code># EfficientDet scaling philosophy
+# Compound coefficient φ scales:
+# - Backbone: EfficientNet-B{φ}
+# - BiFPN: width and depth increase with φ
+# - Box/class nets: depth increases with φ
+# - Resolution: increases with φ
+
+# Example: EfficientDet-D0 to D7
+# D0: Input 512x512, BiFPN layers: 3
+# D7: Input 1536x1536, BiFPN layers: 8</code></pre>
+
+            <h3>RetinaNet</h3>
+            <p>Introduced focal loss to handle class imbalance in one-stage detectors.</p>
+            <pre><code>import torch.nn.functional as F
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2.0):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, inputs, targets):
+        # inputs: [N, num_classes]
+        # targets: [N] (class indices)
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * ce_loss
+        return focal_loss.mean()</code></pre>
+
+            <h2>Real-World Deployment</h2>
+
+            <h3>Model Optimization</h3>
+            <pre><code># TensorRT optimization for NVIDIA GPUs
+model.export(format='engine', device=0, half=True)
+
+# CoreML for iOS
+model.export(format='coreml')
+
+# TFLite for mobile
+model.export(format='tflite')
+
+# OpenVINO for Intel hardware
+model.export(format='openvino')</code></pre>
+
+            <h3>Real-time Video Processing</h3>
+            <pre><code>import cv2
+from ultralytics import YOLO
+
+model = YOLO('yolov8n.pt')
+
+cap = cv2.VideoCapture(0)  # Webcam
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Inference
+    results = model(frame, verbose=False)
+
+    # Visualize
+    annotated_frame = results[0].plot()
+
+    # Calculate FPS
+    fps = 1.0 / (time.time() - start_time)
+    cv2.putText(annotated_frame, f'FPS: {fps:.1f}', (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    cv2.imshow('Detection', annotated_frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()</code></pre>
+
+            <h3>Performance Tips</h3>
+            <ul>
+                <li><strong>Use smaller models</strong> - YOLOv8n is 4x faster than YOLOv8x with minimal accuracy drop</li>
+                <li><strong>Reduce input size</strong> - 320x320 is 4x faster than 640x640</li>
+                <li><strong>Enable half precision</strong> - FP16 doubles speed on modern GPUs</li>
+                <li><strong>Batch processing</strong> - Process multiple images together for throughput</li>
+                <li><strong>TensorRT</strong> - 2-3x speedup on NVIDIA GPUs</li>
+                <li><strong>Multi-stream</strong> - Process multiple video streams in parallel</li>
+            </ul>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Object detection identifies and localizes objects with bounding boxes and class labels</li>
+                    <li>YOLO provides real-time detection with single-stage architecture, achieving 280+ FPS</li>
+                    <li>Faster R-CNN offers higher accuracy with two-stage approach using RPN</li>
+                    <li>NMS removes duplicate detections based on IoU threshold, Soft-NMS improves on this</li>
+                    <li>mAP is the standard evaluation metric; COCO uses mAP@[0.5:0.95] for robustness</li>
+                    <li>Modern architectures include DETR (transformers), EfficientDet (compound scaling)</li>
+                    <li>Model optimization with TensorRT, quantization enables real-time deployment</li>
+                    <li>弘益人間 - Detection technology serves humanity in safety, accessibility, and automation</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>What are the main differences between one-stage and two-stage detectors? When would you choose each?</li>
+                    <li>How does NMS work and why is it necessary? What are the limitations of traditional NMS?</li>
+                    <li>Explain the IoU metric and its importance in object detection evaluation.</li>
+                    <li>What is mAP@0.5:0.95 and why does COCO use it instead of just mAP@0.5?</li>
+                    <li>How does YOLO achieve real-time performance compared to Faster R-CNN?</li>
+                    <li>Explain the evolution from YOLOv1 to YOLOv8. What were the key innovations?</li>
+                    <li>How does focal loss in RetinaNet address class imbalance?</li>
+                    <li>What optimization techniques can you use to deploy models on mobile devices?</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

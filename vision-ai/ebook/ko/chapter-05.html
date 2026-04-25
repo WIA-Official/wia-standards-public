@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 5: 이미지 분할 | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 5</div>
+            <h1>이미지 분할</h1>
+            <p style="color: #0f172a; margin-top: 15px;">픽셀 수준의 장면 이해</p>
+        </div>
+        <div class="content">
+            <h2>분할의 종류</h2>
+            <p>이미지 분할은 이미지를 여러 영역으로 나누어 각 픽셀에 레이블을 할당합니다. 의료 진단부터 자율주행까지 다양한 응용에 필수적입니다.</p>
+
+            <h3>의미론적 분할 (Semantic Segmentation)</h3>
+            <p>각 픽셀을 클래스로 분류합니다. 같은 클래스의 모든 픽셀은 동일한 레이블을 공유합니다.</p>
+            <p>예: 이미지에 사람이 여럿 있어도 모두 "사람" 클래스 1로 레이블링됩니다.</p>
+
+            <h3>인스턴스 분할 (Instance Segmentation)</h3>
+            <p>각 객체 인스턴스를 별도로 탐지하고 분할합니다. 개별 객체마다 고유한 마스크가 생성됩니다.</p>
+            <p>예: 사람 1, 사람 2, 사람 3이 각각 고유한 마스크를 받습니다.</p>
+
+            <h3>전방위 분할 (Panoptic Segmentation)</h3>
+            <p>의미론적 분할과 인스턴스 분할을 결합하여 완전한 장면 이해를 제공합니다.</p>
+            <p>"stuff" 클래스(하늘, 도로)와 "thing" 클래스(사람, 자동차)를 통합 프레임워크로 처리합니다.</p>
+
+            <h2>U-Net 아키텍처</h2>
+            <p>U-Net은 의료 이미지 분할의 표준이 되었습니다. 스킵 연결이 있는 대칭적 인코더-디코더 구조로 공간 정보를 보존합니다.</p>
+
+            <pre><code>import torch
+import torch.nn as nn
+
+class UNet(nn.Module):
+    def __init__(self, in_channels=3, num_classes=21):
+        super(UNet, self).__init__()
+
+        # 인코더 (다운샘플링)
+        self.enc1 = self.conv_block(in_channels, 64)
+        self.enc2 = self.conv_block(64, 128)
+        self.enc3 = self.conv_block(128, 256)
+        self.enc4 = self.conv_block(256, 512)
+
+        # 병목 구간
+        self.bottleneck = self.conv_block(512, 1024)
+
+        # 디코더 (업샘플링)
+        self.upconv4 = nn.ConvTranspose2d(1024, 512, 2, stride=2)
+        self.dec4 = self.conv_block(1024, 512)
+        self.upconv3 = nn.ConvTranspose2d(512, 256, 2, stride=2)
+        self.dec3 = self.conv_block(512, 256)
+        self.upconv2 = nn.ConvTranspose2d(256, 128, 2, stride=2)
+        self.dec2 = self.conv_block(256, 128)
+        self.upconv1 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.dec1 = self.conv_block(128, 64)
+
+        # 출력
+        self.out = nn.Conv2d(64, num_classes, 1)
+
+        self.pool = nn.MaxPool2d(2, 2)
+
+    def conv_block(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        # 인코더
+        enc1 = self.enc1(x)
+        enc2 = self.enc2(self.pool(enc1))
+        enc3 = self.enc3(self.pool(enc2))
+        enc4 = self.enc4(self.pool(enc3))
+
+        # 병목
+        bottleneck = self.bottleneck(self.pool(enc4))
+
+        # 디코더 with 스킵 연결
+        dec4 = self.upconv4(bottleneck)
+        dec4 = torch.cat([dec4, enc4], dim=1)
+        dec4 = self.dec4(dec4)
+
+        dec3 = self.upconv3(dec4)
+        dec3 = torch.cat([dec3, enc3], dim=1)
+        dec3 = self.dec3(dec3)
+
+        dec2 = self.upconv2(dec3)
+        dec2 = torch.cat([dec2, enc2], dim=1)
+        dec2 = self.dec2(dec2)
+
+        dec1 = self.upconv1(dec2)
+        dec1 = torch.cat([dec1, enc1], dim=1)
+        dec1 = self.dec1(dec1)
+
+        return self.out(dec1)</code></pre>
+
+            <h2>DeepLab v3+</h2>
+            <p>Atrous(Dilated) 합성곱과 ASPP를 사용하는 최첨단 의미론적 분할 모델입니다.</p>
+
+            <pre><code>from torchvision.models.segmentation import deeplabv3_resnet50
+
+# 사전 학습된 DeepLab 로드
+model = deeplabv3_resnet50(pretrained=True)
+model.eval()
+
+# 추론
+import torch
+from PIL import Image
+import torchvision.transforms as T
+
+image = Image.open('image.jpg')
+transform = T.Compose([
+    T.Resize((512, 512)),
+    T.ToTensor(),
+    T.Normalize(mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225])
+])
+
+input_tensor = transform(image).unsqueeze(0)
+
+with torch.no_grad():
+    output = model(input_tensor)['out'][0]
+
+# 클래스 예측 얻기
+predictions = output.argmax(0).cpu().numpy()</code></pre>
+
+            <h3>Atrous (Dilated) 합성곱</h3>
+            <p>파라미터 증가 없이 수용 영역을 확장합니다.</p>
+
+            <pre><code># 다양한 dilation rate의 Atrous 합성곱
+conv_rate1 = nn.Conv2d(256, 256, 3, padding=1, dilation=1)   # 표준
+conv_rate6 = nn.Conv2d(256, 256, 3, padding=6, dilation=6)   # 6배 영역
+conv_rate12 = nn.Conv2d(256, 256, 3, padding=12, dilation=12) # 12배 영역
+conv_rate18 = nn.Conv2d(256, 256, 3, padding=18, dilation=18) # 18배 영역
+
+# ASPP 모듈
+class ASPP(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 1)
+        self.conv6 = nn.Conv2d(in_channels, out_channels, 3, padding=6, dilation=6)
+        self.conv12 = nn.Conv2d(in_channels, out_channels, 3, padding=12, dilation=12)
+        self.conv18 = nn.Conv2d(in_channels, out_channels, 3, padding=18, dilation=18)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.conv_pool = nn.Conv2d(in_channels, out_channels, 1)
+
+        self.project = nn.Conv2d(out_channels * 5, out_channels, 1)
+
+    def forward(self, x):
+        size = x.shape[2:]
+        feat1 = self.conv1(x)
+        feat6 = self.conv6(x)
+        feat12 = self.conv12(x)
+        feat18 = self.conv18(x)
+        feat_pool = F.interpolate(self.conv_pool(self.pool(x)), size=size, mode='bilinear')
+
+        out = torch.cat([feat1, feat6, feat12, feat18, feat_pool], dim=1)
+        return self.project(out)</code></pre>
+
+            <h2>Mask R-CNN</h2>
+            <p>Faster R-CNN을 확장하여 마스크 예측 브랜치를 추가한 인스턴스 분할 모델입니다.</p>
+
+            <pre><code>from torchvision.models.detection import maskrcnn_resnet50_fpn
+
+# Mask R-CNN 로드
+model = maskrcnn_resnet50_fpn(pretrained=True)
+model.eval()
+
+# 추론
+image = Image.open('image.jpg')
+transform = T.Compose([T.ToTensor()])
+img_tensor = transform(image)
+
+with torch.no_grad():
+    predictions = model([img_tensor])
+
+# 예측 추출
+boxes = predictions[0]['boxes']
+labels = predictions[0]['labels']
+scores = predictions[0]['scores']
+masks = predictions[0]['masks']  # 각 인스턴스의 이진 마스크
+
+# 신뢰도로 필터링
+threshold = 0.5
+keep = scores > threshold
+boxes = boxes[keep]
+labels = labels[keep]
+scores = scores[keep]
+masks = masks[keep]</code></pre>
+
+            <h2>분할 손실 함수</h2>
+
+            <h3>교차 엔트로피 손실</h3>
+            <pre><code>criterion = nn.CrossEntropyLoss()
+loss = criterion(predictions, targets)
+
+# 불균형 데이터셋을 위한 클래스 가중치
+class_weights = torch.tensor([0.1, 1.0, 2.0, 5.0]).to(device)
+criterion = nn.CrossEntropyLoss(weight=class_weights)</code></pre>
+
+            <h3>Dice 손실</h3>
+            <p>의료 이미지 분할에 일반적으로 사용됩니다.</p>
+
+            <pre><code>class DiceLoss(nn.Module):
+    def __init__(self, smooth=1.0):
+        super(DiceLoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, predictions, targets):
+        # predictions: [B, C, H, W]
+        # targets: [B, H, W]
+        predictions = torch.softmax(predictions, dim=1)
+
+        # targets를 one-hot으로 변환
+        num_classes = predictions.shape[1]
+        targets_one_hot = F.one_hot(targets, num_classes).permute(0, 3, 1, 2).float()
+
+        # 텐서 평탄화
+        pred_flat = predictions.contiguous().view(-1)
+        target_flat = targets_one_hot.contiguous().view(-1)
+
+        intersection = (pred_flat * target_flat).sum()
+        union = pred_flat.sum() + target_flat.sum()
+
+        dice = (2. * intersection + self.smooth) / (union + self.smooth)
+        return 1 - dice</code></pre>
+
+            <h3>Focal 손실</h3>
+            <pre><code>class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2.0):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * ce_loss
+        return focal_loss.mean()</code></pre>
+
+            <h2>평가 메트릭</h2>
+
+            <h3>IoU (Intersection over Union)</h3>
+            <pre><code>def compute_iou(pred, target, num_classes):
+    ious = []
+    pred = pred.view(-1)
+    target = target.view(-1)
+
+    for cls in range(num_classes):
+        pred_cls = (pred == cls)
+        target_cls = (target == cls)
+
+        intersection = (pred_cls & target_cls).sum().float()
+        union = (pred_cls | target_cls).sum().float()
+
+        if union == 0:
+            ious.append(float('nan'))
+        else:
+            ious.append((intersection / union).item())
+
+    return np.nanmean(ious)</code></pre>
+
+            <h3>평균 IoU (mIoU)</h3>
+            <p>모든 클래스에 대한 평균 IoU입니다. 의미론적 분할의 표준 메트릭입니다.</p>
+
+            <h2>데이터 증강</h2>
+            <p>모델 일반화를 위해 중요합니다. 이미지와 마스크에 동일한 공간 변환을 적용해야 합니다.</p>
+
+            <pre><code>import albumentations as A
+
+# 증강 파이프라인
+transform = A.Compose([
+    A.RandomRotate90(p=0.5),
+    A.Flip(p=0.5),
+    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1,
+                       rotate_limit=45, p=0.5),
+    A.OneOf([
+        A.ElasticTransform(alpha=120, sigma=120 * 0.05,
+                          alpha_affine=120 * 0.03, p=0.5),
+        A.GridDistortion(p=0.5),
+        A.OpticalDistortion(distort_limit=1, shift_limit=0.5, p=1),
+    ], p=0.3),
+    A.CLAHE(clip_limit=2, p=0.5),
+    A.RandomBrightnessContrast(p=0.5),
+    A.RandomGamma(p=0.5),
+    A.GaussNoise(p=0.3),
+    A.Blur(blur_limit=3, p=0.3),
+    A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+])
+
+# 이미지와 마스크에 적용
+augmented = transform(image=image, mask=mask)
+image_aug = augmented['image']
+mask_aug = augmented['mask']</code></pre>
+
+            <h2>실제 응용</h2>
+
+            <h3>의료 영상</h3>
+            <ul>
+                <li><strong>종양 분할</strong> - MRI/CT 스캔에서 암 영역 식별</li>
+                <li><strong>장기 윤곽</strong> - 수술 계획을 위한 장기 윤곽</li>
+                <li><strong>세포 분할</strong> - 현미경 이미지에서 세포 계수 및 분석</li>
+                <li><strong>병변 검출</strong> - 피부, 망막 등의 이상 식별</li>
+            </ul>
+
+            <h3>자율주행</h3>
+            <ul>
+                <li><strong>차선 검출</strong> - 주행 가능한 차선과 경계 식별</li>
+                <li><strong>주행 가능 영역</strong> - 안전한 주행 구역 분할</li>
+                <li><strong>보행자 분할</strong> - 배경에서 보행자 분리</li>
+                <li><strong>교통 표지판 인식</strong> - 도로 표지판 분할 및 분류</li>
+            </ul>
+
+            <h3>위성 영상</h3>
+            <ul>
+                <li><strong>토지 이용 분류</strong> - 지형 유형 분류</li>
+                <li><strong>건물 추출</strong> - 도시 구조물 매핑</li>
+                <li><strong>도로망 매핑</strong> - 교통 인프라 추출</li>
+                <li><strong>환경 모니터링</strong> - 산림 파괴, 홍수 등 추적</li>
+            </ul>
+
+            <h2>현대 분할 모델</h2>
+
+            <h3>Segment Anything Model (SAM)</h3>
+            <p>Meta의 파운데이션 모델로, 프롬프트(점, 박스, 텍스트)로 모든 객체를 분할할 수 있습니다.</p>
+
+            <pre><code>from segment_anything import sam_model_registry, SamPredictor
+
+# SAM 로드
+sam = sam_model_registry["vit_h"](checkpoint="sam_vit_h.pth")
+predictor = SamPredictor(sam)
+
+# 이미지 설정
+predictor.set_image(image)
+
+# 점 프롬프트로 예측
+point_coords = np.array([[500, 375]])
+point_labels = np.array([1])  # 1 = 전경, 0 = 배경
+
+masks, scores, logits = predictor.predict(
+    point_coords=point_coords,
+    point_labels=point_labels,
+    multimask_output=True
+)
+
+# 박스 프롬프트로 예측
+box = np.array([100, 100, 500, 500])  # x1, y1, x2, y2
+masks, scores, logits = predictor.predict(
+    box=box,
+    multimask_output=False
+)</code></pre>
+
+            <h3>SegFormer</h3>
+            <p>계층적 특징을 가진 효율적인 트랜스포머 기반 분할 모델입니다.</p>
+
+            <h3>Swin-UNet</h3>
+            <p>의료 영상을 위해 Swin Transformer와 U-Net 아키텍처를 결합했습니다.</p>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>의미론적 분할은 모든 픽셀을 분류하고, 인스턴스 분할은 개별 객체를 분리합니다</li>
+                    <li>U-Net은 스킵 연결이 있는 인코더-디코더 구조로 정밀한 분할을 수행합니다</li>
+                    <li>DeepLab v3+는 atrous 합성곱과 ASPP로 다중 스케일 문맥을 활용합니다</li>
+                    <li>Mask R-CNN은 객체 탐지를 확장하여 인스턴스 수준 마스크를 생성합니다</li>
+                    <li>Dice 손실과 Focal 손실은 교차 엔트로피보다 클래스 불균형을 더 잘 처리합니다</li>
+                    <li>mIoU는 분할 작업의 표준 평가 메트릭입니다</li>
+                    <li>SAM 같은 현대 모델은 프롬프트로 zero-shot 분할을 가능하게 합니다</li>
+                    <li>弘益人間 - 분할 기술로 의료, 안전, 환경 보호에서 인류에 기여합니다</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>복습 문제</h2>
+                <ol>
+                    <li>의미론적 분할과 인스턴스 분할의 차이점은 무엇인가요? 실제 예를 들어 설명하세요.</li>
+                    <li>U-Net의 스킵 연결이 분할 품질을 어떻게 향상시키나요?</li>
+                    <li>Dice 손실이 의료 영상에서 교차 엔트로피보다 선호되는 이유는 무엇인가요?</li>
+                    <li>Atrous 합성곱이 해상도 손실 없이 수용 영역을 확장하는 방법을 설명하세요.</li>
+                    <li>자율주행에서 분할의 주요 응용 분야는 무엇인가요?</li>
+                    <li>SAM이 zero-shot 분할 기능을 달성하는 방법은 무엇인가요?</li>
+                    <li>U-Net과 DeepLab v3+ 아키텍처의 장단점을 비교하세요.</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

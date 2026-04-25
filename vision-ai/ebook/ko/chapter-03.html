@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 3: CNN과 비전 트랜스포머 | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 3</div>
+            <h1>CNN과 비전 트랜스포머</h1>
+            <p style="color: #0f172a; margin-top: 15px;">현대 비전 AI의 핵심 아키텍처</p>
+        </div>
+        <div class="content">
+            <h2>합성곱 신경망 (CNN) 기초</h2>
+            <p>CNN은 이미지 처리에 특화된 딥러닝 아키텍처로, 지역적 연결성과 파라미터 공유를 통해 효율적으로 시각적 특징을 학습합니다.</p>
+
+            <h3>CNN의 핵심 레이어</h3>
+            <ul>
+                <li><strong>합성곱 레이어</strong> - 필터를 사용해 특징 맵 생성</li>
+                <li><strong>활성화 함수</strong> - 비선형성 도입 (ReLU, LeakyReLU)</li>
+                <li><strong>풀링 레이어</strong> - 공간 차원 축소, 불변성 증가</li>
+                <li><strong>배치 정규화</strong> - 학습 안정화 및 속도 향상</li>
+                <li><strong>완전 연결 레이어</strong> - 최종 분류</li>
+            </ul>
+
+            <pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class CNN(nn.Module):
+    def __init__(self, num_classes=10):
+        super(CNN, self).__init__()
+
+        # 첫 번째 합성곱 블록
+        self.conv1 = nn.Conv2d(
+            in_channels=3,    # RGB 입력
+            out_channels=32,  # 32개의 필터
+            kernel_size=3,    # 3x3 필터
+            padding=1         # 같은 크기 유지
+        )
+        self.bn1 = nn.BatchNorm2d(32)
+
+        # 두 번째 합성곱 블록
+        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+
+        # 세 번째 합성곱 블록
+        self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+
+        # 풀링
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # 완전 연결 레이어
+        self.fc1 = nn.Linear(128 * 28 * 28, 512)
+        self.fc2 = nn.Linear(512, num_classes)
+
+        # 드롭아웃
+        self.dropout = nn.Dropout(0.5)
+
+    def forward(self, x):
+        # 블록 1: Conv -> BN -> ReLU -> Pool
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.pool(x)  # 224 -> 112
+
+        # 블록 2
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = self.pool(x)  # 112 -> 56
+
+        # 블록 3
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = F.relu(x)
+        x = self.pool(x)  # 56 -> 28
+
+        # 평탄화
+        x = x.view(x.size(0), -1)
+
+        # 완전 연결 레이어
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+
+        return x
+
+# 모델 생성 및 확인
+model = CNN(num_classes=10)
+print(model)
+
+# 입력 텐서로 테스트
+dummy_input = torch.randn(1, 3, 224, 224)
+output = model(dummy_input)
+print(f"출력 shape: {output.shape}")  # [1, 10]</code></pre>
+
+            <h2>유명한 CNN 아키텍처</h2>
+
+            <h3>LeNet-5 (1998)</h3>
+            <p>최초의 성공적인 CNN, 손글씨 숫자 인식에 사용</p>
+
+            <h3>AlexNet (2012)</h3>
+            <p>ImageNet 대회에서 우승하며 딥러닝 혁명을 시작</p>
+            <ul>
+                <li>5개의 합성곱 레이어</li>
+                <li>ReLU 활성화 함수 사용</li>
+                <li>드롭아웃으로 과적합 방지</li>
+                <li>데이터 증강</li>
+            </ul>
+
+            <h3>VGGNet (2014)</h3>
+            <p>3x3 작은 필터를 깊게 쌓은 구조</p>
+            <pre><code># VGG-16 스타일 블록
+class VGGBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, num_convs):
+        super().__init__()
+        layers = []
+        for _ in range(num_convs):
+            layers.append(nn.Conv2d(in_channels, out_channels, 3, padding=1))
+            layers.append(nn.BatchNorm2d(out_channels))
+            layers.append(nn.ReLU(inplace=True))
+            in_channels = out_channels
+        layers.append(nn.MaxPool2d(2, 2))
+        self.block = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.block(x)</code></pre>
+
+            <h3>GoogLeNet / Inception (2014)</h3>
+            <p>Inception 모듈로 다중 스케일 특징 추출</p>
+            <pre><code>class InceptionModule(nn.Module):
+    def __init__(self, in_channels):
+        super().__init__()
+
+        # 1x1 경로
+        self.branch1 = nn.Conv2d(in_channels, 64, 1)
+
+        # 1x1 -> 3x3 경로
+        self.branch2 = nn.Sequential(
+            nn.Conv2d(in_channels, 96, 1),
+            nn.Conv2d(96, 128, 3, padding=1)
+        )
+
+        # 1x1 -> 5x5 경로
+        self.branch3 = nn.Sequential(
+            nn.Conv2d(in_channels, 16, 1),
+            nn.Conv2d(16, 32, 5, padding=2)
+        )
+
+        # 3x3 MaxPool -> 1x1 경로
+        self.branch4 = nn.Sequential(
+            nn.MaxPool2d(3, stride=1, padding=1),
+            nn.Conv2d(in_channels, 32, 1)
+        )
+
+    def forward(self, x):
+        branch1 = self.branch1(x)
+        branch2 = self.branch2(x)
+        branch3 = self.branch3(x)
+        branch4 = self.branch4(x)
+
+        # 채널 차원으로 연결
+        outputs = [branch1, branch2, branch3, branch4]
+        return torch.cat(outputs, 1)</code></pre>
+
+            <h3>ResNet (2015)</h3>
+            <p>잔차 연결(Residual Connection)로 매우 깊은 네트워크 학습 가능</p>
+            <pre><code>class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+
+        # 주 경로
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, stride, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+        # 스킵 연결 (차원 조정 필요시)
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, 1, stride),
+                nn.BatchNorm2d(out_channels)
+            )
+
+    def forward(self, x):
+        # 잔차 학습
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = F.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        # 스킵 연결 추가
+        out += self.shortcut(residual)
+        out = F.relu(out)
+
+        return out</code></pre>
+
+            <h3>DenseNet (2017)</h3>
+            <p>각 레이어가 모든 이전 레이어와 연결</p>
+
+            <h3>EfficientNet (2019)</h3>
+            <p>복합 스케일링으로 효율성과 정확도 균형</p>
+
+            <h2>Vision Transformer (ViT)</h2>
+            <p>NLP의 트랜스포머를 비전에 적용한 혁신적인 아키텍처. 이미지를 패치로 나누어 시퀀스로 처리합니다.</p>
+
+            <h3>ViT 아키텍처</h3>
+            <pre><code>import torch
+import torch.nn as nn
+
+class PatchEmbedding(nn.Module):
+    """이미지를 패치로 분할하고 임베딩"""
+    def __init__(self, img_size=224, patch_size=16, in_channels=3, embed_dim=768):
+        super().__init__()
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.n_patches = (img_size // patch_size) ** 2
+
+        # 합성곱으로 패치 추출 및 임베딩
+        self.proj = nn.Conv2d(
+            in_channels,
+            embed_dim,
+            kernel_size=patch_size,
+            stride=patch_size
+        )
+
+    def forward(self, x):
+        # x: [batch, 3, 224, 224]
+        x = self.proj(x)  # [batch, embed_dim, 14, 14]
+        x = x.flatten(2)   # [batch, embed_dim, 196]
+        x = x.transpose(1, 2)  # [batch, 196, embed_dim]
+        return x
+
+class MultiHeadSelfAttention(nn.Module):
+    """멀티헤드 셀프 어텐션"""
+    def __init__(self, embed_dim=768, num_heads=12):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        self.qkv = nn.Linear(embed_dim, embed_dim * 3)
+        self.proj = nn.Linear(embed_dim, embed_dim)
+
+    def forward(self, x):
+        batch_size, n_tokens, embed_dim = x.shape
+
+        # Q, K, V 계산
+        qkv = self.qkv(x)  # [batch, n_tokens, embed_dim * 3]
+        qkv = qkv.reshape(batch_size, n_tokens, 3, self.num_heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)  # [3, batch, num_heads, n_tokens, head_dim]
+        q, k, v = qkv[0], qkv[1], qkv[2]
+
+        # 어텐션 스코어 계산
+        attn = (q @ k.transpose(-2, -1)) / (self.head_dim ** 0.5)
+        attn = attn.softmax(dim=-1)
+
+        # 어텐션 적용
+        out = attn @ v  # [batch, num_heads, n_tokens, head_dim]
+        out = out.transpose(1, 2)  # [batch, n_tokens, num_heads, head_dim]
+        out = out.reshape(batch_size, n_tokens, embed_dim)
+
+        # 출력 프로젝션
+        out = self.proj(out)
+        return out
+
+class TransformerBlock(nn.Module):
+    """트랜스포머 인코더 블록"""
+    def __init__(self, embed_dim=768, num_heads=12, mlp_ratio=4.0):
+        super().__init__()
+
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.attn = MultiHeadSelfAttention(embed_dim, num_heads)
+
+        self.norm2 = nn.LayerNorm(embed_dim)
+        mlp_hidden_dim = int(embed_dim * mlp_ratio)
+        self.mlp = nn.Sequential(
+            nn.Linear(embed_dim, mlp_hidden_dim),
+            nn.GELU(),
+            nn.Linear(mlp_hidden_dim, embed_dim)
+        )
+
+    def forward(self, x):
+        # 어텐션 + 잔차 연결
+        x = x + self.attn(self.norm1(x))
+
+        # MLP + 잔차 연결
+        x = x + self.mlp(self.norm2(x))
+
+        return x
+
+class VisionTransformer(nn.Module):
+    """Vision Transformer"""
+    def __init__(
+        self,
+        img_size=224,
+        patch_size=16,
+        in_channels=3,
+        num_classes=1000,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4.0
+    ):
+        super().__init__()
+
+        # 패치 임베딩
+        self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
+        n_patches = self.patch_embed.n_patches
+
+        # CLS 토큰 (분류용)
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+
+        # 위치 임베딩
+        self.pos_embed = nn.Parameter(torch.zeros(1, n_patches + 1, embed_dim))
+
+        # 트랜스포머 블록들
+        self.blocks = nn.ModuleList([
+            TransformerBlock(embed_dim, num_heads, mlp_ratio)
+            for _ in range(depth)
+        ])
+
+        self.norm = nn.LayerNorm(embed_dim)
+
+        # 분류 헤드
+        self.head = nn.Linear(embed_dim, num_classes)
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+
+        # 패치 임베딩
+        x = self.patch_embed(x)  # [batch, n_patches, embed_dim]
+
+        # CLS 토큰 추가
+        cls_token = self.cls_token.expand(batch_size, -1, -1)
+        x = torch.cat([cls_token, x], dim=1)  # [batch, n_patches+1, embed_dim]
+
+        # 위치 임베딩 추가
+        x = x + self.pos_embed
+
+        # 트랜스포머 블록들 통과
+        for block in self.blocks:
+            x = block(x)
+
+        x = self.norm(x)
+
+        # CLS 토큰으로 분류
+        cls_output = x[:, 0]
+        output = self.head(cls_output)
+
+        return output
+
+# ViT 모델 생성
+vit = VisionTransformer(
+    img_size=224,
+    patch_size=16,
+    num_classes=1000,
+    embed_dim=768,
+    depth=12,
+    num_heads=12
+)
+
+# 테스트
+dummy_input = torch.randn(1, 3, 224, 224)
+output = vit(dummy_input)
+print(f"출력 shape: {output.shape}")  # [1, 1000]</code></pre>
+
+            <h2>CNN vs Transformer</h2>
+
+            <h3>CNN의 장점</h3>
+            <ul>
+                <li>지역적 귀납 편향 (inductive bias)</li>
+                <li>적은 데이터로도 학습 가능</li>
+                <li>계산 효율적</li>
+                <li>작은 이미지에 효과적</li>
+            </ul>
+
+            <h3>Transformer의 장점</h3>
+            <ul>
+                <li>전역적 문맥 파악</li>
+                <li>대규모 데이터에서 뛰어난 성능</li>
+                <li>확장성 우수</li>
+                <li>다양한 작업에 전이 가능</li>
+            </ul>
+
+            <h2>하이브리드 아키텍처</h2>
+
+            <h3>Swin Transformer</h3>
+            <p>계층적 구조와 윈도우 기반 어텐션으로 효율성 개선</p>
+
+            <h3>ConvNeXt</h3>
+            <p>CNN에 트랜스포머의 설계 원칙을 적용</p>
+
+            <h3>CoAtNet</h3>
+            <p>합성곱과 어텐션을 효과적으로 결합</p>
+
+            <h2>실전 활용</h2>
+
+            <h3>전이 학습</h3>
+            <pre><code>import torchvision.models as models
+
+# ImageNet으로 사전학습된 ResNet50 로드
+resnet50 = models.resnet50(pretrained=True)
+
+# 마지막 레이어만 파인튜닝 (새 작업 10개 클래스)
+num_classes = 10
+resnet50.fc = nn.Linear(resnet50.fc.in_features, num_classes)
+
+# 백본 동결 (선택사항)
+for param in resnet50.parameters():
+    param.requires_grad = False
+
+# 마지막 레이어만 학습 가능
+for param in resnet50.fc.parameters():
+    param.requires_grad = True
+
+# 옵티마이저 (마지막 레이어만)
+optimizer = torch.optim.Adam(resnet50.fc.parameters(), lr=0.001)</code></pre>
+
+            <h3>모델 앙상블</h3>
+            <pre><code>class EnsembleModel(nn.Module):
+    def __init__(self, models):
+        super().__init__()
+        self.models = nn.ModuleList(models)
+
+    def forward(self, x):
+        # 각 모델의 예측 평균
+        outputs = [model(x) for model in self.models]
+        return torch.stack(outputs).mean(dim=0)
+
+# ResNet, EfficientNet, ViT 앙상블
+ensemble = EnsembleModel([
+    models.resnet50(pretrained=True),
+    models.efficientnet_b0(pretrained=True),
+    # vit 모델
+])</code></pre>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>CNN은 합성곱, 풀링, 활성화 함수로 구성된 이미지 특화 아키텍처입니다</li>
+                    <li>AlexNet, VGG, ResNet, EfficientNet 등 다양한 CNN 아키텍처가 발전해왔습니다</li>
+                    <li>ResNet의 잔차 연결로 매우 깊은 네트워크 학습이 가능해졌습니다</li>
+                    <li>Vision Transformer는 이미지를 패치로 나누어 어텐션 메커니즘 적용합니다</li>
+                    <li>CNN은 귀납 편향이 강하고, Transformer는 대규모 데이터에서 뛰어납니다</li>
+                    <li>Swin Transformer, ConvNeXt 등 하이브리드 아키텍처가 등장했습니다</li>
+                    <li>전이 학습으로 사전학습 모델을 새 작업에 효율적으로 활용합니다</li>
+                    <li>弘益人間 - 강력한 비전 모델로 의료 진단, 재난 감지 등 사회에 기여합니다</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>복습 문제</h2>
+                <ol>
+                    <li>CNN의 합성곱 레이어가 완전 연결 레이어보다 이미지 처리에 적합한 이유는 무엇인가요?</li>
+                    <li>ResNet의 잔차 연결(Residual Connection)이 해결하는 문제는 무엇인가요?</li>
+                    <li>Inception 모듈이 다중 스케일 특징을 추출하는 방법을 설명하세요.</li>
+                    <li>Vision Transformer가 이미지를 처리하는 방식을 단계별로 설명하세요.</li>
+                    <li>CNN과 Transformer의 주요 차이점과 각각의 장단점은 무엇인가요?</li>
+                    <li>전이 학습이 무엇이며, 어떤 상황에서 유용한가요?</li>
+                    <li>배치 정규화(Batch Normalization)의 역할과 효과를 설명하세요.</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

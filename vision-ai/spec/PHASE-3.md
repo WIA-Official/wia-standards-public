@@ -392,5 +392,118 @@ POST /api/v3/recognize_action
 
 ---
 
+---
+
+## 13. Wire Protocol Specification
+
+### 13.1 Inference RPC
+
+Vision-AI inference calls use HTTP/2 (RFC 9113) or HTTP/3 (RFC 9114) with TLS 1.3 (RFC 8446). The request body is JSON (RFC 8259) or CBOR (RFC 8949), carrying:
+
+```json
+{
+  "modelId": "string",
+  "modelVersion": "semver",
+  "input": {
+    "kind": "image|video|stream",
+    "format": "image/jpeg|image/png|video/mp4|video/h265|...",
+    "uri": "string",
+    "inlineBytes": "<base64 if small>"
+  },
+  "options": {
+    "confidenceThreshold": "number",
+    "maxResults": "uint",
+    "explainability": "bool"
+  }
+}
+```
+
+### 13.2 Streaming Inference
+
+Long-lived stream inference uses HTTP/2 server push or RFC 8895-style server-sent events, or CoAP OBSERVE (RFC 7641) on constrained clients. Streamed result frames carry a monotonically increasing sequence number and the inference timestamp.
+
+### 13.3 Result Format
+
+Results MUST encode:
+
+- Detected entities (boxes, polygons, masks).
+- Per-entity class label and confidence.
+- Optional explainability artefacts (saliency map, feature attributions).
+- Provenance: model identifier, model version, weights digest (SHA-256, FIPS 180-4).
+
+### 13.4 Result Authenticity
+
+Where results contribute to consequential decisions (access, regulatory, safety), the response MUST be signed with COSE_Sign1 (RFC 9052) using the model-deployment key. Verifiers obtain the signing key through the discovery document.
+
+### 13.5 RTSP Streaming
+
+Live-camera ingestion uses RTSP 2.0 (RFC 7826) over TLS 1.3. RTSP 1.0 (RFC 2326) is supported only when the camera lacks RTSP 2.0 capability and MUST always be tunnelled through TLS regardless. RTP payload formats follow RFC 6184 (H.264/AVC) and RFC 7798 (H.265/HEVC).
+
+---
+
+## 14. Time and Synchronization
+
+Inference results that bind to real-world time (e.g. forensic CCTV timestamps) MUST be slaved to NTPv4 with NTS (RFC 5905, RFC 8915). Time skew exceeding 50 ms MUST raise an audit event.
+
+---
+
+## 15. Cryptographic Algorithms
+
+| Layer | Algorithm | Reference |
+|-------|-----------|-----------|
+| TLS / HTTP/2 / HTTP/3 | TLS 1.3 cipher suites | RFC 8446 |
+| DTLS for CoAP | DTLS 1.3 | RFC 9147 |
+| OSCORE | AES-CCM-16-64-128 | RFC 8613 |
+| COSE signature | ES256, EdDSA | RFC 9053 |
+| Model-weight integrity | SHA-256 | FIPS 180-4 |
+| Trace encryption | AES-256-GCM | ISO/IEC 18033-3 |
+
+Implementations MUST refuse cipher suites whose IETF status is "not recommended" for new deployments.
+
+---
+
+## 16. Failure Modes
+
+### 16.1 Model unavailable
+
+If a requested model is unavailable, the surface MUST return HTTP 503 with the problem detail `vision/model-unavailable` (RFC 9457) and a `Retry-After` header indicating the next expected availability window.
+
+### 16.2 Input rejected
+
+If the input does not satisfy the model's pre-conditions (resolution range, codec, integrity), the surface MUST return HTTP 422 with the problem detail `vision/input-rejected` and a structured `errors` field listing the failing pre-conditions.
+
+### 16.3 Inference timeout
+
+Inference timeouts return HTTP 504 with the problem detail `vision/inference-timeout` and the `Retry-After` header where retry is appropriate.
+
+---
+
+## 17. References
+
+1. ISO/IEC 14496-10; ISO/IEC 23008-2 — *AVC, HEVC.*
+2. ISO/IEC 18033-3:2010 — *Block ciphers.*
+3. ISO/IEC 19794 (all parts) — *Biometric data interchange.*
+4. ISO/IEC 19795-1:2021 — *Biometric performance testing.*
+5. ISO/IEC 22989:2022 — *AI concepts and terminology.*
+6. ISO/IEC 23053:2022 — *AI / ML framework.*
+7. ISO/IEC 27001:2022; ISO/IEC 27037:2012; ISO/IEC 27701:2019.
+8. ISO/IEC 30107-3:2023 — *Biometric presentation attack detection.*
+9. ISO/IEC 42001:2023 — *AI management system.*
+10. ISO/IEC TR 24028:2020 — *AI trustworthiness.*
+11. ISO/IEC TS 4213:2022 — *ML classification performance.*
+12. RFC 2326; RFC 7826 — *RTSP 1.0 / 2.0.*
+13. RFC 5905; RFC 8915 — *NTPv4, NTS.*
+14. RFC 6184; RFC 7798 — *RTP payload for H.264 / H.265.*
+15. RFC 7252; RFC 7641 — *CoAP, OBSERVE.*
+16. RFC 8259; RFC 8615; RFC 8949 — *JSON, well-known URIs, CBOR.*
+17. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
+18. RFC 8613 — *OSCORE.*
+19. RFC 9052; RFC 9053 — *COSE.*
+20. RFC 9110; RFC 9113; RFC 9114; RFC 9457 — *HTTP family, problem details.*
+21. RFC 9700 — *OAuth 2.1.*
+22. FIPS 180-4 — *Secure Hash Standard.*
+
+---
+
 © 2025 SmileStory Inc. / World Certification Industry Association
 弘益人間 · Benefit All Humanity

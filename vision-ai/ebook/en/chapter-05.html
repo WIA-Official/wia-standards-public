@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 5: Image Segmentation | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 5</div>
+            <h1>Image Segmentation</h1>
+            <p style="color: #0f172a; margin-top: 15px;">Pixel-level understanding of visual scenes</p>
+        </div>
+        <div class="content">
+            <h2>Types of Segmentation</h2>
+            <p>Image segmentation partitions an image into multiple segments or regions, where each pixel is assigned a label. This provides fine-grained understanding of visual scenes, essential for applications from medical diagnosis to autonomous driving.</p>
+
+            <h3>Semantic Segmentation</h3>
+            <p>Classify each pixel into a category. All pixels of the same class share the same label, regardless of object instances.</p>
+            <p>Example: All "person" pixels are labeled as class 1, regardless of how many people are in the image. This means two people standing next to each other are treated as a single "person" region.</p>
+
+            <h3>Instance Segmentation</h3>
+            <p>Detect and segment each object instance separately. Each individual object gets a unique mask.</p>
+            <p>Example: Person 1, Person 2, Person 3 each get unique masks. This allows counting and tracking individual objects.</p>
+
+            <h3>Panoptic Segmentation</h3>
+            <p>Combines semantic and instance segmentation for complete scene understanding. Assigns both semantic labels and instance IDs.</p>
+            <p>Handles both "stuff" classes (sky, road, grass) and "thing" classes (person, car, dog) in a unified framework.</p>
+
+            <h2>U-Net Architecture</h2>
+            <p>U-Net is the gold standard for medical image segmentation and many other segmentation tasks. Its symmetric encoder-decoder architecture with skip connections preserves spatial information while learning hierarchical features.</p>
+
+            <pre><code>import torch
+import torch.nn as nn
+
+class UNet(nn.Module):
+    def __init__(self, in_channels=3, num_classes=21):
+        super(UNet, self).__init__()
+
+        # Encoder (downsampling)
+        self.enc1 = self.conv_block(in_channels, 64)
+        self.enc2 = self.conv_block(64, 128)
+        self.enc3 = self.conv_block(128, 256)
+        self.enc4 = self.conv_block(256, 512)
+
+        # Bottleneck
+        self.bottleneck = self.conv_block(512, 1024)
+
+        # Decoder (upsampling)
+        self.upconv4 = nn.ConvTranspose2d(1024, 512, 2, stride=2)
+        self.dec4 = self.conv_block(1024, 512)
+        self.upconv3 = nn.ConvTranspose2d(512, 256, 2, stride=2)
+        self.dec3 = self.conv_block(512, 256)
+        self.upconv2 = nn.ConvTranspose2d(256, 128, 2, stride=2)
+        self.dec2 = self.conv_block(256, 128)
+        self.upconv1 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.dec1 = self.conv_block(128, 64)
+
+        # Output
+        self.out = nn.Conv2d(64, num_classes, 1)
+
+        self.pool = nn.MaxPool2d(2, 2)
+
+    def conv_block(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        # Encoder
+        enc1 = self.enc1(x)
+        enc2 = self.enc2(self.pool(enc1))
+        enc3 = self.enc3(self.pool(enc2))
+        enc4 = self.enc4(self.pool(enc3))
+
+        # Bottleneck
+        bottleneck = self.bottleneck(self.pool(enc4))
+
+        # Decoder with skip connections
+        dec4 = self.upconv4(bottleneck)
+        dec4 = torch.cat([dec4, enc4], dim=1)
+        dec4 = self.dec4(dec4)
+
+        dec3 = self.upconv3(dec4)
+        dec3 = torch.cat([dec3, enc3], dim=1)
+        dec3 = self.dec3(dec3)
+
+        dec2 = self.upconv2(dec3)
+        dec2 = torch.cat([dec2, enc2], dim=1)
+        dec2 = self.dec2(dec2)
+
+        dec1 = self.upconv1(dec2)
+        dec1 = torch.cat([dec1, enc1], dim=1)
+        dec1 = self.dec1(dec1)
+
+        return self.out(dec1)</code></pre>
+
+            <h3>Training U-Net</h3>
+            <pre><code># Training loop
+model = UNet(in_channels=3, num_classes=21).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(num_epochs):
+    for images, masks in train_loader:
+        images = images.to(device)
+        masks = masks.to(device)
+
+        # Forward pass
+        outputs = model(images)
+        loss = criterion(outputs, masks)
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")</code></pre>
+
+            <h2>DeepLab v3+</h2>
+            <p>State-of-the-art semantic segmentation using atrous (dilated) convolutions and encoder-decoder architecture with Atrous Spatial Pyramid Pooling (ASPP).</p>
+
+            <pre><code>from torchvision.models.segmentation import deeplabv3_resnet50
+
+# Load pre-trained DeepLab
+model = deeplabv3_resnet50(pretrained=True)
+model.eval()
+
+# Inference
+import torch
+from PIL import Image
+import torchvision.transforms as T
+
+image = Image.open('image.jpg')
+transform = T.Compose([
+    T.Resize((512, 512)),
+    T.ToTensor(),
+    T.Normalize(mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225])
+])
+
+input_tensor = transform(image).unsqueeze(0)
+
+with torch.no_grad():
+    output = model(input_tensor)['out'][0]
+
+# Get class predictions
+predictions = output.argmax(0).cpu().numpy()
+
+# Visualize segmentation
+import matplotlib.pyplot as plt
+import numpy as np
+
+plt.imshow(predictions, cmap='tab20')
+plt.colorbar()
+plt.show()</code></pre>
+
+            <h3>Atrous (Dilated) Convolution</h3>
+            <p>Expands receptive field without increasing parameters or reducing resolution. Essential for capturing multi-scale context.</p>
+
+            <pre><code># Atrous convolution with different rates
+conv_rate1 = nn.Conv2d(256, 256, 3, padding=1, dilation=1)   # Standard
+conv_rate6 = nn.Conv2d(256, 256, 3, padding=6, dilation=6)   # 6x field
+conv_rate12 = nn.Conv2d(256, 256, 3, padding=12, dilation=12) # 12x field
+conv_rate18 = nn.Conv2d(256, 256, 3, padding=18, dilation=18) # 18x field
+
+# ASPP module
+class ASPP(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 1)
+        self.conv6 = nn.Conv2d(in_channels, out_channels, 3, padding=6, dilation=6)
+        self.conv12 = nn.Conv2d(in_channels, out_channels, 3, padding=12, dilation=12)
+        self.conv18 = nn.Conv2d(in_channels, out_channels, 3, padding=18, dilation=18)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.conv_pool = nn.Conv2d(in_channels, out_channels, 1)
+
+        self.project = nn.Conv2d(out_channels * 5, out_channels, 1)
+
+    def forward(self, x):
+        size = x.shape[2:]
+        feat1 = self.conv1(x)
+        feat6 = self.conv6(x)
+        feat12 = self.conv12(x)
+        feat18 = self.conv18(x)
+        feat_pool = F.interpolate(self.conv_pool(self.pool(x)), size=size, mode='bilinear')
+
+        out = torch.cat([feat1, feat6, feat12, feat18, feat_pool], dim=1)
+        return self.project(out)</code></pre>
+
+            <h2>Mask R-CNN</h2>
+            <p>Extends Faster R-CNN for instance segmentation by adding a mask prediction branch. Produces pixel-level masks for each detected object.</p>
+
+            <pre><code>from torchvision.models.detection import maskrcnn_resnet50_fpn
+
+# Load Mask R-CNN
+model = maskrcnn_resnet50_fpn(pretrained=True)
+model.eval()
+
+# Inference
+image = Image.open('image.jpg')
+transform = T.Compose([T.ToTensor()])
+img_tensor = transform(image)
+
+with torch.no_grad():
+    predictions = model([img_tensor])
+
+# Extract predictions
+boxes = predictions[0]['boxes']
+labels = predictions[0]['labels']
+scores = predictions[0]['scores']
+masks = predictions[0]['masks']  # Binary masks for each instance
+
+# Filter by confidence
+threshold = 0.5
+keep = scores > threshold
+boxes = boxes[keep]
+labels = labels[keep]
+scores = scores[keep]
+masks = masks[keep]
+
+# Visualize masks
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, axes = plt.subplots(1, min(5, len(masks)), figsize=(15, 3))
+for i, (mask, label) in enumerate(zip(masks[:5], labels[:5])):
+    axes[i].imshow(mask[0].cpu().numpy(), cmap='gray')
+    axes[i].set_title(f"Class {label.item()}")
+    axes[i].axis('off')
+plt.show()</code></pre>
+
+            <h2>Loss Functions for Segmentation</h2>
+
+            <h3>Cross-Entropy Loss</h3>
+            <p>Standard loss for multi-class segmentation tasks.</p>
+            <pre><code>criterion = nn.CrossEntropyLoss()
+loss = criterion(predictions, targets)
+
+# With class weights for imbalanced datasets
+class_weights = torch.tensor([0.1, 1.0, 2.0, 5.0]).to(device)
+criterion = nn.CrossEntropyLoss(weight=class_weights)
+loss = criterion(predictions, targets)</code></pre>
+
+            <h3>Dice Loss</h3>
+            <p>Commonly used for medical image segmentation. Directly optimizes the Dice coefficient (F1 score).</p>
+
+            <pre><code>class DiceLoss(nn.Module):
+    def __init__(self, smooth=1.0):
+        super(DiceLoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, predictions, targets):
+        # predictions: [B, C, H, W]
+        # targets: [B, H, W]
+        predictions = torch.softmax(predictions, dim=1)
+
+        # Convert targets to one-hot
+        num_classes = predictions.shape[1]
+        targets_one_hot = F.one_hot(targets, num_classes).permute(0, 3, 1, 2).float()
+
+        # Flatten tensors
+        pred_flat = predictions.contiguous().view(-1)
+        target_flat = targets_one_hot.contiguous().view(-1)
+
+        intersection = (pred_flat * target_flat).sum()
+        union = pred_flat.sum() + target_flat.sum()
+
+        dice = (2. * intersection + self.smooth) / (union + self.smooth)
+        return 1 - dice</code></pre>
+
+            <h3>Focal Loss for Imbalanced Classes</h3>
+            <p>Focuses on hard-to-classify pixels, reducing the loss for well-classified examples.</p>
+
+            <pre><code>class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2.0):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * ce_loss
+        return focal_loss.mean()</code></pre>
+
+            <h3>Combined Loss</h3>
+            <pre><code>class CombinedLoss(nn.Module):
+    def __init__(self, alpha=0.5):
+        super().__init__()
+        self.alpha = alpha
+        self.dice = DiceLoss()
+        self.ce = nn.CrossEntropyLoss()
+
+    def forward(self, predictions, targets):
+        dice_loss = self.dice(predictions, targets)
+        ce_loss = self.ce(predictions, targets)
+        return self.alpha * dice_loss + (1 - self.alpha) * ce_loss</code></pre>
+
+            <h2>Evaluation Metrics</h2>
+
+            <h3>IoU (Intersection over Union)</h3>
+            <pre><code>def compute_iou(pred, target, num_classes):
+    ious = []
+    pred = pred.view(-1)
+    target = target.view(-1)
+
+    for cls in range(num_classes):
+        pred_cls = (pred == cls)
+        target_cls = (target == cls)
+
+        intersection = (pred_cls & target_cls).sum().float()
+        union = (pred_cls | target_cls).sum().float()
+
+        if union == 0:
+            ious.append(float('nan'))
+        else:
+            ious.append((intersection / union).item())
+
+    return np.nanmean(ious)</code></pre>
+
+            <h3>Mean IoU (mIoU)</h3>
+            <p>Average IoU across all classes. Standard metric for semantic segmentation. Higher mIoU indicates better pixel-wise classification accuracy.</p>
+
+            <h3>Dice Coefficient</h3>
+            <pre><code>def dice_coefficient(pred, target):
+    pred = pred.view(-1)
+    target = target.view(-1)
+    intersection = (pred & target).sum().float()
+    return (2 * intersection) / (pred.sum() + target.sum()).float()</code></pre>
+
+            <h3>Pixel Accuracy</h3>
+            <pre><code>def pixel_accuracy(pred, target):
+    correct = (pred == target).sum()
+    total = target.numel()
+    return (correct / total).item()</code></pre>
+
+            <h2>Data Augmentation for Segmentation</h2>
+            <p>Critical for improving model generalization. Must apply the same spatial transformations to both image and mask.</p>
+
+            <pre><code>import albumentations as A
+
+# Augmentation pipeline
+transform = A.Compose([
+    A.RandomRotate90(p=0.5),
+    A.Flip(p=0.5),
+    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1,
+                       rotate_limit=45, p=0.5),
+    A.OneOf([
+        A.ElasticTransform(alpha=120, sigma=120 * 0.05,
+                          alpha_affine=120 * 0.03, p=0.5),
+        A.GridDistortion(p=0.5),
+        A.OpticalDistortion(distort_limit=1, shift_limit=0.5, p=1),
+    ], p=0.3),
+    A.CLAHE(clip_limit=2, p=0.5),
+    A.RandomBrightnessContrast(p=0.5),
+    A.RandomGamma(p=0.5),
+    A.GaussNoise(p=0.3),
+    A.Blur(blur_limit=3, p=0.3),
+    A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+])
+
+# Apply to both image and mask
+augmented = transform(image=image, mask=mask)
+image_aug = augmented['image']
+mask_aug = augmented['mask']</code></pre>
+
+            <h2>Post-Processing Techniques</h2>
+
+            <h3>Conditional Random Fields (CRF)</h3>
+            <p>Refines segmentation boundaries using pixel-level relationships.</p>
+            <pre><code>import pydensecrf.densecrf as dcrf
+from pydensecrf.utils import unary_from_softmax
+
+def apply_crf(image, probabilities, n_iters=5):
+    """
+    image: [H, W, 3] RGB image
+    probabilities: [num_classes, H, W]
+    """
+    h, w = image.shape[:2]
+    n_classes = probabilities.shape[0]
+
+    d = dcrf.DenseCRF2D(w, h, n_classes)
+
+    # Unary potential
+    U = unary_from_softmax(probabilities)
+    d.setUnaryEnergy(U)
+
+    # Pairwise potentials
+    d.addPairwiseGaussian(sxy=3, compat=3)
+    d.addPairwiseBilateral(sxy=80, srgb=13, rgbim=image, compat=10)
+
+    # Inference
+    Q = d.inference(n_iters)
+    return np.argmax(Q, axis=0).reshape((h, w))</code></pre>
+
+            <h3>Morphological Operations</h3>
+            <pre><code>import cv2
+
+def refine_mask(mask):
+    # Remove small noise
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+    # Fill holes
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Smooth boundaries
+    mask = cv2.GaussianBlur(mask, (5, 5), 0)
+
+    return mask</code></pre>
+
+            <h2>Practical Applications</h2>
+
+            <h3>Medical Imaging</h3>
+            <ul>
+                <li><strong>Tumor segmentation</strong> - Identify cancerous regions in MRI/CT scans</li>
+                <li><strong>Organ delineation</strong> - Outline organs for surgical planning</li>
+                <li><strong>Cell segmentation</strong> - Count and analyze cells in microscopy</li>
+                <li><strong>Lesion detection</strong> - Identify abnormalities in skin, retina, etc.</li>
+            </ul>
+
+            <h3>Autonomous Driving</h3>
+            <ul>
+                <li><strong>Lane detection</strong> - Identify drivable lanes and boundaries</li>
+                <li><strong>Drivable area</strong> - Segment safe navigation zones</li>
+                <li><strong>Pedestrian segmentation</strong> - Separate pedestrians from background</li>
+                <li><strong>Traffic sign recognition</strong> - Segment and classify road signs</li>
+            </ul>
+
+            <h3>Satellite Imagery</h3>
+            <ul>
+                <li><strong>Land use classification</strong> - Categorize terrain types</li>
+                <li><strong>Building extraction</strong> - Map urban structures</li>
+                <li><strong>Road network mapping</strong> - Extract transportation infrastructure</li>
+                <li><strong>Environmental monitoring</strong> - Track deforestation, flooding, etc.</li>
+            </ul>
+
+            <h3>Agriculture</h3>
+            <ul>
+                <li><strong>Crop health monitoring</strong> - Identify diseased plants</li>
+                <li><strong>Weed detection</strong> - Segment weeds for targeted spraying</li>
+                <li><strong>Yield estimation</strong> - Count and measure crops</li>
+            </ul>
+
+            <h2>Modern Segmentation Models</h2>
+
+            <h3>Segment Anything Model (SAM)</h3>
+            <p>Foundation model from Meta that can segment any object with prompts (points, boxes, or text).</p>
+
+            <pre><code>from segment_anything import sam_model_registry, SamPredictor
+
+# Load SAM
+sam = sam_model_registry["vit_h"](checkpoint="sam_vit_h.pth")
+predictor = SamPredictor(sam)
+
+# Set image
+predictor.set_image(image)
+
+# Predict with point prompt
+point_coords = np.array([[500, 375]])
+point_labels = np.array([1])  # 1 = foreground, 0 = background
+
+masks, scores, logits = predictor.predict(
+    point_coords=point_coords,
+    point_labels=point_labels,
+    multimask_output=True
+)
+
+# Predict with box prompt
+box = np.array([100, 100, 500, 500])  # x1, y1, x2, y2
+masks, scores, logits = predictor.predict(
+    box=box,
+    multimask_output=False
+)
+
+# Automatic mask generation
+from segment_anything import SamAutomaticMaskGenerator
+
+mask_generator = SamAutomaticMaskGenerator(sam)
+masks = mask_generator.generate(image)</code></pre>
+
+            <h3>SegFormer</h3>
+            <p>Efficient transformer-based segmentation with hierarchical features. Achieves excellent performance with fewer parameters.</p>
+
+            <pre><code>from transformers import SegformerForSemanticSegmentation, SegformerImageProcessor
+
+processor = SegformerImageProcessor.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
+model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
+
+inputs = processor(images=image, return_tensors="pt")
+outputs = model(**inputs)
+logits = outputs.logits
+
+# Upsample to original size
+upsampled_logits = nn.functional.interpolate(
+    logits,
+    size=image.shape[:2],
+    mode='bilinear',
+    align_corners=False
+)
+
+pred_seg = upsampled_logits.argmax(dim=1)[0]</code></pre>
+
+            <h3>Swin-UNet</h3>
+            <p>Combines Swin Transformer with U-Net architecture for medical imaging. Leverages transformer's global context with U-Net's precise localization.</p>
+
+            <h2>Performance Optimization</h2>
+
+            <h3>Inference Speed Tips</h3>
+            <ul>
+                <li><strong>Reduce input resolution</strong> - 256x256 is 4x faster than 512x512</li>
+                <li><strong>Use lighter backbones</strong> - MobileNet instead of ResNet</li>
+                <li><strong>Model pruning</strong> - Remove redundant weights</li>
+                <li><strong>Quantization</strong> - INT8 inference for 2-4x speedup</li>
+                <li><strong>TensorRT optimization</strong> - Optimize for NVIDIA GPUs</li>
+            </ul>
+
+            <h3>Memory Optimization</h3>
+            <pre><code># Gradient checkpointing for large models
+from torch.utils.checkpoint import checkpoint
+
+def forward_with_checkpointing(self, x):
+    x = checkpoint(self.layer1, x)
+    x = checkpoint(self.layer2, x)
+    return x
+
+# Mixed precision training
+from torch.cuda.amp import autocast, GradScaler
+
+scaler = GradScaler()
+
+for images, masks in train_loader:
+    with autocast():
+        outputs = model(images)
+        loss = criterion(outputs, masks)
+
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()</code></pre>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Semantic segmentation classifies every pixel, instance segmentation separates individual objects</li>
+                    <li>U-Net uses encoder-decoder architecture with skip connections for precise segmentation</li>
+                    <li>DeepLab v3+ leverages atrous convolutions and ASPP for multi-scale context</li>
+                    <li>Mask R-CNN extends object detection to produce instance-level pixel masks</li>
+                    <li>Dice loss and focal loss handle class imbalance better than cross-entropy</li>
+                    <li>mIoU is the standard evaluation metric for segmentation tasks</li>
+                    <li>Modern models like SAM enable zero-shot segmentation with prompts</li>
+                    <li>Post-processing with CRF and morphological operations refines predictions</li>
+                    <li>弘益人間 - Segmentation technology serves humanity in healthcare, safety, and environmental protection</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>What's the difference between semantic and instance segmentation? Provide real-world examples.</li>
+                    <li>How do skip connections in U-Net improve segmentation quality?</li>
+                    <li>Why is Dice loss preferred over cross-entropy for medical imaging?</li>
+                    <li>Explain how atrous convolutions expand receptive fields without losing resolution.</li>
+                    <li>What are the key applications of segmentation in autonomous driving?</li>
+                    <li>How does SAM achieve zero-shot segmentation capabilities?</li>
+                    <li>Compare the trade-offs between U-Net and DeepLab v3+ architectures.</li>
+                    <li>What post-processing techniques can improve segmentation boundaries?</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

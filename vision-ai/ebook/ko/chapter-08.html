@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 8: 프로덕션 배포 | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 8</div>
+            <h1>프로덕션 배포</h1>
+            <p style="color: #0f172a; margin-top: 15px;">비전 AI 모델을 실제 서비스로</p>
+        </div>
+        <div class="content">
+            <h2>프로덕션 배포 개요</h2>
+            <p>연구 환경에서 개발된 비전 AI 모델을 실제 프로덕션 환경에 배포하는 것은 성능, 확장성, 신뢰성, 모니터링 등 다양한 고려사항이 필요합니다.</p>
+
+            <h3>주요 고려사항</h3>
+            <ul>
+                <li><strong>모델 최적화</strong> - 추론 속도 및 메모리 최적화</li>
+                <li><strong>서빙 인프라</strong> - API 서버, 로드 밸런싱, 확장성</li>
+                <li><strong>모니터링</strong> - 성능 추적, 로깅, 알림</li>
+                <li><strong>A/B 테스팅</strong> - 모델 버전 비교</li>
+                <li><strong>모델 버전 관리</strong> - MLOps, CI/CD</li>
+                <li><strong>보안</strong> - 데이터 보호, 모델 보안</li>
+            </ul>
+
+            <h2>모델 최적화</h2>
+
+            <h3>양자화 (Quantization)</h3>
+            <p>FP32를 INT8로 변환하여 모델 크기를 줄이고 추론 속도를 높입니다.</p>
+
+            <pre><code>import torch
+
+# PyTorch 동적 양자화
+model_fp32 = YourModel()
+model_fp32.eval()
+
+# 동적 양자화 (가중치만)
+model_int8 = torch.quantization.quantize_dynamic(
+    model_fp32,
+    {torch.nn.Linear},  # 양자화할 레이어
+    dtype=torch.qint8
+)
+
+# 정적 양자화 (활성화도 포함)
+model_fp32.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+model_prepared = torch.quantization.prepare(model_fp32)
+
+# 보정 데이터로 실행
+for data in calibration_data:
+    model_prepared(data)
+
+model_int8 = torch.quantization.convert(model_prepared)
+
+# ONNX 양자화
+import onnx
+from onnxruntime.quantization import quantize_dynamic, QuantType
+
+model_path = "model.onnx"
+quantized_model_path = "model_quantized.onnx"
+
+quantize_dynamic(
+    model_path,
+    quantized_model_path,
+    weight_type=QuantType.QUInt8
+)
+
+print(f"원본 크기: {os.path.getsize(model_path) / 1024 / 1024:.2f} MB")
+print(f"양자화 크기: {os.path.getsize(quantized_model_path) / 1024 / 1024:.2f} MB")</code></pre>
+
+            <h3>프루닝 (Pruning)</h3>
+            <p>중요하지 않은 가중치를 제거하여 모델을 압축합니다.</p>
+
+            <pre><code>import torch.nn.utils.prune as prune
+
+# 레이어별 프루닝
+model = YourModel()
+
+# L1 정규화 기반 프루닝 (30% 제거)
+for name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        prune.l1_unstructured(module, name='weight', amount=0.3)
+
+# 글로벌 프루닝 (전체 모델의 40% 제거)
+parameters_to_prune = []
+for module in model.modules():
+    if isinstance(module, torch.nn.Conv2d):
+        parameters_to_prune.append((module, 'weight'))
+
+prune.global_unstructured(
+    parameters_to_prune,
+    pruning_method=prune.L1Unstructured,
+    amount=0.4,
+)
+
+# 프루닝 영구 적용
+for module, name in parameters_to_prune:
+    prune.remove(module, name)</code></pre>
+
+            <h3>지식 증류 (Knowledge Distillation)</h3>
+            <p>큰 teacher 모델의 지식을 작은 student 모델로 전이합니다.</p>
+
+            <pre><code>import torch.nn.functional as F
+
+class DistillationLoss(nn.Module):
+    def __init__(self, alpha=0.5, temperature=3.0):
+        super().__init__()
+        self.alpha = alpha
+        self.temperature = temperature
+
+    def forward(self, student_logits, teacher_logits, labels):
+        # Hard loss (실제 레이블)
+        hard_loss = F.cross_entropy(student_logits, labels)
+
+        # Soft loss (teacher 지식)
+        soft_loss = F.kl_div(
+            F.log_softmax(student_logits / self.temperature, dim=1),
+            F.softmax(teacher_logits / self.temperature, dim=1),
+            reduction='batchmean'
+        ) * (self.temperature ** 2)
+
+        # 결합
+        return self.alpha * hard_loss + (1 - self.alpha) * soft_loss
+
+# 학습 루프
+teacher_model.eval()
+student_model.train()
+
+criterion = DistillationLoss(alpha=0.5, temperature=3.0)
+optimizer = torch.optim.Adam(student_model.parameters(), lr=0.001)
+
+for images, labels in train_loader:
+    # Teacher 예측 (그래디언트 계산 안함)
+    with torch.no_grad():
+        teacher_logits = teacher_model(images)
+
+    # Student 예측
+    student_logits = student_model(images)
+
+    # 증류 손실
+    loss = criterion(student_logits, teacher_logits, labels)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()</code></pre>
+
+            <h2>모델 서빙</h2>
+
+            <h3>FastAPI로 REST API 구축</h3>
+            <pre><code>from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse
+import torch
+from PIL import Image
+import io
+import numpy as np
+
+app = FastAPI(title="비전 AI API")
+
+# 모델 로드 (시작시 한 번만)
+model = torch.jit.load('model_scripted.pt')
+model.eval()
+
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    """이미지 분류 예측"""
+    try:
+        # 이미지 읽기
+        image_data = await file.read()
+        image = Image.open(io.BytesIO(image_data)).convert('RGB')
+
+        # 전처리
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                               std=[0.229, 0.224, 0.225])
+        ])
+        input_tensor = transform(image).unsqueeze(0)
+
+        # 추론
+        with torch.no_grad():
+            output = model(input_tensor)
+            probabilities = F.softmax(output[0], dim=0)
+
+        # 상위 5개 예측
+        top5_prob, top5_idx = torch.topk(probabilities, 5)
+
+        results = [
+            {"class_id": int(idx), "probability": float(prob)}
+            for idx, prob in zip(top5_idx, top5_prob)
+        ]
+
+        return JSONResponse(content={"predictions": results})
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+@app.get("/health")
+async def health():
+    """헬스 체크"""
+    return {"status": "healthy"}
+
+# 실행: uvicorn main:app --host 0.0.0.0 --port 8000</code></pre>
+
+            <h3>배치 추론 최적화</h3>
+            <pre><code>from collections import deque
+import asyncio
+
+class BatchPredictor:
+    def __init__(self, model, max_batch_size=32, max_wait_time=0.1):
+        self.model = model
+        self.max_batch_size = max_batch_size
+        self.max_wait_time = max_wait_time
+        self.queue = deque()
+        self.batch_processing = False
+
+    async def predict(self, image_tensor):
+        # 큐에 추가
+        future = asyncio.Future()
+        self.queue.append((image_tensor, future))
+
+        # 배치 처리 시작
+        if not self.batch_processing:
+            asyncio.create_task(self.process_batch())
+
+        # 결과 대기
+        return await future
+
+    async def process_batch(self):
+        self.batch_processing = True
+        await asyncio.sleep(self.max_wait_time)
+
+        # 배치 수집
+        batch_items = []
+        while self.queue and len(batch_items) < self.max_batch_size:
+            batch_items.append(self.queue.popleft())
+
+        if batch_items:
+            # 배치 텐서 생성
+            tensors = [item[0] for item in batch_items]
+            batch_tensor = torch.stack(tensors)
+
+            # 배치 추론
+            with torch.no_grad():
+                predictions = self.model(batch_tensor)
+
+            # 결과 분배
+            for i, (_, future) in enumerate(batch_items):
+                future.set_result(predictions[i])
+
+        self.batch_processing = False
+
+# 사용
+batch_predictor = BatchPredictor(model)
+
+@app.post("/predict_batch")
+async def predict_batch(file: UploadFile = File(...)):
+    image = preprocess_image(await file.read())
+    result = await batch_predictor.predict(image)
+    return {"prediction": result.tolist()}</code></pre>
+
+            <h2>Docker 컨테이너화</h2>
+
+            <h3>Dockerfile</h3>
+            <pre><code># Dockerfile
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+
+WORKDIR /app
+
+# 시스템 의존성
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 의존성
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 애플리케이션 코드
+COPY . .
+
+# 모델 다운로드 (빌드 시)
+RUN python download_model.py
+
+# 포트 노출
+EXPOSE 8000
+
+# 실행
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]</code></pre>
+
+            <pre><code># docker-compose.yml
+version: '3.8'
+
+services:
+  vision-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/models/model.pt
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - vision-api</code></pre>
+
+            <h2>TensorRT 최적화</h2>
+            <p>NVIDIA GPU에서 최고 성능을 위한 추론 엔진입니다.</p>
+
+            <pre><code>import tensorrt as trt
+import pycuda.driver as cuda
+import pycuda.autoinit
+
+def build_engine(onnx_path, engine_path):
+    """ONNX를 TensorRT 엔진으로 변환"""
+    logger = trt.Logger(trt.Logger.WARNING)
+    builder = trt.Builder(logger)
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    )
+    parser = trt.OnnxParser(network, logger)
+
+    # ONNX 파일 파싱
+    with open(onnx_path, 'rb') as model:
+        if not parser.parse(model.read()):
+            for error in range(parser.num_errors):
+                print(parser.get_error(error))
+            return None
+
+    # 빌드 설정
+    config = builder.create_builder_config()
+    config.max_workspace_size = 1 << 30  # 1GB
+
+    # FP16 활성화 (지원하는 경우)
+    if builder.platform_has_fast_fp16:
+        config.set_flag(trt.BuilderFlag.FP16)
+
+    # INT8 활성화 (보정 데이터 필요)
+    # config.set_flag(trt.BuilderFlag.INT8)
+
+    # 엔진 빌드
+    engine = builder.build_engine(network, config)
+
+    # 엔진 저장
+    with open(engine_path, 'wb') as f:
+        f.write(engine.serialize())
+
+    return engine
+
+# TensorRT 추론
+class TRTInference:
+    def __init__(self, engine_path):
+        # 엔진 로드
+        logger = trt.Logger(trt.Logger.WARNING)
+        with open(engine_path, 'rb') as f:
+            runtime = trt.Runtime(logger)
+            self.engine = runtime.deserialize_cuda_engine(f.read())
+
+        self.context = self.engine.create_execution_context()
+
+        # 메모리 할당
+        self.inputs = []
+        self.outputs = []
+        self.bindings = []
+
+        for binding in self.engine:
+            size = trt.volume(self.engine.get_binding_shape(binding))
+            dtype = trt.nptype(self.engine.get_binding_dtype(binding))
+            host_mem = cuda.pagelocked_empty(size, dtype)
+            device_mem = cuda.mem_alloc(host_mem.nbytes)
+
+            self.bindings.append(int(device_mem))
+
+            if self.engine.binding_is_input(binding):
+                self.inputs.append({'host': host_mem, 'device': device_mem})
+            else:
+                self.outputs.append({'host': host_mem, 'device': device_mem})
+
+        self.stream = cuda.Stream()
+
+    def infer(self, input_data):
+        # 입력 복사
+        np.copyto(self.inputs[0]['host'], input_data.ravel())
+        cuda.memcpy_htod_async(
+            self.inputs[0]['device'],
+            self.inputs[0]['host'],
+            self.stream
+        )
+
+        # 추론 실행
+        self.context.execute_async_v2(
+            bindings=self.bindings,
+            stream_handle=self.stream.handle
+        )
+
+        # 출력 복사
+        cuda.memcpy_dtoh_async(
+            self.outputs[0]['host'],
+            self.outputs[0]['device'],
+            self.stream
+        )
+
+        self.stream.synchronize()
+
+        return self.outputs[0]['host']</code></pre>
+
+            <h2>모니터링 및 로깅</h2>
+
+            <h3>Prometheus 메트릭</h3>
+            <pre><code>from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import start_http_server
+import time
+
+# 메트릭 정의
+request_count = Counter(
+    'vision_api_requests_total',
+    '총 요청 수',
+    ['endpoint', 'status']
+)
+
+inference_duration = Histogram(
+    'vision_api_inference_duration_seconds',
+    '추론 시간',
+    buckets=[0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0]
+)
+
+model_confidence = Histogram(
+    'vision_api_model_confidence',
+    '모델 신뢰도',
+    buckets=[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
+)
+
+active_requests = Gauge(
+    'vision_api_active_requests',
+    '진행 중인 요청 수'
+)
+
+# FastAPI 미들웨어
+@app.middleware("http")
+async def monitor_requests(request, call_next):
+    active_requests.inc()
+    start_time = time.time()
+
+    try:
+        response = await call_next(request)
+        status = "success"
+        return response
+    except Exception as e:
+        status = "error"
+        raise
+    finally:
+        duration = time.time() - start_time
+        inference_duration.observe(duration)
+        request_count.labels(
+            endpoint=request.url.path,
+            status=status
+        ).inc()
+        active_requests.dec()
+
+# Prometheus 서버 시작
+start_http_server(9090)</code></pre>
+
+            <h3>구조화된 로깅</h3>
+            <pre><code>import logging
+import json
+from datetime import datetime
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_data = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+        }
+
+        # 추가 필드
+        if hasattr(record, 'request_id'):
+            log_data['request_id'] = record.request_id
+        if hasattr(record, 'user_id'):
+            log_data['user_id'] = record.user_id
+        if hasattr(record, 'duration'):
+            log_data['duration'] = record.duration
+
+        # 예외 정보
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
+
+        return json.dumps(log_data)
+
+# 로거 설정
+logger = logging.getLogger('vision_api')
+logger.setLevel(logging.INFO)
+
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logger.addHandler(handler)
+
+# 사용
+@app.post("/predict")
+async def predict(file: UploadFile):
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+
+    logger.info(
+        "추론 요청 시작",
+        extra={'request_id': request_id, 'filename': file.filename}
+    )
+
+    try:
+        result = await process_image(file)
+
+        logger.info(
+            "추론 완료",
+            extra={
+                'request_id': request_id,
+                'duration': time.time() - start_time,
+                'top_class': result['predictions'][0]['class_id']
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(
+            "추론 실패",
+            extra={'request_id': request_id, 'error': str(e)},
+            exc_info=True
+        )
+        raise</code></pre>
+
+            <h2>MLOps 파이프라인</h2>
+
+            <h3>MLflow로 실험 추적</h3>
+            <pre><code>import mlflow
+import mlflow.pytorch
+
+# MLflow 설정
+mlflow.set_tracking_uri("http://mlflow-server:5000")
+mlflow.set_experiment("vision-model-training")
+
+# 학습 루프
+with mlflow.start_run():
+    # 파라미터 로깅
+    mlflow.log_param("learning_rate", 0.001)
+    mlflow.log_param("batch_size", 32)
+    mlflow.log_param("model_architecture", "resnet50")
+
+    # 학습
+    for epoch in range(num_epochs):
+        train_loss = train_epoch(model, train_loader)
+        val_loss, val_acc = validate(model, val_loader)
+
+        # 메트릭 로깅
+        mlflow.log_metric("train_loss", train_loss, step=epoch)
+        mlflow.log_metric("val_loss", val_loss, step=epoch)
+        mlflow.log_metric("val_accuracy", val_acc, step=epoch)
+
+    # 모델 저장
+    mlflow.pytorch.log_model(model, "model")
+
+    # 아티팩트 로깅
+    mlflow.log_artifact("config.yaml")
+    mlflow.log_artifact("training_curve.png")</code></pre>
+
+            <h3>CI/CD 파이프라인</h3>
+            <pre><code># .github/workflows/deploy.yml
+name: 모델 배포
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Python 설정
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: 의존성 설치
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: 테스트 실행
+        run: pytest tests/
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Docker 이미지 빌드
+        run: docker build -t vision-api:${{ github.sha }} .
+
+      - name: ECR 푸시
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REGISTRY
+          docker tag vision-api:${{ github.sha }} $ECR_REGISTRY/vision-api:latest
+          docker push $ECR_REGISTRY/vision-api:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kubernetes 배포
+        run: |
+          kubectl set image deployment/vision-api vision-api=$ECR_REGISTRY/vision-api:latest
+          kubectl rollout status deployment/vision-api</code></pre>
+
+            <h2>A/B 테스팅</h2>
+
+            <pre><code>import random
+
+class ABTestRouter:
+    def __init__(self, model_a, model_b, traffic_split=0.5):
+        self.model_a = model_a
+        self.model_b = model_b
+        self.traffic_split = traffic_split
+
+    async def predict(self, image, user_id):
+        # 사용자 ID 기반 일관된 라우팅
+        model_variant = 'A' if hash(user_id) % 100 < self.traffic_split * 100 else 'B'
+
+        if model_variant == 'A':
+            result = await self.model_a.predict(image)
+        else:
+            result = await self.model_b.predict(image)
+
+        # 로깅 (분석용)
+        logger.info(
+            "A/B 테스트 예측",
+            extra={
+                'user_id': user_id,
+                'variant': model_variant,
+                'prediction': result
+            }
+        )
+
+        return result
+
+# 사용
+ab_router = ABTestRouter(model_v1, model_v2, traffic_split=0.5)
+
+@app.post("/predict")
+async def predict(file: UploadFile, user_id: str):
+    image = await preprocess_image(file)
+    return await ab_router.predict(image, user_id)</code></pre>
+
+            <h2>보안 고려사항</h2>
+
+            <h3>입력 검증</h3>
+            <pre><code>from PIL import Image
+import magic
+
+def validate_image(file_data: bytes):
+    """이미지 파일 검증"""
+    # 파일 타입 확인
+    mime = magic.from_buffer(file_data, mime=True)
+    allowed_types = ['image/jpeg', 'image/png', 'image/webp']
+
+    if mime not in allowed_types:
+        raise ValueError(f"지원하지 않는 파일 타입: {mime}")
+
+    # 이미지 로드 시도
+    try:
+        image = Image.open(io.BytesIO(file_data))
+        image.verify()
+    except Exception as e:
+        raise ValueError(f"유효하지 않은 이미지: {str(e)}")
+
+    # 크기 제한
+    max_size = 10 * 1024 * 1024  # 10MB
+    if len(file_data) > max_size:
+        raise ValueError(f"파일 크기 초과: {len(file_data)} bytes")
+
+    # 해상도 제한
+    max_resolution = 4096
+    if image.width > max_resolution or image.height > max_resolution:
+        raise ValueError(f"해상도 초과: {image.width}x{image.height}")
+
+    return True</code></pre>
+
+            <h3>Rate Limiting</h3>
+            <pre><code>from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.post("/predict")
+@limiter.limit("10/minute")  # 분당 10개 요청 제한
+async def predict(request: Request, file: UploadFile):
+    # 추론 로직
+    pass</code></pre>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>양자화, 프루닝, 지식 증류로 모델을 최적화합니다</li>
+                    <li>FastAPI와 Docker로 확장 가능한 API를 구축합니다</li>
+                    <li>TensorRT로 NVIDIA GPU에서 최고 성능을 달성합니다</li>
+                    <li>Prometheus와 구조화된 로깅으로 시스템을 모니터링합니다</li>
+                    <li>MLflow로 실험을 추적하고 CI/CD로 자동화합니다</li>
+                    <li>A/B 테스팅으로 모델 버전을 비교합니다</li>
+                    <li>입력 검증과 rate limiting으로 보안을 강화합니다</li>
+                    <li>弘益人間 - 안정적이고 확장 가능한 AI 시스템으로 더 많은 사람들에게 서비스합니다</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>복습 문제</h2>
+                <ol>
+                    <li>양자화가 모델 성능에 미치는 영향과 trade-off를 설명하세요.</li>
+                    <li>지식 증류에서 temperature 파라미터의 역할은 무엇인가요?</li>
+                    <li>배치 추론이 개별 추론보다 효율적인 이유는 무엇인가요?</li>
+                    <li>TensorRT가 일반 PyTorch 추론보다 빠른 이유는 무엇인가요?</li>
+                    <li>프로덕션 환경에서 모니터링해야 할 주요 메트릭은 무엇인가요?</li>
+                    <li>A/B 테스팅에서 사용자 ID 기반 라우팅이 중요한 이유는?</li>
+                    <li>비전 AI API의 주요 보안 고려사항을 설명하세요.</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

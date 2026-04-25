@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 7: 3D 비전 | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 7</div>
+            <h1>3D 비전</h1>
+            <p style="color: #0f172a; margin-top: 15px;">깊이 인식과 3차원 공간 이해</p>
+        </div>
+        <div class="content">
+            <h2>3D 비전 개요</h2>
+            <p>3D 비전은 2D 이미지에서 3차원 공간 정보를 복원하고 이해하는 분야입니다. 깊이 추정, 3D 재구성, 자세 추정 등이 포함됩니다.</p>
+
+            <h3>주요 작업</h3>
+            <ul>
+                <li><strong>깊이 추정</strong> - 각 픽셀까지의 거리 예측</li>
+                <li><strong>3D 재구성</strong> - 2D 이미지로부터 3D 모델 생성</li>
+                <li><strong>자세 추정</strong> - 3D 공간에서 객체나 사람의 자세 파악</li>
+                <li><strong>SLAM</strong> - 동시적 위치 추정 및 지도 작성</li>
+                <li><strong>포인트 클라우드 처리</strong> - 3D 점군 데이터 분석</li>
+            </ul>
+
+            <h2>스테레오 비전</h2>
+            <p>두 개의 카메라로 촬영한 이미지의 시차를 이용하여 깊이를 계산합니다.</p>
+
+            <h3>스테레오 매칭</h3>
+            <pre><code>import cv2
+import numpy as np
+
+# 스테레오 이미지 로드
+left_img = cv2.imread('left.jpg', cv2.IMREAD_GRAYSCALE)
+right_img = cv2.imread('right.jpg', cv2.IMREAD_GRAYSCALE)
+
+# 스테레오 BM (Block Matching) 알고리즘
+stereo = cv2.StereoBM_create(numDisparities=16*10, blockSize=15)
+disparity = stereo.compute(left_img, right_img)
+
+# 시차 맵 시각화
+disparity_normalized = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+disparity_normalized = np.uint8(disparity_normalized)
+
+# SGBM (Semi-Global Block Matching) - 더 정확함
+window_size = 3
+min_disp = 0
+num_disp = 16 * 10
+
+stereo_sgbm = cv2.StereoSGBM_create(
+    minDisparity=min_disp,
+    numDisparities=num_disp,
+    blockSize=window_size,
+    P1=8 * 3 * window_size ** 2,
+    P2=32 * 3 * window_size ** 2,
+    disp12MaxDiff=1,
+    uniquenessRatio=10,
+    speckleWindowSize=100,
+    speckleRange=32
+)
+
+disparity_sgbm = stereo_sgbm.compute(left_img, right_img)
+
+# 시차를 깊이로 변환
+# depth = (baseline * focal_length) / disparity
+baseline = 0.1  # 미터 단위
+focal_length = 700  # 픽셀 단위
+depth = (baseline * focal_length) / (disparity_sgbm + 1e-6)</code></pre>
+
+            <h2>단안 깊이 추정</h2>
+            <p>단일 이미지에서 딥러닝을 사용하여 깊이를 추정합니다.</p>
+
+            <h3>MiDaS 모델</h3>
+            <pre><code>import torch
+import cv2
+import numpy as np
+from torchvision.transforms import Compose
+
+# MiDaS 모델 로드
+model_type = "DPT_Large"  # 또는 "MiDaS_small"
+midas = torch.hub.load("intel-isl/MiDaS", model_type)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+midas.to(device)
+midas.eval()
+
+# 변환 로드
+midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
+
+if model_type == "DPT_Large":
+    transform = midas_transforms.dpt_transform
+else:
+    transform = midas_transforms.small_transform
+
+# 이미지 로드 및 전처리
+img = cv2.imread('image.jpg')
+img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+input_batch = transform(img_rgb).to(device)
+
+# 깊이 예측
+with torch.no_grad():
+    prediction = midas(input_batch)
+
+    # 원본 크기로 리샘플링
+    prediction = torch.nn.functional.interpolate(
+        prediction.unsqueeze(1),
+        size=img.shape[:2],
+        mode="bicubic",
+        align_corners=False,
+    ).squeeze()
+
+depth_map = prediction.cpu().numpy()
+
+# 시각화
+depth_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
+depth_colored = cv2.applyColorMap(np.uint8(depth_normalized), cv2.COLORMAP_INFERNO)
+
+cv2.imshow('깊이 맵', depth_colored)
+cv2.waitKey(0)</code></pre>
+
+            <h3>커스텀 깊이 추정 모델</h3>
+            <pre><code>import torch.nn as nn
+
+class DepthEstimation(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        # 인코더 (ResNet 백본)
+        resnet = models.resnet50(pretrained=True)
+        self.encoder1 = nn.Sequential(*list(resnet.children())[:3])
+        self.encoder2 = nn.Sequential(*list(resnet.children())[3:5])
+        self.encoder3 = resnet.layer2
+        self.encoder4 = resnet.layer3
+        self.encoder5 = resnet.layer4
+
+        # 디코더
+        self.decoder5 = self.decoder_block(2048, 1024)
+        self.decoder4 = self.decoder_block(1024, 512)
+        self.decoder3 = self.decoder_block(512, 256)
+        self.decoder2 = self.decoder_block(256, 128)
+        self.decoder1 = self.decoder_block(128, 64)
+
+        # 최종 깊이 예측
+        self.final = nn.Conv2d(64, 1, kernel_size=1)
+
+    def decoder_block(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        )
+
+    def forward(self, x):
+        # 인코더
+        e1 = self.encoder1(x)
+        e2 = self.encoder2(e1)
+        e3 = self.encoder3(e2)
+        e4 = self.encoder4(e3)
+        e5 = self.encoder5(e4)
+
+        # 디코더
+        d5 = self.decoder5(e5)
+        d4 = self.decoder4(d5 + e4)
+        d3 = self.decoder3(d4 + e3)
+        d2 = self.decoder2(d3 + e2)
+        d1 = self.decoder1(d2 + e1)
+
+        # 깊이 맵 출력
+        depth = self.final(d1)
+        return torch.sigmoid(depth)  # 0~1 범위로 정규화</code></pre>
+
+            <h2>3D 자세 추정</h2>
+
+            <h3>MediaPipe Pose</h3>
+            <pre><code>import mediapipe as mp
+import cv2
+
+# MediaPipe Pose 초기화
+mp_pose = mp.solutions.pose
+mp_drawing = mp.solutions.drawing_utils
+
+pose = mp_pose.Pose(
+    static_image_mode=False,
+    model_complexity=2,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
+
+# 비디오 캡처
+cap = cv2.VideoCapture(0)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # BGR을 RGB로 변환
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # 자세 추정
+    results = pose.process(rgb_frame)
+
+    # 랜드마크 그리기
+    if results.pose_landmarks:
+        mp_drawing.draw_landmarks(
+            frame,
+            results.pose_landmarks,
+            mp_pose.POSE_CONNECTIONS,
+            mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2),
+            mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+        )
+
+        # 3D 좌표 추출
+        for idx, landmark in enumerate(results.pose_landmarks.landmark):
+            x = landmark.x
+            y = landmark.y
+            z = landmark.z  # 깊이 정보
+            visibility = landmark.visibility
+
+            print(f"랜드마크 {idx}: ({x:.3f}, {y:.3f}, {z:.3f}), 가시성: {visibility:.3f}")
+
+    cv2.imshow('자세 추정', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+pose.close()</code></pre>
+
+            <h3>6DoF 객체 자세 추정</h3>
+            <pre><code>import numpy as np
+import cv2
+
+def estimate_pose_pnp(object_points, image_points, camera_matrix, dist_coeffs):
+    """
+    PnP (Perspective-n-Point)로 6DoF 자세 추정
+    """
+    # solvePnP로 회전 및 이동 벡터 추정
+    success, rvec, tvec = cv2.solvePnP(
+        object_points,
+        image_points,
+        camera_matrix,
+        dist_coeffs,
+        flags=cv2.SOLVEPNP_ITERATIVE
+    )
+
+    if success:
+        # 회전 벡터를 회전 행렬로 변환
+        rotation_matrix, _ = cv2.Rodrigues(rvec)
+
+        # 4x4 변환 행렬 생성
+        pose_matrix = np.eye(4)
+        pose_matrix[:3, :3] = rotation_matrix
+        pose_matrix[:3, 3] = tvec.flatten()
+
+        return pose_matrix
+    else:
+        return None
+
+# 3D 객체 포인트 (큐브 예시)
+object_points = np.array([
+    [0, 0, 0],
+    [1, 0, 0],
+    [1, 1, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 0, 1],
+    [1, 1, 1],
+    [0, 1, 1]
+], dtype=np.float32)
+
+# 대응하는 2D 이미지 포인트 (검출된 코너)
+image_points = np.array([
+    [100, 200],
+    [300, 200],
+    [300, 400],
+    [100, 400],
+    [150, 150],
+    [350, 150],
+    [350, 350],
+    [150, 350]
+], dtype=np.float32)
+
+# 카메라 내부 파라미터
+camera_matrix = np.array([
+    [800, 0, 320],
+    [0, 800, 240],
+    [0, 0, 1]
+], dtype=np.float32)
+
+dist_coeffs = np.zeros((4, 1))  # 왜곡 없음 가정
+
+# 자세 추정
+pose = estimate_pose_pnp(object_points, image_points, camera_matrix, dist_coeffs)
+print("추정된 자세 행렬:")
+print(pose)</code></pre>
+
+            <h2>포인트 클라우드 처리</h2>
+
+            <h3>PointNet</h3>
+            <p>3D 포인트 클라우드를 직접 처리하는 딥러닝 아키텍처입니다.</p>
+
+            <pre><code>class PointNet(nn.Module):
+    def __init__(self, num_classes=10):
+        super().__init__()
+
+        # 포인트별 특징 추출 (공유 MLP)
+        self.conv1 = nn.Conv1d(3, 64, 1)
+        self.conv2 = nn.Conv1d(64, 128, 1)
+        self.conv3 = nn.Conv1d(128, 1024, 1)
+
+        self.bn1 = nn.BatchNorm1d(64)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.bn3 = nn.BatchNorm1d(1024)
+
+        # 전역 특징에서 분류
+        self.fc1 = nn.Linear(1024, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, num_classes)
+
+        self.dropout = nn.Dropout(0.3)
+        self.bn4 = nn.BatchNorm1d(512)
+        self.bn5 = nn.BatchNorm1d(256)
+
+    def forward(self, x):
+        # x: [batch, 3, num_points]
+        # 포인트별 특징
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+
+        # 대칭 함수 (max pooling)로 전역 특징 추출
+        x = torch.max(x, 2, keepdim=True)[0]
+        x = x.view(-1, 1024)
+
+        # 분류 헤드
+        x = F.relu(self.bn4(self.fc1(x)))
+        x = F.relu(self.bn5(self.dropout(self.fc2(x))))
+        x = self.fc3(x)
+
+        return x
+
+# 모델 생성
+model = PointNet(num_classes=40)
+
+# 입력: [batch, 3, 1024] - 1024개의 3D 점
+dummy_input = torch.randn(4, 3, 1024)
+output = model(dummy_input)
+print(f"출력 shape: {output.shape}")  # [4, 40]</code></pre>
+
+            <h2>Neural Radiance Fields (NeRF)</h2>
+            <p>암시적 신경망 표현으로 사실적인 3D 장면을 재구성합니다.</p>
+
+            <pre><code>class NeRF(nn.Module):
+    def __init__(self, pos_dim=3, view_dim=3, hidden_dim=256):
+        super().__init__()
+
+        # 위치 인코딩
+        self.pos_encoder = nn.Sequential(
+            nn.Linear(pos_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+        )
+
+        # 밀도 예측
+        self.density = nn.Linear(hidden_dim, 1)
+
+        # 뷰 방향 인코딩
+        self.view_encoder = nn.Sequential(
+            nn.Linear(hidden_dim + view_dim, hidden_dim // 2),
+            nn.ReLU(),
+        )
+
+        # RGB 색상 예측
+        self.rgb = nn.Sequential(
+            nn.Linear(hidden_dim // 2, 3),
+            nn.Sigmoid()
+        )
+
+    def forward(self, pos, view_dir):
+        # 위치 특징
+        pos_feat = self.pos_encoder(pos)
+
+        # 밀도 예측 (볼륨 밀도)
+        density = F.relu(self.density(pos_feat))
+
+        # 뷰 방향과 결합
+        view_feat = torch.cat([pos_feat, view_dir], dim=-1)
+        view_feat = self.view_encoder(view_feat)
+
+        # RGB 색상 예측
+        rgb = self.rgb(view_feat)
+
+        return rgb, density
+
+# 볼륨 렌더링
+def volume_rendering(rgb, density, z_vals):
+    """
+    rgb: [num_rays, num_samples, 3]
+    density: [num_rays, num_samples, 1]
+    z_vals: [num_rays, num_samples]
+    """
+    # 샘플 간 거리
+    dists = z_vals[..., 1:] - z_vals[..., :-1]
+    dists = torch.cat([dists, torch.ones_like(dists[..., :1]) * 1e10], -1)
+
+    # 알파 값 (투명도)
+    alpha = 1.0 - torch.exp(-density.squeeze(-1) * dists)
+
+    # 누적 투과율
+    transmittance = torch.cumprod(
+        torch.cat([torch.ones_like(alpha[..., :1]), 1.0 - alpha + 1e-10], -1),
+        -1
+    )[:, :-1]
+
+    # 가중치
+    weights = alpha * transmittance
+
+    # RGB 합성
+    rgb_map = torch.sum(weights[..., None] * rgb, -2)
+
+    return rgb_map</code></pre>
+
+            <h2>SLAM (동시적 위치 추정 및 매핑)</h2>
+
+            <h3>시각적 SLAM 개념</h3>
+            <pre><code>import numpy as np
+import cv2
+
+class SimpleSLAM:
+    def __init__(self):
+        # 특징 검출기
+        self.detector = cv2.ORB_create(nfeatures=1000)
+
+        # 매처
+        self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+        # 지도 (3D 포인트)
+        self.map_points = []
+
+        # 카메라 궤적
+        self.trajectory = []
+
+    def process_frame(self, frame):
+        # 특징점 검출 및 기술자 계산
+        keypoints, descriptors = self.detector.detectAndCompute(frame, None)
+
+        # 이전 프레임과 매칭 (단순화된 예시)
+        if hasattr(self, 'prev_descriptors'):
+            matches = self.matcher.match(self.prev_descriptors, descriptors)
+            matches = sorted(matches, key=lambda x: x.distance)
+
+            # 상위 매칭만 사용
+            good_matches = matches[:100]
+
+            # Essential Matrix 추정으로 카메라 움직임 계산
+            # 실제 구현에서는 더 복잡한 최적화가 필요
+
+        # 현재 프레임 저장
+        self.prev_keypoints = keypoints
+        self.prev_descriptors = descriptors
+
+        return keypoints
+
+# SLAM 시스템 생성
+slam = SimpleSLAM()
+
+cap = cv2.VideoCapture('video.mp4')
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    keypoints = slam.process_frame(frame)
+
+    # 키포인트 시각화
+    frame_with_keypoints = cv2.drawKeypoints(
+        frame, keypoints, None, color=(0, 255, 0)
+    )
+
+    cv2.imshow('SLAM', frame_with_keypoints)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()</code></pre>
+
+            <h2>3D 비전 응용</h2>
+
+            <h3>증강 현실 (AR)</h3>
+            <ul>
+                <li><strong>마커 추적</strong> - AR 콘텐츠 정확한 배치</li>
+                <li><strong>평면 검출</strong> - 가상 객체를 실제 표면에 배치</li>
+                <li><strong>깊이 기반 occlusion</strong> - 현실적인 객체 겹침</li>
+            </ul>
+
+            <h3>로보틱스</h3>
+            <ul>
+                <li><strong>물체 파지</strong> - 3D 자세로 물체 잡기</li>
+                <li><strong>내비게이션</strong> - 3D 환경에서 경로 계획</li>
+                <li><strong>장애물 회피</strong> - 깊이 정보로 충돌 방지</li>
+            </ul>
+
+            <h3>자율주행</h3>
+            <ul>
+                <li><strong>3D 객체 탐지</strong> - 차량, 보행자의 3D 위치</li>
+                <li><strong>도로 매핑</strong> - 고정밀 3D 지도 생성</li>
+                <li><strong>깊이 인식</strong> - 안전 거리 유지</li>
+            </ul>
+
+            <h3>문화재 보존</h3>
+            <ul>
+                <li><strong>3D 스캐닝</strong> - 문화재의 디지털 복원</li>
+                <li><strong>구조 분석</strong> - 건축물 손상 평가</li>
+                <li><strong>가상 박물관</strong> - 몰입형 전시 경험</li>
+            </ul>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>3D 비전은 2D 이미지에서 3차원 공간 정보를 추출합니다</li>
+                    <li>스테레오 비전은 두 이미지의 시차로 깊이를 계산합니다</li>
+                    <li>단안 깊이 추정은 딥러닝으로 단일 이미지에서 깊이를 예측합니다</li>
+                    <li>자세 추정은 3D 공간에서 객체나 사람의 위치와 방향을 파악합니다</li>
+                    <li>PointNet은 3D 포인트 클라우드를 직접 처리합니다</li>
+                    <li>NeRF는 암시적 표현으로 사실적인 3D 장면을 재구성합니다</li>
+                    <li>SLAM은 동시에 위치를 추정하고 환경 지도를 작성합니다</li>
+                    <li>弘益人間 - 3D 비전으로 AR, 로보틱스, 문화재 보존에 기여합니다</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>복습 문제</h2>
+                <ol>
+                    <li>스테레오 비전이 깊이를 계산하는 원리를 설명하세요.</li>
+                    <li>단안 깊이 추정이 스테레오 비전보다 어려운 이유는 무엇인가요?</li>
+                    <li>6DoF 자세 추정이 무엇이며 어떻게 계산하나요?</li>
+                    <li>PointNet이 순열 불변성(permutation invariance)을 달성하는 방법은?</li>
+                    <li>NeRF의 볼륨 렌더링 과정을 단계별로 설명하세요.</li>
+                    <li>SLAM의 주요 도전 과제는 무엇이며 어떻게 해결하나요?</li>
+                    <li>3D 비전이 자율주행에 어떻게 활용되는지 구체적으로 설명하세요.</li>
+                </ol>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

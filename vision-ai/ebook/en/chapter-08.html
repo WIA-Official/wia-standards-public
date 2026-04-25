@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 8: Production Deployment | WIA-AI-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #10B981 100%); padding: 40px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+        .chapter-number { font-size: 18px; color: #0f172a; font-weight: bold; }
+        h1 { font-size: 42px; color: #0f172a; margin: 10px 0; }
+        .nav { display: flex; justify-content: space-between; margin: 30px 0; }
+        .nav a { background: #10B981; color: #0f172a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .content { background: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: #10B981; font-size: 32px; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #10B981; }
+        h3 { color: #10B981; font-size: 24px; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; color: #cbd5e1; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: bold; }
+        .summary { background: #14532d; padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e3a8a; padding: 30px; border-radius: 12px; margin: 40px 0; }
+        .info-box { background: #1e3a8a; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .warning-box { background: #7c2d12; border-left: 4px solid #f97316; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .success-box { background: #14532d; border-left: 4px solid #10B981; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        footer { text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #10B981; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 8</div>
+            <h1>Production Deployment</h1>
+            <p style="color: #0f172a; margin-top: 15px;">Deploying Vision AI systems at scale</p>
+        </div>
+        <div class="content">
+            <h2>From Research to Production</h2>
+            <p>Deploying Vision AI in production requires more than just a trained model. You need to consider performance, scalability, monitoring, reliability, and cost optimization.</p>
+            <h3>Key Considerations</h3>
+            <ul>
+                <li><strong>Latency</strong> - Response time requirements (real-time vs batch)</li>
+                <li><strong>Throughput</strong> - Number of requests per second</li>
+                <li><strong>Accuracy</strong> - Acceptable error rates</li>
+                <li><strong>Cost</strong> - Infrastructure and operational expenses</li>
+                <li><strong>Scalability</strong> - Handling traffic spikes</li>
+                <li><strong>Reliability</strong> - Uptime and fault tolerance</li>
+                <li><strong>Security</strong> - Data privacy and model protection</li>
+            </ul>
+            <h2>Model Optimization</h2>
+            <h3>Quantization</h3>
+            <p>Reduce model size and inference time by using lower precision (INT8 instead of FP32).</p>
+            <pre><code>import torch
+
+# Post-training quantization
+model_fp32 = YourModel()
+model_fp32.load_state_dict(torch.load('model.pth'))
+model_fp32.eval()
+
+# Dynamic quantization
+model_int8 = torch.quantization.quantize_dynamic(
+    model_fp32,
+    {torch.nn.Linear},
+    dtype=torch.qint8
+)
+
+# Static quantization (requires calibration data)
+model_fp32.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+model_prepared = torch.quantization.prepare(model_fp32)
+
+# Calibrate with representative data
+for data in calibration_data:
+    model_prepared(data)
+
+model_int8 = torch.quantization.convert(model_prepared)
+
+# Compare model sizes
+torch.save(model_fp32.state_dict(), 'model_fp32.pth')
+torch.save(model_int8.state_dict(), 'model_int8.pth')
+# INT8 model is typically 4x smaller</code></pre>
+            <h3>Pruning</h3>
+            <p>Remove unnecessary weights to reduce model size.</p>
+            <pre><code>import torch.nn.utils.prune as prune
+
+# Prune 30% of weights in conv layer
+module = model.conv1
+prune.l1_unstructured(module, name='weight', amount=0.3)
+
+# Remove pruning re-parametrization
+prune.remove(module, 'weight')
+
+# Global pruning across entire model
+parameters_to_prune = []
+for name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        parameters_to_prune.append((module, 'weight'))
+
+prune.global_unstructured(
+    parameters_to_prune,
+    pruning_method=prune.L1Unstructured,
+    amount=0.2,
+)</code></pre>
+            <h3>Knowledge Distillation</h3>
+            <p>Train a smaller student model to mimic a larger teacher model.</p>
+            <pre><code>def distillation_loss(student_logits, teacher_logits, labels, T=3.0, alpha=0.7):
+    """
+    T: Temperature for softening distributions
+    alpha: Weight between distillation and task loss
+    """
+    # Soft targets from teacher
+    soft_targets = F.softmax(teacher_logits / T, dim=1)
+    soft_student = F.log_softmax(student_logits / T, dim=1)
+    distillation_loss = F.kl_div(soft_student, soft_targets, reduction='batchmean') * (T * T)
+
+    # Hard targets (ground truth)
+    student_loss = F.cross_entropy(student_logits, labels)
+
+    # Combined loss
+    return alpha * distillation_loss + (1 - alpha) * student_loss
+
+# Training loop
+teacher.eval()
+student.train()
+
+for images, labels in dataloader:
+    with torch.no_grad():
+        teacher_logits = teacher(images)
+
+    student_logits = student(images)
+    loss = distillation_loss(student_logits, teacher_logits, labels)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()</code></pre>
+            <h2>Model Serving</h2>
+            <h3>ONNX Export</h3>
+            <p>Export to ONNX for cross-framework compatibility.</p>
+            <pre><code>import torch.onnx
+
+# Export PyTorch model to ONNX
+model = YourModel()
+model.load_state_dict(torch.load('model.pth'))
+model.eval()
+
+dummy_input = torch.randn(1, 3, 224, 224)
+
+torch.onnx.export(
+    model,
+    dummy_input,
+    "model.onnx",
+    export_params=True,
+    opset_version=14,
+    do_constant_folding=True,
+    input_names=['input'],
+    output_names=['output'],
+    dynamic_axes={'input': {0: 'batch_size'},
+                  'output': {0: 'batch_size'}}
+)
+
+# Verify ONNX model
+import onnx
+onnx_model = onnx.load("model.onnx")
+onnx.checker.check_model(onnx_model)
+
+# Run inference with ONNX Runtime
+import onnxruntime as ort
+
+ort_session = ort.InferenceSession("model.onnx")
+outputs = ort_session.run(
+    None,
+    {"input": dummy_input.numpy()}
+)</code></pre>
+            <h3>TensorRT Optimization</h3>
+            <p>Optimize for NVIDIA GPUs with TensorRT.</p>
+            <pre><code># Convert ONNX to TensorRT
+import tensorrt as trt
+
+logger = trt.Logger(trt.Logger.WARNING)
+builder = trt.Builder(logger)
+network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+parser = trt.OnnxParser(network, logger)
+
+with open('model.onnx', 'rb') as f:
+    parser.parse(f.read())
+
+config = builder.create_builder_config()
+config.max_workspace_size = 1 << 30  # 1GB
+
+# Enable FP16 for faster inference
+if builder.platform_has_fast_fp16:
+    config.set_flag(trt.BuilderFlag.FP16)
+
+engine = builder.build_engine(network, config)
+
+# Save engine
+with open("model.trt", "wb") as f:
+    f.write(engine.serialize())</code></pre>
+            <h3>TorchServe</h3>
+            <p>Production-ready model serving for PyTorch models.</p>
+            <pre><code># Create model archive
+torch-model-archiver \
+    --model-name vision_model \
+    --version 1.0 \
+    --model-file model.py \
+    --serialized-file model.pth \
+    --handler image_classifier \
+    --extra-files index_to_name.json
+
+# Start TorchServe
+torchserve --start --model-store model_store \
+    --models vision_model=vision_model.mar
+
+# Inference API
+curl -X POST http://localhost:8080/predictions/vision_model \
+    -T image.jpg</code></pre>
+            <h3>FastAPI Deployment</h3>
+            <pre><code>from fastapi import FastAPI, File, UploadFile
+import torch
+from PIL import Image
+import io
+
+app = FastAPI()
+
+# Load model once at startup
+model = YourModel()
+model.load_state_dict(torch.load('model.pth'))
+model.eval()
+
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    # Read image
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents))
+
+    # Preprocess
+    input_tensor = preprocess(image).unsqueeze(0)
+
+    # Inference
+    with torch.no_grad():
+        output = model(input_tensor)
+        predictions = torch.nn.functional.softmax(output[0], dim=0)
+
+    # Return top-5 predictions
+    top5_prob, top5_catid = torch.topk(predictions, 5)
+    results = [
+        {"class": int(top5_catid[i]), "probability": float(top5_prob[i])}
+        for i in range(5)
+    ]
+
+    return {"predictions": results}
+
+# Run with: uvicorn main:app --reload</code></pre>
+            <h2>Containerization with Docker</h2>
+            <pre><code># Dockerfile
+FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]</code></pre>
+            <pre><code># Build and run
+docker build -t vision-ai-service .
+docker run -p 8000:8000 --gpus all vision-ai-service</code></pre>
+            <h2>Cloud Deployment</h2>
+            <h3>AWS SageMaker</h3>
+            <pre><code>import sagemaker
+from sagemaker.pytorch import PyTorchModel
+
+# Deploy model
+pytorch_model = PyTorchModel(
+    model_data='s3://bucket/model.tar.gz',
+    role=role,
+    entry_point='inference.py',
+    framework_version='2.0.0',
+    py_version='py39'
+)
+
+predictor = pytorch_model.deploy(
+    initial_instance_count=1,
+    instance_type='ml.g4dn.xlarge'
+)
+
+# Inference
+result = predictor.predict(image_bytes)</code></pre>
+            <h3>Google Cloud AI Platform</h3>
+            <pre><code># Deploy to Vertex AI
+gcloud ai models upload \
+    --region=us-central1 \
+    --display-name=vision-model \
+    --container-image-uri=gcr.io/project/vision-ai:latest
+
+gcloud ai endpoints create \
+    --region=us-central1 \
+    --display-name=vision-endpoint
+
+gcloud ai endpoints deploy-model ENDPOINT_ID \
+    --region=us-central1 \
+    --model=MODEL_ID \
+    --machine-type=n1-standard-4 \
+    --accelerator=type=nvidia-tesla-t4,count=1</code></pre>
+            <h3>Azure Machine Learning</h3>
+            <pre><code>from azureml.core import Workspace, Model
+from azureml.core.webservice import AciWebservice, Webservice
+
+ws = Workspace.from_config()
+
+# Register model
+model = Model.register(
+    workspace=ws,
+    model_path='model.pth',
+    model_name='vision-model'
+)
+
+# Deploy
+deployment_config = AciWebservice.deploy_configuration(
+    cpu_cores=2,
+    memory_gb=4,
+    gpu_cores=1
+)
+
+service = Model.deploy(
+    workspace=ws,
+    name='vision-service',
+    models=[model],
+    inference_config=inference_config,
+    deployment_config=deployment_config
+)</code></pre>
+            <h2>Monitoring and Logging</h2>
+            <h3>Prometheus Metrics</h3>
+            <pre><code>from prometheus_client import Counter, Histogram, start_http_server
+import time
+
+# Define metrics
+REQUEST_COUNT = Counter('requests_total', 'Total requests')
+REQUEST_LATENCY = Histogram('request_latency_seconds', 'Request latency')
+PREDICTION_COUNT = Counter('predictions_total', 'Total predictions', ['class'])
+
+@app.post("/predict")
+@REQUEST_LATENCY.time()
+async def predict(file: UploadFile = File(...)):
+    REQUEST_COUNT.inc()
+
+    # ... inference code ...
+
+    # Track prediction
+    predicted_class = results[0]['class']
+    PREDICTION_COUNT.labels(class=predicted_class).inc()
+
+    return {"predictions": results}
+
+# Start Prometheus metrics server
+start_http_server(8001)</code></pre>
+            <h3>MLflow Tracking</h3>
+            <pre><code>import mlflow
+
+# Log training run
+with mlflow.start_run():
+    mlflow.log_param("learning_rate", 0.001)
+    mlflow.log_param("batch_size", 32)
+
+    # Training loop
+    for epoch in range(num_epochs):
+        loss = train_epoch()
+        accuracy = validate()
+
+        mlflow.log_metric("loss", loss, step=epoch)
+        mlflow.log_metric("accuracy", accuracy, step=epoch)
+
+    # Log model
+    mlflow.pytorch.log_model(model, "model")
+
+# Load model for inference
+model = mlflow.pytorch.load_model("runs:/RUN_ID/model")</code></pre>
+            <h2>Performance Optimization</h2>
+            <h3>Batch Processing</h3>
+            <pre><code>class BatchPredictor:
+    def __init__(self, model, batch_size=32, max_wait=0.1):
+        self.model = model
+        self.batch_size = batch_size
+        self.max_wait = max_wait
+        self.queue = []
+        self.results = {}
+
+    async def predict(self, image_id, image):
+        # Add to queue
+        self.queue.append((image_id, image))
+
+        # Process when batch is full or timeout
+        if len(self.queue) >= self.batch_size:
+            await self.process_batch()
+
+        # Wait for result
+        while image_id not in self.results:
+            await asyncio.sleep(0.01)
+
+        return self.results.pop(image_id)
+
+    async def process_batch(self):
+        if not self.queue:
+            return
+
+        # Create batch
+        batch_ids, batch_images = zip(*self.queue[:self.batch_size])
+        self.queue = self.queue[self.batch_size:]
+
+        batch_tensor = torch.stack([preprocess(img) for img in batch_images])
+
+        # Inference
+        with torch.no_grad():
+            outputs = self.model(batch_tensor)
+
+        # Store results
+        for i, image_id in enumerate(batch_ids):
+            self.results[image_id] = outputs[i]</code></pre>
+            <h3>Model Caching</h3>
+            <pre><code>from functools import lru_cache
+import hashlib
+
+@lru_cache(maxsize=1000)
+def predict_cached(image_hash):
+    # This will be called only once per unique image
+    return model(preprocess(image))
+
+def predict_with_cache(image):
+    # Compute image hash
+    image_bytes = image.tobytes()
+    image_hash = hashlib.md5(image_bytes).hexdigest()
+
+    return predict_cached(image_hash)</code></pre>
+            <h2>A/B Testing</h2>
+            <pre><code>import random
+
+def get_model_version(user_id):
+    # Route 10% of traffic to new model
+    if hash(user_id) % 100 < 10:
+        return "model_v2"
+    return "model_v1"
+
+@app.post("/predict")
+async def predict(file: UploadFile, user_id: str):
+    model_version = get_model_version(user_id)
+    model = models[model_version]
+
+    # Log which model was used
+    mlflow.log_param("model_version", model_version)
+
+    # ... inference code ...</code></pre>
+            <h2>Security Best Practices</h2>
+            <h3>Input Validation</h3>
+            <pre><code>from PIL import Image
+import magic
+
+def validate_image(file_bytes):
+    # Check file type
+    file_type = magic.from_buffer(file_bytes, mime=True)
+    if file_type not in ['image/jpeg', 'image/png', 'image/webp']:
+        raise ValueError("Invalid image type")
+
+    # Check image can be opened
+    try:
+        img = Image.open(io.BytesIO(file_bytes))
+        img.verify()
+    except:
+        raise ValueError("Corrupted image")
+
+    # Check image size
+    if len(file_bytes) > 10 * 1024 * 1024:  # 10MB
+        raise ValueError("Image too large")
+
+    return img</code></pre>
+            <h3>Rate Limiting</h3>
+            <pre><code>from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.post("/predict")
+@limiter.limit("10/minute")
+async def predict(request: Request, file: UploadFile):
+    # ... inference code ...</code></pre>
+            <h2>Cost Optimization</h2>
+            <h3>Strategies</h3>
+            <ul>
+                <li><strong>Auto-scaling</strong> - Scale down during low traffic</li>
+                <li><strong>Spot instances</strong> - Use cheaper spot instances for batch processing</li>
+                <li><strong>Model compression</strong> - Smaller models = cheaper inference</li>
+                <li><strong>Edge deployment</strong> - Process on device to reduce cloud costs</li>
+                <li><strong>Serverless</strong> - Pay only for actual usage (AWS Lambda, Cloud Functions)</li>
+            </ul>
+            <div class="success-box">
+                <h3>弘益人間 in Production</h3>
+                <p>As you deploy Vision AI systems, remember the WIA-AI-021 principle of benefiting all humanity. Ensure your systems are:</p>
+                <ul>
+                    <li>Privacy-respecting - Minimize data collection and protect user information</li>
+                    <li>Fair and unbiased - Monitor for and mitigate algorithmic bias</li>
+                    <li>Transparent - Provide clear explanations of system decisions</li>
+                    <li>Reliable - Build robust systems that fail gracefully</li>
+                    <li>Sustainable - Optimize for energy efficiency and environmental impact</li>
+                </ul>
+            </div>
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Production deployment requires optimizing for latency, throughput, cost, and reliability</li>
+                    <li>Model optimization techniques include quantization, pruning, and knowledge distillation</li>
+                    <li>ONNX and TensorRT enable cross-platform deployment and GPU acceleration</li>
+                    <li>Containerization with Docker simplifies deployment and scaling</li>
+                    <li>Cloud platforms (AWS, GCP, Azure) provide managed services for ML deployment</li>
+                    <li>Monitoring with Prometheus and MLflow ensures system health and performance</li>
+                    <li>Security best practices include input validation, rate limiting, and data encryption</li>
+                    <li>Cost optimization through auto-scaling, model compression, and serverless architectures</li>
+                </ul>
+            </div>
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>What are the key differences between INT8 quantization and FP16 precision?</li>
+                    <li>How does knowledge distillation reduce model size while maintaining accuracy?</li>
+                    <li>Why is ONNX useful for production deployment?</li>
+                    <li>What are the trade-offs between cloud deployment and edge deployment?</li>
+                    <li>How does batch processing improve inference throughput?</li>
+                    <li>What security considerations are important for Vision AI APIs?</li>
+                    <li>How can A/B testing help improve ML systems in production?</li>
+                    <li>What metrics should you monitor for a production Vision AI system?</li>
+                </ol>
+            </div>
+            <div class="success-box" style="margin-top: 40px; padding: 40px;">
+                <h2 style="color: #10B981; text-align: center; font-size: 36px;">Congratulations!</h2>
+                <p style="text-align: center; font-size: 18px; margin-top: 20px;">
+                    You've completed the WIA-AI-021 Vision AI Complete Guide. You now have the knowledge to build, train, and deploy sophisticated computer vision systems that benefit humanity.
+                </p>
+                <p style="text-align: center; font-size: 24px; margin-top: 30px; color: #10B981; font-weight: bold;">
+                    弘益人間 · Benefit All Humanity
+                </p>
+            </div>
+        </div>
+        </div>
+</body>
+</html>
