@@ -1,86 +1,165 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>제6장: Phase 3 - 프로토콜 - WIA 기후 데이터 Standard Ebook</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Malgun Gothic', sans-serif;
-            background: #0f172a;
-            color: #f8fafc;
-            line-height: 1.8;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        h1, h2, h3 { color: #EF4444; }
-        a { color: #60a5fa; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #EF4444; }
-        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
-        nav {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #334155;
-        }
-        footer {
-            margin-top: 60px;
-            padding-top: 20px;
-            border-top: 1px solid #334155;
-            text-align: center;
-            color: #94a3b8;
-        }
-        footer .philosophy { color: #ffd700; }
-    </style>
+<meta charset="UTF-8">
+<title>6장 — Phase 3 프로토콜</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#EF4444;margin-top:2em}
+h1{border-bottom:3px solid #EF4444;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #EF4444}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#EF4444}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#fb7185}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
 </head>
 <body>
-    <h1>제6장: Phase 3 - 프로토콜</h1>
-    <h2>통신 프로토콜 및 메시지 형식</h2>
+<h1>6장: Phase 3 — 프로토콜</h1>
 
-    <h3>6.1 Overview</h3>
-    <p>
-        This chapter covers the essential aspects of Phase 3 - 프로토콜 in the WIA 기후 데이터 Standard.
-        The content follows the WIA four-phase architecture ensuring comprehensive coverage and interoperability.
-    </p>
+<div class="info-box">
+<strong>장 개요:</strong> 데이터 평면 — WMO WIS 2.0 MQTT 5 브로커, Kafka 3 exactly‑once, NetCDF over HTTPS 바이트 범위, OGC SensorThings 1.1, TLS 1.3 + DPoP + Ed25519 — 를 한자리에 정렬한다.
+</div>
 
-    <h3>6.2 Key Concepts</h3>
-    <p>
-        Understanding the fundamental concepts is crucial for implementing the 기후 데이터 standard effectively.
-        This section outlines the core principles and methodologies.
-    </p>
+<h2>6.1 WMO WIS 2.0 MQTT 브로커</h2>
 
-    <h3>6.3 Technical Specifications</h3>
-    <p>
-        Detailed technical specifications ensure consistent implementation across different platforms and systems.
-        All specifications follow industry best practices and WIA standards.
-    </p>
+<p>WIS 2.0은 2023년부터 GTS를 대체한 운영 시스템이다. 글로벌 정보 시스템 센터(DWD·NCAR·KMA 등)가 MQTT 5 브로커를 운영하며, 구독자는 WNM(WIS2 Notification Message) JSON을 받고 그 안의 링크로 실제 데이터를 가져온다.</p>
 
-    <h3>6.4 Implementation Guidelines</h3>
-    <p>
-        Practical guidelines for developers and implementers to follow when building 기후 데이터 compliant systems.
-        These guidelines ensure interoperability and ethical compliance.
-    </p>
+<pre><code>// KMA의 지상 SYNOP 통보 구독
+mosquitto_sub -h gisc.kma.go.kr -p 8883 \
+  --cafile wmo-ca.pem --cert client.crt --key client.key \
+  -t "origin/a/wis2/+/data/core/weather/surface-based-observations/synop/#"
 
-    <h3>6.5 Examples and Use Cases</h3>
-    <pre><code>// Example implementation
+// WNM 페이로드
 {
-  "wia_standard": "climate",
-  "version": "1.0",
-  "implementation": {
-    "phase": 6,
-    "compliant": true,
-    "certification_level": "standard"
-  }
+  "id":"urn:wmo:md:kma:weather-obs:2026-04-25T12:00:00Z",
+  "conformsTo":["https://wis.wmo.int/spec/wnm/1/conf/core"],
+  "type":"Feature",
+  "geometry":{"type":"Point","coordinates":[126.98,37.57]},
+  "properties":{
+    "data_id":"weather/surface-based-observations/synop/2026-04-25T12:00:00Z/47108.bufr",
+    "datetime":"2026-04-25T12:00:00Z",
+    "pubtime":"2026-04-25T12:01:18Z",
+    "wmo:dataPolicy":"core",
+    "integrity":{"method":"sha512","value":"…"}
+  },
+  "links":[
+    {"rel":"canonical","href":"https://gisc.kma.go.kr/data/…/47108.bufr","type":"application/x-bufr"}
+  ]
 }</code></pre>
 
-    <h3>6.6 Best Practices</h3>
-    <ul>
-        <li>Follow WIA standard specifications precisely</li>
-        <li>Implement proper error handling and validation</li>
-        <li>Ensure data privacy and security compliance</li>
-        <li>Document all implementation decisions</li>
-        <li>Test thoroughly before deployment</li>
-    </ul>
+<h2>6.2 표준이 의존하는 MQTT 5 기능</h2>
+
+<ul>
+<li><strong>Session Expiry Interval</strong> — 규제기관 대시보드 같은 장기 구독자가 일시 단절을 견딘다.</li>
+<li><strong>Payload Format Indicator</strong> — JSON WNM과 바이너리 BUFR 빠른 경로를 구분.</li>
+<li><strong>Subscription Identifier</strong> — 한 클라이언트가 수백 개 토픽 필터를 다중화.</li>
+<li><strong>Shared Subscription</strong> — <code>$share/group/topic</code>으로 컨슈머 파드 부하 분산.</li>
+<li><strong>AUTH 패킷 + Reason Codes</strong> — 강화 인증 실패 사유가 게이트웨이 로그에 그대로.</li>
+</ul>
+
+<h2>6.3 토픽 구조</h2>
+
+<pre><code>origin/a/wis2/{centre-id}/data/{policy}/{discipline}/{category}/{kind}/{…}
+cache/a/wis2/{centre-id}/data/{policy}/{discipline}/{category}/{kind}/{…}
+wia/climate/inventory/{lei}/{period}/{event-type}
+wia/climate/disclosure/{lei}/{form}/{state}</code></pre>
+
+<h2>6.4 Kafka 3 exactly‑once 인벤토리 스트리밍</h2>
+
+<p>사업장 미터·연료 인수·공정 측정은 Kafka 3 exactly‑once 3법칙으로 흐른다.</p>
+
+<ol>
+<li>프로듀서 <code>enable.idempotence=true</code> (3.0 이후 기본값).</li>
+<li>컨슈머 <code>isolation.level=read_committed</code>.</li>
+<li>안정적인 <code>transactional.id</code>를 가진 트랜잭션 프로듀서.</li>
+</ol>
+
+<pre><code>// 인벤토리 ingest 이벤트
+{
+  "schemaId": "wia.climate.ingest.v1",
+  "facilityLei": "213800ABCDEFGHIJKL00",
+  "meterId": "POH-CEMS-7",
+  "ts": "2026-04-25T12:00:00+09:00",
+  "channel": "co2_concentration_dry_corrected",
+  "value": 12.4,
+  "unit": "%v/v",
+  "quality": {"validation":"ok","calibrationDue":"2026-09-12"},
+  "lineage": {"sourceFile":"s3://kr-cems/poh-7/2026-04-25.csv","row":34812}
+}</code></pre>
+
+<h2>6.5 NetCDF over HTTPS 바이트 범위</h2>
+
+<p>대용량 재분석(ERA5, JRA‑3Q)을 위해 HTTP/2 chunked transfer + 바이트 범위 fetch 사용. netCDF‑c 4.9의 <code>byterange</code> 드라이버로 원격 파일을 로컬처럼 연다.</p>
+
+<pre><code>import netCDF4 as nc
+url = "https://archive.wia-climate.org/era5/single-level/t2m/2025/era5_t2m_2025.nc"
+ds = nc.Dataset(url + "#mode=bytes")
+seoul = ds.variables["t2m"][:, 280, 530]   # 한 격자, 8760시간, &lt;10MB 다운로드</code></pre>
+
+<h2>6.6 OGC SensorThings 1.1</h2>
+
+<p>대기질 관측소·총일사계·에디 공분산 타워·CEMS 굴뚝 모니터가 OGC SensorThings(ISO 19156 Observations &amp; Measurements 정렬)로 등록된다.</p>
+
+<pre><code>POST /sensorthings/v1.1/Datastreams(42)/Observations
+{
+  "phenomenonTime":"2026-04-25T12:00:00Z/2026-04-25T13:00:00Z",
+  "result": 412.7,
+  "FeatureOfInterest":{"@iot.id":1},
+  "parameters":{"unit":"10*-6","species":"CO2","accuracyPpm":0.5}
+}</code></pre>
+
+<h2>6.7 변조 불가능 앵커링</h2>
+
+<p>30초 단위 ingest 윈도와 OGC API 쓰기마다 머클 루트가 WIA Chain PoA → BSC 메인넷에 앵커링된다. 외부 감사인은 데이터 본문을 보지 않고도 시점 무결성을 검증한다.</p>
+
+<h2>6.8 보안 베이스라인</h2>
+
+<table>
+<tr><th>계층</th><th>요구</th></tr>
+<tr><td>전송</td><td>TLS 1.3, TLS_AES_256_GCM_SHA384 / TLS_CHACHA20_POLY1305_SHA256</td></tr>
+<tr><td>토큰</td><td>EdDSA JWT, audience 제한, 30분 수명, DPoP 바인딩(RFC 9449)</td></tr>
+<tr><td>응용 서명</td><td>Ed25519(RFC 8032) over RFC 8785 정규화</td></tr>
+<tr><td>키 관리</td><td>HSM 보관, RFC 7517 JWKS 회전, 90일 최대</td></tr>
+<tr><td>BUFR/GRIB 무결성</td><td>WNM <code>integrity</code> 필드의 SHA‑512</td></tr>
+</table>
+
+<h2>6.9 프로토콜 계층 실패 모드</h2>
+
+<ul>
+<li><strong>브로커 다운</strong> — 24시간 로컬 버퍼링 + 원본 ts 리플레이.</li>
+<li><strong>지연 관측</strong> — <code>cache/...</code> 토픽 접두사로 재발행.</li>
+<li><strong>시계 드리프트</strong> — 6시간 NTP, <code>|now − ts| &gt; 600 s</code> 거절(기후 윈도는 물류보다 느리다).</li>
+<li><strong>리플레이 공격</strong> — RFC 9421 nonce + JWT JTI 캐시.</li>
+<li><strong>스키마 진화</strong> — Kafka subject schema registry, 후방 호환 강제.</li>
+</ul>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>WIS 2.0 MQTT는 인바운드 관측 파이프라인이며 표준은 OGC API로 재발행한다.</li>
+<li>Kafka 3 idempotent + transactional이 인벤토리 exactly‑once를 만든다.</li>
+<li>NetCDF/HTTPS 바이트 범위가 다국 TB 아카이브를 다운로드 없이 연다.</li>
+<li>OGC SensorThings 1.1이 CEMS 등 사업장 센서 인입을 표준화한다.</li>
+<li>WIA Chain PoA + BSC 머클 루트 앵커링이 외부 감사 가능성을 만든다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>WNM 페이로드는 데이터 본문인가, 포인터인가?</li>
+<li>Kafka exactly‑once의 3법칙을 들어보라.</li>
+<li>왜 OGC SensorThings(ISO 19156)가 CEMS 인터페이스로 선호되는가?</li>
+<li>지연 관측 재발행 시 토픽 접두사 변경의 의미는?</li>
+<li>DPoP 바인딩이 기후 API에서 갖는 의의는?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>7장은 통합 — UNFCCC ETF, IFRS S2/ESRS E1 트윈, 등록부 브리지, 기후 정의 태그 — 를 마무리한다.</p>
+
 </body>
 </html>

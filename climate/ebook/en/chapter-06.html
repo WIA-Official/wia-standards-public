@@ -1,86 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chapter 6: Phase 3 - Protocol - WIA Climate Data Standard Ebook</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f172a;
-            color: #f8fafc;
-            line-height: 1.8;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        h1, h2, h3 { color: #EF4444; }
-        a { color: #60a5fa; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #EF4444; }
-        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
-        nav {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #334155;
-        }
-        footer {
-            margin-top: 60px;
-            padding-top: 20px;
-            border-top: 1px solid #334155;
-            text-align: center;
-            color: #94a3b8;
-        }
-        footer .philosophy { color: #ffd700; }
-    </style>
+<meta charset="UTF-8">
+<title>Chapter 6 — Phase 3 Protocol · WIA Climate Data Standard</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#EF4444;margin-top:2em}
+h1{border-bottom:3px solid #EF4444;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #EF4444}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#EF4444}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#fb7185}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
 </head>
 <body>
-    <h1>Chapter 6: Phase 3 - Protocol</h1>
-    <h2>Communication Protocols and Message Formats</h2>
+<h1>Chapter 6: Phase 3 — Protocol</h1>
 
-    <h3>6.1 Overview</h3>
-    <p>
-        This chapter covers the essential aspects of Phase 3 - Protocol in the WIA Climate Data Standard.
-        The content follows the WIA four-phase architecture ensuring comprehensive coverage and interoperability.
-    </p>
+<div class="info-box">
+<strong>Overview:</strong> Phase 3 is the data plane: WMO WIS 2.0 MQTT 5 brokers for atmospheric observations, Kafka 3 with exactly-once semantics for inventory event streams, NetCDF-over-HTTPS with chunked-transfer for bulk, OGC SensorThings 1.1 for ground stations, and TLS 1.3 / OAuth 2.1 + DPoP / Ed25519 throughout.
+</div>
 
-    <h3>6.2 Key Concepts</h3>
-    <p>
-        Understanding the fundamental concepts is crucial for implementing the Climate Data standard effectively.
-        This section outlines the core principles and methodologies.
-    </p>
+<h2>6.1 WMO WIS 2.0 MQTT broker network</h2>
 
-    <h3>6.3 Technical Specifications</h3>
-    <p>
-        Detailed technical specifications ensure consistent implementation across different platforms and systems.
-        All specifications follow industry best practices and WIA standards.
-    </p>
+<p>WIS 2.0 became the production WMO Information System in 2023, replacing the legacy GTS message-switched network. It is built on MQTT 5 brokers run by Global Information System Centres (e.g., DWD, NCAR, KMA) and Data Collection or Production Centres. Subscribers receive WIS2 Notification Messages (WNM) — small JSON payloads that point to the actual data in object storage.</p>
 
-    <h3>6.4 Implementation Guidelines</h3>
-    <p>
-        Practical guidelines for developers and implementers to follow when building Climate Data compliant systems.
-        These guidelines ensure interoperability and ethical compliance.
-    </p>
+<pre><code>// Subscribe to KMA's surface synop notifications
+mosquitto_sub -h gisc.kma.go.kr -p 8883 \
+  --cafile wmo-ca.pem --cert client.crt --key client.key \
+  -t "origin/a/wis2/+/data/core/weather/surface-based-observations/synop/#"
 
-    <h3>6.5 Examples and Use Cases</h3>
-    <pre><code>// Example implementation
+// Notification payload (WNM)
 {
-  "wia_standard": "climate",
-  "version": "1.0",
-  "implementation": {
-    "phase": 6,
-    "compliant": true,
-    "certification_level": "standard"
-  }
+  "id":"urn:wmo:md:kma:weather-obs:2026-04-25T12:00:00Z",
+  "conformsTo":["https://wis.wmo.int/spec/wnm/1/conf/core"],
+  "type":"Feature",
+  "geometry":{"type":"Point","coordinates":[126.98,37.57]},
+  "properties":{
+    "data_id":"weather/surface-based-observations/synop/2026-04-25T12:00:00Z/47108.bufr",
+    "datetime":"2026-04-25T12:00:00Z",
+    "pubtime":"2026-04-25T12:01:18Z",
+    "wmo:dataPolicy":"core",
+    "integrity":{"method":"sha512","value":"…"}
+  },
+  "links":[
+    {"rel":"canonical","href":"https://gisc.kma.go.kr/data/…/47108.bufr","type":"application/x-bufr"}
+  ]
 }</code></pre>
 
-    <h3>6.6 Best Practices</h3>
-    <ul>
-        <li>Follow WIA standard specifications precisely</li>
-        <li>Implement proper error handling and validation</li>
-        <li>Ensure data privacy and security compliance</li>
-        <li>Document all implementation decisions</li>
-        <li>Test thoroughly before deployment</li>
-    </ul>
+<p>WIA-CLIMATE-022 ingests these notifications, downloads referenced data, transcodes BUFR/GRIB2 into CF-1.10 NetCDF, and re-publishes through the OGC API endpoints from Chapter 5.</p>
+
+<h2>6.2 MQTT 5 features the standard relies on</h2>
+
+<ul>
+<li><strong>Session Expiry Interval</strong> — long-lived subscribers (regulator dashboards) survive transient drops.</li>
+<li><strong>Payload Format Indicator</strong> — distinguishes JSON WNM from binary BUFR fast-paths.</li>
+<li><strong>Subscription Identifier</strong> — multiplexes hundreds of topic filters per client.</li>
+<li><strong>Shared Subscriptions</strong> — load-balancing across consumer pods (<code>$share/group/topic</code>).</li>
+<li><strong>AUTH packet + Reason Codes</strong> — surfaces enhanced auth failures.</li>
+</ul>
+
+<h2>6.3 Topic structure</h2>
+
+<pre><code>origin/a/wis2/{centre-id}/data/{policy}/{discipline}/{category}/{kind}/{…}
+cache/a/wis2/{centre-id}/data/{policy}/{discipline}/{category}/{kind}/{…}
+wia/climate/inventory/{lei}/{period}/{event-type}
+wia/climate/disclosure/{lei}/{form}/{state}</code></pre>
+
+<h2>6.4 Kafka 3 for inventory streaming with exactly-once</h2>
+
+<p>GHG inventory events (meter readings, fuel deliveries, process measurements) are streamed through Kafka 3 with the three-rule recipe for exactly-once semantics:</p>
+
+<ol>
+<li><code>enable.idempotence=true</code> on producers (since Kafka 3.0 default).</li>
+<li><code>isolation.level=read_committed</code> on consumers.</li>
+<li>Transactional producer with a stable <code>transactional.id</code> per ingest worker.</li>
+</ol>
+
+<pre><code>// Inventory ingest event
+{
+  "schemaId": "wia.climate.ingest.v1",
+  "facilityLei": "213800ABCDEFGHIJKL00",
+  "meterId": "POH-CEMS-7",
+  "ts": "2026-04-25T12:00:00+09:00",
+  "channel": "co2_concentration_dry_corrected",
+  "value": 12.4,
+  "unit": "%v/v",
+  "quality": {"validation":"ok","calibrationDue":"2026-09-12"},
+  "lineage": {"sourceFile":"s3://kr-cems/poh-7/2026-04-25.csv","row":34812}
+}</code></pre>
+
+<h2>6.5 NetCDF-over-HTTPS for bulk</h2>
+
+<p>For bulk historical reanalyses (ERA5, JRA-3Q), the standard supports HTTP/2 chunked transfer with byte-range fetches. The NetCDF library (netCDF-c 4.9 with the <code>byterange</code> driver) opens the remote file as if it were local; only the requested chunks travel.</p>
+
+<pre><code>import netCDF4 as nc
+url = "https://archive.wia-climate.org/era5/single-level/t2m/2025/era5_t2m_2025.nc"
+ds = nc.Dataset(url + "#mode=bytes")
+seoul = ds.variables["t2m"][:, 280, 530]   # one grid cell, 8760 hours, &lt;10 MB downloaded</code></pre>
+
+<h2>6.6 OGC SensorThings 1.1 for ground stations</h2>
+
+<p>Air-quality stations, pyranometers, eddy-covariance towers and CEMS smokestack monitors register through OGC SensorThings — a lightweight REST/MQTT vocabulary aligned with ISO 19156 Observations &amp; Measurements.</p>
+
+<pre><code>POST /sensorthings/v1.1/Datastreams(42)/Observations
+{
+  "phenomenonTime":"2026-04-25T12:00:00Z/2026-04-25T13:00:00Z",
+  "result": 412.7,
+  "FeatureOfInterest":{"@iot.id":1},
+  "parameters":{"unit":"10*-6","species":"CO2","accuracyPpm":0.5}
+}</code></pre>
+
+<h2>6.7 Tamper-evident anchoring</h2>
+
+<p>Every Kafka ingest window (default 30 seconds) and every OGC API write produces a Merkle root that is anchored on WIA Chain PoA and onward to BSC mainnet. External auditors verify integrity without seeing the underlying data.</p>
+
+<pre><code>async function anchorIngestWindow(rootHex, windowStartIso) {
+  const tx = await wiaChain.submit({
+    network:"WIA-CLIMATE",
+    payload:{ type:"INGEST_WINDOW", root: rootHex, windowStart: windowStartIso }
+  });
+  return tx.transactionId;
+}</code></pre>
+
+<h2>6.8 Security baseline</h2>
+
+<table>
+<tr><th>Layer</th><th>Required</th></tr>
+<tr><td>Transport</td><td>TLS 1.3 with TLS_AES_256_GCM_SHA384 or TLS_CHACHA20_POLY1305_SHA256</td></tr>
+<tr><td>Token format</td><td>JWT EdDSA, audience-restricted, 30 min lifetime, DPoP-bound (RFC 9449)</td></tr>
+<tr><td>Application signing</td><td>Ed25519 (RFC 8032) over RFC 8785 canonicalised JSON</td></tr>
+<tr><td>Key management</td><td>HSM-backed, RFC 7517 JWKS rotation, 90-day max</td></tr>
+<tr><td>BUFR/GRIB integrity</td><td>SHA-512 of payload published in WNM <code>integrity</code> field</td></tr>
+</table>
+
+<h2>6.9 Failure modes the protocol layer must handle</h2>
+
+<ul>
+<li><strong>Broker outage</strong> — gateways MUST buffer up to 24 h locally and replay with original timestamps.</li>
+<li><strong>Late observations</strong> — re-publish under <code>cache/...</code> topic prefix, not <code>origin/...</code>.</li>
+<li><strong>Clock drift</strong> — NTP every 6 h; ingest rejects readings with <code>|now − ts| &gt; 600 s</code> (climate windows are slower than logistics).</li>
+<li><strong>Replay attacks</strong> — RFC 9421 nonces + JWT JTI cache.</li>
+<li><strong>Schema evolution</strong> — Kafka subject schema registry with backwards-compatibility enforced.</li>
+</ul>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>WIS 2.0 MQTT is the inbound observation pipeline; the standard republishes through OGC APIs.</li>
+<li>Kafka 3 with idempotent + transactional producers gives exactly-once for inventory events.</li>
+<li>NetCDF-over-HTTPS byte-range reads let analysts open multi-TB archives without downloading them.</li>
+<li>OGC SensorThings 1.1 standardises ground-station ingest, including stack-emissions monitors.</li>
+<li>Merkle-root anchoring on WIA Chain PoA + BSC gives external auditability without data exposure.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>What does the WNM payload <em>actually</em> contain — the data, or a pointer?</li>
+<li>What three Kafka settings combine for exactly-once inventory ingest?</li>
+<li>Why is OGC SensorThings (ISO 19156) the preferred CEMS interface?</li>
+<li>What does the standard require for late observations re-published?</li>
+<li>Which RFC defines DPoP-bound token possession and why is it relevant to climate APIs?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 7 closes the loop: ETF treaty filings, IFRS S2 / ESRS E1 disclosure twins, registry bridges, and the climate-justice policies that make integration more than plumbing.</p>
+
 </body>
 </html>

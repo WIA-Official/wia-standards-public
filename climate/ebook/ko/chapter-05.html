@@ -1,86 +1,198 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>제5장: Phase 2 - API 인터페이스 - WIA 기후 데이터 Standard Ebook</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Malgun Gothic', sans-serif;
-            background: #0f172a;
-            color: #f8fafc;
-            line-height: 1.8;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        h1, h2, h3 { color: #EF4444; }
-        a { color: #60a5fa; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #EF4444; }
-        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
-        nav {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #334155;
-        }
-        footer {
-            margin-top: 60px;
-            padding-top: 20px;
-            border-top: 1px solid #334155;
-            text-align: center;
-            color: #94a3b8;
-        }
-        footer .philosophy { color: #ffd700; }
-    </style>
+<meta charset="UTF-8">
+<title>5장 — Phase 2 API 인터페이스</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#EF4444;margin-top:2em}
+h1{border-bottom:3px solid #EF4444;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #EF4444}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#EF4444}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#fb7185}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
 </head>
 <body>
-    <h1>제5장: Phase 2 - API 인터페이스</h1>
-    <h2>REST API 사양 및 엔드포인트</h2>
+<h1>5장: Phase 2 — API 인터페이스</h1>
 
-    <h3>5.1 Overview</h3>
-    <p>
-        This chapter covers the essential aspects of Phase 2 - API 인터페이스 in the WIA 기후 데이터 Standard.
-        The content follows the WIA four-phase architecture ensuring comprehensive coverage and interoperability.
-    </p>
+<div class="info-box">
+<strong>장 개요:</strong> 4개의 동등 normative façade(OGC API Features/Coverages/EDR/Records + STAC 1.0)를 묶고, IFRS S2 트윈, UNFCCC ETF 제출, CloudEvents 1.0 웹훅까지 호출 단위로 펼친다.
+</div>
 
-    <h3>5.2 Key Concepts</h3>
-    <p>
-        Understanding the fundamental concepts is crucial for implementing the 기후 데이터 standard effectively.
-        This section outlines the core principles and methodologies.
-    </p>
+<h2>5.1 4 façade, 같은 진실</h2>
 
-    <h3>5.3 Technical Specifications</h3>
-    <p>
-        Detailed technical specifications ensure consistent implementation across different platforms and systems.
-        All specifications follow industry best practices and WIA standards.
-    </p>
+<table>
+<tr><th>Façade</th><th>경로</th><th>활용</th></tr>
+<tr><td>OGC API Features</td><td><code>/v1/collections/{id}/items</code></td><td>벡터 — 사업장 폴리곤, 프로젝트 경계, 협약 영역</td></tr>
+<tr><td>OGC API Coverages</td><td><code>/v1/collections/{id}/coverage?bbox=…&amp;subset=time(…)</code></td><td>CF NetCDF/Zarr 부분집합</td></tr>
+<tr><td>OGC API EDR</td><td><code>/v1/collections/{id}/position?coords=…</code></td><td>점·궤적 시계열</td></tr>
+<tr><td>OGC API Records (+ STAC 1.0)</td><td><code>/v1/collections</code></td><td>카탈로그·검색·구독</td></tr>
+</table>
 
-    <h3>5.4 Implementation Guidelines</h3>
-    <p>
-        Practical guidelines for developers and implementers to follow when building 기후 데이터 compliant systems.
-        These guidelines ensure interoperability and ethical compliance.
-    </p>
+<p>conformance suite는 동등 시나리오를 4 façade로 동시 실행해 결과 해시를 비교한다.</p>
 
-    <h3>5.5 Examples and Use Cases</h3>
-    <pre><code>// Example implementation
+<h2>5.2 인증 메뉴</h2>
+
+<table>
+<tr><th>방식</th><th>표준</th><th>활용</th></tr>
+<tr><td>OAuth 2.1 + PKCE</td><td>RFC 9700</td><td>연구 대시보드, 규제기관 포털</td></tr>
+<tr><td>mTLS X.509</td><td>RFC 8446</td><td>센서 게이트웨이, M2M WIS 2.0</td></tr>
+<tr><td>HTTP Message Signature</td><td>RFC 9421</td><td>cross‑org 이벤트 ingest, BTR 제출</td></tr>
+</table>
+
+<h2>5.3 OGC API Coverages — 주력</h2>
+
+<pre><code>GET /v1/collections/cmip6.scenariomip.kma-k-ace.ssp245.tas/coverage
+   ?bbox=124,33,131,39
+   &amp;subset=time("2050-01-01"/"2099-12-31")
+   &amp;f=netcdf
+Authorization: Bearer $TOKEN
+
+&rarr; HTTP/1.1 200 OK
+   Content-Type: application/x-netcdf;version=4
+   Content-Disposition: attachment; filename="tas_…20500101-20991231.nc"
+   ETag: "W/\"sha256-3a2f…\""</code></pre>
+
+<p>출력 형식은 <code>f</code> 쿼리 또는 <code>Accept</code>로 협상: <code>netcdf</code>, <code>zarr</code>, <code>covjson</code>, <code>geotiff</code>.</p>
+
+<h2>5.4 OGC API EDR — 점 시계열</h2>
+
+<pre><code>GET /v1/collections/era5.t2m/position
+   ?coords=POINT(126.98 37.57)
+   &amp;datetime=2025-01-01T00:00:00Z/2025-12-31T23:00:00Z
+   &amp;f=covjson</code></pre>
+
+<p>같은 경로가 <code>cube</code>·<code>area</code>·<code>trajectory</code>·<code>corridor</code>도 지원한다(선박 항적, 항공기 항로 등).</p>
+
+<h2>5.5 STAC 카탈로그 검색</h2>
+
+<pre><code>POST /v1/search
 {
-  "wia_standard": "climate",
-  "version": "1.0",
-  "implementation": {
-    "phase": 5,
-    "compliant": true,
-    "certification_level": "standard"
-  }
+  "collections": ["cmip6.scenariomip.*.ssp245.tas"],
+  "bbox": [124, 33, 131, 39],
+  "datetime": "2050-01-01/2099-12-31",
+  "query": {
+    "wia:scenario": {"eq": "ssp245"},
+    "wia:variant_label": {"in": ["r1i1p1f1","r2i1p1f1"]}
+  },
+  "limit": 50
 }</code></pre>
 
-    <h3>5.6 Best Practices</h3>
-    <ul>
-        <li>Follow WIA standard specifications precisely</li>
-        <li>Implement proper error handling and validation</li>
-        <li>Ensure data privacy and security compliance</li>
-        <li>Document all implementation decisions</li>
-        <li>Test thoroughly before deployment</li>
-    </ul>
+<h2>5.6 GHG 인벤토리 제출(멱등 보장)</h2>
+
+<pre><code>POST /v1/inventories
+Authorization: Bearer $TOKEN
+Idempotency-Key: 4f1d3c0e-7b2c-4a98-9c7e-2c0e9b8a4a01
+Content-Type: application/ld+json
+
+[ 4장 §4.4 JSON-LD 본문 ]
+
+&rarr; HTTP/1.1 201 Created
+   Location: /v1/inventories/urn:wia:climate:facility:LEI:213800ABCDEFGHIJKL00:2026Q1
+   ETag: "v1:abcdef"</code></pre>
+
+<h2>5.7 오류 — RFC 9457 problem+json</h2>
+
+<pre><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":"https://errors.wia-climate.org/cf-validation",
+  "title":"CF-1.10 standard_name not in current table",
+  "status":422,
+  "detail":"Variable 'tas_anomaly' does not appear in CF Standard Name Table v84",
+  "instance":"/v1/collections/your-coll/items/abc",
+  "violations":[{"variable":"tas_anomaly","cfTableVersion":"84"}]
+}</code></pre>
+
+<h2>5.8 IFRS S2 공시 트윈</h2>
+
+<pre><code>POST /v1/disclosures/ifrs-s2
+Content-Type: application/ld+json
+
+{
+  "@context":"https://schemas.wia-climate.org/ifrs-s2-context-v1.jsonld",
+  "@type":"ifrs:S2Disclosure",
+  "filer":{"lei":"213800ABCDEFGHIJKL00"},
+  "reportingPeriod":{"start":"2026-01-01","end":"2026-12-31"},
+  "metrics":{
+    "scope1": {"value": 19340000, "unit": "t_CO2_eq"},
+    "scope2_locationBased": {"value": 5410000, "unit": "t_CO2_eq"},
+    "scope2_marketBased": {"value": 4970000, "unit": "t_CO2_eq"},
+    "scope3":{"category1_purchasedGoods":{"value": 41200000, "unit":"t_CO2_eq",
+              "uncertaintyRangePct":[-30,50]}}
+  },
+  "physicalRiskScenarios":[
+    {"label":"SSP2-4.5","horizon":"2050",
+     "sourceCoverage":"/v1/collections/cmip6.scenariomip.kma-k-ace.ssp245.tas/coverage?…"}
+  ]
+}
+
+&rarr; HTTP/1.1 201 Created
+   Link: &lt;…&gt;; rel="alternate"; type="application/inline-xbrl+xml"</code></pre>
+
+<h2>5.9 UNFCCC ETF / CRT 2.0 BTR 제출</h2>
+
+<pre><code>POST /etf/v1/btr
+Content-Type: application/ld+json
+
+{
+  "country":"KOR","reportingPeriod":{"start":"2025-01-01","end":"2025-12-31"},
+  "submitter":{"did":"did:wia:nda:kr-mofa","role":"NationalDesignatedAuthority"},
+  "crt":{"version":"2.0","sectors":["energy","ippu","afolu","waste"],
+         "entries":[…]},
+  "proof":{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","…":"…"}
+}</code></pre>
+
+<h2>5.10 웹훅 — CloudEvents 1.0 + RFC 9421</h2>
+
+<pre><code>POST /webhooks/your-endpoint
+Content-Type: application/cloudevents+json
+Signature-Input: sig1=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="wia-climate";alg="ed25519"
+
+{"specversion":"1.0","id":"evt-7b9","source":"https://api.wia-climate.org/v1",
+ "type":"org.wia.climate.observation.published","subject":"era5.t2m/2026-04-25T12",
+ "time":"2026-04-25T12:05:00Z","datacontenttype":"application/json",
+ "data":{"granuleId":"era5_t2m_20260425_12","stacItemHref":"…"}}</code></pre>
+
+<h2>5.11 SLO와 요청 한도</h2>
+
+<table>
+<tr><th>등급</th><th>지속 TPS</th><th>Coverage MB/s</th><th>P95 catalogue</th><th>P95 coverage</th></tr>
+<tr><td>Standard</td><td>50</td><td>20</td><td>120 ms</td><td>900 ms</td></tr>
+<tr><td>Premium</td><td>500</td><td>200</td><td>80 ms</td><td>500 ms</td></tr>
+<tr><td>Enterprise</td><td>5 000</td><td>2 000</td><td>50 ms</td><td>250 ms</td></tr>
+</table>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>4 OGC API façade + STAC가 동치성을 가져야 conformance를 통과한다.</li>
+<li>Idempotency‑Key + ETag/If‑Match가 네트워크 단절·동시 갱신을 안전하게 만든다.</li>
+<li>RFC 9457 problem+json은 클라이언트 처리의 안정 식별 키다.</li>
+<li>공시는 한 번 제출 → JSON‑LD와 iXBRL 두 형식으로 동시 노출.</li>
+<li>UNFCCC ETF/CRT 2.0 BTR 제출은 1급 엔드포인트로, NDA 키로 서명한다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>SSP 시나리오 부분집합을 어느 façade가 서비스하는가?</li>
+<li>공시 응답의 <code>alternate</code> 링크가 가리키는 형식과 그 청자는?</li>
+<li>분기 인벤토리 제출에 Idempotency‑Key가 필요한 이유는?</li>
+<li>RFC 9457을 한 줄로 요약하라.</li>
+<li>Premium 등급의 P95 coverage 응답 SLO는?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>6장은 데이터 평면 — WIS 2.0 MQTT 5, Kafka 3 exactly‑once, NetCDF/HTTPS 바이트 범위, OGC SensorThings — 의 와이어 형식과 보안 모델을 코드와 함께 보여준다.</p>
+
 </body>
 </html>

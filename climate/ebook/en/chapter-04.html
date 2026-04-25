@@ -1,86 +1,181 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chapter 4: Phase 1 - Data Format - WIA Climate Data Standard Ebook</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f172a;
-            color: #f8fafc;
-            line-height: 1.8;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        h1, h2, h3 { color: #EF4444; }
-        a { color: #60a5fa; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #EF4444; }
-        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
-        nav {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #334155;
-        }
-        footer {
-            margin-top: 60px;
-            padding-top: 20px;
-            border-top: 1px solid #334155;
-            text-align: center;
-            color: #94a3b8;
-        }
-        footer .philosophy { color: #ffd700; }
-    </style>
+<meta charset="UTF-8">
+<title>Chapter 4 — Phase 1 Data Format · WIA Climate Data Standard</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#EF4444;margin-top:2em}
+h1{border-bottom:3px solid #EF4444;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #EF4444}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#EF4444}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#fb7185}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
 </head>
 <body>
-    <h1>Chapter 4: Phase 1 - Data Format</h1>
-    <h2>Standardized Data Schemas and Structures</h2>
+<h1>Chapter 4: Phase 1 — Data Format</h1>
 
-    <h3>4.1 Overview</h3>
-    <p>
-        This chapter covers the essential aspects of Phase 1 - Data Format in the WIA Climate Data Standard.
-        The content follows the WIA four-phase architecture ensuring comprehensive coverage and interoperability.
-    </p>
+<div class="info-box">
+<strong>Overview:</strong> Phase 1 binds the wire bytes — CF-1.10 NetCDF for gridded fields, Zarr v3 for cloud-native cubes, JSON-LD for GHG inventories and disclosures, GeoJSON / OGC CRS84 for vectors, and UCUM for every unit on the bus.
+</div>
 
-    <h3>4.2 Key Concepts</h3>
-    <p>
-        Understanding the fundamental concepts is crucial for implementing the Climate Data standard effectively.
-        This section outlines the core principles and methodologies.
-    </p>
+<h2>4.1 CF-1.10 NetCDF for gridded climate data</h2>
 
-    <h3>4.3 Technical Specifications</h3>
-    <p>
-        Detailed technical specifications ensure consistent implementation across different platforms and systems.
-        All specifications follow industry best practices and WIA standards.
-    </p>
+<p>Every gridded field — observation, reanalysis, model output — uses NetCDF-4 with the CF Conventions 1.10 (released 2024). The Conventions standardise variable names, coordinate axes, units, and metadata so a generic reader can plot a temperature field without a vendor manual.</p>
 
-    <h3>4.4 Implementation Guidelines</h3>
-    <p>
-        Practical guidelines for developers and implementers to follow when building Climate Data compliant systems.
-        These guidelines ensure interoperability and ethical compliance.
-    </p>
+<pre><code>// ncdump -h tas_day_KMA-K-ACE_ssp245_r1i1p1f1_gn_20260101-20261231.nc
+netcdf tas_day_KMA-K-ACE_ssp245_r1i1p1f1_gn_20260101-20261231 {
+dimensions:
+    time = UNLIMITED ;
+    lat  = 192 ;
+    lon  = 288 ;
+variables:
+    float tas(time, lat, lon) ;
+        tas:standard_name = "air_temperature" ;
+        tas:long_name     = "Near-Surface Air Temperature" ;
+        tas:units         = "K" ;
+        tas:cell_methods  = "time: mean" ;
+    double time(time) ;
+        time:standard_name = "time" ;
+        time:units         = "days since 1850-01-01 00:00:00" ;
+        time:calendar      = "proleptic_gregorian" ;
+    double lat(lat), lon(lon) ;
 
-    <h3>4.5 Examples and Use Cases</h3>
-    <pre><code>// Example implementation
-{
-  "wia_standard": "climate",
-  "version": "1.0",
-  "implementation": {
-    "phase": 4,
-    "compliant": true,
-    "certification_level": "standard"
+// global attributes:
+    :Conventions          = "CF-1.10" ;
+    :title                = "Near-Surface Air Temperature, KMA K-ACE SSP2-4.5" ;
+    :institution          = "Korea Meteorological Administration / NIMS" ;
+    :source               = "K-ACE 1.0" ;
+    :experiment_id        = "ssp245" ;
+    :variant_label        = "r1i1p1f1" ;
+    :tracking_id          = "hdl:21.14100/abcdef-1234" ;
+    :wia_compliance       = "WIA-CLIMATE-022:2026" ;
+    :wia_signature        = "ed25519:wia:climate:kma-k-ace-2026#k1" ;
+}</code></pre>
+
+<p>The <code>standard_name</code> values come from the CF Standard Name Table (currently version 84, June 2024). Custom names are forbidden; if you need a name that is not in the table, the path is to propose it to the CF community.</p>
+
+<h2>4.2 DRS filename convention (CMIP6-aligned)</h2>
+
+<pre><code>&lt;variable&gt;_&lt;table&gt;_&lt;source_id&gt;_&lt;experiment_id&gt;_&lt;variant_label&gt;_&lt;grid_label&gt;_&lt;date_range&gt;.nc
+
+tas_day_KMA-K-ACE_ssp245_r1i1p1f1_gn_20260101-20261231.nc
+│   │   │         │      │        │  │
+│   │   │         │      │        │  └─ ISO 8601 range (YYYYMMDD-YYYYMMDD)
+│   │   │         │      │        └──── grid label (gn = native, gr = regridded)
+│   │   │         │      └───────────── variant (realisation/initialisation/physics/forcing)
+│   │   │         └──────────────────── ScenarioMIP experiment id
+│   │   └────────────────────────────── source identifier (institution + model)
+│   └────────────────────────────────── CMIP6 table id (day, mon, Amon, etc.)
+└────────────────────────────────────── CF standard name short form</code></pre>
+
+<h2>4.3 Zarr v3 for cloud-native subsets</h2>
+
+<p>NetCDF-4 is fast on local disks but expensive over object storage. WIA-CLIMATE-022 mirrors every NetCDF granule into Zarr v3 with consistent chunking (typical: <code>{time: 30, lat: 192, lon: 288}</code>) so analysts can <code>xarray.open_zarr</code> a 30 TB store and read a single bounding box in milliseconds.</p>
+
+<pre><code>import xarray as xr
+ds = xr.open_zarr(
+    "s3://wia-climate/cmip6/ScenarioMIP/KMA/K-ACE/ssp245/r1i1p1f1/Amon/tas/gn/v20260315",
+    consolidated=True,
+)
+seoul = ds.tas.sel(lat=37.57, lon=126.98, method="nearest").sel(time=slice("2050","2099"))</code></pre>
+
+<h2>4.4 JSON-LD for GHG inventory</h2>
+
+<p>Facility-level Scope 1/2 records use a JSON-LD document with a custom <code>@context</code> that pins to GHG Protocol, IPCC 2019 Refinement, and ISO 14064-1.</p>
+
+<pre><code>{
+  "@context": [
+    "https://schemas.wia-climate.org/ghg-context-v2.jsonld",
+    {"ghgp":"https://ghgprotocol.org/cs/", "ipcc":"https://ipcc.ch/cs/"}
+  ],
+  "@id": "urn:wia:climate:facility:LEI:213800ABCDEFGHIJKL00:2026Q1",
+  "type": "ghgp:FacilityInventory",
+  "facility": {
+    "lei": "213800ABCDEFGHIJKL00",
+    "name": "POSCO Pohang Works Steelworks",
+    "isic": "2410",
+    "geo": {"lat": 36.0190, "lon": 129.3435}
+  },
+  "reportingPeriod": {"start":"2026-01-01","end":"2026-03-31"},
+  "scope1": [
+    { "category": "ipcc:1A2-Manufacturing-IronSteel",
+      "fuel": "ipcc:HardCoal",
+      "activityData": {"value": 1840000, "unit": "ucum:t"},
+      "emissionFactor": {"value": 94.6, "unit": "ucum:kg/GJ", "source":"ipcc:2019Refinement-Vol2-Ch2-Table2-2"},
+      "co2e": {"value": 4830000, "unit": "ucum:t_CO2_eq",
+               "gwpHorizon": 100, "gwpReport": "ipcc:AR6-WG1-Chapter7"}}
+  ],
+  "scope2": [...],
+  "verification": {
+    "verifier": "did:wia:verifier:bsi-korea",
+    "iso14064_3_level": "REASONABLE_ASSURANCE",
+    "report": "https://verify.wia-climate.org/reports/2026Q1/POSCO-Pohang"
+  },
+  "proof": {
+    "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022",
+    "proofPurpose": "assertionMethod",
+    "verificationMethod": "did:wia:facility:posco-pohang#k1",
+    "proofValue": "z3MvT..."
   }
 }</code></pre>
 
-    <h3>4.6 Best Practices</h3>
-    <ul>
-        <li>Follow WIA standard specifications precisely</li>
-        <li>Implement proper error handling and validation</li>
-        <li>Ensure data privacy and security compliance</li>
-        <li>Document all implementation decisions</li>
-        <li>Test thoroughly before deployment</li>
-    </ul>
+<h2>4.5 Units: UCUM as the single source</h2>
+
+<p>The Unified Code for Units of Measure (UCUM, ISO 80000-1 aligned) is the only unit vocabulary on the wire. Examples:</p>
+
+<table>
+<tr><th>Quantity</th><th>UCUM</th><th>Common-language equivalent</th></tr>
+<tr><td>Temperature</td><td><code>K</code></td><td>Kelvin (CF requires SI)</td></tr>
+<tr><td>Tonne CO₂-equivalent</td><td><code>t_CO2_eq</code></td><td>Metric ton CO₂e</td></tr>
+<tr><td>Emission factor</td><td><code>kg/GJ</code></td><td>Kilogram per gigajoule</td></tr>
+<tr><td>Concentration</td><td><code>10*-6</code> (mol/mol)</td><td>parts per million by volume</td></tr>
+<tr><td>Mass flux</td><td><code>kg.m-2.s-1</code></td><td>Carbon flux density</td></tr>
+</table>
+
+<h2>4.6 Spatial reference and geometry</h2>
+
+<p>Every coordinate on the wire is OGC CRS84 (WGS 84 longitude/latitude, decimal degrees). Polygons use GeoJSON Feature (RFC 7946); rasters declare their CRS in the CF <code>grid_mapping</code> attribute. Projected CRS strings are EPSG codes (e.g., <code>EPSG:5179</code> for Korea 2000 / Unified TM).</p>
+
+<h2>4.7 Validation</h2>
+
+<ul>
+<li>NetCDF files MUST pass <code>cf-checker</code> with no warnings against CF 1.10.</li>
+<li>JSON-LD documents MUST round-trip through canonicalisation (RFC 8785) and signature verification.</li>
+<li>UCUM unit strings MUST parse with <code>libucum</code>; symbol-only forms are forbidden in machine-readable fields.</li>
+<li>Coordinate values MUST round-trip through CRS84; precision is bounded at 7 decimal degrees.</li>
+<li>Time values MUST use ISO 8601-1 with explicit calendar attribute (<code>proleptic_gregorian</code> default for climate data).</li>
+</ul>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>CF-1.10 NetCDF (and its Zarr v3 mirror) is the only on-the-wire form for gridded climate fields.</li>
+<li>DRS filenames carry full provenance — variable, model, scenario, ensemble member, grid, time range.</li>
+<li>JSON-LD with a pinned <code>@context</code> is the only on-the-wire form for inventories and disclosures.</li>
+<li>UCUM is the unit system; symbol-only "tCO₂e" is rejected.</li>
+<li>OGC CRS84 + GeoJSON + EPSG-coded projections cover all spatial geometry.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>What CF version does the standard pin, and where do <code>standard_name</code> values come from?</li>
+<li>Decode the DRS filename <code>pr_mon_NIMS-KIM-3.5_historical_r3i1p1f2_gr_18500101-20141231.nc</code>.</li>
+<li>Why does the standard mirror NetCDF into Zarr v3 instead of just shipping NetCDF over HTTP range reads?</li>
+<li>Which IPCC source is cited for an emission factor in the JSON-LD example, and why is the citation important?</li>
+<li>What does <code>10*-6</code> represent in UCUM?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 5 turns these formats into HTTP traffic — OGC API — Coverages / EDR / Records, STAC 1.0, OAuth 2.1, Idempotency-Key, ETag — and shows the EUDR-grade auditability that comes for free.</p>
+
 </body>
 </html>

@@ -1,86 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chapter 5: Phase 2 - API Interface - WIA Climate Data Standard Ebook</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f172a;
-            color: #f8fafc;
-            line-height: 1.8;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        h1, h2, h3 { color: #EF4444; }
-        a { color: #60a5fa; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #EF4444; }
-        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
-        nav {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #334155;
-        }
-        footer {
-            margin-top: 60px;
-            padding-top: 20px;
-            border-top: 1px solid #334155;
-            text-align: center;
-            color: #94a3b8;
-        }
-        footer .philosophy { color: #ffd700; }
-    </style>
+<meta charset="UTF-8">
+<title>Chapter 5 — Phase 2 API · WIA Climate Data Standard</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#EF4444;margin-top:2em}
+h1{border-bottom:3px solid #EF4444;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #EF4444}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#EF4444}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#fb7185}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
 </head>
 <body>
-    <h1>Chapter 5: Phase 2 - API Interface</h1>
-    <h2>REST API Specifications and Endpoints</h2>
+<h1>Chapter 5: Phase 2 — API Interface</h1>
 
-    <h3>5.1 Overview</h3>
-    <p>
-        This chapter covers the essential aspects of Phase 2 - API Interface in the WIA Climate Data Standard.
-        The content follows the WIA four-phase architecture ensuring comprehensive coverage and interoperability.
-    </p>
+<div class="info-box">
+<strong>Overview:</strong> Phase 2 binds Phase-1 records to four equally normative HTTP façades — OGC API — Features / Coverages / EDR / Records, plus STAC 1.0 — and connects authority systems (UNFCCC ETF, IFRS S2 filers, registries) without re-keying any data.
+</div>
 
-    <h3>5.2 Key Concepts</h3>
-    <p>
-        Understanding the fundamental concepts is crucial for implementing the Climate Data standard effectively.
-        This section outlines the core principles and methodologies.
-    </p>
+<h2>5.1 Four API façades, one truth</h2>
 
-    <h3>5.3 Technical Specifications</h3>
-    <p>
-        Detailed technical specifications ensure consistent implementation across different platforms and systems.
-        All specifications follow industry best practices and WIA standards.
-    </p>
+<table>
+<tr><th>Façade</th><th>Path</th><th>Use case</th></tr>
+<tr><td>OGC API — Features</td><td><code>/v1/collections/{id}/items</code></td><td>Vector geometry: facility footprints, project boundaries, treaty-defined polygons</td></tr>
+<tr><td>OGC API — Coverages</td><td><code>/v1/collections/{id}/coverage?bbox=…&amp;subset=time(…)</code></td><td>Subset of CF NetCDF / Zarr by bbox, time, level</td></tr>
+<tr><td>OGC API — EDR</td><td><code>/v1/collections/{id}/position?coords=…</code></td><td>Time-series for a point or trajectory (drone, ship, balloon)</td></tr>
+<tr><td>OGC API — Records (+ STAC 1.0)</td><td><code>/v1/collections</code></td><td>Catalogue, search, broker subscription</td></tr>
+</table>
 
-    <h3>5.4 Implementation Guidelines</h3>
-    <p>
-        Practical guidelines for developers and implementers to follow when building Climate Data compliant systems.
-        These guidelines ensure interoperability and ethical compliance.
-    </p>
+<p>An implementation MUST surface the same state through all four. The conformance suite (<code>https://conformance.wia-climate.org</code>) executes equivalent queries on each and compares result hashes.</p>
 
-    <h3>5.5 Examples and Use Cases</h3>
-    <pre><code>// Example implementation
+<h2>5.2 Authentication menu</h2>
+
+<table>
+<tr><th>Method</th><th>RFC</th><th>Use case</th></tr>
+<tr><td>OAuth 2.1 + PKCE</td><td>RFC 9700 BCP</td><td>Researcher dashboards, regulator portals</td></tr>
+<tr><td>mTLS X.509</td><td>RFC 8446</td><td>Sensor gateways, machine-to-machine WIS 2.0</td></tr>
+<tr><td>HTTP Message Signatures</td><td>RFC 9421</td><td>Cross-org event ingest, BTR submission</td></tr>
+</table>
+
+<pre><code>Authorization: Bearer eyJhbGciOiJFZERTQSIs...
+Signature-Input: sig=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="kma-wis2";alg="ed25519"
+Signature: sig=:NN5BFJ7H...:</code></pre>
+
+<h2>5.3 OGC API — Coverages (the workhorse)</h2>
+
+<pre><code>GET /v1/collections/cmip6.scenariomip.kma-k-ace.ssp245.tas/coverage
+   ?bbox=124,33,131,39
+   &amp;subset=time("2050-01-01"/"2099-12-31")
+   &amp;f=netcdf
+Authorization: Bearer $TOKEN
+
+&rarr; HTTP/1.1 200 OK
+   Content-Type: application/x-netcdf;version=4
+   Content-Disposition: attachment; filename="tas_…20500101-20991231.nc"
+   ETag: "W/\"sha256-3a2f…\""</code></pre>
+
+<p>Output formats are negotiated through the <code>f</code> query parameter or <code>Accept</code> header: <code>netcdf</code>, <code>zarr</code>, <code>covjson</code> (CoverageJSON, CF-aligned), <code>geotiff</code>.</p>
+
+<h2>5.4 OGC API — EDR for point time-series</h2>
+
+<pre><code>GET /v1/collections/era5.t2m/position
+   ?coords=POINT(126.98 37.57)
+   &amp;datetime=2025-01-01T00:00:00Z/2025-12-31T23:00:00Z
+   &amp;f=covjson</code></pre>
+
+<p>Returns a CoverageJSON document the analyst can plot directly. The same path supports <code>cube</code>, <code>area</code>, <code>trajectory</code>, and <code>corridor</code> queries (e.g., a ship's track, an airline route).</p>
+
+<h2>5.5 STAC catalogue and search</h2>
+
+<pre><code>POST /v1/search
 {
-  "wia_standard": "climate",
-  "version": "1.0",
-  "implementation": {
-    "phase": 5,
-    "compliant": true,
-    "certification_level": "standard"
-  }
+  "collections": ["cmip6.scenariomip.*.ssp245.tas"],
+  "bbox": [124, 33, 131, 39],
+  "datetime": "2050-01-01/2099-12-31",
+  "query": {
+    "wia:scenario": {"eq": "ssp245"},
+    "wia:variant_label": {"in": ["r1i1p1f1","r2i1p1f1"]}
+  },
+  "limit": 50
 }</code></pre>
 
-    <h3>5.6 Best Practices</h3>
-    <ul>
-        <li>Follow WIA standard specifications precisely</li>
-        <li>Implement proper error handling and validation</li>
-        <li>Ensure data privacy and security compliance</li>
-        <li>Document all implementation decisions</li>
-        <li>Test thoroughly before deployment</li>
-    </ul>
+<p>STAC 1.0 items embed asset HREFs that point to NetCDF, Zarr, or a presigned object-storage URL. The <code>self</code> link is durable; ETag-based caching cuts repeated downloads to a 304.</p>
+
+<h2>5.6 GHG inventory submission (with idempotency)</h2>
+
+<pre><code>POST /v1/inventories
+Authorization: Bearer $TOKEN
+Idempotency-Key: 4f1d3c0e-7b2c-4a98-9c7e-2c0e9b8a4a01
+Content-Type: application/ld+json
+
+[ JSON-LD body from §4.4 ]
+
+&rarr; HTTP/1.1 201 Created
+   Location: /v1/inventories/urn:wia:climate:facility:LEI:213800ABCDEFGHIJKL00:2026Q1
+   ETag: "v1:abcdef"</code></pre>
+
+<p><code>Idempotency-Key</code> (draft-ietf-httpapi-idempotency-key) makes resubmission after network failure safe; the server caches the response for 24 h.</p>
+
+<h2>5.7 Errors: RFC 9457 problem+json</h2>
+
+<pre><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":"https://errors.wia-climate.org/cf-validation",
+  "title":"CF-1.10 standard_name not in current table",
+  "status":422,
+  "detail":"Variable 'tas_anomaly' does not appear in CF Standard Name Table v84",
+  "instance":"/v1/collections/your-coll/items/abc",
+  "violations":[{"variable":"tas_anomaly","cfTableVersion":"84"}]
+}</code></pre>
+
+<h2>5.8 Disclosure twin endpoint</h2>
+
+<pre><code>POST /v1/disclosures/ifrs-s2
+Content-Type: application/ld+json
+
+{
+  "@context":"https://schemas.wia-climate.org/ifrs-s2-context-v1.jsonld",
+  "@type":"ifrs:S2Disclosure",
+  "filer":{"lei":"213800ABCDEFGHIJKL00"},
+  "reportingPeriod":{"start":"2026-01-01","end":"2026-12-31"},
+  "metrics":{
+    "scope1": {"value": 19340000, "unit": "t_CO2_eq"},
+    "scope2_locationBased": {"value": 5410000, "unit": "t_CO2_eq"},
+    "scope2_marketBased": {"value": 4970000, "unit": "t_CO2_eq"},
+    "scope3": {
+      "category1_purchasedGoods": {"value": 41200000, "unit": "t_CO2_eq",
+                                   "uncertaintyRangePct": [-30, 50]},
+      "...": "..."
+    }
+  },
+  "physicalRiskScenarios":[
+    {"label":"SSP2-4.5","horizon":"2050","sourceCoverage":"/v1/collections/cmip6.scenariomip.kma-k-ace.ssp245.tas/coverage?…"}
+  ]
+}
+
+&rarr; HTTP/1.1 201 Created
+   Location: /v1/disclosures/ifrs-s2/2026/213800ABCDEFGHIJKL00
+   Link: &lt;…&gt;; rel="alternate"; type="application/inline-xbrl+xml"</code></pre>
+
+<p>The same content is served as iXBRL via the <code>alternate</code> link, satisfying both regulator's machine-consumption and the audit firm's iXBRL-only tooling.</p>
+
+<h2>5.9 UNFCCC ETF / CRT 2.0 submission</h2>
+
+<pre><code>POST /etf/v1/btr
+Content-Type: application/ld+json
+
+{
+  "country":"KOR","reportingPeriod":{"start":"2025-01-01","end":"2025-12-31"},
+  "submitter":{"did":"did:wia:nda:kr-mofa","role":"NationalDesignatedAuthority"},
+  "crt":{"version":"2.0","sectors":["energy","ippu","afolu","waste"],
+         "entries":[…]},
+  "proof":{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","…":"…"}
+}</code></pre>
+
+<h2>5.10 Webhooks: CloudEvents 1.0 + RFC 9421</h2>
+
+<pre><code>POST /webhooks/your-endpoint
+Content-Type: application/cloudevents+json
+Signature-Input: sig1=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="wia-climate";alg="ed25519"
+
+{"specversion":"1.0","id":"evt-7b9","source":"https://api.wia-climate.org/v1",
+ "type":"org.wia.climate.observation.published","subject":"era5.t2m/2026-04-25T12",
+ "time":"2026-04-25T12:05:00Z","datacontenttype":"application/json",
+ "data":{"granuleId":"era5_t2m_20260425_12","stacItemHref":"…"}}</code></pre>
+
+<h2>5.11 Rate limits and SLOs</h2>
+
+<table>
+<tr><th>Tier</th><th>Sustained TPS</th><th>Coverage MB/s</th><th>P95 catalogue</th><th>P95 coverage</th></tr>
+<tr><td>Standard</td><td>50</td><td>20</td><td>120 ms</td><td>900 ms</td></tr>
+<tr><td>Premium</td><td>500</td><td>200</td><td>80 ms</td><td>500 ms</td></tr>
+<tr><td>Enterprise</td><td>5 000</td><td>2 000</td><td>50 ms</td><td>250 ms</td></tr>
+</table>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>Four OGC API façades (Features, Coverages, EDR, Records) plus STAC must surface identical state.</li>
+<li>Idempotency-Key + ETag/If-Match handle network blips and concurrent updates safely.</li>
+<li>RFC 9457 problem+json gives clients stable failure types — including CF-validation faults.</li>
+<li>Disclosures are filed once and served as both JSON-LD and iXBRL.</li>
+<li>UNFCCC ETF/CRT 2.0 BTR submission is a first-class endpoint, signed with the NDA's key.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>Which OGC API façade serves a CMIP6 SSP scenario subset over a custom bounding box?</li>
+<li>What does the <code>alternate</code> link on a disclosure response carry, and why?</li>
+<li>What is the role of the Idempotency-Key on a quarterly inventory submission?</li>
+<li>Which RFC defines the problem+json error envelope?</li>
+<li>What is the SLO P95 latency for a coverage subset on the Premium tier?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 6 walks the data plane — WIS 2.0 MQTT brokers, Kafka exactly-once for inventory streaming, NetCDF-over-HTTPS for bulk, and OGC SensorThings for ground-station ingest.</p>
+
 </body>
 </html>
