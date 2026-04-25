@@ -102,7 +102,7 @@ Response:
 ```json
 {
   "key_id": "key_live_abc123xyz789",
-  "api_key": "wia_sk_live_abc123xyz789def456ghi...",
+  "api_key": "wia_EXAMPLE_API_KEY_REPLACE_ME...",
   "created_at": "2025-12-29T10:30:00Z",
   "expires_at": "2026-12-29T00:00:00Z",
   "scopes": ["samples:write", "analysis:read"],
@@ -1141,7 +1141,7 @@ Public status page: `https://status.wia-soil-microbiome.org`
 ```python
 from wia_soil_microbiome import Client
 
-client = Client(api_key="wia_sk_live_abc123...")
+client = Client(api_key="wia_EXAMPLE_API_KEY_REPLACE_ME...")
 
 # Create sample
 sample = client.samples.create({

@@ -286,7 +286,7 @@ curl -X GET "https://api.wia-robot.org/v1/robots/mobile-manipulator-001" \
   "data": {
     "robot_id": "mobile-manipulator-003",
     "registered_at": "2025-01-15T14:30:00Z",
-    "api_key": "wia_sk_live_abc123...",
+    "api_key": "wia_EXAMPLE_API_KEY_REPLACE_ME...",
     "websocket_url": "wss://api.wia-robot.org/v1/robots/mobile-manipulator-003/ws"
   }
 }

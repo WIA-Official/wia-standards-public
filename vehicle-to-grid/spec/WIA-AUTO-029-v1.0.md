@@ -1079,7 +1079,7 @@ Response:
 {
   "status": "success",
   "vehicleId": "EV-12345",
-  "apiKey": "sk_live_abc123...",
+  "apiKey": "EXAMPLE_API_KEY_REPLACE_ME...",
   "registered": "2025-12-26T14:30:00Z"
 }
 ```
@@ -1138,7 +1138,7 @@ const ws = new WebSocket('wss://api.wia.com/v2g/stream');
 // Authenticate
 ws.send(JSON.stringify({
   type: 'auth',
-  apiKey: 'sk_live_abc123...'
+  apiKey: 'EXAMPLE_API_KEY_REPLACE_ME...'
 }));
 
 // Subscribe to vehicle updates

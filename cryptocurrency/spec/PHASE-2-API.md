@@ -1131,7 +1131,7 @@ Authorization: Bearer {token}
 const wallet = await fetch('https://api.example.com/v1/wallets', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer sk_live_...',
+    'Authorization': 'Bearer EXAMPLE_API_KEY_REPLACE_ME',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -1147,7 +1147,7 @@ const wallet = await fetch('https://api.example.com/v1/wallets', {
 const address = await fetch(`https://api.example.com/v1/wallets/${wallet.walletId}/addresses`, {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer sk_live_...',
+    'Authorization': 'Bearer EXAMPLE_API_KEY_REPLACE_ME',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -1160,7 +1160,7 @@ const address = await fetch(`https://api.example.com/v1/wallets/${wallet.walletI
 const tx = await fetch(`https://api.example.com/v1/wallets/${wallet.walletId}/transactions`, {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer sk_live_...',
+    'Authorization': 'Bearer EXAMPLE_API_KEY_REPLACE_ME',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -1174,7 +1174,7 @@ const tx = await fetch(`https://api.example.com/v1/wallets/${wallet.walletId}/tr
 const signed = await fetch(`https://api.example.com/v1/wallets/${wallet.walletId}/transactions/${tx.transactionId}/sign`, {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer sk_live_...',
+    'Authorization': 'Bearer EXAMPLE_API_KEY_REPLACE_ME',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -1186,7 +1186,7 @@ const signed = await fetch(`https://api.example.com/v1/wallets/${wallet.walletId
 const broadcast = await fetch('https://api.example.com/v1/transactions/broadcast', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer sk_live_...',
+    'Authorization': 'Bearer EXAMPLE_API_KEY_REPLACE_ME',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({

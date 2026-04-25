@@ -133,7 +133,7 @@ client_secret={client_secret}
 
 ```http
 GET /api/v1/matches
-X-API-Key: wia_sk_live_abc123def456
+X-API-Key: wia_EXAMPLE_API_KEY_REPLACE_ME
 ```
 
 ---
