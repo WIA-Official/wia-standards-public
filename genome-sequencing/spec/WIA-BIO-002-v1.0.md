@@ -908,10 +908,10 @@ Stop run if:
 ### 10.1 Scientific Papers
 
 1. Illumina (2017). "An Introduction to Next-Generation Sequencing Technology"
-2. Van Dijk et al. (2014). "Ten years of next-generation sequencing technology." Trends in Genetics.
-3. McKenna et al. (2010). "The Genome Analysis Toolkit: A MapReduce framework." Genome Research.
-4. McLaren et al. (2016). "The Ensembl Variant Effect Predictor." Genome Biology.
-5. Richards et al. (2015). "Standards and guidelines for the interpretation of sequence variants." ACMG/AMP.
+2. Van 선행 연구. "Ten years of next-generation sequencing technology." Trends in Genetics.
+3. 선행 연구. "The Genome Analysis Toolkit: A MapReduce framework." Genome Research.
+4. 선행 연구. "The Ensembl Variant Effect Predictor." Genome Biology.
+5. 선행 연구. "Standards and guidelines for the interpretation of sequence variants." ACMG/AMP.
 
 ### 10.2 Reference Genomes
 

@@ -1025,7 +1025,7 @@ interface PowerMonitor {
 ### 11.1 Scientific Papers
 
 1. Wilczek, F. (2012). "Quantum Time Crystals"
-2. Yao, N., et al. (2017). "Discrete Time Crystals"
+2. 선행 연구. "Discrete Time Crystals"
 3. Thorne, K. (1988). "Wormholes, Time Machines, and the Weak Energy Condition"
 4. Novikov, I. (1992). "Time Machine and Self-Consistent Evolution"
 5. Penrose, R. (1969). "Gravitational Collapse: The Role of General Relativity"

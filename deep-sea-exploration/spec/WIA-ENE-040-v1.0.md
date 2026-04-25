@@ -1169,11 +1169,11 @@ ws://api.wia.org/ene-040/v1/dives/{diveId}/live
 
 1. **Jamieson, A.J. (2015)**. "The Hadal Zone: Life in the Deepest Oceans." Cambridge University Press.
 
-2. **Ramirez-Llodra, E. et al. (2010)**. "Deep, diverse and definitely different: unique attributes of the world's largest ecosystem." *Biogeosciences*, 7: 2851-2899.
+2. **선행 연구**. "Deep, diverse and definitely different: unique attributes of the world's largest ecosystem." *Biogeosciences*, 7: 2851-2899.
 
 3. **Van Dover, C.L. (2000)**. "The Ecology of Deep-Sea Hydrothermal Vents." Princeton University Press.
 
-4. **Gallo, N.D. et al. (2015)**. "Submersible- and lander-observed community patterns in the Mariana and New Britain trenches: Influence of productivity and depth on epibenthic and scavenging communities." *Deep Sea Research Part I*, 99: 119-133.
+4. **선행 연구**. "Submersible- and lander-observed community patterns in the Mariana and New Britain trenches: Influence of productivity and depth on epibenthic and scavenging communities." *Deep Sea Research Part I*, 99: 119-133.
 
 ### 15.2 데이터베이스
 

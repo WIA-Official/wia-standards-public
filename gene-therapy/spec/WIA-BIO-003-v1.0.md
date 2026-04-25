@@ -663,7 +663,7 @@ Standard error codes:
 
 ### 10.1 Seminal Publications
 
-1. Dunbar, C.E., et al. (2018). "Gene therapy comes of age." *Science* 359(6372).
+1. 선행 연구. "Gene therapy comes of age." *Science* 359(6372).
 2. Naldini, L. (2015). "Gene therapy returns to centre stage." *Nature* 526:351-360.
 3. High, K.A., Roncarolo, M.G. (2019). "Gene Therapy." *NEJM* 381:455-464.
 4. Wang, D., Tai, P.W.L., Gao, G. (2019). "Adeno-associated virus vector as a platform for gene therapy." *Nat Rev Drug Discov* 18:358-378.

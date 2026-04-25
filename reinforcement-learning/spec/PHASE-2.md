@@ -335,9 +335,9 @@ interface TrainingConfig {
 
 ## References
 
-1. Mnih et al. (2015). Human-level control through deep reinforcement learning. *Nature*.
-2. Schulman et al. (2017). Proximal Policy Optimization Algorithms.
-3. Mnih et al. (2016). Asynchronous Methods for Deep Reinforcement Learning.
+1. 선행 연구. Human-level control through deep reinforcement learning. *Nature*.
+2. 선행 연구. Proximal Policy Optimization Algorithms.
+3. 선행 연구. Asynchronous Methods for Deep Reinforcement Learning.
 
 ---
 

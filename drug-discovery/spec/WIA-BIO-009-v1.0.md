@@ -682,11 +682,11 @@ Standard error codes:
 
 ### 10.1 Scientific Literature
 
-1. Lipinski, C.A., et al. (1997). "Experimental and computational approaches to estimate solubility and permeability"
+1. 선행 연구. "Experimental and computational approaches to estimate solubility and permeability"
 2. Hopkins, A.L., Groom, C.R. (2002). "The druggable genome"
 3. Zhang, M.Q., Wilkinson, B. (2007). "Drug discovery beyond the 'rule-of-five'"
-4. Waring, M.J., et al. (2015). "An analysis of the attrition of drug candidates"
-5. Morgan, P., et al. (2018). "Impact of a five-dimensional framework on R&D productivity"
+4. 선행 연구. "An analysis of the attrition of drug candidates"
+5. 선행 연구. "Impact of a five-dimensional framework on R&D productivity"
 
 ### 10.2 Regulatory Guidelines
 

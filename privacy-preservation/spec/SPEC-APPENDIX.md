@@ -864,16 +864,16 @@ k-anonymity satisfied: TRUE
 
 ### 8.1 Academic Papers
 
-1. Dwork, C., et al. (2006). "Calibrating Noise to Sensitivity in Private Data Analysis"
+1. 선행 연구. "Calibrating Noise to Sensitivity in Private Data Analysis"
    - https://doi.org/10.1007/11681878_14
 
 2. Sweeney, L. (2002). "k-anonymity: A model for protecting privacy"
    - International Journal of Uncertainty, Fuzziness and Knowledge-Based Systems
 
-3. Machanavajjhala, A., et al. (2007). "l-Diversity: Privacy Beyond k-Anonymity"
+3. 선행 연구. "l-Diversity: Privacy Beyond k-Anonymity"
    - ACM Transactions on Knowledge Discovery from Data
 
-4. Li, N., et al. (2007). "t-Closeness: Privacy Beyond k-Anonymity and l-Diversity"
+4. 선행 연구. "t-Closeness: Privacy Beyond k-Anonymity and l-Diversity"
    - IEEE 23rd International Conference on Data Engineering
 
 5. Gentry, C. (2009). "Fully homomorphic encryption using ideal lattices"

@@ -351,10 +351,10 @@ This standard applies to:
 
 ### 10.3 Literature
 
-- Esteva et al. (2017) Dermatologist-level classification
-- Gulshan et al. (2016) Diabetic retinopathy detection
-- Rajpurkar et al. (2017) CheXNet pneumonia detection
-- McKinney et al. (2020) Breast cancer screening
+- 선행 연구 Dermatologist-level classification
+- 선행 연구 Diabetic retinopathy detection
+- 선행 연구 CheXNet pneumonia detection
+- 선행 연구 Breast cancer screening
 
 ---
 

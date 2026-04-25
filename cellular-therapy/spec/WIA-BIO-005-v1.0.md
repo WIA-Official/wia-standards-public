@@ -910,13 +910,13 @@ ICH E2A: Clinical Safety Data Management
 
 ### 10.1 Key Publications
 
-1. Lee, D.W., et al. (2019). "ASTCT Consensus Grading for Cytokine Release Syndrome and Neurologic Toxicity." *Biology of Blood and Marrow Transplantation*, 25(4), 625-638.
+1. 선행 연구. "ASTCT Consensus Grading for Cytokine Release Syndrome and Neurologic Toxicity." *Biology of Blood and Marrow Transplantation*, 25(4), 625-638.
 
 2. FDA (2020). "Chemistry, Manufacturing, and Control (CMC) Information for Human Gene Therapy Investigational New Drug Applications (INDs)."
 
-3. Levine, B.L., et al. (2017). "Global Manufacturing of CAR T Cell Therapy." *Molecular Therapy - Methods & Clinical Development*, 4, 92-101.
+3. 선행 연구. "Global Manufacturing of CAR T Cell Therapy." *Molecular Therapy - Methods & Clinical Development*, 4, 92-101.
 
-4. Dominici, M., et al. (2006). "Minimal criteria for defining multipotent mesenchymal stromal cells." *Cytotherapy*, 8(4), 315-317.
+4. 선행 연구. "Minimal criteria for defining multipotent mesenchymal stromal cells." *Cytotherapy*, 8(4), 315-317.
 
 5. USP <1046>: "Cellular and Tissue-Based Products"
 

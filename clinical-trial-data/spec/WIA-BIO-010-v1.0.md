@@ -844,7 +844,7 @@ Bayesian predictive probability of success < 10% → stop
 
 ### 10.3 Statistical Methods
 
-1. Chow, S.C., et al. (2017). "Sample Size Calculations in Clinical Research"
+1. 선행 연구. "Sample Size Calculations in Clinical Research"
 2. Piantadosi, S. (2017). "Clinical Trials: A Methodologic Perspective"
 3. Jennison, C., Turnbull, B.W. (2000). "Group Sequential Methods"
 

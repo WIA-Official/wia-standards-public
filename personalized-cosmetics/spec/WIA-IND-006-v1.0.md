@@ -2912,10 +2912,10 @@ Investment: High (genetics, automation, ML)
 
 1. Baumann, L. (2008). The Baumann Skin Typing System. *Journal of Cosmetic Dermatology, 7*(4), 284-287.
 2. Fitzpatrick, T. B. (1988). The Validity and Practicality of Sun-Reactive Skin Types I Through VI. *Archives of Dermatology, 124*(6), 869-871.
-3. Gasser, P., et al. (2004). Niacinamide: Mechanisms of Action and Its Topical Use in Dermatology. *Skin Pharmacology and Physiology, 17*(6), 311-315.
+3. 선행 연구. Niacinamide: Mechanisms of Action and Its Topical Use in Dermatology. *Skin Pharmacology and Physiology, 17*(6), 311-315.
 4. Kligman, D. E., & Kligman, A. M. (1998). Salicylic Acid Peels for the Treatment of Photoaging. *Dermatologic Surgery, 24*(3), 325-328.
-5. Pullar, J. M., et al. (2017). The Roles of Vitamin C in Skin Health. *Nutrients, 9*(8), 866.
-6. Mukherjee, S., et al. (2006). Retinoids in the Treatment of Skin Aging. *Clinical Interventions in Aging, 1*(4), 327-348.
+5. 선행 연구. The Roles of Vitamin C in Skin Health. *Nutrients, 9*(8), 866.
+6. 선행 연구. Retinoids in the Treatment of Skin Aging. *Clinical Interventions in Aging, 1*(4), 327-348.
 
 ### 14.2 Regulatory References
 

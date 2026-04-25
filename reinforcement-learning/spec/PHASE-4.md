@@ -408,7 +408,7 @@ interface ProductionRLSystem {
 
 ## References
 
-1. Achiam et al. (2017). Constrained Policy Optimization
+1. 선행 연구. Constrained Policy Optimization
 2. Ray RLlib Documentation
 3. TensorFlow Serving Guide
 4. Production Machine Learning Best Practices

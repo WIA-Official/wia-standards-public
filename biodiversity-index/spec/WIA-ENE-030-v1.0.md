@@ -655,7 +655,7 @@ HSI = Σ(요소 점수 × 가중치)
   "datasetName": "한라산 생물다양성 조사",
   "license": "CC BY 4.0",
   "rightsHolder": "한라산국립공원관리소",
-  "citation": "Kim et al. 2025. Biodiversity of Hallasan National Park",
+  "citation": "선행 연구. Biodiversity of Hallasan National Park",
   "contact": {
     "name": "김생태",
     "email": "ecology@hallasan.go.kr"

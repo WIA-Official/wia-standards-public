@@ -1144,11 +1144,11 @@ Standard error codes:
 
 ### 10.1 Scientific Papers
 
-1. Jinek, M. et al. (2012). "A programmable dual-RNA-guided DNA endonuclease"
-2. Cong, L. et al. (2013). "Multiplex genome engineering using CRISPR/Cas systems"
-3. Doench, J.G. et al. (2016). "Optimized sgRNA design to maximize activity"
-4. Kleinstiver, B.P. et al. (2016). "High-fidelity CRISPR-Cas9 nucleases"
-5. Anzalone, A.V. et al. (2019). "Search-and-replace genome editing"
+1. 선행 연구. "A programmable dual-RNA-guided DNA endonuclease"
+2. 선행 연구. "Multiplex genome engineering using CRISPR/Cas systems"
+3. 선행 연구. "Optimized sgRNA design to maximize activity"
+4. 선행 연구. "High-fidelity CRISPR-Cas9 nucleases"
+5. 선행 연구. "Search-and-replace genome editing"
 
 ### 10.2 Computational Tools
 

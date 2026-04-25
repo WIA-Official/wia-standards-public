@@ -222,7 +222,7 @@
 #### 2025 Publication Standards
 - 예측 구조 발표 시 신뢰도 메트릭 필수 포함
 - 관련 파일 공개 권장
-- 인용: Fleming J. et al. (2025) Journal of Molecular Biology
+- 인용: 선행 연구 Journal of Molecular Biology
 
 ---
 

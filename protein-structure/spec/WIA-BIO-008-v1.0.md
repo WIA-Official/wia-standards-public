@@ -741,11 +741,11 @@ L: Leucine      Y: Tyrosine
 
 ### 10.1 Key Publications
 
-1. Jumper et al. (2021). "Highly accurate protein structure prediction with AlphaFold". Nature.
-2. Baek et al. (2021). "Accurate prediction of protein structures and interactions using RoseTTAFold". Science.
+1. 선행 연구. "Highly accurate protein structure prediction with AlphaFold". Nature.
+2. 선행 연구. "Accurate prediction of protein structures and interactions using RoseTTAFold". Science.
 3. Zhang & Skolnick (2004). "Scoring function for automated assessment of protein structure template quality". Proteins.
 4. Trott & Olson (2010). "AutoDock Vina: improving the speed and accuracy of docking". J Comput Chem.
-5. Abraham et al. (2015). "GROMACS: High performance molecular simulations". SoftwareX.
+5. 선행 연구. "GROMACS: High performance molecular simulations". SoftwareX.
 
 ### 10.2 Software Tools
 

@@ -714,9 +714,9 @@ Recommendations:
 
 ### 10.1 Sequencing Protocols
 
-1. Caporaso, J.G. et al. (2012). "Ultra-high-throughput microbial community analysis on the Illumina HiSeq and MiSeq platforms." ISME J.
-2. Bolyen, E. et al. (2019). "Reproducible, interactive, scalable and extensible microbiome data science using QIIME 2." Nat Biotechnol.
-3. Truong, D.T. et al. (2015). "MetaPhlAn2 for enhanced metagenomic taxonomic profiling." Nat Methods.
+1. 선행 연구. "Ultra-high-throughput microbial community analysis on the Illumina HiSeq and MiSeq platforms." ISME J.
+2. 선행 연구. "Reproducible, interactive, scalable and extensible microbiome data science using QIIME 2." Nat Biotechnol.
+3. 선행 연구. "MetaPhlAn2 for enhanced metagenomic taxonomic profiling." Nat Methods.
 
 ### 10.2 Diversity Metrics
 
@@ -726,9 +726,9 @@ Recommendations:
 
 ### 10.3 Clinical Applications
 
-1. Qin, J. et al. (2012). "A metagenome-wide association study of gut microbiota in type 2 diabetes." Nature.
-2. Manichanh, C. et al. (2012). "Reduced diversity of faecal microbiota in Crohn's disease revealed by a metagenomic approach." Gut.
-3. van Nood, E. et al. (2013). "Duodenal infusion of donor feces for recurrent Clostridium difficile." NEJM.
+1. 선행 연구. "A metagenome-wide association study of gut microbiota in type 2 diabetes." Nature.
+2. 선행 연구. "Reduced diversity of faecal microbiota in Crohn's disease revealed by a metagenomic approach." Gut.
+3. van 선행 연구. "Duodenal infusion of donor feces for recurrent Clostridium difficile." NEJM.
 
 ### 10.4 Databases
 

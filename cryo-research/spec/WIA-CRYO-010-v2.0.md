@@ -401,7 +401,7 @@ For migrating from v1.2 to v2.0, see: `migration-guide-v1.2-to-v2.0.md`
 
 1. Polge, C., Smith, A. U., & Parkes, A. S. (1949). Revival of spermatozoa after vitrification and dehydration at low temperatures. Nature, 164(4172), 666-666.
 
-2. Wilkinson, M. D., et al. (2016). The FAIR Guiding Principles for scientific data management and stewardship. Scientific data, 3(1), 1-9.
+2. 선행 연구. The FAIR Guiding Principles for scientific data management and stewardship. Scientific data, 3(1), 1-9.
 
 3. WIA Standards Committee. (2024). Cryopreservation Data Best Practices. WIA Technical Report 2024-001.
 

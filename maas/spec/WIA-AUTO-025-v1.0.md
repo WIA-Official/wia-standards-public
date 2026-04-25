@@ -68,7 +68,7 @@ The standard covers:
 
 ### 2.1 Level Classification
 
-MaaS systems are classified into five integration levels based on the Sochor et al. (2018) framework:
+MaaS systems are classified into five integration levels based on the 선행 연구 framework:
 
 #### 2.1.1 Level 0: No Integration
 ```

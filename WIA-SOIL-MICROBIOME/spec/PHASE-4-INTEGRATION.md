@@ -854,7 +854,7 @@ def detect_microbiome_management_response(time_series_samples, satellite_time_se
       "coordinates": [[[-90, 38], [-82, 38], [-82, 42], [-90, 42], [-90, 38]]]
     },
     "license": "CC-BY-4.0",
-    "citation": "Smith et al. (2025). WIA-SOIL-MICROBIOME dataset...",
+    "citation": "선행 연구. WIA-SOIL-MICROBIOME dataset...",
     "funding": "USDA Grant #12345"
   },
   "data_files": [

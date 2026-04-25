@@ -1282,8 +1282,8 @@ Prevent:
 
 1. Kempton, W., & Tomić, J. (2005). "Vehicle-to-grid power fundamentals: Calculating capacity and net revenue." *Journal of Power Sources*, 144(1), 268-279.
 2. Peterson, S. B., Whitacre, J. F., & Apt, J. (2010). "The economics of using plug-in hybrid electric vehicle battery packs for grid storage." *Journal of Power Sources*, 195(8), 2377-2384.
-3. Uddin, K., et al. (2017). "On the possibility of extending the lifetime of lithium-ion batteries through optimal V2G facilitated by an integrated vehicle and smart-grid system." *Energy*, 133, 710-722.
-4. Mwasilu, F., et al. (2014). "Electric vehicles and smart grid interaction: A review on vehicle to grid and renewable energy sources integration." *Renewable and Sustainable Energy Reviews*, 34, 501-516.
+3. 선행 연구. "On the possibility of extending the lifetime of lithium-ion batteries through optimal V2G facilitated by an integrated vehicle and smart-grid system." *Energy*, 133, 710-722.
+4. 선행 연구. "Electric vehicles and smart grid interaction: A review on vehicle to grid and renewable energy sources integration." *Renewable and Sustainable Energy Reviews*, 34, 501-516.
 
 ### 12.3 Grid Operator Resources
 
@@ -1294,7 +1294,7 @@ Prevent:
 
 ### 12.4 Battery Research
 
-1. Schmalstieg, J., et al. (2014). "A holistic aging model for Li(NiMnCo)O2 based 18650 lithium-ion batteries." *Journal of Power Sources*, 257, 325-334.
+1. 선행 연구. "A holistic aging model for Li(NiMnCo)O2 based 18650 lithium-ion batteries." *Journal of Power Sources*, 257, 325-334.
 2. Dubarry, M., & Baure, G. (2020). "Perspective on commercial Li-ion battery testing, best practices for simple and effective protocols." *Electronics*, 9(1), 152.
 
 ---

@@ -363,7 +363,7 @@ WIA Braille:
 
 2. Lorimer, P. (1996). A Critical Evaluation of the Historical Development of the Tactile Modes of Reading. PhD Thesis, University of Birmingham.
 
-3. Jimenez, J., et al. (2009). Biography of Louis Braille. Survey of Ophthalmology, 54(1), 142-149.
+3. 선행 연구. Biography of Louis Braille. Survey of Ophthalmology, 54(1), 142-149.
 
 ## 8.2 IPA (국제음성기호)
 

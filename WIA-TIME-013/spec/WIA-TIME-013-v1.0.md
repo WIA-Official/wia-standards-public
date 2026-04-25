@@ -1059,7 +1059,7 @@ Regular system validation:
 1. Tononi, G. (2004). "An information integration theory of consciousness"
 2. Hameroff, S., Penrose, R. (2014). "Consciousness in the universe: Review of the 'Orch OR' theory"
 3. Chalmers, D. (1995). "Facing Up to the Problem of Consciousness"
-4. Koch, C., et al. (2016). "Neural correlates of consciousness: progress and problems"
+4. 선행 연구. "Neural correlates of consciousness: progress and problems"
 5. Tegmark, M. (2015). "Consciousness as a state of matter"
 
 ### 12.2 Technical Standards

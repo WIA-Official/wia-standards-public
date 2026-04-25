@@ -362,11 +362,11 @@ interface AdvancedRLAgent {
 
 ## References
 
-1. Haarnoja et al. (2018). Soft Actor-Critic Algorithms
-2. Fujimoto et al. (2018). Addressing Function Approximation Error in Actor-Critic Methods (TD3)
-3. Rashid et al. (2018). QMIX: Monotonic Value Function Factorisation
-4. Kumar et al. (2020). Conservative Q-Learning for Offline RL
-5. Finn et al. (2017). Model-Agnostic Meta-Learning
+1. 선행 연구. Soft Actor-Critic Algorithms
+2. 선행 연구. Addressing Function Approximation Error in Actor-Critic Methods (TD3)
+3. 선행 연구. QMIX: Monotonic Value Function Factorisation
+4. 선행 연구. Conservative Q-Learning for Offline RL
+5. 선행 연구. Model-Agnostic Meta-Learning
 
 ---
 
