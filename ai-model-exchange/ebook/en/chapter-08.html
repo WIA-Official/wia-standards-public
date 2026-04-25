@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Best Practices & Case Studies | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        .case-study { background: #0f172a; padding: 25px; border-radius: 10px; margin: 25px 0; border-left: 4px solid #10B981; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 8: Best Practices & Case Studies</h1>
+        <p class="chapter-meta">WIA-AI-008 Standard • Estimated reading time: 45 minutes</p>
+
+        <h2>8.1 End-to-End Model Exchange Workflow</h2>
+        <p>
+            A robust model exchange workflow integrates all concepts from previous chapters into a cohesive pipeline that
+            spans training, optimization, versioning, distribution, and deployment.
+        </p>
+
+        <h3>Complete Pipeline Example</h3>
+        <pre><code>#!/usr/bin/env python3
+"""
+Complete model exchange pipeline following WIA-AI-008 standard
+弘益人間 - Benefit All Humanity
+"""
+
+import torch
+import mlflow
+import onnx
+from datetime import datetime
+
+class ModelExchangePipeline:
+    def __init__(self, config):
+        self.config = config
+        mlflow.set_tracking_uri(config['mlflow_uri'])
+        mlflow.set_experiment(config['experiment_name'])
+
+    def train(self):
+        """Phase 1: Train model"""
+        print("📚 Phase 1: Training model...")
+
+        with mlflow.start_run():
+            # Train model
+            model = self._train_model()
+
+            # Log everything
+            mlflow.log_params(self.config['hyperparameters'])
+            mlflow.log_metrics(self.metrics)
+            mlflow.log_artifact("training_logs.txt")
+
+            # Save PyTorch model
+            torch.save(model.state_dict(), "model.pth")
+
+            return model
+
+    def optimize(self, model):
+        """Phase 2: Optimize model"""
+        print("⚡ Phase 2: Optimizing model...")
+
+        # Quantization
+        quantized_model = torch.quantization.quantize_dynamic(
+            model, {torch.nn.Linear}, dtype=torch.qint8
+        )
+
+        # Prune
+        # ... pruning code ...
+
+        # Validate accuracy
+        accuracy_drop = self._validate_optimization(model, quantized_model)
+        assert accuracy_drop < 0.02, "Accuracy degradation too high"
+
+        return quantized_model
+
+    def export(self, model):
+        """Phase 3: Export to multiple formats"""
+        print("📦 Phase 3: Exporting to multiple formats...")
+
+        # Export to ONNX
+        dummy_input = torch.randn(1, *self.config['input_shape'])
+        torch.onnx.export(
+            model, dummy_input, "model.onnx",
+            opset_version=15, export_params=True,
+            input_names=['input'], output_names=['output'],
+            dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}}
+        )
+
+        # Validate ONNX
+        onnx_model = onnx.load("model.onnx")
+        onnx.checker.check_model(onnx_model)
+
+        # Export to TorchScript
+        scripted_model = torch.jit.script(model)
+        scripted_model.save("model.pt")
+
+        print("✓ Exported to ONNX and TorchScript")
+
+    def create_model_card(self):
+        """Phase 4: Create comprehensive model card"""
+        print("📝 Phase 4: Creating model card...")
+
+        model_card = {
+            'name': self.config['model_name'],
+            'version': self.config['version'],
+            'created_at': datetime.now().isoformat(),
+            'framework': 'pytorch',
+            'architecture': self.config['architecture'],
+            'metrics': self.metrics,
+            'hyperparameters': self.config['hyperparameters'],
+            'intended_use': 'Image classification',
+            'limitations': 'Limited to ImageNet classes',
+            'ethical_considerations': 'May have biases from training data',
+            'philosophy': '弘益人間 - Benefit All Humanity'
+        }
+
+        with open("model_card.json", "w") as f:
+            json.dump(model_card, f, indent=2)
+
+    def register(self):
+        """Phase 5: Register to model registry"""
+        print("🏛️ Phase 5: Registering to MLflow...")
+
+        mlflow.pytorch.log_model(
+            self.model,
+            "model",
+            registered_model_name=self.config['model_name']
+        )
+
+        # Transition to staging
+        client = mlflow.tracking.MlflowClient()
+        versions = client.search_model_versions(f"name='{self.config['model_name']}'")
+        latest_version = versions[0].version
+
+        client.transition_model_version_stage(
+            name=self.config['model_name'],
+            version=latest_version,
+            stage="Staging"
+        )
+
+        print(f"✓ Registered version {latest_version}")
+
+    def deploy(self):
+        """Phase 6: Deploy model"""
+        print("🚀 Phase 6: Deploying model...")
+
+        # Create TorchServe archive
+        os.system(f"""
+            torch-model-archiver \\
+                --model-name {self.config['model_name']} \\
+                --version {self.config['version']} \\
+                --serialized-file model.pt \\
+                --handler image_classifier \\
+                --export-path model-store/
+        """)
+
+        # Deploy to TorchServe
+        # ... deployment code ...
+
+        print("✓ Model deployed")
+
+    def run_pipeline(self):
+        """Execute complete pipeline"""
+        print("=" * 60)
+        print("WIA-AI-008 Model Exchange Pipeline")
+        print("弘益人間 - Benefit All Humanity")
+        print("=" * 60)
+
+        model = self.train()
+        model = self.optimize(model)
+        self.export(model)
+        self.create_model_card()
+        self.register()
+        self.deploy()
+
+        print("\n✅ Pipeline completed successfully!")
+
+# Usage
+config = {
+    'model_name': 'resnet18-classifier',
+    'version': '1.0.0',
+    'experiment_name': 'image-classification',
+    'mlflow_uri': 'http://localhost:5000',
+    'architecture': 'ResNet-18',
+    'input_shape': [3, 224, 224],
+    'hyperparameters': {
+        'learning_rate': 0.001,
+        'batch_size': 32,
+        'epochs': 10
+    }
+}
+
+pipeline = ModelExchangePipeline(config)
+pipeline.run_pipeline()</code></pre>
+
+        <h2>8.2 Case Study 1: Hugging Face Model Sharing</h2>
+
+        <div class="case-study">
+            <h3>🤗 Scenario: Sharing a Fine-Tuned BERT Model</h3>
+            <p>
+                A research team fine-tuned BERT for sentiment analysis and wants to share it with the community following
+                WIA-AI-008 standards.
+            </p>
+
+            <h4>Implementation</h4>
+            <pre><code>from transformers import BertForSequenceClassification, BertTokenizer, TrainingArguments, Trainer
+from huggingface_hub import HfApi, create_repo
+
+# 1. Fine-tune model
+model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+trainer = Trainer(model=model, args=training_args, train_dataset=train_dataset)
+trainer.train()
+
+# 2. Save model and tokenizer
+model.save_pretrained("./sentiment-bert")
+tokenizer.save_pretrained("./sentiment-bert")
+
+# 3. Create comprehensive README (model card)
+readme = """---
+language: en
+license: apache-2.0
+tags:
+- sentiment-analysis
+- bert
+- text-classification
+datasets:
+- imdb
+metrics:
+- accuracy: 0.934
+- f1: 0.931
+model-index:
+- name: sentiment-bert
+  results:
+  - task:
+      type: text-classification
+      name: Sentiment Analysis
+    dataset:
+      name: IMDB
+      type: imdb
+    metrics:
+    - type: accuracy
+      value: 0.934
+---
+
+# Sentiment Analysis BERT
+
+Fine-tuned BERT-base model for sentiment analysis on IMDB reviews.
+
+## Model Details
+- Base model: bert-base-uncased
+- Task: Binary sentiment classification (positive/negative)
+- Training data: IMDB dataset (50,000 reviews)
+- Framework: PyTorch + Transformers
+
+## Usage
+```python
+from transformers import pipeline
+
+classifier = pipeline('sentiment-analysis', model='username/sentiment-bert')
+result = classifier('This movie was amazing!')
+# [{'label': 'POSITIVE', 'score': 0.9987}]
+```
+
+## Training Procedure
+- Learning rate: 2e-5
+- Batch size: 16
+- Epochs: 3
+- Optimizer: AdamW
+
+## Evaluation Results
+- Accuracy: 93.4%
+- F1 Score: 93.1%
+- Precision: 94.2%
+- Recall: 92.0%
+
+## Limitations
+- English language only
+- Trained on movie reviews, may not generalize to other domains
+- May exhibit biases present in IMDB dataset
+
+## Ethical Considerations
+弘益人間 (Benefit All Humanity) - This model is intended for research and educational purposes.
+Users should be aware of potential biases and use responsibly.
+
+## Citation
+```bibtex
+@misc{sentiment-bert,
+  author = {Research Team},
+  title = {Fine-tuned BERT for Sentiment Analysis},
+  year = {2025},
+  publisher = {Hugging Face},
+  howpublished = {\\url{https://huggingface.co/username/sentiment-bert}}
+}
+```
+"""
+
+with open("./sentiment-bert/README.md", "w") as f:
+    f.write(readme)
+
+# 4. Create repository and upload
+repo_id = "username/sentiment-bert"
+create_repo(repo_id, exist_ok=True)
+
+api = HfApi()
+api.upload_folder(
+    folder_path="./sentiment-bert",
+    repo_id=repo_id,
+    commit_message="Initial model upload"
+)
+
+print(f"✓ Model published: https://huggingface.co/{repo_id}")</code></pre>
+
+            <h4>Results</h4>
+            <ul>
+                <li>✅ Model downloaded 10,000+ times in first month</li>
+                <li>✅ Used by 50+ research papers</li>
+                <li>✅ Community contributed improvements via pull requests</li>
+                <li>✅ Comprehensive documentation enabled easy adoption</li>
+            </ul>
+        </div>
+
+        <h2>8.3 Case Study 2: Cross-Platform Mobile Deployment</h2>
+
+        <div class="case-study">
+            <h3>📱 Scenario: Deploying Object Detection to iOS and Android</h3>
+            <p>
+                A company trained YOLOv5 in PyTorch and needed to deploy it on both iOS (CoreML) and Android (TFLite)
+                while maintaining consistent performance.
+            </p>
+
+            <h4>Solution Architecture</h4>
+            <pre><code># PyTorch (Training) → ONNX → TFLite (Android)
+#                            ↓
+#                        CoreML (iOS)
+
+# Step 1: Export PyTorch to ONNX
+import torch
+from models.yolo import YOLOv5
+
+model = YOLOv5.from_pretrained('yolov5s')
+model.eval()
+
+dummy_input = torch.randn(1, 3, 640, 640)
+torch.onnx.export(
+    model, dummy_input, "yolov5s.onnx",
+    opset_version=12, input_names=['images'],
+    output_names=['output'], dynamic_axes={'images': {0: 'batch'}}
+)
+
+# Step 2: ONNX to CoreML (iOS)
+import coremltools as ct
+from onnx_coreml import convert
+
+coreml_model = convert(model='yolov5s.onnx')
+coreml_model.save('YOLOv5.mlmodel')
+
+# Step 3: ONNX to TensorFlow to TFLite (Android)
+from onnx_tf.backend import prepare
+import tensorflow as tf
+
+onnx_model = onnx.load("yolov5s.onnx")
+tf_model = prepare(onnx_model)
+tf_model.export_graph("yolov5_tf")
+
+converter = tf.lite.TFLiteConverter.from_saved_model("yolov5_tf")
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+with open("yolov5s.tflite", "wb") as f:
+    f.write(tflite_model)
+
+# Step 4: Numerical validation
+validate_cross_platform(pytorch_model, coreml_model, tflite_model)</code></pre>
+
+            <h4>Performance Comparison</h4>
+            <table>
+                <tr>
+                    <th>Platform</th>
+                    <th>Format</th>
+                    <th>Size</th>
+                    <th>Latency</th>
+                    <th>mAP</th>
+                </tr>
+                <tr>
+                    <td>Server (PyTorch)</td>
+                    <td>.pt</td>
+                    <td>14.4 MB</td>
+                    <td>8ms (GPU)</td>
+                    <td>56.0%</td>
+                </tr>
+                <tr>
+                    <td>iOS (CoreML)</td>
+                    <td>.mlmodel</td>
+                    <td>7.2 MB</td>
+                    <td>45ms (ANE)</td>
+                    <td>55.8%</td>
+                </tr>
+                <tr>
+                    <td>Android (TFLite)</td>
+                    <td>.tflite</td>
+                    <td>7.3 MB</td>
+                    <td>52ms (GPU)</td>
+                    <td>55.7%</td>
+                </tr>
+            </table>
+
+            <h4>Lessons Learned</h4>
+            <ul>
+                <li>ONNX as intermediate format enabled multi-platform deployment</li>
+                <li>Quantization reduced size by 50% with < 1% mAP loss</li>
+                <li>Comprehensive testing across platforms caught numerical issues early</li>
+                <li>Model cards documented platform-specific optimizations</li>
+            </ul>
+        </div>
+
+        <h2>8.4 Case Study 3: MLOps Pipeline at Scale</h2>
+
+        <div class="case-study">
+            <h3>🏭 Scenario: Enterprise ML Platform with 100+ Models</h3>
+            <p>
+                A large tech company built a centralized ML platform managing hundreds of models across dozens of teams.
+            </p>
+
+            <h4>Architecture</h4>
+            <ul>
+                <li><strong>Training</strong>: Kubernetes + Kubeflow for distributed training</li>
+                <li><strong>Registry</strong>: MLflow with PostgreSQL backend</li>
+                <li><strong>Storage</strong>: S3 for model artifacts</li>
+                <li><strong>Serving</strong>: NVIDIA Triton on GPU clusters</li>
+                <li><strong>Monitoring</strong>: Prometheus + Grafana</li>
+                <li><strong>CI/CD</strong>: GitLab CI with automated testing</li>
+            </ul>
+
+            <h4>Automated Pipeline</h4>
+            <pre><code># .gitlab-ci.yml
+stages:
+  - train
+  - test
+  - optimize
+  - register
+  - deploy
+
+train:
+  stage: train
+  script:
+    - python train.py --config config.yaml
+    - python validate.py --threshold 0.90
+  artifacts:
+    paths:
+      - model.pth
+      - metrics.json
+
+test:
+  stage: test
+  script:
+    - pytest tests/test_model.py
+    - python benchmark.py --latency-threshold 100
+  dependencies:
+    - train
+
+optimize:
+  stage: optimize
+  script:
+    - python quantize.py --model model.pth
+    - python export_onnx.py
+    - python validate_onnx.py
+  artifacts:
+    paths:
+      - model_quantized.pth
+      - model.onnx
+
+register:
+  stage: register
+  script:
+    - python register_model.py --name $CI_COMMIT_TAG
+  only:
+    - tags
+
+deploy:
+  stage: deploy
+  script:
+    - python deploy_triton.py --version $CI_COMMIT_TAG
+  when: manual
+  only:
+    - tags</code></pre>
+
+            <h4>Impact</h4>
+            <ul>
+                <li>⚡ 10x faster model deployment (weeks → days)</li>
+                <li>🔒 100% model lineage tracking</li>
+                <li>📊 Centralized monitoring across all models</li>
+                <li>🤝 Improved collaboration between teams</li>
+                <li>♻️ Model reuse increased by 40%</li>
+            </ul>
+        </div>
+
+        <h2>8.5 Best Practices Checklist</h2>
+
+        <h3>Model Development</h3>
+        <ul>
+            <li>☑️ Use version control (Git) for code</li>
+            <li>☑️ Track experiments with MLflow/W&B</li>
+            <li>☑️ Document hyperparameters and configurations</li>
+            <li>☑️ Save training logs and metrics</li>
+            <li>☑️ Use reproducible random seeds</li>
+        </ul>
+
+        <h3>Model Export & Conversion</h3>
+        <ul>
+            <li>☑️ Export to framework-agnostic format (ONNX)</li>
+            <li>☑️ Validate numerical equivalence after conversion</li>
+            <li>☑️ Test on representative data samples</li>
+            <li>☑️ Document conversion steps and parameters</li>
+            <li>☑️ Include fallback for unsupported operations</li>
+        </ul>
+
+        <h3>Model Optimization</h3>
+        <ul>
+            <li>☑️ Benchmark before optimization (baseline)</li>
+            <li>☑️ Apply quantization with calibration data</li>
+            <li>☑️ Measure accuracy impact of each optimization</li>
+            <li>☑️ Profile inference performance</li>
+            <li>☑️ Document size/speed/accuracy trade-offs</li>
+        </ul>
+
+        <h3>Model Registry</h3>
+        <ul>
+            <li>☑️ Use semantic versioning (MAJOR.MINOR.PATCH)</li>
+            <li>☑️ Include comprehensive model cards</li>
+            <li>☑️ Tag models with metadata (task, dataset, metrics)</li>
+            <li>☑️ Implement access control and permissions</li>
+            <li>☑️ Maintain staging → production workflow</li>
+        </ul>
+
+        <h3>Model Deployment</h3>
+        <ul>
+            <li>☑️ Containerize serving infrastructure (Docker)</li>
+            <li>☑️ Implement health checks and readiness probes</li>
+            <li>☑️ Set up monitoring and alerting</li>
+            <li>☑️ Use load balancing and auto-scaling</li>
+            <li>☑️ Plan for rollback and disaster recovery</li>
+        </ul>
+
+        <h3>Production Monitoring</h3>
+        <ul>
+            <li>☑️ Track latency, throughput, error rates</li>
+            <li>☑️ Monitor model performance (accuracy drift)</li>
+            <li>☑️ Log predictions for debugging</li>
+            <li>☑️ Set up alerts for anomalies</li>
+            <li>☑️ Implement A/B testing infrastructure</li>
+        </ul>
+
+        <h2>8.6 Common Pitfalls and Solutions</h2>
+
+        <table>
+            <tr>
+                <th>Pitfall</th>
+                <th>Impact</th>
+                <th>Solution</th>
+            </tr>
+            <tr>
+                <td>Skipping numerical validation after conversion</td>
+                <td>Silent accuracy degradation</td>
+                <td>Always compare outputs with tolerance checks</td>
+            </tr>
+            <tr>
+                <td>Hardcoding model paths</td>
+                <td>Difficult to version/deploy</td>
+                <td>Use configuration files and environment variables</td>
+            </tr>
+            <tr>
+                <td>No model versioning</td>
+                <td>Cannot track or rollback</td>
+                <td>Implement semantic versioning from day 1</td>
+            </tr>
+            <tr>
+                <td>Missing model cards</td>
+                <td>Poor reproducibility</td>
+                <td>Automate model card generation in pipeline</td>
+            </tr>
+            <tr>
+                <td>Deploying without monitoring</td>
+                <td>Production issues go unnoticed</td>
+                <td>Set up comprehensive monitoring before launch</td>
+            </tr>
+            <tr>
+                <td>Over-optimizing for speed</td>
+                <td>Accuracy degradation</td>
+                <td>Define acceptable accuracy thresholds</td>
+            </tr>
+        </table>
+
+        <h2>8.7 Tools and Resources</h2>
+
+        <h3>Essential Tools</h3>
+        <ul>
+            <li><strong>ONNX</strong>: Framework-agnostic model format</li>
+            <li><strong>ONNX Runtime</strong>: High-performance inference engine</li>
+            <li><strong>Netron</strong>: Model visualization</li>
+            <li><strong>MLflow</strong>: Experiment tracking and model registry</li>
+            <li><strong>DVC</strong>: Data and model version control</li>
+            <li><strong>TorchServe</strong>: PyTorch model serving</li>
+            <li><strong>TensorFlow Serving</strong>: TensorFlow model serving</li>
+            <li><strong>NVIDIA Triton</strong>: Multi-framework serving</li>
+            <li><strong>Prometheus</strong>: Metrics and monitoring</li>
+            <li><strong>Grafana</strong>: Visualization and dashboards</li>
+        </ul>
+
+        <h3>Learning Resources</h3>
+        <ul>
+            <li>WIA-AI-008 Specification: wia.org/standards/ai-008</li>
+            <li>ONNX Tutorials: github.com/onnx/tutorials</li>
+            <li>MLflow Documentation: mlflow.org/docs</li>
+            <li>Model Cards Paper: arxiv.org/abs/1810.03993</li>
+            <li>TorchServe GitHub: github.com/pytorch/serve</li>
+        </ul>
+
+        <h2>8.8 Future of Model Exchange</h2>
+
+        <h3>Emerging Trends</h3>
+        <ul>
+            <li><strong>Federated Learning</strong>: Training across distributed data without centralization</li>
+            <li><strong>Neural Architecture Search (NAS)</strong>: Automated model design for target platforms</li>
+            <li><strong>Model Compression</strong>: Advanced techniques (knowledge distillation, pruning, quantization)</li>
+            <li><strong>Edge AI</strong>: On-device inference with TinyML</li>
+            <li><strong>Model Marketplaces</strong>: Commercial model exchange platforms</li>
+            <li><strong>AI Regulations</strong>: Compliance requirements for model documentation</li>
+        </ul>
+
+        <h3>The Role of WIA-AI-008</h3>
+        <p>
+            The WIA-AI-008 standard provides a foundation for these future developments, ensuring interoperability,
+            transparency, and ethical deployment of AI models. As the field evolves, the standard will adapt to incorporate
+            new best practices while maintaining its core philosophy of 弘益人間 (Benefit All Humanity).
+        </p>
+
+        <h2>8.9 Conclusion</h2>
+        <p>
+            Model exchange is no longer optional—it's essential for modern ML operations. By following the WIA-AI-008
+            standard and the best practices outlined in this book, teams can:
+        </p>
+        <ul>
+            <li>Accelerate development through model sharing and reuse</li>
+            <li>Deploy models across diverse platforms and frameworks</li>
+            <li>Maintain high standards for reproducibility and documentation</li>
+            <li>Build production-ready ML systems with confidence</li>
+            <li>Contribute to the open AI ecosystem</li>
+        </ul>
+
+        <p>
+            The journey from training to production is complex, but with the right tools, processes, and standards, it
+            becomes manageable and repeatable. We hope this book serves as a comprehensive guide for your model exchange
+            needs.
+        </p>
+
+        <div class="note">
+            <strong>弘益人間 (Hong-ik In-gan)</strong><br>
+            "Broadly benefiting humanity" - This ancient Korean philosophy guides the WIA-AI-008 standard. By making
+            AI models accessible, portable, and well-documented, we enable innovation that benefits everyone. Thank you
+            for joining us on this journey.
+        </div>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Complete end-to-end workflows integrate all model exchange concepts</li>
+                <li>Real-world case studies demonstrate practical applications</li>
+                <li>Best practices checklist covers development through production</li>
+                <li>Common pitfalls and solutions help avoid mistakes</li>
+                <li>Essential tools ecosystem supports the entire lifecycle</li>
+                <li>Future trends: federated learning, NAS, edge AI, model marketplaces</li>
+                <li>WIA-AI-008 provides standardization for interoperability and ethics</li>
+                <li>弘益人間 philosophy ensures AI benefits all humanity</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Design an end-to-end pipeline from training to production deployment.</li>
+                <li>How would you share a fine-tuned model on Hugging Face following WIA-AI-008?</li>
+                <li>What challenges arise when deploying to both iOS and Android?</li>
+                <li>Describe an enterprise MLOps architecture for 100+ models.</li>
+                <li>Create a comprehensive checklist for model deployment.</li>
+                <li>What are the most common pitfalls in model exchange? How do you avoid them?</li>
+                <li>Which tools would you choose for a production ML platform? Why?</li>
+                <li>How will federated learning impact model exchange?</li>
+                <li>What role does WIA-AI-008 play in the future of AI deployment?</li>
+                <li>Reflect on how the 弘익人間 philosophy applies to your ML work.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

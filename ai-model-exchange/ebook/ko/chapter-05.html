@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 변환 파이프라인 | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>5장: 변환 파이프라인</h1>
+        <p class="chapter-meta">WIA-AI-008 표준 • 예상 소요 시간: 55분</p>
+
+        <h2>5.1 모델 최적화가 중요한 이유</h2>
+        <p>
+            모델 최적화는 허용 가능한 정확도를 유지하면서 크기를 줄이고, 추론 속도를 향상시키며, 에너지 소비를 줄입니다.
+            이는 메모리와 컴퓨팅이 제한된 스마트폰, 임베디드 시스템, 엣지 디바이스 등 리소스가 제한된 디바이스에 배포하는 데 중요합니다.
+        </p>
+
+        <h3>최적화 목표</h3>
+        <ul>
+            <li><strong>모델 크기 축소</strong>: 100MB 단위에서 한 자릿수 MB로</li>
+            <li><strong>지연 시간 개선</strong>: 실시간 애플리케이션을 위한 더 빠른 추론</li>
+            <li><strong>전력 소비 감소</strong>: 모바일 및 엣지 디바이스에 필수적</li>
+            <li><strong>정확도 유지</strong>: 최적화로 인한 저하 최소화</li>
+        </ul>
+
+        <h2>5.2 양자화 기초</h2>
+        <p>
+            양자화는 모델 가중치와 활성화의 정밀도를 부동 소수점(FP32)에서 더 낮은 정밀도 형식(FP16, INT8, INT4)으로 줄입니다.
+            이는 모델 크기를 극적으로 줄이고 특수 정수 산술 유닛이 있는 하드웨어에서 추론 속도를 향상시킵니다.
+        </p>
+
+        <h3>양자화 유형</h3>
+        <table>
+            <tr>
+                <th>유형</th>
+                <th>정밀도</th>
+                <th>크기 축소</th>
+                <th>속도 향상</th>
+                <th>정확도 손실</th>
+            </tr>
+            <tr>
+                <td>FP32 (기준선)</td>
+                <td>32비트 부동소수점</td>
+                <td>1x</td>
+                <td>1x</td>
+                <td>0%</td>
+            </tr>
+            <tr>
+                <td>FP16</td>
+                <td>16비트 부동소수점</td>
+                <td>2x</td>
+                <td>1.5-2x</td>
+                <td>< 0.1%</td>
+            </tr>
+            <tr>
+                <td>INT8 동적</td>
+                <td>8비트 정수</td>
+                <td>4x</td>
+                <td>2-4x</td>
+                <td>0.5-2%</td>
+            </tr>
+            <tr>
+                <td>INT8 정적</td>
+                <td>8비트 정수</td>
+                <td>4x</td>
+                <td>3-4x</td>
+                <td>1-3%</td>
+            </tr>
+            <tr>
+                <td>INT4</td>
+                <td>4비트 정수</td>
+                <td>8x</td>
+                <td>4-8x</td>
+                <td>3-5%</td>
+            </tr>
+        </table>
+
+        <h2>5.3 학습 후 양자화</h2>
+        <p>
+            학습 후 양자화(PTQ)는 재학습 없이 이미 학습된 모델에 양자화를 적용합니다.
+        </p>
+
+        <h3>PyTorch 동적 양자화</h3>
+        <pre><code>import torch
+import torch.quantization
+import torchvision.models as models
+
+# 사전 학습된 모델 로드
+model = models.resnet18(pretrained=True)
+model.eval()
+
+# 동적 양자화 (가중치만)
+quantized_model = torch.quantization.quantize_dynamic(
+    model,
+    {torch.nn.Linear, torch.nn.Conv2d},  # 양자화할 레이어
+    dtype=torch.qint8
+)
+
+# 크기 비교
+def get_model_size(model):
+    torch.save(model.state_dict(), "temp.pth")
+    size_mb = os.path.getsize("temp.pth") / (1024 * 1024)
+    os.remove("temp.pth")
+    return size_mb
+
+original_size = get_model_size(model)
+quantized_size = get_model_size(quantized_model)
+
+print(f"원본 모델: {original_size:.2f} MB")
+print(f"양자화된 모델: {quantized_size:.2f} MB")
+print(f"압축 비율: {original_size / quantized_size:.2f}x")</code></pre>
+
+        <h3>PyTorch 정적 양자화</h3>
+        <pre><code>import torch
+import torch.quantization
+
+# 정적 양자화를 위한 모델 준비
+model = models.resnet18(pretrained=True)
+model.eval()
+
+# 양자화 설정 지정
+model.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+
+# 양자화 준비 (옵저버 삽입)
+model_prepared = torch.quantization.prepare(model)
+
+# 대표 데이터로 보정
+def calibrate(model, data_loader):
+    model.eval()
+    with torch.no_grad():
+        for data, _ in data_loader:
+            model(data)
+
+calibrate(model_prepared, calibration_loader)
+
+# 양자화된 모델로 변환
+model_quantized = torch.quantization.convert(model_prepared)
+
+# 추론 테스트
+test_input = torch.randn(1, 3, 224, 224)
+output = model_quantized(test_input)
+
+print("정적 양자화 완료")</code></pre>
+
+        <h3>TensorFlow Lite 양자화</h3>
+        <pre><code>import tensorflow as tf
+
+# 모델 로드
+model = tf.keras.applications.MobileNetV2(weights='imagenet')
+
+# 양자화와 함께 TFLite로 변환
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+
+# 동적 범위 양자화 (가중치만)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+# 전체 정수 양자화 (가중치 + 활성화)
+def representative_dataset():
+    for _ in range(100):
+        # 입력 분포와 일치하는 실제 데이터 또는 합성 데이터 사용
+        data = np.random.rand(1, 224, 224, 3).astype(np.float32)
+        yield [data]
+
+converter.representative_dataset = representative_dataset
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.int8
+converter.inference_output_type = tf.int8
+
+# 변환
+tflite_quantized_model = converter.convert()
+
+# 저장
+with open('model_quantized.tflite', 'wb') as f:
+    f.write(tflite_quantized_model)
+
+print(f"양자화된 모델 크기: {len(tflite_quantized_model) / 1024:.2f} KB")</code></pre>
+
+        <h2>5.4 양자화 인식 학습</h2>
+        <p>
+            양자화 인식 학습(QAT)은 학습 중 양자화를 시뮬레이션하여 모델이 적응하고 양자화 후 더 높은 정확도를 유지할 수 있게 합니다.
+        </p>
+
+        <h3>PyTorch QAT</h3>
+        <pre><code>import torch
+import torch.quantization as quantization
+
+# 모델 정의
+model = models.resnet18(pretrained=True)
+
+# QAT 설정 지정
+model.train()
+model.qconfig = quantization.get_default_qat_qconfig('fbgemm')
+
+# QAT 준비
+model_prepared = quantization.prepare_qat(model)
+
+# QAT로 학습 루프
+optimizer = torch.optim.SGD(model_prepared.parameters(), lr=0.001)
+criterion = torch.nn.CrossEntropyLoss()
+
+for epoch in range(num_epochs):
+    for data, target in train_loader:
+        optimizer.zero_grad()
+        output = model_prepared(data)
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+
+    # 몇 epoch 후 옵저버 비활성화 및 배치 정규화 고정
+    if epoch > 3:
+        model_prepared.apply(torch.quantization.disable_observer)
+    if epoch > 2:
+        model_prepared.apply(torch.nn.intrinsic.qat.freeze_bn_stats)
+
+# 양자화된 모델로 변환
+model_prepared.eval()
+model_quantized = quantization.convert(model_prepared)
+
+# 평가
+test_accuracy = evaluate(model_quantized, test_loader)
+print(f"QAT 모델 정확도: {test_accuracy:.2f}%")</code></pre>
+
+        <h3>TensorFlow QAT</h3>
+        <pre><code>import tensorflow as tf
+import tensorflow_model_optimization as tfmot
+
+# 모델 로드
+model = tf.keras.applications.MobileNetV2(weights='imagenet', classes=1000)
+
+# 양자화 인식 학습 적용
+quantize_model = tfmot.quantization.keras.quantize_model
+
+qat_model = quantize_model(model)
+
+# QAT로 컴파일
+qat_model.compile(
+    optimizer='adam',
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+    metrics=['accuracy']
+)
+
+# 학습
+qat_model.fit(train_dataset, epochs=10, validation_data=val_dataset)
+
+# TFLite로 변환
+converter = tf.lite.TFLiteConverter.from_keras_model(qat_model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+tflite_qat_model = converter.convert()
+
+with open('model_qat.tflite', 'wb') as f:
+    f.write(tflite_qat_model)</code></pre>
+
+        <h2>5.5 프루닝</h2>
+        <p>
+            프루닝은 네트워크에서 중요하지 않은 가중치를 제거하여 더 작고 빠른 희소 모델을 생성합니다.
+        </p>
+
+        <h3>크기 기반 프루닝</h3>
+        <pre><code>import torch
+import torch.nn.utils.prune as prune
+
+# 모델 로드
+model = models.resnet18(pretrained=True)
+
+# Conv2d 가중치의 30%를 크기로 프루닝
+for name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        prune.l1_unstructured(module, name='weight', amount=0.3)
+
+# 프루닝을 영구적으로 만들기
+for name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        prune.remove(module, 'weight')
+
+# 희소성 확인
+def check_sparsity(model):
+    total_params = 0
+    zero_params = 0
+    for param in model.parameters():
+        total_params += param.numel()
+        zero_params += (param == 0).sum().item()
+
+    sparsity = 100.0 * zero_params / total_params
+    return sparsity
+
+sparsity = check_sparsity(model)
+print(f"모델 희소성: {sparsity:.2f}%")</code></pre>
+
+        <h3>구조적 프루닝</h3>
+        <pre><code># 전체 채널/필터 프루닝 (하드웨어 친화적)
+prune.ln_structured(
+    module,
+    name='weight',
+    amount=0.5,  # 필터의 50% 프루닝
+    n=2,         # L2 노름
+    dim=0        # 출력 채널 차원으로 프루닝
+)
+
+# TensorFlow 프루닝
+import tensorflow_model_optimization as tfmot
+
+# 프루닝 일정 정의
+pruning_params = {
+    'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(
+        initial_sparsity=0.0,
+        final_sparsity=0.5,
+        begin_step=0,
+        end_step=1000
+    )
+}
+
+# 프루닝 적용
+model_for_pruning = tfmot.sparsity.keras.prune_low_magnitude(model, **pruning_params)
+
+# 컴파일 및 학습
+model_for_pruning.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model_for_pruning.fit(train_dataset, epochs=10, callbacks=[tfmot.sparsity.keras.UpdatePruningStep()])
+
+# 프루닝 래퍼 제거
+model_pruned = tfmot.sparsity.keras.strip_pruning(model_for_pruning)</code></pre>
+
+        <h2>5.6 지식 증류</h2>
+        <p>
+            지식 증류는 더 큰 "교사" 모델을 모방하도록 더 작은 "학생" 모델을 학습시켜
+            학생을 처음부터 학습시키는 것보다 더 나은 정확도를 달성합니다.
+        </p>
+
+        <pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class DistillationLoss(nn.Module):
+    def __init__(self, temperature=3.0, alpha=0.5):
+        super().__init__()
+        self.temperature = temperature
+        self.alpha = alpha
+        self.ce_loss = nn.CrossEntropyLoss()
+
+    def forward(self, student_logits, teacher_logits, targets):
+        # 교사의 소프트 타겟
+        soft_loss = F.kl_div(
+            F.log_softmax(student_logits / self.temperature, dim=1),
+            F.softmax(teacher_logits / self.temperature, dim=1),
+            reduction='batchmean'
+        ) * (self.temperature ** 2)
+
+        # 하드 타겟 (실제 정답)
+        hard_loss = self.ce_loss(student_logits, targets)
+
+        # 결합된 손실
+        return self.alpha * soft_loss + (1 - self.alpha) * hard_loss
+
+# 교사 모델 (큰 모델)
+teacher = models.resnet50(pretrained=True)
+teacher.eval()
+
+# 학생 모델 (작은 모델)
+student = models.resnet18(pretrained=False)
+
+# 학습 루프
+distill_loss_fn = DistillationLoss(temperature=3.0, alpha=0.7)
+optimizer = torch.optim.Adam(student.parameters(), lr=0.001)
+
+for epoch in range(num_epochs):
+    for data, targets in train_loader:
+        # 교사 예측 (그래디언트 없음)
+        with torch.no_grad():
+            teacher_logits = teacher(data)
+
+        # 학생 예측
+        student_logits = student(data)
+
+        # 증류 손실
+        loss = distill_loss_fn(student_logits, teacher_logits, targets)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+print("지식 증류 완료")</code></pre>
+
+        <h2>5.7 그래프 최적화</h2>
+        <p>
+            그래프 수준 최적화는 더 나은 성능을 위해 계산 그래프를 변환합니다.
+        </p>
+
+        <h3>연산자 융합</h3>
+        <pre><code># Conv + BatchNorm + ReLU → 융합된 ConvBNReLU
+# 메모리 액세스를 줄이고 성능 향상
+
+# PyTorch 융합
+model = models.resnet18(pretrained=True)
+model.eval()
+
+# 모듈 융합
+model_fused = torch.quantization.fuse_modules(
+    model,
+    [['conv1', 'bn1', 'relu']],  # 융합할 모듈
+    inplace=False
+)
+
+# ONNX Runtime 최적화
+import onnxruntime as ort
+
+session_options = ort.SessionOptions()
+session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+session = ort.InferenceSession("model.onnx", session_options)</code></pre>
+
+        <h3>상수 폴딩</h3>
+        <pre><code># 컴파일 시점에 상수 표현식 평가
+# 예: 모델에 "x * 2 + 3"이 있으면 매 추론마다가 아닌 한 번만 계산
+
+# ONNX 내보내기 중 자동으로 수행됨
+torch.onnx.export(
+    model,
+    dummy_input,
+    "model.onnx",
+    do_constant_folding=True  # 상수 폴딩 활성화
+)</code></pre>
+
+        <h2>5.8 하드웨어별 최적화</h2>
+
+        <h3>NVIDIA TensorRT</h3>
+        <pre><code>import tensorrt as trt
+
+# NVIDIA GPU용 최적화된 엔진 빌드
+logger = trt.Logger(trt.Logger.WARNING)
+builder = trt.Builder(logger)
+network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+parser = trt.OnnxParser(network, logger)
+
+# ONNX 모델 파싱
+with open('model.onnx', 'rb') as f:
+    parser.parse(f.read())
+
+# 최적화 구성
+config = builder.create_builder_config()
+config.max_workspace_size = 1 << 30  # 1GB
+config.set_flag(trt.BuilderFlag.FP16)  # FP16 활성화
+config.set_flag(trt.BuilderFlag.STRICT_TYPES)
+
+# 최적화된 엔진 빌드
+engine = builder.build_engine(network, config)
+
+# 속도 향상: NVIDIA GPU에서 3-5배</code></pre>
+
+        <h3>Apple Core ML</h3>
+        <pre><code>import coremltools as ct
+
+# Apple Neural Engine에 최적화와 함께 변환
+model = ct.convert(
+    "model.onnx",
+    compute_units=ct.ComputeUnit.ALL,  # Neural Engine + GPU + CPU 사용
+    minimum_deployment_target=ct.target.iOS15
+)
+
+# 최적화 적용
+model = ct.models.neural_network.quantization_utils.quantize_weights(model, nbits=8)
+
+model.save("model_optimized.mlmodel")</code></pre>
+
+        <h2>5.9 최적화 영향 측정</h2>
+
+        <h3>벤치마크 스위트</h3>
+        <pre><code>import time
+import numpy as np
+
+def benchmark_model(model, input_shape, num_iterations=100, warmup=10):
+    """
+    모델 추론 성능 벤치마크
+    """
+    # 워밍업
+    dummy_input = torch.randn(*input_shape)
+    for _ in range(warmup):
+        _ = model(dummy_input)
+
+    # 벤치마크
+    torch.cuda.synchronize() if torch.cuda.is_available() else None
+    start_time = time.time()
+
+    for _ in range(num_iterations):
+        _ = model(dummy_input)
+
+    torch.cuda.synchronize() if torch.cuda.is_available() else None
+    end_time = time.time()
+
+    # 메트릭 계산
+    total_time = end_time - start_time
+    avg_latency = (total_time / num_iterations) * 1000  # ms
+    throughput = num_iterations / total_time  # fps
+
+    return {
+        'avg_latency_ms': avg_latency,
+        'throughput_fps': throughput,
+        'total_time_s': total_time
+    }
+
+# 원본 vs 최적화 비교
+results_original = benchmark_model(model_original, (1, 3, 224, 224))
+results_optimized = benchmark_model(model_optimized, (1, 3, 224, 224))
+
+print("원본 모델:")
+print(f"  지연 시간: {results_original['avg_latency_ms']:.2f} ms")
+print(f"  처리량: {results_original['throughput_fps']:.2f} FPS")
+
+print("\n최적화된 모델:")
+print(f"  지연 시간: {results_optimized['avg_latency_ms']:.2f} ms")
+print(f"  처리량: {results_optimized['throughput_fps']:.2f} FPS")
+
+speedup = results_original['avg_latency_ms'] / results_optimized['avg_latency_ms']
+print(f"\n속도 향상: {speedup:.2f}x")</code></pre>
+
+        <h2>5.10 정확도-성능 트레이드오프</h2>
+
+        <h3>파레토 프론티어 분석</h3>
+        <pre><code># 다양한 최적화 설정 평가
+configs = [
+    {'name': '기준선', 'quantization': None, 'pruning': 0},
+    {'name': 'FP16', 'quantization': 'fp16', 'pruning': 0},
+    {'name': 'INT8', 'quantization': 'int8', 'pruning': 0},
+    {'name': 'INT8+프루닝30', 'quantization': 'int8', 'pruning': 0.3},
+    {'name': 'INT8+프루닝50', 'quantization': 'int8', 'pruning': 0.5},
+]
+
+results = []
+for config in configs:
+    model_opt = apply_optimizations(model, config)
+    accuracy = evaluate_accuracy(model_opt, test_loader)
+    latency = benchmark_model(model_opt, (1, 3, 224, 224))['avg_latency_ms']
+    size_mb = get_model_size(model_opt)
+
+    results.append({
+        'name': config['name'],
+        'accuracy': accuracy,
+        'latency': latency,
+        'size_mb': size_mb
+    })
+
+# 결과 출력
+print("최적화 결과:")
+print(f"{'설정':<20} {'정확도':<12} {'지연시간(ms)':<15} {'크기(MB)':<12}")
+print("-" * 60)
+for r in results:
+    print(f"{r['name']:<20} {r['accuracy']:<12.2f} {r['latency']:<15.2f} {r['size_mb']:<12.2f}")</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>모델 최적화는 크기를 줄이고, 속도를 향상시키며, 전력 소비를 낮춥니다</li>
+                <li>양자화는 FP32를 더 낮은 정밀도(FP16, INT8, INT4)로 변환하여 2-8배 압축</li>
+                <li>학습 후 양자화(PTQ)는 재학습 없이 학습된 모델에 적용됩니다</li>
+                <li>양자화 인식 학습(QAT)은 학습 중 양자화를 시뮬레이션하여 더 높은 정확도 유지</li>
+                <li>프루닝은 중요하지 않은 가중치를 제거하여 희소 모델 생성</li>
+                <li>지식 증류는 더 작은 모델이 더 큰 모델을 모방하도록 학습</li>
+                <li>그래프 최적화(융합, 상수 폴딩)로 추론 성능 향상</li>
+                <li>하드웨어별 최적화(TensorRT, CoreML)로 추가 속도 향상</li>
+                <li>항상 벤치마크를 수행하고 정확도-성능 트레이드오프를 측정하세요</li>
+                <li>배포 대상과 요구사항에 따라 최적화를 선택하세요</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>모델 최적화의 주요 목표는 무엇입니까?</li>
+                <li>FP16, INT8, INT4 양자화를 크기, 속도, 정확도 측면에서 비교하세요.</li>
+                <li>동적 양자화와 정적 양자화의 차이점은 무엇입니까?</li>
+                <li>양자화 인식 학습(QAT)이 학습 후 양자화보다 더 높은 정확도를 유지하는 이유는 무엇입니까?</li>
+                <li>구조적 프루닝과 비구조적 프루닝의 차이점을 설명하세요.</li>
+                <li>지식 증류는 어떻게 작동합니까? "소프트" 타겟과 "하드" 타겟은 무엇입니까?</li>
+                <li>연산자 융합이란 무엇이며 성능이 향상되는 이유는 무엇입니까?</li>
+                <li>배포에 TensorRT와 ONNX Runtime을 언제 사용합니까?</li>
+                <li>모델 최적화를 비교하기 위한 벤치마크 스위트를 설계하세요.</li>
+                <li>여러 최적화를 적용할 때 정확도-성능 트레이드오프를 어떻게 분석합니까?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

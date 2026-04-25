@@ -748,7 +748,7 @@ stream.on('end', () => {
 ```json
 {
   "headers": {
-    "x-api-key": "sk_live_1234567890abcdef"
+    "x-api-key": "sk_REPLACE_WITH_YOUR_API_KEY_PLACEHOLDER"
   }
 }
 ```

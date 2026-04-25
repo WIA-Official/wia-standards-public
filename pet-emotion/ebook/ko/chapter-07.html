@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제7장: 경보 및 대응 시스템 - WIA-PET-EMOTION</title>
+</head>
+<body>
+<h1>제7장: 경보 및 대응 시스템</h1>
+
+<blockquote>
+"홍익인간: 고통에 대한 신속한 대응은 우리가 돌보는 이들에 대한 헌신의 깊이를 반영합니다."
+</blockquote>
+
+<hr>
+
+<h2>7.1 경보 시스템 개요</h2>
+
+<p>경보 시스템은 감정 감지를 실행 가능한 알림으로 변환하여, 반려동물이 고통이나 우려되는 감정 상태를 경험할 때 시의적절한 개입을 가능하게 합니다.</p>
+
+<h3>경보 아키텍처</h3>
+
+<pre>
+경보 파이프라인
+==============
+
+[감정 읽기] --> [경보 규칙 엔진]
+                            |
+                            v
+                     [경보 생성]
+                            |
+              +-------------+-------------+
+              |             |             |
+              v             v             v
+        [우선순위]    [라우팅]      [전달]
+              |             |             |
+              v             v             v
+        LOW/MED/HIGH  보호자/수의사  푸시/SMS/전화
+              |             |             |
+              +-------------+-------------+
+                            |
+                            v
+                    [사용자 응답]
+                            |
+                            v
+                    [경보 해결]
+</pre>
+
+<hr>
+
+<h2>7.2 경보 우선순위 수준</h2>
+
+<table border="1">
+<tr>
+<th>우선순위</th>
+<th>응답 시간</th>
+<th>트리거 조건</th>
+<th>전달 방법</th>
+</tr>
+<tr>
+<td>URGENT</td>
+<td>즉시</td>
+<td>극심한 두려움/통증, 응급</td>
+<td>푸시 + SMS + 전화</td>
+</tr>
+<tr>
+<td>HIGH</td>
+<td>15분 이내</td>
+<td>지속적 고통, 공격성</td>
+<td>푸시 + SMS</td>
+</tr>
+<tr>
+<td>MEDIUM</td>
+<td>1시간 이내</td>
+<td>장기 불안, 기분 하락</td>
+<td>푸시 알림</td>
+</tr>
+<tr>
+<td>LOW</td>
+<td>하루 끝</td>
+<td>사소한 우려, 패턴</td>
+<td>앱 배지, 일일 요약</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.3 경보 트리거 규칙</h2>
+
+<pre>
+경보 규칙 정의
+=============
+
+규칙: SUSTAINED_DISTRESS
+  조건:
+    (ANXIOUS OR FEARFUL OR SAD)
+    AND 강도 >= 3
+    AND 지속시간 > 30분
+  우선순위: HIGH
+  메시지: "{이름}이 30분 넘게 고통받고 있습니다"
+
+규칙: ACUTE_FEAR
+  조건:
+    FEARFUL
+    AND 강도 >= 4
+    AND 급격한_시작 = true
+  우선순위: URGENT
+  메시지: "{이름}이 급성 두려움을 경험하고 있습니다"
+
+규칙: AGGRESSIVE_BEHAVIOR
+  조건:
+    AGGRESSIVE
+    AND 강도 >= 3
+    AND 지속시간 > 5분
+  우선순위: HIGH
+  메시지: "{이름}이 공격적 행동을 보입니다"
+
+규칙: SEPARATION_ANXIETY
+  조건:
+    ANXIOUS
+    AND 보호자_부재 = true
+    AND 지속시간 > 20분
+  우선순위: MEDIUM
+  메시지: "{이름}이 분리 불안을 경험할 수 있습니다"
+
+규칙: WELLBEING_DECLINE
+  조건:
+    웰빙_추세 = DECLINING
+    AND 하락률 > 5점/주
+  우선순위: MEDIUM
+  메시지: "{이름}의 전반적 웰빙이 하락하고 있습니다"
+
+규칙: UNUSUAL_PATTERN
+  조건:
+    현재_감정 != 시간대_예상
+    AND 편차_유의미 = true
+  우선순위: LOW
+  메시지: "{이름}의 감정 패턴이 평소와 다릅니다"
+</pre>
+
+<hr>
+
+<h2>7.4 경보 메시지 형식</h2>
+
+<pre>
+경보 메시지 구조
+===============
+
+{
+  "alertId": "alert-456",
+  "profileId": "pet-123",
+  "petName": "맥스",
+  "timestamp": "2024-01-15T14:30:00Z",
+
+  "alertType": "SUSTAINED_DISTRESS",
+  "priority": "HIGH",
+
+  "emotionData": {
+    "emotionType": "ANXIOUS",
+    "intensity": 4,
+    "duration": 35,
+    "confidence": 85
+  },
+
+  "context": {
+    "ownerPresent": false,
+    "recentEvents": ["owner_departure"],
+    "location": "home"
+  },
+
+  "message": {
+    "title": "맥스가 주의를 필요로 합니다",
+    "body": "맥스가 35분간 불안해하고 있습니다",
+    "details": "보호자 출발 후 불안 시작"
+  },
+
+  "actions": [
+    {"action": "VIEW_LIVE", "label": "지금 보기"},
+    {"action": "CALL_SITTER", "label": "시터 연락"},
+    {"action": "DISMISS", "label": "해제"}
+  ],
+
+  "acknowledged": false,
+  "resolvedAt": null
+}
+</pre>
+
+<hr>
+
+<h2>7.5 경보 설정</h2>
+
+<pre>
+사용자 구성 가능 설정
+===================
+
+AlertSettings {
+  profileId: string
+
+  // 카테고리 활성화/비활성화
+  enabledAlertTypes: [
+    "distress",
+    "anxiety",
+    "aggression",
+    "wellbeing",
+    "patterns"
+  ]
+
+  // 민감도 조정
+  sensitivityLevel: "low" | "medium" | "high"
+  // low = 적은 경보, 주요 문제만
+  // high = 많은 경보, 사소한 우려 포함
+
+  // 시간 기반 설정
+  quietHours: {
+    enabled: true,
+    start: "22:00",
+    end: "07:00",
+    allowUrgent: true
+  }
+
+  // 전달 선호도
+  deliveryMethods: {
+    push: true,
+    sms: true,
+    email: false,
+    phone: false
+  }
+
+  // 긴급 연락망
+  emergencyContacts: [
+    {name: "보호자", phone: "+82...", priority: 1},
+    {name: "펫시터", phone: "+82...", priority: 2}
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>7.6 경보 수명주기</h2>
+
+<pre>
+경보 상태 머신
+=============
+
+     [TRIGGERED]
+          |
+          v
+     [DELIVERED]
+          |
+     +----+----+
+     |         |
+     v         v
+[VIEWED]   [EXPIRED]
+     |
+     v
+[ACKNOWLEDGED]
+     |
+     +----+----+
+     |         |
+     v         v
+[RESOLVED]  [ESCALATED]
+</pre>
+
+<h3>상태 정의</h3>
+
+<table border="1">
+<tr>
+<th>상태</th>
+<th>설명</th>
+<th>다음 상태</th>
+</tr>
+<tr>
+<td>TRIGGERED</td>
+<td>경보 조건 충족</td>
+<td>DELIVERED</td>
+</tr>
+<tr>
+<td>DELIVERED</td>
+<td>사용자에게 전송됨</td>
+<td>VIEWED, EXPIRED</td>
+</tr>
+<tr>
+<td>VIEWED</td>
+<td>사용자가 경보 열람</td>
+<td>ACKNOWLEDGED</td>
+</tr>
+<tr>
+<td>ACKNOWLEDGED</td>
+<td>사용자가 수신 확인</td>
+<td>RESOLVED, ESCALATED</td>
+</tr>
+<tr>
+<td>RESOLVED</td>
+<td>문제 해결됨</td>
+<td>(종료)</td>
+</tr>
+<tr>
+<td>ESCALATED</td>
+<td>다음 연락처로 상향</td>
+<td>RESOLVED</td>
+</tr>
+<tr>
+<td>EXPIRED</td>
+<td>조건이 더 이상 활성 아님</td>
+<td>(종료)</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.7 대응 조치</h2>
+
+<h3>자동 대응</h3>
+
+<pre>
+자동 대응 옵션
+=============
+
+1. 환경 조정
+   - 진정 음악/소리 활성화
+   - 조명 조정 (스마트 홈 경우)
+   - 간식 디스펜서 활성화
+   - 인터랙티브 장난감 시작
+
+2. 커뮤니케이션
+   - 보호자 음성 녹음 재생
+   - 양방향 오디오 활성화
+   - 보호자 영상 표시 (화면 있으면)
+
+3. 에스컬레이션
+   - 백업 케어기버 알림
+   - 수의사 알림 (건강 문제 시)
+   - 펫시터 서비스 연락
+
+4. 문서화
+   - 영상 클립 저장
+   - 생리 데이터 기록
+   - 수의사 상담용 로그
+</pre>
+
+<h3>수동 대응 옵션</h3>
+
+<table border="1">
+<tr>
+<th>조치</th>
+<th>설명</th>
+</tr>
+<tr>
+<td>실시간 보기</td>
+<td>카메라/센서 피드 열기</td>
+</tr>
+<tr>
+<td>양방향 오디오</td>
+<td>원격으로 반려동물에게 말하기</td>
+</tr>
+<tr>
+<td>간식 주기</td>
+<td>연결된 급식기 활성화</td>
+</tr>
+<tr>
+<td>시터 연락</td>
+<td>펫시터 빠른 전화</td>
+</tr>
+<tr>
+<td>귀가하기</td>
+<td>집으로 길 안내</td>
+</tr>
+<tr>
+<td>수의사용 로그</td>
+<td>상담용 사건 저장</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.8 경보 피로 방지</h2>
+
+<pre>
+피로 방지 전략
+=============
+
+1. 지능형 그룹화
+   - 관련 경보 결합
+   - 진행 상황 요약
+   - 지속 상태에 단일 경보
+
+2. 적응형 임계값
+   - 정상 패턴 학습
+   - 개인에게 트리거 조정
+   - 시간에 따라 오탐 감소
+
+3. 쿨다운 기간
+   - 유사 경보 간 최소 시간
+   - 에스컬레이션 예외
+   - 사용자 구성 가능
+
+4. 스마트 타이밍
+   - 회의 중 비긴급 지연
+   - 방해 금지 시간 준수
+   - 낮은 우선순위 요약으로 일괄
+
+5. 관련성 점수
+   - 진정 실행 가능한 경보 우선
+   - 조치 불가 시 억제
+   - 사용자 맥락 고려
+</pre>
+
+<hr>
+
+<h2>7.9 경보 분석</h2>
+
+<table border="1">
+<tr>
+<th>지표</th>
+<th>목적</th>
+<th>목표</th>
+</tr>
+<tr>
+<td>일일 경보 수</td>
+<td>볼륨 모니터링</td>
+<td>반려동물당 <5</td>
+</tr>
+<tr>
+<td>응답 시간</td>
+<td>사용자 참여</td>
+<td>HIGH의 경우 <15분</td>
+</tr>
+<tr>
+<td>오탐률</td>
+<td>정확도</td>
+<td><10%</td>
+</tr>
+<tr>
+<td>확인률</td>
+<td>경보 관련성</td>
+<td>>80%</td>
+</tr>
+<tr>
+<td>해결률</td>
+<td>실행 가능성</td>
+<td>>70%</td>
+</tr>
+<tr>
+<td>에스컬레이션률</td>
+<td>심각도 정확성</td>
+<td><5%</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.10 케어 제공자 통합</h2>
+
+<pre>
+수의사 통합
+==========
+
+1. 경보 공유
+   보호자가 수의사와 경보 히스토리 공유 가능
+   포함: 감정 데이터, 맥락, 빈도
+
+2. 전문가 경보
+   고심각도 경보가 수의사에게 직접 알림 가능
+   명시적 보호자 동의 필요
+   의료 응급상황에 사용
+
+3. 행동 상담
+   집계 패턴을 행동 전문가와 공유
+   진단과 치료 계획 지원
+
+4. 약물 모니터링
+   치료에 대한 감정 반응 추적
+   부작용 감지 시 경보
+
+펫시터 통합
+==========
+
+1. 실시간 가시성
+   시터가 현재 감정 상태 확인
+   주의 우선순위 지정에 도움
+
+2. 경보 전달
+   보호자가 시터에게 경보 라우팅 가능
+   시터가 확인/응답 가능
+
+3. 교대 보고서
+   자동 감정 요약
+   케어 연속성 지원
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] URGENT부터 LOW까지 4단계 우선순위</li>
+<li>[OK] 유연한 조건의 구성 가능한 경보 규칙</li>
+<li>[OK] 트리거에서 해결까지 전체 경보 수명주기</li>
+<li>[OK] 자동 및 수동 대응 옵션 사용 가능</li>
+<li>[OK] 스마트 그룹화와 타이밍으로 피로 방지</li>
+<li>[OK] 수의사 및 펫케어 제공자와 통합</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-06.html">이전: 제6장 - 웰빙 평가</a> | <a href="chapter-08.html">다음: 제8장 - 구현 가이드</a></p>
+</body>
+</html>

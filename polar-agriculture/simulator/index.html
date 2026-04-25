@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <title>🧊 WIA-AGRI-022 Polar Agriculture Simulator</title>
+    <style>
+        :root {
+            --primary: #84CC16;
+            --primary-dark: #65A30D;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2rem; }
+
+        .lang-switch {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+            z-index: 1000;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        .tab:hover { border-color: var(--primary); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Panels */
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .card {
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .card h2 { margin-bottom: 20px; color: var(--primary); }
+
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        textarea { min-height: 100px; font-family: monospace; }
+
+        .btn-center {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(132, 204, 22, 0.3); }
+
+        .result {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-top: 20px;
+            min-height: 100px;
+        }
+        pre {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .sensor-card {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .sensor-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+        .sensor-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        footer {
+            margin-top: 60px;
+            padding: 30px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        footer .philosophy {
+            color: #ffd700;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        footer p {
+            color: var(--text-muted);
+            margin: 5px 0;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.5rem; }
+            .tabs { flex-direction: column; align-items: center; }
+            .tab { width: 100%; text-align: center; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added 2026-04-25 for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Polar Agriculture</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="lang-switch">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('ko')">KO</button>
+    </div>
+
+    <div class="container">
+        <h1>🧊 <span data-en="WIA-AGRI-022 Polar Agriculture Simulator" data-ko="WIA-AGRI-022 극지 농업 시뮬레이터">WIA-AGRI-022 Polar Agriculture Simulator</span></h1>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Overview" data-ko="📊 개요">📊 Overview</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🌡️ Data Input" data-ko="🌡️ 데이터 입력">🌡️ Data Input</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔌 API Test" data-ko="🔌 API 테스트">🔌 API Test</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+        </div>
+
+        <!-- Panel 0: Overview -->
+        <div class="panel active" id="panel-0">
+            <div class="card">
+                <h2 data-en="🧊 Polar Agriculture Overview" data-ko="🧊 극지 농업 개요">🧊 Polar Agriculture Overview</h2>
+                <p data-en="The WIA-AGRI-022 Polar Agriculture Standard enables sustainable food production in Arctic, Antarctic, and extreme sub-polar regions where traditional agriculture is impossible." data-ko="WIA-AGRI-022 극지 농업 표준은 전통적인 농업이 불가능한 북극, 남극 및 극한 아극지 지역에서 지속 가능한 식량 생산을 가능하게 합니다.">The WIA-AGRI-022 Polar Agriculture Standard enables sustainable food production in Arctic, Antarctic, and extreme sub-polar regions where traditional agriculture is impossible.</p>
+
+                <div class="sensor-grid" style="margin-top: 30px;">
+                    <div class="sensor-card">
+                        <div class="sensor-label" data-en="External Temperature" data-ko="외부 온도">External Temperature</div>
+                        <div class="sensor-value">-42°C</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label" data-en="Internal Temperature" data-ko="내부 온도">Internal Temperature</div>
+                        <div class="sensor-value">22°C</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label" data-en="Light Level" data-ko="조명 수준">Light Level</div>
+                        <div class="sensor-value">850 µmol/m²/s</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label" data-en="CO₂ Level" data-ko="CO₂ 수준">CO₂ Level</div>
+                        <div class="sensor-value">1200 ppm</div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px; color: var(--primary);" data-en="Key Features" data-ko="주요 기능">Key Features</h3>
+                <ul style="margin-left: 20px; margin-top: 10px; line-height: 1.8;">
+                    <li data-en="Advanced climate control for extreme cold environments" data-ko="극한 한랭 환경을 위한 고급 기후 제어">Advanced climate control for extreme cold environments</li>
+                    <li data-en="Hydroponic and aeroponic systems optimized for polar conditions" data-ko="극지 조건에 최적화된 수경 및 공중재배 시스템">Hydroponic and aeroponic systems optimized for polar conditions</li>
+                    <li data-en="AI-driven crop selection and growth optimization" data-ko="AI 기반 작물 선택 및 성장 최적화">AI-driven crop selection and growth optimization</li>
+                    <li data-en="Energy-efficient LED grow lights for 24-hour darkness periods" data-ko="24시간 어둠 기간을 위한 에너지 효율적인 LED 재배 조명">Energy-efficient LED grow lights for 24-hour darkness periods</li>
+                    <li data-en="Real-time monitoring and automated adjustments" data-ko="실시간 모니터링 및 자동 조정">Real-time monitoring and automated adjustments</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Panel 1: Data Input -->
+        <div class="panel" id="panel-1">
+            <div class="card">
+                <h2 data-en="🌡️ Polar Farm Data Input" data-ko="🌡️ 극지 농장 데이터 입력">🌡️ Polar Farm Data Input</h2>
+
+                <label data-en="Farm ID" data-ko="농장 ID">Farm ID</label>
+                <input type="text" id="farmId" placeholder="POLAR-FARM-001">
+
+                <label data-en="Location" data-ko="위치">Location</label>
+                <select id="location">
+                    <option>Svalbard, Norway</option>
+                    <option>McMurdo Station, Antarctica</option>
+                    <option>Alert, Canada</option>
+                    <option>Qaanaaq, Greenland</option>
+                    <option>Tiksi, Russia</option>
+                </select>
+
+                <label data-en="Crop Type" data-ko="작물 유형">Crop Type</label>
+                <select id="cropType">
+                    <option>Lettuce (Arctic Variety)</option>
+                    <option>Spinach (Cold-Hardy)</option>
+                    <option>Tomatoes (Greenhouse)</option>
+                    <option>Microgreens</option>
+                    <option>Herbs (Basil, Mint)</option>
+                </select>
+
+                <label data-en="Growing System" data-ko="재배 시스템">Growing System</label>
+                <select id="growingSystem">
+                    <option>Deep Water Culture (DWC)</option>
+                    <option>Nutrient Film Technique (NFT)</option>
+                    <option>Aeroponics</option>
+                    <option>Vertical Tower</option>
+                </select>
+
+                <label data-en="External Temperature (°C)" data-ko="외부 온도 (°C)">External Temperature (°C)</label>
+                <input type="number" id="extTemp" value="-42">
+
+                <label data-en="Target Internal Temperature (°C)" data-ko="목표 내부 온도 (°C)">Target Internal Temperature (°C)</label>
+                <input type="number" id="intTemp" value="22">
+
+                <div class="btn-center">
+                    <button onclick="generateFarmData()">
+                        <span data-en="Generate Farm Data" data-ko="농장 데이터 생성">Generate Farm Data</span>
+                    </button>
+                </div>
+
+                <div id="farmResult" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Panel 2: API Test -->
+        <div class="panel" id="panel-2">
+            <div class="card">
+                <h2 data-en="🔌 API Interface Test" data-ko="🔌 API 인터페이스 테스트">🔌 API Interface Test</h2>
+
+                <label data-en="API Endpoint" data-ko="API 엔드포인트">API Endpoint</label>
+                <select id="apiEndpoint">
+                    <option>POST /api/v1/polar-farm/status</option>
+                    <option>GET /api/v1/polar-farm/{farmId}</option>
+                    <option>PUT /api/v1/polar-farm/{farmId}/climate</option>
+                    <option>POST /api/v1/polar-farm/harvest</option>
+                </select>
+
+                <label data-en="Request Body (JSON)" data-ko="요청 본문 (JSON)">Request Body (JSON)</label>
+                <textarea id="apiRequest">{
+  "farmId": "POLAR-FARM-001",
+  "location": {
+    "latitude": 78.2232,
+    "longitude": 15.6267,
+    "site": "Svalbard"
+  },
+  "climate": {
+    "externalTemp": -42,
+    "internalTemp": 22,
+    "humidity": 65,
+    "co2Level": 1200
+  },
+  "crop": {
+    "type": "lettuce",
+    "variety": "arctic-green",
+    "plantingDate": "2025-01-15",
+    "expectedHarvest": "2025-02-28"
+  }
+}</textarea>
+
+                <div class="btn-center">
+                    <button onclick="testAPI()">
+                        <span data-en="Send API Request" data-ko="API 요청 전송">Send API Request</span>
+                    </button>
+                </div>
+
+                <div id="apiResult" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Panel 3: Protocol -->
+        <div class="panel" id="panel-3">
+            <div class="card">
+                <h2 data-en="📡 Polar Agriculture Protocol" data-ko="📡 극지 농업 프로토콜">📡 Polar Agriculture Protocol</h2>
+
+                <label data-en="Protocol Message Type" data-ko="프로토콜 메시지 유형">Protocol Message Type</label>
+                <select id="protocolType">
+                    <option>CLIMATE_UPDATE</option>
+                    <option>SENSOR_READING</option>
+                    <option>HARVEST_EVENT</option>
+                    <option>ALERT_EMERGENCY</option>
+                </select>
+
+                <label data-en="Priority Level" data-ko="우선순위 수준">Priority Level</label>
+                <select id="priority">
+                    <option>HIGH (Emergency)</option>
+                    <option>MEDIUM (Warning)</option>
+                    <option>LOW (Info)</option>
+                </select>
+
+                <div class="btn-center">
+                    <button onclick="generateProtocol()">
+                        <span data-en="Generate Protocol Message" data-ko="프로토콜 메시지 생성">Generate Protocol Message</span>
+                    </button>
+                </div>
+
+                <div id="protocolResult" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Panel 4: Integration -->
+        <div class="panel" id="panel-4">
+            <div class="card">
+                <h2 data-en="🔗 WIA Ecosystem Integration" data-ko="🔗 WIA 생태계 통합">🔗 WIA Ecosystem Integration</h2>
+
+                <h3 style="color: var(--primary); margin-bottom: 15px;" data-en="Integration Partners" data-ko="통합 파트너">Integration Partners</h3>
+                <div class="grid">
+                    <div style="padding: 15px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--primary);">🌾 WIA-AGRI-001</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);" data-en="Smart Farm - Core agricultural data exchange" data-ko="스마트 팜 - 핵심 농업 데이터 교환">Smart Farm - Core agricultural data exchange</p>
+                    </div>
+                    <div style="padding: 15px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--primary);">💧 WIA-AGRI-010</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);" data-en="Smart Irrigation - Water management in closed systems" data-ko="스마트 관개 - 폐쇄 시스템의 물 관리">Smart Irrigation - Water management in closed systems</p>
+                    </div>
+                    <div style="padding: 15px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--primary);">🌡️ WIA-ENV-005</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);" data-en="Climate Monitoring - Environmental data integration" data-ko="기후 모니터링 - 환경 데이터 통합">Climate Monitoring - Environmental data integration</p>
+                    </div>
+                    <div style="padding: 15px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--primary);">⚡ WIA-ENERGY-003</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);" data-en="Renewable Energy - Power management for polar facilities" data-ko="재생 에너지 - 극지 시설의 전력 관리">Renewable Energy - Power management for polar facilities</p>
+                    </div>
+                </div>
+
+                <div class="btn-center" style="margin-top: 30px;">
+                    <button onclick="generateIntegration()">
+                        <span data-en="Generate Integration Config" data-ko="통합 구성 생성">Generate Integration Config</span>
+                    </button>
+                </div>
+
+                <div id="integrationResult" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>© 2025 WIA Standards | MIT License</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => {
+                p.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateFarmData() {
+            const data = {
+                farmId: document.getElementById('farmId').value,
+                location: document.getElementById('location').value,
+                crop: document.getElementById('cropType').value,
+                system: document.getElementById('growingSystem').value,
+                climate: {
+                    external: parseFloat(document.getElementById('extTemp').value),
+                    internal: parseFloat(document.getElementById('intTemp').value),
+                    deltaT: parseFloat(document.getElementById('intTemp').value) - parseFloat(document.getElementById('extTemp').value)
+                },
+                energyDemand: Math.abs(parseFloat(document.getElementById('intTemp').value) - parseFloat(document.getElementById('extTemp').value)) * 12.5 + " kW/h",
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('farmResult').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+
+        function testAPI() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const request = document.getElementById('apiRequest').value;
+
+            const response = {
+                status: 200,
+                message: "Success",
+                endpoint: endpoint,
+                request: JSON.parse(request),
+                response: {
+                    farmId: "POLAR-FARM-001",
+                    status: "OPERATIONAL",
+                    climateStable: true,
+                    cropHealth: "EXCELLENT",
+                    nextHarvest: "14 days",
+                    energyEfficiency: "87%"
+                },
+                timestamp: new Date().toISOString()
+            };
+
+            document.getElementById('apiResult').innerHTML = '<pre>' + JSON.stringify(response, null, 2) + '</pre>';
+        }
+
+        function generateProtocol() {
+            const protocol = {
+                version: "WIA-AGRI-022-v1.0",
+                messageType: document.getElementById('protocolType').value,
+                priority: document.getElementById('priority').value,
+                payload: {
+                    farmId: "POLAR-FARM-001",
+                    sensors: {
+                        temperature: -42.3,
+                        internalTemp: 22.1,
+                        humidity: 65,
+                        co2: 1200,
+                        lightLevel: 850
+                    },
+                    alerts: [],
+                    checksum: "a3f8d9e2b1c4"
+                },
+                timestamp: new Date().toISOString()
+            };
+
+            document.getElementById('protocolResult').innerHTML = '<pre>' + JSON.stringify(protocol, null, 2) + '</pre>';
+        }
+
+        function generateIntegration() {
+            const integration = {
+                standard: "WIA-AGRI-022",
+                integrations: [
+                    {
+                        partner: "WIA-AGRI-001",
+                        dataFlow: "BIDIRECTIONAL",
+                        fields: ["crop_data", "yield_predictions", "environmental_data"]
+                    },
+                    {
+                        partner: "WIA-AGRI-010",
+                        dataFlow: "OUTBOUND",
+                        fields: ["water_usage", "nutrient_levels"]
+                    },
+                    {
+                        partner: "WIA-ENV-005",
+                        dataFlow: "INBOUND",
+                        fields: ["weather_forecast", "external_temperature"]
+                    },
+                    {
+                        partner: "WIA-ENERGY-003",
+                        dataFlow: "BIDIRECTIONAL",
+                        fields: ["power_consumption", "renewable_availability"]
+                    }
+                ],
+                certificationLevel: "WIA-CERTIFIED-GOLD",
+                implementationDate: new Date().toISOString()
+            };
+
+            document.getElementById('integrationResult').innerHTML = '<pre>' + JSON.stringify(integration, null, 2) + '</pre>';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

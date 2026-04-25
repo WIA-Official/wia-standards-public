@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 모델 포맷 표준 | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>2장: 모델 포맷 표준</h1>
+        <p class="chapter-meta">WIA-AI-008 표준 • 예상 소요 시간: 45분</p>
+
+        <h2>2.1 모델 직렬화 이해하기</h2>
+        <p>
+            직렬화는 모델의 메모리 내 표현을 디스크에 저장하거나 네트워크를 통해 전송할 수 있는 형식으로 변환하는 프로세스입니다.
+            이 기본 작업은 모델 지속성, 버전 관리, 배포를 가능하게 합니다. 프레임워크마다 직렬화에 대한 철학과 기술적 구현이 다릅니다.
+        </p>
+
+        <h3>직렬화 대상은 무엇인가?</h3>
+        <p>완전한 모델 직렬화에는 일반적으로 다음이 포함됩니다:</p>
+        <ul>
+            <li><strong>아키텍처/그래프</strong>: 연산과 연결을 정의하는 계산 그래프</li>
+            <li><strong>매개변수/가중치</strong>: 학습에서 얻은 매개변수(가중치, 편향)</li>
+            <li><strong>옵티마이저 상태</strong>: (선택사항) 학습 재개를 위한 옵티마이저의 현재 상태</li>
+            <li><strong>메타데이터</strong>: 버전 정보, 입력/출력 명세, 사용자 정의 설정</li>
+            <li><strong>전처리 로직</strong>: (선택사항) 데이터 전처리 및 후처리 코드</li>
+        </ul>
+
+        <h2>2.2 PyTorch 직렬화 형식</h2>
+        <p>
+            PyTorch는 다양한 사용 사례에 적합한 여러 직렬화 메커니즘을 제공합니다.
+        </p>
+
+        <h3>torch.save()와 torch.load()</h3>
+        <p>
+            가장 기본적인 직렬화는 Python의 pickle 프로토콜을 사용합니다:
+        </p>
+        <pre><code>import torch
+
+# 전체 모델 저장 (아키텍처 + 가중치)
+torch.save(model, 'model.pth')
+
+# state dict만 저장 (가중치만)
+torch.save(model.state_dict(), 'weights.pth')
+
+# 추가 정보와 함께 체크포인트 저장
+torch.save({
+    'epoch': 100,
+    'model_state_dict': model.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+    'loss': 0.123,
+    'accuracy': 0.956
+}, 'checkpoint.pth')
+
+# 로드
+model = torch.load('model.pth')  # 전체 모델
+model.load_state_dict(torch.load('weights.pth'))  # 가중치만</code></pre>
+
+        <div class="note">
+            <strong>모범 사례:</strong> 전체 모델보다 state_dict를 저장하세요. 이는 모델 아키텍처가 약간 변경될 때
+            더 많은 유연성을 제공하며 pickle 관련 호환성 문제를 방지합니다.
+        </div>
+
+        <h3>TorchScript</h3>
+        <p>
+            TorchScript는 Python 없이 실행할 수 있는 직렬화 가능하고 최적화 가능한 표현을 생성합니다:
+        </p>
+        <pre><code>import torch
+
+# 트레이싱 방법 (연산 기록)
+example_input = torch.randn(1, 3, 224, 224)
+traced_model = torch.jit.trace(model, example_input)
+traced_model.save('model_traced.pt')
+
+# 스크립팅 방법 (코드 분석)
+scripted_model = torch.jit.script(model)
+scripted_model.save('model_scripted.pt')
+
+# TorchScript 모델 로드
+loaded_model = torch.jit.load('model_traced.pt')</code></pre>
+
+        <h3>각 형식을 언제 사용할까?</h3>
+        <table>
+            <tr>
+                <th>형식</th>
+                <th>사용 사례</th>
+                <th>장점</th>
+                <th>단점</th>
+            </tr>
+            <tr>
+                <td>torch.save (전체)</td>
+                <td>빠른 실험</td>
+                <td>사용이 가장 간단</td>
+                <td>코드 변경에 취약</td>
+            </tr>
+            <tr>
+                <td>state_dict</td>
+                <td>프로덕션 체크포인트</td>
+                <td>유연하고 이식 가능</td>
+                <td>아키텍처 코드 필요</td>
+            </tr>
+            <tr>
+                <td>TorchScript</td>
+                <td>C++ 배포, 모바일</td>
+                <td>Python 의존성 없음</td>
+                <td>제한된 Python 기능 지원</td>
+            </tr>
+        </table>
+
+        <h2>2.3 TensorFlow 직렬화 형식</h2>
+        <p>
+            TensorFlow의 직렬화는 TF 1.x와 TF 2.x 사이에 크게 진화했으며, SavedModel이 표준 형식이 되었습니다.
+        </p>
+
+        <h3>SavedModel 형식</h3>
+        <p>
+            SavedModel은 TensorFlow의 범용 직렬화 형식입니다:
+        </p>
+        <pre><code>import tensorflow as tf
+
+# 모델 저장
+model = tf.keras.models.Sequential([...])
+model.save('my_model')  # saved_model.pb가 있는 디렉토리 생성
+
+# 시그니처 사용자 정의
+@tf.function(input_signature=[tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32)])
+def serve(x):
+    return model(x)
+
+tf.saved_model.save(model, 'my_model', signatures={'serving_default': serve})
+
+# 모델 로드
+loaded_model = tf.saved_model.load('my_model')
+# 또는 Keras 모델의 경우:
+loaded_model = tf.keras.models.load_model('my_model')</code></pre>
+
+        <h3>HDF5 형식 (.h5)</h3>
+        <p>
+            레거시 Keras 형식이지만 여전히 널리 사용됩니다:
+        </p>
+        <pre><code># HDF5로 저장
+model.save('model.h5')
+
+# 가중치만 저장
+model.save_weights('weights.h5')
+
+# 로드
+model = tf.keras.models.load_model('model.h5')</code></pre>
+
+        <h3>체크포인트 형식</h3>
+        <p>
+            학습 체크포인트용:
+        </p>
+        <pre><code>checkpoint = tf.train.Checkpoint(
+    optimizer=optimizer,
+    model=model
+)
+
+# 체크포인트 저장
+checkpoint.save('checkpoints/ckpt')
+
+# 복원
+checkpoint.restore('checkpoints/ckpt-10')</code></pre>
+
+        <h2>2.4 JAX 모델 직렬화</h2>
+        <p>
+            JAX는 함수형 프레임워크이므로 내장 직렬화가 없습니다. 커뮤니티는 여러 접근 방식을 사용합니다:
+        </p>
+
+        <h3>Pickle 사용</h3>
+        <pre><code>import pickle
+import jax.numpy as jnp
+
+# 매개변수 저장
+params = {'w': jnp.array([1., 2., 3.]), 'b': jnp.array(0.5)}
+with open('params.pkl', 'wb') as f:
+    pickle.dump(params, f)
+
+# 매개변수 로드
+with open('params.pkl', 'rb') as f:
+    loaded_params = pickle.load(f)</code></pre>
+
+        <h3>MessagePack/Orbax 사용</h3>
+        <pre><code>from flax import serialization
+
+# 바이트로 직렬화
+bytes_output = serialization.to_bytes(params)
+
+# 파일에 저장
+with open('params.msgpack', 'wb') as f:
+    f.write(bytes_output)
+
+# 로드
+with open('params.msgpack', 'rb') as f:
+    loaded_params = serialization.from_bytes(params, f.read())</code></pre>
+
+        <h2>2.5 ONNX 형식 심층 분석</h2>
+        <p>
+            ONNX(Open Neural Network Exchange)는 범용 중간 표현 역할을 하는 프레임워크 독립적 형식입니다.
+        </p>
+
+        <h3>ONNX 파일 구조</h3>
+        <p>ONNX 파일(.onnx)에는 다음이 포함됩니다:</p>
+        <ul>
+            <li><strong>그래프</strong>: 노드(연산)와 에지(텐서)가 있는 계산 그래프</li>
+            <li><strong>연산자</strong>: 표준화된 연산(Conv, MatMul, ReLU 등)</li>
+            <li><strong>텐서</strong>: Protocol Buffer 메시지로 저장된 가중치</li>
+            <li><strong>메타데이터</strong>: 모델 버전, 생산자, opset 버전</li>
+        </ul>
+
+        <pre><code>import onnx
+
+# ONNX 모델 로드 및 검사
+model = onnx.load('model.onnx')
+
+print(f"IR 버전: {model.ir_version}")
+print(f"생산자: {model.producer_name}")
+print(f"Opset 버전: {model.opset_import[0].version}")
+
+# 모델 유효성 확인
+onnx.checker.check_model(model)
+
+# 그래프 정보 출력
+graph = model.graph
+print(f"입력: {[i.name for i in graph.input]}")
+print(f"출력: {[o.name for o in graph.output]}")
+print(f"노드 수: {len(graph.node)}")</code></pre>
+
+        <h3>ONNX로 내보내기</h3>
+        <p>PyTorch에서:</p>
+        <pre><code>import torch.onnx
+
+dummy_input = torch.randn(1, 3, 224, 224)
+
+torch.onnx.export(
+    model,                          # 모델
+    dummy_input,                    # 예제 입력
+    "resnet50.onnx",               # 출력 파일
+    export_params=True,             # 가중치 저장
+    opset_version=14,              # ONNX 버전
+    do_constant_folding=True,      # 상수 폴딩 최적화
+    input_names=['input'],         # 입력 이름
+    output_names=['output'],       # 출력 이름
+    dynamic_axes={                  # 동적 차원
+        'input': {0: 'batch_size'},
+        'output': {0: 'batch_size'}
+    }
+)</code></pre>
+
+        <p>TensorFlow에서:</p>
+        <pre><code>import tf2onnx
+
+# SavedModel을 ONNX로 변환
+# python -m tf2onnx.convert \
+#     --saved-model my_model \
+#     --output model.onnx \
+#     --opset 14
+
+# 또는 프로그래밍 방식으로
+import tensorflow as tf
+import tf2onnx
+
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+output_path = "model.onnx"
+
+model_proto, _ = tf2onnx.convert.from_keras(model, input_signature=spec, opset=14)
+with open(output_path, "wb") as f:
+    f.write(model_proto.SerializeToString())</code></pre>
+
+        <h2>2.6 TensorFlow Lite 형식</h2>
+        <p>
+            TensorFlow Lite(.tflite)는 모바일 및 엣지 디바이스에 최적화되어 있습니다:
+        </p>
+
+        <pre><code>import tensorflow as tf
+
+# TFLite로 변환
+converter = tf.lite.TFLiteConverter.from_saved_model('my_model')
+
+# 최적화 옵션
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_types = [tf.float16]  # FP16 양자화
+
+tflite_model = converter.convert()
+
+# 저장
+with open('model.tflite', 'wb') as f:
+    f.write(tflite_model)
+
+# 추론
+interpreter = tf.lite.Interpreter(model_path='model.tflite')
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+interpreter.set_tensor(input_details[0]['index'], input_data)
+interpreter.invoke()
+output_data = interpreter.get_tensor(output_details[0]['index'])</code></pre>
+
+        <h2>2.7 CoreML 형식</h2>
+        <p>
+            CoreML은 iOS/macOS 배포를 위한 Apple의 형식입니다:
+        </p>
+
+        <pre><code>import coremltools as ct
+
+# PyTorch를 CoreML로 변환
+example_input = torch.rand(1, 3, 224, 224)
+traced_model = torch.jit.trace(model, example_input)
+
+coreml_model = ct.convert(
+    traced_model,
+    inputs=[ct.TensorType(shape=(1, 3, 224, 224))]
+)
+
+coreml_model.save("MyModel.mlmodel")
+
+# 메타데이터 추가
+coreml_model.author = 'WIA 팀'
+coreml_model.license = 'Apache 2.0'
+coreml_model.short_description = '이미지 분류 모델'</code></pre>
+
+        <h2>2.8 모델 형식 비교</h2>
+        <table>
+            <tr>
+                <th>형식</th>
+                <th>프레임워크</th>
+                <th>파일 확장자</th>
+                <th>주요 용도</th>
+                <th>크기</th>
+            </tr>
+            <tr>
+                <td>PyTorch State Dict</td>
+                <td>PyTorch</td>
+                <td>.pth, .pt</td>
+                <td>학습/체크포인트</td>
+                <td>중간</td>
+            </tr>
+            <tr>
+                <td>TorchScript</td>
+                <td>PyTorch</td>
+                <td>.pt</td>
+                <td>프로덕션/C++</td>
+                <td>중간</td>
+            </tr>
+            <tr>
+                <td>SavedModel</td>
+                <td>TensorFlow</td>
+                <td>디렉토리</td>
+                <td>프로덕션/서빙</td>
+                <td>큼</td>
+            </tr>
+            <tr>
+                <td>HDF5</td>
+                <td>Keras</td>
+                <td>.h5</td>
+                <td>레거시 Keras</td>
+                <td>작음</td>
+            </tr>
+            <tr>
+                <td>ONNX</td>
+                <td>범용</td>
+                <td>.onnx</td>
+                <td>상호운용성</td>
+                <td>중간</td>
+            </tr>
+            <tr>
+                <td>TFLite</td>
+                <td>TensorFlow</td>
+                <td>.tflite</td>
+                <td>모바일/엣지</td>
+                <td>매우 작음</td>
+            </tr>
+            <tr>
+                <td>CoreML</td>
+                <td>Apple</td>
+                <td>.mlmodel</td>
+                <td>iOS/macOS</td>
+                <td>작음</td>
+            </tr>
+        </table>
+
+        <h2>2.9 버전 관리와 호환성</h2>
+        <p>
+            모델 형식은 시간이 지남에 따라 진화합니다. 호환성을 보장하려면 신중한 버전 관리가 필요합니다:
+        </p>
+
+        <h3>모델을 위한 시맨틱 버전 관리</h3>
+        <pre><code># 모델 버전 형식: MAJOR.MINOR.PATCH
+# 예: 2.1.3
+
+# MAJOR: 호환되지 않는 API 변경 (입력/출력 형태 변경)
+# MINOR: 하위 호환 가능한 기능 (새 기능, 향상된 정확도)
+# PATCH: 하위 호환 가능한 버그 수정 (수치 수정, 아키텍처 변경 없음)
+
+metadata = {
+    'model_name': 'sentiment-classifier',
+    'version': '2.1.3',
+    'framework': 'pytorch',
+    'framework_version': '2.0.1',
+    'onnx_opset': 14,
+    'created_at': '2025-01-15T10:30:00Z'
+}</code></pre>
+
+        <h2>2.10 직렬화 모범 사례</h2>
+
+        <h3>1. 항상 메타데이터 저장</h3>
+        <pre><code># 나쁜 예: 가중치만
+torch.save(model.state_dict(), 'model.pth')
+
+# 좋은 예: 컨텍스트 포함
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'model_name': 'resnet50',
+    'version': '1.0.0',
+    'input_shape': [1, 3, 224, 224],
+    'num_classes': 1000,
+    'accuracy': 0.923,
+    'framework_version': torch.__version__,
+    'created_at': datetime.now().isoformat()
+}, 'model_checkpoint.pth')</code></pre>
+
+        <h3>2. 배포에는 프레임워크 독립적 형식 사용</h3>
+        <p>
+            다른 프레임워크나 플랫폼에서 사용할 수 있는 모델 공유에는 ONNX를 선호하세요.
+        </p>
+
+        <h3>3. 직렬화 후 검증</h3>
+        <pre><code>import numpy as np
+
+# 테스트 입력 생성
+test_input = torch.randn(5, 3, 224, 224)
+
+# 원본 모델 출력
+original_output = model(test_input)
+
+# 저장 및 로드
+torch.save(model.state_dict(), 'model.pth')
+loaded_model = ResNet50()
+loaded_model.load_state_dict(torch.load('model.pth'))
+loaded_model.eval()
+
+# 로드된 모델 출력
+loaded_output = loaded_model(test_input)
+
+# 수치적 동등성 검증
+assert torch.allclose(original_output, loaded_output, rtol=1e-5)
+print("✓ 직렬화 검증 통과")</code></pre>
+
+        <h3>4. 전처리 정보 포함</h3>
+        <pre><code>preprocessing_info = {
+    'mean': [0.485, 0.456, 0.406],
+    'std': [0.229, 0.224, 0.225],
+    'resize': 256,
+    'crop': 224,
+    'normalization': 'imagenet'
+}</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>직렬화는 메모리 내 모델을 저장 및 전송을 위한 영구 형식으로 변환합니다</li>
+                <li>PyTorch는 state_dict(가중치만), 전체 모델 저장, TorchScript 형식을 제공합니다</li>
+                <li>TensorFlow의 SavedModel은 범용 형식이며, 레거시 Keras 지원을 위한 HDF5가 있습니다</li>
+                <li>JAX는 매개변수 직렬화를 위해 pickle 또는 MessagePack을 사용합니다</li>
+                <li>ONNX는 상호운용성을 위한 프레임워크 독립적 표현을 제공합니다</li>
+                <li>TFLite와 CoreML은 모바일/엣지 배포에 최적화되어 있습니다</li>
+                <li>직렬화된 모델에는 항상 메타데이터(버전, 입력 형태, 전처리)를 포함하세요</li>
+                <li>직렬화 및 역직렬화 후 수치적 동등성을 검증하세요</li>
+                <li>모델 버전에 시맨틱 버전 관리를 사용하세요</li>
+                <li>사용 사례에 따라 형식 선택: 체크포인트, 프로덕션 서빙 또는 크로스 프레임워크 교환</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>완전한 모델 체크포인트에 직렬화되어야 하는 5가지 핵심 구성요소는 무엇입니까?</li>
+                <li>PyTorch의 state_dict 접근 방식과 전체 모델 저장을 비교하세요. 각각 언제 사용해야 합니까?</li>
+                <li>TorchScript란 무엇이며 표준 PyTorch 직렬화에 비해 어떤 장점이 있습니까?</li>
+                <li>TensorFlow의 SavedModel과 HDF5 형식의 차이점을 설명하세요.</li>
+                <li>JAX에 내장 직렬화 형식이 없는 이유는 무엇입니까? 커뮤니티는 어떤 접근 방식을 사용합니까?</li>
+                <li>ONNX 파일의 구조를 설명하세요. 어떤 정보가 포함되어 있습니까?</li>
+                <li>모델 직렬화에서 TFLite를 ONNX 대신 선택하는 경우는 언제입니까?</li>
+                <li>시맨틱 버전 관리를 머신러닝 모델에 어떻게 적용해야 합니까?</li>
+                <li>모델을 저장할 때 항상 포함해야 하는 메타데이터는 무엇입니까?</li>
+                <li>모델이 직렬화 전후에 동일한 출력을 생성하는지 검증하는 코드를 작성하세요.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Vulnerability Detection and Auditing | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Vulnerability Detection and Auditing</h1>
+
+    <div class="highlight">
+        <strong>Chapter Overview:</strong> Proactive security requires systematic vulnerability detection and thorough auditing processes. This chapter covers methodologies, tools, and best practices for identifying security issues before they can be exploited.
+    </div>
+
+    <h2>Common Smart Contract Vulnerabilities</h2>
+    <p>Understanding common vulnerability patterns is the first step in effective detection. Smart contracts have unique vulnerability classes that differ from traditional software.</p>
+
+    <h3>Reentrancy Attacks</h3>
+    <p>Reentrancy remains one of the most dangerous vulnerabilities in smart contracts. It occurs when an external call allows the called contract to re-enter the calling function before state updates are complete.</p>
+
+    <pre><code>// VULNERABLE: Reentrancy Attack Example
+pragma solidity ^0.8.19;
+
+contract VulnerableBank {
+    mapping(address => uint256) public balances;
+
+    function deposit() external payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    // VULNERABLE: State update after external call
+    function withdraw(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+
+        // External call before state update - VULNERABLE
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        // State update after external call - TOO LATE
+        balances[msg.sender] -= amount;
+    }
+}
+
+// ATTACK CONTRACT
+contract ReentrancyAttacker {
+    VulnerableBank public target;
+    uint256 public attackCount;
+
+    constructor(address _target) {
+        target = VulnerableBank(_target);
+    }
+
+    function attack() external payable {
+        target.deposit{value: msg.value}();
+        target.withdraw(msg.value);
+    }
+
+    receive() external payable {
+        if (address(target).balance >= msg.value && attackCount < 10) {
+            attackCount++;
+            target.withdraw(msg.value);
+        }
+    }
+}</code></pre>
+
+    <h3>Secure Implementation</h3>
+    <pre><code>// SECURE: Reentrancy-Safe Implementation
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract SecureBank is ReentrancyGuard {
+    mapping(address => uint256) public balances;
+
+    function deposit() external payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    // SECURE: Uses checks-effects-interactions pattern
+    function withdraw(uint256 amount) external nonReentrant {
+        // Checks
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+
+        // Effects - State update BEFORE external call
+        balances[msg.sender] -= amount;
+
+        // Interactions - External call LAST
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+}</code></pre>
+
+    <h2>Vulnerability Classification</h2>
+    <table>
+        <tr><th>Category</th><th>Vulnerability</th><th>Severity</th><th>Detection Method</th></tr>
+        <tr><td>Logic</td><td>Reentrancy</td><td>Critical</td><td>Static analysis, manual review</td></tr>
+        <tr><td>Logic</td><td>Access control bypass</td><td>Critical</td><td>Fuzzing, formal verification</td></tr>
+        <tr><td>Arithmetic</td><td>Integer overflow/underflow</td><td>High</td><td>Static analysis, symbolic execution</td></tr>
+        <tr><td>State</td><td>Uninitialized storage</td><td>High</td><td>Static analysis</td></tr>
+        <tr><td>External</td><td>Oracle manipulation</td><td>Critical</td><td>Manual review, simulation</td></tr>
+        <tr><td>Timing</td><td>Front-running</td><td>Medium</td><td>Transaction simulation</td></tr>
+        <tr><td>Gas</td><td>DoS via gas limits</td><td>Medium</td><td>Gas profiling, fuzzing</td></tr>
+    </table>
+
+    <h2>Automated Vulnerability Detection</h2>
+    <p>Automated tools provide the first line of defense in vulnerability detection. They can quickly identify common patterns and potential issues.</p>
+
+    <h3>Static Analysis Configuration</h3>
+    <pre><code>// Slither Configuration - slither.config.json
+{
+    "detectors_to_run": [
+        "reentrancy-eth",
+        "reentrancy-no-eth",
+        "reentrancy-benign",
+        "uninitialized-storage",
+        "arbitrary-send",
+        "controlled-delegatecall",
+        "tx-origin",
+        "unchecked-transfer",
+        "divide-before-multiply",
+        "unused-return",
+        "shadowing-state",
+        "weak-prng"
+    ],
+    "exclude_informational": false,
+    "exclude_low": false,
+    "filter_paths": [
+        "node_modules",
+        "test"
+    ],
+    "solc_remaps": [
+        "@openzeppelin/=node_modules/@openzeppelin/"
+    ]
+}
+
+// Run command
+// slither . --config-file slither.config.json --json slither-report.json</code></pre>
+
+    <h3>Vulnerability Scanner Implementation</h3>
+    <pre><code>// Automated Vulnerability Scanner
+import { ethers } from 'ethers';
+
+interface VulnerabilityScan {
+    contract: string;
+    findings: Finding[];
+    riskScore: number;
+    timestamp: Date;
+}
+
+interface Finding {
+    id: string;
+    severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+    title: string;
+    description: string;
+    location: CodeLocation;
+    recommendation: string;
+}
+
+class VulnerabilityScanner {
+    private patterns: VulnerabilityPattern[];
+
+    constructor() {
+        this.patterns = this.loadPatterns();
+    }
+
+    async scanContract(bytecode: string, abi: any[]): Promise<VulnerabilityScan> {
+        const findings: Finding[] = [];
+
+        // Check for known vulnerable patterns
+        findings.push(...this.checkReentrancy(bytecode, abi));
+        findings.push(...this.checkAccessControl(abi));
+        findings.push(...this.checkDelegatecall(bytecode));
+        findings.push(...this.checkSelfDestruct(bytecode));
+        findings.push(...this.checkTxOrigin(bytecode));
+
+        // Calculate risk score
+        const riskScore = this.calculateRiskScore(findings);
+
+        return {
+            contract: ethers.utils.keccak256(bytecode),
+            findings,
+            riskScore,
+            timestamp: new Date()
+        };
+    }
+
+    private checkReentrancy(bytecode: string, abi: any[]): Finding[] {
+        const findings: Finding[] = [];
+
+        // Check for CALL followed by SSTORE pattern
+        const opcodes = this.disassemble(bytecode);
+
+        for (let i = 0; i < opcodes.length - 1; i++) {
+            if (opcodes[i].opcode === 'CALL') {
+                // Look for SSTORE after CALL in same function
+                for (let j = i + 1; j < Math.min(i + 50, opcodes.length); j++) {
+                    if (opcodes[j].opcode === 'SSTORE') {
+                        findings.push({
+                            id: `REEN-${i}`,
+                            severity: 'critical',
+                            title: 'Potential Reentrancy Vulnerability',
+                            description: 'State modification detected after external call',
+                            location: { offset: opcodes[i].offset },
+                            recommendation: 'Apply checks-effects-interactions pattern'
+                        });
+                        break;
+                    }
+                    if (opcodes[j].opcode === 'RETURN' || opcodes[j].opcode === 'STOP') {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return findings;
+    }
+
+    private checkAccessControl(abi: any[]): Finding[] {
+        const findings: Finding[] = [];
+        const sensitivePatterns = ['withdraw', 'transfer', 'mint', 'burn', 'pause', 'upgrade'];
+
+        for (const item of abi) {
+            if (item.type !== 'function') continue;
+
+            const isSensitive = sensitivePatterns.some(p =>
+                item.name.toLowerCase().includes(p)
+            );
+
+            if (isSensitive && !this.hasAccessModifier(item)) {
+                findings.push({
+                    id: `AC-${item.name}`,
+                    severity: 'high',
+                    title: 'Missing Access Control',
+                    description: `Sensitive function ${item.name} may lack access control`,
+                    location: { functionName: item.name },
+                    recommendation: 'Add onlyOwner or role-based access control'
+                });
+            }
+        }
+
+        return findings;
+    }
+
+    private calculateRiskScore(findings: Finding[]): number {
+        const weights = { critical: 100, high: 50, medium: 20, low: 5, info: 1 };
+        return findings.reduce((score, f) => score + weights[f.severity], 0);
+    }
+}</code></pre>
+
+    <h2>Security Audit Process</h2>
+    <p>A comprehensive security audit follows a structured methodology to ensure thorough coverage of all potential vulnerabilities.</p>
+
+    <div class="highlight">
+        <strong>Audit Phases:</strong> A complete security audit consists of multiple phases, each with specific objectives and deliverables. Following this structured approach ensures comprehensive coverage and actionable results.
+    </div>
+
+    <h3>Audit Workflow</h3>
+    <pre><code>Security Audit Process Flow:
+
+Phase 1: Preparation (2-3 days)
+├── Receive codebase and documentation
+├── Define scope and objectives
+├── Set up development environment
+├── Review previous audits (if any)
+└── Establish communication channels
+
+Phase 2: Automated Analysis (1-2 days)
+├── Run static analysis tools (Slither, Mythril)
+├── Execute symbolic execution (Manticore)
+├── Perform fuzzing campaigns
+├── Generate initial findings list
+└── Prioritize areas for manual review
+
+Phase 3: Manual Review (5-10 days)
+├── Architecture review
+├── Business logic analysis
+├── Access control verification
+├── State machine validation
+├── External dependency review
+├── Gas optimization analysis
+└── Code quality assessment
+
+Phase 4: Attack Simulation (2-3 days)
+├── Develop proof-of-concept exploits
+├── Test on forked mainnet
+├── Verify attack scenarios
+├── Document attack paths
+└── Estimate potential impact
+
+Phase 5: Reporting (2-3 days)
+├── Compile findings with severity ratings
+├── Provide remediation recommendations
+├── Create executive summary
+├── Review with development team
+└── Deliver final report
+
+Phase 6: Remediation Verification (2-3 days)
+├── Review implemented fixes
+├── Verify no new issues introduced
+├── Re-run automated tools
+├── Issue remediation report
+└── Final sign-off</code></pre>
+
+    <h2>Penetration Testing Techniques</h2>
+    <p>Penetration testing goes beyond static analysis to actively attempt exploitation of vulnerabilities in a controlled environment.</p>
+
+    <h3>Fuzzing Framework</h3>
+    <pre><code>// Smart Contract Fuzzing Framework
+interface FuzzConfig {
+    iterations: number;
+    seed: number;
+    invariants: InvariantCheck[];
+}
+
+class ContractFuzzer {
+    private contract: ethers.Contract;
+    private config: FuzzConfig;
+    private violations: InvariantViolation[] = [];
+
+    async fuzz(): Promise<FuzzResult> {
+        const rng = this.createRNG(this.config.seed);
+
+        for (let i = 0; i < this.config.iterations; i++) {
+            const call = this.generateRandomCall(rng);
+
+            try {
+                await this.executeCall(call);
+                const state = await this.captureState();
+
+                for (const invariant of this.config.invariants) {
+                    if (!invariant.check(state)) {
+                        this.violations.push({ iteration: i, call, invariant: invariant.name });
+                    }
+                }
+            } catch (error) {
+                if (!this.isExpectedError(error)) {
+                    this.violations.push({ iteration: i, call, error: error.message });
+                }
+            }
+        }
+        return { iterations: this.config.iterations, violations: this.violations };
+    }
+}
+
+// Run fuzzing with invariants
+const fuzzer = new ContractFuzzer(tokenContract, {
+    iterations: 10000,
+    seed: Date.now(),
+    invariants: [
+        { name: 'Total supply equals sum of balances', check: (s) => s.totalSupply.eq(sumBalances(s)) },
+        { name: 'No balance exceeds total supply', check: (s) => allBalancesValid(s) }
+    ]
+});</code></pre>
+
+    <div class="highlight">
+        <strong>Summary:</strong> Effective vulnerability detection requires a combination of automated tools, manual review, and active exploitation attempts. By following systematic audit processes and employing comprehensive testing techniques, security teams can identify and remediate vulnerabilities before deployment.
+    </div>
+
+</body>
+</html>

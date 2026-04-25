@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Cross-Framework Conversion | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Cross-Framework Conversion</h1>
+        <p class="chapter-meta">WIA-AI-008 Standard • Estimated reading time: 60 minutes</p>
+
+        <h2>4.1 The Cross-Framework Challenge</h2>
+        <p>
+            Modern AI development often requires converting models between frameworks. A research team might train in PyTorch
+            but need to deploy with TensorFlow Serving. A mobile app might require converting a TensorFlow model to CoreML
+            for iOS or TFLite for Android. Understanding conversion paths and potential pitfalls is essential for successful
+            model exchange.
+        </p>
+
+        <h3>Common Conversion Paths</h3>
+        <table>
+            <tr>
+                <th>Source</th>
+                <th>Target</th>
+                <th>Method</th>
+                <th>Difficulty</th>
+            </tr>
+            <tr>
+                <td>PyTorch</td>
+                <td>ONNX</td>
+                <td>torch.onnx.export()</td>
+                <td>Easy</td>
+            </tr>
+            <tr>
+                <td>TensorFlow</td>
+                <td>ONNX</td>
+                <td>tf2onnx</td>
+                <td>Easy</td>
+            </tr>
+            <tr>
+                <td>ONNX</td>
+                <td>TensorFlow</td>
+                <td>onnx-tf</td>
+                <td>Medium</td>
+            </tr>
+            <tr>
+                <td>PyTorch</td>
+                <td>TFLite</td>
+                <td>PyTorch→ONNX→TF→TFLite</td>
+                <td>Hard</td>
+            </tr>
+            <tr>
+                <td>TensorFlow</td>
+                <td>CoreML</td>
+                <td>coremltools</td>
+                <td>Medium</td>
+            </tr>
+        </table>
+
+        <h2>4.2 PyTorch to TensorFlow</h2>
+        <p>
+            Converting from PyTorch to TensorFlow typically uses ONNX as an intermediate format:
+        </p>
+
+        <h3>Step-by-Step Conversion</h3>
+        <pre><code># Step 1: PyTorch to ONNX
+import torch
+import torchvision.models as models
+
+model = models.resnet18(pretrained=True)
+model.eval()
+
+dummy_input = torch.randn(1, 3, 224, 224)
+
+torch.onnx.export(
+    model,
+    dummy_input,
+    "resnet18.onnx",
+    opset_version=13,
+    input_names=['input'],
+    output_names=['output'],
+    dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}}
+)
+
+# Step 2: ONNX to TensorFlow
+from onnx_tf.backend import prepare
+import onnx
+
+onnx_model = onnx.load("resnet18.onnx")
+tf_model = prepare(onnx_model)
+
+# Export as TensorFlow SavedModel
+tf_model.export_graph("resnet18_tf")
+
+# Step 3: Load and use in TensorFlow
+import tensorflow as tf
+
+loaded_model = tf.saved_model.load("resnet18_tf")
+infer = loaded_model.signatures["serving_default"]
+
+# Test inference
+import numpy as np
+test_input = np.random.randn(1, 3, 224, 224).astype(np.float32)
+output = infer(input=tf.constant(test_input))
+
+print(f"Output shape: {output['output'].shape}")</code></pre>
+
+        <h3>Validation After Conversion</h3>
+        <pre><code>import torch
+import tensorflow as tf
+import numpy as np
+
+# Prepare test input
+test_input_np = np.random.randn(5, 3, 224, 224).astype(np.float32)
+
+# PyTorch inference
+model_pt = models.resnet18(pretrained=True)
+model_pt.eval()
+with torch.no_grad():
+    output_pt = model_pt(torch.from_numpy(test_input_np)).numpy()
+
+# TensorFlow inference
+model_tf = tf.saved_model.load("resnet18_tf")
+infer_tf = model_tf.signatures["serving_default"]
+output_tf = infer_tf(input=tf.constant(test_input_np))['output'].numpy()
+
+# Compare outputs
+max_diff = np.max(np.abs(output_pt - output_tf))
+mean_diff = np.mean(np.abs(output_pt - output_tf))
+print(f"Max difference: {max_diff:.6f}")
+print(f"Mean difference: {mean_diff:.6f}")
+
+assert max_diff < 1e-4, "Conversion validation failed!"
+print("✓ Conversion validated successfully")</code></pre>
+
+        <h2>4.3 TensorFlow to PyTorch</h2>
+        <p>
+            The reverse conversion also uses ONNX:
+        </p>
+
+        <pre><code># Step 1: TensorFlow to ONNX
+import tensorflow as tf
+import tf2onnx
+
+# Load TensorFlow model
+model = tf.keras.applications.MobileNetV2(weights='imagenet')
+
+# Convert to ONNX
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+model_proto, _ = tf2onnx.convert.from_keras(model, input_signature=spec, opset=13)
+
+with open("mobilenet_v2.onnx", "wb") as f:
+    f.write(model_proto.SerializeToString())
+
+# Step 2: ONNX to PyTorch
+import onnx
+from onnx2pytorch import ConvertModel
+
+onnx_model = onnx.load("mobilenet_v2.onnx")
+pytorch_model = ConvertModel(onnx_model)
+
+# Step 3: Use in PyTorch
+import torch
+
+pytorch_model.eval()
+test_input = torch.randn(1, 3, 224, 224)
+
+with torch.no_grad():
+    output = pytorch_model(test_input)
+
+print(f"Output shape: {output.shape}")</code></pre>
+
+        <div class="note">
+            <strong>Important:</strong> TensorFlow uses NHWC (batch, height, width, channels) format while PyTorch uses
+            NCHW (batch, channels, height, width). Conversions handle this automatically, but be aware when debugging.
+        </div>
+
+        <h2>4.4 Converting to Mobile Formats</h2>
+
+        <h3>PyTorch to TensorFlow Lite</h3>
+        <p>
+            For Android and embedded systems:
+        </p>
+        <pre><code># Complete pipeline: PyTorch → ONNX → TF → TFLite
+import torch
+import onnx
+from onnx_tf.backend import prepare
+import tensorflow as tf
+
+# 1. PyTorch to ONNX
+model_pt = torch.nn.Sequential(
+    torch.nn.Conv2d(3, 32, 3, padding=1),
+    torch.nn.ReLU(),
+    torch.nn.MaxPool2d(2),
+    torch.nn.Flatten(),
+    torch.nn.Linear(32 * 112 * 112, 10)
+)
+
+dummy_input = torch.randn(1, 3, 224, 224)
+torch.onnx.export(model_pt, dummy_input, "model.onnx", opset_version=13)
+
+# 2. ONNX to TensorFlow
+onnx_model = onnx.load("model.onnx")
+tf_model = prepare(onnx_model)
+tf_model.export_graph("model_tf")
+
+# 3. TensorFlow to TFLite
+converter = tf.lite.TFLiteConverter.from_saved_model("model_tf")
+
+# Apply optimizations
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_types = [tf.float16]
+
+tflite_model = converter.convert()
+
+with open("model.tflite", "wb") as f:
+    f.write(tflite_model)
+
+print(f"TFLite model size: {len(tflite_model) / 1024:.2f} KB")</code></pre>
+
+        <h3>TensorFlow to CoreML</h3>
+        <p>
+            For iOS deployment:
+        </p>
+        <pre><code>import coremltools as ct
+import tensorflow as tf
+
+# Load TensorFlow model
+model = tf.keras.applications.MobileNetV2(weights='imagenet')
+
+# Convert to CoreML
+coreml_model = ct.convert(
+    model,
+    inputs=[ct.ImageType(name="input", shape=(1, 224, 224, 3))],
+    classifier_config=ct.ClassifierConfig(
+        class_labels=['class1', 'class2', ...]  # Your class labels
+    )
+)
+
+# Add metadata
+coreml_model.author = 'WIA Team'
+coreml_model.license = 'Apache 2.0'
+coreml_model.short_description = 'MobileNetV2 image classifier'
+coreml_model.version = '1.0.0'
+
+# Save
+coreml_model.save("MobileNetV2.mlmodel")
+
+print("✓ CoreML model created successfully")</code></pre>
+
+        <h2>4.5 Handling Architecture Differences</h2>
+
+        <h3>Batch Normalization</h3>
+        <p>
+            PyTorch and TensorFlow implement BatchNorm differently:
+        </p>
+        <pre><code># PyTorch: momentum = 0.1 (default)
+# TensorFlow: momentum = 0.99 (default)
+
+# PyTorch BatchNorm
+bn_pt = torch.nn.BatchNorm2d(64, momentum=0.1)
+
+# Equivalent TensorFlow BatchNorm
+bn_tf = tf.keras.layers.BatchNormalization(momentum=0.9)  # Note: 1 - 0.1 = 0.9
+
+# When converting, ensure momentum values are adjusted</code></pre>
+
+        <h3>Padding Differences</h3>
+        <pre><code># PyTorch: 'same' padding not available in Conv2d (use padding parameter)
+conv_pt = torch.nn.Conv2d(3, 64, kernel_size=3, padding=1)  # Manual padding
+
+# TensorFlow: 'same' padding available
+conv_tf = tf.keras.layers.Conv2D(64, 3, padding='same')
+
+# ONNX handles this conversion automatically, but be aware for manual conversions</code></pre>
+
+        <h3>Activation Functions</h3>
+        <pre><code># Some activations have different default parameters
+
+# PyTorch LeakyReLU
+leaky_pt = torch.nn.LeakyReLU(negative_slope=0.01)
+
+# TensorFlow LeakyReLU
+leaky_tf = tf.keras.layers.LeakyReLU(alpha=0.01)  # Different parameter name
+
+# GELU implementations may differ slightly
+gelu_pt = torch.nn.GELU()  # Uses tanh approximation by default
+gelu_tf = tf.keras.activations.gelu  # Uses erf (exact) by default</code></pre>
+
+        <h2>4.6 Advanced Conversion Techniques</h2>
+
+        <h3>Custom Layer Mapping</h3>
+        <pre><code>from onnx_tf.handlers.backend import BackendHandler
+from onnx_tf.handlers.handler import onnx_op
+import tensorflow as tf
+
+# Define custom ONNX operator handler
+@onnx_op("CustomOp")
+class CustomOpHandler(BackendHandler):
+    @classmethod
+    def version_1(cls, node, **kwargs):
+        # Implement custom conversion logic
+        x = kwargs["tensor_dict"][node.inputs[0]]
+        alpha = node.attrs.get("alpha", 1.0)
+
+        # Map to TensorFlow operations
+        output = tf.multiply(x, alpha)
+
+        return [output]
+
+# Now ONNX models with CustomOp can be converted to TensorFlow</code></pre>
+
+        <h3>Quantization-Aware Conversion</h3>
+        <pre><code>import torch
+import tensorflow as tf
+
+# PyTorch quantization-aware training
+model_pt = models.resnet18(pretrained=True)
+model_pt.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
+model_prepared = torch.quantization.prepare_qat(model_pt)
+
+# After QAT training...
+model_quantized = torch.quantization.convert(model_prepared)
+
+# Export quantized model to ONNX
+torch.onnx.export(
+    model_quantized,
+    dummy_input,
+    "resnet18_quantized.onnx",
+    opset_version=13
+)
+
+# Convert to TFLite with quantization
+converter = tf.lite.TFLiteConverter.from_saved_model("model_tf")
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.int8
+converter.inference_output_type = tf.int8
+
+# Representative dataset for calibration
+def representative_dataset():
+    for _ in range(100):
+        yield [np.random.randn(1, 3, 224, 224).astype(np.float32)]
+
+converter.representative_dataset = representative_dataset
+tflite_model = converter.convert()</code></pre>
+
+        <h2>4.7 Troubleshooting Common Conversion Issues</h2>
+
+        <h3>Issue 1: Unsupported Operators</h3>
+        <pre><code># Problem: Operator not supported in target framework
+# Solution: Replace with supported equivalent or implement custom handler
+
+# Example: Replace unsupported operation
+class ModelWithUnsupportedOp(torch.nn.Module):
+    def forward(self, x):
+        # torch.einsum may not be supported
+        # Replace with equivalent matmul operations
+        return torch.matmul(x, x.transpose(-2, -1))
+
+# Or use ONNX fallback operators
+torch.onnx.export(
+    model,
+    dummy_input,
+    "model.onnx",
+    operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH
+)</code></pre>
+
+        <h3>Issue 2: Dynamic Shapes</h3>
+        <pre><code># Problem: Target framework requires fixed input shapes
+# Solution: Export with specific shapes or use dynamic shape support
+
+# Fixed shape export
+torch.onnx.export(
+    model,
+    torch.randn(1, 3, 224, 224),
+    "model_fixed.onnx",
+    input_names=['input'],
+    output_names=['output']
+    # No dynamic_axes specified
+)
+
+# Dynamic shape export (where supported)
+torch.onnx.export(
+    model,
+    torch.randn(1, 3, 224, 224),
+    "model_dynamic.onnx",
+    input_names=['input'],
+    output_names=['output'],
+    dynamic_axes={
+        'input': {0: 'batch', 2: 'height', 3: 'width'},
+        'output': {0: 'batch'}
+    }
+)</code></pre>
+
+        <h3>Issue 3: Numerical Precision</h3>
+        <pre><code># Problem: Different frameworks have different precision defaults
+# Solution: Explicitly set dtypes and validate outputs
+
+import numpy as np
+
+def validate_conversion(model_original, model_converted, test_inputs, tolerance=1e-5):
+    """
+    Validate conversion maintains numerical accuracy
+    """
+    for i, test_input in enumerate(test_inputs):
+        # Original output
+        output_original = model_original(test_input).detach().numpy()
+
+        # Converted output
+        output_converted = model_converted(test_input).numpy()
+
+        # Compute differences
+        abs_diff = np.abs(output_original - output_converted)
+        rel_diff = abs_diff / (np.abs(output_original) + 1e-8)
+
+        max_abs_diff = np.max(abs_diff)
+        max_rel_diff = np.max(rel_diff)
+
+        print(f"Test {i+1}:")
+        print(f"  Max absolute difference: {max_abs_diff:.2e}")
+        print(f"  Max relative difference: {max_rel_diff:.2e}")
+
+        if max_abs_diff > tolerance:
+            print(f"  ⚠️ Warning: Exceeds tolerance {tolerance}")
+        else:
+            print(f"  ✓ Within tolerance")
+
+    return True
+
+# Usage
+test_inputs = [torch.randn(1, 3, 224, 224) for _ in range(10)]
+validate_conversion(model_pytorch, model_tensorflow, test_inputs)</code></pre>
+
+        <h2>4.8 Conversion Best Practices</h2>
+
+        <h3>1. Always Validate</h3>
+        <ul>
+            <li>Run identical inputs through both models</li>
+            <li>Compare outputs with appropriate tolerances</li>
+            <li>Test edge cases and boundary conditions</li>
+            <li>Validate on representative dataset samples</li>
+        </ul>
+
+        <h3>2. Use Latest Opsets</h3>
+        <pre><code># Use recent ONNX opsets for better operator coverage
+torch.onnx.export(model, dummy_input, "model.onnx", opset_version=15)  # Good
+torch.onnx.export(model, dummy_input, "model.onnx", opset_version=9)   # Outdated</code></pre>
+
+        <h3>3. Simplify Models Before Conversion</h3>
+        <pre><code>from onnxsim import simplify
+import onnx
+
+# Simplify ONNX model before converting to other frameworks
+model = onnx.load("model.onnx")
+model_simplified, check = simplify(model)
+
+if check:
+    onnx.save(model_simplified, "model_simplified.onnx")
+    # Now convert simplified model to target framework</code></pre>
+
+        <h3>4. Document Conversion Steps</h3>
+        <pre><code># Create a conversion manifest
+conversion_info = {
+    'source_framework': 'pytorch',
+    'source_version': '2.0.1',
+    'target_framework': 'tensorflow',
+    'target_version': '2.12.0',
+    'intermediate_format': 'onnx',
+    'onnx_opset': 15,
+    'conversion_date': '2025-01-15',
+    'validation_passed': True,
+    'max_numerical_diff': 1.2e-6,
+    'notes': 'Converted ResNet-18 for TF Serving deployment'
+}
+
+import json
+with open('conversion_manifest.json', 'w') as f:
+    json.dump(conversion_info, f, indent=2)</code></pre>
+
+        <h2>4.9 Automation and CI/CD Integration</h2>
+
+        <h3>Automated Conversion Pipeline</h3>
+        <pre><code>#!/usr/bin/env python3
+"""
+Automated model conversion pipeline with validation
+"""
+
+import torch
+import onnx
+import tensorflow as tf
+from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class ModelConverter:
+    def __init__(self, source_path, target_format):
+        self.source_path = Path(source_path)
+        self.target_format = target_format
+
+    def convert(self):
+        logger.info(f"Converting {self.source_path} to {self.target_format}")
+
+        # Load source model
+        model = torch.load(self.source_path)
+        model.eval()
+
+        # Export to ONNX
+        onnx_path = self.source_path.with_suffix('.onnx')
+        dummy_input = torch.randn(1, 3, 224, 224)
+
+        torch.onnx.export(
+            model, dummy_input, str(onnx_path),
+            opset_version=15, export_params=True
+        )
+
+        logger.info(f"✓ Exported to ONNX: {onnx_path}")
+
+        # Validate ONNX
+        onnx_model = onnx.load(str(onnx_path))
+        onnx.checker.check_model(onnx_model)
+        logger.info("✓ ONNX model validated")
+
+        # Convert to target format
+        if self.target_format == 'tensorflow':
+            self._convert_to_tensorflow(onnx_path)
+        elif self.target_format == 'tflite':
+            self._convert_to_tflite(onnx_path)
+
+        logger.info("✓ Conversion completed")
+
+    def _convert_to_tensorflow(self, onnx_path):
+        # Implementation here
+        pass
+
+    def _convert_to_tflite(self, onnx_path):
+        # Implementation here
+        pass
+
+# Usage in CI/CD
+if __name__ == "__main__":
+    converter = ModelConverter("model.pth", "tensorflow")
+    converter.convert()</code></pre>
+
+        <h2>4.10 Framework-Specific Optimizations</h2>
+
+        <h3>TensorRT Optimization (NVIDIA GPUs)</h3>
+        <pre><code>import tensorrt as trt
+import pycuda.driver as cuda
+
+# Convert ONNX to TensorRT for maximum GPU performance
+TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+
+def build_engine(onnx_path, engine_path, fp16_mode=True):
+    with trt.Builder(TRT_LOGGER) as builder, \
+         builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, \
+         trt.OnnxParser(network, TRT_LOGGER) as parser:
+
+        # Configure builder
+        config = builder.create_builder_config()
+        config.max_workspace_size = 1 << 30  # 1GB
+
+        if fp16_mode:
+            config.set_flag(trt.BuilderFlag.FP16)
+
+        # Parse ONNX
+        with open(onnx_path, 'rb') as model:
+            parser.parse(model.read())
+
+        # Build engine
+        engine = builder.build_engine(network, config)
+
+        # Save engine
+        with open(engine_path, 'wb') as f:
+            f.write(engine.serialize())
+
+        return engine
+
+# Build TensorRT engine
+engine = build_engine("model.onnx", "model.trt", fp16_mode=True)
+print("✓ TensorRT engine built")</code></pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Cross-framework conversion enables model deployment across diverse platforms</li>
+                <li>ONNX serves as the universal intermediate format for most conversions</li>
+                <li>Common paths: PyTorch ↔ ONNX ↔ TensorFlow, with mobile formats via additional steps</li>
+                <li>Framework differences (BatchNorm, padding, activations) require careful handling</li>
+                <li>Always validate conversions with numerical comparison on test data</li>
+                <li>Use latest ONNX opsets for better operator coverage</li>
+                <li>Simplify models before conversion to avoid issues</li>
+                <li>Document conversion steps and validation results</li>
+                <li>Automate conversion pipelines for CI/CD integration</li>
+                <li>Apply target-specific optimizations (TensorRT, CoreML) for best performance</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the three main conversion paths for PyTorch to TensorFlow Lite?</li>
+                <li>Why is ONNX commonly used as an intermediate format for conversions?</li>
+                <li>Explain the difference between NHWC and NCHW tensor layouts. Why does it matter?</li>
+                <li>How do BatchNormalization momentum parameters differ between PyTorch and TensorFlow?</li>
+                <li>What steps should you take to validate a converted model?</li>
+                <li>Describe a strategy for handling unsupported operators during conversion.</li>
+                <li>When would you use fixed shapes vs dynamic shapes in ONNX export?</li>
+                <li>What is quantization-aware conversion and when is it beneficial?</li>
+                <li>How can you automate model conversion in a CI/CD pipeline?</li>
+                <li>What advantages does TensorRT provide over standard ONNX Runtime?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

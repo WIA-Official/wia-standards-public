@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Implementation and Integration - WIA-PET-GENOME</title>
+</head>
+<body>
+    <hr>
+
+    <h1>Chapter 8: Implementation and Integration</h1>
+    <blockquote>"Robust implementation brings genetic insights from laboratory to life."</blockquote>
+    <hr>
+
+    <h2>8.1 Overview</h2>
+    <p>This chapter provides technical guidance for implementing WIA-PET-GENOME compliant systems. It covers system architecture, API integration, database design, and deployment considerations.</p>
+
+    <h3>Implementation Components</h3>
+    <ul>
+        <li><strong>Core Services</strong> - Profile management, analysis engines</li>
+        <li><strong>API Layer</strong> - RESTful interfaces for integration</li>
+        <li><strong>Data Storage</strong> - Secure storage for genetic data</li>
+        <li><strong>Processing Pipeline</strong> - Sequencing data analysis</li>
+        <li><strong>Integration Points</strong> - External system connections</li>
+    </ul>
+    <hr>
+
+    <h2>8.2 System Architecture</h2>
+
+    <h3>High-Level Architecture</h3>
+    <pre>
+WIA-PET-GENOME SYSTEM ARCHITECTURE
+================================================================================
+
+                            +-----------------+
+                            |   API Gateway   |
+                            |   (REST/gRPC)   |
+                            +--------+--------+
+                                     |
+         +---------------------------+---------------------------+
+         |                           |                           |
++--------v--------+       +----------v----------+     +----------v----------+
+|  Profile        |       |  Analysis           |     |  Identity           |
+|  Service        |       |  Service            |     |  Service            |
+|  - CRUD ops     |       |  - Breed analysis   |     |  - Fingerprinting   |
+|  - Validation   |       |  - Health predict   |     |  - Comparison       |
+|  - Search       |       |  - Trait analysis   |     |  - Clone verify     |
++---------+-------+       +----------+----------+     +----------+----------+
+          |                          |                           |
+          +------------+-------------+---------------------------+
+                       |
+              +--------v--------+
+              |   PostgreSQL    |
+              |   Database      |
+              |   (Encrypted)   |
+              +-----------------+
+
+External Integrations:
+- Laboratory Information Systems (LIS)
+- Veterinary Practice Management Systems
+- Breed Registries
+- Clone Facility Systems
+    </pre>
+
+    <h3>Service Responsibilities</h3>
+    <table border="1">
+        <tr><th>Service</th><th>Responsibilities</th><th>Key Endpoints</th></tr>
+        <tr><td>Profile Service</td><td>CRUD, validation, search</td><td>/profiles/*</td></tr>
+        <tr><td>Analysis Service</td><td>Breed, health, traits</td><td>/analysis/*, /health/*</td></tr>
+        <tr><td>Identity Service</td><td>Fingerprint, compare, clone</td><td>/identity/*, /cloning/*</td></tr>
+        <tr><td>Care Service</td><td>Recommendations</td><td>/care/*</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.3 API Specification</h2>
+
+    <h3>API Standards</h3>
+    <table border="1">
+        <tr><th>Aspect</th><th>Standard</th></tr>
+        <tr><td>Protocol</td><td>HTTPS (TLS 1.3)</td></tr>
+        <tr><td>Format</td><td>JSON (application/json)</td></tr>
+        <tr><td>Authentication</td><td>OAuth 2.0 / API Keys</td></tr>
+        <tr><td>Versioning</td><td>URL path (/v1/, /v2/)</td></tr>
+        <tr><td>Documentation</td><td>OpenAPI 3.0</td></tr>
+    </table>
+
+    <h3>Core Endpoints</h3>
+    <table border="1">
+        <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+        <tr><td>POST</td><td>/v1/profiles</td><td>Create new genome profile</td></tr>
+        <tr><td>GET</td><td>/v1/profiles/{id}</td><td>Retrieve profile by ID</td></tr>
+        <tr><td>PUT</td><td>/v1/profiles/{id}</td><td>Update profile</td></tr>
+        <tr><td>POST</td><td>/v1/analysis/breed/{id}</td><td>Run breed analysis</td></tr>
+        <tr><td>GET</td><td>/v1/health/predictions/{id}</td><td>Get health predictions</td></tr>
+        <tr><td>POST</td><td>/v1/identity/fingerprint/{id}</td><td>Generate fingerprint</td></tr>
+        <tr><td>POST</td><td>/v1/identity/compare</td><td>Compare two samples</td></tr>
+        <tr><td>POST</td><td>/v1/cloning/verify</td><td>Verify clone identity</td></tr>
+        <tr><td>GET</td><td>/v1/care/recommendations/{id}</td><td>Get care plan</td></tr>
+    </table>
+
+    <h3>Request/Response Example</h3>
+    <pre>
+POST /v1/profiles
+Content-Type: application/json
+Authorization: Bearer {token}
+
+Request:
+{
+  "petInfo": {
+    "name": "Max",
+    "dateOfBirth": "2022-03-15",
+    "sex": "MALE",
+    "microchipId": "985112000123456"
+  },
+  "species": "CANINE",
+  "sequencingInfo": {
+    "sequencingType": "WHOLE_GENOME",
+    "platform": "Illumina NovaSeq",
+    "laboratoryId": "WIA-LAB-001"
+  }
+}
+
+Response (201 Created):
+{
+  "profileId": "PGP-2025-001234",
+  "status": "CREATED",
+  "createdAt": "2025-01-15T10:30:00Z",
+  "links": {
+    "self": "/v1/profiles/PGP-2025-001234",
+    "analysis": "/v1/analysis/breed/PGP-2025-001234",
+    "health": "/v1/health/predictions/PGP-2025-001234"
+  }
+}
+    </pre>
+    <hr>
+
+    <h2>8.4 Database Schema</h2>
+
+    <h3>Core Tables</h3>
+    <pre>
+DATABASE SCHEMA OVERVIEW
+================================================================================
+
+genome_profiles
+  - profile_id (PK)
+  - pet_name, species, sex
+  - date_of_birth, microchip_id
+  - owner_id (FK), created_at, updated_at, status
+
+genetic_markers
+  - marker_id (PK)
+  - profile_id (FK)
+  - marker_type, chromosome, position
+  - reference_allele, alternate_allele, genotype
+  - quality_score
+
+health_predictions
+  - prediction_id (PK)
+  - profile_id (FK)
+  - condition_code, risk_level, risk_percentage
+  - inheritance_pattern, age_of_onset
+  - recommendations (JSONB)
+
+genetic_fingerprints
+  - fingerprint_id (PK)
+  - profile_id (FK)
+  - fingerprint_hash (UNIQUE)
+  - marker_count, marker_data (JSONB)
+  - generated_at, laboratory_id
+
+clone_registry
+  - clone_id (PK)
+  - original_profile_id (FK)
+  - clone_profile_id (FK)
+  - cloning_facility, cloning_date
+  - verification_status, verification_date
+    </pre>
+
+    <h3>Index Recommendations</h3>
+    <table border="1">
+        <tr><th>Table</th><th>Column(s)</th><th>Index Type</th><th>Purpose</th></tr>
+        <tr><td>genome_profiles</td><td>profile_id</td><td>PRIMARY</td><td>Primary lookup</td></tr>
+        <tr><td>genome_profiles</td><td>microchip_id</td><td>UNIQUE</td><td>Microchip lookup</td></tr>
+        <tr><td>genome_profiles</td><td>species, created_at</td><td>BTREE</td><td>Filtered queries</td></tr>
+        <tr><td>genetic_markers</td><td>profile_id</td><td>BTREE</td><td>Profile markers</td></tr>
+        <tr><td>genetic_fingerprints</td><td>fingerprint_hash</td><td>HASH</td><td>Fast comparison</td></tr>
+        <tr><td>health_predictions</td><td>profile_id, risk_level</td><td>BTREE</td><td>Risk queries</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.5 Security Implementation</h2>
+
+    <h3>Security Requirements</h3>
+    <table border="1">
+        <tr><th>Layer</th><th>Requirement</th><th>Implementation</th></tr>
+        <tr><td>Transport</td><td>Encryption</td><td>TLS 1.3, certificate pinning</td></tr>
+        <tr><td>Authentication</td><td>Identity verification</td><td>OAuth 2.0, JWT tokens</td></tr>
+        <tr><td>Authorization</td><td>Access control</td><td>RBAC, resource ownership</td></tr>
+        <tr><td>Data</td><td>Encryption at rest</td><td>AES-256, key management</td></tr>
+        <tr><td>Audit</td><td>Activity logging</td><td>Comprehensive audit trail</td></tr>
+    </table>
+
+    <h3>Role-Based Access Control</h3>
+    <table border="1">
+        <tr><th>Role</th><th>Permissions</th></tr>
+        <tr><td>Owner</td><td>Full access to own profiles</td></tr>
+        <tr><td>Veterinarian</td><td>Read health data (with owner consent)</td></tr>
+        <tr><td>Laboratory</td><td>Create/update sequencing results</td></tr>
+        <tr><td>Registry</td><td>Verify identity, read breed data</td></tr>
+        <tr><td>Administrator</td><td>System management</td></tr>
+    </table>
+
+    <h3>Data Privacy Compliance</h3>
+    <ul>
+        <li>Owner consent required for data sharing</li>
+        <li>Right to deletion (data portability)</li>
+        <li>Data minimization principles</li>
+        <li>Transparent data processing</li>
+        <li>Breach notification procedures</li>
+    </ul>
+    <hr>
+
+    <h2>8.6 Integration Patterns</h2>
+
+    <h3>Laboratory Integration (LIS)</h3>
+    <pre>
+LABORATORY INTEGRATION FLOW
+================================================================================
+
+1. Sample Receipt
+   Laboratory receives sample -> Creates job in LIS
+
+2. Job Notification
+   LIS -> POST /v1/sequencing/jobs
+   {
+     "profileId": "PGP-2025-001234",
+     "sampleId": "SAMPLE-001",
+     "sequencingType": "WHOLE_GENOME"
+   }
+
+3. Results Submission
+   Sequencing complete -> LIS submits results
+   POST /v1/sequencing/results
+   {
+     "jobId": "JOB-001",
+     "status": "COMPLETED",
+     "markers": [...],
+     "qualityMetrics": {...}
+   }
+
+4. Analysis Trigger
+   Results received -> Automatic analysis pipeline
+   - Breed analysis
+   - Health predictions
+   - Trait analysis
+   - Fingerprint generation
+
+5. Notification
+   Analysis complete -> Notify owner/veterinarian
+    </pre>
+
+    <h3>Veterinary System Integration</h3>
+    <table border="1">
+        <tr><th>Integration Point</th><th>Method</th><th>Use Case</th></tr>
+        <tr><td>Patient lookup</td><td>GET /profiles/search</td><td>Find profile by microchip</td></tr>
+        <tr><td>Health data</td><td>GET /health/predictions/{id}</td><td>View genetic risks</td></tr>
+        <tr><td>Drug check</td><td>GET /health/drug-sensitivity/{id}</td><td>Prescription safety</td></tr>
+        <tr><td>Care plan</td><td>GET /care/recommendations/{id}</td><td>Treatment planning</td></tr>
+    </table>
+
+    <h3>Webhook Events</h3>
+    <table border="1">
+        <tr><th>Event</th><th>Trigger</th><th>Payload</th></tr>
+        <tr><td>profile.created</td><td>New profile registered</td><td>Profile summary</td></tr>
+        <tr><td>analysis.completed</td><td>Analysis finished</td><td>Analysis type, profile ID</td></tr>
+        <tr><td>health.alert</td><td>High-risk finding</td><td>Condition, risk level</td></tr>
+        <tr><td>identity.match</td><td>Fingerprint match found</td><td>Match details</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.7 Deployment Architecture</h2>
+
+    <h3>Container Configuration</h3>
+    <pre>
+DOCKER COMPOSE CONFIGURATION
+================================================================================
+
+services:
+  api-gateway:
+    image: wia-genome/api-gateway:1.0
+    ports:
+      - "443:443"
+    environment:
+      - TLS_CERT=/certs/server.crt
+      - TLS_KEY=/certs/server.key
+
+  profile-service:
+    image: wia-genome/profile-service:1.0
+    replicas: 3
+    environment:
+      - DATABASE_URL=postgresql://...
+      - REDIS_URL=redis://cache:6379
+
+  analysis-service:
+    image: wia-genome/analysis-service:1.0
+    replicas: 2
+    resources:
+      limits:
+        memory: 8G
+        cpus: '4'
+
+  identity-service:
+    image: wia-genome/identity-service:1.0
+    replicas: 2
+
+  postgres:
+    image: postgres:15
+    volumes:
+      - genome-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+
+  redis:
+    image: redis:7
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    </pre>
+
+    <h3>Scaling Considerations</h3>
+    <table border="1">
+        <tr><th>Component</th><th>Scaling Strategy</th><th>Trigger</th></tr>
+        <tr><td>API Gateway</td><td>Horizontal</td><td>Request rate</td></tr>
+        <tr><td>Profile Service</td><td>Horizontal</td><td>CPU/memory</td></tr>
+        <tr><td>Analysis Service</td><td>Horizontal + GPU</td><td>Queue depth</td></tr>
+        <tr><td>Database</td><td>Vertical + Read replicas</td><td>Connection count</td></tr>
+        <tr><td>Cache</td><td>Cluster mode</td><td>Memory usage</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.8 Monitoring and Operations</h2>
+
+    <h3>Key Metrics</h3>
+    <table border="1">
+        <tr><th>Metric</th><th>Target</th><th>Alert Threshold</th></tr>
+        <tr><td>API Response Time (p95)</td><td><200ms</td><td>>500ms</td></tr>
+        <tr><td>API Error Rate</td><td><0.1%</td><td>>1%</td></tr>
+        <tr><td>Analysis Queue Depth</td><td><100</td><td>>500</td></tr>
+        <tr><td>Database Connection Pool</td><td><70%</td><td>>90%</td></tr>
+        <tr><td>Disk Usage</td><td><70%</td><td>>85%</td></tr>
+    </table>
+
+    <h3>Health Check Endpoints</h3>
+    <pre>
+GET /health/live
+Response: { "status": "UP" }
+
+GET /health/ready
+Response: {
+  "status": "UP",
+  "components": {
+    "database": "UP",
+    "cache": "UP",
+    "analysis-pipeline": "UP"
+  }
+}
+    </pre>
+
+    <h3>Operational Procedures</h3>
+    <ul>
+        <li>Daily: Automated backup verification</li>
+        <li>Weekly: Security scan, dependency updates</li>
+        <li>Monthly: Performance review, capacity planning</li>
+        <li>Quarterly: Disaster recovery test</li>
+    </ul>
+    <hr>
+
+    <h2>8.9 Testing Strategy</h2>
+
+    <h3>Test Categories</h3>
+    <table border="1">
+        <tr><th>Category</th><th>Coverage Target</th><th>Tools</th></tr>
+        <tr><td>Unit Tests</td><td>>80%</td><td>pytest, Jest</td></tr>
+        <tr><td>Integration Tests</td><td>All endpoints</td><td>Postman, pytest</td></tr>
+        <tr><td>Performance Tests</td><td>Load scenarios</td><td>k6, Locust</td></tr>
+        <tr><td>Security Tests</td><td>OWASP Top 10</td><td>OWASP ZAP</td></tr>
+    </table>
+
+    <h3>Test Data Management</h3>
+    <ul>
+        <li>Synthetic genome data for testing</li>
+        <li>Anonymized production data samples</li>
+        <li>Edge case datasets (rare breeds, conditions)</li>
+        <li>Performance test datasets (large scale)</li>
+    </ul>
+    <hr>
+
+    <h2>8.10 Compliance Checklist</h2>
+
+    <h3>WIA-PET-GENOME Compliance</h3>
+    <table border="1">
+        <tr><th>Requirement</th><th>Section</th><th>Status</th></tr>
+        <tr><td>Profile ID format</td><td>2.2</td><td>[ ] Implemented</td></tr>
+        <tr><td>Species enumeration</td><td>2.4</td><td>[ ] Implemented</td></tr>
+        <tr><td>Sequencing types</td><td>2.5</td><td>[ ] Implemented</td></tr>
+        <tr><td>Marker data structure</td><td>2.7</td><td>[ ] Implemented</td></tr>
+        <tr><td>Breed analysis algorithm</td><td>3.2</td><td>[ ] Implemented</td></tr>
+        <tr><td>Risk calculation</td><td>4.2</td><td>[ ] Implemented</td></tr>
+        <tr><td>Drug sensitivity</td><td>4.5</td><td>[ ] Implemented</td></tr>
+        <tr><td>Fingerprint generation</td><td>7.3</td><td>[ ] Implemented</td></tr>
+        <tr><td>Clone verification</td><td>7.5</td><td>[ ] Implemented</td></tr>
+        <tr><td>API specifications</td><td>8.3</td><td>[ ] Implemented</td></tr>
+    </table>
+    <hr>
+
+    <h2>Summary</h2>
+    <p>Implementing a WIA-PET-GENOME compliant system requires careful attention to data structures, security, and integration patterns. This guide provides the foundation for building robust systems that can manage genetic data, perform analysis, and integrate with the broader ecosystem of pet health services.</p>
+
+    <p>By following these specifications, implementers can create interoperable systems that benefit pets and their owners worldwide, aligned with the Hong-ik Ingan principle of benefiting all humanity.</p>
+    <hr>
+
+    <h2>Appendix: Quick Reference</h2>
+
+    <h3>Key URLs</h3>
+    <ul>
+        <li>API Documentation: /docs/api</li>
+        <li>OpenAPI Spec: /openapi.json</li>
+        <li>Health Check: /health/ready</li>
+        <li>Metrics: /metrics</li>
+    </ul>
+
+    <h3>Support Resources</h3>
+    <ul>
+        <li>Technical Documentation: docs.wia-genome.org</li>
+        <li>Developer Portal: developers.wia-genome.org</li>
+        <li>Community Forum: community.wia-genome.org</li>
+    </ul>
+    <hr>
+
+    <p><a href="chapter-07.html">Previous: Chapter 7 - Identity and Clone Verification</a></p>
+    <hr>
+    <p><em>WIA-PET-GENOME Technical Guide - Chapter 8</em></p>
+    <p><em>Version 1.0.0 | Hong-ik Ingan</em></p>
+</body>
+</html>

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Model Optimization & Quantization | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Model Optimization & Quantization</h1>
+        <p class="chapter-meta">WIA-AI-008 Standard • Estimated reading time: 55 minutes</p>
+
+        <h2>5.1 Why Optimize Models?</h2>
+        <p>
+            Model optimization reduces size, improves inference speed, and decreases energy consumption while maintaining
+            acceptable accuracy. This is critical for deployment on resource-constrained devices like smartphones, embedded
+            systems, and edge devices where memory and compute are limited.
+        </p>
+
+        <h3>Optimization Goals</h3>
+        <ul>
+            <li><strong>Reduce Model Size</strong>: From 100s of MB to single-digit MB</li>
+            <li><strong>Improve Latency</strong>: Faster inference for real-time applications</li>
+            <li><strong>Lower Power Consumption</strong>: Essential for mobile and edge devices</li>
+            <li><strong>Maintain Accuracy</strong>: Minimize degradation from optimizations</li>
+        </ul>
+
+        <h2>5.2 Quantization Fundamentals</h2>
+        <p>
+            Quantization reduces the precision of model weights and activations from floating-point (FP32) to lower-precision
+            formats (FP16, INT8, INT4). This dramatically reduces model size and improves inference speed on hardware with
+            specialized integer arithmetic units.
+        </p>
+
+        <h3>Quantization Types</h3>
+        <table>
+            <tr>
+                <th>Type</th>
+                <th>Precision</th>
+                <th>Size Reduction</th>
+                <th>Speedup</th>
+                <th>Accuracy Loss</th>
+            </tr>
+            <tr>
+                <td>FP32 (Baseline)</td>
+                <td>32-bit float</td>
+                <td>1x</td>
+                <td>1x</td>
+                <td>0%</td>
+            </tr>
+            <tr>
+                <td>FP16</td>
+                <td>16-bit float</td>
+                <td>2x</td>
+                <td>1.5-2x</td>
+                <td>< 0.1%</td>
+            </tr>
+            <tr>
+                <td>INT8 Dynamic</td>
+                <td>8-bit integer</td>
+                <td>4x</td>
+                <td>2-4x</td>
+                <td>0.5-2%</td>
+            </tr>
+            <tr>
+                <td>INT8 Static</td>
+                <td>8-bit integer</td>
+                <td>4x</td>
+                <td>3-4x</td>
+                <td>1-3%</td>
+            </tr>
+            <tr>
+                <td>INT4</td>
+                <td>4-bit integer</td>
+                <td>8x</td>
+                <td>4-8x</td>
+                <td>3-5%</td>
+            </tr>
+        </table>
+
+        <h2>5.3 Post-Training Quantization</h2>
+        <p>
+            Post-training quantization (PTQ) applies quantization to an already-trained model without retraining.
+        </p>
+
+        <h3>PyTorch Dynamic Quantization</h3>
+        <pre><code>import torch
+import torch.quantization
+import torchvision.models as models
+
+# Load pretrained model
+model = models.resnet18(pretrained=True)
+model.eval()
+
+# Dynamic quantization (weights only)
+quantized_model = torch.quantization.quantize_dynamic(
+    model,
+    {torch.nn.Linear, torch.nn.Conv2d},  # Layers to quantize
+    dtype=torch.qint8
+)
+
+# Compare sizes
+def get_model_size(model):
+    torch.save(model.state_dict(), "temp.pth")
+    size_mb = os.path.getsize("temp.pth") / (1024 * 1024)
+    os.remove("temp.pth")
+    return size_mb
+
+original_size = get_model_size(model)
+quantized_size = get_model_size(quantized_model)
+
+print(f"Original model: {original_size:.2f} MB")
+print(f"Quantized model: {quantized_size:.2f} MB")
+print(f"Compression ratio: {original_size / quantized_size:.2f}x")</code></pre>
+
+        <h3>PyTorch Static Quantization</h3>
+        <pre><code>import torch
+import torch.quantization
+
+# Prepare model for static quantization
+model = models.resnet18(pretrained=True)
+model.eval()
+
+# Set quantization config
+model.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+
+# Prepare for quantization (insert observers)
+model_prepared = torch.quantization.prepare(model)
+
+# Calibrate with representative data
+def calibrate(model, data_loader):
+    model.eval()
+    with torch.no_grad():
+        for data, _ in data_loader:
+            model(data)
+
+calibrate(model_prepared, calibration_loader)
+
+# Convert to quantized model
+model_quantized = torch.quantization.convert(model_prepared)
+
+# Test inference
+test_input = torch.randn(1, 3, 224, 224)
+output = model_quantized(test_input)
+
+print("Static quantization completed")</code></pre>
+
+        <h3>TensorFlow Lite Quantization</h3>
+        <pre><code>import tensorflow as tf
+
+# Load model
+model = tf.keras.applications.MobileNetV2(weights='imagenet')
+
+# Convert to TFLite with quantization
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+
+# Dynamic range quantization (weights only)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+# Full integer quantization (weights + activations)
+def representative_dataset():
+    for _ in range(100):
+        # Use real data or synthetic data matching input distribution
+        data = np.random.rand(1, 224, 224, 3).astype(np.float32)
+        yield [data]
+
+converter.representative_dataset = representative_dataset
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.int8
+converter.inference_output_type = tf.int8
+
+# Convert
+tflite_quantized_model = converter.convert()
+
+# Save
+with open('model_quantized.tflite', 'wb') as f:
+    f.write(tflite_quantized_model)
+
+print(f"Quantized model size: {len(tflite_quantized_model) / 1024:.2f} KB")</code></pre>
+
+        <h2>5.4 Quantization-Aware Training</h2>
+        <p>
+            Quantization-Aware Training (QAT) simulates quantization during training, allowing the model to adapt and
+            maintain higher accuracy after quantization.
+        </p>
+
+        <h3>PyTorch QAT</h3>
+        <pre><code>import torch
+import torch.quantization as quantization
+
+# Define model
+model = models.resnet18(pretrained=True)
+
+# Set QAT config
+model.train()
+model.qconfig = quantization.get_default_qat_qconfig('fbgemm')
+
+# Prepare for QAT
+model_prepared = quantization.prepare_qat(model)
+
+# Training loop with QAT
+optimizer = torch.optim.SGD(model_prepared.parameters(), lr=0.001)
+criterion = torch.nn.CrossEntropyLoss()
+
+for epoch in range(num_epochs):
+    for data, target in train_loader:
+        optimizer.zero_grad()
+        output = model_prepared(data)
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+
+    # Disable observer and fold batch norm after a few epochs
+    if epoch > 3:
+        model_prepared.apply(torch.quantization.disable_observer)
+    if epoch > 2:
+        model_prepared.apply(torch.nn.intrinsic.qat.freeze_bn_stats)
+
+# Convert to quantized model
+model_prepared.eval()
+model_quantized = quantization.convert(model_prepared)
+
+# Evaluate
+test_accuracy = evaluate(model_quantized, test_loader)
+print(f"QAT model accuracy: {test_accuracy:.2f}%")</code></pre>
+
+        <h3>TensorFlow QAT</h3>
+        <pre><code>import tensorflow as tf
+import tensorflow_model_optimization as tfmot
+
+# Load model
+model = tf.keras.applications.MobileNetV2(weights='imagenet', classes=1000)
+
+# Apply quantization-aware training
+quantize_model = tfmot.quantization.keras.quantize_model
+
+qat_model = quantize_model(model)
+
+# Compile with QAT
+qat_model.compile(
+    optimizer='adam',
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+    metrics=['accuracy']
+)
+
+# Train
+qat_model.fit(train_dataset, epochs=10, validation_data=val_dataset)
+
+# Convert to TFLite
+converter = tf.lite.TFLiteConverter.from_keras_model(qat_model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+tflite_qat_model = converter.convert()
+
+with open('model_qat.tflite', 'wb') as f:
+    f.write(tflite_qat_model)</code></pre>
+
+        <h2>5.5 Pruning</h2>
+        <p>
+            Pruning removes unimportant weights from the network, creating sparse models that are smaller and faster.
+        </p>
+
+        <h3>Magnitude-Based Pruning</h3>
+        <pre><code>import torch
+import torch.nn.utils.prune as prune
+
+# Load model
+model = models.resnet18(pretrained=True)
+
+# Prune 30% of Conv2d weights by magnitude
+for name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        prune.l1_unstructured(module, name='weight', amount=0.3)
+
+# Make pruning permanent
+for name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        prune.remove(module, 'weight')
+
+# Check sparsity
+def check_sparsity(model):
+    total_params = 0
+    zero_params = 0
+    for param in model.parameters():
+        total_params += param.numel()
+        zero_params += (param == 0).sum().item()
+
+    sparsity = 100.0 * zero_params / total_params
+    return sparsity
+
+sparsity = check_sparsity(model)
+print(f"Model sparsity: {sparsity:.2f}%")</code></pre>
+
+        <h3>Structured Pruning</h3>
+        <pre><code># Prune entire channels/filters (more hardware-friendly)
+prune.ln_structured(
+    module,
+    name='weight',
+    amount=0.5,  # Prune 50% of filters
+    n=2,         # L2 norm
+    dim=0        # Prune along output channel dimension
+)
+
+# TensorFlow pruning
+import tensorflow_model_optimization as tfmot
+
+# Define pruning schedule
+pruning_params = {
+    'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(
+        initial_sparsity=0.0,
+        final_sparsity=0.5,
+        begin_step=0,
+        end_step=1000
+    )
+}
+
+# Apply pruning
+model_for_pruning = tfmot.sparsity.keras.prune_low_magnitude(model, **pruning_params)
+
+# Compile and train
+model_for_pruning.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model_for_pruning.fit(train_dataset, epochs=10, callbacks=[tfmot.sparsity.keras.UpdatePruningStep()])
+
+# Strip pruning wrappers
+model_pruned = tfmot.sparsity.keras.strip_pruning(model_for_pruning)</code></pre>
+
+        <h2>5.6 Knowledge Distillation</h2>
+        <p>
+            Knowledge distillation trains a smaller "student" model to mimic a larger "teacher" model, achieving better
+            accuracy than training the student from scratch.
+        </p>
+
+        <pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class DistillationLoss(nn.Module):
+    def __init__(self, temperature=3.0, alpha=0.5):
+        super().__init__()
+        self.temperature = temperature
+        self.alpha = alpha
+        self.ce_loss = nn.CrossEntropyLoss()
+
+    def forward(self, student_logits, teacher_logits, targets):
+        # Soft targets from teacher
+        soft_loss = F.kl_div(
+            F.log_softmax(student_logits / self.temperature, dim=1),
+            F.softmax(teacher_logits / self.temperature, dim=1),
+            reduction='batchmean'
+        ) * (self.temperature ** 2)
+
+        # Hard targets (ground truth)
+        hard_loss = self.ce_loss(student_logits, targets)
+
+        # Combined loss
+        return self.alpha * soft_loss + (1 - self.alpha) * hard_loss
+
+# Teacher model (large)
+teacher = models.resnet50(pretrained=True)
+teacher.eval()
+
+# Student model (small)
+student = models.resnet18(pretrained=False)
+
+# Training loop
+distill_loss_fn = DistillationLoss(temperature=3.0, alpha=0.7)
+optimizer = torch.optim.Adam(student.parameters(), lr=0.001)
+
+for epoch in range(num_epochs):
+    for data, targets in train_loader:
+        # Teacher predictions (no gradients)
+        with torch.no_grad():
+            teacher_logits = teacher(data)
+
+        # Student predictions
+        student_logits = student(data)
+
+        # Distillation loss
+        loss = distill_loss_fn(student_logits, teacher_logits, targets)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+print("Knowledge distillation completed")</code></pre>
+
+        <h2>5.7 Graph Optimization</h2>
+        <p>
+            Graph-level optimizations transform the computational graph for better performance.
+        </p>
+
+        <h3>Operator Fusion</h3>
+        <pre><code># Conv + BatchNorm + ReLU → Fused ConvBNReLU
+# Reduces memory access and improves performance
+
+# PyTorch fusion
+model = models.resnet18(pretrained=True)
+model.eval()
+
+# Fuse modules
+model_fused = torch.quantization.fuse_modules(
+    model,
+    [['conv1', 'bn1', 'relu']],  # Modules to fuse
+    inplace=False
+)
+
+# ONNX Runtime optimizations
+import onnxruntime as ort
+
+session_options = ort.SessionOptions()
+session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+session = ort.InferenceSession("model.onnx", session_options)</code></pre>
+
+        <h3>Constant Folding</h3>
+        <pre><code># Evaluate constant expressions at compile time
+# Example: If model has "x * 2 + 3", compute it once instead of every inference
+
+# Automatically done during ONNX export
+torch.onnx.export(
+    model,
+    dummy_input,
+    "model.onnx",
+    do_constant_folding=True  # Enable constant folding
+)</code></pre>
+
+        <h2>5.8 Hardware-Specific Optimizations</h2>
+
+        <h3>NVIDIA TensorRT</h3>
+        <pre><code>import tensorrt as trt
+
+# Build optimized engine for NVIDIA GPUs
+logger = trt.Logger(trt.Logger.WARNING)
+builder = trt.Builder(logger)
+network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+parser = trt.OnnxParser(network, logger)
+
+# Parse ONNX model
+with open('model.onnx', 'rb') as f:
+    parser.parse(f.read())
+
+# Configure optimization
+config = builder.create_builder_config()
+config.max_workspace_size = 1 << 30  # 1GB
+config.set_flag(trt.BuilderFlag.FP16)  # Enable FP16
+config.set_flag(trt.BuilderFlag.STRICT_TYPES)
+
+# Build optimized engine
+engine = builder.build_engine(network, config)
+
+# Speedup: 3-5x on NVIDIA GPUs</code></pre>
+
+        <h3>Apple Core ML</h3>
+        <pre><code>import coremltools as ct
+
+# Convert with optimizations for Apple Neural Engine
+model = ct.convert(
+    "model.onnx",
+    compute_units=ct.ComputeUnit.ALL,  # Use Neural Engine + GPU + CPU
+    minimum_deployment_target=ct.target.iOS15
+)
+
+# Apply optimizations
+model = ct.models.neural_network.quantization_utils.quantize_weights(model, nbits=8)
+
+model.save("model_optimized.mlmodel")</code></pre>
+
+        <h2>5.9 Measuring Optimization Impact</h2>
+
+        <h3>Benchmark Suite</h3>
+        <pre><code>import time
+import numpy as np
+
+def benchmark_model(model, input_shape, num_iterations=100, warmup=10):
+    """
+    Benchmark model inference performance
+    """
+    # Warmup
+    dummy_input = torch.randn(*input_shape)
+    for _ in range(warmup):
+        _ = model(dummy_input)
+
+    # Benchmark
+    torch.cuda.synchronize() if torch.cuda.is_available() else None
+    start_time = time.time()
+
+    for _ in range(num_iterations):
+        _ = model(dummy_input)
+
+    torch.cuda.synchronize() if torch.cuda.is_available() else None
+    end_time = time.time()
+
+    # Calculate metrics
+    total_time = end_time - start_time
+    avg_latency = (total_time / num_iterations) * 1000  # ms
+    throughput = num_iterations / total_time  # fps
+
+    return {
+        'avg_latency_ms': avg_latency,
+        'throughput_fps': throughput,
+        'total_time_s': total_time
+    }
+
+# Compare original vs optimized
+results_original = benchmark_model(model_original, (1, 3, 224, 224))
+results_optimized = benchmark_model(model_optimized, (1, 3, 224, 224))
+
+print("Original Model:")
+print(f"  Latency: {results_original['avg_latency_ms']:.2f} ms")
+print(f"  Throughput: {results_original['throughput_fps']:.2f} FPS")
+
+print("\nOptimized Model:")
+print(f"  Latency: {results_optimized['avg_latency_ms']:.2f} ms")
+print(f"  Throughput: {results_optimized['throughput_fps']:.2f} FPS")
+
+speedup = results_original['avg_latency_ms'] / results_optimized['avg_latency_ms']
+print(f"\nSpeedup: {speedup:.2f}x")</code></pre>
+
+        <h2>5.10 Accuracy-Performance Trade-offs</h2>
+
+        <h3>Pareto Frontier Analysis</h3>
+        <pre><code># Evaluate different optimization configurations
+configs = [
+    {'name': 'Baseline', 'quantization': None, 'pruning': 0},
+    {'name': 'FP16', 'quantization': 'fp16', 'pruning': 0},
+    {'name': 'INT8', 'quantization': 'int8', 'pruning': 0},
+    {'name': 'INT8+Prune30', 'quantization': 'int8', 'pruning': 0.3},
+    {'name': 'INT8+Prune50', 'quantization': 'int8', 'pruning': 0.5},
+]
+
+results = []
+for config in configs:
+    model_opt = apply_optimizations(model, config)
+    accuracy = evaluate_accuracy(model_opt, test_loader)
+    latency = benchmark_model(model_opt, (1, 3, 224, 224))['avg_latency_ms']
+    size_mb = get_model_size(model_opt)
+
+    results.append({
+        'name': config['name'],
+        'accuracy': accuracy,
+        'latency': latency,
+        'size_mb': size_mb
+    })
+
+# Print results
+print("Optimization Results:")
+print(f"{'Config':<20} {'Accuracy':<12} {'Latency (ms)':<15} {'Size (MB)':<12}")
+print("-" * 60)
+for r in results:
+    print(f"{r['name']:<20} {r['accuracy']:<12.2f} {r['latency']:<15.2f} {r['size_mb']:<12.2f}")</code></pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Model optimization reduces size, improves speed, and lowers power consumption</li>
+                <li>Quantization converts FP32 to lower precision (FP16, INT8, INT4) with 2-8x compression</li>
+                <li>Post-training quantization (PTQ) applies to trained models without retraining</li>
+                <li>Quantization-aware training (QAT) maintains higher accuracy by simulating quantization during training</li>
+                <li>Pruning removes unimportant weights, creating sparse models</li>
+                <li>Knowledge distillation trains smaller models to mimic larger ones</li>
+                <li>Graph optimizations (fusion, constant folding) improve inference performance</li>
+                <li>Hardware-specific optimizations (TensorRT, CoreML) provide additional speedups</li>
+                <li>Always benchmark and measure accuracy-performance trade-offs</li>
+                <li>Choose optimizations based on deployment target and requirements</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the main goals of model optimization?</li>
+                <li>Compare FP16, INT8, and INT4 quantization in terms of size, speed, and accuracy.</li>
+                <li>What is the difference between dynamic and static quantization?</li>
+                <li>Why does quantization-aware training (QAT) maintain higher accuracy than post-training quantization?</li>
+                <li>Explain the difference between structured and unstructured pruning.</li>
+                <li>How does knowledge distillation work? What are the "soft" and "hard" targets?</li>
+                <li>What is operator fusion and why does it improve performance?</li>
+                <li>When would you use TensorRT vs ONNX Runtime for deployment?</li>
+                <li>Design a benchmark suite to compare model optimizations.</li>
+                <li>How do you analyze accuracy-performance trade-offs when applying multiple optimizations?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 운영 및 컴플라이언스 | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>제7장: 운영 및 컴플라이언스</h1>
+
+    <div class="highlight">
+        <strong>장 개요:</strong> 보안 운영은 보안 정책을 지속적인 실천으로 전환합니다. 이 장에서는 지속적 모니터링, 위협 탐지 시스템, SIEM 통합, 그리고 블록체인 시스템을 위한 규제 컴플라이언스 프레임워크를 다룹니다.
+    </div>
+
+    <h2>보안 운영 센터(SOC)</h2>
+    <p>블록체인 중심의 보안 운영 센터는 네트워크 상태, 트랜잭션 패턴, 잠재적 위협을 실시간으로 모니터링합니다. SOC는 보안 운영의 신경 중추 역할을 합니다.</p>
+
+    <h3>SOC 아키텍처</h3>
+    <pre><code>블록체인 보안 운영 센터 아키텍처:
+
+┌─────────────────────────────────────────────────────────────────┐
+│                        SOC 대시보드                               │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐ │
+│  │   알림   │  │   메트릭  │  │   사고   │  │  컴플라이언스 상태 │ │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────────┬─────────┘ │
+└───────┼─────────────┼─────────────┼─────────────────┼───────────┘
+        ▼             ▼             ▼                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SIEM / 로그 집계                               │
+│  - 로그 상관관계 분석        - 위협 인텔리전스 상관관계            │
+│  - 이상 탐지 알고리즘        - 자동화된 플레이북 실행              │
+└─────────────────────────────────────────────────────────────────┘
+        ▲             ▲             ▲                 ▲
+┌───────┴───────┬─────┴─────┬───────┴───────┬─────────┴───────────┐
+│ 노드 에이전트  │  네트워크  │ 스마트 컨트랙트│  API 및 애플리케이션 │
+│ - 피어 상태   │ - 트래픽   │ - 이벤트 로그  │ - 접근 로그         │
+│ - 동기화 상태 │ - 지연시간 │ - 상태 변경    │ - 감사 추적         │
+└───────────────┴───────────┴───────────────┴─────────────────────┘</code></pre>
+
+    <h3>모니터링 구현</h3>
+    <pre><code>// 종합 보안 모니터링 시스템
+import { EventEmitter } from 'events';
+import { InfluxDB, Point } from '@influxdata/influxdb-client';
+
+interface AlertThresholds {
+    transactionVolumeSpike: number;
+    failedTransactionRate: number;
+    nodeLatencyMs: number;
+    memoryUsagePercent: number;
+    peerCountMinimum: number;
+}
+
+class BlockchainSecurityMonitor extends EventEmitter {
+    private influx: InfluxDB;
+    private thresholds: AlertThresholds;
+
+    async monitorNode(nodeId: string): Promise&lt;void&gt; {
+        const metrics = await this.collectNodeMetrics(nodeId);
+
+        // InfluxDB에 메트릭 기록
+        const point = new Point('node_metrics')
+            .tag('node_id', nodeId)
+            .floatField('cpu_usage', metrics.cpuUsage)
+            .floatField('memory_usage', metrics.memoryUsage)
+            .intField('peer_count', metrics.peerCount);
+
+        this.writeApi.writePoint(point);
+        this.checkThresholds(nodeId, metrics);
+    }
+
+    private checkThresholds(nodeId: string, metrics: NodeMetrics): void {
+        if (metrics.memoryUsage > this.thresholds.memoryUsagePercent) {
+            this.emit('alert', {
+                type: 'HIGH_MEMORY_USAGE',
+                severity: 'warning',
+                nodeId,
+                message: `노드 ${nodeId} 메모리 사용량 ${metrics.memoryUsage}%`
+            });
+        }
+
+        if (metrics.peerCount < this.thresholds.peerCountMinimum) {
+            this.emit('alert', {
+                type: 'LOW_PEER_COUNT',
+                severity: 'warning',
+                message: `노드 ${nodeId}의 피어가 ${metrics.peerCount}개뿐임`
+            });
+        }
+    }
+}</code></pre>
+
+    <h2>위협 탐지 시스템</h2>
+    <p>고급 위협 탐지는 규칙 기반 탐지와 머신러닝을 결합하여 알려진 공격 패턴과 새로운 위협 모두를 식별합니다.</p>
+
+    <h3>탐지 규칙 엔진</h3>
+    <pre><code>// 위협 탐지 규칙 엔진
+interface DetectionRule {
+    id: string;
+    name: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    conditions: RuleCondition[];
+    actions: RuleAction[];
+    enabled: boolean;
+}
+
+class ThreatDetectionEngine {
+    private rules: DetectionRule[];
+
+    async evaluate(event: SecurityEvent): Promise&lt;DetectionResult[]&gt; {
+        const results: DetectionResult[] = [];
+
+        for (const rule of this.rules) {
+            const match = await this.evaluateRule(rule, event);
+            if (match.triggered && !this.isDuplicate(rule.id, event)) {
+                results.push({
+                    ruleId: rule.id,
+                    ruleName: rule.name,
+                    severity: rule.severity,
+                    timestamp: Date.now()
+                });
+                await this.executeActions(rule.actions, event, match);
+            }
+        }
+        return results;
+    }
+}
+
+// 예시 탐지 규칙
+const blockchainDetectionRules: DetectionRule[] = [
+    {
+        id: 'REEN-001',
+        name: '재진입 공격 패턴',
+        severity: 'critical',
+        conditions: [
+            { field: 'event.type', operator: 'eq', value: 'CONTRACT_CALL' },
+            { field: 'event.depth', operator: 'gt', value: 2 }
+        ],
+        actions: [
+            { type: 'ALERT', target: 'security-team' },
+            { type: 'LOG', level: 'critical' }
+        ],
+        enabled: true
+    }
+];</code></pre>
+
+    <h2>규제 컴플라이언스 프레임워크</h2>
+    <p>블록체인 시스템은 관할권과 사용 사례에 따라 다양한 규제 요구사항을 준수해야 합니다.</p>
+
+    <div class="highlight">
+        <strong>컴플라이언스는 지속적입니다:</strong> 규제 요구사항은 끊임없이 진화합니다. 조직은 규제 변화를 모니터링하고 컴플라이언스 프로그램을 적절히 조정하는 프로세스를 수립해야 합니다.
+    </div>
+
+    <h3>컴플라이언스 프레임워크 매핑</h3>
+    <table>
+        <tr><th>규제</th><th>관할권</th><th>주요 요구사항</th><th>블록체인 영향</th></tr>
+        <tr><td>GDPR</td><td>EU</td><td>데이터 보호, 삭제권</td><td>오프체인 PII, 프라이버시 레이어</td></tr>
+        <tr><td>MiCA</td><td>EU</td><td>암호자산 규제</td><td>토큰 분류, 수탁</td></tr>
+        <tr><td>FATF 트래블 룰</td><td>글로벌</td><td>송금자 정보</td><td>$3000 이상 전송에 KYC</td></tr>
+        <tr><td>SOC 2</td><td>미국</td><td>보안 통제</td><td>노드 보안, 접근 통제</td></tr>
+        <tr><td>PCI-DSS</td><td>글로벌</td><td>결제 카드 보안</td><td>키 관리, 암호화</td></tr>
+        <tr><td>BSA/AML</td><td>미국</td><td>자금세탁 방지</td><td>트랜잭션 모니터링, SAR</td></tr>
+    </table>
+
+    <h3>컴플라이언스 모니터링 시스템</h3>
+    <pre><code>// 자동화된 컴플라이언스 모니터링
+interface ComplianceCheck {
+    id: string;
+    regulation: string;
+    requirement: string;
+    checkFunction: () => Promise&lt;ComplianceResult&gt;;
+    frequency: 'realtime' | 'hourly' | 'daily' | 'weekly';
+}
+
+interface ComplianceResult {
+    compliant: boolean;
+    score: number;
+    findings: Finding[];
+    recommendations: string[];
+}
+
+class ComplianceMonitor {
+    private checks: ComplianceCheck[];
+
+    async runComplianceAudit(): Promise&lt;ComplianceReport&gt; {
+        const results: Map&lt;string, ComplianceResult&gt; = new Map();
+
+        for (const check of this.checks) {
+            const result = await check.checkFunction();
+            results.set(check.id, result);
+        }
+
+        return this.generateReport(results);
+    }
+
+    private generateReport(results: Map&lt;string, ComplianceResult&gt;): ComplianceReport {
+        const scores = Array.from(results.values()).map(r => r.score);
+        const overallScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+        return {
+            timestamp: new Date(),
+            overallScore,
+            overallCompliant: overallScore >= 80,
+            detailedResults: Object.fromEntries(results)
+        };
+    }
+}
+
+// FATF 트래블 룰 컴플라이언스 검사
+const travelRuleCheck: ComplianceCheck = {
+    id: 'FATF-TR-001',
+    regulation: 'FATF 트래블 룰',
+    requirement: '$3000 이상 전송에 대한 송금자 및 수취인 정보',
+    frequency: 'realtime',
+    checkFunction: async (): Promise&lt;ComplianceResult&gt; => {
+        const transactions = await getRecentTransactions({ minValue: 3000 });
+        const findings: Finding[] = [];
+
+        for (const tx of transactions) {
+            if (!tx.originatorInfo || !tx.beneficiaryInfo) {
+                findings.push({
+                    type: 'violation',
+                    severity: 'high',
+                    message: `트랜잭션 ${tx.hash}에 필수 당사자 정보 누락`
+                });
+            }
+        }
+
+        return {
+            compliant: findings.length === 0,
+            score: Math.max(0, 100 - (findings.length * 10)),
+            findings,
+            recommendations: findings.length > 0
+                ? ['필수 송금자/수취인 정보 수집 구현']
+                : []
+        };
+    }
+};</code></pre>
+
+    <div class="highlight">
+        <strong>요약:</strong> 보안 운영과 컴플라이언스는 시간이 지남에 따라 안전한 블록체인 환경을 유지하기 위한 기반을 형성합니다. 지속적인 모니터링, 위협 탐지, 규제 컴플라이언스에는 위협 환경과 규제 환경에 따라 진화하는 전용 프로세스와 도구가 필요합니다.
+    </div>
+
+</body>
+</html>

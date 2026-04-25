@@ -351,10 +351,6 @@ This standard applies to:
 
 ### 10.3 Literature
 
-- 선행 연구 Dermatologist-level classification
-- 선행 연구 Diabetic retinopathy detection
-- 선행 연구 CheXNet pneumonia detection
-- 선행 연구 Breast cancer screening
 
 ---
 

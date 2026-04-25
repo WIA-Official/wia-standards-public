@@ -1,689 +1,1462 @@
-# WIA Cryo-Legal Standard - Phase 3: Communication Protocol
+# CRYO-LEGAL Phase 3: Protocol Specification
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
+## Overview
+
+This document defines the REST API protocol for legal status management, document handling, jurisdiction recognition, and restoration workflows.
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.0.3
+info:
+  title: CRYO-LEGAL Protocol API
+  description: |
+    WIA Standard API for legal status management of cryopreserved individuals.
+    Handles death certificates, preservation declarations, jurisdiction recognition,
+    and legal restoration upon revival.
+  version: 1.0.0
+  contact:
+    name: WIA Technical Committee
+    url: https://wia.org/standards/cryo-legal
+  license:
+    name: WIA Open Standard License
+    url: https://wia.org/licenses/open-standard
+
+servers:
+  - url: https://api.wia-legal.org/v1
+    description: Production server
+  - url: https://staging-api.wia-legal.org/v1
+    description: Staging server
+
+tags:
+  - name: status
+    description: Legal status management
+  - name: documents
+    description: Legal document handling
+  - name: jurisdictions
+    description: Multi-jurisdiction recognition
+  - name: restoration
+    description: Legal restoration workflow
+  - name: guardianship
+    description: Guardianship management
+
+paths:
+  /records:
+    post:
+      tags: [status]
+      summary: Create a new legal status record
+      operationId: createRecord
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecordRequest'
+      responses:
+        '201':
+          description: Record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalStatusRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    get:
+      tags: [status]
+      summary: List legal status records
+      operationId: listRecords
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/LegalStatus'
+        - name: jurisdiction
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LegalStatusRecordSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /records/{recordId}:
+    get:
+      tags: [status]
+      summary: Get legal status record
+      operationId: getRecord
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/recordId'
+      responses:
+        '200':
+          description: Legal status record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalStatusRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /records/{recordId}/transition:
+    post:
+      tags: [status]
+      summary: Transition legal status
+      operationId: transitionStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/recordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionRequest'
+      responses:
+        '200':
+          description: Transition result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransitionResult'
+        '400':
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransitionError'
+
+  /records/{recordId}/history:
+    get:
+      tags: [status]
+      summary: Get status transition history
+      operationId: getStatusHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/recordId'
+      responses:
+        '200':
+          description: Status history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_status:
+                    $ref: '#/components/schemas/LegalStatus'
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StatusTransition'
+
+  /documents:
+    post:
+      tags: [documents]
+      summary: Create a legal document
+      operationId: createDocument
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocument'
+
+    get:
+      tags: [documents]
+      summary: List legal documents
+      operationId: listDocuments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: record_id
+          in: query
+          schema:
+            type: string
+        - name: document_type
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentType'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentStatus'
+      responses:
+        '200':
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LegalDocumentSummary'
+
+  /documents/{documentId}:
+    get:
+      tags: [documents]
+      summary: Get legal document
+      operationId: getDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Legal document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocument'
+
+  /documents/{documentId}/content:
+    get:
+      tags: [documents]
+      summary: Download document content
+      operationId: downloadDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document content
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /documents/{documentId}/signatures:
+    post:
+      tags: [documents]
+      summary: Add signature to document
+      operationId: addSignature
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignatureRequest'
+      responses:
+        '201':
+          description: Signature added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Signature'
+
+  /documents/{documentId}/finalize:
+    post:
+      tags: [documents]
+      summary: Finalize document
+      operationId: finalizeDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document finalized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocument'
+
+  /documents/{documentId}/notarize:
+    post:
+      tags: [documents]
+      summary: Notarize document
+      operationId: notarizeDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotarizationRequest'
+      responses:
+        '200':
+          description: Document notarized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocument'
+
+  /documents/{documentId}/apostille:
+    post:
+      tags: [documents]
+      summary: Add apostille to document
+      operationId: addApostille
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApostilleRequest'
+      responses:
+        '200':
+          description: Apostille added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocument'
+
+  /documents/{documentId}/verify:
+    get:
+      tags: [documents]
+      summary: Verify document validity
+      operationId: verifyDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVerification'
+
+  /jurisdictions:
+    get:
+      tags: [jurisdictions]
+      summary: List supported jurisdictions
+      operationId: listJurisdictions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of jurisdictions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Jurisdiction'
+
+  /jurisdictions/{countryCode}:
+    get:
+      tags: [jurisdictions]
+      summary: Get jurisdiction details
+      operationId: getJurisdiction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: countryCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Jurisdiction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JurisdictionDetails'
+
+  /records/{recordId}/jurisdictions:
+    get:
+      tags: [jurisdictions]
+      summary: Get jurisdiction recognitions for record
+      operationId: getRecordJurisdictions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/recordId'
+      responses:
+        '200':
+          description: Jurisdiction recognitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JurisdictionRecognition'
+
+    post:
+      tags: [jurisdictions]
+      summary: Register jurisdiction recognition
+      operationId: registerJurisdiction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/recordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JurisdictionRegistrationRequest'
+      responses:
+        '201':
+          description: Recognition registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JurisdictionRecognition'
+
+  /jurisdictions/check-recognition:
+    post:
+      tags: [jurisdictions]
+      summary: Check recognition between jurisdictions
+      operationId: checkRecognition
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecognitionCheckRequest'
+      responses:
+        '200':
+          description: Recognition check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecognitionCheckResult'
+
+  /restoration:
+    post:
+      tags: [restoration]
+      summary: Initiate legal restoration case
+      operationId: initiateRestoration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateRestorationRequest'
+      responses:
+        '201':
+          description: Restoration case initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestorationCase'
+
+    get:
+      tags: [restoration]
+      summary: List restoration cases
+      operationId: listRestorationCases
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RestorationStage'
+      responses:
+        '200':
+          description: List of restoration cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RestorationCaseSummary'
+
+  /restoration/{caseId}:
+    get:
+      tags: [restoration]
+      summary: Get restoration case details
+      operationId: getRestorationCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Restoration case details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestorationCase'
+
+  /restoration/{caseId}/tasks:
+    get:
+      tags: [restoration]
+      summary: Get restoration tasks
+      operationId: getRestorationTasks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stage
+          in: query
+          schema:
+            $ref: '#/components/schemas/RestorationStage'
+        - name: completed
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Restoration tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RestorationTask'
+
+  /restoration/{caseId}/tasks/{taskId}/complete:
+    post:
+      tags: [restoration]
+      summary: Complete a restoration task
+      operationId: completeTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteTaskRequest'
+      responses:
+        '200':
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestorationTask'
+
+  /restoration/{caseId}/court-petition:
+    post:
+      tags: [restoration]
+      summary: File court petition
+      operationId: fileCourtPetition
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourtPetitionRequest'
+      responses:
+        '201':
+          description: Petition filed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourtPetitionResult'
+
+  /restoration/{caseId}/court-decision:
+    post:
+      tags: [restoration]
+      summary: Record court decision
+      operationId: recordCourtDecision
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourtDecisionRequest'
+      responses:
+        '200':
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestorationCase'
+
+  /guardianship:
+    post:
+      tags: [guardianship]
+      summary: Create guardianship
+      operationId: createGuardianship
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGuardianshipRequest'
+      responses:
+        '201':
+          description: Guardianship created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardianship'
+
+  /guardianship/{guardianshipId}:
+    get:
+      tags: [guardianship]
+      summary: Get guardianship details
+      operationId: getGuardianship
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: guardianshipId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Guardianship details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardianship'
+
+  /guardianship/{guardianshipId}/authorize:
+    post:
+      tags: [guardianship]
+      summary: Check guardian authorization
+      operationId: checkAuthorization
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: guardianshipId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizationCheckRequest'
+      responses:
+        '200':
+          description: Authorization check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationResult'
+
+  /guardianship/{guardianshipId}/terminate:
+    post:
+      tags: [guardianship]
+      summary: Terminate guardianship
+      operationId: terminateGuardianship
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: guardianshipId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminateGuardianshipRequest'
+      responses:
+        '200':
+          description: Guardianship terminated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardianship'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    recordId:
+      name: recordId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^LEGAL-[0-9]{4}-[0-9]{6}$'
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    LegalStatus:
+      type: string
+      enum:
+        - LIVING
+        - LEGALLY_DECEASED
+        - PRESERVED_STATUS
+        - REVIVAL_PENDING
+        - LEGALLY_RESTORED
+        - PERMANENT_DEATH
+
+    DocumentType:
+      type: string
+      enum:
+        - DEATH_CERTIFICATE
+        - PRESERVATION_DECLARATION
+        - RESTORATION_CERTIFICATE
+        - COURT_ORDER
+        - GUARDIANSHIP_ORDER
+        - TRUST_DOCUMENT
+        - POWER_OF_ATTORNEY
+        - IDENTITY_VERIFICATION
+
+    DocumentStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PENDING_SIGNATURE
+        - ACTIVE
+        - SUPERSEDED
+        - REVOKED
+        - EXPIRED
+
+    RestorationStage:
+      type: string
+      enum:
+        - INITIATED
+        - IDENTITY_VERIFICATION
+        - MEDICAL_CLEARANCE
+        - LEGAL_REVIEW
+        - COURT_PETITION
+        - COURT_HEARING
+        - RESTORATION_GRANTED
+        - RIGHTS_RESTORATION
+        - COMPLETED
+        - DENIED
+
+    CreateRecordRequest:
+      type: object
+      required:
+        - subject_id
+        - identity_id
+        - primary_jurisdiction
+      properties:
+        subject_id:
+          type: string
+        identity_id:
+          type: string
+        primary_jurisdiction:
+          type: string
+
+    LegalStatusRecord:
+      type: object
+      properties:
+        record_id:
+          type: string
+        subject_id:
+          type: string
+        identity_id:
+          type: string
+        current_status:
+          $ref: '#/components/schemas/LegalStatus'
+        primary_jurisdiction:
+          $ref: '#/components/schemas/Jurisdiction'
+        death_certificate:
+          $ref: '#/components/schemas/DeathCertificate'
+        preservation_declaration:
+          $ref: '#/components/schemas/PreservationDeclaration'
+        restoration_certificate:
+          $ref: '#/components/schemas/RestorationCertificate'
+        guardianship:
+          $ref: '#/components/schemas/GuardianshipSummary'
+        created_at:
+          type: string
+          format: date-time
+        last_updated:
+          type: string
+          format: date-time
+
+    LegalStatusRecordSummary:
+      type: object
+      properties:
+        record_id:
+          type: string
+        subject_id:
+          type: string
+        current_status:
+          $ref: '#/components/schemas/LegalStatus'
+        primary_jurisdiction:
+          type: string
+
+    StatusTransition:
+      type: object
+      properties:
+        transition_id:
+          type: string
+        from_status:
+          $ref: '#/components/schemas/LegalStatus'
+        to_status:
+          $ref: '#/components/schemas/LegalStatus'
+        transition_date:
+          type: string
+          format: date-time
+        authority_id:
+          type: string
+        document_ref:
+          type: string
+        reason:
+          type: string
+
+    TransitionRequest:
+      type: object
+      required:
+        - to_status
+        - authority_id
+        - document_ref
+        - reason
+      properties:
+        to_status:
+          $ref: '#/components/schemas/LegalStatus'
+        authority_id:
+          type: string
+        document_ref:
+          type: string
+        reason:
+          type: string
+
+    TransitionResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        transition:
+          $ref: '#/components/schemas/StatusTransition'
+        new_status:
+          $ref: '#/components/schemas/LegalStatus'
+
+    TransitionError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        current_status:
+          $ref: '#/components/schemas/LegalStatus'
+        valid_transitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/LegalStatus'
+
+    Jurisdiction:
+      type: object
+      properties:
+        country:
+          type: string
+        country_code:
+          type: string
+        region:
+          type: string
+        legal_system:
+          type: string
+        treaty_member:
+          type: boolean
+
+    JurisdictionDetails:
+      type: object
+      properties:
+        jurisdiction:
+          $ref: '#/components/schemas/Jurisdiction'
+        recognition_requirements:
+          type: array
+          items:
+            type: string
+        bilateral_agreements:
+          type: array
+          items:
+            type: string
+        local_authorities:
+          type: array
+          items:
+            type: object
+
+    JurisdictionRecognition:
+      type: object
+      properties:
+        jurisdiction:
+          $ref: '#/components/schemas/Jurisdiction'
+        recognition_status:
+          type: string
+        local_status_equivalent:
+          type: string
+        registration_id:
+          type: string
+        registration_date:
+          type: string
+          format: date-time
+
+    DeathCertificate:
+      type: object
+      properties:
+        certificate_id:
+          type: string
+        certificate_number:
+          type: string
+        date_of_death:
+          type: string
+          format: date
+        cause_of_death:
+          type: string
+        preservation_annotated:
+          type: boolean
+        issue_date:
+          type: string
+          format: date
+
+    PreservationDeclaration:
+      type: object
+      properties:
+        declaration_id:
+          type: string
+        declaration_type:
+          type: string
+        facility_id:
+          type: string
+        preservation_date:
+          type: string
+          format: date
+        legal_effects:
+          type: object
+        effective_date:
+          type: string
+          format: date
+
+    RestorationCertificate:
+      type: object
+      properties:
+        certificate_id:
+          type: string
+        revival_procedure_id:
+          type: string
+        revival_date:
+          type: string
+          format: date
+        restored_rights:
+          type: object
+        issue_date:
+          type: string
+          format: date
+
+    LegalDocument:
+      type: object
+      properties:
+        document_id:
+          type: string
+        document_type:
+          $ref: '#/components/schemas/DocumentType'
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        content_hash:
+          type: string
+        signatures:
+          type: array
+          items:
+            $ref: '#/components/schemas/Signature'
+        notarized:
+          type: boolean
+        apostille:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        effective_date:
+          type: string
+          format: date-time
+
+    LegalDocumentSummary:
+      type: object
+      properties:
+        document_id:
+          type: string
+        document_type:
+          $ref: '#/components/schemas/DocumentType'
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+
+    Signature:
+      type: object
+      properties:
+        signer_id:
+          type: string
+        signer_name:
+          type: string
+        signer_role:
+          type: string
+        signature_date:
+          type: string
+          format: date-time
+        signature_type:
+          type: string
+        verified:
+          type: boolean
+
+    RestorationCase:
+      type: object
+      properties:
+        case_id:
+          type: string
+        subject_id:
+          type: string
+        revival_procedure_id:
+          type: string
+        current_stage:
+          $ref: '#/components/schemas/RestorationStage'
+        stages_completed:
+          type: array
+          items:
+            $ref: '#/components/schemas/RestorationStage'
+        court_case_number:
+          type: string
+        decision:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    RestorationCaseSummary:
+      type: object
+      properties:
+        case_id:
+          type: string
+        subject_id:
+          type: string
+        current_stage:
+          $ref: '#/components/schemas/RestorationStage'
+
+    RestorationTask:
+      type: object
+      properties:
+        task_id:
+          type: string
+        stage:
+          $ref: '#/components/schemas/RestorationStage'
+        description:
+          type: string
+        assigned_to:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+        completed:
+          type: boolean
+        completion_date:
+          type: string
+          format: date-time
+
+    Guardianship:
+      type: object
+      properties:
+        guardianship_id:
+          type: string
+        subject_id:
+          type: string
+        status:
+          type: string
+        guardians:
+          type: array
+          items:
+            $ref: '#/components/schemas/Guardian'
+        scope:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    GuardianshipSummary:
+      type: object
+      properties:
+        guardianship_id:
+          type: string
+        primary_guardian:
+          type: string
+        status:
+          type: string
+
+    Guardian:
+      type: object
+      properties:
+        guardian_id:
+          type: string
+        name:
+          type: string
+        relationship:
+          type: string
+        priority:
+          type: integer
+        active:
+          type: boolean
+
+    CreateDocumentRequest:
+      type: object
+      properties:
+        document_type:
+          $ref: '#/components/schemas/DocumentType'
+        title:
+          type: string
+        content:
+          type: string
+          format: binary
+        jurisdiction:
+          type: string
+        effective_date:
+          type: string
+          format: date
+
+    SignatureRequest:
+      type: object
+      required:
+        - signer_id
+        - signer_name
+        - signer_role
+        - signature_type
+      properties:
+        signer_id:
+          type: string
+        signer_name:
+          type: string
+        signer_role:
+          type: string
+        signature_type:
+          type: string
+        digital_signature:
+          type: string
+
+    NotarizationRequest:
+      type: object
+      required:
+        - notary_id
+        - notary_name
+        - notary_jurisdiction
+      properties:
+        notary_id:
+          type: string
+        notary_name:
+          type: string
+        notary_jurisdiction:
+          type: string
+
+    ApostilleRequest:
+      type: object
+      required:
+        - apostille_number
+        - issuing_country
+        - issuing_authority
+      properties:
+        apostille_number:
+          type: string
+        issuing_country:
+          type: string
+        issuing_authority:
+          type: string
+
+    DocumentVerification:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        document_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        expiration_date:
+          type: string
+          format: date-time
+        issues:
+          type: array
+          items:
+            type: string
+
+    InitiateRestorationRequest:
+      type: object
+      required:
+        - subject_id
+        - revival_procedure_id
+      properties:
+        subject_id:
+          type: string
+        revival_procedure_id:
+          type: string
+
+    CompleteTaskRequest:
+      type: object
+      required:
+        - completed_by
+      properties:
+        completed_by:
+          type: string
+        notes:
+          type: string
+
+    CourtPetitionRequest:
+      type: object
+      required:
+        - court_name
+        - jurisdiction
+      properties:
+        court_name:
+          type: string
+        jurisdiction:
+          type: string
+
+    CourtPetitionResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        court_case_number:
+          type: string
+
+    CourtDecisionRequest:
+      type: object
+      required:
+        - decision
+        - judge_name
+        - decision_date
+      properties:
+        decision:
+          type: string
+          enum: [GRANTED, DENIED, CONTINUED]
+        judge_name:
+          type: string
+        decision_date:
+          type: string
+          format: date
+        order_text:
+          type: string
+
+    CreateGuardianshipRequest:
+      type: object
+      required:
+        - subject_id
+        - guardians
+        - appointment_authority
+        - court_order_ref
+      properties:
+        subject_id:
+          type: string
+        guardians:
+          type: array
+          items:
+            type: object
+        scope:
+          type: object
+        appointment_authority:
+          type: string
+        court_order_ref:
+          type: string
+
+    AuthorizationCheckRequest:
+      type: object
+      required:
+        - guardian_id
+        - decision_type
+      properties:
+        guardian_id:
+          type: string
+        decision_type:
+          type: string
+
+    AuthorizationResult:
+      type: object
+      properties:
+        authorized:
+          type: boolean
+        reason:
+          type: string
+
+    TerminateGuardianshipRequest:
+      type: object
+      required:
+        - reason
+        - authority
+      properties:
+        reason:
+          type: string
+        authority:
+          type: string
+
+    JurisdictionRegistrationRequest:
+      type: object
+      required:
+        - country_code
+      properties:
+        country_code:
+          type: string
+        documents:
+          type: array
+          items:
+            type: string
+
+    RecognitionCheckRequest:
+      type: object
+      required:
+        - from_jurisdiction
+        - to_jurisdiction
+      properties:
+        from_jurisdiction:
+          type: string
+        to_jurisdiction:
+          type: string
+
+    RecognitionCheckResult:
+      type: object
+      properties:
+        recognition_status:
+          type: string
+        requirements:
+          type: array
+          items:
+            type: string
+        bilateral_agreement:
+          type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+```
 
 ---
 
-## 1. Overview
-
-### 1.1 Purpose
-
-This document defines the communication protocol for the WIA Cryo-Legal Standard, enabling secure, real-time synchronization of legal documents, signatures, and compliance status across distributed systems.
-
-### 1.2 Protocol Selection Rationale
-
-| Protocol | Use Case | Justification |
-|----------|----------|---------------|
-| WebSocket | Real-time updates | Bi-directional, low latency |
-| HTTPS | API calls | Standard, secure, cacheable |
-| gRPC | Service-to-service | High performance, typed |
-
-### 1.3 Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Client Applications                       │
-│           (Web, Mobile, Desktop, Facility Systems)          │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ WebSocket / HTTPS
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    API Gateway                               │
-│              (Authentication, Rate Limiting)                │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ gRPC
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Cryo-Legal Service Cluster                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │  Document   │  │  Signature  │  │ Compliance  │        │
-│  │  Service    │  │  Service    │  │  Service    │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘        │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 2. Transport Layer
-
-### 2.1 WebSocket Connection
-
-**Endpoint:**
-```
-wss://ws.wia.live/cryo-legal/v1
-```
-
-**Connection Parameters:**
-```
-wss://ws.wia.live/cryo-legal/v1?token={jwt_token}&client_id={client_id}
-```
-
-### 2.2 Connection Handshake
-
-```
-Client                                    Server
-   │                                        │
-   │ ────── WebSocket Upgrade Request ────► │
-   │         (with JWT token)               │
-   │                                        │
-   │ ◄───── 101 Switching Protocols ─────── │
-   │                                        │
-   │ ────────── auth message ─────────────► │
-   │                                        │
-   │ ◄──────── auth_ack message ────────── │
-   │                                        │
-   │ ────────── subscribe ────────────────► │
-   │                                        │
-   │ ◄──────── subscribe_ack ───────────── │
-   │                                        │
-   │ ◄─────── real-time events ──────────  │
-   │                                        │
-```
-
-### 2.3 TLS Requirements
-
-| Requirement | Value |
-|-------------|-------|
-| TLS Version | 1.3 (minimum 1.2) |
-| Cipher Suites | TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256 |
-| Certificate | Valid CA-signed certificate |
-| HSTS | Enabled, max-age=31536000 |
-
----
-
-## 3. Message Format
-
-### 3.1 Base Message Structure
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "msg-uuid-v4",
-  "timestamp": 1705312200000,
-  "type": "message_type",
-  "payload": {}
-}
-```
-
-### 3.2 Message Types
-
-| Type | Direction | Description |
-|------|-----------|-------------|
-| `auth` | C → S | Authentication request |
-| `auth_ack` | S → C | Authentication response |
-| `subscribe` | C → S | Subscribe to events |
-| `subscribe_ack` | S → C | Subscription confirmation |
-| `unsubscribe` | C → S | Cancel subscription |
-| `document.created` | S → C | New document event |
-| `document.updated` | S → C | Document modified |
-| `document.signed` | S → C | Signature added |
-| `signature.request` | S → C | Signature requested |
-| `compliance.alert` | S → C | Compliance issue |
-| `ping` | C → S | Keep-alive |
-| `pong` | S → C | Keep-alive response |
-| `error` | S → C | Error notification |
-
-### 3.3 JSON Schema
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wia.live/cryo-legal/protocol/v1/message.schema.json",
-  "type": "object",
-  "required": ["protocol", "version", "messageId", "timestamp", "type", "payload"],
-  "properties": {
-    "protocol": {
-      "type": "string",
-      "const": "wia-cryo-legal"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "messageId": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "timestamp": {
-      "type": "integer",
-      "description": "Unix timestamp in milliseconds"
-    },
-    "type": {
-      "type": "string",
-      "enum": [
-        "auth", "auth_ack",
-        "subscribe", "subscribe_ack", "unsubscribe",
-        "document.created", "document.updated", "document.signed",
-        "signature.request", "compliance.alert",
-        "ping", "pong", "error"
-      ]
-    },
-    "payload": {
-      "type": "object"
-    }
-  }
-}
-```
-
----
-
-## 4. Connection Lifecycle
-
-### 4.1 Authentication Message
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440001",
-  "timestamp": 1705312200000,
-  "type": "auth",
-  "payload": {
-    "token": "eyJhbGciOiJSUzI1NiIs...",
-    "clientId": "facility-001",
-    "clientType": "facility_system",
-    "capabilities": ["documents", "signatures", "compliance"]
-  }
-}
-```
-
-### 4.2 Authentication Response
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440002",
-  "timestamp": 1705312200050,
-  "type": "auth_ack",
-  "payload": {
-    "success": true,
-    "sessionId": "session-abc123",
-    "expiresAt": 1705398600000,
-    "permissions": ["documents:read", "documents:write", "signatures:create"],
-    "serverInfo": {
-      "version": "1.0.0",
-      "region": "us-west-2"
-    }
-  }
-}
-```
-
-### 4.3 Subscription
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440003",
-  "timestamp": 1705312200100,
-  "type": "subscribe",
-  "payload": {
-    "channels": [
-      {
-        "channel": "documents",
-        "filter": {
-          "partyId": "party-uuid-123",
-          "documentTypes": ["cryopreservation_contract", "consent_form"]
-        }
-      },
-      {
-        "channel": "signatures",
-        "filter": {
-          "pendingOnly": true
-        }
-      },
-      {
-        "channel": "compliance",
-        "filter": {
-          "jurisdictions": ["US", "CA"]
-        }
-      }
-    ]
-  }
-}
-```
-
-### 4.4 Keep-Alive
-
-**Ping (Client):**
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440010",
-  "timestamp": 1705312230000,
-  "type": "ping",
-  "payload": {
-    "sequence": 1
-  }
-}
-```
-
-**Pong (Server):**
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440011",
-  "timestamp": 1705312230005,
-  "type": "pong",
-  "payload": {
-    "sequence": 1,
-    "latency": 5
-  }
-}
-```
-
-### 4.5 Reconnection Policy
-
-| Attempt | Delay | Max Delay |
-|---------|-------|-----------|
-| 1 | 1s | - |
-| 2 | 2s | - |
-| 3 | 4s | - |
-| 4 | 8s | - |
-| 5+ | 16s | 30s |
-
-```javascript
-const delay = Math.min(Math.pow(2, attempt) * 1000, 30000);
-```
-
----
-
-## 5. Event Messages
-
-### 5.1 Document Created
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440020",
-  "timestamp": 1705312300000,
-  "type": "document.created",
-  "payload": {
-    "documentId": "doc-uuid-123",
-    "documentType": "cryopreservation_contract",
-    "status": "draft",
-    "createdBy": "user-123",
-    "parties": [
-      {
-        "partyId": "party-uuid-1",
-        "role": "subject",
-        "legalName": "John Smith"
-      }
-    ],
-    "jurisdiction": {
-      "primaryCountry": "US",
-      "governingLaw": "Arizona"
-    },
-    "requiredActions": [
-      {
-        "action": "sign",
-        "partyId": "party-uuid-1",
-        "deadline": "2025-02-15T00:00:00Z"
-      }
-    ]
-  }
-}
-```
-
-### 5.2 Document Signed
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440021",
-  "timestamp": 1705312400000,
-  "type": "document.signed",
-  "payload": {
-    "documentId": "doc-uuid-123",
-    "signatureId": "sig-uuid-456",
-    "signerId": "party-uuid-1",
-    "signerName": "John Smith",
-    "signedAt": "2025-01-15T14:30:00Z",
-    "documentStatus": "pending",
-    "signatureProgress": {
-      "completed": 1,
-      "required": 2
-    },
-    "nextSigner": {
-      "partyId": "party-uuid-2",
-      "role": "facility",
-      "legalName": "CryoLife Inc."
-    }
-  }
-}
-```
-
-### 5.3 Signature Request
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440022",
-  "timestamp": 1705312500000,
-  "type": "signature.request",
-  "payload": {
-    "requestId": "req-uuid-789",
-    "documentId": "doc-uuid-123",
-    "documentType": "cryopreservation_contract",
-    "documentTitle": "Cryopreservation Services Agreement",
-    "requestedSigner": {
-      "partyId": "party-uuid-2",
-      "role": "facility"
-    },
-    "requestedBy": {
-      "partyId": "party-uuid-1",
-      "legalName": "John Smith"
-    },
-    "urgency": "normal",
-    "deadline": "2025-02-01T00:00:00Z",
-    "signUrl": "https://sign.wia.live/doc-uuid-123?token=xyz"
-  }
-}
-```
-
-### 5.4 Compliance Alert
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440023",
-  "timestamp": 1705312600000,
-  "type": "compliance.alert",
-  "payload": {
-    "alertId": "alert-uuid-101",
-    "severity": "warning",
-    "documentId": "doc-uuid-123",
-    "jurisdiction": "US-CA",
-    "issue": {
-      "code": "WITNESS_COUNT",
-      "message": "California requires 2 witnesses for advance directives",
-      "currentValue": 1,
-      "requiredValue": 2
-    },
-    "remediation": {
-      "action": "add_witness",
-      "deadline": "2025-02-01T00:00:00Z",
-      "instructions": "Add one additional witness to comply with California requirements"
-    }
-  }
-}
-```
-
----
-
-## 6. Security
-
-### 6.1 Message Encryption
-
-All WebSocket messages are encrypted using TLS. For additional security with sensitive payloads:
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "...",
-  "timestamp": 1705312200000,
-  "type": "document.signed",
-  "encrypted": true,
-  "payload": {
-    "algorithm": "AES-256-GCM",
-    "iv": "base64-iv",
-    "data": "base64-encrypted-payload",
-    "tag": "base64-auth-tag"
-  }
-}
-```
-
-### 6.2 Message Signing
-
-Critical messages include digital signatures:
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "...",
-  "timestamp": 1705312200000,
-  "type": "document.signed",
-  "payload": {...},
-  "signature": {
-    "algorithm": "RS256",
-    "keyId": "server-key-001",
-    "value": "base64-signature"
-  }
-}
-```
-
-### 6.3 Signature Verification
-
-```python
-import jwt
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
-
-def verify_message_signature(message: dict, public_key) -> bool:
-    signature_info = message.get('signature')
-    if not signature_info:
-        return False
-
-    # Create canonical payload
-    payload = json.dumps({
-        k: v for k, v in message.items()
-        if k != 'signature'
-    }, sort_keys=True, separators=(',', ':'))
-
-    signature = base64.b64decode(signature_info['value'])
-
-    try:
-        public_key.verify(
-            signature,
-            payload.encode(),
-            padding.PKCS1v15(),
-            hashes.SHA256()
-        )
-        return True
-    except Exception:
-        return False
-```
-
----
-
-## 7. Error Handling
-
-### 7.1 Error Message Format
-
-```json
-{
-  "protocol": "wia-cryo-legal",
-  "version": "1.0.0",
-  "messageId": "550e8400-e29b-41d4-a716-446655440099",
-  "timestamp": 1705312200000,
-  "type": "error",
-  "payload": {
-    "code": 4001,
-    "name": "SUBSCRIPTION_FAILED",
-    "message": "Invalid channel specified",
-    "details": {
-      "channel": "invalid_channel",
-      "validChannels": ["documents", "signatures", "compliance"]
-    },
-    "recoverable": true,
-    "relatedMessageId": "550e8400-e29b-41d4-a716-446655440003"
-  }
-}
-```
-
-### 7.2 Error Codes
-
-| Code | Name | Description | Recoverable |
-|------|------|-------------|-------------|
-| 1001 | `AUTH_FAILED` | Authentication failed | No |
-| 1002 | `AUTH_EXPIRED` | Token expired | Yes (refresh) |
-| 1003 | `PERMISSION_DENIED` | Insufficient permissions | No |
-| 2001 | `DOCUMENT_NOT_FOUND` | Document doesn't exist | No |
-| 2002 | `DOCUMENT_LOCKED` | Document is locked | Retry later |
-| 3001 | `SIGNATURE_INVALID` | Invalid signature | No |
-| 3002 | `CERTIFICATE_EXPIRED` | Certificate expired | Yes (renew) |
-| 4001 | `SUBSCRIPTION_FAILED` | Invalid subscription | Yes (fix params) |
-| 4002 | `CHANNEL_UNAVAILABLE` | Channel not available | Retry later |
-| 5001 | `RATE_LIMITED` | Too many messages | Yes (backoff) |
-| 5002 | `SERVER_ERROR` | Internal error | Retry later |
-
-### 7.3 Recovery Procedures
-
-```typescript
-async function handleError(error: ProtocolError): Promise<void> {
-  switch (error.code) {
-    case 1002: // AUTH_EXPIRED
-      await refreshToken();
-      await reconnect();
-      break;
-
-    case 2002: // DOCUMENT_LOCKED
-    case 4002: // CHANNEL_UNAVAILABLE
-    case 5002: // SERVER_ERROR
-      await delay(exponentialBackoff(retryCount));
-      await retry();
-      break;
-
-    case 5001: // RATE_LIMITED
-      await delay(error.details.retryAfter || 60000);
-      await retry();
-      break;
-
-    default:
-      logError(error);
-      notifyUser(error);
-  }
-}
-```
-
----
-
-## 8. Implementation Examples
-
-### 8.1 TypeScript Client
-
-```typescript
-import { CryoLegalWebSocket } from '@wia/cryo-legal';
-
-const ws = new CryoLegalWebSocket({
-  url: 'wss://ws.wia.live/cryo-legal/v1',
-  token: 'jwt-token',
-  clientId: 'my-app',
-  autoReconnect: true
-});
-
-// Connect and authenticate
-await ws.connect();
-
-// Subscribe to channels
-await ws.subscribe({
-  channels: [
-    { channel: 'documents', filter: { partyId: 'my-party-id' } },
-    { channel: 'signatures', filter: { pendingOnly: true } }
-  ]
-});
-
-// Handle events
-ws.on('document.created', (event) => {
-  console.log('New document:', event.payload.documentId);
-});
-
-ws.on('signature.request', (event) => {
-  console.log('Signature requested:', event.payload.documentTitle);
-  showSignatureModal(event.payload);
-});
-
-ws.on('compliance.alert', (event) => {
-  console.log('Compliance issue:', event.payload.issue.message);
-  handleComplianceAlert(event.payload);
-});
-
-ws.on('error', (error) => {
-  console.error('Protocol error:', error);
-});
-
-// Graceful disconnect
-await ws.disconnect();
-```
-
-### 8.2 Python Client
-
-```python
-import asyncio
-from wia_cryo_legal import CryoLegalWebSocket
-
-async def main():
-    ws = CryoLegalWebSocket(
-        url='wss://ws.wia.live/cryo-legal/v1',
-        token='jwt-token',
-        client_id='my-app'
-    )
-
-    await ws.connect()
-
-    # Subscribe
-    await ws.subscribe(
-        channels=[
-            {'channel': 'documents', 'filter': {'partyId': 'my-party-id'}},
-            {'channel': 'signatures', 'filter': {'pendingOnly': True}}
-        ]
-    )
-
-    # Handle events
-    @ws.on('document.created')
-    async def on_document_created(event):
-        print(f"New document: {event['payload']['documentId']}")
-
-    @ws.on('signature.request')
-    async def on_signature_request(event):
-        print(f"Signature requested: {event['payload']['documentTitle']}")
-
-    # Run until cancelled
-    try:
-        await asyncio.Future()
-    except asyncio.CancelledError:
-        await ws.disconnect()
-
-asyncio.run(main())
-```
-
----
-
-## 9. Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial release |
-
----
-
-<div align="center">
-
-**WIA Cryo-Legal Standard v1.0.0**
-
-Phase 3: Communication Protocol
-
-**弘益人間 (홍익인간)** · Benefit All Humanity
-
----
-
-© 2025 WIA Standards Committee
-
-MIT License
-
-</div>
+*WIA Technical Committee - Cryopreservation Working Group*

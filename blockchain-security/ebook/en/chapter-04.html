@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: DeFi Security | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: DeFi Security</h1>
+
+    <div class="highlight">
+        <strong>Chapter Overview:</strong> Decentralized Finance (DeFi) introduces unique security challenges beyond traditional smart contract vulnerabilities. This chapter covers flash loan attacks, MEV mitigation, oracle security, and liquidity pool protection strategies.
+    </div>
+
+    <h2>Flash Loan Attack Vectors</h2>
+    <p>Flash loans enable borrowing large amounts of capital without collateral, provided the loan is repaid within the same transaction. While legitimate use cases exist, flash loans have been exploited in numerous attacks totaling billions in losses.</p>
+
+    <h3>Flash Loan Attack Anatomy</h3>
+    <pre><code>Flash Loan Attack Flow:
+
+1. Attacker initiates flash loan
+   └── Borrows $100M from lending protocol
+
+2. Manipulate market conditions
+   ├── Swap large amounts on DEX A (price impact)
+   ├── Trigger liquidations on lending protocol
+   └── Exploit price discrepancy on DEX B
+
+3. Extract profit
+   ├── Sell tokens at manipulated prices
+   └── Collect liquidation bonuses
+
+4. Repay flash loan + fee
+   └── Return $100M + 0.09% fee
+
+5. Keep profit
+   └── Attacker nets $5M in profit
+
+All steps executed in single atomic transaction!</code></pre>
+
+    <h3>Flash Loan Protection</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/**
+ * @title FlashLoanGuard
+ * @notice Protection mechanisms against flash loan attacks
+ */
+abstract contract FlashLoanGuard {
+    // Track block numbers for each address
+    mapping(address => uint256) private _lastActionBlock;
+
+    // Minimum blocks between sensitive actions
+    uint256 public constant MIN_BLOCK_DELAY = 1;
+
+    /**
+     * @notice Prevents same-block interactions
+     * @dev Flash loans must complete in one block, so this breaks attack atomicity
+     */
+    modifier noFlashLoan() {
+        require(
+            _lastActionBlock[msg.sender] < block.number,
+            "FlashLoanGuard: same-block interaction"
+        );
+        _lastActionBlock[msg.sender] = block.number;
+        _;
+    }
+
+    /**
+     * @notice Require minimum blocks between actions
+     */
+    modifier delayedAction(uint256 minBlocks) {
+        require(
+            block.number >= _lastActionBlock[msg.sender] + minBlocks,
+            "FlashLoanGuard: action too soon"
+        );
+        _lastActionBlock[msg.sender] = block.number;
+        _;
+    }
+}
+
+/**
+ * @title SecureLending
+ * @notice Lending protocol with flash loan protections
+ */
+contract SecureLending is FlashLoanGuard {
+    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public borrows;
+
+    // Collateralization ratio (150%)
+    uint256 public constant COLLATERAL_RATIO = 150;
+
+    function deposit() external payable noFlashLoan {
+        deposits[msg.sender] += msg.value;
+    }
+
+    function borrow(uint256 amount) external noFlashLoan {
+        uint256 maxBorrow = (deposits[msg.sender] * 100) / COLLATERAL_RATIO;
+        require(borrows[msg.sender] + amount <= maxBorrow, "Insufficient collateral");
+
+        borrows[msg.sender] += amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function liquidate(address user) external delayedAction(MIN_BLOCK_DELAY) {
+        // Use TWAP price instead of spot price
+        uint256 twapPrice = _getTWAPPrice();
+
+        uint256 collateralValue = deposits[user] * twapPrice / 1e18;
+        uint256 borrowValue = borrows[user];
+
+        require(
+            collateralValue * 100 < borrowValue * COLLATERAL_RATIO,
+            "Position is healthy"
+        );
+
+        // Perform liquidation with delay-verified price
+        _executeLiquidation(user);
+    }
+}</code></pre>
+
+    <h2>MEV (Maximal Extractable Value) Mitigation</h2>
+    <p>MEV refers to the profit that miners/validators can extract by reordering, inserting, or censoring transactions. Front-running, sandwich attacks, and back-running are common MEV strategies.</p>
+
+    <div class="highlight">
+        <strong>MEV Impact:</strong> MEV extraction costs DeFi users an estimated $500-700M annually. Effective mitigation strategies are essential for protecting user value.
+    </div>
+
+    <h3>Common MEV Attack Types</h3>
+    <table>
+        <tr><th>Attack Type</th><th>Description</th><th>Victim Impact</th></tr>
+        <tr><td>Front-running</td><td>Attacker places transaction before victim</td><td>Worse execution price</td></tr>
+        <tr><td>Sandwich Attack</td><td>Attacker surrounds victim transaction</td><td>Maximum price impact</td></tr>
+        <tr><td>Back-running</td><td>Attacker places transaction after victim</td><td>Lost arbitrage opportunity</td></tr>
+        <tr><td>Liquidation Sniping</td><td>Compete to execute liquidations</td><td>Higher gas costs</td></tr>
+        <tr><td>Time-bandit Attack</td><td>Reorg to steal profitable transactions</td><td>Transaction reversal</td></tr>
+    </table>
+
+    <h3>MEV Protection Implementation</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/**
+ * @title MEVProtectedSwap
+ * @notice DEX swap with MEV protection mechanisms
+ */
+contract MEVProtectedSwap {
+    // Commit-reveal scheme storage
+    struct SwapCommitment {
+        bytes32 commitHash;
+        uint256 commitBlock;
+        bool revealed;
+    }
+
+    mapping(address => SwapCommitment) public commitments;
+    uint256 public constant REVEAL_DELAY = 2; // blocks
+    uint256 public constant COMMIT_EXPIRY = 20; // blocks
+
+    /**
+     * @notice Phase 1: Commit to a swap without revealing parameters
+     * @param commitHash Hash of (tokenIn, tokenOut, amountIn, minAmountOut, salt)
+     */
+    function commitSwap(bytes32 commitHash) external {
+        require(
+            commitments[msg.sender].commitBlock == 0 ||
+            block.number > commitments[msg.sender].commitBlock + COMMIT_EXPIRY,
+            "Existing commitment"
+        );
+
+        commitments[msg.sender] = SwapCommitment({
+            commitHash: commitHash,
+            commitBlock: block.number,
+            revealed: false
+        });
+    }
+
+    /**
+     * @notice Phase 2: Reveal and execute swap after delay
+     */
+    function revealSwap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        bytes32 salt
+    ) external returns (uint256 amountOut) {
+        SwapCommitment storage commitment = commitments[msg.sender];
+
+        // Verify commitment exists and delay passed
+        require(commitment.commitBlock > 0, "No commitment");
+        require(!commitment.revealed, "Already revealed");
+        require(
+            block.number >= commitment.commitBlock + REVEAL_DELAY,
+            "Reveal too early"
+        );
+        require(
+            block.number <= commitment.commitBlock + COMMIT_EXPIRY,
+            "Commitment expired"
+        );
+
+        // Verify commitment hash
+        bytes32 expectedHash = keccak256(
+            abi.encodePacked(tokenIn, tokenOut, amountIn, minAmountOut, salt)
+        );
+        require(commitment.commitHash == expectedHash, "Invalid reveal");
+
+        commitment.revealed = true;
+
+        // Execute swap with slippage protection
+        amountOut = _executeSwap(tokenIn, tokenOut, amountIn, minAmountOut);
+
+        return amountOut;
+    }
+
+    /**
+     * @notice Calculate maximum slippage allowed based on pool state
+     */
+    function calculateSafeSlippage(
+        address pool,
+        uint256 amountIn
+    ) public view returns (uint256 maxSlippageBps) {
+        uint256 poolLiquidity = _getPoolLiquidity(pool);
+        uint256 impactRatio = (amountIn * 10000) / poolLiquidity;
+
+        // Dynamic slippage based on trade size relative to pool
+        if (impactRatio < 10) { // < 0.1% of pool
+            return 50; // 0.5% slippage
+        } else if (impactRatio < 100) { // < 1% of pool
+            return 100; // 1% slippage
+        } else {
+            return 300; // 3% slippage for large trades
+        }
+    }
+}</code></pre>
+
+    <h2>Oracle Security</h2>
+    <p>Oracles provide external data to smart contracts. Compromised or manipulated oracles have been the root cause of many DeFi exploits.</p>
+
+    <h3>Oracle Manipulation Vectors</h3>
+    <pre><code>Oracle Attack Scenarios:
+
+1. Spot Price Manipulation
+   └── Attacker moves DEX price with large swap
+   └── Oracle reads manipulated spot price
+   └── Attacker exploits mispriced collateral
+
+2. Low Liquidity Oracle
+   └── Oracle sources from thin liquidity pool
+   └── Small capital moves price significantly
+   └── Cascade effect on dependent protocols
+
+3. Delayed Oracle Updates
+   └── Oracle price lags real market
+   └── Attacker exploits stale prices
+   └── Arbitrage between oracle and market
+
+4. Centralized Oracle Compromise
+   └── Single oracle operator compromised
+   └── False data submitted to blockchain
+   └── Protocols act on incorrect data</code></pre>
+
+    <h3>Secure Oracle Implementation</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+contract SecureOracle {
+    mapping(address => AggregatorV3Interface[]) public priceFeeds;
+    uint256 public constant MIN_ORACLE_SOURCES = 3;
+
+    function getSecurePrice(address token) external view returns (uint256 price) {
+        AggregatorV3Interface[] storage feeds = priceFeeds[token];
+        require(feeds.length >= MIN_ORACLE_SOURCES, "Insufficient sources");
+
+        uint256[] memory prices = new uint256[](feeds.length);
+        uint256 validPrices = 0;
+
+        for (uint256 i = 0; i < feeds.length; i++) {
+            (, int256 answer,, uint256 updatedAt,) = feeds[i].latestRoundData();
+            if (block.timestamp - updatedAt < 1 hours && answer > 0) {
+                prices[validPrices++] = uint256(answer);
+            }
+        }
+        require(validPrices >= 2, "Insufficient valid prices");
+        return _calculateMedian(prices, validPrices);
+    }
+
+    function getTWAP(address pool, uint32 period) external view returns (uint256) {
+        (int56 tickStart, int56 tickEnd) = _getTickCumulatives(pool, period);
+        int24 avgTick = int24((tickEnd - tickStart) / int56(uint56(period)));
+        return _tickToPrice(avgTick);
+    }
+}</code></pre>
+
+    <h2>Liquidity Pool Security</h2>
+    <p>Liquidity pools are central to DeFi but present unique security challenges including impermanent loss, rug pulls, and pool manipulation.</p>
+
+    <h3>Rug Pull Prevention</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/**
+ * @title SecureLiquidityPool
+ * @notice LP with rug-pull prevention mechanisms
+ */
+contract SecureLiquidityPool {
+    address public owner;
+    uint256 public constant LOCK_PERIOD = 180 days;
+    uint256 public poolCreatedAt;
+
+    mapping(address => LPPosition) public positions;
+
+    struct LPPosition {
+        uint256 liquidity;
+        uint256 depositedAt;
+        uint256 withdrawableAt;
+    }
+
+    // Maximum single withdrawal as percentage of pool
+    uint256 public constant MAX_WITHDRAWAL_PERCENT = 10;
+
+    // Cooldown between large withdrawals
+    uint256 public lastLargeWithdrawal;
+    uint256 public constant WITHDRAWAL_COOLDOWN = 24 hours;
+
+    modifier liquidityLocked() {
+        require(
+            block.timestamp >= poolCreatedAt + LOCK_PERIOD,
+            "Liquidity locked"
+        );
+        _;
+    }
+
+    function addLiquidity(uint256 amount) external {
+        // Transfer tokens and mint LP
+        uint256 lpAmount = _calculateLPTokens(amount);
+
+        positions[msg.sender] = LPPosition({
+            liquidity: positions[msg.sender].liquidity + lpAmount,
+            depositedAt: block.timestamp,
+            withdrawableAt: block.timestamp + 7 days // Min lock
+        });
+    }
+
+    function removeLiquidity(
+        uint256 lpAmount
+    ) external liquidityLocked returns (uint256 amountOut) {
+        LPPosition storage position = positions[msg.sender];
+
+        require(position.liquidity >= lpAmount, "Insufficient LP");
+        require(
+            block.timestamp >= position.withdrawableAt,
+            "Position locked"
+        );
+
+        uint256 totalLiquidity = _getTotalLiquidity();
+        uint256 withdrawPercent = (lpAmount * 100) / totalLiquidity;
+
+        // Large withdrawal checks
+        if (withdrawPercent > MAX_WITHDRAWAL_PERCENT) {
+            require(
+                block.timestamp >= lastLargeWithdrawal + WITHDRAWAL_COOLDOWN,
+                "Withdrawal cooldown active"
+            );
+            lastLargeWithdrawal = block.timestamp;
+
+            // Cap at maximum
+            lpAmount = (totalLiquidity * MAX_WITHDRAWAL_PERCENT) / 100;
+        }
+
+        position.liquidity -= lpAmount;
+        amountOut = _calculateTokensOut(lpAmount);
+
+        // Transfer tokens
+        _transferOut(msg.sender, amountOut);
+
+        return amountOut;
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Summary:</strong> DeFi security requires understanding the unique attack vectors enabled by composability, flash loans, and on-chain liquidity. Implementing proper protections against MEV, oracle manipulation, and flash loan attacks is essential for building secure DeFi protocols.
+    </div>
+
+</body>
+</html>

@@ -1808,9 +1808,7 @@ interface CertificatePolicy {
 ### 12.4 Research Papers
 
 1. Miller, C., & Valasek, C. (2015). "Remote Exploitation of an Unaltered Passenger Vehicle"
-2. 선행 연구. "Comprehensive Experimental Analyses of Automotive Attack Surfaces"
-3. 선행 연구. "Experimental Security Analysis of a Modern Automobile"
-4. Petit, J., & Shladover, S. E. (2015). "Potential Cyberattacks on Automated Vehicles"
+2. Petit, J., & Shladover, S. E. (2015). "Potential Cyberattacks on Automated Vehicles"
 
 ### 12.5 WIA Standards Integration
 

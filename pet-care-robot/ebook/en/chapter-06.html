@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Communication Protocol | WIA-ROB-014</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--pet-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--pet-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--pet-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--pet-color);margin:40px 0 20px;border-bottom:2px solid var(--pet-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--pet-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--pet-color);margin:20px 0;font-size:18px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--pet-color);text-decoration:none;padding:10px 20px;border:2px solid var(--pet-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--pet-color)}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--pet-color);padding:20px;margin:25px 0}
+        strong{color:var(--pet-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;color:#22c55e;font-size:14px}
+        ul,ol{margin:15px 0;padding-left:30px}
+        li{margin:8px 0}
+        .protocol-box{background:#1e293b;border:2px solid var(--pet-color);padding:20px;margin:20px 0;border-radius:8px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Phase 3 - Communication Protocol</h1>
+        <div class="philosophy">弘益人間 (Benefit All Humanity)</div>
+
+        <h2>6.1 Beyond Request-Response: Real-Time Communication</h2>
+        <p>While RESTful APIs excel at structured data exchange and control operations, pet care applications demand real-time, bidirectional communication for critical functions. Watching a live video feed, receiving instant notifications when a pet approaches the camera, or dispensing treats with sub-second latency requires protocols optimized for continuous, low-latency data streams.</p>
+
+        <p>Phase 3 of WIA-ROB-014 introduces communication protocols that complement the REST API layer, enabling real-time monitoring, streaming media, and responsive interaction. These protocols maintain the standard's principles of security, interoperability, and simplicity while addressing the unique requirements of live pet interaction.</p>
+
+        <h2>6.2 Protocol Stack Overview</h2>
+
+        <h3>6.2.1 Multi-Protocol Approach</h3>
+        <p>Different use cases demand different communication patterns. Rather than forcing all interactions through a single protocol, the standard defines appropriate protocols for each scenario, with clear guidance on when to use each.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Protocol</th>
+                    <th>Use Cases</th>
+                    <th>Latency</th>
+                    <th>Overhead</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>WebSocket</strong></td>
+                    <td>Event streams, notifications, telemetry</td>
+                    <td>50-200ms</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td><strong>WebRTC</strong></td>
+                    <td>Video/audio streaming, peer-to-peer</td>
+                    <td>100-300ms</td>
+                    <td>Medium</td>
+                </tr>
+                <tr>
+                    <td><strong>MQTT</strong></td>
+                    <td>IoT device communication, telemetry</td>
+                    <td>20-100ms</td>
+                    <td>Very Low</td>
+                </tr>
+                <tr>
+                    <td><strong>RTSP</strong></td>
+                    <td>Camera streaming (legacy support)</td>
+                    <td>200-500ms</td>
+                    <td>Medium</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.2.2 Protocol Selection Decision Tree</h3>
+        <div class="highlight-box">
+            <strong>Choosing the Right Protocol:</strong>
+            <ul>
+                <li><strong>Video/Audio Streaming:</strong> WebRTC (preferred) or RTSP (fallback)</li>
+                <li><strong>Real-time Notifications:</strong> WebSocket</li>
+                <li><strong>Device Telemetry:</strong> MQTT (for devices) or WebSocket (for apps)</li>
+                <li><strong>Command and Control:</strong> MQTT (device-initiated) or REST API (user-initiated)</li>
+                <li><strong>Bulk Data Transfer:</strong> REST API with chunking</li>
+            </ul>
+        </div>
+
+        <h2>6.3 WebSocket Protocol Specification</h2>
+
+        <h3>6.3.1 Connection Establishment</h3>
+        <p>WebSocket connections upgrade from HTTP, enabling reuse of existing authentication and TLS infrastructure while providing full-duplex communication.</p>
+
+        <pre>// Client initiates WebSocket connection
+GET wss://api.petcare.example.com/v1/stream HTTP/1.1
+Host: api.petcare.example.com
+Upgrade: websocket
+Connection: Upgrade
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+
+// Server accepts upgrade
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=</pre>
+
+        <h3>6.3.2 Message Format</h3>
+        <p>All WebSocket messages use JSON encoding with a standardized envelope structure containing message type, timestamp, and payload.</p>
+
+        <pre>{
+  "messageType": "event",
+  "eventType": "feeding_completed",
+  "timestamp": "2025-12-29T18:02:45Z",
+  "deviceId": "device-uuid-456",
+  "petId": "pet-uuid-123",
+  "payload": {
+    "feedingId": "event-uuid-789",
+    "plannedAmount": 150,
+    "actualAmount": 148,
+    "consumptionTime": 180,
+    "percentConsumed": 95
+  }
+}</pre>
+
+        <h3>6.3.3 Event Types and Subscriptions</h3>
+        <p>Clients subscribe to specific event types to receive only relevant notifications, reducing bandwidth and processing overhead.</p>
+
+        <div class="protocol-box">
+            <strong>Subscription Message:</strong>
+            <pre>{
+  "messageType": "subscribe",
+  "subscriptions": [
+    {
+      "eventType": "feeding_event",
+      "petId": "pet-uuid-123"
+    },
+    {
+      "eventType": "health_alert",
+      "severity": ["high", "critical"]
+    },
+    {
+      "eventType": "device_status",
+      "deviceId": "device-uuid-456"
+    }
+  ]
+}</pre>
+
+            <strong>Subscription Confirmation:</strong>
+            <pre>{
+  "messageType": "subscription_confirmed",
+  "subscriptionId": "sub-uuid-xyz",
+  "activeSubscriptions": 3
+}</pre>
+        </div>
+
+        <h3>6.3.4 Heartbeat and Connection Management</h3>
+        <p>Long-lived connections require heartbeat mechanisms to detect disconnections and maintain session state.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Message Type</th>
+                    <th>Direction</th>
+                    <th>Frequency</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ping</td>
+                    <td>Server → Client</td>
+                    <td>Every 30 seconds</td>
+                    <td>Verify connection alive</td>
+                </tr>
+                <tr>
+                    <td>pong</td>
+                    <td>Client → Server</td>
+                    <td>Response to ping</td>
+                    <td>Acknowledge connection</td>
+                </tr>
+                <tr>
+                    <td>keep_alive</td>
+                    <td>Client → Server</td>
+                    <td>Every 60 seconds</td>
+                    <td>Prevent timeout</td>
+                </tr>
+                <tr>
+                    <td>connection_timeout</td>
+                    <td>Server → Client</td>
+                    <td>After 90s silence</td>
+                    <td>Warning before disconnect</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.4 WebRTC Video Streaming</h2>
+
+        <h3>6.4.1 Peer-to-Peer Architecture</h3>
+        <p>WebRTC enables direct peer-to-peer video streaming between pet cameras and viewing applications, reducing latency and server bandwidth compared to server-relayed streams. When direct connection is impossible due to network restrictions, TURN servers provide relay functionality.</p>
+
+        <div class="highlight-box">
+            <strong>WebRTC Connection Flow:</strong>
+            <ol>
+                <li><strong>Signaling:</strong> Client requests stream session via REST API</li>
+                <li><strong>ICE Candidate Exchange:</strong> Both peers gather and exchange network connection options</li>
+                <li><strong>SDP Offer/Answer:</strong> Negotiate codec, resolution, and streaming parameters</li>
+                <li><strong>Connection Establishment:</strong> Optimal connection path selected (direct or relayed)</li>
+                <li><strong>Media Streaming:</strong> Encrypted video/audio flows between peers</li>
+                <li><strong>Adaptive Quality:</strong> Bitrate and resolution adjust to network conditions</li>
+            </ol>
+        </div>
+
+        <h3>6.4.2 Session Initiation Protocol</h3>
+
+        <pre>// 1. Client requests stream session
+POST /v1/devices/{deviceId}/camera/stream
+Authorization: Bearer {token}
+
+{
+  "quality": "auto",
+  "maxResolution": "1080p",
+  "audioEnabled": true
+}
+
+// 2. Server responds with WebRTC offer
+{
+  "sessionId": "stream-uuid-abc",
+  "iceServers": [
+    {
+      "urls": "stun:stun.petcare.example.com:3478"
+    },
+    {
+      "urls": "turn:turn.petcare.example.com:3478",
+      "username": "user-timestamp",
+      "credential": "temporary-password"
+    }
+  ],
+  "offer": {
+    "type": "offer",
+    "sdp": "v=0\r\no=- 12345 2 IN IP4 127.0.0.1..."
+  },
+  "expiresAt": "2025-12-29T19:00:00Z"
+}</pre>
+
+        <h3>6.4.3 Video Codec Requirements</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Codec</th>
+                    <th>Support Level</th>
+                    <th>Max Resolution</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>H.264</strong></td>
+                    <td>Mandatory</td>
+                    <td>1080p @ 30fps</td>
+                    <td>Universal compatibility</td>
+                </tr>
+                <tr>
+                    <td><strong>VP8</strong></td>
+                    <td>Recommended</td>
+                    <td>1080p @ 30fps</td>
+                    <td>Open source, browser support</td>
+                </tr>
+                <tr>
+                    <td><strong>H.265 (HEVC)</strong></td>
+                    <td>Optional</td>
+                    <td>4K @ 60fps</td>
+                    <td>Bandwidth-constrained scenarios</td>
+                </tr>
+                <tr>
+                    <td><strong>AV1</strong></td>
+                    <td>Optional</td>
+                    <td>4K @ 60fps</td>
+                    <td>Future-proofing, efficiency</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.4.4 Adaptive Bitrate Streaming</h3>
+        <p>Network conditions vary dramatically across environments. The protocol requires adaptive bitrate adjustment to maintain smooth playback while maximizing quality.</p>
+
+        <pre>{
+  "qualityLevels": [
+    {
+      "name": "ultra",
+      "resolution": "1920x1080",
+      "framerate": 30,
+      "bitrate": 3000,
+      "minBandwidth": 4000
+    },
+    {
+      "name": "high",
+      "resolution": "1280x720",
+      "framerate": 30,
+      "bitrate": 1500,
+      "minBandwidth": 2000
+    },
+    {
+      "name": "medium",
+      "resolution": "854x480",
+      "framerate": 30,
+      "bitrate": 800,
+      "minBandwidth": 1000
+    },
+    {
+      "name": "low",
+      "resolution": "640x360",
+      "framerate": 20,
+      "bitrate": 400,
+      "minBandwidth": 500
+    }
+  ]
+}</pre>
+
+        <h2>6.5 MQTT for IoT Devices</h2>
+
+        <h3>6.5.1 Why MQTT for Devices</h3>
+        <p>IoT devices have constraints that REST APIs don't address well: limited memory, intermittent connectivity, battery power concerns, and need for efficient protocols. MQTT (Message Queuing Telemetry Transport) was designed specifically for these constraints.</p>
+
+        <div class="highlight-box">
+            <strong>MQTT Advantages for Pet Care Devices:</strong>
+            <ul>
+                <li><strong>Lightweight:</strong> Minimal protocol overhead, ideal for embedded systems</li>
+                <li><strong>Persistent Sessions:</strong> Messages queued during disconnection, delivered upon reconnection</li>
+                <li><strong>Quality of Service:</strong> Configurable delivery guarantees (at-most-once, at-least-once, exactly-once)</li>
+                <li><strong>Last Will and Testament:</strong> Automatic notification when device unexpectedly disconnects</li>
+                <li><strong>Topic-based Routing:</strong> Efficient message distribution to interested subscribers</li>
+            </ul>
+        </div>
+
+        <h3>6.5.2 Topic Hierarchy</h3>
+        <p>MQTT uses hierarchical topics for message routing. The standard defines a consistent topic structure for all pet care devices.</p>
+
+        <pre>wia-rob-014/{accountId}/{deviceId}/{category}/{action}
+
+Examples:
+wia-rob-014/account-123/feeder-456/feeding/schedule-updated
+wia-rob-014/account-123/feeder-456/status/online
+wia-rob-014/account-123/camera-789/motion/detected
+wia-rob-014/account-123/tracker-321/vitals/heartrate</pre>
+
+        <h3>6.5.3 Message Quality of Service</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>QoS Level</th>
+                    <th>Guarantee</th>
+                    <th>Overhead</th>
+                    <th>Use Cases</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>QoS 0</strong></td>
+                    <td>At most once (fire and forget)</td>
+                    <td>Minimal</td>
+                    <td>Frequent telemetry, non-critical status</td>
+                </tr>
+                <tr>
+                    <td><strong>QoS 1</strong></td>
+                    <td>At least once (acknowledged)</td>
+                    <td>Low</td>
+                    <td>Feeding events, alerts, commands</td>
+                </tr>
+                <tr>
+                    <td><strong>QoS 2</strong></td>
+                    <td>Exactly once (guaranteed)</td>
+                    <td>High</td>
+                    <td>Critical health alerts, medication</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.5.4 Device Status Management</h3>
+        <p>MQTT's Last Will and Testament feature enables automatic offline detection and notification when devices lose connectivity.</p>
+
+        <pre>// Device connects and sets Last Will
+CONNECT
+  client_id: feeder-456
+  username: device-feeder-456
+  password: {device-token}
+  clean_session: false
+  keep_alive: 60
+  will_topic: wia-rob-014/account-123/feeder-456/status/lwt
+  will_payload: {
+    "status": "offline",
+    "lastSeen": "2025-12-29T18:30:00Z",
+    "reason": "unexpected_disconnect"
+  }
+  will_qos: 1
+  will_retain: true
+
+// Normal status updates
+PUBLISH wia-rob-014/account-123/feeder-456/status/online
+{
+  "status": "online",
+  "firmwareVersion": "2.4.1",
+  "batteryLevel": 100,
+  "foodLevel": 65
+}</pre>
+
+        <h2>6.6 Real-Time Pet Monitoring Protocol</h2>
+
+        <h3>6.6.1 Continuous Telemetry Streaming</h3>
+        <p>Health monitoring devices generate continuous streams of sensor data. The protocol defines efficient encoding and transmission patterns for high-frequency measurements.</p>
+
+        <pre>// Batch telemetry message (reduces overhead)
+{
+  "messageType": "telemetry_batch",
+  "deviceId": "tracker-uuid-321",
+  "petId": "pet-uuid-123",
+  "startTime": "2025-12-29T18:00:00Z",
+  "interval": 60,
+  "samples": 10,
+
+  "heartRate": [92, 94, 93, 91, 90, 89, 90, 92, 93, 95],
+  "activity": [120, 135, 142, 138, 125, 118, 110, 105, 98, 95],
+  "temperature": [38.4, 38.4, 38.5, 38.5, 38.4, 38.5, 38.5, 38.6, 38.6, 38.5]
+}</pre>
+
+        <h3>6.6.2 Event-Driven Notifications</h3>
+        <p>Not all data should be transmitted continuously. Event-driven protocols reduce bandwidth by transmitting only when significant changes occur.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Event Type</th>
+                    <th>Trigger Condition</th>
+                    <th>Priority</th>
+                    <th>Delivery Method</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Heart Rate Anomaly</td>
+                    <td>&gt;20% deviation from baseline</td>
+                    <td>High</td>
+                    <td>MQTT QoS 2 + Push notification</td>
+                </tr>
+                <tr>
+                    <td>Activity Change</td>
+                    <td>State transition (rest↔active)</td>
+                    <td>Medium</td>
+                    <td>MQTT QoS 1</td>
+                </tr>
+                <tr>
+                    <td>Feeding Complete</td>
+                    <td>Portion dispensed and consumed</td>
+                    <td>Low</td>
+                    <td>MQTT QoS 1 + WebSocket</td>
+                </tr>
+                <tr>
+                    <td>Motion Detected</td>
+                    <td>Camera motion sensor triggered</td>
+                    <td>Low</td>
+                    <td>WebSocket (if connected)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.7 Treat Dispensing and Interactive Control</h2>
+
+        <h3>6.7.1 Low-Latency Command Execution</h3>
+        <p>Interactive features like treat dispensing or laser pointer control require sub-second response times. The protocol optimizes for minimal latency from user action to device response.</p>
+
+        <div class="protocol-box">
+            <strong>Command Flow:</strong>
+            <ol>
+                <li><strong>User Action:</strong> User taps "Dispense Treat" button in app</li>
+                <li><strong>Command Transmission:</strong> App sends command via WebSocket or MQTT (≈50ms)</li>
+                <li><strong>Device Receipt:</strong> Device receives and validates command (≈20ms)</li>
+                <li><strong>Execution:</strong> Motor activates to dispense treat (≈200ms)</li>
+                <li><strong>Confirmation:</strong> Device reports completion (≈50ms)</li>
+                <li><strong>Total Latency:</strong> ~320ms from tap to treat dispensed</li>
+            </ol>
+        </div>
+
+        <h3>6.7.2 Command Acknowledgment Protocol</h3>
+
+        <pre>// User initiates treat dispense
+{
+  "messageType": "command",
+  "commandId": "cmd-uuid-xyz",
+  "deviceId": "feeder-uuid-456",
+  "action": "dispense_treat",
+  "parameters": {
+    "count": 3,
+    "playSound": true
+  },
+  "timestamp": "2025-12-29T18:45:00Z"
+}
+
+// Device acknowledges receipt
+{
+  "messageType": "command_ack",
+  "commandId": "cmd-uuid-xyz",
+  "status": "received",
+  "estimatedExecution": "2025-12-29T18:45:00.500Z"
+}
+
+// Device reports execution
+{
+  "messageType": "command_complete",
+  "commandId": "cmd-uuid-xyz",
+  "status": "success",
+  "actualExecution": "2025-12-29T18:45:00.520Z",
+  "result": {
+    "dispensed": 3,
+    "soundPlayed": true
+  }
+}</pre>
+
+        <h2>6.8 Offline Operation and Synchronization</h2>
+
+        <h3>6.8.1 Edge Computing Capabilities</h3>
+        <p>Devices must continue operating during internet outages. Critical functions like scheduled feeding execute locally with synchronization occurring upon reconnection.</p>
+
+        <div class="highlight-box">
+            <strong>Offline-First Design Principles:</strong>
+            <ul>
+                <li><strong>Local Schedules:</strong> Feeding schedules stored in device memory, executed regardless of connectivity</li>
+                <li><strong>Event Buffering:</strong> Feeding events, alerts, and telemetry queued locally during outage</li>
+                <li><strong>Synchronization:</strong> Upon reconnection, buffered data transmitted to cloud</li>
+                <li><strong>Conflict Resolution:</strong> Cloud-side changes during outage merged with local state</li>
+                <li><strong>Capacity Limits:</strong> Devices buffer minimum 7 days of events before oldest data pruned</li>
+            </ul>
+        </div>
+
+        <h3>6.8.2 Synchronization Protocol</h3>
+
+        <pre>// Device reconnects after outage
+{
+  "messageType": "sync_request",
+  "deviceId": "feeder-uuid-456",
+  "lastSyncTime": "2025-12-28T10:30:00Z",
+  "currentTime": "2025-12-29T19:00:00Z",
+  "bufferedEvents": 142,
+  "configVersion": "1.2.5"
+}
+
+// Server responds with sync strategy
+{
+  "messageType": "sync_response",
+  "syncId": "sync-uuid-abc",
+  "strategy": "incremental",
+  "configUpdated": true,
+  "newConfigVersion": "1.2.7",
+  "requestBufferedEvents": true,
+  "maxBatchSize": 50
+}</pre>
+
+        <h2>6.9 Security Considerations</h2>
+
+        <h3>6.9.1 Transport Layer Security</h3>
+        <p>All protocol communications must use TLS 1.3 or higher, with certificate validation enforced. Unencrypted connections are prohibited for production deployments.</p>
+
+        <h3>6.9.2 Message Authentication</h3>
+        <p>Every message includes authentication information preventing spoofing and replay attacks.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Protocol</th>
+                    <th>Authentication Method</th>
+                    <th>Token Lifetime</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>WebSocket</td>
+                    <td>JWT in connection handshake</td>
+                    <td>1 hour (renewable)</td>
+                </tr>
+                <tr>
+                    <td>WebRTC</td>
+                    <td>Short-lived credentials per session</td>
+                    <td>Session duration (max 2 hours)</td>
+                </tr>
+                <tr>
+                    <td>MQTT</td>
+                    <td>Device certificates or JWT credentials</td>
+                    <td>24 hours (auto-renewal)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.10 Performance Optimization</h2>
+
+        <h3>6.10.1 Connection Pooling and Reuse</h3>
+        <p>Establishing new connections is expensive. The protocol encourages connection reuse and multiplexing multiple logical streams over single physical connections.</p>
+
+        <h3>6.10.2 Compression</h3>
+        <p>Text-based protocols benefit from compression, especially for telemetry data with high redundancy.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Compression</th>
+                    <th>Typical Reduction</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>JSON Events</td>
+                    <td>gzip</td>
+                    <td>60-70%</td>
+                </tr>
+                <tr>
+                    <td>Telemetry Batches</td>
+                    <td>Brotli</td>
+                    <td>70-80%</td>
+                </tr>
+                <tr>
+                    <td>Video Streams</td>
+                    <td>Codec-native (H.264/VP8)</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td>Audio</td>
+                    <td>Opus codec</td>
+                    <td>N/A</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Key Takeaways</h2>
+        <div class="highlight-box">
+            <ul>
+                <li>Real-time protocols complement REST APIs for latency-sensitive operations</li>
+                <li>WebSocket enables efficient bidirectional event streaming and notifications</li>
+                <li>WebRTC provides low-latency peer-to-peer video streaming with adaptive quality</li>
+                <li>MQTT optimizes IoT device communication with minimal overhead and offline resilience</li>
+                <li>Quality of Service levels match message criticality to delivery guarantees</li>
+                <li>Offline-first design ensures critical functions continue during connectivity loss</li>
+                <li>Interactive features achieve sub-second latency through protocol optimization</li>
+                <li>Security remains paramount across all communication channels</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+        <div class="highlight-box">
+            <ol>
+                <li>Why does the standard use multiple protocols (WebSocket, WebRTC, MQTT) rather than a single unified protocol?</li>
+                <li>Explain the difference between MQTT QoS levels 0, 1, and 2. When should each be used?</li>
+                <li>How does WebRTC's peer-to-peer architecture reduce latency compared to server-relayed streaming?</li>
+                <li>What is MQTT's Last Will and Testament feature, and why is it important for pet care devices?</li>
+                <li>Describe the command acknowledgment flow for treat dispensing. What is the typical total latency?</li>
+                <li>How do devices handle internet outages while maintaining scheduled feeding operations?</li>
+                <li>What role does adaptive bitrate streaming play in WebRTC video quality?</li>
+                <li>Why is message compression particularly effective for JSON telemetry data?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

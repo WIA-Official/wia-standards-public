@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>제7장: 회복 절차</title>
+</head>
+<body>
+<pre>
+================================================================================
+제7장: 회복 절차
+================================================================================
+
+<a href="index.html">[목차]</a>
+
+--------------------------------------------------------------------------------
+7.1 회복 워크플로우
+--------------------------------------------------------------------------------
+
+자산 회복은 성공적인 소생 후 소생된 개인에게 재산을 반환합니다.
+
+[ID] 회복 워크플로우:
+
+    RestorationWorkflow {
+      stage1: {
+        name:       "INITIATED"
+        trigger:    "소생 절차 시작 (CRYO-REVIVAL 통지)"
+        actions: [
+          "등록부 상태를 RESTORATION_PENDING으로 업데이트",
+          "모든 수탁자 및 수임자에게 통지",
+          "비필수 거래 동결",
+          "회복 계획 시작"
+        ]
+        duration:   "통지 시 즉시"
+      }
+
+      stage2: {
+        name:       "IDENTITY_VERIFIED"
+        trigger:    "CRYO-IDENTITY가 신원 확인"
+        actions: [
+          "자산 등록부가 대상자와 일치 확인",
+          "신탁 수익자 지정 확인",
+          "신원 문서 준비",
+          "신원 관련 보류 해제"
+        ]
+        duration:   "1-7일"
+      }
+
+      stage3: {
+        name:       "CAPACITY_ASSESSED"
+        trigger:    "의료/법적 능력 판정"
+        actions: [
+          "CRYO-REVIVAL로부터 능력 평가 수령",
+          "적절한 회복 경로 결정",
+          "완전 능력인 경우: 직접 회복 진행",
+          "제한된 능력인 경우: 지원 구조 설정"
+        ]
+        duration:   "7-30일"
+      }
+
+      stage4: {
+        name:       "ASSET_INVENTORY"
+        trigger:    "능력 결정됨"
+        actions: [
+          "현재 자산 목록 완료",
+          "모든 가치평가 업데이트",
+          "청구 또는 담보 식별",
+          "자산 요약 보고서 준비"
+        ]
+        duration:   "14-30일"
+      }
+
+      stage5: {
+        name:       "LEGAL_CLEARANCE"
+        trigger:    "목록 완료"
+        actions: [
+          "회복을 위한 법원 승인 획득",
+          "법적 보류 해제",
+          "미결 청구 해결",
+          "이전 문서 준비"
+        ]
+        duration:   "30-60일"
+      }
+
+      stage6: {
+        name:       "TRANSFER_EXECUTION"
+        trigger:    "법적 허가 획득"
+        actions: [
+          "자산 이전 실행",
+          "소유권 및 등록 업데이트",
+          "신탁 계좌 폐쇄",
+          "개인에게 통제권 이전"
+        ]
+        duration:   "30-90일"
+      }
+
+      stage7: {
+        name:       "COMPLETED"
+        trigger:    "모든 이전 실행됨"
+        actions: [
+          "법원에 최종 회계",
+          "신탁 종료 신청",
+          "등록부를 RESTORED로 업데이트",
+          "기록 보관"
+        ]
+        duration:   "최종 상태"
+      }
+    }
+
+[ID] 워크플로우 시각화:
+
+    CRYO-REVIVAL 통지
+              |
+              v
+        [INITIATED]
+              |
+              v
+    [IDENTITY_VERIFIED] <---- CRYO-IDENTITY 확인
+              |
+              v
+    [CAPACITY_ASSESSED] <---- 의료/법적 판정
+              |
+              +------------------------+
+              |                        |
+        (완전 능력)              (제한된 능력)
+              |                        |
+              v                        v
+       직접 회복              지원 회복
+              |                        |
+              +------------------------+
+              |
+              v
+      [ASSET_INVENTORY]
+              |
+              v
+      [LEGAL_CLEARANCE]
+              |
+              v
+    [TRANSFER_EXECUTION]
+              |
+              v
+        [COMPLETED]
+
+
+--------------------------------------------------------------------------------
+7.2 자산 확인
+--------------------------------------------------------------------------------
+
+회복 전에 모든 자산을 확인하고 조정해야 합니다.
+
+[ID] 확인 절차:
+
+    VerificationProcess {
+      existenceVerification: {
+        purpose:      "등록된 모든 자산이 여전히 존재하는지 확인"
+        process: [
+          "금융 자산에 대한 현재 명세서 획득",
+          "부동산에 대한 소유권 기록 확인",
+          "증권에 대한 수탁 확인",
+          "암호화폐에 대한 블록체인 보유 확인",
+          "개인 재산의 물리적 목록"
+        ]
+        documentation: "확인 체크리스트"
+      }
+
+      ownershipVerification: {
+        purpose:      "신탁/등록부가 여전히 소유권 보유 확인"
+        process: [
+          "등기 기록 검토",
+          "계좌 등록 확인",
+          "담보 또는 저당 없음 확인",
+          "불리한 청구 없음 확인"
+        ]
+        documentation: "소유권 확인 보고서"
+      }
+
+      valuationVerification: {
+        purpose:      "모든 자산의 현재 가치"
+        process: [
+          "모든 가치평가를 현재 날짜로 업데이트",
+          "비유동 자산에 대한 감정 획득",
+          "모든 증권의 시가 평가",
+          "통합 명세서 준비"
+        ]
+        documentation: "현재 가치평가 보고서"
+      }
+
+      encumbranceVerification: {
+        purpose:      "자산에 대한 청구 식별"
+        process: [
+          "부동산에 대한 소유권 검색",
+          "담보권에 대한 UCC 검색",
+          "미결 대출 검토",
+          "세금 담보 확인"
+        ]
+        documentation: "담보 보고서"
+      }
+    }
+
+[ID] 조정 요건:
+
+    ReconciliationRequirements {
+      registryToActual: {
+        comparison:   "등록부 기록 vs. 실제 자산"
+        resolution:   "불일치 조사 및 해결"
+        documentation: "조정 보고서"
+      }
+
+      originalToRestoration: {
+        comparison:   "원래 목록 vs. 회복 목록"
+        accounting:   "보존 기간 동안의 모든 변경 설명"
+        categories: [
+          "보유된 자산 (원래 보유)",
+          "매각된 자산 (수익금 추적)",
+          "매입된 자산 (새 취득)",
+          "벌어들인 수입 및 분배",
+          "신탁에서 지급된 비용"
+        ]
+        documentation: "전체 보존 회계"
+      }
+
+      outstandingIssues: {
+        identification: "미해결 사항"
+        examples: [
+          "계류 중인 소송",
+          "분쟁 청구",
+          "누락된 자산",
+          "불완전한 문서"
+        ]
+        resolution:   "회복 전 또는 회복 중"
+      }
+    }
+
+
+--------------------------------------------------------------------------------
+7.3 이전 절차
+--------------------------------------------------------------------------------
+
+자산 이전은 각 자산 유형에 대해 특정 절차를 따라야 합니다.
+
+[ID] 자산 유형별 이전:
+
+    TransferProcedures {
+      financialAccounts: {
+        process: [
+          "개인을 계좌 소유자/서명자로 추가",
+          "소유자로서 신탁 제거",
+          "수익자 지정 업데이트",
+          "온라인 접근 자격 증명 이전",
+          "신탁 전용 계좌 폐쇄 및 자금 이전"
+        ]
+        timeline:     "1-4주"
+        documentation: "계좌 이전 양식"
+      }
+
+      realProperty: {
+        process: [
+          "신탁에서 개인으로의 등기 준비",
+          "수탁자 서명으로 실행",
+          "등기소에 등기",
+          "재산세 기록 업데이트",
+          "보험 정책 이전",
+          "해당하는 경우 담보권자에게 통지"
+        ]
+        timeline:     "4-8주"
+        documentation: "등기, 등록 영수증"
+      }
+
+      securities: {
+        process: [
+          "재등록 지침 준비",
+          "수탁자/대리인에게 제출",
+          "계좌 명의를 개인으로 업데이트",
+          "취득 원가 정보 이전",
+          "수익자 지정 업데이트"
+        ]
+        timeline:     "2-4주"
+        documentation: "이전 지침, 확인"
+      }
+
+      cryptocurrency: {
+        process: [
+          "개인의 지갑 생성/확인",
+          "이전 거래 실행",
+          "보관 준비 업데이트",
+          "자가 보관인 경우 개인 키 접근 이전",
+          "모든 블록체인 거래 문서화"
+        ]
+        timeline:     "1-2주"
+        documentation: "거래 기록, 지갑 주소"
+      }
+
+      businessInterests: {
+        process: [
+          "운영/주주 계약 검토",
+          "지분 양도서 준비",
+          "필요한 동의 획득",
+          "이전 문서 실행",
+          "회사 기록 업데이트",
+          "필요한 정부 신고 제출"
+        ]
+        timeline:     "4-12주"
+        documentation: "양도서, 회사 결의"
+      }
+
+      intellectualProperty: {
+        process: [
+          "양도 문서 준비",
+          "적절한 형식으로 실행",
+          "필요시 특허청/저작권청에 등록",
+          "라이선스 계약 업데이트",
+          "도메인 등록 이전"
+        ]
+        timeline:     "4-8주"
+        documentation: "양도서, 등록 확인"
+      }
+
+      personalProperty: {
+        process: [
+          "물품의 물리적 인도",
+          "등록 재산에 대한 소유권 이전 (차량)",
+          "보험 보장 업데이트",
+          "목록 영수증 제공"
+        ]
+        timeline:     "2-4주"
+        documentation: "이전 영수증, 소유권 문서"
+      }
+    }
+
+[ID] 특별 이전 고려사항:
+
+    SpecialConsiderations {
+      jointAssets: {
+        situation:    "타인과 공동 보유 자산"
+        consideration: "개인의 지분만 이전"
+        process:      "분할 또는 매수 필요할 수 있음"
+      }
+
+      restrictedAssets: {
+        situation:    "이전 제한이 있는 자산"
+        examples:     "제한 주식, 파트너십 지분"
+        consideration: "제한 조건 준수"
+        process:      "동의 또는 대기 기간 필요할 수 있음"
+      }
+
+      beneficiaryDesignations: {
+        situation:    "연금, 생명보험 등"
+        consideration: "지정 업데이트 필요할 수 있음"
+        process:      "새 수익자 지정 양식"
+      }
+
+      internationalAssets: {
+        situation:    "외국 관할권의 자산"
+        consideration: "현지법 요건"
+        process:      "현지 변호사와 조정"
+      }
+    }
+
+
+--------------------------------------------------------------------------------
+7.4 세금 영향
+--------------------------------------------------------------------------------
+
+자산 회복은 계획이 필요한 중대한 세금 영향이 있습니다.
+
+[ID] 세금 고려사항:
+
+    TaxConsiderations {
+      incomeAccumulation: {
+        issue:        "보존 기간 중 축적된 수입"
+        treatment:    "신탁에 과세 또는 수익자에게 분배"
+        planning:     "분배 시기 최적화"
+      }
+
+      capitalGains: {
+        issue:        "평가된 자산 이전"
+        treatment:    "일반적으로 개인에게 취득 원가 이월"
+        planning:     "이전 전 손실 수확 고려"
+        exception:    "영구 사망 후 회복 시 스텝업"
+      }
+
+      giftTax: {
+        issue:        "개인에게 신탁 분배"
+        treatment:    "일반적으로 증여 아님 (개인이 수익자)"
+        documentation: "신탁 조건이 분배 지원 확인"
+      }
+
+      estateTax: {
+        issue:        "신탁 자산이 개인 유산의 일부인가?"
+        treatment:    "신탁 구조에 따라 다름"
+        planning:     "유산세 영향 검토"
+      }
+
+      internationalTax: {
+        issue:        "국경 간 자산 이전"
+        considerations: [
+          "해외 계좌 보고",
+          "이전 가격",
+          "원천징수 요건",
+          "조세 조약 혜택"
+        ]
+        planning:     "국제 세금 변호사 참여"
+      }
+    }
+
+[ID] 세금 계획 전략:
+
+    TaxPlanningStrategies {
+      timingOptimization: {
+        strategy:     "최적의 세금 결과를 위한 이전 시기 조정"
+        considerations: [
+          "세금 연도에 걸쳐 이전 분산",
+          "이익과 손실 매칭",
+          "회복 연도의 소득 수준 고려"
+        ]
+      }
+
+      basisManagement: {
+        strategy:     "미래 매각을 위한 취득 원가 관리"
+        actions: [
+          "모든 취득 원가 정보 문서화",
+          "특정 로트 식별 고려",
+          "이전 전 손실 수확"
+        ]
+      }
+
+      charitableStrategies: {
+        strategy:     "세금 효율성을 위한 자선 수단 사용"
+        options: [
+          "평가된 자산 기부",
+          "기부자 조언 기금 기여",
+          "자선 잔여 신탁 전환"
+        ]
+      }
+
+      retirementAccountRollover: {
+        strategy:     "연금 계좌 전환 최적화"
+        considerations: [
+          "개인 연금 계좌로 이월",
+          "로스 전환 고려",
+          "최소 필요 분배 계획"
+        ]
+      }
+    }
+
+
+--------------------------------------------------------------------------------
+7.5 분쟁 해결
+--------------------------------------------------------------------------------
+
+회복 중에 해결이 필요한 분쟁이 발생할 수 있습니다.
+
+[ID] 일반적인 분쟁 유형:
+
+    DisputeTypes {
+      identityDisputes: {
+        description:  "개인의 신원에 대한 이의"
+        claimant:     "가족 구성원, 기타 당사자"
+        resolution:   "CRYO-IDENTITY 확인, 법원"
+      }
+
+      ownershipDisputes: {
+        description:  "자산 소유권에 대한 이의"
+        claimant:     "소유권을 주장하는 제3자"
+        resolution:   "소유권 증거, 법원 재판"
+      }
+
+      valuationDisputes: {
+        description:  "자산 가치에 대한 불일치"
+        claimant:     "우발적 수익자, 세무당국"
+        resolution:   "독립 감정, 조정"
+      }
+
+      creditorClaims: {
+        description:  "보존 전 채무"
+        claimant:     "보존된 개인의 채권자"
+        resolution:   "소멸시효, 협상, 법원"
+      }
+
+      familyDisputes: {
+        description:  "가족 구성원의 청구"
+        examples:     "배우자 재산, 상속 문제"
+        resolution:   "가정법원, 조정"
+      }
+
+      trusteeDisputes: {
+        description:  "수탁자 행위에 대한 분쟁"
+        claimant:     "개인 또는 기타 수익자"
+        resolution:   "법원 검토, 위반 시 손해배상"
+      }
+    }
+
+[ID] 해결 메커니즘:
+
+    ResolutionMechanisms {
+      negotiation: {
+        description:  "당사자 간 직접 협의"
+        advantages:   "빠름, 저렴, 관계 보존"
+        appropriate:  "사소한 분쟁, 협조적인 당사자"
+      }
+
+      mediation: {
+        description:  "중립인과 함께하는 촉진된 협상"
+        advantages:   "구조화, 비밀 유지, 구속력 없음"
+        appropriate:  "대부분의 분쟁, 대화 의향이 있는 당사자"
+      }
+
+      arbitration: {
+        description:  "사적 재판"
+        advantages:   "법원보다 빠름, 전문 중재인"
+        appropriate:  "사전 합의된 경우 상업적 분쟁"
+      }
+
+      courtProceedings: {
+        description:  "공식 소송"
+        advantages:   "구속력, 집행 가능, 완전한 절차"
+        appropriate:  "주요 분쟁, 비협조적인 당사자"
+        types: [
+          "신탁 회계 절차",
+          "소유권 확정 소송",
+          "확인 판결",
+          "수탁 의무 위반 청구"
+        ]
+      }
+    }
+
+[ID] 분쟁 예방:
+
+    DisputePrevention {
+      documentation: {
+        practice:     "보존 전반에 걸친 철저한 문서화"
+        benefits:     "분쟁 발생 시 명확한 증거"
+      }
+
+      communication: {
+        practice:     "모든 이해관계자에게 정기적 업데이트"
+        benefits:     "오해와 놀라움 감소"
+      }
+
+      compliance: {
+        practice:     "신탁 조건과 법률 엄격 준수"
+        benefits:     "방어 가능한 수탁자 행위"
+      }
+
+      earlyResolution: {
+        practice:     "문제 발생 시 즉시 해결"
+        benefits:     "확대 방지"
+      }
+    }
+
+[!] 중요: 대부분의 회복 분쟁은 적절한 계획, 문서화 및 커뮤니케이션을
+    통해 피할 수 있습니다. 분쟁이 발생하면 가능한 경우 소송 전에
+    조정을 시도하세요.
+
+
+--------------------------------------------------------------------------------
+장 요약
+--------------------------------------------------------------------------------
+
+핵심 개념:
+  [OK] 회복 워크플로우는 7개의 정의된 단계 포함
+  [OK] 자산 확인으로 존재 및 소유권 확인
+  [OK] 이전 절차는 자산 유형에 따라 다름
+  [OK] 세금 영향은 신중한 계획 필요
+  [OK] 여러 분쟁 해결 메커니즘 사용 가능
+  [OK] 문서화와 커뮤니케이션이 대부분의 분쟁 예방
+
+<a href="chapter-06.html">[이전: 제6장]</a>
+<a href="chapter-08.html">[다음: 제8장]</a>
+<a href="index.html">[목차]</a>
+
+================================================================================
+</pre>
+</body>
+</html>

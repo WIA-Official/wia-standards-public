@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>제2장: 자산 등록부 관리</title>
+</head>
+<body>
+<pre>
+================================================================================
+제2장: 자산 등록부 관리
+================================================================================
+
+<a href="index.html">[목차]</a>
+
+--------------------------------------------------------------------------------
+2.1 등록부 구조
+--------------------------------------------------------------------------------
+
+자산 등록부는 보존된 개인과 관련된 모든 자산을 추적하기 위한
+중앙 저장소입니다.
+
+[ID] 등록부 기록 구조:
+
+    AssetRegistryRecord {
+      registryId:       "REG-2075-KR-000012345"
+      subjectId:        "CID-2075-KR-001234"
+      subjectName:      "김보존"
+      jurisdiction:     "KR"
+
+      status:           "TRUST_MANAGED"
+      statusHistory: [
+        { status: "ACTIVE",        date: "2074-01-15", actor: "시스템" },
+        { status: "FROZEN",        date: "2075-06-15", actor: "CRYO-LEGAL" },
+        { status: "TRUST_MANAGED", date: "2075-07-01", actor: "법원" }
+      ]
+
+      trustInfo: {
+        trustId:        "TR-2075-KR-000012345"
+        trustName:      "김보존 보존 신탁"
+        trustType:      "PRESERVATION_TRUST"
+        establishedDate: "2075-07-01"
+        trusteeName:    "글로벌 신탁 서비스 주식회사"
+      }
+
+      assetSummary: {
+        totalAssets:    47
+        totalValue:     4250000000.00
+        currency:       "KRW"
+        lastValuation:  "2075-12-01"
+      }
+
+      createdAt:        "2075-06-15T10:30:00Z"
+      updatedAt:        "2075-12-01T14:22:00Z"
+    }
+
+[ID] 등록부 구성요소:
+
+    +------------------------------------------------------------------+
+    | 구성요소          | 설명                                         |
+    +------------------------------------------------------------------+
+    | 대상자 정보       | CRYO-IDENTITY 기록에 대한 신원 연결         |
+    | 상태 추적         | 현재 상태 및 전체 이력                      |
+    | 신탁 참조         | 관리 신탁 기관에 대한 연결                  |
+    | 자산 요약         | 집계된 자산 정보                            |
+    | 감사 추적         | 완전한 변경 이력                            |
+    +------------------------------------------------------------------+
+
+
+--------------------------------------------------------------------------------
+2.2 상태 전환
+--------------------------------------------------------------------------------
+
+등록부 상태 변경은 적절한 승인 및 문서화를 보장하기 위해
+엄격한 규칙을 따릅니다.
+
+[ID] 유효한 전환:
+
+    StatusTransitions {
+      ACTIVE: {
+        validTransitions: ["FROZEN"]
+        trigger:          "보존 절차 시작"
+        authorization:    "CRYO-LEGAL 통지"
+        documentation:    "보존 선언 참조"
+      }
+
+      FROZEN: {
+        validTransitions: ["TRUST_MANAGED", "ACTIVE"]
+        trigger:          "신탁 설정 또는 보존 취소"
+        authorization:    "법원 명령 또는 법적 취소"
+        documentation:    "신탁 설정 또는 취소 문서"
+      }
+
+      TRUST_MANAGED: {
+        validTransitions: ["RESTORATION_PENDING", "ESTATE_DISTRIBUTED"]
+        trigger:          "소생 시작 또는 영구 사망 선언"
+        authorization:    "CRYO-REVIVAL 통지 또는 법원 명령"
+        documentation:    "소생 시작 또는 사망 선언"
+      }
+
+      RESTORATION_PENDING: {
+        validTransitions: ["RESTORED", "TRUST_MANAGED"]
+        trigger:          "소생 성공 또는 소생 실패"
+        authorization:    "CRYO-REVIVAL 완료 또는 실패 통지"
+        documentation:    "소생 완료 증명서"
+      }
+
+      RESTORED: {
+        validTransitions: []
+        trigger:          "해당 없음 - 최종 상태"
+        authorization:    "해당 없음"
+        documentation:    "회복 완료 증명서"
+      }
+
+      ESTATE_DISTRIBUTED: {
+        validTransitions: []
+        trigger:          "해당 없음 - 최종 상태"
+        authorization:    "해당 없음"
+        documentation:    "분배 완료 증명서"
+      }
+    }
+
+[ID] 전환 워크플로우:
+
+    TransitionWorkflow {
+      step1_request: {
+        action:   "전환 요청 제출"
+        actor:    "승인된 당사자 (수탁자, 법원, CRYO 시스템)"
+        data:     "대상 상태, 승인 문서"
+      }
+
+      step2_validation: {
+        action:   "전환 허용 확인"
+        checks: [
+          "현재 상태가 대상 상태 허용",
+          "요청자에게 권한 있음",
+          "필수 문서 존재",
+          "차단 조건 없음"
+        ]
+      }
+
+      step3_execution: {
+        action:   "상태 변경 실행"
+        process: [
+          "등록부 상태 업데이트",
+          "상태 이력에 추가",
+          "타임스탬프 업데이트",
+          "감사 항목 생성"
+        ]
+      }
+
+      step4_notification: {
+        action:   "이해관계자에게 통지"
+        recipients: [
+          "신탁 관리자",
+          "후견인 (해당하는 경우)",
+          "법원 (필요한 경우)",
+          "관련 시스템"
+        ]
+      }
+    }
+
+
+--------------------------------------------------------------------------------
+2.3 등록부 작업
+--------------------------------------------------------------------------------
+
+등록부는 자산 관리를 위한 포괄적인 작업을 지원합니다.
+
+[ID] 핵심 작업:
+
+    RegistryOperations {
+      createRegistry: {
+        description:  "새 자산 등록부 초기화"
+        trigger:      "보존 동의 완료"
+        requiredData: [
+          "대상자 신원 참조",
+          "관할권",
+          "초기 자산 목록"
+        ]
+        output:       "ACTIVE 상태의 새 등록부"
+      }
+
+      addAsset: {
+        description:  "등록부에 새 자산 등록"
+        authorization: "수탁자 또는 승인된 대리인"
+        requiredData: [
+          "자산 유형 및 세부사항",
+          "가치평가 정보",
+          "소유권 문서"
+        ]
+        validation:   "자산이 다른 곳에 이미 등록되지 않음"
+      }
+
+      updateAsset: {
+        description:  "자산 정보 수정"
+        authorization: "수탁자 또는 승인된 대리인"
+        scope: [
+          "가치평가 업데이트",
+          "상태 변경",
+          "위치 업데이트",
+          "문서 업데이트"
+        ]
+        auditTrail:   "전체 변경 이력 유지"
+      }
+
+      removeAsset: {
+        description:  "등록부에서 자산 제거"
+        authorization: "수탁자 (필요시 법원 승인 포함)"
+        validReasons: [
+          "자산 매각/청산",
+          "자산이 다른 기관으로 이전",
+          "자산 파손/노후화",
+          "중복 항목 정정"
+        ]
+        documentation: "제거 사유 및 지원 문서"
+      }
+
+      transferAsset: {
+        description:  "등록부 간 자산 이동"
+        authorization: "양측 수탁자 및 법원 승인"
+        useCase:      "신탁 구조조정, 유산 분배"
+        validation:   "소유권 체인 유지"
+      }
+    }
+
+[ID] 조회 작업:
+
+    QueryOperations {
+      getRegistry: {
+        parameters:   ["registryId"]
+        returns:      "모든 자산이 포함된 전체 등록부 기록"
+        authorization: "수탁자, 후견인, 승인된 당사자"
+      }
+
+      getAssetsByType: {
+        parameters:   ["registryId", "assetType"]
+        returns:      "지정된 유형의 모든 자산"
+        useCase:      "범주별 분석"
+      }
+
+      getAssetsByStatus: {
+        parameters:   ["registryId", "assetStatus"]
+        returns:      "지정된 상태의 모든 자산"
+        useCase:      "관리 워크플로우 추적"
+      }
+
+      getTotalValue: {
+        parameters:   ["registryId", "currency", "valuationDate"]
+        returns:      "집계된 자산 가치"
+        useCase:      "포트폴리오 요약, 보고"
+      }
+
+      getStatusHistory: {
+        parameters:   ["registryId"]
+        returns:      "완전한 상태 전환 이력"
+        useCase:      "감사 추적, 준수 확인"
+      }
+
+      searchAssets: {
+        parameters:   ["검색 조건 객체"]
+        returns:      "등록부 전체에서 일치하는 자산"
+        authorization: "상승된 권한 필요"
+        useCase:      "시스템 전체 자산 위치"
+      }
+    }
+
+
+--------------------------------------------------------------------------------
+2.4 준수 및 감사
+--------------------------------------------------------------------------------
+
+등록부는 책임성과 규제 준수를 보장하기 위해 포괄적인
+감사 기능을 유지합니다.
+
+[ID] 감사 프레임워크:
+
+    AuditFramework {
+      auditTrail: {
+        coverage:     "모든 등록부 및 자산 변경"
+        retention:    "영구 (전체 보존 기간)"
+        contents: [
+          "수행된 작업",
+          "행위자 신원",
+          "타임스탬프",
+          "이전 값",
+          "새 값",
+          "승인 참조"
+        ]
+        immutability: "추가 전용, 암호화 봉인"
+      }
+
+      periodicAudits: {
+        annual: {
+          scope:      "전체 등록부 조정"
+          auditor:    "독립 공인 감사인"
+          report:     "법원에 제출"
+          findings:   "불일치는 설명되어야 함"
+        }
+
+        quarterly: {
+          scope:      "자산 존재 및 가치평가"
+          auditor:    "신탁 내부 준수팀"
+          report:     "후견인 및 법원에 제공"
+          findings:   "중요한 문제는 상위 보고"
+        }
+
+        asNeeded: {
+          scope:      "특정 우려사항 또는 사건"
+          trigger:    "법원 명령, 이해관계자 요청"
+          auditor:    "지시에 따라"
+          report:     "요청 당사자에게"
+        }
+      }
+    }
+
+[ID] 준수 요건:
+
+    ComplianceRequirements {
+      regulatoryReporting: {
+        taxAuthorities: {
+          frequency:    "연간"
+          contents:     "소득, 이익, 손실"
+          responsibility: "수탁자"
+        }
+
+        courtReports: {
+          frequency:    "연간 또는 요구 시"
+          contents:     "자산 상태, 관리 조치"
+          responsibility: "수탁자"
+        }
+
+        beneficiaryStatements: {
+          frequency:    "분기별"
+          contents:     "자산 요약, 변경, 가치평가"
+          responsibility: "수탁자"
+        }
+      }
+
+      documentRetention: {
+        assetDocuments:   "보존 기간 + 10년"
+        transactionRecords: "보존 기간 + 10년"
+        valuationReports:   "보존 기간 + 10년"
+        auditReports:       "영구"
+        courtFilings:       "영구"
+      }
+
+      dataProtection: {
+        classification:   "극비"
+        access:           "역할 기반, 알 필요"
+        encryption:       "저장 및 전송 시 필수"
+        backups:          "지리적으로 분산"
+      }
+    }
+
+[ID] 조정 절차:
+
+    ReconciliationProcess {
+      step1_extraction: {
+        action:   "등록부 데이터 추출"
+        scope:    "해당 기간의 모든 자산 및 거래"
+      }
+
+      step2_verification: {
+        action:   "자산 존재 확인"
+        methods: [
+          "금융 자산에 대한 은행 명세서",
+          "부동산에 대한 재산 기록",
+          "증권에 대한 수탁자 확인",
+          "암호화폐에 대한 블록체인 확인"
+        ]
+      }
+
+      step3_valuation: {
+        action:   "가치평가 확인 또는 업데이트"
+        methods: [
+          "거래 자산에 대한 시장 가격",
+          "고유 자산에 대한 감정",
+          "필요에 따른 전문 가치평가"
+        ]
+      }
+
+      step4_reporting: {
+        action:   "조정 보고서 생성"
+        contents: [
+          "확인된 자산",
+          "가치평가 변경",
+          "발견된 불일치",
+          "권장 조치"
+        ]
+      }
+
+      step5_resolution: {
+        action:   "불일치 해결"
+        process:  "조사, 정정, 문서화"
+      }
+    }
+
+[!] 중요: 조정에서 중대한 불일치가 발견되면 30일 이내에 법원에
+    보고해야 합니다. 설명되지 않은 자산 손실은 수탁자 책임으로
+    이어질 수 있습니다.
+
+
+--------------------------------------------------------------------------------
+장 요약
+--------------------------------------------------------------------------------
+
+핵심 개념:
+  [OK] 자산 등록부는 모든 자산의 중앙 목록 역할
+  [OK] 상태 전환은 엄격한 승인 규칙 따름
+  [OK] 모든 변경에 대한 전체 감사 추적 유지
+  [OK] 포괄적인 조회 및 관리 작업 지원
+  [OK] 정기 조정으로 자산 무결성 보장
+  [OK] 법원, 세무당국, 수익자에 대한 준수 보고
+
+<a href="chapter-01.html">[이전: 제1장]</a>
+<a href="chapter-03.html">[다음: 제3장]</a>
+<a href="index.html">[목차]</a>
+
+================================================================================
+</pre>
+</body>
+</html>

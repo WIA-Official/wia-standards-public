@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 7: Alert and Response Systems - WIA-PET-EMOTION</title>
+</head>
+<body>
+<h1>Chapter 7: Alert and Response Systems</h1>
+
+<blockquote>
+"Hong-ik Ingan: Swift response to distress reflects the depth of our commitment to those in our care."
+</blockquote>
+
+<hr>
+
+<h2>7.1 Alert System Overview</h2>
+
+<p>The alert system transforms emotion detection into actionable notifications, enabling timely intervention when pets experience distress or concerning emotional states.</p>
+
+<h3>Alert Architecture</h3>
+
+<pre>
+ALERT PIPELINE
+==============
+
+[Emotion Reading] --> [Alert Rules Engine]
+                            |
+                            v
+                     [Alert Generated]
+                            |
+              +-------------+-------------+
+              |             |             |
+              v             v             v
+        [Priority]    [Routing]     [Delivery]
+              |             |             |
+              v             v             v
+        LOW/MED/HIGH   Owner/Vet    Push/SMS/Call
+              |             |             |
+              +-------------+-------------+
+                            |
+                            v
+                    [User Response]
+                            |
+                            v
+                    [Alert Resolved]
+</pre>
+
+<hr>
+
+<h2>7.2 Alert Priority Levels</h2>
+
+<table border="1">
+<tr>
+<th>Priority</th>
+<th>Response Time</th>
+<th>Trigger Conditions</th>
+<th>Delivery Method</th>
+</tr>
+<tr>
+<td>URGENT</td>
+<td>Immediate</td>
+<td>Intense fear/pain, emergency</td>
+<td>Push + SMS + Call</td>
+</tr>
+<tr>
+<td>HIGH</td>
+<td>Within 15 min</td>
+<td>Sustained distress, aggression</td>
+<td>Push + SMS</td>
+</tr>
+<tr>
+<td>MEDIUM</td>
+<td>Within 1 hour</td>
+<td>Extended anxiety, mood decline</td>
+<td>Push notification</td>
+</tr>
+<tr>
+<td>LOW</td>
+<td>End of day</td>
+<td>Minor concerns, patterns</td>
+<td>App badge, daily digest</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.3 Alert Trigger Rules</h2>
+
+<pre>
+ALERT RULE DEFINITIONS
+======================
+
+Rule: SUSTAINED_DISTRESS
+  Condition:
+    (ANXIOUS OR FEARFUL OR SAD)
+    AND intensity >= 3
+    AND duration > 30 minutes
+  Priority: HIGH
+  Message: "{name} has been distressed for over 30 minutes"
+
+Rule: ACUTE_FEAR
+  Condition:
+    FEARFUL
+    AND intensity >= 4
+    AND sudden_onset = true
+  Priority: URGENT
+  Message: "{name} is experiencing acute fear"
+
+Rule: AGGRESSIVE_BEHAVIOR
+  Condition:
+    AGGRESSIVE
+    AND intensity >= 3
+    AND duration > 5 minutes
+  Priority: HIGH
+  Message: "{name} showing aggressive behavior"
+
+Rule: SEPARATION_ANXIETY
+  Condition:
+    ANXIOUS
+    AND owner_absent = true
+    AND duration > 20 minutes
+  Priority: MEDIUM
+  Message: "{name} may be experiencing separation anxiety"
+
+Rule: WELLBEING_DECLINE
+  Condition:
+    wellbeing_trend = DECLINING
+    AND decline_rate > 5 points/week
+  Priority: MEDIUM
+  Message: "{name}'s overall wellbeing is declining"
+
+Rule: UNUSUAL_PATTERN
+  Condition:
+    current_emotion != expected_for_time
+    AND deviation_significant = true
+  Priority: LOW
+  Message: "{name}'s emotional pattern differs from usual"
+</pre>
+
+<hr>
+
+<h2>7.4 Alert Message Format</h2>
+
+<pre>
+ALERT MESSAGE STRUCTURE
+=======================
+
+{
+  "alertId": "alert-456",
+  "profileId": "pet-123",
+  "petName": "Max",
+  "timestamp": "2024-01-15T14:30:00Z",
+
+  "alertType": "SUSTAINED_DISTRESS",
+  "priority": "HIGH",
+
+  "emotionData": {
+    "emotionType": "ANXIOUS",
+    "intensity": 4,
+    "duration": 35,
+    "confidence": 85
+  },
+
+  "context": {
+    "ownerPresent": false,
+    "recentEvents": ["owner_departure"],
+    "location": "home"
+  },
+
+  "message": {
+    "title": "Max needs attention",
+    "body": "Max has been anxious for 35 minutes",
+    "details": "Anxiety started after owner departure"
+  },
+
+  "actions": [
+    {"action": "VIEW_LIVE", "label": "View now"},
+    {"action": "CALL_SITTER", "label": "Call sitter"},
+    {"action": "DISMISS", "label": "Dismiss"}
+  ],
+
+  "acknowledged": false,
+  "resolvedAt": null
+}
+</pre>
+
+<hr>
+
+<h2>7.5 Alert Settings</h2>
+
+<pre>
+USER CONFIGURABLE SETTINGS
+==========================
+
+AlertSettings {
+  profileId: string
+
+  // Enable/disable categories
+  enabledAlertTypes: [
+    "distress",
+    "anxiety",
+    "aggression",
+    "wellbeing",
+    "patterns"
+  ]
+
+  // Sensitivity adjustment
+  sensitivityLevel: "low" | "medium" | "high"
+  // low = fewer alerts, only major concerns
+  // high = more alerts, including minor concerns
+
+  // Time-based settings
+  quietHours: {
+    enabled: true,
+    start: "22:00",
+    end: "07:00",
+    allowUrgent: true
+  }
+
+  // Delivery preferences
+  deliveryMethods: {
+    push: true,
+    sms: true,
+    email: false,
+    phone: false
+  }
+
+  // Contact chain for urgent
+  emergencyContacts: [
+    {name: "Owner", phone: "+1...", priority: 1},
+    {name: "Pet Sitter", phone: "+1...", priority: 2}
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>7.6 Alert Lifecycle</h2>
+
+<pre>
+ALERT STATE MACHINE
+===================
+
+     [TRIGGERED]
+          |
+          v
+     [DELIVERED]
+          |
+     +----+----+
+     |         |
+     v         v
+[VIEWED]   [EXPIRED]
+     |
+     v
+[ACKNOWLEDGED]
+     |
+     +----+----+
+     |         |
+     v         v
+[RESOLVED]  [ESCALATED]
+</pre>
+
+<h3>State Definitions</h3>
+
+<table border="1">
+<tr>
+<th>State</th>
+<th>Description</th>
+<th>Next States</th>
+</tr>
+<tr>
+<td>TRIGGERED</td>
+<td>Alert condition met</td>
+<td>DELIVERED</td>
+</tr>
+<tr>
+<td>DELIVERED</td>
+<td>Sent to user</td>
+<td>VIEWED, EXPIRED</td>
+</tr>
+<tr>
+<td>VIEWED</td>
+<td>User opened alert</td>
+<td>ACKNOWLEDGED</td>
+</tr>
+<tr>
+<td>ACKNOWLEDGED</td>
+<td>User confirmed receipt</td>
+<td>RESOLVED, ESCALATED</td>
+</tr>
+<tr>
+<td>RESOLVED</td>
+<td>Issue addressed</td>
+<td>(terminal)</td>
+</tr>
+<tr>
+<td>ESCALATED</td>
+<td>Elevated to next contact</td>
+<td>RESOLVED</td>
+</tr>
+<tr>
+<td>EXPIRED</td>
+<td>Condition no longer active</td>
+<td>(terminal)</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.7 Response Actions</h2>
+
+<h3>Automated Responses</h3>
+
+<pre>
+AUTOMATED RESPONSE OPTIONS
+==========================
+
+1. Environmental Adjustments
+   - Activate calming music/sounds
+   - Adjust lighting (if smart home)
+   - Enable treat dispenser
+   - Start interactive toy
+
+2. Communication
+   - Play owner voice recording
+   - Enable two-way audio
+   - Show owner video (if screen available)
+
+3. Escalation
+   - Alert backup caregiver
+   - Notify veterinarian (if health concern)
+   - Contact pet sitter service
+
+4. Documentation
+   - Save video clip
+   - Record physiological data
+   - Log for vet consultation
+</pre>
+
+<h3>Manual Response Options</h3>
+
+<table border="1">
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+<tr>
+<td>View Live</td>
+<td>Open camera/sensor feed</td>
+</tr>
+<tr>
+<td>Two-Way Audio</td>
+<td>Speak to pet remotely</td>
+</tr>
+<tr>
+<td>Dispense Treat</td>
+<td>Activate connected feeder</td>
+</tr>
+<tr>
+<td>Call Sitter</td>
+<td>Speed dial pet sitter</td>
+</tr>
+<tr>
+<td>Head Home</td>
+<td>Get directions home</td>
+</tr>
+<tr>
+<td>Log for Vet</td>
+<td>Save incident for consultation</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.8 Alert Fatigue Prevention</h2>
+
+<pre>
+FATIGUE PREVENTION STRATEGIES
+=============================
+
+1. Intelligent Grouping
+   - Combine related alerts
+   - Summarize ongoing situation
+   - Single alert for persistent state
+
+2. Adaptive Thresholds
+   - Learn normal patterns
+   - Adjust triggers to individual
+   - Reduce false positives over time
+
+3. Cooldown Periods
+   - Minimum time between similar alerts
+   - Exceptions for escalation
+   - User-configurable
+
+4. Smart Timing
+   - Delay non-urgent during meetings
+   - Respect quiet hours
+   - Batch low-priority for digest
+
+5. Relevance Scoring
+   - Prioritize truly actionable alerts
+   - Suppress if no action possible
+   - Consider user context
+</pre>
+
+<hr>
+
+<h2>7.9 Alert Analytics</h2>
+
+<table border="1">
+<tr>
+<th>Metric</th>
+<th>Purpose</th>
+<th>Target</th>
+</tr>
+<tr>
+<td>Alerts per day</td>
+<td>Monitor volume</td>
+<td><5 per pet</td>
+</tr>
+<tr>
+<td>Response time</td>
+<td>User engagement</td>
+<td><15 min for HIGH</td>
+</tr>
+<tr>
+<td>False positive rate</td>
+<td>Accuracy</td>
+<td><10%</td>
+</tr>
+<tr>
+<td>Acknowledgment rate</td>
+<td>Alert relevance</td>
+<td>>80%</td>
+</tr>
+<tr>
+<td>Resolution rate</td>
+<td>Actionability</td>
+<td>>70%</td>
+</tr>
+<tr>
+<td>Escalation rate</td>
+<td>Severity accuracy</td>
+<td><5%</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>7.10 Integration with Care Providers</h2>
+
+<pre>
+VETERINARY INTEGRATION
+======================
+
+1. Alert Sharing
+   Owner can share alert history with vet
+   Includes: emotion data, context, frequency
+
+2. Professional Alerts
+   High-severity alerts can notify vet directly
+   Requires explicit owner consent
+   Used for medical emergencies
+
+3. Behavior Consultation
+   Aggregate patterns shared with behaviorist
+   Supports diagnosis and treatment planning
+
+4. Medication Monitoring
+   Track emotional response to treatment
+   Alert if adverse reactions detected
+
+PET SITTER INTEGRATION
+======================
+
+1. Real-Time Visibility
+   Sitter sees current emotional state
+   Helps prioritize attention
+
+2. Alert Forwarding
+   Owner can route alerts to sitter
+   Sitter can acknowledge/respond
+
+3. Shift Reports
+   Automatic emotional summary
+   Helps continuity of care
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] Four priority levels from URGENT to LOW</li>
+<li>[OK] Configurable alert rules with flexible conditions</li>
+<li>[OK] Full alert lifecycle from trigger to resolution</li>
+<li>[OK] Automated and manual response options available</li>
+<li>[OK] Fatigue prevention through smart grouping and timing</li>
+<li>[OK] Integration with veterinary and pet care providers</li>
+</ul>
+</body>
+</html>

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 구현 및 인증 | WIA-ROB-014 반려동물 돌봄 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--pet-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--pet-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--pet-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--pet-color);margin:40px 0 20px;border-bottom:2px solid var(--pet-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--pet-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--pet-color);text-decoration:none;padding:10px 20px;border:2px solid var(--pet-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--pet-color)}
+        strong{color:var(--pet-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border:1px solid var(--pet-color)}
+        code{color:#22d3ee;font-family:'Courier New',monospace}
+        .summary{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:40px 0;border-left:4px solid var(--pet-color)}
+        .questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:40px 0}
+        .questions ol{margin-left:25px;margin-top:15px}
+        .questions li{margin:10px 0}
+        ul{margin:15px 0 15px 40px}
+        li{margin:8px 0}
+        .philosophy{text-align:center;padding:20px;background:var(--bg-tertiary);border-radius:8px;margin:30px 0;border:2px solid var(--pet-color)}
+        .success{background:#065f46;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #10b981}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제8장: 구현 및 인증</h1>
+
+        <h2>8.1 개발 환경 설정</h2>
+        <p>WIA-ROB-014를 구현하기 위한 <strong>개발 환경</strong>을 준비합니다.</p>
+
+        <h3>8.1.1 필수 도구</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>도구</th>
+                    <th>버전</th>
+                    <th>용도</th>
+                    <th>설치 명령</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Node.js</td>
+                    <td>18 LTS 이상</td>
+                    <td>JavaScript 런타임</td>
+                    <td>nvm install 18</td>
+                </tr>
+                <tr>
+                    <td>Python</td>
+                    <td>3.10 이상</td>
+                    <td>AI 모델, 백엔드</td>
+                    <td>pyenv install 3.10</td>
+                </tr>
+                <tr>
+                    <td>Docker</td>
+                    <td>24.0 이상</td>
+                    <td>컨테이너화</td>
+                    <td>docker --version</td>
+                </tr>
+                <tr>
+                    <td>Git</td>
+                    <td>최신</td>
+                    <td>버전 관리</td>
+                    <td>git --version</td>
+                </tr>
+                <tr>
+                    <td>Mosquitto</td>
+                    <td>2.0 이상</td>
+                    <td>MQTT 브로커</td>
+                    <td>brew install mosquitto</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.1.2 WIA SDK 설치</h3>
+        <pre><code># TypeScript/Node.js SDK
+npm install @wia/rob-014
+
+# Python SDK
+pip install wia-rob-014
+
+# CLI 도구
+npm install -g @wia/rob-014-cli
+
+# SDK 버전 확인
+wia-rob-014 --version
+# Output: WIA-ROB-014 CLI v1.0.0</code></pre>
+
+        <h2>8.2 첫 번째 프로젝트: 스마트 급식기</h2>
+        <p><strong>단계별 실습</strong>으로 WIA-ROB-014 표준을 적용합니다.</p>
+
+        <h3>8.2.1 프로젝트 초기화</h3>
+        <pre><code># 프로젝트 생성
+mkdir smart-pet-feeder
+cd smart-pet-feeder
+
+# WIA 프로젝트 초기화
+wia-rob-014 init
+
+# 대화형 설정
+? Project name: smart-pet-feeder
+? Device type: feeder
+? Compliance level: standard
+? Language: TypeScript
+? Include examples: Yes
+
+# 생성된 구조
+smart-pet-feeder/
+├── src/
+│   ├── device.ts          # 디바이스 로직
+│   ├── schemas/           # 데이터 스키마
+│   └── api/               # API 클라이언트
+├── config/
+│   ├── device.json        # 디바이스 설정
+│   └── wia.json           # WIA 설정
+├── tests/                 # 테스트
+├── package.json
+└── README.md</code></pre>
+
+        <h3>8.2.2 디바이스 구현</h3>
+        <pre><code>// src/device.ts
+import { WIAPetDevice, FeedingEvent } from '@wia/rob-014';
+
+class SmartPetFeeder extends WIAPetDevice {
+  private motorPin: number = 17;
+  private sensorPin: number = 27;
+  private currentFoodLevel: number = 100; // percentage
+
+  constructor(config) {
+    super({
+      deviceId: config.deviceId,
+      type: 'feeder',
+      manufacturer: 'My Pet Tech',
+      model: 'SPF-001',
+      wiaCompliance: {
+        version: '1.0',
+        level: 'standard'
+      }
+    });
+
+    this.initializeHardware();
+  }
+
+  private initializeHardware() {
+    // GPIO 초기화 (Raspberry Pi)
+    // const Gpio = require('onoff').Gpio;
+    // this.motor = new Gpio(this.motorPin, 'out');
+    // this.sensor = new Gpio(this.sensorPin, 'in');
+    console.log('하드웨어 초기화 완료');
+  }
+
+  async dispense(amount: { value: number; unit: string }): Promise<void> {
+    console.log(`급식 시작: ${amount.value}${amount.unit}`);
+
+    // 1. 모터 구동
+    await this.runMotor(amount.value);
+
+    // 2. WIA 표준 이벤트 생성
+    const event: FeedingEvent = {
+      eventId: this.generateEventId(),
+      petId: this.assignedPetId,
+      type: 'feeding',
+      timestamp: new Date().toISOString(),
+      amount: amount,
+      deviceId: this.deviceId,
+      method: 'automatic'
+    };
+
+    // 3. 클라우드에 전송 (MQTT)
+    await this.publishEvent('activity', event);
+
+    // 4. 사료 잔량 업데이트
+    this.currentFoodLevel = await this.measureFoodLevel();
+    await this.updateDeviceState({
+      foodLevel: this.currentFoodLevel
+    });
+
+    // 5. 사료 부족 시 알림
+    if (this.currentFoodLevel < 10) {
+      await this.sendAlert({
+        type: 'low-food',
+        severity: 'medium',
+        message: '사료가 부족합니다 (10% 이하)'
+      });
+    }
+
+    console.log('급식 완료');
+  }
+
+  private async runMotor(grams: number): Promise<void> {
+    // 모터 구동 시간 계산 (예: 1초에 10g)
+    const durationMs = (grams / 10) * 1000;
+
+    // 모터 켜기
+    // this.motor.writeSync(1);
+    await this.sleep(durationMs);
+    // 모터 끄기
+    // this.motor.writeSync(0);
+
+    console.log(`모터 ${durationMs}ms 동작`);
+  }
+
+  private async measureFoodLevel(): Promise<number> {
+    // 초음파 센서로 사료 높이 측정
+    // const distance = await this.readUltrasonicSensor();
+    // const level = this.convertDistanceToPercentage(distance);
+
+    // 시뮬레이션
+    return Math.max(0, this.currentFoodLevel - 5);
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// 디바이스 시작
+const config = require('../config/device.json');
+const feeder = new SmartPetFeeder(config);
+
+feeder.connect().then(() => {
+  console.log('스마트 급식기 준비 완료');
+
+  // 스케줄된 급식
+  feeder.schedules.add({
+    times: ['08:00', '18:00'],
+    amount: { value: 150, unit: 'grams' }
+  });
+});</code></pre>
+
+        <h2>8.3 테스트 및 검증</h2>
+        <p>WIA-ROB-014 <strong>준수 여부</strong>를 확인합니다.</p>
+
+        <h3>8.3.1 자동화 테스트</h3>
+        <pre><code>// tests/device.test.ts
+import { describe, it, expect } from 'vitest';
+import { SmartPetFeeder } from '../src/device';
+import { validateSchema } from '@wia/rob-014-validator';
+
+describe('SmartPetFeeder', () => {
+  let feeder: SmartPetFeeder;
+
+  beforeEach(() => {
+    feeder = new SmartPetFeeder({
+      deviceId: 'test-feeder-001'
+    });
+  });
+
+  it('디바이스 메타데이터가 WIA 스키마를 준수해야 함', () => {
+    const metadata = feeder.getMetadata();
+    const result = validateSchema('device', metadata);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('급식 이벤트가 올바른 형식이어야 함', async () => {
+    const event = await feeder.createFeedingEvent({
+      amount: { value: 150, unit: 'grams' }
+    });
+
+    const result = validateSchema('activity-feeding', event);
+
+    expect(result.valid).toBe(true);
+    expect(event.type).toBe('feeding');
+    expect(event.amount.value).toBe(150);
+  });
+
+  it('사료 부족 시 알림을 발송해야 함', async () => {
+    feeder.currentFoodLevel = 8; // 8%
+
+    const alerts = [];
+    feeder.on('alert', (alert) => alerts.push(alert));
+
+    await feeder.dispense({ value: 50, unit: 'grams' });
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].type).toBe('low-food');
+    expect(alerts[0].severity).toBe('medium');
+  });
+
+  it('MQTT 메시지가 올바른 토픽으로 발행되어야 함', async () => {
+    const messages = [];
+    feeder.mqtt.on('publish', (topic, message) => {
+      messages.push({ topic, message });
+    });
+
+    await feeder.dispense({ value: 150, unit: 'grams' });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0].topic).toBe(
+      `wia/pets/${feeder.assignedPetId}/activity`
+    );
+  });
+});</code></pre>
+
+        <h3>8.3.2 WIA 준수 테스트 도구</h3>
+        <pre><code># CLI로 준수 테스트 실행
+wia-rob-014 test --device device-feeder-001
+
+# 테스트 결과
+Running WIA-ROB-014 Compliance Tests...
+
+✅ Device Metadata
+  ✓ Schema validation
+  ✓ Required fields present
+  ✓ WIA compliance object valid
+
+✅ Data Schemas
+  ✓ Activity events conform to schema
+  ✓ Health data structure valid
+  ✓ Timestamp formats correct
+
+✅ API Integration
+  ✓ REST endpoints respond correctly
+  ✓ Authentication working
+  ✓ Error handling proper
+
+✅ Communication Protocols
+  ✓ MQTT topics correct
+  ✓ QoS levels appropriate
+  ✓ TLS encryption enabled
+
+✅ Security
+  ✓ JWT tokens valid
+  ✓ Certificate verification
+  ✓ Data encryption
+
+Overall Score: 100/100
+Compliance Level: Standard ✓
+
+Ready for WIA-ROB-014 certification!</code></pre>
+
+        <h2>8.4 WIA 인증 프로세스</h2>
+        <p><strong>공식 인증</strong>을 받기 위한 단계입니다.</p>
+
+        <h3>8.4.1 인증 체크리스트</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>항목</th>
+                    <th>Basic</th>
+                    <th>Standard</th>
+                    <th>Advanced</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>데이터 스키마 준수</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>REST API 구현</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>MQTT over TLS</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>OAuth 2.0 인증</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>WebSocket 실시간 통신</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>AI 모델 통합</td>
+                    <td>❌</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>스마트홈 연동</td>
+                    <td>❌</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td>Edge Computing</td>
+                    <td>❌</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.4.2 인증 신청</h3>
+        <pre><code># 인증 신청 명령
+wia-rob-014 certify apply --level standard
+
+# 대화형 신청
+? Company name: My Pet Tech Inc.
+? Product name: Smart Pet Feeder
+? Model number: SPF-001
+? Contact email: cert@mypettech.com
+? Website: https://mypettech.com
+
+Generating certification package...
+✓ Device metadata exported
+✓ Test results included
+✓ Documentation compiled
+✓ Source code samples prepared
+
+Certification package created: cert-package-20250120.zip
+
+Upload to: https://certification.wia.org/rob-014/upload
+Application ID: CERT-ROB014-20250120-001
+
+Next steps:
+1. Upload certification package
+2. Pay certification fee ($500)
+3. Wait for review (1-2 weeks)
+4. Complete on-site testing if required
+5. Receive certification</code></pre>
+
+        <h2>8.5 배포 및 출시</h2>
+        <p>인증 후 <strong>프로덕션 환경</strong>에 배포합니다.</p>
+
+        <h3>8.5.1 Docker 컨테이너화</h3>
+        <pre><code># Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 의존성 설치
+COPY package*.json ./
+RUN npm ci --only=production
+
+# 소스 복사
+COPY dist/ ./dist/
+COPY config/ ./config/
+
+# WIA 인증서 복사
+COPY certs/ ./certs/
+
+# 환경 변수
+ENV NODE_ENV=production
+ENV WIA_DEVICE_ID=device-feeder-001
+ENV WIA_API_URL=https://api.wia-rob014.org
+
+# 헬스체크
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node healthcheck.js || exit 1
+
+# 실행
+CMD ["node", "dist/device.js"]</code></pre>
+
+        <h3>8.5.2 Kubernetes 배포</h3>
+        <pre><code># deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-pet-feeder
+  labels:
+    app: pet-feeder
+    wia-standard: rob-014
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pet-feeder
+  template:
+    metadata:
+      labels:
+        app: pet-feeder
+    spec:
+      containers:
+      - name: feeder
+        image: mypettech/smart-feeder:1.0.0
+        env:
+        - name: WIA_DEVICE_ID
+          valueFrom:
+            configMapKeyRef:
+              name: wia-config
+              key: device-id
+        - name: WIA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: wia-secrets
+              key: api-key
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30</code></pre>
+
+        <h2>8.6 모니터링 및 유지보수</h2>
+        <p>운영 중인 시스템의 <strong>건강 상태</strong>를 추적합니다.</p>
+
+        <h3>8.6.1 로깅 전략</h3>
+        <pre><code>// src/logger.ts
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: {
+    service: 'smart-pet-feeder',
+    deviceId: process.env.WIA_DEVICE_ID,
+    wiaStandard: 'ROB-014-v1.0'
+  },
+  transports: [
+    // 콘솔 출력
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+
+    // 파일 로그
+    new winston.transports.File({
+      filename: 'logs/error.log',
+      level: 'error'
+    }),
+    new winston.transports.File({
+      filename: 'logs/combined.log'
+    })
+  ]
+});
+
+// 사용 예
+logger.info('급식 시작', {
+  petId: 'pet-123',
+  amount: 150,
+  unit: 'grams'
+});
+
+logger.error('MQTT 연결 실패', {
+  error: error.message,
+  broker: 'mqtt.wia-rob014.org'
+});</code></pre>
+
+        <h3>8.6.2 알람 설정</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>알람 조건</th>
+                    <th>심각도</th>
+                    <th>통지 방법</th>
+                    <th>대응 조치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>API 에러율 > 5%</td>
+                    <td>High</td>
+                    <td>Slack, PagerDuty</td>
+                    <td>즉시 조사</td>
+                </tr>
+                <tr>
+                    <td>디바이스 오프라인 > 5분</td>
+                    <td>Medium</td>
+                    <td>Slack</td>
+                    <td>재연결 시도</td>
+                </tr>
+                <tr>
+                    <td>MQTT 메시지 손실</td>
+                    <td>High</td>
+                    <td>Slack, Email</td>
+                    <td>데이터 복구</td>
+                </tr>
+                <tr>
+                    <td>메모리 사용률 > 90%</td>
+                    <td>Medium</td>
+                    <td>Slack</td>
+                    <td>스케일링</td>
+                </tr>
+                <tr>
+                    <td>인증서 만료 임박 (30일)</td>
+                    <td>Low</td>
+                    <td>Email</td>
+                    <td>인증서 갱신</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>8.7 문제 해결 가이드</h2>
+        <p>일반적인 <strong>문제와 해결책</strong>입니다.</p>
+
+        <h3>8.7.1 연결 문제</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>증상</th>
+                    <th>원인</th>
+                    <th>해결책</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>MQTT 연결 실패</td>
+                    <td>인증서 오류, 네트워크 문제</td>
+                    <td>인증서 확인, 포트 8883 열기</td>
+                </tr>
+                <tr>
+                    <td>API 401 Unauthorized</td>
+                    <td>토큰 만료, 잘못된 credentials</td>
+                    <td>토큰 갱신, API 키 확인</td>
+                </tr>
+                <tr>
+                    <td>WebSocket 연결 끊김</td>
+                    <td>heartbeat 미응답</td>
+                    <td>pong 메시지 전송, 재연결 로직 구현</td>
+                </tr>
+                <tr>
+                    <td>데이터 전송 지연</td>
+                    <td>네트워크 대역폭 부족</td>
+                    <td>배치 전송, 압축 사용</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.7.2 디버깅 명령</h3>
+        <pre><code># 디바이스 상태 확인
+wia-rob-014 status --device device-feeder-001
+
+# 연결 테스트
+wia-rob-014 ping --host api.wia-rob014.org
+
+# MQTT 메시지 모니터링
+wia-rob-014 mqtt subscribe --topic "wia/pets/+/activity"
+
+# 로그 스트림
+wia-rob-014 logs --device device-feeder-001 --follow
+
+# 스키마 검증
+wia-rob-014 validate --file data.json --schema activity-feeding
+
+# 성능 테스트
+wia-rob-014 benchmark --duration 60s --requests 100</code></pre>
+
+        <h2>8.8 커뮤니티 및 지원</h2>
+        <p>WIA-ROB-014 <strong>커뮤니티</strong>에 참여하세요.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>리소스</th>
+                    <th>URL</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>공식 문서</td>
+                    <td>https://wia.org/rob-014/docs</td>
+                    <td>전체 스펙, 가이드</td>
+                </tr>
+                <tr>
+                    <td>GitHub 저장소</td>
+                    <td>https://github.com/WIA-Official/ROB-014</td>
+                    <td>SDK, 예제 코드</td>
+                </tr>
+                <tr>
+                    <td>포럼</td>
+                    <td>https://forum.wia.org/rob-014</td>
+                    <td>Q&A, 토론</td>
+                </tr>
+                <tr>
+                    <td>Slack</td>
+                    <td>https://wia-community.slack.com</td>
+                    <td>실시간 채팅</td>
+                </tr>
+                <tr>
+                    <td>Stack Overflow</td>
+                    <td>태그: wia-rob-014</td>
+                    <td>기술 질문</td>
+                </tr>
+                <tr>
+                    <td>인증 포털</td>
+                    <td>https://certification.wia.org</td>
+                    <td>인증 신청, 관리</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>8.9 사례 연구</h2>
+        <p>WIA-ROB-014를 <strong>성공적으로 도입</strong>한 사례입니다.</p>
+
+        <h3>8.9.1 PetTech Startup A</h3>
+        <div class="success">
+            <h4>🎯 목표</h4>
+            <p>자동 급식기 제품의 스마트홈 플랫폼 호환성 확보</p>
+
+            <h4>📊 결과</h4>
+            <ul>
+                <li><strong>개발 시간 60% 단축</strong>: WIA SDK 활용으로 6개월 → 2.5개월</li>
+                <li><strong>호환 플랫폼 5배 증가</strong>: 독자 프로토콜 1개 → WIA 표준 5개</li>
+                <li><strong>사용자 만족도 40% 향상</strong>: 통합 앱으로 편의성 증가</li>
+                <li><strong>유지보수 비용 70% 절감</strong>: 표준 API로 일관된 관리</li>
+            </ul>
+
+            <h4>💡 핵심 교훈</h4>
+            <p>"초기부터 표준을 적용하니 장기적으로 큰 이득을 봤습니다. 특히 다른 제조사 제품과의 호환성이 오히려 우리 제품의 경쟁력이 되었습니다."</p>
+        </div>
+
+        <h3>8.9.2 Enterprise Pet Care Platform B</h3>
+        <div class="success">
+            <h4>🎯 목표</h4>
+            <p>100개 이상 제조사의 디바이스를 하나의 플랫폼으로 통합</p>
+
+            <h4>📊 결과</h4>
+            <ul>
+                <li><strong>통합 디바이스 3배 증가</strong>: 35개 → 120개 제조사</li>
+                <li><strong>데이터 품질 90% 향상</strong>: 표준 스키마로 일관성 확보</li>
+                <li><strong>고객 이탈률 50% 감소</strong>: 원하는 디바이스 자유 선택</li>
+                <li><strong>AI 분석 정확도 25% 향상</strong>: 통일된 데이터로 학습</li>
+            </ul>
+
+            <h4>💡 핵심 교훈</h4>
+            <p>"WIA-ROB-014가 없었다면 이렇게 많은 디바이스 통합은 불가능했을 것입니다. 표준이 시장을 확대했습니다."</p>
+        </div>
+
+        <h2>8.10 다음 단계</h2>
+        <p>WIA-ROB-014를 마스터한 후 <strong>더 나아가기</strong>.</p>
+
+        <h3>8.10.1 고급 주제</h3>
+        <ul>
+            <li><strong>Edge AI 구현</strong>: 디바이스에서 직접 AI 모델 실행</li>
+            <li><strong>Federated Learning</strong>: 프라이버시 보호 분산 학습</li>
+            <li><strong>블록체인 통합</strong>: 건강 기록의 불변성 보장</li>
+            <li><strong>5G/LoRaWAN</strong>: 다양한 네트워크 프로토콜 지원</li>
+            <li><strong>AR/VR 인터페이스</strong>: 몰입형 펫케어 경험</li>
+        </ul>
+
+        <h3>8.10.2 관련 WIA 표준</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>표준</th>
+                    <th>설명</th>
+                    <th>관계</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>WIA-IOT-001</td>
+                    <td>일반 IoT 디바이스 표준</td>
+                    <td>ROB-014의 기반</td>
+                </tr>
+                <tr>
+                    <td>WIA-HOME-005</td>
+                    <td>스마트홈 통합 표준</td>
+                    <td>연동 가능</td>
+                </tr>
+                <tr>
+                    <td>WIA-HEALTH-012</td>
+                    <td>건강 데이터 표준</td>
+                    <td>건강 모니터링 확장</td>
+                </tr>
+                <tr>
+                    <td>WIA-AI-008</td>
+                    <td>AI 모델 배포 표준</td>
+                    <td>AI 기능 고도화</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.10.3 학습 리소스</h3>
+        <pre><code># 공식 튜토리얼
+https://wia.org/rob-014/tutorials
+
+# 예제 프로젝트
+git clone https://github.com/WIA-Official/ROB-014-examples
+
+# 비디오 코스
+https://wia.org/rob-014/courses
+
+# 웨비나 녹화
+https://wia.org/rob-014/webinars
+
+# API 레퍼런스
+https://api-docs.wia.org/rob-014
+
+# 커뮤니티 프로젝트
+https://github.com/topics/wia-rob-014</code></pre>
+
+        <div class="philosophy">
+            <h3>🌟 弘益人間 (홍익인간)</h3>
+            <p><strong>널리 인간을 이롭게 하라</strong></p>
+            <p style="margin-top:10px;">당신의 구현이 전 세계 반려동물과 보호자들에게<br>더 나은 삶을 선사할 것입니다.</p>
+        </div>
+
+        <div class="summary">
+            <h3>📌 핵심 내용 요약</h3>
+            <ul>
+                <li><strong>개발 환경</strong>: Node.js 18+, Python 3.10+, Docker 24+, WIA SDK</li>
+                <li><strong>첫 프로젝트</strong>: 스마트 급식기 단계별 구현, 하드웨어 연동</li>
+                <li><strong>테스트</strong>: 자동화 테스트, WIA 준수 검증, 100점 달성</li>
+                <li><strong>인증</strong>: 3단계 레벨(Basic, Standard, Advanced), 체크리스트 준수</li>
+                <li><strong>배포</strong>: Docker 컨테이너화, Kubernetes 오케스트레이션</li>
+                <li><strong>모니터링</strong>: Winston 로깅, Prometheus 메트릭, 알람 설정</li>
+                <li><strong>문제 해결</strong>: 연결 문제, 디버깅 명령, 트러블슈팅 가이드</li>
+                <li><strong>커뮤니티</strong>: 문서, GitHub, 포럼, Slack, Stack Overflow</li>
+                <li><strong>사례 연구</strong>: 개발 시간 60% 단축, 호환 플랫폼 5배, 만족도 40% 향상</li>
+                <li><strong>다음 단계</strong>: Edge AI, Federated Learning, 블록체인, 관련 WIA 표준</li>
+            </ul>
+        </div>
+
+        <div class="questions">
+            <h3>🤔 복습 질문</h3>
+            <ol>
+                <li>WIA-ROB-014 개발에 필요한 5가지 필수 도구와 각각의 최소 버전을 나열하세요.</li>
+                <li>스마트 급식기 구현에서 급식 프로세스의 5단계(모터 구동, 이벤트 생성, 전송, 잔량 업데이트, 알림)를 설명하세요.</li>
+                <li>자동화 테스트에서 검증해야 할 4가지 주요 항목(메타데이터, 이벤트 형식, 알림, MQTT)을 설명하세요.</li>
+                <li>WIA 인증의 3가지 레벨(Basic, Standard, Advanced)에서 각각 요구되는 기능을 비교하세요.</li>
+                <li>Docker 컨테이너화 시 포함해야 할 주요 요소(Dockerfile, 헬스체크, 환경 변수)를 설명하세요.</li>
+                <li>운영 중 설정해야 할 5가지 알람 조건과 각각의 심각도 및 대응 조치를 설명하세요.</li>
+                <li>일반적인 연결 문제 4가지(MQTT, API 401, WebSocket, 지연)와 각각의 해결책을 설명하세요.</li>
+                <li>사례 연구에서 나타난 WIA-ROB-014 도입의 정량적 효과(개발 시간, 호환성, 만족도, 비용)를 요약하세요.</li>
+            </ol>
+        </div>
+
+        <div style="text-align:center; margin-top:60px; padding:40px; background:var(--bg-tertiary); border-radius:12px; border:2px solid var(--pet-color);">
+            <h2 style="color:var(--pet-color); margin-bottom:20px;">🎓 축하합니다!</h2>
+            <p style="font-size:20px; margin-bottom:20px;">WIA-ROB-014 반려동물 돌봄 로봇 표준 가이드를 완독하셨습니다.</p>
+            <p>이제 표준을 준수하는 펫케어 솔루션을 구현하고 WIA 인증을 받을 준비가 되었습니다.</p>
+            <p style="margin-top:30px; font-size:24px; color:var(--pet-color);">🐾 행운을 빕니다! 🐾</p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 3단계 - 통신 프로토콜 | WIA-ROB-014 반려동물 돌봄 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--pet-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--pet-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--pet-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--pet-color);margin:40px 0 20px;border-bottom:2px solid var(--pet-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--pet-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--pet-color);text-decoration:none;padding:10px 20px;border:2px solid var(--pet-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--pet-color)}
+        strong{color:var(--pet-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border:1px solid var(--pet-color)}
+        code{color:#22d3ee;font-family:'Courier New',monospace}
+        .summary{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:40px 0;border-left:4px solid var(--pet-color)}
+        .questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:40px 0}
+        .questions ol{margin-left:25px;margin-top:15px}
+        .questions li{margin:10px 0}
+        ul{margin:15px 0 15px 40px}
+        li{margin:8px 0}
+        .philosophy{text-align:center;padding:20px;background:var(--bg-tertiary);border-radius:8px;margin:30px 0;border:2px solid var(--pet-color)}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: 3단계 - 통신 프로토콜</h1>
+
+        <h2>6.1 통신 프로토콜 개요</h2>
+        <p>WIA-ROB-014는 다양한 환경에서 <strong>안전하고 효율적인 통신</strong>을 보장합니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>프로토콜</th>
+                    <th>용도</th>
+                    <th>특징</th>
+                    <th>적용 계층</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>HTTPS/TLS 1.3</td>
+                    <td>RESTful API</td>
+                    <td>암호화, 인증서 기반</td>
+                    <td>Application</td>
+                </tr>
+                <tr>
+                    <td>WebSocket over TLS</td>
+                    <td>실시간 양방향 통신</td>
+                    <td>저지연, 지속 연결</td>
+                    <td>Application</td>
+                </tr>
+                <tr>
+                    <td>MQTT over TLS</td>
+                    <td>IoT 디바이스 메시징</td>
+                    <td>경량, QoS 보장</td>
+                    <td>Application</td>
+                </tr>
+                <tr>
+                    <td>WebRTC</td>
+                    <td>영상/음성 스트리밍</td>
+                    <td>P2P, 낮은 지연</td>
+                    <td>Application</td>
+                </tr>
+                <tr>
+                    <td>OAuth 2.0 + JWT</td>
+                    <td>인증 및 권한 부여</td>
+                    <td>토큰 기반, 무상태</td>
+                    <td>Security</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.2 TLS/SSL 보안</h2>
+        <p>모든 네트워크 통신은 <strong>TLS 1.3</strong> 이상으로 암호화해야 합니다.</p>
+
+        <h3>6.2.1 TLS 구성 요구사항</h3>
+        <pre><code>// TLS 1.3 설정 예제 (Node.js)
+import https from 'https';
+import fs from 'fs';
+
+const tlsOptions = {
+  // 인증서
+  cert: fs.readFileSync('/path/to/cert.pem'),
+  key: fs.readFileSync('/path/to/key.pem'),
+  ca: fs.readFileSync('/path/to/ca.pem'),
+
+  // TLS 버전
+  minVersion: 'TLSv1.3',
+  maxVersion: 'TLSv1.3',
+
+  // 암호화 스위트 (권장)
+  ciphers: [
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'TLS_AES_128_GCM_SHA256'
+  ].join(':'),
+
+  // 보안 옵션
+  honorCipherOrder: true,
+  sessionTimeout: 300,
+
+  // 클라이언트 인증 (선택)
+  requestCert: true,
+  rejectUnauthorized: true
+};
+
+const server = https.createServer(tlsOptions, (req, res) => {
+  // 요청 처리
+});</code></pre>
+
+        <h3>6.2.2 인증서 관리</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>인증서 타입</th>
+                    <th>용도</th>
+                    <th>유효 기간</th>
+                    <th>갱신 주기</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>서버 인증서</td>
+                    <td>API 서버 신원 확인</td>
+                    <td>1년</td>
+                    <td>90일마다 확인</td>
+                </tr>
+                <tr>
+                    <td>클라이언트 인증서</td>
+                    <td>디바이스 인증 (선택)</td>
+                    <td>2년</td>
+                    <td>6개월마다 확인</td>
+                </tr>
+                <tr>
+                    <td>CA 인증서</td>
+                    <td>루트 신뢰 체인</td>
+                    <td>10년</td>
+                    <td>1년마다 확인</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 OAuth 2.0 인증</h2>
+        <p>사용자 및 디바이스 <strong>인증</strong>은 OAuth 2.0 프레임워크를 따릅니다.</p>
+
+        <h3>6.3.1 인증 플로우</h3>
+        <pre><code>// 1. 인증 코드 요청 (Authorization Code Flow)
+GET https://auth.wia-rob014.org/oauth/authorize?
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=https://yourapp.com/callback&
+  response_type=code&
+  scope=pets:read pets:write devices:control&
+  state=random-state-string
+
+// 2. 사용자 로그인 및 동의
+
+// 3. 인증 코드 수신
+// Redirect to: https://yourapp.com/callback?code=AUTH_CODE&state=random-state-string
+
+// 4. 액세스 토큰 교환
+POST https://auth.wia-rob014.org/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&
+code=AUTH_CODE&
+redirect_uri=https://yourapp.com/callback&
+client_id=YOUR_CLIENT_ID&
+client_secret=YOUR_CLIENT_SECRET
+
+// 응답
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "refresh_token_here",
+  "scope": "pets:read pets:write devices:control"
+}</code></pre>
+
+        <h3>6.3.2 JWT 토큰 구조</h3>
+        <pre><code>// JWT Header
+{
+  "alg": "RS256",
+  "typ": "JWT",
+  "kid": "wia-rob014-key-1"
+}
+
+// JWT Payload
+{
+  "iss": "https://auth.wia-rob014.org",
+  "sub": "user-f9e8d7c6b5a4321098765432109876543",
+  "aud": "https://api.wia-rob014.org",
+  "exp": 1737374400,
+  "iat": 1737370800,
+  "scope": "pets:read pets:write devices:control",
+  "userId": "user-f9e8d7c6b5a4321098765432109876543",
+  "email": "user@example.com"
+}
+
+// JWT 사용
+const response = await fetch('https://api.wia-rob014.org/v1/pets', {
+  headers: {
+    'Authorization': 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...'
+  }
+});</code></pre>
+
+        <h2>6.4 MQTT 프로토콜</h2>
+        <p>IoT 디바이스는 <strong>MQTT over TLS</strong>로 통신합니다.</p>
+
+        <h3>6.4.1 MQTT 토픽 구조</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>토픽 패턴</th>
+                    <th>방향</th>
+                    <th>설명</th>
+                    <th>QoS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>wia/pets/{petId}/activity</td>
+                    <td>Device → Cloud</td>
+                    <td>활동 데이터 전송</td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td>wia/pets/{petId}/health</td>
+                    <td>Device → Cloud</td>
+                    <td>건강 데이터 전송</td>
+                    <td>2</td>
+                </tr>
+                <tr>
+                    <td>wia/devices/{deviceId}/control</td>
+                    <td>Cloud → Device</td>
+                    <td>제어 명령 전송</td>
+                    <td>2</td>
+                </tr>
+                <tr>
+                    <td>wia/devices/{deviceId}/status</td>
+                    <td>Device → Cloud</td>
+                    <td>디바이스 상태 전송</td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td>wia/alerts/{petId}</td>
+                    <td>Cloud → App</td>
+                    <td>알림 메시지</td>
+                    <td>1</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.4.2 MQTT 메시지 예제</h3>
+        <pre><code>// 디바이스에서 활동 데이터 발행
+const mqtt = require('mqtt');
+
+const client = mqtt.connect('mqtts://mqtt.wia-rob014.org:8883', {
+  clientId: 'device-feeder-001',
+  username: 'device-feeder-001',
+  password: 'device-token-xyz',
+  ca: fs.readFileSync('/path/to/ca.crt'),
+  cert: fs.readFileSync('/path/to/device.crt'),
+  key: fs.readFileSync('/path/to/device.key')
+});
+
+client.on('connect', () => {
+  console.log('MQTT 연결 성공');
+
+  // 활동 데이터 발행
+  const activityData = {
+    eventId: "event-b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+    petId: "pet-a1b2c3d4e5f67890a1b2c3d4e5f67890",
+    type: "feeding",
+    timestamp: new Date().toISOString(),
+    amount: { value: 150, unit: "grams" }
+  };
+
+  client.publish(
+    'wia/pets/pet-a1b2c3d4e5f67890a1b2c3d4e5f67890/activity',
+    JSON.stringify(activityData),
+    { qos: 1, retain: false }
+  );
+
+  // 제어 명령 구독
+  client.subscribe('wia/devices/device-feeder-001/control', { qos: 2 });
+});
+
+client.on('message', (topic, message) => {
+  const command = JSON.parse(message.toString());
+  console.log('제어 명령 수신:', command);
+
+  if (command.action === 'dispense') {
+    // 급식 실행
+    dispensFood(command.parameters.amount);
+  }
+});</code></pre>
+
+        <h3>6.4.3 QoS 레벨</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>QoS</th>
+                    <th>이름</th>
+                    <th>설명</th>
+                    <th>사용 사례</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0</td>
+                    <td>At most once</td>
+                    <td>최대 1번 전송, 확인 없음</td>
+                    <td>환경 센서 데이터 (빈번함)</td>
+                </tr>
+                <tr>
+                    <td>1</td>
+                    <td>At least once</td>
+                    <td>최소 1번 전송, 중복 가능</td>
+                    <td>활동 데이터, 알림</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Exactly once</td>
+                    <td>정확히 1번 전송, 중복 없음</td>
+                    <td>제어 명령, 건강 데이터</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.5 WebSocket 프로토콜</h2>
+        <p>실시간 양방향 통신을 위한 <strong>WebSocket</strong> 사용 방법입니다.</p>
+
+        <h3>6.5.1 WebSocket 연결</h3>
+        <pre><code>// 클라이언트에서 WebSocket 연결
+const ws = new WebSocket('wss://ws.wia-rob014.org/v1/stream', {
+  headers: {
+    'Authorization': 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...'
+  }
+});
+
+ws.on('open', () => {
+  console.log('WebSocket 연결됨');
+
+  // 반려동물 데이터 구독
+  ws.send(JSON.stringify({
+    type: 'subscribe',
+    channels: [
+      'pets:pet-a1b2c3d4e5f67890a1b2c3d4e5f67890:activity',
+      'pets:pet-a1b2c3d4e5f67890a1b2c3d4e5f67890:health',
+      'alerts:pet-a1b2c3d4e5f67890a1b2c3d4e5f67890'
+    ]
+  }));
+});
+
+ws.on('message', (data) => {
+  const message = JSON.parse(data);
+
+  switch (message.type) {
+    case 'activity':
+      console.log('활동 데이터:', message.data);
+      break;
+    case 'health':
+      console.log('건강 데이터:', message.data);
+      break;
+    case 'alert':
+      console.log('알림:', message.data);
+      showNotification(message.data);
+      break;
+    case 'heartbeat':
+      // 연결 유지
+      ws.send(JSON.stringify({ type: 'pong' }));
+      break;
+  }
+});
+
+ws.on('error', (error) => {
+  console.error('WebSocket 오류:', error);
+});
+
+ws.on('close', (code, reason) => {
+  console.log(`WebSocket 종료: ${code} - ${reason}`);
+  // 재연결 로직
+  setTimeout(() => reconnect(), 5000);
+});</code></pre>
+
+        <h3>6.5.2 WebSocket 메시지 타입</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>타입</th>
+                    <th>방향</th>
+                    <th>설명</th>
+                    <th>예제</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>subscribe</td>
+                    <td>Client → Server</td>
+                    <td>채널 구독 요청</td>
+                    <td>{"type":"subscribe","channels":[...]}</td>
+                </tr>
+                <tr>
+                    <td>unsubscribe</td>
+                    <td>Client → Server</td>
+                    <td>구독 해제</td>
+                    <td>{"type":"unsubscribe","channels":[...]}</td>
+                </tr>
+                <tr>
+                    <td>activity</td>
+                    <td>Server → Client</td>
+                    <td>활동 데이터</td>
+                    <td>{"type":"activity","data":{...}}</td>
+                </tr>
+                <tr>
+                    <td>health</td>
+                    <td>Server → Client</td>
+                    <td>건강 데이터</td>
+                    <td>{"type":"health","data":{...}}</td>
+                </tr>
+                <tr>
+                    <td>alert</td>
+                    <td>Server → Client</td>
+                    <td>알림</td>
+                    <td>{"type":"alert","data":{...}}</td>
+                </tr>
+                <tr>
+                    <td>heartbeat</td>
+                    <td>Server → Client</td>
+                    <td>연결 유지</td>
+                    <td>{"type":"heartbeat"}</td>
+                </tr>
+                <tr>
+                    <td>pong</td>
+                    <td>Client → Server</td>
+                    <td>heartbeat 응답</td>
+                    <td>{"type":"pong"}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.6 WebRTC 영상 스트리밍</h2>
+        <p>낮은 지연 시간의 <strong>영상/음성 스트리밍</strong>을 위한 WebRTC 구현입니다.</p>
+
+        <h3>6.6.1 WebRTC 연결 설정</h3>
+        <pre><code>// 클라이언트: Offer 생성 및 전송
+const peerConnection = new RTCPeerConnection({
+  iceServers: [
+    { urls: 'stun:stun.wia-rob014.org:3478' },
+    {
+      urls: 'turn:turn.wia-rob014.org:3478',
+      username: 'turn-user',
+      credential: 'turn-password'
+    }
+  ]
+});
+
+// 로컬 스트림 추가 (양방향 음성용)
+const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+localStream.getTracks().forEach(track => {
+  peerConnection.addTrack(track, localStream);
+});
+
+// 원격 스트림 수신
+peerConnection.ontrack = (event) => {
+  const remoteVideo = document.getElementById('remote-video');
+  remoteVideo.srcObject = event.streams[0];
+};
+
+// Offer 생성
+const offer = await peerConnection.createOffer();
+await peerConnection.setLocalDescription(offer);
+
+// Signaling 서버로 Offer 전송
+await fetch('https://api.wia-rob014.org/v1/devices/device-camera-001/stream/offer', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + accessToken
+  },
+  body: JSON.stringify({
+    offer: peerConnection.localDescription
+  })
+}).then(res => res.json())
+  .then(async (data) => {
+    // Answer 수신 및 설정
+    await peerConnection.setRemoteDescription(data.answer);
+  });
+
+// ICE Candidate 처리
+peerConnection.onicecandidate = (event) => {
+  if (event.candidate) {
+    // Signaling 서버로 ICE candidate 전송
+    sendIceCandidate(event.candidate);
+  }
+};</code></pre>
+
+        <h2>6.7 디바이스 간 직접 통신</h2>
+        <p>로컬 네트워크에서의 <strong>디바이스 간 통신</strong>을 지원합니다.</p>
+
+        <h3>6.7.1 디바이스 발견 (mDNS)</h3>
+        <pre><code>// mDNS를 이용한 디바이스 발견
+const mdns = require('mdns');
+
+// 서비스 광고 (디바이스 측)
+const ad = mdns.createAdvertisement(mdns.tcp('wia-rob014'), 8080, {
+  name: 'pet-feeder-living-room',
+  txtRecord: {
+    deviceId: 'device-feeder-001',
+    type: 'feeder',
+    version: '1.0.0'
+  }
+});
+ad.start();
+
+// 서비스 탐색 (앱 측)
+const browser = mdns.createBrowser(mdns.tcp('wia-rob014'));
+
+browser.on('serviceUp', (service) => {
+  console.log('디바이스 발견:', service.name);
+  console.log('주소:', service.addresses[0], ':', service.port);
+
+  // 로컬 연결 시도
+  connectToLocalDevice(service.addresses[0], service.port);
+});
+
+browser.start();</code></pre>
+
+        <h3>6.7.2 로컬 통신의 장점</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>측면</th>
+                    <th>클라우드 경유</th>
+                    <th>로컬 직접 통신</th>
+                    <th>개선 효과</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>지연 시간</td>
+                    <td>100-500ms</td>
+                    <td>5-20ms</td>
+                    <td>95% 감소</td>
+                </tr>
+                <tr>
+                    <td>대역폭 비용</td>
+                    <td>클라우드 과금</td>
+                    <td>무료 (로컬)</td>
+                    <td>100% 절감</td>
+                </tr>
+                <tr>
+                    <td>프라이버시</td>
+                    <td>중간 서버 경유</td>
+                    <td>직접 전송</td>
+                    <td>향상</td>
+                </tr>
+                <tr>
+                    <td>인터넷 의존성</td>
+                    <td>필수</td>
+                    <td>불필요</td>
+                    <td>오프라인 동작 가능</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.8 재시도 및 에러 복구</h2>
+        <p>네트워크 장애 시 <strong>자동 복구</strong> 메커니즘입니다.</p>
+
+        <h3>6.8.1 지수 백오프 재시도</h3>
+        <pre><code>// 재시도 로직 구현
+class RetryableRequest {
+  async execute(operation, options = {}) {
+    const {
+      maxRetries = 5,
+      initialDelay = 1000,
+      maxDelay = 32000,
+      backoffMultiplier = 2
+    } = options;
+
+    let delay = initialDelay;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+
+        // 재시도 가능한 오류인지 확인
+        if (!this.isRetryable(error)) {
+          throw error;
+        }
+
+        console.log(`재시도 ${attempt + 1}/${maxRetries}, ${delay}ms 대기`);
+        await this.sleep(delay);
+
+        // 지수 백오프
+        delay = Math.min(delay * backoffMultiplier, maxDelay);
+      }
+    }
+  }
+
+  isRetryable(error) {
+    // 네트워크 오류, 일시적 서버 오류 등
+    const retryableErrors = [
+      'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND',
+      'ECONNREFUSED', 'ENETUNREACH'
+    ];
+
+    const retryableStatuses = [408, 429, 500, 502, 503, 504];
+
+    return (
+      retryableErrors.includes(error.code) ||
+      retryableStatuses.includes(error.statusCode)
+    );
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// 사용 예
+const retryable = new RetryableRequest();
+
+await retryable.execute(async () => {
+  return await fetch('https://api.wia-rob014.org/v1/pets');
+});</code></pre>
+
+        <h2>6.9 네트워크 대역폭 최적화</h2>
+        <p>제한된 대역폭 환경에서의 <strong>효율적인 통신</strong> 방법입니다.</p>
+
+        <h3>6.9.1 데이터 압축</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>압축 방식</th>
+                    <th>압축률</th>
+                    <th>CPU 사용</th>
+                    <th>적용 대상</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>gzip</td>
+                    <td>60-70%</td>
+                    <td>중간</td>
+                    <td>HTTP 응답</td>
+                </tr>
+                <tr>
+                    <td>brotli</td>
+                    <td>70-80%</td>
+                    <td>높음</td>
+                    <td>정적 리소스</td>
+                </tr>
+                <tr>
+                    <td>MessagePack</td>
+                    <td>40-50%</td>
+                    <td>낮음</td>
+                    <td>MQTT 메시지</td>
+                </tr>
+                <tr>
+                    <td>H.264/H.265</td>
+                    <td>90-95%</td>
+                    <td>매우 높음</td>
+                    <td>영상 스트림</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.9.2 적응형 비트레이트</h3>
+        <pre><code>// 네트워크 상태에 따른 영상 품질 조정
+class AdaptiveBitrateController {
+  constructor() {
+    this.qualities = [
+      { name: 'low', width: 640, height: 480, bitrate: 500000 },
+      { name: 'medium', width: 1280, height: 720, bitrate: 1500000 },
+      { name: 'high', width: 1920, height: 1080, bitrate: 3000000 }
+    ];
+    this.currentQuality = this.qualities[1]; // medium
+  }
+
+  async adjustQuality(networkStats) {
+    const { bandwidth, latency, packetLoss } = networkStats;
+
+    if (packetLoss > 5 || bandwidth < 1000000) {
+      // 품질 낮춤
+      this.currentQuality = this.qualities[0];
+    } else if (packetLoss < 1 && bandwidth > 4000000 && latency < 50) {
+      // 품질 높임
+      this.currentQuality = this.qualities[2];
+    } else {
+      // 중간 품질
+      this.currentQuality = this.qualities[1];
+    }
+
+    console.log(`영상 품질 변경: ${this.currentQuality.name}`);
+    await this.applyQuality(this.currentQuality);
+  }
+
+  async applyQuality(quality) {
+    // WebRTC 또는 스트리밍 서버에 품질 변경 요청
+    // ...
+  }
+}</code></pre>
+
+        <h2>6.10 프로토콜 보안 점검</h2>
+        <p>통신 프로토콜의 <strong>보안 준수 사항</strong>을 확인합니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>항목</th>
+                    <th>요구사항</th>
+                    <th>검증 방법</th>
+                    <th>우선순위</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>TLS 버전</td>
+                    <td>1.3 이상</td>
+                    <td>openssl s_client 테스트</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td>인증서 검증</td>
+                    <td>유효한 인증서</td>
+                    <td>인증서 체인 확인</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td>암호화 스위트</td>
+                    <td>강력한 암호만</td>
+                    <td>nmap, ssllabs 테스트</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td>토큰 만료</td>
+                    <td>1시간 이내</td>
+                    <td>JWT exp 클레임 확인</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td>MQTT QoS</td>
+                    <td>중요 메시지 QoS 2</td>
+                    <td>메시지 로그 분석</td>
+                    <td>권장</td>
+                </tr>
+                <tr>
+                    <td>WebSocket 재연결</td>
+                    <td>지수 백오프</td>
+                    <td>연결 실패 시나리오 테스트</td>
+                    <td>권장</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="philosophy">
+            <h3>🌟 弘益人間 (홍익인간)</h3>
+            <p><strong>널리 인간을 이롭게 하라</strong></p>
+            <p style="margin-top:10px;">안전한 통신 프로토콜은 사용자의 프라이버시를 보호하고<br>신뢰할 수 있는 펫케어 서비스를 제공합니다.</p>
+        </div>
+
+        <div class="summary">
+            <h3>📌 핵심 내용 요약</h3>
+            <ul>
+                <li><strong>프로토콜 구성</strong>: HTTPS/TLS 1.3, WebSocket, MQTT, WebRTC, OAuth 2.0</li>
+                <li><strong>TLS 보안</strong>: TLS 1.3 이상 필수, 강력한 암호화 스위트, 인증서 관리</li>
+                <li><strong>OAuth 2.0</strong>: Authorization Code Flow, JWT 토큰, 1시간 만료</li>
+                <li><strong>MQTT</strong>: QoS 0/1/2 지원, 토픽 구조 정의, TLS 암호화</li>
+                <li><strong>WebSocket</strong>: 실시간 양방향 통신, heartbeat 연결 유지, 재연결 로직</li>
+                <li><strong>WebRTC</strong>: P2P 영상 스트리밍, STUN/TURN 서버, ICE 프로토콜</li>
+                <li><strong>로컬 통신</strong>: mDNS 디바이스 발견, 95% 지연 감소, 오프라인 동작</li>
+                <li><strong>에러 복구</strong>: 지수 백오프 재시도, 최대 5회, 32초 최대 대기</li>
+                <li><strong>대역폭 최적화</strong>: gzip/brotli 압축, 적응형 비트레이트, H.264/H.265</li>
+                <li><strong>보안 점검</strong>: TLS 버전, 인증서, 암호화 스위트, 토큰 만료 검증</li>
+            </ul>
+        </div>
+
+        <div class="questions">
+            <h3>🤔 복습 질문</h3>
+            <ol>
+                <li>WIA-ROB-014에서 사용하는 5가지 주요 통신 프로토콜과 각각의 용도를 설명하세요.</li>
+                <li>TLS 1.3 구성 요구사항과 권장되는 3가지 암호화 스위트를 설명하세요.</li>
+                <li>OAuth 2.0 Authorization Code Flow의 4단계 과정을 설명하고, JWT 토큰의 구조를 나열하세요.</li>
+                <li>MQTT QoS 레벨 0, 1, 2의 차이점과 각각이 적합한 사용 사례를 설명하세요.</li>
+                <li>WebSocket의 7가지 메시지 타입과 각각의 방향 및 역할을 설명하세요.</li>
+                <li>WebRTC를 사용한 영상 스트리밍의 장점과 연결 설정 과정(Offer/Answer, ICE)을 설명하세요.</li>
+                <li>로컬 디바이스 간 직접 통신이 클라우드 경유 대비 가지는 4가지 장점을 설명하세요.</li>
+                <li>지수 백오프 재시도 전략의 매개변수(최대 재시도, 초기 지연, 배수)와 재시도 가능한 오류 타입을 설명하세요.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

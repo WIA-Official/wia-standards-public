@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제1장: 기초 | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>제1장: 블록체인 보안 기초</h1>
+
+    <div class="highlight">
+        <strong>장 개요:</strong> 이 장에서는 블록체인 시스템을 보호하는 데 필수적인 기초 보안 개념을 확립합니다. 이러한 기초를 이해하는 것은 블록체인 인프라의 모든 계층에서 효과적인 보안 조치를 구현하는 데 중요합니다.
+    </div>
+
+    <h2>암호화 기본 요소</h2>
+    <p>블록체인 보안은 신뢰 없는 시스템에 필수적인 수학적 보장을 제공하는 암호화 기본 요소를 기반으로 합니다. 이러한 기본 요소는 모든 블록체인 보안 메커니즘의 기초를 형성합니다.</p>
+
+    <h3>해시 함수</h3>
+    <p>암호화 해시 함수는 데이터 무결성, 작업 증명 메커니즘, 주소 생성을 제공하며 블록체인 보안의 기본입니다. 해시 함수의 보안 속성은 다음과 같습니다:</p>
+    <ul>
+        <li><strong>프리이미지 저항성:</strong> 해시 출력 H(x)가 주어지면 x를 찾는 것이 계산적으로 불가능해야 함</li>
+        <li><strong>2차 프리이미지 저항성:</strong> x가 주어지면 H(x) = H(y)인 y를 찾는 것이 불가능해야 함</li>
+        <li><strong>충돌 저항성:</strong> H(x) = H(y)인 두 입력 x와 y를 찾는 것이 불가능해야 함</li>
+    </ul>
+
+    <pre><code>// TypeScript에서 안전한 해시 구현
+import { createHash, randomBytes } from 'crypto';
+
+interface HashResult {
+    algorithm: string;
+    digest: string;
+    timestamp: number;
+}
+
+class SecureHasher {
+    private readonly algorithm: string;
+
+    constructor(algorithm: string = 'sha256') {
+        const supported = ['sha256', 'sha384', 'sha512', 'sha3-256', 'sha3-512'];
+        if (!supported.includes(algorithm)) {
+            throw new Error(`지원되지 않는 알고리즘: ${algorithm}`);
+        }
+        this.algorithm = algorithm;
+    }
+
+    hash(data: Buffer | string): HashResult {
+        const hash = createHash(this.algorithm);
+        hash.update(typeof data === 'string' ? Buffer.from(data) : data);
+
+        return {
+            algorithm: this.algorithm,
+            digest: hash.digest('hex'),
+            timestamp: Date.now()
+        };
+    }
+
+    verifyIntegrity(data: Buffer | string, expectedHash: string): boolean {
+        const computed = this.hash(data);
+        return this.constantTimeCompare(computed.digest, expectedHash);
+    }
+
+    private constantTimeCompare(a: string, b: string): boolean {
+        if (a.length !== b.length) return false;
+        let result = 0;
+        for (let i = 0; i < a.length; i++) {
+            result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+        }
+        return result === 0;
+    }
+}
+
+// 블록체인 블록 해싱 사용 예제
+const hasher = new SecureHasher('sha256');
+const blockData = JSON.stringify({
+    index: 1,
+    previousHash: '0x000...',
+    transactions: [],
+    nonce: 12345
+});
+const blockHash = hasher.hash(blockData);
+console.log(`블록 해시: ${blockHash.digest}`);</code></pre>
+
+    <h3>디지털 서명</h3>
+    <p>디지털 서명은 블록체인 트랜잭션에 대한 인증 및 부인 방지를 제공합니다. 블록체인에서 가장 일반적으로 사용되는 서명 체계에는 ECDSA, EdDSA, Schnorr 서명이 포함됩니다.</p>
+
+    <div class="highlight">
+        <strong>보안 고려사항:</strong> 디지털 서명의 보안은 전적으로 개인 키의 비밀 유지에 달려 있습니다. 개인 키가 노출되면 해당 키로 만든 모든 서명이 손상되어 공격자가 트랜잭션을 위조할 수 있습니다.
+    </div>
+
+    <pre><code>// ECDSA 서명 구현
+import { ec as EC } from 'elliptic';
+import { createHash } from 'crypto';
+
+class ECDSASigner {
+    private ec: EC;
+    private keyPair: EC.KeyPair;
+
+    constructor(curve: string = 'secp256k1') {
+        this.ec = new EC(curve);
+    }
+
+    generateKeyPair(): { publicKey: string; privateKey: string } {
+        this.keyPair = this.ec.genKeyPair();
+        return {
+            publicKey: this.keyPair.getPublic('hex'),
+            privateKey: this.keyPair.getPrivate('hex')
+        };
+    }
+
+    loadPrivateKey(privateKeyHex: string): void {
+        this.keyPair = this.ec.keyFromPrivate(privateKeyHex, 'hex');
+    }
+
+    sign(message: string): { r: string; s: string; recovery: number } {
+        const msgHash = createHash('sha256').update(message).digest('hex');
+        const signature = this.keyPair.sign(msgHash);
+
+        return {
+            r: signature.r.toString('hex'),
+            s: signature.s.toString('hex'),
+            recovery: signature.recoveryParam || 0
+        };
+    }
+
+    verify(message: string, signature: { r: string; s: string }, publicKey: string): boolean {
+        const msgHash = createHash('sha256').update(message).digest('hex');
+        const key = this.ec.keyFromPublic(publicKey, 'hex');
+        return key.verify(msgHash, signature);
+    }
+}
+
+// 트랜잭션 서명 예제
+const signer = new ECDSASigner();
+const keys = signer.generateKeyPair();
+
+const transaction = {
+    from: '0x1234...',
+    to: '0x5678...',
+    value: '1000000000000000000',
+    nonce: 5
+};
+
+const signature = signer.sign(JSON.stringify(transaction));
+console.log('트랜잭션 서명:', signature);</code></pre>
+
+    <h2>합의 메커니즘 보안</h2>
+    <p>합의 메커니즘은 블록체인 보안의 중추로서, 모든 노드가 원장 상태에 동의하도록 보장합니다. 각 합의 메커니즘은 고유한 보안 속성과 잠재적 취약점을 가지고 있습니다.</p>
+
+    <h3>작업 증명(PoW) 보안</h3>
+    <table>
+        <tr><th>공격 벡터</th><th>설명</th><th>완화 방법</th></tr>
+        <tr><td>51% 공격</td><td>공격자가 해시 파워의 과반수를 제어</td><td>네트워크 분산화, 체크포인팅</td></tr>
+        <tr><td>이기적 채굴</td><td>이점을 얻기 위해 블록 보류</td><td>엉클 보상, 개선된 포크 선택 규칙</td></tr>
+        <tr><td>블록 보류</td><td>풀 채굴자가 부분 증명만 제출</td><td>Stratum V2, 암호화된 채굴 프로토콜</td></tr>
+        <tr><td>타임 워프</td><td>블록 타임스탬프 조작</td><td>더 엄격한 타임스탬프 검증 규칙</td></tr>
+    </table>
+
+    <h3>지분 증명(PoS) 보안</h3>
+    <p>지분 증명은 작업 증명과 다른 보안 고려사항을 도입합니다. PoS 기반 네트워크를 보호하려면 이를 이해하는 것이 필수적입니다.</p>
+
+    <pre><code>// 스테이크 검증 보안 모듈
+interface ValidatorStake {
+    address: string;
+    amount: bigint;
+    activationEpoch: number;
+    exitEpoch: number | null;
+    slashed: boolean;
+}
+
+class StakeSecurityValidator {
+    private readonly minStake: bigint = BigInt('32000000000000000000'); // 32 ETH
+    private readonly maxEffectiveBalance: bigint = BigInt('32000000000000000000');
+
+    validateStake(stake: ValidatorStake, currentEpoch: number): ValidationResult {
+        const errors: string[] = [];
+
+        // 최소 스테이크 요구사항 확인
+        if (stake.amount < this.minStake) {
+            errors.push('스테이크가 최소 임계값 미만');
+        }
+
+        // 검증자 활성화 확인
+        if (stake.activationEpoch > currentEpoch) {
+            errors.push('검증자가 아직 활성화되지 않음');
+        }
+
+        // 검증자 탈퇴 확인
+        if (stake.exitEpoch !== null && stake.exitEpoch <= currentEpoch) {
+            errors.push('검증자가 탈퇴함');
+        }
+
+        // 슬래싱 상태 확인
+        if (stake.slashed) {
+            errors.push('검증자가 슬래싱됨');
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors,
+            effectiveBalance: this.calculateEffectiveBalance(stake.amount)
+        };
+    }
+
+    private calculateEffectiveBalance(amount: bigint): bigint {
+        return amount > this.maxEffectiveBalance
+            ? this.maxEffectiveBalance
+            : amount;
+    }
+
+    detectLongRangeAttack(
+        proposedChain: Block[],
+        canonicalChain: Block[]
+    ): boolean {
+        // 새 블록에 대한 이전 검증자 서명 확인
+        const oldValidators = this.getHistoricalValidators(canonicalChain);
+        const proposedValidators = this.getBlockValidators(proposedChain);
+
+        // 이전에 탈퇴한 검증자가 최근 블록에 서명했는지 감지
+        return proposedValidators.some(v =>
+            oldValidators.includes(v) && this.hasExited(v)
+        );
+    }
+}</code></pre>
+
+    <h2>키 관리 기초</h2>
+    <p>안전한 키 관리는 블록체인 보안에서 가장 중요한 측면일 수 있습니다. 개인 키의 분실이나 손상은 자산과 액세스 손실로 직접 이어집니다.</p>
+
+    <h3>키 생성 모범 사례</h3>
+    <div class="highlight">
+        <strong>중요 보안 규칙:</strong> 개인 키는 암호학적으로 안전한 난수 생성기(CSPRNG)를 사용하여 생성해야 합니다. 타임스탬프, 추가 엔트로피 없는 사용자 입력 또는 약한 난수 생성기와 같은 예측 가능한 소스를 절대 사용하지 마십시오.
+    </div>
+
+    <pre><code>// 안전한 키 생성 구현
+import { randomBytes } from 'crypto';
+import * as bip39 from 'bip39';
+import { hdkey } from 'ethereumjs-wallet';
+
+class SecureKeyGenerator {
+    private readonly entropyBits: number = 256;
+
+    generateEntropy(): Buffer {
+        // 암호학적으로 안전한 랜덤 바이트 사용
+        return randomBytes(this.entropyBits / 8);
+    }
+
+    generateMnemonic(strength: 128 | 160 | 192 | 224 | 256 = 256): string {
+        // 지정된 강도로 BIP-39 니모닉 생성
+        return bip39.generateMnemonic(strength);
+    }
+
+    deriveKeyFromMnemonic(
+        mnemonic: string,
+        path: string = "m/44'/60'/0'/0/0",
+        passphrase: string = ''
+    ): DerivedKey {
+        // 니모닉 검증
+        if (!bip39.validateMnemonic(mnemonic)) {
+            throw new Error('유효하지 않은 니모닉 문구');
+        }
+
+        // 선택적 패스프레이즈로 시드 파생
+        const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
+
+        // HD 지갑 생성
+        const hdWallet = hdkey.fromMasterSeed(seed);
+        const wallet = hdWallet.derivePath(path).getWallet();
+
+        return {
+            privateKey: wallet.getPrivateKey().toString('hex'),
+            publicKey: wallet.getPublicKey().toString('hex'),
+            address: wallet.getAddressString(),
+            path
+        };
+    }
+}
+
+interface DerivedKey {
+    privateKey: string;
+    publicKey: string;
+    address: string;
+    path: string;
+}
+
+// 안전한 키 생성 예제
+const keyGen = new SecureKeyGenerator();
+const mnemonic = keyGen.generateMnemonic(256);
+console.log('니모닉 (비밀 유지):', mnemonic);
+
+const key = keyGen.deriveKeyFromMnemonic(mnemonic, "m/44'/60'/0'/0/0");
+console.log('파생된 주소:', key.address);</code></pre>
+
+    <h3>키 저장 보안 수준</h3>
+    <table>
+        <tr><th>수준</th><th>방법</th><th>사용 사례</th><th>위험 수준</th></tr>
+        <tr><td>수준 1</td><td>암호화된 파일 저장</td><td>개발, 테스트</td><td>높음</td></tr>
+        <tr><td>수준 2</td><td>비밀번호로 보호된 키스토어</td><td>개인 지갑</td><td>중간</td></tr>
+        <tr><td>수준 3</td><td>하드웨어 지갑</td><td>개인 보유량</td><td>낮음</td></tr>
+        <tr><td>수준 4</td><td>다중 서명 설정</td><td>조직 자산</td><td>매우 낮음</td></tr>
+        <tr><td>수준 5</td><td>에어갭 서명이 있는 HSM</td><td>수탁 서비스</td><td>최소</td></tr>
+    </table>
+
+    <h2>네트워크 보안 기초</h2>
+    <p>블록체인 네트워크는 신뢰 없고 무허가 환경에서 운영하면서 보안을 유지해야 하는 고유한 과제에 직면합니다.</p>
+
+    <pre><code>// P2P 네트워크 보안 구성
+interface NetworkSecurityConfig {
+    maxPeers: number;
+    minPeers: number;
+    peerScoring: boolean;
+    encryptedTransport: boolean;
+    messageValidation: boolean;
+}
+
+const productionSecurityConfig: NetworkSecurityConfig = {
+    maxPeers: 50,           // 리소스 고갈 방지를 위한 제한
+    minPeers: 10,           // 네트워크 연결성 보장
+    peerScoring: true,      // 피어 행동 추적
+    encryptedTransport: true, // TLS/Noise 프로토콜 사용
+    messageValidation: true  // 모든 메시지 검증
+};
+
+class PeerSecurityManager {
+    private peerScores: Map<string, number> = new Map();
+    private banList: Set<string> = new Set();
+
+    scorePeer(peerId: string, action: PeerAction): void {
+        const currentScore = this.peerScores.get(peerId) || 100;
+        const newScore = currentScore + this.getScoreAdjustment(action);
+
+        if (newScore <= 0) {
+            this.banPeer(peerId, '점수가 임계값 이하로 떨어짐');
+        } else {
+            this.peerScores.set(peerId, Math.min(newScore, 150));
+        }
+    }
+
+    private getScoreAdjustment(action: PeerAction): number {
+        const adjustments: Record<PeerAction, number> = {
+            'valid_block': 5,
+            'valid_transaction': 1,
+            'invalid_block': -20,
+            'invalid_transaction': -10,
+            'timeout': -5,
+            'protocol_violation': -50
+        };
+        return adjustments[action] || 0;
+    }
+
+    banPeer(peerId: string, reason: string): void {
+        this.banList.add(peerId);
+        console.log(`피어 차단됨 ${peerId}: ${reason}`);
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>요약:</strong> 이러한 암호화 및 네트워크 보안 기초를 이해하는 것은 안전한 블록체인 시스템을 구축하는 데 필수적입니다. 후속 장에서는 블록체인 아키텍처, 스마트 컨트랙트, DeFi, 운영에서의 특정 보안 과제를 해결하기 위해 이러한 개념을 기반으로 합니다.
+    </div>
+
+</body>
+</html>

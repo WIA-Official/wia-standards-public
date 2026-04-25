@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8장: 구현 및 통합 - WIA-PET-GENOME</title>
+</head>
+<body>
+    <hr>
+
+    <h1>8장: 구현 및 통합</h1>
+    <blockquote>"견고한 구현은 유전적 인사이트를 실험실에서 일상으로 가져옵니다."</blockquote>
+    <hr>
+
+    <h2>8.1 개요</h2>
+    <p>이 장은 WIA-PET-GENOME 표준 준수 시스템 구현을 위한 기술 지침을 제공합니다. 시스템 아키텍처, API 통합, 데이터베이스 설계, 배포 고려사항을 다룹니다.</p>
+
+    <h3>구현 구성요소</h3>
+    <ul>
+        <li><strong>핵심 서비스</strong> - 프로필 관리, 분석 엔진</li>
+        <li><strong>API 계층</strong> - 통합을 위한 RESTful 인터페이스</li>
+        <li><strong>데이터 스토리지</strong> - 유전 데이터의 안전한 저장</li>
+        <li><strong>처리 파이프라인</strong> - 시퀀싱 데이터 분석</li>
+        <li><strong>통합 지점</strong> - 외부 시스템 연결</li>
+    </ul>
+    <hr>
+
+    <h2>8.2 시스템 아키텍처</h2>
+
+    <h3>고수준 아키텍처</h3>
+    <pre>
+WIA-PET-GENOME 시스템 아키텍처
+================================================================================
+
+                            +-----------------+
+                            |   API 게이트웨이 |
+                            |   (REST/gRPC)   |
+                            +--------+--------+
+                                     |
+         +---------------------------+---------------------------+
+         |                           |                           |
++--------v--------+       +----------v----------+     +----------v----------+
+|  프로필         |       |  분석              |     |  신원              |
+|  서비스         |       |  서비스            |     |  서비스            |
+|  - CRUD 작업   |       |  - 품종 분석       |     |  - 지문 생성       |
+|  - 검증        |       |  - 건강 예측       |     |  - 비교            |
+|  - 검색        |       |  - 형질 분석       |     |  - 복제 검증       |
++---------+-------+       +----------+----------+     +----------+----------+
+          |                          |                           |
+          +------------+-------------+---------------------------+
+                       |
+              +--------v--------+
+              |   PostgreSQL    |
+              |   데이터베이스   |
+              |   (암호화)      |
+              +-----------------+
+
+외부 통합:
+- 실험실 정보 시스템 (LIS)
+- 수의 진료 관리 시스템
+- 품종 등록 기관
+- 복제 시설 시스템
+    </pre>
+
+    <h3>서비스 책임</h3>
+    <table border="1">
+        <tr><th>서비스</th><th>책임</th><th>주요 엔드포인트</th></tr>
+        <tr><td>프로필 서비스</td><td>CRUD, 검증, 검색</td><td>/profiles/*</td></tr>
+        <tr><td>분석 서비스</td><td>품종, 건강, 형질</td><td>/analysis/*, /health/*</td></tr>
+        <tr><td>신원 서비스</td><td>지문, 비교, 복제</td><td>/identity/*, /cloning/*</td></tr>
+        <tr><td>케어 서비스</td><td>권장사항</td><td>/care/*</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.3 API 사양</h2>
+
+    <h3>API 표준</h3>
+    <table border="1">
+        <tr><th>측면</th><th>표준</th></tr>
+        <tr><td>프로토콜</td><td>HTTPS (TLS 1.3)</td></tr>
+        <tr><td>형식</td><td>JSON (application/json)</td></tr>
+        <tr><td>인증</td><td>OAuth 2.0 / API 키</td></tr>
+        <tr><td>버전 관리</td><td>URL 경로 (/v1/, /v2/)</td></tr>
+        <tr><td>문서화</td><td>OpenAPI 3.0</td></tr>
+    </table>
+
+    <h3>핵심 엔드포인트</h3>
+    <table border="1">
+        <tr><th>메서드</th><th>엔드포인트</th><th>설명</th></tr>
+        <tr><td>POST</td><td>/v1/profiles</td><td>새 유전체 프로필 생성</td></tr>
+        <tr><td>GET</td><td>/v1/profiles/{id}</td><td>ID로 프로필 조회</td></tr>
+        <tr><td>PUT</td><td>/v1/profiles/{id}</td><td>프로필 업데이트</td></tr>
+        <tr><td>POST</td><td>/v1/analysis/breed/{id}</td><td>품종 분석 실행</td></tr>
+        <tr><td>GET</td><td>/v1/health/predictions/{id}</td><td>건강 예측 조회</td></tr>
+        <tr><td>POST</td><td>/v1/identity/fingerprint/{id}</td><td>지문 생성</td></tr>
+        <tr><td>POST</td><td>/v1/identity/compare</td><td>두 샘플 비교</td></tr>
+        <tr><td>POST</td><td>/v1/cloning/verify</td><td>복제 신원 검증</td></tr>
+        <tr><td>GET</td><td>/v1/care/recommendations/{id}</td><td>케어 플랜 조회</td></tr>
+    </table>
+
+    <h3>요청/응답 예시</h3>
+    <pre>
+POST /v1/profiles
+Content-Type: application/json
+Authorization: Bearer {token}
+
+요청:
+{
+  "petInfo": {
+    "name": "맥스",
+    "dateOfBirth": "2022-03-15",
+    "sex": "MALE",
+    "microchipId": "985112000123456"
+  },
+  "species": "CANINE",
+  "sequencingInfo": {
+    "sequencingType": "WHOLE_GENOME",
+    "platform": "Illumina NovaSeq",
+    "laboratoryId": "WIA-LAB-001"
+  }
+}
+
+응답 (201 Created):
+{
+  "profileId": "PGP-2025-001234",
+  "status": "CREATED",
+  "createdAt": "2025-01-15T10:30:00Z",
+  "links": {
+    "self": "/v1/profiles/PGP-2025-001234",
+    "analysis": "/v1/analysis/breed/PGP-2025-001234",
+    "health": "/v1/health/predictions/PGP-2025-001234"
+  }
+}
+    </pre>
+    <hr>
+
+    <h2>8.4 데이터베이스 스키마</h2>
+
+    <h3>핵심 테이블</h3>
+    <pre>
+데이터베이스 스키마 개요
+================================================================================
+
+genome_profiles
+  - profile_id (PK)
+  - pet_name, species, sex
+  - date_of_birth, microchip_id
+  - owner_id (FK), created_at, updated_at, status
+
+genetic_markers
+  - marker_id (PK)
+  - profile_id (FK)
+  - marker_type, chromosome, position
+  - reference_allele, alternate_allele, genotype
+  - quality_score
+
+health_predictions
+  - prediction_id (PK)
+  - profile_id (FK)
+  - condition_code, risk_level, risk_percentage
+  - inheritance_pattern, age_of_onset
+  - recommendations (JSONB)
+
+genetic_fingerprints
+  - fingerprint_id (PK)
+  - profile_id (FK)
+  - fingerprint_hash (UNIQUE)
+  - marker_count, marker_data (JSONB)
+  - generated_at, laboratory_id
+
+clone_registry
+  - clone_id (PK)
+  - original_profile_id (FK)
+  - clone_profile_id (FK)
+  - cloning_facility, cloning_date
+  - verification_status, verification_date
+    </pre>
+
+    <h3>인덱스 권장사항</h3>
+    <table border="1">
+        <tr><th>테이블</th><th>컬럼</th><th>인덱스 유형</th><th>목적</th></tr>
+        <tr><td>genome_profiles</td><td>profile_id</td><td>PRIMARY</td><td>기본 조회</td></tr>
+        <tr><td>genome_profiles</td><td>microchip_id</td><td>UNIQUE</td><td>마이크로칩 조회</td></tr>
+        <tr><td>genome_profiles</td><td>species, created_at</td><td>BTREE</td><td>필터 쿼리</td></tr>
+        <tr><td>genetic_markers</td><td>profile_id</td><td>BTREE</td><td>프로필 마커</td></tr>
+        <tr><td>genetic_fingerprints</td><td>fingerprint_hash</td><td>HASH</td><td>빠른 비교</td></tr>
+        <tr><td>health_predictions</td><td>profile_id, risk_level</td><td>BTREE</td><td>위험 쿼리</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.5 보안 구현</h2>
+
+    <h3>보안 요구사항</h3>
+    <table border="1">
+        <tr><th>계층</th><th>요구사항</th><th>구현</th></tr>
+        <tr><td>전송</td><td>암호화</td><td>TLS 1.3, 인증서 피닝</td></tr>
+        <tr><td>인증</td><td>신원 확인</td><td>OAuth 2.0, JWT 토큰</td></tr>
+        <tr><td>인가</td><td>접근 제어</td><td>RBAC, 리소스 소유권</td></tr>
+        <tr><td>데이터</td><td>저장 시 암호화</td><td>AES-256, 키 관리</td></tr>
+        <tr><td>감사</td><td>활동 로깅</td><td>포괄적 감사 추적</td></tr>
+    </table>
+
+    <h3>역할 기반 접근 제어</h3>
+    <table border="1">
+        <tr><th>역할</th><th>권한</th></tr>
+        <tr><td>보호자</td><td>자신의 프로필에 대한 전체 접근</td></tr>
+        <tr><td>수의사</td><td>건강 데이터 읽기 (보호자 동의 하에)</td></tr>
+        <tr><td>실험실</td><td>시퀀싱 결과 생성/업데이트</td></tr>
+        <tr><td>등록기관</td><td>신원 확인, 품종 데이터 읽기</td></tr>
+        <tr><td>관리자</td><td>시스템 관리</td></tr>
+    </table>
+
+    <h3>데이터 프라이버시 준수</h3>
+    <ul>
+        <li>데이터 공유에 보호자 동의 필요</li>
+        <li>삭제 권리 (데이터 이동성)</li>
+        <li>데이터 최소화 원칙</li>
+        <li>투명한 데이터 처리</li>
+        <li>침해 알림 절차</li>
+    </ul>
+    <hr>
+
+    <h2>8.6 통합 패턴</h2>
+
+    <h3>실험실 통합 (LIS)</h3>
+    <pre>
+실험실 통합 흐름
+================================================================================
+
+1. 샘플 수령
+   실험실이 샘플 수령 -> LIS에서 작업 생성
+
+2. 작업 알림
+   LIS -> POST /v1/sequencing/jobs
+   {
+     "profileId": "PGP-2025-001234",
+     "sampleId": "SAMPLE-001",
+     "sequencingType": "WHOLE_GENOME"
+   }
+
+3. 결과 제출
+   시퀀싱 완료 -> LIS가 결과 제출
+   POST /v1/sequencing/results
+   {
+     "jobId": "JOB-001",
+     "status": "COMPLETED",
+     "markers": [...],
+     "qualityMetrics": {...}
+   }
+
+4. 분석 트리거
+   결과 수신 -> 자동 분석 파이프라인
+   - 품종 분석
+   - 건강 예측
+   - 형질 분석
+   - 지문 생성
+
+5. 알림
+   분석 완료 -> 보호자/수의사 알림
+    </pre>
+
+    <h3>수의 시스템 통합</h3>
+    <table border="1">
+        <tr><th>통합 지점</th><th>메서드</th><th>용도</th></tr>
+        <tr><td>환자 조회</td><td>GET /profiles/search</td><td>마이크로칩으로 프로필 찾기</td></tr>
+        <tr><td>건강 데이터</td><td>GET /health/predictions/{id}</td><td>유전적 위험 보기</td></tr>
+        <tr><td>약물 확인</td><td>GET /health/drug-sensitivity/{id}</td><td>처방 안전성</td></tr>
+        <tr><td>케어 플랜</td><td>GET /care/recommendations/{id}</td><td>치료 계획</td></tr>
+    </table>
+
+    <h3>웹훅 이벤트</h3>
+    <table border="1">
+        <tr><th>이벤트</th><th>트리거</th><th>페이로드</th></tr>
+        <tr><td>profile.created</td><td>새 프로필 등록</td><td>프로필 요약</td></tr>
+        <tr><td>analysis.completed</td><td>분석 완료</td><td>분석 유형, 프로필 ID</td></tr>
+        <tr><td>health.alert</td><td>고위험 발견</td><td>질환, 위험 수준</td></tr>
+        <tr><td>identity.match</td><td>지문 일치 발견</td><td>일치 세부정보</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.7 배포 아키텍처</h2>
+
+    <h3>컨테이너 구성</h3>
+    <pre>
+DOCKER COMPOSE 구성
+================================================================================
+
+services:
+  api-gateway:
+    image: wia-genome/api-gateway:1.0
+    ports:
+      - "443:443"
+    environment:
+      - TLS_CERT=/certs/server.crt
+      - TLS_KEY=/certs/server.key
+
+  profile-service:
+    image: wia-genome/profile-service:1.0
+    replicas: 3
+    environment:
+      - DATABASE_URL=postgresql://...
+      - REDIS_URL=redis://cache:6379
+
+  analysis-service:
+    image: wia-genome/analysis-service:1.0
+    replicas: 2
+    resources:
+      limits:
+        memory: 8G
+        cpus: '4'
+
+  identity-service:
+    image: wia-genome/identity-service:1.0
+    replicas: 2
+
+  postgres:
+    image: postgres:15
+    volumes:
+      - genome-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+
+  redis:
+    image: redis:7
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    </pre>
+
+    <h3>확장 고려사항</h3>
+    <table border="1">
+        <tr><th>구성요소</th><th>확장 전략</th><th>트리거</th></tr>
+        <tr><td>API 게이트웨이</td><td>수평</td><td>요청률</td></tr>
+        <tr><td>프로필 서비스</td><td>수평</td><td>CPU/메모리</td></tr>
+        <tr><td>분석 서비스</td><td>수평 + GPU</td><td>큐 깊이</td></tr>
+        <tr><td>데이터베이스</td><td>수직 + 읽기 복제본</td><td>연결 수</td></tr>
+        <tr><td>캐시</td><td>클러스터 모드</td><td>메모리 사용량</td></tr>
+    </table>
+    <hr>
+
+    <h2>8.8 모니터링 및 운영</h2>
+
+    <h3>주요 지표</h3>
+    <table border="1">
+        <tr><th>지표</th><th>목표</th><th>알림 임계값</th></tr>
+        <tr><td>API 응답 시간 (p95)</td><td><200ms</td><td>>500ms</td></tr>
+        <tr><td>API 오류율</td><td><0.1%</td><td>>1%</td></tr>
+        <tr><td>분석 큐 깊이</td><td><100</td><td>>500</td></tr>
+        <tr><td>데이터베이스 연결 풀</td><td><70%</td><td>>90%</td></tr>
+        <tr><td>디스크 사용량</td><td><70%</td><td>>85%</td></tr>
+    </table>
+
+    <h3>헬스 체크 엔드포인트</h3>
+    <pre>
+GET /health/live
+응답: { "status": "UP" }
+
+GET /health/ready
+응답: {
+  "status": "UP",
+  "components": {
+    "database": "UP",
+    "cache": "UP",
+    "analysis-pipeline": "UP"
+  }
+}
+    </pre>
+
+    <h3>운영 절차</h3>
+    <ul>
+        <li>일일: 자동화된 백업 검증</li>
+        <li>주간: 보안 스캔, 종속성 업데이트</li>
+        <li>월간: 성능 검토, 용량 계획</li>
+        <li>분기별: 재해 복구 테스트</li>
+    </ul>
+    <hr>
+
+    <h2>8.9 테스트 전략</h2>
+
+    <h3>테스트 범주</h3>
+    <table border="1">
+        <tr><th>범주</th><th>커버리지 목표</th><th>도구</th></tr>
+        <tr><td>단위 테스트</td><td>>80%</td><td>pytest, Jest</td></tr>
+        <tr><td>통합 테스트</td><td>모든 엔드포인트</td><td>Postman, pytest</td></tr>
+        <tr><td>성능 테스트</td><td>부하 시나리오</td><td>k6, Locust</td></tr>
+        <tr><td>보안 테스트</td><td>OWASP Top 10</td><td>OWASP ZAP</td></tr>
+    </table>
+
+    <h3>테스트 데이터 관리</h3>
+    <ul>
+        <li>테스트용 합성 유전체 데이터</li>
+        <li>익명화된 운영 데이터 샘플</li>
+        <li>엣지 케이스 데이터셋 (희귀 품종, 질환)</li>
+        <li>성능 테스트 데이터셋 (대규모)</li>
+    </ul>
+    <hr>
+
+    <h2>8.10 준수 체크리스트</h2>
+
+    <h3>WIA-PET-GENOME 준수</h3>
+    <table border="1">
+        <tr><th>요구사항</th><th>섹션</th><th>상태</th></tr>
+        <tr><td>프로필 ID 형식</td><td>2.2</td><td>[ ] 구현됨</td></tr>
+        <tr><td>종 열거형</td><td>2.4</td><td>[ ] 구현됨</td></tr>
+        <tr><td>시퀀싱 유형</td><td>2.5</td><td>[ ] 구현됨</td></tr>
+        <tr><td>마커 데이터 구조</td><td>2.7</td><td>[ ] 구현됨</td></tr>
+        <tr><td>품종 분석 알고리즘</td><td>3.2</td><td>[ ] 구현됨</td></tr>
+        <tr><td>위험 계산</td><td>4.2</td><td>[ ] 구현됨</td></tr>
+        <tr><td>약물 민감성</td><td>4.5</td><td>[ ] 구현됨</td></tr>
+        <tr><td>지문 생성</td><td>7.3</td><td>[ ] 구현됨</td></tr>
+        <tr><td>복제 검증</td><td>7.5</td><td>[ ] 구현됨</td></tr>
+        <tr><td>API 사양</td><td>8.3</td><td>[ ] 구현됨</td></tr>
+    </table>
+    <hr>
+
+    <h2>요약</h2>
+    <p>WIA-PET-GENOME 표준 준수 시스템을 구현하려면 데이터 구조, 보안, 통합 패턴에 세심한 주의가 필요합니다. 이 가이드는 유전 데이터를 관리하고, 분석을 수행하며, 더 넓은 반려동물 건강 서비스 생태계와 통합할 수 있는 견고한 시스템을 구축하기 위한 기반을 제공합니다.</p>
+
+    <p>이러한 사양을 따름으로써, 구현자들은 홍익인간의 원칙에 부합하여 전 세계의 반려동물과 그 보호자에게 혜택을 주는 상호운용 가능한 시스템을 만들 수 있습니다.</p>
+    <hr>
+
+    <h2>부록: 빠른 참조</h2>
+
+    <h3>주요 URL</h3>
+    <ul>
+        <li>API 문서: /docs/api</li>
+        <li>OpenAPI 스펙: /openapi.json</li>
+        <li>헬스 체크: /health/ready</li>
+        <li>메트릭: /metrics</li>
+    </ul>
+
+    <h3>지원 리소스</h3>
+    <ul>
+        <li>기술 문서: docs.wia-genome.org</li>
+        <li>개발자 포털: developers.wia-genome.org</li>
+        <li>커뮤니티 포럼: community.wia-genome.org</li>
+    </ul>
+    <hr>
+
+    <p><a href="chapter-07.html">이전: 7장 - 신원 및 복제 검증</a></p>
+    <hr>
+    <p><em>WIA-PET-GENOME 기술 가이드 - 8장</em></p>
+    <p><em>버전 1.0.0 | 홍익인간</em></p>
+</body>
+</html>

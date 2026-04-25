@@ -1,748 +1,1034 @@
-# WIA Cryo-Legal Standard - Phase 4: Ecosystem Integration
+# CRYO-LEGAL Phase 4: Integration Specification
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
+## Overview
 
----
+This document defines the system integration architecture for legal status management, including Rust implementation, PostgreSQL schema, and deployment configuration.
 
-## 1. Overview
+## Rust Implementation
 
-### 1.1 Purpose
+### Core Service
 
-Phase 4 defines how the WIA Cryo-Legal Standard integrates with the broader WIA ecosystem and external systems, enabling seamless legal document management across cryopreservation facilities, identity systems, and compliance frameworks.
+```rust
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use thiserror::Error;
+use uuid::Uuid;
 
-### 1.2 Integration Architecture
+#[derive(Error, Debug)]
+pub enum LegalError {
+    #[error("Record not found: {0}")]
+    RecordNotFound(String),
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                       External Systems                               │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │ Legal    │  │ Identity │  │ Finance  │  │Healthcare│            │
-│  │ Databases│  │ Providers│  │ Systems  │  │ Records  │            │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
-└───────┼─────────────┼─────────────┼─────────────┼───────────────────┘
-        │             │             │             │
-        └──────────┬──┴──────┬──────┴──────┬──────┘
-                   │         │             │
-                   ▼         ▼             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    WIA Integration Layer                             │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                   Cryo-Legal Hub                             │   │
-│  │  ┌───────────┐  ┌───────────┐  ┌───────────┐               │   │
-│  │  │ Document  │  │ Signature │  │Compliance │               │   │
-│  │  │ Manager   │  │ Validator │  │ Engine    │               │   │
-│  │  └───────────┘  └───────────┘  └───────────┘               │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└───────────────────────────────┬─────────────────────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌──────────────┐       ┌──────────────┐       ┌──────────────┐
-│ Cryo-Identity│       │ Cryo-Consent │       │  Cryo-Asset  │
-│   Standard   │       │   Standard   │       │   Standard   │
-└──────────────┘       └──────────────┘       └──────────────┘
-```
+    #[error("Invalid transition: {from} -> {to}")]
+    InvalidTransition { from: String, to: String },
 
----
+    #[error("Document not found: {0}")]
+    DocumentNotFound(String),
 
-## 2. WIA Ecosystem Interoperability
+    #[error("Signature validation failed: {0}")]
+    SignatureValidationFailed(String),
 
-### 2.1 Integration with Cryo-Identity
+    #[error("Jurisdiction not recognized: {0}")]
+    JurisdictionNotRecognized(String),
 
-The Cryo-Legal standard integrates with Cryo-Identity for party verification.
+    #[error("Authorization denied: {0}")]
+    AuthorizationDenied(String),
 
-```json
-{
-  "integration": "cryo-identity",
-  "version": "1.0.0",
-  "operations": [
-    {
-      "operation": "verify_party",
-      "endpoint": "/cryo-identity/v1/verify",
-      "mapping": {
-        "cryo-legal.parties[].identity.legalName": "cryo-identity.subject.fullName",
-        "cryo-legal.parties[].identity.dateOfBirth": "cryo-identity.subject.birthDate",
-        "cryo-legal.parties[].identity.identificationNumber": "cryo-identity.credentials[].number"
-      }
-    },
-    {
-      "operation": "link_identity",
-      "endpoint": "/cryo-identity/v1/link",
-      "mapping": {
-        "cryo-legal.documentId": "cryo-identity.linkedDocuments[]"
-      }
-    }
-  ]
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] sqlx::Error),
 }
-```
 
-**TypeScript Integration:**
-```typescript
-import { CryoLegalClient } from '@wia/cryo-legal';
-import { CryoIdentityClient } from '@wia/cryo-identity';
+pub type Result<T> = std::result::Result<T, LegalError>;
 
-async function verifyPartyIdentity(partyId: string): Promise<VerificationResult> {
-  const legalClient = new CryoLegalClient();
-  const identityClient = new CryoIdentityClient();
-
-  // Get party from legal document
-  const party = await legalClient.parties.get(partyId);
-
-  // Verify against identity system
-  const verification = await identityClient.verify({
-    fullName: party.identity.legalName,
-    birthDate: party.identity.dateOfBirth,
-    documentNumber: party.identity.identificationNumber,
-    documentType: party.identity.identificationType
-  });
-
-  // Update legal party verification status
-  if (verification.verified) {
-    await legalClient.parties.update(partyId, {
-      verificationStatus: 'verified',
-      verificationId: verification.verificationId
-    });
-  }
-
-  return verification;
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "legal_status", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LegalStatus {
+    Living,
+    LegallyDeceased,
+    PreservedStatus,
+    RevivalPending,
+    LegallyRestored,
+    PermanentDeath,
 }
-```
 
-### 2.2 Integration with Cryo-Consent
-
-```json
-{
-  "integration": "cryo-consent",
-  "version": "1.0.0",
-  "operations": [
-    {
-      "operation": "create_consent_record",
-      "trigger": "document.signed",
-      "condition": "documentType IN ['consent_form', 'advance_directive']",
-      "action": {
-        "endpoint": "/cryo-consent/v1/consents",
-        "method": "POST",
-        "payload": {
-          "subjectId": "${parties[role=subject].partyId}",
-          "consentType": "${documentType}",
-          "documentReference": "${documentId}",
-          "signatureReference": "${signatures[0].signatureId}",
-          "effectiveDate": "${effectiveDate}",
-          "jurisdiction": "${jurisdiction.primaryCountry}"
+impl LegalStatus {
+    pub fn valid_transitions(&self) -> Vec<LegalStatus> {
+        match self {
+            Self::Living => vec![Self::LegallyDeceased],
+            Self::LegallyDeceased => vec![Self::PreservedStatus],
+            Self::PreservedStatus => vec![Self::RevivalPending, Self::PermanentDeath],
+            Self::RevivalPending => vec![
+                Self::LegallyRestored,
+                Self::PreservedStatus,
+                Self::PermanentDeath
+            ],
+            Self::LegallyRestored => vec![],
+            Self::PermanentDeath => vec![],
         }
-      }
     }
-  ]
+
+    pub fn can_transition_to(&self, target: &LegalStatus) -> bool {
+        self.valid_transitions().contains(target)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegalStatusRecord {
+    pub record_id: String,
+    pub subject_id: String,
+    pub identity_id: String,
+    pub current_status: LegalStatus,
+    pub primary_jurisdiction: String,
+    pub death_certificate_id: Option<String>,
+    pub preservation_declaration_id: Option<String>,
+    pub restoration_certificate_id: Option<String>,
+    pub guardianship_id: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatusTransition {
+    pub transition_id: String,
+    pub record_id: String,
+    pub from_status: LegalStatus,
+    pub to_status: LegalStatus,
+    pub transition_date: DateTime<Utc>,
+    pub authority_id: String,
+    pub document_ref: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "document_type", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum DocumentType {
+    DeathCertificate,
+    PreservationDeclaration,
+    RestorationCertificate,
+    CourtOrder,
+    GuardianshipOrder,
+    TrustDocument,
+    PowerOfAttorney,
+    IdentityVerification,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "document_status", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum DocumentStatus {
+    Draft,
+    PendingSignature,
+    Active,
+    Superseded,
+    Revoked,
+    Expired,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegalDocument {
+    pub document_id: String,
+    pub document_type: DocumentType,
+    pub title: String,
+    pub content_hash: String,
+    pub status: DocumentStatus,
+    pub jurisdiction: String,
+    pub effective_date: DateTime<Utc>,
+    pub expiration_date: Option<DateTime<Utc>>,
+    pub notarized: bool,
+    pub apostille: bool,
+    pub created_at: DateTime<Utc>,
 }
 ```
 
-### 2.3 Integration with Cryo-Asset
+### Legal Status Service
 
-```json
-{
-  "integration": "cryo-asset",
-  "version": "1.0.0",
-  "operations": [
-    {
-      "operation": "link_trust_assets",
-      "trigger": "document.executed",
-      "condition": "documentType = 'trust_document'",
-      "action": {
-        "endpoint": "/cryo-asset/v1/trusts/${trustId}/documents",
-        "method": "POST",
-        "payload": {
-          "documentId": "${documentId}",
-          "documentType": "legal_trust",
-          "effectiveDate": "${effectiveDate}"
+```rust
+pub struct LegalStatusService {
+    pool: PgPool,
+    document_service: DocumentService,
+    jurisdiction_service: JurisdictionService,
+}
+
+impl LegalStatusService {
+    pub fn new(
+        pool: PgPool,
+        document_service: DocumentService,
+        jurisdiction_service: JurisdictionService,
+    ) -> Self {
+        Self {
+            pool,
+            document_service,
+            jurisdiction_service,
         }
-      }
     }
-  ]
-}
-```
 
-### 2.4 Cross-Standard Event Bus
+    pub async fn create_record(
+        &self,
+        request: CreateRecordRequest,
+    ) -> Result<LegalStatusRecord> {
+        let year = Utc::now().format("%Y");
+        let sequence: i32 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(sequence_number), 0) + 1
+             FROM legal_status_records
+             WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())"
+        )
+        .fetch_one(&self.pool)
+        .await?;
 
-```typescript
-import { WIAEventBus } from '@wia/event-bus';
+        let record_id = format!("LEGAL-{}-{:06}", year, sequence);
 
-const eventBus = new WIAEventBus();
+        let record = sqlx::query_as::<_, LegalStatusRecord>(
+            r#"
+            INSERT INTO legal_status_records (
+                record_id, subject_id, identity_id, current_status,
+                primary_jurisdiction, sequence_number
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+            "#
+        )
+        .bind(&record_id)
+        .bind(&request.subject_id)
+        .bind(&request.identity_id)
+        .bind(LegalStatus::Living)
+        .bind(&request.primary_jurisdiction)
+        .bind(sequence)
+        .fetch_one(&self.pool)
+        .await?;
 
-// Subscribe to cross-standard events
-eventBus.subscribe('cryo-legal.document.executed', async (event) => {
-  const { documentId, documentType, parties } = event.payload;
-
-  // Notify related standards
-  if (documentType === 'cryopreservation_contract') {
-    await eventBus.publish('cryo-consent.consent.required', {
-      subjectId: parties.find(p => p.role === 'subject').partyId,
-      sourceDocument: documentId
-    });
-
-    await eventBus.publish('cryo-facility.contract.registered', {
-      facilityId: parties.find(p => p.role === 'facility').partyId,
-      contractId: documentId
-    });
-  }
-});
-```
-
----
-
-## 3. External System Integration
-
-### 3.1 Legal Database Integration
-
-**Court Records Integration:**
-```typescript
-interface CourtRecordsAdapter {
-  // Query court records
-  queryRecords(params: {
-    jurisdiction: string;
-    partyName: string;
-    documentType?: string;
-  }): Promise<CourtRecord[]>;
-
-  // File document with court
-  fileDocument(params: {
-    jurisdiction: string;
-    documentId: string;
-    documentType: string;
-    filingType: 'original' | 'amendment' | 'withdrawal';
-  }): Promise<FilingResult>;
-
-  // Check filing status
-  getFilingStatus(filingId: string): Promise<FilingStatus>;
-}
-
-// Implementation example
-class USCourtRecordsAdapter implements CourtRecordsAdapter {
-  async fileDocument(params: FileDocumentParams): Promise<FilingResult> {
-    const cryoLegal = new CryoLegalClient();
-    const document = await cryoLegal.documents.get(params.documentId);
-
-    // Export document in court-accepted format
-    const pdf = await cryoLegal.documents.export(params.documentId, 'pdf');
-
-    // Submit to court e-filing system
-    const result = await this.courtAPI.efile({
-      jurisdiction: params.jurisdiction,
-      caseType: mapDocumentTypeToCaseType(params.documentType),
-      documents: [pdf],
-      filer: document.parties.find(p => p.role === 'legal_representative')
-    });
-
-    return result;
-  }
-}
-```
-
-### 3.2 Identity Provider Integration
-
-**OAuth/OIDC Integration:**
-```typescript
-interface IdentityProvider {
-  provider: string;
-  protocol: 'oauth2' | 'oidc' | 'saml';
-  endpoints: {
-    authorize: string;
-    token: string;
-    userinfo: string;
-  };
-  scopes: string[];
-  mapping: Record<string, string>;
-}
-
-const identityProviders: IdentityProvider[] = [
-  {
-    provider: 'gov-id',
-    protocol: 'oidc',
-    endpoints: {
-      authorize: 'https://id.gov/oauth/authorize',
-      token: 'https://id.gov/oauth/token',
-      userinfo: 'https://id.gov/oauth/userinfo'
-    },
-    scopes: ['openid', 'profile', 'identity_document'],
-    mapping: {
-      'sub': 'partyId',
-      'name': 'identity.legalName',
-      'birthdate': 'identity.dateOfBirth',
-      'document_number': 'identity.identificationNumber'
+        Ok(record)
     }
-  },
-  {
-    provider: 'bank-kyc',
-    protocol: 'oauth2',
-    endpoints: {
-      authorize: 'https://bank.com/oauth/authorize',
-      token: 'https://bank.com/oauth/token',
-      userinfo: 'https://bank.com/api/kyc'
-    },
-    scopes: ['kyc_basic', 'kyc_documents'],
-    mapping: {
-      'customer_id': 'partyId',
-      'full_name': 'identity.legalName',
-      'verified_address': 'address'
+
+    pub async fn get_record(&self, record_id: &str) -> Result<LegalStatusRecord> {
+        sqlx::query_as::<_, LegalStatusRecord>(
+            "SELECT * FROM legal_status_records WHERE record_id = $1"
+        )
+        .bind(record_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| LegalError::RecordNotFound(record_id.to_string()))
     }
-  }
-];
-```
 
-### 3.3 Notarization Services
+    pub async fn transition_status(
+        &self,
+        record_id: &str,
+        request: TransitionRequest,
+    ) -> Result<StatusTransition> {
+        let record = self.get_record(record_id).await?;
 
-```typescript
-interface NotarizationService {
-  // Request remote online notarization
-  requestRON(params: {
-    documentId: string;
-    notaryJurisdiction: string;
-    signerIds: string[];
-    scheduledTime?: Date;
-  }): Promise<NotarizationSession>;
+        if !record.current_status.can_transition_to(&request.to_status) {
+            return Err(LegalError::InvalidTransition {
+                from: format!("{:?}", record.current_status),
+                to: format!("{:?}", request.to_status),
+            });
+        }
 
-  // Complete notarization
-  completeNotarization(sessionId: string): Promise<NotarizationResult>;
+        // Verify document exists
+        self.document_service
+            .verify_document(&request.document_ref)
+            .await?;
+
+        let transition_id = format!(
+            "TRANS-{}-{:03}",
+            record_id,
+            self.count_transitions(record_id).await? + 1
+        );
+
+        let transition = sqlx::query_as::<_, StatusTransition>(
+            r#"
+            INSERT INTO status_transitions (
+                transition_id, record_id, from_status, to_status,
+                authority_id, document_ref, reason
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+            "#
+        )
+        .bind(&transition_id)
+        .bind(record_id)
+        .bind(&record.current_status)
+        .bind(&request.to_status)
+        .bind(&request.authority_id)
+        .bind(&request.document_ref)
+        .bind(&request.reason)
+        .fetch_one(&self.pool)
+        .await?;
+
+        // Update record status
+        sqlx::query(
+            "UPDATE legal_status_records SET current_status = $2, last_updated = NOW() WHERE record_id = $1"
+        )
+        .bind(record_id)
+        .bind(&request.to_status)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(transition)
+    }
+
+    async fn count_transitions(&self, record_id: &str) -> Result<i64> {
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM status_transitions WHERE record_id = $1"
+        )
+        .bind(record_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(count.0)
+    }
+
+    pub async fn get_transition_history(
+        &self,
+        record_id: &str,
+    ) -> Result<Vec<StatusTransition>> {
+        let transitions = sqlx::query_as::<_, StatusTransition>(
+            "SELECT * FROM status_transitions WHERE record_id = $1 ORDER BY transition_date"
+        )
+        .bind(record_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(transitions)
+    }
 }
 
-// Integration with Notarize.com, DocVerify, etc.
-class RemoteNotarizationAdapter implements NotarizationService {
-  async requestRON(params: RONParams): Promise<NotarizationSession> {
-    const cryoLegal = new CryoLegalClient();
-    const document = await cryoLegal.documents.get(params.documentId);
+#[derive(Debug, Deserialize)]
+pub struct CreateRecordRequest {
+    pub subject_id: String,
+    pub identity_id: String,
+    pub primary_jurisdiction: String,
+}
 
-    // Create notarization session
-    const session = await this.notaryAPI.createSession({
-      documentTitle: document.content.title,
-      documentPdf: await cryoLegal.documents.export(params.documentId, 'pdf'),
-      signers: params.signerIds.map(id => {
-        const party = document.parties.find(p => p.partyId === id);
-        return {
-          name: party.identity.legalName,
-          email: party.contact.email
+#[derive(Debug, Deserialize)]
+pub struct TransitionRequest {
+    pub to_status: LegalStatus,
+    pub authority_id: String,
+    pub document_ref: String,
+    pub reason: String,
+}
+```
+
+### Document Service
+
+```rust
+use sha2::{Sha256, Digest};
+
+pub struct DocumentService {
+    pool: PgPool,
+    storage: DocumentStorage,
+}
+
+impl DocumentService {
+    pub async fn create_document(
+        &self,
+        request: CreateDocumentRequest,
+    ) -> Result<LegalDocument> {
+        let content_hash = self.hash_content(&request.content);
+
+        let doc_type_prefix = match request.document_type {
+            DocumentType::DeathCertificate => "DEATH",
+            DocumentType::PreservationDeclaration => "PRES",
+            DocumentType::RestorationCertificate => "REST",
+            DocumentType::CourtOrder => "COURT",
+            DocumentType::GuardianshipOrder => "GUARD",
+            _ => "DOC",
         };
-      }),
-      jurisdiction: params.notaryJurisdiction,
-      scheduledTime: params.scheduledTime
-    });
 
-    return session;
-  }
+        let sequence: i32 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM legal_documents"
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let document_id = format!("DOC-{}-{:06}", doc_type_prefix, sequence);
+
+        // Store content
+        self.storage.store(&document_id, &request.content).await?;
+
+        let document = sqlx::query_as::<_, LegalDocument>(
+            r#"
+            INSERT INTO legal_documents (
+                document_id, document_type, title, content_hash,
+                status, jurisdiction, effective_date, sequence_number
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+            "#
+        )
+        .bind(&document_id)
+        .bind(&request.document_type)
+        .bind(&request.title)
+        .bind(&content_hash)
+        .bind(DocumentStatus::Draft)
+        .bind(&request.jurisdiction)
+        .bind(&request.effective_date)
+        .bind(sequence)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(document)
+    }
+
+    pub async fn add_signature(
+        &self,
+        document_id: &str,
+        signature: SignatureRequest,
+    ) -> Result<()> {
+        let document = self.get_document(document_id).await?;
+
+        if !matches!(document.status, DocumentStatus::Draft | DocumentStatus::PendingSignature) {
+            return Err(LegalError::SignatureValidationFailed(
+                "Document not in signable state".to_string()
+            ));
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO document_signatures (
+                document_id, signer_id, signer_name, signer_role,
+                signature_type, digital_signature
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            "#
+        )
+        .bind(document_id)
+        .bind(&signature.signer_id)
+        .bind(&signature.signer_name)
+        .bind(&signature.signer_role)
+        .bind(&signature.signature_type)
+        .bind(&signature.digital_signature)
+        .execute(&self.pool)
+        .await?;
+
+        // Update document status
+        sqlx::query(
+            "UPDATE legal_documents SET status = 'PENDING_SIGNATURE' WHERE document_id = $1"
+        )
+        .bind(document_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn finalize_document(&self, document_id: &str) -> Result<LegalDocument> {
+        let missing = self.check_required_signatures(document_id).await?;
+
+        if !missing.is_empty() {
+            return Err(LegalError::SignatureValidationFailed(
+                format!("Missing signatures: {:?}", missing)
+            ));
+        }
+
+        sqlx::query(
+            "UPDATE legal_documents SET status = 'ACTIVE' WHERE document_id = $1"
+        )
+        .bind(document_id)
+        .execute(&self.pool)
+        .await?;
+
+        self.get_document(document_id).await
+    }
+
+    pub async fn verify_document(&self, document_id: &str) -> Result<bool> {
+        let document = self.get_document(document_id).await?;
+
+        if document.status != DocumentStatus::Active {
+            return Ok(false);
+        }
+
+        if let Some(exp) = document.expiration_date {
+            if Utc::now() > exp {
+                // Mark as expired
+                sqlx::query(
+                    "UPDATE legal_documents SET status = 'EXPIRED' WHERE document_id = $1"
+                )
+                .bind(document_id)
+                .execute(&self.pool)
+                .await?;
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
+    async fn get_document(&self, document_id: &str) -> Result<LegalDocument> {
+        sqlx::query_as::<_, LegalDocument>(
+            "SELECT * FROM legal_documents WHERE document_id = $1"
+        )
+        .bind(document_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| LegalError::DocumentNotFound(document_id.to_string()))
+    }
+
+    async fn check_required_signatures(&self, document_id: &str) -> Result<Vec<String>> {
+        // Implementation to check required signatures based on document type
+        Ok(vec![])
+    }
+
+    fn hash_content(&self, content: &[u8]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(content);
+        format!("{:x}", hasher.finalize())
+    }
 }
 ```
 
----
+### Restoration Service
 
-## 4. Migration Guide
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "restoration_stage", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RestorationStage {
+    Initiated,
+    IdentityVerification,
+    MedicalClearance,
+    LegalReview,
+    CourtPetition,
+    CourtHearing,
+    RestorationGranted,
+    RightsRestoration,
+    Completed,
+    Denied,
+}
 
-### 4.1 From Legacy Systems
+pub struct RestorationService {
+    pool: PgPool,
+    legal_status_service: LegalStatusService,
+    identity_client: IdentityServiceClient,
+}
 
-**Migration Steps:**
+impl RestorationService {
+    pub async fn initiate_restoration(
+        &self,
+        subject_id: &str,
+        revival_procedure_id: &str,
+    ) -> Result<RestorationCase> {
+        let year = Utc::now().format("%Y");
+        let sequence: i32 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM restoration_cases"
+        )
+        .fetch_one(&self.pool)
+        .await?;
 
-1. **Assess Current State**
-   - Inventory existing legal documents
-   - Map document types to WIA Cryo-Legal types
-   - Identify jurisdiction requirements
+        let case_id = format!("RESTORE-{}-{:04}", year, sequence);
 
-2. **Data Extraction**
-   ```python
-   from wia_cryo_legal import MigrationTool
+        let case = sqlx::query_as::<_, RestorationCase>(
+            r#"
+            INSERT INTO restoration_cases (
+                case_id, subject_id, revival_procedure_id, current_stage, sequence_number
+            ) VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            "#
+        )
+        .bind(&case_id)
+        .bind(subject_id)
+        .bind(revival_procedure_id)
+        .bind(RestorationStage::Initiated)
+        .bind(sequence)
+        .fetch_one(&self.pool)
+        .await?;
 
-   migration = MigrationTool(
-       source_system='legacy_docs',
-       target_system='wia_cryo_legal'
-   )
+        // Generate initial tasks
+        self.generate_stage_tasks(&case_id, RestorationStage::IdentityVerification).await?;
 
-   # Extract from legacy system
-   legacy_docs = migration.extract_from_source(
-       query="SELECT * FROM contracts WHERE type = 'cryopreservation'"
-   )
+        Ok(case)
+    }
 
-   # Transform to WIA format
-   wia_docs = migration.transform(legacy_docs, mapping={
-       'contract_id': 'documentId',
-       'contract_type': 'documentType',
-       'client_name': 'parties[0].identity.legalName',
-       'signed_date': 'signatures[0].timestamp'
-   })
+    pub async fn complete_task(
+        &self,
+        case_id: &str,
+        task_id: &str,
+        completed_by: &str,
+        notes: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE restoration_tasks
+            SET completed = true, completion_date = NOW(), completed_by = $3, notes = $4
+            WHERE case_id = $1 AND task_id = $2
+            "#
+        )
+        .bind(case_id)
+        .bind(task_id)
+        .bind(completed_by)
+        .bind(notes)
+        .execute(&self.pool)
+        .await?;
 
-   # Validate before import
-   validation = migration.validate(wia_docs)
-   print(f"Valid: {validation.valid_count}, Invalid: {validation.invalid_count}")
+        // Check if stage is complete
+        self.check_stage_completion(case_id).await?;
 
-   # Import to WIA Cryo-Legal
-   results = migration.import_to_target(wia_docs)
-   ```
+        Ok(())
+    }
 
-3. **Signature Migration**
-   - Re-verify existing signatures where possible
-   - Mark legacy signatures as `legacy_imported`
-   - Require re-signing for critical documents
+    pub async fn record_court_decision(
+        &self,
+        case_id: &str,
+        decision: &str,
+        judge_name: &str,
+        order_text: &str,
+    ) -> Result<RestorationCase> {
+        let new_stage = match decision {
+            "GRANTED" => RestorationStage::RestorationGranted,
+            "DENIED" => RestorationStage::Denied,
+            _ => return Err(LegalError::InvalidTransition {
+                from: "COURT_HEARING".to_string(),
+                to: decision.to_string(),
+            }),
+        };
 
-4. **Parallel Operation**
-   - Run both systems in parallel during transition
-   - Sync changes bidirectionally
-   - Gradually shift traffic to WIA system
+        sqlx::query(
+            r#"
+            UPDATE restoration_cases
+            SET current_stage = $2, decision = $3, judge_assigned = $4, decision_text = $5
+            WHERE case_id = $1
+            "#
+        )
+        .bind(case_id)
+        .bind(&new_stage)
+        .bind(decision)
+        .bind(judge_name)
+        .bind(order_text)
+        .execute(&self.pool)
+        .await?;
 
-### 4.2 Migration Checklist
+        if decision == "GRANTED" {
+            self.generate_stage_tasks(case_id, RestorationStage::RightsRestoration).await?;
+        }
 
-| Task | Status | Notes |
-|------|--------|-------|
-| Document inventory complete | ☐ | Count and categorize all documents |
-| Type mapping defined | ☐ | Map legacy types to WIA types |
-| Party data extracted | ☐ | Names, addresses, contacts |
-| Signatures catalogued | ☐ | Note signature types and validity |
-| Jurisdictions mapped | ☐ | Map to ISO country codes |
-| Test migration complete | ☐ | Test with sample documents |
-| Validation passed | ☐ | All documents validate |
-| Parallel sync enabled | ☐ | Two-way sync operational |
-| User training complete | ☐ | Staff trained on new system |
-| Go-live approved | ☐ | Stakeholder sign-off |
+        self.get_case(case_id).await
+    }
 
----
+    async fn get_case(&self, case_id: &str) -> Result<RestorationCase> {
+        sqlx::query_as::<_, RestorationCase>(
+            "SELECT * FROM restoration_cases WHERE case_id = $1"
+        )
+        .bind(case_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| LegalError::RecordNotFound(case_id.to_string()))
+    }
 
-## 5. Deployment
+    async fn generate_stage_tasks(&self, case_id: &str, stage: RestorationStage) -> Result<()> {
+        let tasks = match stage {
+            RestorationStage::IdentityVerification => vec![
+                "Verify biometric identity (DNA)",
+                "Verify biometric identity (fingerprint)",
+                "Cross-reference CRYO-IDENTITY records",
+                "Obtain witness statements",
+            ],
+            RestorationStage::MedicalClearance => vec![
+                "Complete medical examination",
+                "Assess mental capacity",
+                "Document functional status",
+                "Obtain medical clearance certificate",
+            ],
+            RestorationStage::RightsRestoration => vec![
+                "Obtain new/restored identification",
+                "Restore social security status",
+                "Restore voting rights",
+                "Restore professional licenses",
+                "Update family records",
+            ],
+            _ => vec![],
+        };
 
-### 5.1 Cloud Deployment
+        for (i, description) in tasks.iter().enumerate() {
+            let task_id = format!("{}-{}-{:02}", case_id, &format!("{:?}", stage)[..4], i + 1);
+            sqlx::query(
+                r#"
+                INSERT INTO restoration_tasks (task_id, case_id, stage, description)
+                VALUES ($1, $2, $3, $4)
+                "#
+            )
+            .bind(&task_id)
+            .bind(case_id)
+            .bind(&stage)
+            .bind(description)
+            .execute(&self.pool)
+            .await?;
+        }
 
-**AWS Architecture:**
-```yaml
-# CloudFormation template excerpt
-Resources:
-  CryoLegalAPI:
-    Type: AWS::ECS::Service
-    Properties:
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref CryoLegalTaskDef
-      DesiredCount: 3
-      LoadBalancers:
-        - ContainerName: cryo-legal-api
-          ContainerPort: 8080
-          TargetGroupArn: !Ref CryoLegalTargetGroup
+        Ok(())
+    }
 
-  CryoLegalDatabase:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      DBInstanceClass: db.r5.large
-      Engine: postgres
-      EngineVersion: '15'
-      StorageEncrypted: true
-      MultiAZ: true
+    async fn check_stage_completion(&self, case_id: &str) -> Result<()> {
+        // Check if all tasks for current stage are complete and advance if so
+        Ok(())
+    }
+}
 
-  DocumentStorage:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: cryo-legal-documents
-      VersioningConfiguration:
-        Status: Enabled
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: aws:kms
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestorationCase {
+    pub case_id: String,
+    pub subject_id: String,
+    pub revival_procedure_id: String,
+    pub current_stage: RestorationStage,
+    pub court_case_number: Option<String>,
+    pub judge_assigned: Option<String>,
+    pub decision: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub last_updated: DateTime<Utc>,
+}
 ```
 
-**Kubernetes Deployment:**
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cryo-legal-api
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: cryo-legal-api
-  template:
-    metadata:
-      labels:
-        app: cryo-legal-api
-    spec:
-      containers:
-      - name: api
-        image: wia/cryo-legal-api:1.0.0
-        ports:
-        - containerPort: 8080
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: cryo-legal-secrets
-              key: database-url
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
+## PostgreSQL Schema
+
+```sql
+-- Enable extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Enum types
+CREATE TYPE legal_status AS ENUM (
+    'LIVING', 'LEGALLY_DECEASED', 'PRESERVED_STATUS',
+    'REVIVAL_PENDING', 'LEGALLY_RESTORED', 'PERMANENT_DEATH'
+);
+
+CREATE TYPE document_type AS ENUM (
+    'DEATH_CERTIFICATE', 'PRESERVATION_DECLARATION', 'RESTORATION_CERTIFICATE',
+    'COURT_ORDER', 'GUARDIANSHIP_ORDER', 'TRUST_DOCUMENT',
+    'POWER_OF_ATTORNEY', 'IDENTITY_VERIFICATION'
+);
+
+CREATE TYPE document_status AS ENUM (
+    'DRAFT', 'PENDING_SIGNATURE', 'ACTIVE', 'SUPERSEDED', 'REVOKED', 'EXPIRED'
+);
+
+CREATE TYPE restoration_stage AS ENUM (
+    'INITIATED', 'IDENTITY_VERIFICATION', 'MEDICAL_CLEARANCE', 'LEGAL_REVIEW',
+    'COURT_PETITION', 'COURT_HEARING', 'RESTORATION_GRANTED',
+    'RIGHTS_RESTORATION', 'COMPLETED', 'DENIED'
+);
+
+CREATE TYPE guardianship_status AS ENUM (
+    'ACTIVE', 'SUSPENDED', 'TERMINATED', 'TRANSFERRED'
+);
+
+CREATE TYPE recognition_status AS ENUM (
+    'FULL_RECOGNITION', 'PARTIAL_RECOGNITION', 'PENDING_RECOGNITION',
+    'NOT_RECOGNIZED', 'TREATY_BASED'
+);
+
+-- Legal status records
+CREATE TABLE legal_status_records (
+    record_id VARCHAR(20) PRIMARY KEY,
+    subject_id VARCHAR(50) NOT NULL,
+    identity_id VARCHAR(50) NOT NULL,
+    current_status legal_status NOT NULL DEFAULT 'LIVING',
+    primary_jurisdiction VARCHAR(10) NOT NULL,
+    death_certificate_id VARCHAR(30),
+    preservation_declaration_id VARCHAR(30),
+    restoration_certificate_id VARCHAR(30),
+    guardianship_id VARCHAR(30),
+    sequence_number INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT valid_record_id CHECK (record_id ~ '^LEGAL-[0-9]{4}-[0-9]{6}$')
+);
+
+CREATE INDEX idx_legal_records_subject ON legal_status_records(subject_id);
+CREATE INDEX idx_legal_records_status ON legal_status_records(current_status);
+CREATE INDEX idx_legal_records_jurisdiction ON legal_status_records(primary_jurisdiction);
+
+-- Status transitions
+CREATE TABLE status_transitions (
+    transition_id VARCHAR(30) PRIMARY KEY,
+    record_id VARCHAR(20) NOT NULL REFERENCES legal_status_records(record_id),
+    from_status legal_status NOT NULL,
+    to_status legal_status NOT NULL,
+    transition_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    authority_id VARCHAR(50) NOT NULL,
+    document_ref VARCHAR(30) NOT NULL,
+    reason TEXT NOT NULL,
+
+    CONSTRAINT valid_transition CHECK (from_status != to_status)
+);
+
+CREATE INDEX idx_transitions_record ON status_transitions(record_id);
+
+-- Legal documents
+CREATE TABLE legal_documents (
+    document_id VARCHAR(30) PRIMARY KEY,
+    document_type document_type NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content_hash VARCHAR(64) NOT NULL,
+    status document_status NOT NULL DEFAULT 'DRAFT',
+    jurisdiction VARCHAR(10) NOT NULL,
+    effective_date TIMESTAMPTZ NOT NULL,
+    expiration_date TIMESTAMPTZ,
+    notarized BOOLEAN DEFAULT FALSE,
+    apostille BOOLEAN DEFAULT FALSE,
+    sequence_number INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_documents_type ON legal_documents(document_type);
+CREATE INDEX idx_documents_status ON legal_documents(status);
+
+-- Document signatures
+CREATE TABLE document_signatures (
+    signature_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id VARCHAR(30) NOT NULL REFERENCES legal_documents(document_id),
+    signer_id VARCHAR(50) NOT NULL,
+    signer_name VARCHAR(100) NOT NULL,
+    signer_role VARCHAR(50) NOT NULL,
+    signature_type VARCHAR(20) NOT NULL,
+    digital_signature TEXT,
+    signature_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    verified BOOLEAN DEFAULT FALSE,
+    verified_at TIMESTAMPTZ,
+    verified_by VARCHAR(50)
+);
+
+CREATE INDEX idx_signatures_document ON document_signatures(document_id);
+
+-- Notarization records
+CREATE TABLE notarization_records (
+    notarization_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id VARCHAR(30) NOT NULL REFERENCES legal_documents(document_id),
+    notary_id VARCHAR(50) NOT NULL,
+    notary_name VARCHAR(100) NOT NULL,
+    notary_jurisdiction VARCHAR(10) NOT NULL,
+    notary_commission VARCHAR(50) NOT NULL,
+    commission_expiration DATE NOT NULL,
+    seal_number VARCHAR(50),
+    notarization_date TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Apostille records
+CREATE TABLE apostille_records (
+    apostille_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id VARCHAR(30) NOT NULL REFERENCES legal_documents(document_id),
+    apostille_number VARCHAR(50) NOT NULL,
+    issuing_country VARCHAR(10) NOT NULL,
+    issuing_authority VARCHAR(100) NOT NULL,
+    issue_date DATE NOT NULL,
+    target_country VARCHAR(10)
+);
+
+-- Jurisdictions
+CREATE TABLE jurisdictions (
+    country_code VARCHAR(10) PRIMARY KEY,
+    country_name VARCHAR(100) NOT NULL,
+    region VARCHAR(100),
+    legal_system VARCHAR(20) NOT NULL,
+    treaty_member BOOLEAN DEFAULT FALSE,
+    cryopreservation_legal BOOLEAN,
+    recognition_requirements JSONB DEFAULT '[]',
+    local_authorities JSONB DEFAULT '[]',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Bilateral agreements
+CREATE TABLE bilateral_agreements (
+    agreement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    country_a VARCHAR(10) NOT NULL,
+    country_b VARCHAR(10) NOT NULL,
+    agreement_name VARCHAR(255) NOT NULL,
+    effective_date DATE NOT NULL,
+    expiration_date DATE,
+    agreement_text TEXT,
+    recognition_scope JSONB DEFAULT '{}',
+
+    UNIQUE(country_a, country_b)
+);
+
+-- Jurisdiction recognitions for records
+CREATE TABLE jurisdiction_recognitions (
+    recognition_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    record_id VARCHAR(20) NOT NULL REFERENCES legal_status_records(record_id),
+    country_code VARCHAR(10) NOT NULL,
+    recognition_status recognition_status NOT NULL,
+    local_status_equivalent VARCHAR(100),
+    registration_id VARCHAR(50),
+    registration_date DATE,
+    verified BOOLEAN DEFAULT FALSE,
+    verified_date DATE,
+    documents JSONB DEFAULT '[]',
+
+    UNIQUE(record_id, country_code)
+);
+
+CREATE INDEX idx_recognitions_record ON jurisdiction_recognitions(record_id);
+
+-- Restoration cases
+CREATE TABLE restoration_cases (
+    case_id VARCHAR(20) PRIMARY KEY,
+    subject_id VARCHAR(50) NOT NULL,
+    revival_procedure_id VARCHAR(20) NOT NULL,
+    current_stage restoration_stage NOT NULL DEFAULT 'INITIATED',
+    court_case_number VARCHAR(50),
+    judge_assigned VARCHAR(100),
+    hearing_date DATE,
+    decision VARCHAR(20),
+    decision_text TEXT,
+    sequence_number INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT valid_case_id CHECK (case_id ~ '^RESTORE-[0-9]{4}-[0-9]{4}$')
+);
+
+CREATE INDEX idx_restoration_subject ON restoration_cases(subject_id);
+CREATE INDEX idx_restoration_stage ON restoration_cases(current_stage);
+
+-- Restoration tasks
+CREATE TABLE restoration_tasks (
+    task_id VARCHAR(30) PRIMARY KEY,
+    case_id VARCHAR(20) NOT NULL REFERENCES restoration_cases(case_id),
+    stage restoration_stage NOT NULL,
+    description TEXT NOT NULL,
+    assigned_to VARCHAR(50),
+    due_date DATE,
+    completed BOOLEAN DEFAULT FALSE,
+    completion_date TIMESTAMPTZ,
+    completed_by VARCHAR(50),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_tasks_case ON restoration_tasks(case_id);
+CREATE INDEX idx_tasks_stage ON restoration_tasks(case_id, stage);
+
+-- Guardianships
+CREATE TABLE guardianships (
+    guardianship_id VARCHAR(30) PRIMARY KEY,
+    subject_id VARCHAR(50) NOT NULL,
+    record_id VARCHAR(20) REFERENCES legal_status_records(record_id),
+    status guardianship_status NOT NULL DEFAULT 'ACTIVE',
+    scope JSONB NOT NULL DEFAULT '{}',
+    appointment_authority VARCHAR(100) NOT NULL,
+    court_order_ref VARCHAR(50),
+    review_date DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    terminated_at TIMESTAMPTZ,
+    termination_reason TEXT
+);
+
+CREATE INDEX idx_guardianship_subject ON guardianships(subject_id);
+CREATE INDEX idx_guardianship_status ON guardianships(status);
+
+-- Guardians
+CREATE TABLE guardians (
+    guardian_id VARCHAR(30) PRIMARY KEY,
+    guardianship_id VARCHAR(30) NOT NULL REFERENCES guardianships(guardianship_id),
+    name VARCHAR(100) NOT NULL,
+    relationship VARCHAR(50) NOT NULL,
+    priority INTEGER NOT NULL DEFAULT 1,
+    contact_info JSONB DEFAULT '{}',
+    appointment_date DATE NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    bond_amount DECIMAL(15, 2),
+    bond_provider VARCHAR(100)
+);
+
+CREATE INDEX idx_guardians_guardianship ON guardians(guardianship_id);
+
+-- Audit log
+CREATE TABLE legal_audit_log (
+    log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    record_id VARCHAR(20),
+    document_id VARCHAR(30),
+    action VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id VARCHAR(50),
+    actor_id VARCHAR(50) NOT NULL,
+    actor_role VARCHAR(50),
+    old_values JSONB,
+    new_values JSONB,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ip_address INET,
+    user_agent TEXT
+);
+
+CREATE INDEX idx_audit_record ON legal_audit_log(record_id);
+CREATE INDEX idx_audit_timestamp ON legal_audit_log(timestamp DESC);
+
+-- Views
+CREATE VIEW active_preservation_records AS
+SELECT r.*, g.guardianship_id as active_guardianship
+FROM legal_status_records r
+LEFT JOIN guardianships g ON r.guardianship_id = g.guardianship_id AND g.status = 'ACTIVE'
+WHERE r.current_status = 'PRESERVED_STATUS';
+
+CREATE VIEW pending_restorations AS
+SELECT c.*, r.subject_id, r.current_status as legal_status
+FROM restoration_cases c
+JOIN legal_status_records r ON c.subject_id = r.subject_id
+WHERE c.current_stage NOT IN ('COMPLETED', 'DENIED');
+
+-- Functions
+CREATE OR REPLACE FUNCTION update_legal_record_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_updated = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_legal_record_timestamp
+    BEFORE UPDATE ON legal_status_records
+    FOR EACH ROW
+    EXECUTE FUNCTION update_legal_record_timestamp();
 ```
 
-### 5.2 On-Premise Deployment
+## Docker Configuration
 
-**Docker Compose:**
 ```yaml
 version: '3.8'
+
 services:
-  cryo-legal-api:
-    image: wia/cryo-legal-api:1.0.0
+  legal-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgres://user:pass@db:5432/cryolegal
+      - DATABASE_URL=postgres://legal:${DB_PASSWORD}@db:5432/cryo_legal
       - REDIS_URL=redis://redis:6379
-      - STORAGE_PATH=/data/documents
-    volumes:
-      - document-storage:/data/documents
+      - IDENTITY_SERVICE_URL=http://identity-service:8080
+      - REVIVAL_SERVICE_URL=http://revival-service:8080
+      - JWT_SECRET=${JWT_SECRET}
+      - RUST_LOG=info
     depends_on:
       - db
       - redis
+    networks:
+      - legal-network
 
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     environment:
-      - POSTGRES_DB=cryolegal
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=cryo_legal
+      - POSTGRES_USER=legal
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - legal-network
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
     volumes:
-      - redis-data:/data
+      - redis_data:/data
+    networks:
+      - legal-network
 
 volumes:
-  document-storage:
-  postgres-data:
-  redis-data:
-```
+  postgres_data:
+  redis_data:
 
-### 5.3 High Availability Configuration
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Load Balancer                            │
-│                    (Active-Active)                          │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-        ┌───────────────┼───────────────┐
-        │               │               │
-        ▼               ▼               ▼
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│   API Node   │ │   API Node   │ │   API Node   │
-│   (Zone A)   │ │   (Zone B)   │ │   (Zone C)   │
-└──────┬───────┘ └──────┬───────┘ └──────┬───────┘
-       │                │                │
-       └────────────────┼────────────────┘
-                        │
-                        ▼
-              ┌──────────────────┐
-              │  Primary DB      │
-              │  (Multi-AZ)      │
-              └────────┬─────────┘
-                       │
-              ┌────────┴─────────┐
-              │  Replica DB      │
-              │  (Read-only)     │
-              └──────────────────┘
+networks:
+  legal-network:
+    driver: bridge
 ```
 
 ---
 
-## 6. Monitoring
-
-### 6.1 Metrics
-
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `cryo_legal_documents_created` | Documents created per minute | > 1000/min |
-| `cryo_legal_signatures_verified` | Signatures verified per minute | - |
-| `cryo_legal_api_latency_p99` | 99th percentile latency | > 500ms |
-| `cryo_legal_api_error_rate` | Error rate percentage | > 1% |
-| `cryo_legal_db_connections` | Active database connections | > 80% pool |
-| `cryo_legal_storage_usage` | Document storage utilization | > 80% |
-
-### 6.2 Prometheus Configuration
-
-```yaml
-# prometheus.yml
-scrape_configs:
-  - job_name: 'cryo-legal'
-    static_configs:
-      - targets: ['cryo-legal-api:9090']
-    metrics_path: /metrics
-    scrape_interval: 15s
-
-# Alert rules
-groups:
-  - name: cryo-legal-alerts
-    rules:
-      - alert: HighErrorRate
-        expr: rate(cryo_legal_api_errors_total[5m]) > 0.01
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High error rate in Cryo-Legal API"
-
-      - alert: HighLatency
-        expr: histogram_quantile(0.99, rate(cryo_legal_api_latency_bucket[5m])) > 0.5
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High latency in Cryo-Legal API"
-```
-
-### 6.3 Dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "Cryo-Legal Operations",
-    "panels": [
-      {
-        "title": "Documents Created",
-        "type": "graph",
-        "targets": [
-          {"expr": "rate(cryo_legal_documents_created[5m])"}
-        ]
-      },
-      {
-        "title": "Signature Operations",
-        "type": "graph",
-        "targets": [
-          {"expr": "rate(cryo_legal_signatures_created[5m])"},
-          {"expr": "rate(cryo_legal_signatures_verified[5m])"}
-        ]
-      },
-      {
-        "title": "API Latency",
-        "type": "heatmap",
-        "targets": [
-          {"expr": "cryo_legal_api_latency_bucket"}
-        ]
-      },
-      {
-        "title": "Compliance Status",
-        "type": "piechart",
-        "targets": [
-          {"expr": "cryo_legal_compliance_status"}
-        ]
-      }
-    ]
-  }
-}
-```
-
----
-
-## 7. Certification
-
-### 7.1 WIA Certification Levels
-
-| Level | Name | Requirements |
-|-------|------|--------------|
-| 1 | Basic | Phase 1 data format compliance |
-| 2 | Standard | Phase 1-2 compliance, basic API |
-| 3 | Advanced | Full Phase 1-4, multi-jurisdiction |
-| 4 | Enterprise | Advanced + 99.9% SLA, audit certification |
-
-### 7.2 Certification Process
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                  Certification Process                        │
-├──────────────────────────────────────────────────────────────┤
-│  1. Application                                               │
-│     └─ Submit certification request                          │
-│                                                               │
-│  2. Self-Assessment                                           │
-│     └─ Complete compliance checklist                         │
-│     └─ Run automated validation suite                        │
-│                                                               │
-│  3. Technical Review                                          │
-│     └─ WIA reviews implementation                            │
-│     └─ Validate API compliance                               │
-│     └─ Security assessment                                   │
-│                                                               │
-│  4. Audit                                                     │
-│     └─ Third-party audit (Level 3+)                         │
-│     └─ Penetration testing                                   │
-│                                                               │
-│  5. Certification                                             │
-│     └─ Certificate issued                                    │
-│     └─ Listed in WIA registry                                │
-│                                                               │
-│  6. Maintenance                                               │
-│     └─ Annual re-certification                               │
-│     └─ Incident reporting                                    │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### 7.3 Certification Checklist
-
-```markdown
-## WIA Cryo-Legal Certification Checklist
-
-### Phase 1: Data Format
-- [ ] All documents conform to JSON Schema
-- [ ] Required fields present and valid
-- [ ] Signatures properly encoded
-- [ ] Jurisdictions use ISO codes
-
-### Phase 2: API Interface
-- [ ] RESTful endpoints implemented
-- [ ] Authentication working (OAuth 2.0 / API Key)
-- [ ] Rate limiting enforced
-- [ ] Error responses conform to spec
-
-### Phase 3: Protocol
-- [ ] WebSocket connection stable
-- [ ] Message format correct
-- [ ] Keep-alive functioning
-- [ ] Reconnection working
-
-### Phase 4: Integration
-- [ ] WIA ecosystem integration tested
-- [ ] External system adapters working
-- [ ] Monitoring operational
-- [ ] Documentation complete
-```
-
----
-
-## 8. Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial release |
-
----
-
-<div align="center">
-
-**WIA Cryo-Legal Standard v1.0.0**
-
-Phase 4: Ecosystem Integration
-
-**弘益人間 (홍익인간)** · Benefit All Humanity
-
----
-
-© 2025 WIA Standards Committee
-
-MIT License
-
-</div>
+*WIA Technical Committee - Cryopreservation Working Group*

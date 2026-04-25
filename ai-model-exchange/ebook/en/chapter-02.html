@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Model Formats & Serialization | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        .nav a:hover { text-decoration: underline; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        .note strong { color: #10B981; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 2: Model Formats & Serialization</h1>
+        <p class="chapter-meta">WIA-AI-008 Standard • Estimated reading time: 45 minutes</p>
+
+        <h2>2.1 Understanding Model Serialization</h2>
+        <p>
+            Serialization is the process of converting a model's in-memory representation into a format that can be stored
+            on disk or transmitted over a network. This fundamental operation enables model persistence, versioning, and
+            distribution. Different frameworks approach serialization with varying philosophies and technical implementations.
+        </p>
+
+        <h3>What Gets Serialized?</h3>
+        <p>A complete model serialization typically includes:</p>
+        <ul>
+            <li><strong>Architecture/Graph</strong>: The computational graph defining operations and their connections</li>
+            <li><strong>Parameters/Weights</strong>: Learned parameters (weights, biases) from training</li>
+            <li><strong>Optimizer State</strong>: (Optional) Current state of the optimizer for resuming training</li>
+            <li><strong>Metadata</strong>: Version info, input/output specifications, custom configurations</li>
+            <li><strong>Preprocessing Logic</strong>: (Optional) Data preprocessing and postprocessing code</li>
+        </ul>
+
+        <h2>2.2 PyTorch Serialization Formats</h2>
+        <p>
+            PyTorch provides multiple serialization mechanisms, each suited for different use cases.
+        </p>
+
+        <h3>torch.save() and torch.load()</h3>
+        <p>
+            The most basic serialization uses Python's pickle protocol:
+        </p>
+        <pre><code>import torch
+
+# Save entire model (architecture + weights)
+torch.save(model, 'model.pth')
+
+# Save only state dict (weights only)
+torch.save(model.state_dict(), 'weights.pth')
+
+# Save checkpoint with additional info
+torch.save({
+    'epoch': 100,
+    'model_state_dict': model.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+    'loss': 0.123,
+    'accuracy': 0.956
+}, 'checkpoint.pth')
+
+# Loading
+model = torch.load('model.pth')  # Full model
+model.load_state_dict(torch.load('weights.pth'))  # Weights only</code></pre>
+
+        <div class="note">
+            <strong>Best Practice:</strong> Save state_dict rather than the entire model. This provides more flexibility
+            when model architecture changes slightly and avoids pickle-related compatibility issues.
+        </div>
+
+        <h3>TorchScript</h3>
+        <p>
+            TorchScript creates a serializable, optimizable representation that can run without Python:
+        </p>
+        <pre><code>import torch
+
+# Tracing method (records operations)
+example_input = torch.randn(1, 3, 224, 224)
+traced_model = torch.jit.trace(model, example_input)
+traced_model.save('model_traced.pt')
+
+# Scripting method (analyzes code)
+scripted_model = torch.jit.script(model)
+scripted_model.save('model_scripted.pt')
+
+# Load TorchScript model
+loaded_model = torch.jit.load('model_traced.pt')</code></pre>
+
+        <h3>When to Use Each Format</h3>
+        <table>
+            <tr>
+                <th>Format</th>
+                <th>Use Case</th>
+                <th>Pros</th>
+                <th>Cons</th>
+            </tr>
+            <tr>
+                <td>torch.save (full)</td>
+                <td>Quick experiments</td>
+                <td>Simplest to use</td>
+                <td>Fragile to code changes</td>
+            </tr>
+            <tr>
+                <td>state_dict</td>
+                <td>Production checkpoints</td>
+                <td>Flexible, portable</td>
+                <td>Requires architecture code</td>
+            </tr>
+            <tr>
+                <td>TorchScript</td>
+                <td>C++ deployment, mobile</td>
+                <td>No Python dependency</td>
+                <td>Limited Python feature support</td>
+            </tr>
+        </table>
+
+        <h2>2.3 TensorFlow Serialization Formats</h2>
+        <p>
+            TensorFlow's serialization evolved significantly between TF 1.x and TF 2.x, with SavedModel becoming the
+            standard format.
+        </p>
+
+        <h3>SavedModel Format</h3>
+        <p>
+            SavedModel is TensorFlow's universal serialization format:
+        </p>
+        <pre><code>import tensorflow as tf
+
+# Save model
+model = tf.keras.models.Sequential([...])
+model.save('my_model')  # Creates directory with saved_model.pb
+
+# Customize signatures
+@tf.function(input_signature=[tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32)])
+def serve(x):
+    return model(x)
+
+tf.saved_model.save(model, 'my_model', signatures={'serving_default': serve})
+
+# Load model
+loaded_model = tf.saved_model.load('my_model')
+# Or for Keras models:
+loaded_model = tf.keras.models.load_model('my_model')</code></pre>
+
+        <h3>HDF5 Format (.h5)</h3>
+        <p>
+            Legacy Keras format, still widely used:
+        </p>
+        <pre><code># Save to HDF5
+model.save('model.h5')
+
+# Save weights only
+model.save_weights('weights.h5')
+
+# Load
+model = tf.keras.models.load_model('model.h5')</code></pre>
+
+        <h3>Checkpoint Format</h3>
+        <p>
+            For training checkpoints:
+        </p>
+        <pre><code>checkpoint = tf.train.Checkpoint(
+    optimizer=optimizer,
+    model=model
+)
+
+# Save checkpoint
+checkpoint.save('checkpoints/ckpt')
+
+# Restore
+checkpoint.restore('checkpoints/ckpt-10')</code></pre>
+
+        <h2>2.4 JAX Model Serialization</h2>
+        <p>
+            JAX doesn't have built-in serialization since it's a functional framework. The community uses several approaches:
+        </p>
+
+        <h3>Using Pickle</h3>
+        <pre><code>import pickle
+import jax.numpy as jnp
+
+# Save parameters
+params = {'w': jnp.array([1., 2., 3.]), 'b': jnp.array(0.5)}
+with open('params.pkl', 'wb') as f:
+    pickle.dump(params, f)
+
+# Load parameters
+with open('params.pkl', 'rb') as f:
+    loaded_params = pickle.load(f)</code></pre>
+
+        <h3>Using MessagePack/Orbax</h3>
+        <pre><code>from flax import serialization
+
+# Serialize to bytes
+bytes_output = serialization.to_bytes(params)
+
+# Save to file
+with open('params.msgpack', 'wb') as f:
+    f.write(bytes_output)
+
+# Load
+with open('params.msgpack', 'rb') as f:
+    loaded_params = serialization.from_bytes(params, f.read())</code></pre>
+
+        <h2>2.5 ONNX Format Deep Dive</h2>
+        <p>
+            ONNX (Open Neural Network Exchange) is a framework-agnostic format that serves as a universal intermediate
+            representation.
+        </p>
+
+        <h3>ONNX File Structure</h3>
+        <p>An ONNX file (.onnx) contains:</p>
+        <ul>
+            <li><strong>Graph</strong>: Computational graph with nodes (operations) and edges (tensors)</li>
+            <li><strong>Operators</strong>: Standardized operations (Conv, MatMul, ReLU, etc.)</li>
+            <li><strong>Tensors</strong>: Weights stored as Protocol Buffer messages</li>
+            <li><strong>Metadata</strong>: Model version, producer, opset version</li>
+        </ul>
+
+        <pre><code>import onnx
+
+# Load and inspect ONNX model
+model = onnx.load('model.onnx')
+
+print(f"IR Version: {model.ir_version}")
+print(f"Producer: {model.producer_name}")
+print(f"Opset Version: {model.opset_import[0].version}")
+
+# Check model validity
+onnx.checker.check_model(model)
+
+# Print graph info
+graph = model.graph
+print(f"Inputs: {[i.name for i in graph.input]}")
+print(f"Outputs: {[o.name for o in graph.output]}")
+print(f"Nodes: {len(graph.node)}")</code></pre>
+
+        <h3>Export to ONNX</h3>
+        <p>From PyTorch:</p>
+        <pre><code>import torch.onnx
+
+dummy_input = torch.randn(1, 3, 224, 224)
+
+torch.onnx.export(
+    model,                          # Model
+    dummy_input,                    # Example input
+    "resnet50.onnx",               # Output file
+    export_params=True,             # Store weights
+    opset_version=14,              # ONNX version
+    do_constant_folding=True,      # Optimize constant folding
+    input_names=['input'],         # Input names
+    output_names=['output'],       # Output names
+    dynamic_axes={                  # Variable dimensions
+        'input': {0: 'batch_size'},
+        'output': {0: 'batch_size'}
+    }
+)</code></pre>
+
+        <p>From TensorFlow:</p>
+        <pre><code>import tf2onnx
+
+# Convert SavedModel to ONNX
+python -m tf2onnx.convert \
+    --saved-model my_model \
+    --output model.onnx \
+    --opset 14
+
+# Or programmatically
+import tensorflow as tf
+import tf2onnx
+
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+output_path = "model.onnx"
+
+model_proto, _ = tf2onnx.convert.from_keras(model, input_signature=spec, opset=14)
+with open(output_path, "wb") as f:
+    f.write(model_proto.SerializeToString())</code></pre>
+
+        <h2>2.6 TensorFlow Lite Format</h2>
+        <p>
+            TensorFlow Lite (.tflite) is optimized for mobile and edge devices:
+        </p>
+
+        <pre><code>import tensorflow as tf
+
+# Convert to TFLite
+converter = tf.lite.TFLiteConverter.from_saved_model('my_model')
+
+# Optimization options
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_types = [tf.float16]  # FP16 quantization
+
+tflite_model = converter.convert()
+
+# Save
+with open('model.tflite', 'wb') as f:
+    f.write(tflite_model)
+
+# Inference
+interpreter = tf.lite.Interpreter(model_path='model.tflite')
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+interpreter.set_tensor(input_details[0]['index'], input_data)
+interpreter.invoke()
+output_data = interpreter.get_tensor(output_details[0]['index'])</code></pre>
+
+        <h2>2.7 CoreML Format</h2>
+        <p>
+            CoreML is Apple's format for iOS/macOS deployment:
+        </p>
+
+        <pre><code>import coremltools as ct
+
+# Convert PyTorch to CoreML
+example_input = torch.rand(1, 3, 224, 224)
+traced_model = torch.jit.trace(model, example_input)
+
+coreml_model = ct.convert(
+    traced_model,
+    inputs=[ct.TensorType(shape=(1, 3, 224, 224))]
+)
+
+coreml_model.save("MyModel.mlmodel")
+
+# Add metadata
+coreml_model.author = 'WIA Team'
+coreml_model.license = 'Apache 2.0'
+coreml_model.short_description = 'Image classification model'</code></pre>
+
+        <h2>2.8 Model Format Comparison</h2>
+        <table>
+            <tr>
+                <th>Format</th>
+                <th>Framework</th>
+                <th>File Ext</th>
+                <th>Primary Use</th>
+                <th>Size</th>
+            </tr>
+            <tr>
+                <td>PyTorch State Dict</td>
+                <td>PyTorch</td>
+                <td>.pth, .pt</td>
+                <td>Training/checkpoints</td>
+                <td>Medium</td>
+            </tr>
+            <tr>
+                <td>TorchScript</td>
+                <td>PyTorch</td>
+                <td>.pt</td>
+                <td>Production/C++</td>
+                <td>Medium</td>
+            </tr>
+            <tr>
+                <td>SavedModel</td>
+                <td>TensorFlow</td>
+                <td>Directory</td>
+                <td>Production/serving</td>
+                <td>Large</td>
+            </tr>
+            <tr>
+                <td>HDF5</td>
+                <td>Keras</td>
+                <td>.h5</td>
+                <td>Legacy Keras</td>
+                <td>Small</td>
+            </tr>
+            <tr>
+                <td>ONNX</td>
+                <td>Universal</td>
+                <td>.onnx</td>
+                <td>Interoperability</td>
+                <td>Medium</td>
+            </tr>
+            <tr>
+                <td>TFLite</td>
+                <td>TensorFlow</td>
+                <td>.tflite</td>
+                <td>Mobile/edge</td>
+                <td>Very Small</td>
+            </tr>
+            <tr>
+                <td>CoreML</td>
+                <td>Apple</td>
+                <td>.mlmodel</td>
+                <td>iOS/macOS</td>
+                <td>Small</td>
+            </tr>
+        </table>
+
+        <h2>2.9 Versioning and Compatibility</h2>
+        <p>
+            Model formats evolve over time. Ensuring compatibility requires careful version management:
+        </p>
+
+        <h3>Semantic Versioning for Models</h3>
+        <pre><code># Model version format: MAJOR.MINOR.PATCH
+# Example: 2.1.3
+
+# MAJOR: Incompatible API changes (input/output shape changes)
+# MINOR: Backward-compatible functionality (new features, improved accuracy)
+# PATCH: Backward-compatible bug fixes (numerical fixes, no architecture change)
+
+metadata = {
+    'model_name': 'sentiment-classifier',
+    'version': '2.1.3',
+    'framework': 'pytorch',
+    'framework_version': '2.0.1',
+    'onnx_opset': 14,
+    'created_at': '2025-01-15T10:30:00Z'
+}</code></pre>
+
+        <h2>2.10 Best Practices for Serialization</h2>
+
+        <h3>1. Always Save Metadata</h3>
+        <pre><code># Bad: Only weights
+torch.save(model.state_dict(), 'model.pth')
+
+# Good: Include context
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'model_name': 'resnet50',
+    'version': '1.0.0',
+    'input_shape': [1, 3, 224, 224],
+    'num_classes': 1000,
+    'accuracy': 0.923,
+    'framework_version': torch.__version__,
+    'created_at': datetime.now().isoformat()
+}, 'model_checkpoint.pth')</code></pre>
+
+        <h3>2. Use Framework-Agnostic Formats for Distribution</h3>
+        <p>
+            Prefer ONNX for sharing models that may be used in different frameworks or platforms.
+        </p>
+
+        <h3>3. Validate After Serialization</h3>
+        <pre><code>import numpy as np
+
+# Generate test input
+test_input = torch.randn(5, 3, 224, 224)
+
+# Original model output
+original_output = model(test_input)
+
+# Save and load
+torch.save(model.state_dict(), 'model.pth')
+loaded_model = ResNet50()
+loaded_model.load_state_dict(torch.load('model.pth'))
+loaded_model.eval()
+
+# Loaded model output
+loaded_output = loaded_model(test_input)
+
+# Validate numerical equivalence
+assert torch.allclose(original_output, loaded_output, rtol=1e-5)
+print("✓ Serialization validation passed")</code></pre>
+
+        <h3>4. Include Preprocessing Information</h3>
+        <pre><code>preprocessing_info = {
+    'mean': [0.485, 0.456, 0.406],
+    'std': [0.229, 0.224, 0.225],
+    'resize': 256,
+    'crop': 224,
+    'normalization': 'imagenet'
+}</code></pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Serialization converts in-memory models to persistent formats for storage and transmission</li>
+                <li>PyTorch offers state_dict (weights only), full model save, and TorchScript formats</li>
+                <li>TensorFlow's SavedModel is the universal format, with HDF5 for legacy Keras support</li>
+                <li>JAX uses pickle or MessagePack for parameter serialization</li>
+                <li>ONNX provides framework-agnostic representation for interoperability</li>
+                <li>TFLite and CoreML are optimized for mobile/edge deployment</li>
+                <li>Always include metadata (version, input shape, preprocessing) with serialized models</li>
+                <li>Validate numerical equivalence after serialization and deserialization</li>
+                <li>Use semantic versioning for model versions</li>
+                <li>Choose format based on use case: checkpoints, production serving, or cross-framework exchange</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the five key components that should be serialized in a complete model checkpoint?</li>
+                <li>Compare PyTorch's state_dict approach versus saving the entire model. When should each be used?</li>
+                <li>What is TorchScript and what advantages does it provide over standard PyTorch serialization?</li>
+                <li>Explain the difference between TensorFlow's SavedModel and HDF5 formats.</li>
+                <li>Why doesn't JAX have a built-in serialization format? What approaches does the community use?</li>
+                <li>Describe the structure of an ONNX file. What information does it contain?</li>
+                <li>When would you choose TFLite over ONNX for model serialization?</li>
+                <li>How should semantic versioning be applied to machine learning models?</li>
+                <li>What metadata should always be included when saving a model checkpoint?</li>
+                <li>Write code to validate that a model produces identical outputs before and after serialization.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

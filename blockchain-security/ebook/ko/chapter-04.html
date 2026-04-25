@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: DeFi 보안 | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>제4장: DeFi 보안</h1>
+
+    <div class="highlight">
+        <strong>장 개요:</strong> 탈중앙화 금융(DeFi)은 기존 스마트 컨트랙트 취약점을 넘어서는 고유한 보안 과제를 도입합니다. 이 장에서는 플래시 론 공격, MEV 완화, 오라클 보안, 유동성 풀 보호 전략을 다룹니다.
+    </div>
+
+    <h2>플래시 론 공격 벡터</h2>
+    <p>플래시 론은 같은 트랜잭션 내에서 대출이 상환되는 한 담보 없이 대량의 자본을 빌릴 수 있게 합니다. 합법적인 사용 사례가 있지만, 플래시 론은 수십억 달러의 손실을 초래한 수많은 공격에 악용되었습니다.</p>
+
+    <h3>플래시 론 공격 해부</h3>
+    <pre><code>플래시 론 공격 흐름:
+
+1. 공격자가 플래시 론 시작
+   └── 대출 프로토콜에서 $1억 대출
+
+2. 시장 조건 조작
+   ├── DEX A에서 대량 스왑 (가격 영향)
+   ├── 대출 프로토콜에서 청산 트리거
+   └── DEX B에서 가격 불일치 악용
+
+3. 수익 추출
+   ├── 조작된 가격으로 토큰 판매
+   └── 청산 보너스 수집
+
+4. 플래시 론 + 수수료 상환
+   └── $1억 + 0.09% 수수료 반환
+
+5. 수익 보유
+   └── 공격자가 $500만 순이익
+
+모든 단계가 단일 원자적 트랜잭션에서 실행!</code></pre>
+
+    <h3>플래시 론 보호</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/**
+ * @title FlashLoanGuard
+ * @notice 플래시 론 공격에 대한 보호 메커니즘
+ */
+abstract contract FlashLoanGuard {
+    // 각 주소에 대한 블록 번호 추적
+    mapping(address => uint256) private _lastActionBlock;
+
+    // 민감한 작업 사이의 최소 블록
+    uint256 public constant MIN_BLOCK_DELAY = 1;
+
+    /**
+     * @notice 동일 블록 상호작용 방지
+     * @dev 플래시 론은 하나의 블록에서 완료되어야 하므로 공격 원자성을 깨뜨림
+     */
+    modifier noFlashLoan() {
+        require(
+            _lastActionBlock[msg.sender] < block.number,
+            "FlashLoanGuard: 동일 블록 상호작용"
+        );
+        _lastActionBlock[msg.sender] = block.number;
+        _;
+    }
+
+    /**
+     * @notice 작업 사이에 최소 블록 요구
+     */
+    modifier delayedAction(uint256 minBlocks) {
+        require(
+            block.number >= _lastActionBlock[msg.sender] + minBlocks,
+            "FlashLoanGuard: 작업이 너무 빠름"
+        );
+        _lastActionBlock[msg.sender] = block.number;
+        _;
+    }
+}
+
+/**
+ * @title SecureLending
+ * @notice 플래시 론 보호가 있는 대출 프로토콜
+ */
+contract SecureLending is FlashLoanGuard {
+    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public borrows;
+
+    // 담보 비율 (150%)
+    uint256 public constant COLLATERAL_RATIO = 150;
+
+    function deposit() external payable noFlashLoan {
+        deposits[msg.sender] += msg.value;
+    }
+
+    function borrow(uint256 amount) external noFlashLoan {
+        uint256 maxBorrow = (deposits[msg.sender] * 100) / COLLATERAL_RATIO;
+        require(borrows[msg.sender] + amount <= maxBorrow, "담보 부족");
+
+        borrows[msg.sender] += amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function liquidate(address user) external delayedAction(MIN_BLOCK_DELAY) {
+        // 현물 가격 대신 TWAP 가격 사용
+        uint256 twapPrice = _getTWAPPrice();
+
+        uint256 collateralValue = deposits[user] * twapPrice / 1e18;
+        uint256 borrowValue = borrows[user];
+
+        require(
+            collateralValue * 100 < borrowValue * COLLATERAL_RATIO,
+            "포지션이 건전함"
+        );
+
+        // 지연 검증된 가격으로 청산 수행
+        _executeLiquidation(user);
+    }
+}</code></pre>
+
+    <h2>MEV(최대 추출 가능 가치) 완화</h2>
+    <p>MEV는 채굴자/검증자가 트랜잭션을 재정렬, 삽입 또는 검열하여 추출할 수 있는 이익을 말합니다. 프론트러닝, 샌드위치 공격, 백러닝이 일반적인 MEV 전략입니다.</p>
+
+    <div class="highlight">
+        <strong>MEV 영향:</strong> MEV 추출은 연간 추정 $5-7억의 비용을 DeFi 사용자에게 부과합니다. 효과적인 완화 전략은 사용자 가치를 보호하는 데 필수적입니다.
+    </div>
+
+    <h3>일반적인 MEV 공격 유형</h3>
+    <table>
+        <tr><th>공격 유형</th><th>설명</th><th>피해자 영향</th></tr>
+        <tr><td>프론트러닝</td><td>공격자가 피해자 앞에 트랜잭션 배치</td><td>더 나쁜 실행 가격</td></tr>
+        <tr><td>샌드위치 공격</td><td>공격자가 피해자 트랜잭션을 둘러쌈</td><td>최대 가격 영향</td></tr>
+        <tr><td>백러닝</td><td>공격자가 피해자 뒤에 트랜잭션 배치</td><td>차익 기회 손실</td></tr>
+        <tr><td>청산 스나이핑</td><td>청산 실행을 위해 경쟁</td><td>더 높은 가스 비용</td></tr>
+        <tr><td>타임밴딧 공격</td><td>수익성 있는 트랜잭션을 훔치기 위해 리오그</td><td>트랜잭션 취소</td></tr>
+    </table>
+
+    <h3>MEV 보호 구현</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/**
+ * @title MEVProtectedSwap
+ * @notice MEV 보호 메커니즘이 있는 DEX 스왑
+ */
+contract MEVProtectedSwap {
+    // 커밋-공개 체계 저장소
+    struct SwapCommitment {
+        bytes32 commitHash;
+        uint256 commitBlock;
+        bool revealed;
+    }
+
+    mapping(address => SwapCommitment) public commitments;
+    uint256 public constant REVEAL_DELAY = 2; // 블록
+    uint256 public constant COMMIT_EXPIRY = 20; // 블록
+
+    /**
+     * @notice 1단계: 매개변수를 공개하지 않고 스왑 커밋
+     * @param commitHash (tokenIn, tokenOut, amountIn, minAmountOut, salt)의 해시
+     */
+    function commitSwap(bytes32 commitHash) external {
+        require(
+            commitments[msg.sender].commitBlock == 0 ||
+            block.number > commitments[msg.sender].commitBlock + COMMIT_EXPIRY,
+            "기존 커밋 존재"
+        );
+
+        commitments[msg.sender] = SwapCommitment({
+            commitHash: commitHash,
+            commitBlock: block.number,
+            revealed: false
+        });
+    }
+
+    /**
+     * @notice 2단계: 지연 후 스왑 공개 및 실행
+     */
+    function revealSwap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        bytes32 salt
+    ) external returns (uint256 amountOut) {
+        SwapCommitment storage commitment = commitments[msg.sender];
+
+        // 커밋 존재 및 지연 경과 확인
+        require(commitment.commitBlock > 0, "커밋 없음");
+        require(!commitment.revealed, "이미 공개됨");
+        require(
+            block.number >= commitment.commitBlock + REVEAL_DELAY,
+            "공개가 너무 이름"
+        );
+        require(
+            block.number <= commitment.commitBlock + COMMIT_EXPIRY,
+            "커밋 만료됨"
+        );
+
+        // 커밋 해시 확인
+        bytes32 expectedHash = keccak256(
+            abi.encodePacked(tokenIn, tokenOut, amountIn, minAmountOut, salt)
+        );
+        require(commitment.commitHash == expectedHash, "잘못된 공개");
+
+        commitment.revealed = true;
+
+        // 슬리피지 보호로 스왑 실행
+        amountOut = _executeSwap(tokenIn, tokenOut, amountIn, minAmountOut);
+
+        return amountOut;
+    }
+}</code></pre>
+
+    <h2>오라클 보안</h2>
+    <p>오라클은 스마트 컨트랙트에 외부 데이터를 제공합니다. 손상되거나 조작된 오라클은 많은 DeFi 익스플로잇의 근본 원인이 되었습니다.</p>
+
+    <h3>오라클 조작 벡터</h3>
+    <pre><code>오라클 공격 시나리오:
+
+1. 현물 가격 조작
+   └── 공격자가 대량 스왑으로 DEX 가격 이동
+   └── 오라클이 조작된 현물 가격 읽음
+   └── 공격자가 잘못된 가격의 담보 악용
+
+2. 낮은 유동성 오라클
+   └── 오라클이 얇은 유동성 풀에서 소싱
+   └── 적은 자본으로 가격이 크게 이동
+   └── 종속 프로토콜에 연쇄 효과
+
+3. 지연된 오라클 업데이트
+   └── 오라클 가격이 실제 시장보다 늦음
+   └── 공격자가 오래된 가격 악용
+   └── 오라클과 시장 간 차익
+
+4. 중앙화된 오라클 손상
+   └── 단일 오라클 운영자 손상
+   └── 블록체인에 거짓 데이터 제출
+   └── 프로토콜이 잘못된 데이터로 작동</code></pre>
+
+    <h3>안전한 오라클 구현</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+/**
+ * @title SecureOracle
+ * @notice 조작 저항성이 있는 다중 소스 오라클
+ */
+contract SecureOracle {
+    struct PriceFeed {
+        AggregatorV3Interface feed;
+        uint256 heartbeat;
+        uint256 deviationThreshold;
+    }
+
+    mapping(address => PriceFeed[]) public priceFeeds;
+
+    uint256 public constant MAX_PRICE_DEVIATION = 500; // 5%
+    uint256 public constant MIN_ORACLE_SOURCES = 3;
+
+    /**
+     * @notice 여러 검증이 있는 가격 가져오기
+     */
+    function getSecurePrice(
+        address token
+    ) external view returns (uint256 price, uint256 confidence) {
+        PriceFeed[] storage feeds = priceFeeds[token];
+        require(feeds.length >= MIN_ORACLE_SOURCES, "오라클 소스 부족");
+
+        uint256[] memory prices = new uint256[](feeds.length);
+        uint256 validPrices = 0;
+
+        for (uint256 i = 0; i < feeds.length; i++) {
+            (
+                uint80 roundId,
+                int256 answer,
+                uint256 startedAt,
+                uint256 updatedAt,
+                uint80 answeredInRound
+            ) = feeds[i].feed.latestRoundData();
+
+            // 신선도 검증
+            if (block.timestamp - updatedAt > feeds[i].heartbeat) {
+                continue; // 오래된 가격, 건너뛰기
+            }
+
+            // 라운드 완료 검증
+            if (answeredInRound < roundId) {
+                continue; // 불완전한 라운드, 건너뛰기
+            }
+
+            // 양수 가격 검증
+            if (answer <= 0) {
+                continue; // 유효하지 않은 가격, 건너뛰기
+            }
+
+            prices[validPrices] = uint256(answer);
+            validPrices++;
+        }
+
+        require(validPrices >= 2, "유효한 가격 부족");
+
+        // 중앙값 가격 계산 (조작 저항)
+        price = _calculateMedian(prices, validPrices);
+
+        // 소스 간 편차 확인
+        confidence = _calculateConfidence(prices, validPrices, price);
+
+        return (price, confidence);
+    }
+
+    function _calculateMedian(
+        uint256[] memory arr,
+        uint256 len
+    ) internal pure returns (uint256) {
+        // 배열 정렬
+        for (uint256 i = 0; i < len - 1; i++) {
+            for (uint256 j = 0; j < len - i - 1; j++) {
+                if (arr[j] > arr[j + 1]) {
+                    (arr[j], arr[j + 1]) = (arr[j + 1], arr[j]);
+                }
+            }
+        }
+
+        // 중앙값 반환
+        if (len % 2 == 0) {
+            return (arr[len/2 - 1] + arr[len/2]) / 2;
+        } else {
+            return arr[len/2];
+        }
+    }
+}</code></pre>
+
+    <h2>유동성 풀 보안</h2>
+    <p>유동성 풀은 DeFi의 핵심이지만 비영구적 손실, 러그풀, 풀 조작을 포함한 고유한 보안 과제를 제시합니다.</p>
+
+    <h3>러그풀 방지</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/**
+ * @title SecureLiquidityPool
+ * @notice 러그풀 방지 메커니즘이 있는 LP
+ */
+contract SecureLiquidityPool {
+    address public owner;
+    uint256 public constant LOCK_PERIOD = 180 days;
+    uint256 public poolCreatedAt;
+
+    mapping(address => LPPosition) public positions;
+
+    struct LPPosition {
+        uint256 liquidity;
+        uint256 depositedAt;
+        uint256 withdrawableAt;
+    }
+
+    // 풀의 백분율로서 최대 단일 출금
+    uint256 public constant MAX_WITHDRAWAL_PERCENT = 10;
+
+    // 대량 출금 사이의 쿨다운
+    uint256 public lastLargeWithdrawal;
+    uint256 public constant WITHDRAWAL_COOLDOWN = 24 hours;
+
+    modifier liquidityLocked() {
+        require(
+            block.timestamp >= poolCreatedAt + LOCK_PERIOD,
+            "유동성 잠김"
+        );
+        _;
+    }
+
+    function addLiquidity(uint256 amount) external {
+        // 토큰 전송 및 LP 발행
+        uint256 lpAmount = _calculateLPTokens(amount);
+
+        positions[msg.sender] = LPPosition({
+            liquidity: positions[msg.sender].liquidity + lpAmount,
+            depositedAt: block.timestamp,
+            withdrawableAt: block.timestamp + 7 days // 최소 잠금
+        });
+    }
+
+    function removeLiquidity(
+        uint256 lpAmount
+    ) external liquidityLocked returns (uint256 amountOut) {
+        LPPosition storage position = positions[msg.sender];
+
+        require(position.liquidity >= lpAmount, "LP 부족");
+        require(
+            block.timestamp >= position.withdrawableAt,
+            "포지션 잠김"
+        );
+
+        uint256 totalLiquidity = _getTotalLiquidity();
+        uint256 withdrawPercent = (lpAmount * 100) / totalLiquidity;
+
+        // 대량 출금 확인
+        if (withdrawPercent > MAX_WITHDRAWAL_PERCENT) {
+            require(
+                block.timestamp >= lastLargeWithdrawal + WITHDRAWAL_COOLDOWN,
+                "출금 쿨다운 활성"
+            );
+            lastLargeWithdrawal = block.timestamp;
+
+            // 최대치로 제한
+            lpAmount = (totalLiquidity * MAX_WITHDRAWAL_PERCENT) / 100;
+        }
+
+        position.liquidity -= lpAmount;
+        amountOut = _calculateTokensOut(lpAmount);
+
+        // 토큰 전송
+        _transferOut(msg.sender, amountOut);
+
+        return amountOut;
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>요약:</strong> DeFi 보안은 조합성, 플래시 론, 온체인 유동성에 의해 가능해진 고유한 공격 벡터에 대한 이해가 필요합니다. MEV, 오라클 조작, 플래시 론 공격에 대한 적절한 보호를 구현하는 것은 안전한 DeFi 프로토콜을 구축하는 데 필수적입니다.
+    </div>
+
+</body>
+</html>

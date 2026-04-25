@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제2장: 감정 데이터 표준 - WIA-PET-EMOTION</title>
+</head>
+<body>
+<h1>제2장: 감정 데이터 표준</h1>
+
+<blockquote>
+"홍익인간: 정밀한 데이터 구조는 우리가 이해하고자 하는 감정적 진실의 정확한 표현을 가능하게 합니다."
+</blockquote>
+
+<hr>
+
+<h2>2.1 핵심 데이터 타입</h2>
+
+<h3>EmotionType 열거형</h3>
+
+<pre>
+enum EmotionType {
+  HAPPY         // 기쁨, 즐거움
+  SAD           // 우울, 슬픔
+  ANXIOUS       // 걱정, 초조
+  CALM          // 이완, 평화로움
+  EXCITED       // 높은 각성, 긍정
+  FEARFUL       // 무서움, 위협받음
+  AFFECTIONATE  // 사랑, 유대
+  FRUSTRATED    // 막힘, 짜증
+  PLAYFUL       // 참여, 재미 추구
+  CONTENT       // 만족, 중립-긍정
+  CURIOUS       // 관심, 탐색
+  AGGRESSIVE    // 적대, 방어
+  BORED         // 자극 부족
+  TIRED         // 피로, 졸림
+  ALERT         // 주의, 관찰
+  UNKNOWN       // 데이터 불충분
+}
+</pre>
+
+<hr>
+
+<h2>2.2 강도 척도</h2>
+
+<table border="1">
+<tr>
+<th>수준</th>
+<th>값</th>
+<th>설명</th>
+</tr>
+<tr>
+<td>MINIMAL (최소)</td>
+<td>1</td>
+<td>거의 감지되지 않음, 미묘한 힌트</td>
+</tr>
+<tr>
+<td>MILD (경미)</td>
+<td>2</td>
+<td>명확하지만 두드러지지 않음</td>
+</tr>
+<tr>
+<td>MODERATE (보통)</td>
+<td>3</td>
+<td>분명하고 일관됨</td>
+</tr>
+<tr>
+<td>STRONG (강함)</td>
+<td>4</td>
+<td>지배적 감정 상태</td>
+</tr>
+<tr>
+<td>INTENSE (극심)</td>
+<td>5</td>
+<td>압도적, 주의 필요</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>2.3 신뢰도 수준</h2>
+
+<pre>
+신뢰도 분류
+===========
+
+INSUFFICIENT (불충분) (0-49%):
+  - 데이터 품질이 신뢰할 만한 평가에 너무 낮음
+  - 여러 상충하는 신호
+  - 센서 오작동 가능성
+
+LOW (낮음) (50-64%):
+  - 기본 감정 감지 가능
+  - 상당한 불확실성 남음
+  - 주의해서 사용
+
+MODERATE (보통) (65-84%):
+  - 대부분 목적에 신뢰할 수 있음
+  - 일부 모호함 허용
+  - 표준 운영 임계값
+
+HIGH (높음) (85-100%):
+  - 매우 신뢰할 수 있는 평가
+  - 강한 신호 일치
+  - 중요한 결정에 적합
+</pre>
+
+<hr>
+
+<h2>2.4 EmotionState 구조</h2>
+
+<pre>
+interface EmotionState {
+  // 핵심 식별
+  emotionType: EmotionType      // 주요 감정
+  intensity: 1 | 2 | 3 | 4 | 5  // 1-5 척도
+
+  // 신뢰도 지표
+  confidence: number            // 0-100 백분율
+  confidenceLevel: ConfidenceLevel
+
+  // 시간 정보
+  duration: number              // 상태 지속 밀리초
+  stability: number             // 0-1 안정도
+
+  // 지원 데이터
+  contributingFactors: string[] // 트리거 요인
+  dataSourceCount: number       // 사용된 소스
+}
+</pre>
+
+<hr>
+
+<h2>2.5 EmotionReading 구조</h2>
+
+<pre>
+interface EmotionReading {
+  // 식별
+  readingId: string           // UUID
+  profileId: string           // 반려동물 프로필 참조
+  timestamp: ISO8601DateTime  // 캡처 시간
+
+  // 주요 결과
+  primaryEmotion: EmotionState
+
+  // 추가 감지된 감정
+  secondaryEmotions: EmotionState[]
+
+  // 전체 평가
+  overallMood: MoodAssessment
+
+  // 사용된 데이터 소스
+  dataSources: DataSourceInfo[]
+
+  // 품질 지표
+  overallConfidence: number
+  dataQuality: DataQuality
+}
+</pre>
+
+<hr>
+
+<h2>2.6 기분 평가 모델</h2>
+
+<h3>정서가-각성 공간</h3>
+
+<pre>
+                    높은 각성
+                         |
+                         |
+    불안/두려움           |      흥분/장난
+                         |
+   -------------------------------------------
+                         |
+    슬픔/지루함           |      평온/만족
+                         |
+                         |
+                    낮은 각성
+         부정적                    긍정적
+                    정서가
+</pre>
+
+<table border="1">
+<tr>
+<th>차원</th>
+<th>범위</th>
+<th>설명</th>
+</tr>
+<tr>
+<td>정서가 (Valence)</td>
+<td>-1.0 ~ +1.0</td>
+<td>부정에서 긍정</td>
+</tr>
+<tr>
+<td>각성 (Arousal)</td>
+<td>0.0 ~ 1.0</td>
+<td>낮음에서 높음</td>
+</tr>
+<tr>
+<td>웰빙</td>
+<td>0 ~ 100</td>
+<td>전반적 건강 점수</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>2.7 데이터 소스 유형</h2>
+
+<h3>시각 데이터 소스</h3>
+
+<pre>
+interface VisualDataSource {
+  sourceType: "VISUAL"
+  deviceType: "camera" | "depth_sensor"
+
+  bodyPosture: {
+    posture: string         // 서기, 앉기, 누움
+    tension: number         // 0-1 근육 긴장
+    orientation: string     // 향함, 멀어짐, 중립
+  }
+
+  facialExpression: {
+    eyeState: string        // 크게, 이완, 찡그림
+    mouthState: string      // 열림, 닫힘, 이완
+    earPosition: string     // 앞으로, 뒤로, 이완
+  }
+
+  tailPosition: {
+    position: string        // 높음, 낮음, 숨김
+    movement: string        // 흔들기, 정지, 떨림
+    speed: number           // 움직임 빈도
+  }
+}
+</pre>
+
+<h3>청각 데이터 소스</h3>
+
+<pre>
+interface AudioDataSource {
+  sourceType: "AUDIO"
+  deviceType: "microphone"
+
+  vocalization: {
+    type: string            // 짖음, 끙끙, 골골, 으르렁
+    frequency: number       // Hz
+    amplitude: number       // dB
+    duration: number        // ms
+    pattern: string         // 연속, 간헐
+  }
+
+  acousticFeatures: {
+    pitch: number
+    pitchVariation: number
+    harmonicity: number
+    energy: number
+  }
+}
+</pre>
+
+<h3>생리 데이터 소스</h3>
+
+<pre>
+interface PhysiologicalDataSource {
+  sourceType: "PHYSIOLOGICAL"
+  deviceType: "wearable" | "implant" | "external"
+
+  heartRate: {
+    bpm: number
+    variability: number     // HRV (ms)
+    trend: string           // 증가, 안정, 감소
+  }
+
+  activity: {
+    level: number           // 0-100
+    stepCount: number
+    movement: string        // 정지, 걷기, 달리기
+  }
+
+  temperature: {
+    value: number           // 섭씨
+    location: string        // 귀, 피부, 심부
+  }
+}
+</pre>
+
+<hr>
+
+<h2>2.8 EmotionProfile 구조</h2>
+
+<pre>
+interface EmotionProfile {
+  // 식별
+  profileId: string
+  petId: string
+  ownerId: string
+
+  // 반려동물 정보
+  species: string           // canine, feline 등
+  breed: string
+  name: string
+  birthDate: Date
+  weight: number
+
+  // 기준선 데이터
+  baselineEmotions: EmotionBaseline
+
+  // 성격 평가
+  personalityTraits: PersonalityProfile
+
+  // 알려진 트리거
+  triggers: EmotionTrigger[]
+
+  // 메타데이터
+  createdAt: DateTime
+  updatedAt: DateTime
+  lastReadingAt: DateTime
+}
+</pre>
+
+<hr>
+
+<h2>2.9 기준선 교정</h2>
+
+<pre>
+interface EmotionBaseline {
+  // 생리적 기준선
+  restingHeartRate: number      // bpm
+  restingHRV: number            // ms
+  normalActivityLevel: number   // 0-100
+  normalBodyTemperature: number // 섭씨
+
+  // 행동 기준선
+  typicalSleepHours: number
+  feedingTimes: string[]
+  exercisePattern: string
+
+  // 감정 기준선
+  defaultMoodValence: number    // -1 ~ 1
+  defaultArousalLevel: number   // 0 ~ 1
+  emotionalStability: number    // 0 ~ 1
+
+  // 교정 메타데이터
+  calibrationDate: DateTime
+  calibrationDuration: number   // 데이터 시간
+  calibrationQuality: number    // 0-100
+}
+</pre>
+
+<hr>
+
+<h2>2.10 성격 프로필</h2>
+
+<table border="1">
+<tr>
+<th>특성</th>
+<th>범위</th>
+<th>낮은 점수</th>
+<th>높은 점수</th>
+</tr>
+<tr>
+<td>사회성</td>
+<td>0-1</td>
+<td>내성적, 독립적</td>
+<td>사교적, 사람 중심</td>
+</tr>
+<tr>
+<td>에너지 수준</td>
+<td>0-1</td>
+<td>차분, 앉아있음</td>
+<td>활동적, 에너지 넘침</td>
+</tr>
+<tr>
+<td>불안 경향</td>
+<td>0-1</td>
+<td>자신감, 이완</td>
+<td>긴장, 반응적</td>
+</tr>
+<tr>
+<td>장난기</td>
+<td>0-1</td>
+<td>진지, 과업 중심</td>
+<td>장난, 재미 추구</td>
+</tr>
+<tr>
+<td>훈련 용이성</td>
+<td>0-1</td>
+<td>독립적 사고</td>
+<td>기꺼이 따름</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>2.11 감정 트리거</h2>
+
+<pre>
+interface EmotionTrigger {
+  triggerId: string
+  profileId: string
+
+  // 트리거 정의
+  triggerType: "environmental" | "social" | "temporal" | "physical"
+  description: string
+  keywords: string[]
+
+  // 감정 반응
+  typicalEmotion: EmotionType
+  typicalIntensity: number
+  responseLatency: number       // 반응 ms
+
+  // 맥락
+  frequency: "rare" | "occasional" | "common" | "frequent"
+  lastOccurrence: DateTime
+
+  // 관리
+  mitigation: string            // 영향 줄이는 방법
+  positive: boolean             // 긍정적 트리거인지
+}
+</pre>
+
+<hr>
+
+<h2>2.12 데이터 품질 표준</h2>
+
+<table border="1">
+<tr>
+<th>품질 수준</th>
+<th>기준</th>
+<th>용도</th>
+</tr>
+<tr>
+<td>EXCELLENT</td>
+<td>3개 이상 소스, 모두 높은 품질</td>
+<td>모든 애플리케이션</td>
+</tr>
+<tr>
+<td>GOOD</td>
+<td>2개 이상 소스, 대부분 높은 품질</td>
+<td>표준 모니터링</td>
+</tr>
+<tr>
+<td>ACCEPTABLE</td>
+<td>1개 이상 소스, 적절한 품질</td>
+<td>기본 추적만</td>
+</tr>
+<tr>
+<td>POOR</td>
+<td>제한적이거나 낮은 품질 데이터</td>
+<td>권장하지 않음</td>
+</tr>
+<tr>
+<td>INSUFFICIENT</td>
+<td>판단 불가</td>
+<td>읽기 폐기</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 16가지 감정 유형이 스펙트럼 포괄</li>
+<li>[OK] 최소에서 극심까지 5단계 강도 척도</li>
+<li>[OK] 신뢰도 수준이 적절한 데이터 사용 보장</li>
+<li>[OK] 정서가-각성 모델이 차원 분석 제공</li>
+<li>[OK] 다중 데이터 소스 유형이 포괄적 감지 가능</li>
+<li>[OK] 프로필과 기준선 구조가 개인화 지원</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-01.html">이전: 제1장 - 개론</a> | <a href="chapter-03.html">다음: 제3장 - 다중 모달 감지 시스템</a></p>
+</body>
+</html>

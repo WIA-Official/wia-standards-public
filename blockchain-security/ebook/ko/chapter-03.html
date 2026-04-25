@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 취약점 탐지 및 감사 | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>제3장: 취약점 탐지 및 감사</h1>
+
+    <div class="highlight">
+        <strong>장 개요:</strong> 선제적 보안은 체계적인 취약점 탐지와 철저한 감사 프로세스를 필요로 합니다. 이 장에서는 보안 문제가 악용되기 전에 식별하기 위한 방법론, 도구 및 모범 사례를 다룹니다.
+    </div>
+
+    <h2>일반적인 스마트 컨트랙트 취약점</h2>
+    <p>일반적인 취약점 패턴을 이해하는 것이 효과적인 탐지의 첫 번째 단계입니다. 스마트 컨트랙트는 기존 소프트웨어와 다른 고유한 취약점 클래스를 가지고 있습니다.</p>
+
+    <h3>재진입 공격</h3>
+    <p>재진입은 스마트 컨트랙트에서 가장 위험한 취약점 중 하나입니다. 외부 호출이 상태 업데이트가 완료되기 전에 호출된 컨트랙트가 호출 함수에 다시 진입할 수 있게 할 때 발생합니다.</p>
+
+    <pre><code>// 취약: 재진입 공격 예제
+pragma solidity ^0.8.19;
+
+contract VulnerableBank {
+    mapping(address => uint256) public balances;
+
+    function deposit() external payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    // 취약: 외부 호출 후 상태 업데이트
+    function withdraw(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "잔액 부족");
+
+        // 상태 업데이트 전 외부 호출 - 취약
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "전송 실패");
+
+        // 외부 호출 후 상태 업데이트 - 너무 늦음
+        balances[msg.sender] -= amount;
+    }
+}
+
+// 공격 컨트랙트
+contract ReentrancyAttacker {
+    VulnerableBank public target;
+    uint256 public attackCount;
+
+    constructor(address _target) {
+        target = VulnerableBank(_target);
+    }
+
+    function attack() external payable {
+        target.deposit{value: msg.value}();
+        target.withdraw(msg.value);
+    }
+
+    receive() external payable {
+        if (address(target).balance >= msg.value && attackCount < 10) {
+            attackCount++;
+            target.withdraw(msg.value);
+        }
+    }
+}</code></pre>
+
+    <h3>안전한 구현</h3>
+    <pre><code>// 안전: 재진입 방지 구현
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract SecureBank is ReentrancyGuard {
+    mapping(address => uint256) public balances;
+
+    function deposit() external payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    // 안전: 검사-효과-상호작용 패턴 사용
+    function withdraw(uint256 amount) external nonReentrant {
+        // 검사
+        require(balances[msg.sender] >= amount, "잔액 부족");
+
+        // 효과 - 외부 호출 전에 상태 업데이트
+        balances[msg.sender] -= amount;
+
+        // 상호작용 - 외부 호출은 마지막에
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "전송 실패");
+    }
+}</code></pre>
+
+    <h2>취약점 분류</h2>
+    <table>
+        <tr><th>카테고리</th><th>취약점</th><th>심각도</th><th>탐지 방법</th></tr>
+        <tr><td>로직</td><td>재진입</td><td>치명적</td><td>정적 분석, 수동 검토</td></tr>
+        <tr><td>로직</td><td>액세스 제어 우회</td><td>치명적</td><td>퍼징, 정형 검증</td></tr>
+        <tr><td>산술</td><td>정수 오버플로우/언더플로우</td><td>높음</td><td>정적 분석, 기호 실행</td></tr>
+        <tr><td>상태</td><td>초기화되지 않은 저장소</td><td>높음</td><td>정적 분석</td></tr>
+        <tr><td>외부</td><td>오라클 조작</td><td>치명적</td><td>수동 검토, 시뮬레이션</td></tr>
+        <tr><td>타이밍</td><td>프론트러닝</td><td>중간</td><td>트랜잭션 시뮬레이션</td></tr>
+        <tr><td>가스</td><td>가스 한도를 통한 DoS</td><td>중간</td><td>가스 프로파일링, 퍼징</td></tr>
+    </table>
+
+    <h2>자동화된 취약점 탐지</h2>
+    <p>자동화된 도구는 취약점 탐지의 첫 번째 방어선을 제공합니다. 일반적인 패턴과 잠재적 문제를 신속하게 식별할 수 있습니다.</p>
+
+    <h3>정적 분석 구성</h3>
+    <pre><code>// Slither 구성 - slither.config.json
+{
+    "detectors_to_run": [
+        "reentrancy-eth",
+        "reentrancy-no-eth",
+        "reentrancy-benign",
+        "uninitialized-storage",
+        "arbitrary-send",
+        "controlled-delegatecall",
+        "tx-origin",
+        "unchecked-transfer",
+        "divide-before-multiply",
+        "unused-return",
+        "shadowing-state",
+        "weak-prng"
+    ],
+    "exclude_informational": false,
+    "exclude_low": false,
+    "filter_paths": [
+        "node_modules",
+        "test"
+    ],
+    "solc_remaps": [
+        "@openzeppelin/=node_modules/@openzeppelin/"
+    ]
+}
+
+// 실행 명령어
+// slither . --config-file slither.config.json --json slither-report.json</code></pre>
+
+    <h3>취약점 스캐너 구현</h3>
+    <pre><code>// 자동화된 취약점 스캐너
+import { ethers } from 'ethers';
+
+interface VulnerabilityScan {
+    contract: string;
+    findings: Finding[];
+    riskScore: number;
+    timestamp: Date;
+}
+
+interface Finding {
+    id: string;
+    severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+    title: string;
+    description: string;
+    location: CodeLocation;
+    recommendation: string;
+}
+
+class VulnerabilityScanner {
+    private patterns: VulnerabilityPattern[];
+
+    constructor() {
+        this.patterns = this.loadPatterns();
+    }
+
+    async scanContract(bytecode: string, abi: any[]): Promise<VulnerabilityScan> {
+        const findings: Finding[] = [];
+
+        // 알려진 취약한 패턴 확인
+        findings.push(...this.checkReentrancy(bytecode, abi));
+        findings.push(...this.checkAccessControl(abi));
+        findings.push(...this.checkDelegatecall(bytecode));
+        findings.push(...this.checkSelfDestruct(bytecode));
+        findings.push(...this.checkTxOrigin(bytecode));
+
+        // 위험 점수 계산
+        const riskScore = this.calculateRiskScore(findings);
+
+        return {
+            contract: ethers.utils.keccak256(bytecode),
+            findings,
+            riskScore,
+            timestamp: new Date()
+        };
+    }
+
+    private checkReentrancy(bytecode: string, abi: any[]): Finding[] {
+        const findings: Finding[] = [];
+
+        // CALL 다음에 SSTORE 패턴 확인
+        const opcodes = this.disassemble(bytecode);
+
+        for (let i = 0; i < opcodes.length - 1; i++) {
+            if (opcodes[i].opcode === 'CALL') {
+                // 같은 함수에서 CALL 이후 SSTORE 찾기
+                for (let j = i + 1; j < Math.min(i + 50, opcodes.length); j++) {
+                    if (opcodes[j].opcode === 'SSTORE') {
+                        findings.push({
+                            id: `REEN-${i}`,
+                            severity: 'critical',
+                            title: '잠재적 재진입 취약점',
+                            description: '외부 호출 후 상태 수정 감지됨',
+                            location: { offset: opcodes[i].offset },
+                            recommendation: '검사-효과-상호작용 패턴 적용'
+                        });
+                        break;
+                    }
+                    if (opcodes[j].opcode === 'RETURN' || opcodes[j].opcode === 'STOP') {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return findings;
+    }
+
+    private calculateRiskScore(findings: Finding[]): number {
+        const weights = { critical: 100, high: 50, medium: 20, low: 5, info: 1 };
+        return findings.reduce((score, f) => score + weights[f.severity], 0);
+    }
+}</code></pre>
+
+    <h2>보안 감사 프로세스</h2>
+    <p>포괄적인 보안 감사는 모든 잠재적 취약점의 철저한 커버리지를 보장하기 위해 구조화된 방법론을 따릅니다.</p>
+
+    <div class="highlight">
+        <strong>감사 단계:</strong> 완전한 보안 감사는 각각 특정 목표와 산출물을 가진 여러 단계로 구성됩니다. 이러한 구조화된 접근 방식을 따르면 포괄적인 커버리지와 실행 가능한 결과를 보장합니다.
+    </div>
+
+    <h3>감사 워크플로우</h3>
+    <pre><code>보안 감사 프로세스 흐름:
+
+1단계: 준비 (2-3일)
+├── 코드베이스 및 문서 수령
+├── 범위 및 목표 정의
+├── 개발 환경 설정
+├── 이전 감사 검토 (있는 경우)
+└── 커뮤니케이션 채널 설정
+
+2단계: 자동화 분석 (1-2일)
+├── 정적 분석 도구 실행 (Slither, Mythril)
+├── 기호 실행 실행 (Manticore)
+├── 퍼징 캠페인 수행
+├── 초기 발견 목록 생성
+└── 수동 검토 영역 우선순위 지정
+
+3단계: 수동 검토 (5-10일)
+├── 아키텍처 검토
+├── 비즈니스 로직 분석
+├── 액세스 제어 검증
+├── 상태 머신 검증
+├── 외부 종속성 검토
+├── 가스 최적화 분석
+└── 코드 품질 평가
+
+4단계: 공격 시뮬레이션 (2-3일)
+├── 개념 증명 익스플로잇 개발
+├── 포크된 메인넷에서 테스트
+├── 공격 시나리오 검증
+├── 공격 경로 문서화
+└── 잠재적 영향 추정
+
+5단계: 보고 (2-3일)
+├── 심각도 등급이 있는 발견 항목 컴파일
+├── 수정 권장사항 제공
+├── 경영진 요약 작성
+├── 개발팀과 검토
+└── 최종 보고서 전달
+
+6단계: 수정 검증 (2-3일)
+├── 구현된 수정 검토
+├── 새로운 문제가 도입되지 않았는지 확인
+├── 자동화 도구 재실행
+├── 수정 보고서 발행
+└── 최종 승인</code></pre>
+
+    <h2>침투 테스트 기법</h2>
+    <p>침투 테스트는 정적 분석을 넘어 통제된 환경에서 취약점의 실제 악용을 시도합니다.</p>
+
+    <h3>퍼징 프레임워크</h3>
+    <pre><code>// 스마트 컨트랙트 퍼징 프레임워크
+import { ethers } from 'hardhat';
+
+interface FuzzConfig {
+    iterations: number;
+    seed: number;
+    maxGas: number;
+    invariants: InvariantCheck[];
+}
+
+interface InvariantCheck {
+    name: string;
+    check: (state: ContractState) => boolean;
+}
+
+class ContractFuzzer {
+    private contract: ethers.Contract;
+    private config: FuzzConfig;
+    private violations: InvariantViolation[] = [];
+
+    constructor(contract: ethers.Contract, config: FuzzConfig) {
+        this.contract = contract;
+        this.config = config;
+    }
+
+    async fuzz(): Promise<FuzzResult> {
+        const rng = this.createRNG(this.config.seed);
+
+        for (let i = 0; i < this.config.iterations; i++) {
+            // 랜덤 함수 호출 생성
+            const call = this.generateRandomCall(rng);
+
+            try {
+                // 호출 실행
+                await this.executeCall(call);
+
+                // 불변성 확인
+                const state = await this.captureState();
+                for (const invariant of this.config.invariants) {
+                    if (!invariant.check(state)) {
+                        this.violations.push({
+                            iteration: i,
+                            call,
+                            invariant: invariant.name,
+                            state
+                        });
+                    }
+                }
+            } catch (error) {
+                // 예상치 못한 오류 기록
+                if (!this.isExpectedError(error)) {
+                    this.violations.push({
+                        iteration: i,
+                        call,
+                        error: error.message,
+                        state: null
+                    });
+                }
+            }
+        }
+
+        return {
+            iterations: this.config.iterations,
+            violations: this.violations,
+            coverage: await this.getCoverage()
+        };
+    }
+}</code></pre>
+
+    <h3>불변성 테스트</h3>
+    <pre><code>// 테스트를 위한 중요 불변성 정의
+const tokenInvariants: InvariantCheck[] = [
+    {
+        name: '총 공급량은 잔액의 합과 같음',
+        check: (state) => {
+            const totalBalances = Object.values(state.balances)
+                .reduce((a, b) => a.add(b), ethers.constants.Zero);
+            return state.totalSupply.eq(totalBalances);
+        }
+    },
+    {
+        name: '어떤 잔액도 총 공급량을 초과하지 않음',
+        check: (state) => {
+            return Object.values(state.balances)
+                .every(b => b.lte(state.totalSupply));
+        }
+    },
+    {
+        name: '소유자는 제로 주소가 될 수 없음',
+        check: (state) => {
+            return state.owner !== ethers.constants.AddressZero;
+        }
+    },
+    {
+        name: '일시정지 상태는 전송을 방지함',
+        check: (state) => {
+            if (state.paused) {
+                return state.lastTransfer === null;
+            }
+            return true;
+        }
+    }
+];
+
+// 불변성으로 퍼징 실행
+const fuzzer = new ContractFuzzer(tokenContract, {
+    iterations: 10000,
+    seed: Date.now(),
+    maxGas: 3000000,
+    invariants: tokenInvariants
+});
+
+const results = await fuzzer.fuzz();
+console.log(`${results.violations.length}개의 불변성 위반 발견`);</code></pre>
+
+    <div class="highlight">
+        <strong>요약:</strong> 효과적인 취약점 탐지는 자동화된 도구, 수동 검토, 적극적인 익스플로잇 시도의 조합을 필요로 합니다. 체계적인 감사 프로세스를 따르고 포괄적인 테스트 기법을 사용함으로써 보안 팀은 배포 전에 취약점을 식별하고 수정할 수 있습니다.
+    </div>
+
+</body>
+</html>

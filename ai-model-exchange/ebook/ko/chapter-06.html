@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 검증 및 테스트 | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>6장: 검증 및 테스트</h1>
+        <p class="chapter-meta">WIA-AI-008 표준 • 예상 소요 시간: 40분</p>
+
+        <h2>6.1 모델 레지스트리가 필요한 이유</h2>
+        <p>
+            조직이 ML 운영을 확장함에 따라 수십 또는 수백 개의 모델을 관리하는 것이 어려워집니다. 모델 레지스트리는
+            머신러닝 모델에 대한 중앙집중식 저장소, 버전 관리, 메타데이터 관리, 액세스 제어를 제공합니다.
+            팀 간 협업, 재현성, 거버넌스를 가능하게 합니다.
+        </p>
+
+        <h3>주요 이점</h3>
+        <ul>
+            <li><strong>중앙집중식 저장소</strong>: 모든 모델에 대한 단일 소스</li>
+            <li><strong>버전 제어</strong>: 시간에 따른 모델 진화 추적</li>
+            <li><strong>메타데이터 관리</strong>: 학습 메트릭, 데이터셋, 설정 저장</li>
+            <li><strong>액세스 제어</strong>: 권한 및 감사 로그 관리</li>
+            <li><strong>배포 추적</strong>: 프로덕션에 있는 모델 파악</li>
+            <li><strong>협업</strong>: 팀과 조직 간 모델 공유</li>
+        </ul>
+
+        <h2>6.2 MLflow 모델 레지스트리</h2>
+        <p>
+            MLflow는 강력한 모델 레지스트리를 포함하여 ML 수명주기를 관리하기 위한 오픈 소스 플랫폼입니다.
+        </p>
+
+        <h3>MLflow 설정</h3>
+        <pre><code># MLflow 설치
+# pip install mlflow
+
+# MLflow 추적 서버 시작
+# mlflow server --host 0.0.0.0 --port 5000
+
+import mlflow
+import mlflow.pytorch
+
+# 추적 URI 설정
+mlflow.set_tracking_uri("http://localhost:5000")
+
+# 실험 생성
+mlflow.set_experiment("image-classification")
+
+# 모델 학습 및 로깅
+with mlflow.start_run():
+    # 학습 코드
+    model = train_model()
+
+    # 매개변수 로깅
+    mlflow.log_param("learning_rate", 0.001)
+    mlflow.log_param("batch_size", 32)
+    mlflow.log_param("epochs", 10)
+
+    # 메트릭 로깅
+    mlflow.log_metric("train_accuracy", 0.95)
+    mlflow.log_metric("val_accuracy", 0.92)
+
+    # 모델 로깅
+    mlflow.pytorch.log_model(
+        model,
+        "model",
+        registered_model_name="ResNet18Classifier"
+    )
+
+    print(f"run_id로 모델 로깅됨: {mlflow.active_run().info.run_id}")</code></pre>
+
+        <h3>모델 버전 관리</h3>
+        <pre><code>from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+
+# 새 버전 등록
+result = client.create_model_version(
+    name="ResNet18Classifier",
+    source="runs:/abc123/model",
+    run_id="abc123"
+)
+
+print(f"버전 생성됨: {result.version}")
+
+# 모든 버전 나열
+versions = client.search_model_versions("name='ResNet18Classifier'")
+for v in versions:
+    print(f"버전 {v.version}: {v.current_stage} - {v.creation_timestamp}")
+
+# 스테이징으로 전환
+client.transition_model_version_stage(
+    name="ResNet18Classifier",
+    version=2,
+    stage="Staging"
+)
+
+# 프로덕션으로 승격
+client.transition_model_version_stage(
+    name="ResNet18Classifier",
+    version=2,
+    stage="Production"
+)
+
+# 이전 버전 아카이브
+client.transition_model_version_stage(
+    name="ResNet18Classifier",
+    version=1,
+    stage="Archived"
+)</code></pre>
+
+        <h3>레지스트리에서 모델 로드</h3>
+        <pre><code>import mlflow.pytorch
+
+# 최신 프로덕션 모델 로드
+model_uri = "models:/ResNet18Classifier/Production"
+model = mlflow.pytorch.load_model(model_uri)
+
+# 특정 버전 로드
+model_uri = "models:/ResNet18Classifier/2"
+model = mlflow.pytorch.load_model(model_uri)
+
+# 추론에 사용
+import torch
+input_data = torch.randn(1, 3, 224, 224)
+output = model(input_data)
+print(f"예측: {output}")</code></pre>
+
+        <h2>6.3 Hugging Face Hub</h2>
+        <p>
+            Hugging Face Hub는 특히 NLP 및 멀티모달 AI를 위한 모델을 공유하고 발견하는 인기 있는 플랫폼입니다.
+        </p>
+
+        <h3>모델 업로드</h3>
+        <pre><code>from huggingface_hub import HfApi, create_repo
+from transformers import AutoModel, AutoTokenizer
+
+# 저장소 생성
+repo_id = "username/my-awesome-model"
+create_repo(repo_id, exist_ok=True)
+
+# 모델 및 토크나이저 저장
+model = AutoModel.from_pretrained("bert-base-uncased")
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+model.save_pretrained("./model")
+tokenizer.save_pretrained("./model")
+
+# Hub에 업로드
+api = HfApi()
+api.upload_folder(
+    folder_path="./model",
+    repo_id=repo_id,
+    repo_type="model"
+)
+
+print(f"모델 업로드됨: https://huggingface.co/{repo_id}")</code></pre>
+
+        <h3>Hugging Face의 모델 카드</h3>
+        <pre><code># README.md 생성 (모델 카드)
+model_card = """---
+language: ko
+license: apache-2.0
+tags:
+- text-classification
+- sentiment-analysis
+datasets:
+- imdb
+metrics:
+- accuracy
+---
+
+# 내 멋진 모델
+
+## 모델 설명
+IMDB 데이터셋에서 감정 분석을 위해 미세 조정된 BERT.
+
+## 의도된 사용
+영화 리뷰를 긍정 또는 부정으로 분류합니다.
+
+## 학습 데이터
+IMDB 데이터셋 (50,000개 리뷰)
+
+## 학습 절차
+- 배치 크기: 16
+- 학습률: 2e-5
+- 에폭: 3
+
+## 평가 결과
+- 정확도: 93.2%
+- F1 점수: 0.928
+
+## 제한사항
+- 한국어 전용
+- 다른 도메인으로 일반화되지 않을 수 있음
+
+弘益人間 - 널리 인간을 이롭게 하라
+"""
+
+with open("./model/README.md", "w") as f:
+    f.write(model_card)
+
+# 모델 카드 업로드
+api.upload_file(
+    path_or_fileobj="./model/README.md",
+    path_in_repo="README.md",
+    repo_id=repo_id
+)</code></pre>
+
+        <h3>Hugging Face Hub에서 로드</h3>
+        <pre><code>from transformers import AutoModel, AutoTokenizer
+
+# 모델 로드
+model = AutoModel.from_pretrained("username/my-awesome-model")
+tokenizer = AutoTokenizer.from_pretrained("username/my-awesome-model")
+
+# 추론에 사용
+inputs = tokenizer("이 영화 정말 좋았어요!", return_tensors="pt")
+outputs = model(**inputs)
+print(outputs)</code></pre>
+
+        <h2>6.4 Git 기반 모델 버전 관리</h2>
+        <p>
+            Git LFS(Large File Storage)는 코드와 함께 대용량 모델 파일의 버전 관리를 가능하게 합니다.
+        </p>
+
+        <h3>Git LFS 설정</h3>
+        <pre><code># Git LFS 설치
+# brew install git-lfs  (macOS)
+# apt-get install git-lfs  (Ubuntu)
+
+# 저장소에서 초기화
+git lfs install
+
+# 모델 파일 추적
+git lfs track "*.pth"
+git lfs track "*.onnx"
+git lfs track "*.h5"
+git lfs track "*.tflite"
+
+# .gitattributes 추가
+git add .gitattributes
+
+# 모델 추가 및 커밋
+git add models/resnet18.pth
+git commit -m "ResNet-18 v1.0 추가"
+
+# 원격으로 푸시 (LFS 파일은 별도로 업로드됨)
+git push origin main</code></pre>
+
+        <h3>태그로 모델 버전 관리</h3>
+        <pre><code># 모델 버전 태그
+git tag -a v1.0.0 -m "ResNet-18 기준선 모델"
+git tag -a v1.1.0 -m "향상된 증강이 있는 ResNet-18"
+git tag -a v2.0.0 -m "ResNet-50 아키텍처 업그레이드"
+
+# 태그 푸시
+git push origin --tags
+
+# 특정 버전 체크아웃
+git checkout v1.0.0
+
+# 모든 버전 나열
+git tag -l</code></pre>
+
+        <h2>6.5 DVC (Data Version Control)</h2>
+        <p>
+            DVC는 대용량 데이터셋과 모델을 처리하도록 Git을 확장하여 ML 특정 버전 관리를 제공합니다.
+        </p>
+
+        <h3>DVC 워크플로우</h3>
+        <pre><code># DVC 설치
+# pip install dvc
+
+# DVC 초기화
+dvc init
+
+# 원격 저장소 구성 (S3, Azure, GCS 등)
+dvc remote add -d myremote s3://my-bucket/dvc-storage
+
+# 모델 파일 추적
+dvc add models/resnet18.pth
+
+# models/resnet18.pth.dvc 생성됨
+
+# DVC 메타데이터 커밋 (실제 파일 아님)
+git add models/resnet18.pth.dvc models/.gitignore
+git commit -m "DVC로 ResNet-18 모델 추적"
+
+# 데이터를 원격 저장소로 푸시
+dvc push
+
+# 원격에서 데이터 풀
+dvc pull
+
+# 다른 버전으로 전환
+git checkout v1.0.0
+dvc checkout</code></pre>
+
+        <h3>DVC 파이프라인</h3>
+        <pre><code># dvc.yaml에 ML 파이프라인 정의
+# dvc.yaml
+stages:
+  train:
+    cmd: python train.py
+    deps:
+      - train.py
+      - data/train.csv
+    params:
+      - train.learning_rate
+      - train.epochs
+    outs:
+      - models/model.pth
+
+  evaluate:
+    cmd: python evaluate.py
+    deps:
+      - evaluate.py
+      - models/model.pth
+      - data/test.csv
+    metrics:
+      - metrics.json:
+          cache: false
+
+# 파이프라인 실행
+dvc repro
+
+# 실험 비교
+dvc metrics show
+dvc metrics diff</code></pre>
+
+        <h2>6.6 모델 메타데이터 표준</h2>
+
+        <h3>포괄적인 모델 카드</h3>
+        <pre><code>model_metadata = {
+    # 모델 식별
+    "model_name": "sentiment-classifier-v2",
+    "model_version": "2.1.0",
+    "model_type": "text-classification",
+    "architecture": "BERT-base",
+
+    # 학습 정보
+    "training": {
+        "framework": "pytorch",
+        "framework_version": "2.0.1",
+        "dataset": "imdb",
+        "dataset_version": "1.0",
+        "training_date": "2025-01-15",
+        "training_duration_hours": 4.2,
+        "hyperparameters": {
+            "learning_rate": 2e-5,
+            "batch_size": 16,
+            "epochs": 3,
+            "optimizer": "AdamW",
+            "scheduler": "linear"
+        }
+    },
+
+    # 성능 메트릭
+    "metrics": {
+        "accuracy": 0.932,
+        "f1_score": 0.928,
+        "precision": 0.941,
+        "recall": 0.915,
+        "validation_loss": 0.234
+    },
+
+    # 모델 특성
+    "characteristics": {
+        "input_shape": [1, 512],
+        "output_shape": [1, 2],
+        "num_parameters": 110_000_000,
+        "model_size_mb": 420,
+        "quantized": False,
+        "fp16": False
+    },
+
+    # 배포
+    "deployment": {
+        "target_platform": "cloud",
+        "serving_framework": "torchserve",
+        "inference_latency_ms": 45,
+        "throughput_qps": 100,
+        "hardware": "NVIDIA A100"
+    },
+
+    # 거버넌스
+    "governance": {
+        "owner": "ml-team@company.com",
+        "license": "apache-2.0",
+        "ethical_review": True,
+        "bias_analysis": True,
+        "privacy_compliant": True,
+        "intended_use": "영화 리뷰 감정 분석",
+        "limitations": "한국어 전용, 다른 도메인으로 일반화되지 않을 수 있음",
+        "ethical_considerations": "영화 장르 표현의 잠재적 편향"
+    },
+
+    # 출처
+    "provenance": {
+        "base_model": "bert-base-uncased",
+        "derived_from": "sentiment-classifier-v1",
+        "git_commit": "abc123def456",
+        "mlflow_run_id": "xyz789"
+    },
+
+    # 철학
+    "philosophy": "弘益人間 - 널리 인간을 이롭게 하라"
+}
+
+import json
+with open("model_card.json", "w") as f:
+    json.dump(model_metadata, f, indent=2)</code></pre>
+
+        <h2>6.7 액세스 제어 및 보안</h2>
+
+        <h3>역할 기반 액세스 제어 (RBAC)</h3>
+        <pre><code># 역할 및 권한 정의
+roles = {
+    "data_scientist": {
+        "permissions": ["read", "write", "register"],
+        "models": ["development/*"]
+    },
+    "ml_engineer": {
+        "permissions": ["read", "write", "register", "promote"],
+        "models": ["*"]
+    },
+    "data_analyst": {
+        "permissions": ["read"],
+        "models": ["production/*"]
+    },
+    "admin": {
+        "permissions": ["*"],
+        "models": ["*"]
+    }
+}
+
+# MLflow에 구현
+from mlflow.server import handlers
+
+def check_permission(user, action, model_name):
+    user_role = get_user_role(user)
+    permissions = roles.get(user_role, {}).get("permissions", [])
+
+    if "*" in permissions or action in permissions:
+        # 모델 액세스 확인
+        allowed_models = roles[user_role]["models"]
+        if "*" in allowed_models or model_name in allowed_models:
+            return True
+
+    return False</code></pre>
+
+        <h3>모델 서명 및 검증</h3>
+        <pre><code>import hashlib
+import hmac
+
+def sign_model(model_path, secret_key):
+    """
+    모델에 대한 암호화 서명 생성
+    """
+    with open(model_path, 'rb') as f:
+        model_data = f.read()
+
+    signature = hmac.new(
+        secret_key.encode(),
+        model_data,
+        hashlib.sha256
+    ).hexdigest()
+
+    return signature
+
+def verify_model(model_path, signature, secret_key):
+    """
+    모델 무결성 검증
+    """
+    expected_signature = sign_model(model_path, secret_key)
+    return hmac.compare_digest(signature, expected_signature)
+
+# 사용법
+secret_key = "my-secret-key"  # 안전하게 저장하세요!
+
+# 모델 서명
+signature = sign_model("model.pth", secret_key)
+print(f"모델 서명: {signature}")
+
+# 로드 전 검증
+if verify_model("model.pth", signature, secret_key):
+    model = torch.load("model.pth")
+    print("✓ 모델 검증 및 로드됨")
+else:
+    print("✗ 모델 검증 실패!")</code></pre>
+
+        <h2>6.8 모델 수명주기 관리</h2>
+
+        <h3>단계 전환</h3>
+        <pre><code>class ModelLifecycle:
+    """
+    수명주기 단계를 통한 모델 진행 관리
+    """
+    STAGES = ["Development", "Staging", "Production", "Archived"]
+
+    def __init__(self, registry_client):
+        self.client = registry_client
+
+    def promote_to_staging(self, model_name, version, checks=None):
+        """
+        검증 후 스테이징으로 모델 승격
+        """
+        if checks:
+            # 검증 확인 실행
+            if not self.run_checks(model_name, version, checks):
+                raise ValueError("모델이 검증 확인에 실패했습니다")
+
+        self.client.transition_model_version_stage(
+            name=model_name,
+            version=version,
+            stage="Staging"
+        )
+
+        print(f"✓ {model_name} v{version}이(가) 스테이징으로 승격됨")
+
+    def promote_to_production(self, model_name, version, approval_required=True):
+        """
+        선택적 승인과 함께 프로덕션으로 승격
+        """
+        if approval_required:
+            approval = input(f"{model_name} v{version}을(를) 프로덕션에 승인하시겠습니까? (yes/no): ")
+            if approval.lower() != "yes":
+                print("프로덕션 배포가 취소되었습니다")
+                return
+
+        # 현재 프로덕션 모델 아카이브
+        current_prod = self.get_production_version(model_name)
+        if current_prod:
+            self.client.transition_model_version_stage(
+                name=model_name,
+                version=current_prod.version,
+                stage="Archived"
+            )
+
+        # 새 버전 승격
+        self.client.transition_model_version_stage(
+            name=model_name,
+            version=version,
+            stage="Production"
+        )
+
+        print(f"✓ {model_name} v{version}이(가) 프로덕션에 배포됨")
+
+    def rollback(self, model_name, to_version):
+        """
+        이전 버전으로 롤백
+        """
+        self.client.transition_model_version_stage(
+            name=model_name,
+            version=to_version,
+            stage="Production"
+        )
+
+        print(f"✓ {model_name} v{to_version}(으)로 롤백됨")
+
+# 사용법
+lifecycle = ModelLifecycle(mlflow_client)
+lifecycle.promote_to_staging("ResNet18", version=3, checks=["accuracy", "latency"])
+lifecycle.promote_to_production("ResNet18", version=3)</code></pre>
+
+        <h2>6.9 레지스트리 연합</h2>
+
+        <h3>다중 레지스트리 아키텍처</h3>
+        <pre><code>class FederatedRegistry:
+    """
+    여러 레지스트리에서 모델 집계
+    """
+    def __init__(self):
+        self.registries = {
+            "mlflow": MLflowRegistry("http://mlflow.company.com"),
+            "huggingface": HuggingFaceRegistry("company-org"),
+            "s3": S3Registry("s3://company-models")
+        }
+
+    def search_models(self, query):
+        """
+        모든 레지스트리에서 검색
+        """
+        results = []
+        for name, registry in self.registries.items():
+            matches = registry.search(query)
+            for match in matches:
+                match['source'] = name
+                results.append(match)
+
+        return results
+
+    def load_model(self, model_uri):
+        """
+        적절한 레지스트리에서 모델 로드
+        """
+        # URI 파싱: registry://model-name/version
+        registry_name, model_path = self.parse_uri(model_uri)
+        registry = self.registries[registry_name]
+        return registry.load(model_path)
+
+# 사용법
+fed_registry = FederatedRegistry()
+models = fed_registry.search_models("sentiment-analysis")
+model = fed_registry.load_model("mlflow://ResNet18/Production")</code></pre>
+
+        <h2>6.10 모범 사례</h2>
+
+        <h3>1. 일관된 명명 규칙</h3>
+        <pre><code># 모델 명명 규칙
+# 형식: {use-case}-{architecture}-{variant}-v{version}
+# 예:
+#   - sentiment-analysis-bert-base-v1.2.0
+#   - image-classification-resnet50-quantized-v2.1.0
+#   - object-detection-yolov8-large-v1.0.0</code></pre>
+
+        <h3>2. 등록 전 자동화된 테스트</h3>
+        <pre><code>def validate_before_registration(model, test_data):
+    """
+    모델 등록 전 검증 실행
+    """
+    tests = {
+        "accuracy_threshold": lambda: evaluate_accuracy(model) > 0.90,
+        "latency_threshold": lambda: measure_latency(model) < 100,  # ms
+        "memory_limit": lambda: get_model_size(model) < 500,  # MB
+        "numerical_stability": lambda: test_numerical_stability(model, test_data)
+    }
+
+    results = {}
+    for test_name, test_fn in tests.items():
+        try:
+            passed = test_fn()
+            results[test_name] = "통과" if passed else "실패"
+        except Exception as e:
+            results[test_name] = f"오류: {str(e)}"
+
+    all_passed = all(v == "통과" for v in results.values())
+
+    return all_passed, results</code></pre>
+
+        <h3>3. 포괄적인 로깅</h3>
+        <pre><code># 모델에 대한 모든 것 로깅
+with mlflow.start_run():
+    # 코드 버전
+    mlflow.log_param("git_commit", get_git_commit())
+
+    # 데이터 버전
+    mlflow.log_param("dataset_version", "v2.1")
+
+    # 모든 하이퍼파라미터
+    mlflow.log_params(hyperparameters)
+
+    # 시간에 따른 학습 메트릭
+    for epoch in range(num_epochs):
+        mlflow.log_metric("train_loss", train_loss, step=epoch)
+        mlflow.log_metric("val_loss", val_loss, step=epoch)
+
+    # 최종 평가
+    mlflow.log_metrics(final_metrics)
+
+    # 모델 아티팩트
+    mlflow.log_artifact("confusion_matrix.png")
+    mlflow.log_artifact("feature_importance.csv")
+
+    # 모델 자체
+    mlflow.pytorch.log_model(model, "model")</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>모델 레지스트리는 중앙집중식 저장소, 버전 관리, 메타데이터 관리를 제공합니다</li>
+                <li>MLflow는 스테이징/프로덕션 워크플로우를 갖춘 오픈 소스 레지스트리를 제공합니다</li>
+                <li>Hugging Face Hub는 포괄적인 모델 카드로 모델 공유에 탁월합니다</li>
+                <li>Git LFS와 DVC는 코드와 함께 대용량 모델의 버전 관리를 가능하게 합니다</li>
+                <li>포괄적인 메타데이터 표준은 재현성과 거버넌스를 보장합니다</li>
+                <li>RBAC 및 모델 서명은 보안 및 액세스 제어를 제공합니다</li>
+                <li>수명주기 관리는 모델 승격 및 롤백을 자동화합니다</li>
+                <li>연합 레지스트리는 여러 소스의 모델을 집계합니다</li>
+                <li>자동화된 검증은 등록 전 품질을 보장합니다</li>
+                <li>일관된 명명 및 로깅 관행은 발견 가능성을 향상시킵니다</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>모델 레지스트리 사용의 주요 이점은 무엇입니까?</li>
+                <li>MLflow 모델 버전 관리 및 스테이징 워크플로우를 설명하세요.</li>
+                <li>Hugging Face Hub에 모델 카드를 생성하고 업로드하는 방법은 무엇입니까?</li>
+                <li>모델 버전 관리를 위한 Git LFS와 DVC를 비교하세요. 각각 언제 사용합니까?</li>
+                <li>포괄적인 모델 메타데이터에 포함되어야 할 정보는 무엇입니까?</li>
+                <li>모델 레지스트리를 위한 역할 기반 액세스 제어(RBAC) 시스템을 설명하세요.</li>
+                <li>모델을 암호화 방식으로 서명하고 검증하는 방법은 무엇입니까?</li>
+                <li>개발부터 프로덕션까지 단계를 포함하는 모델 수명주기를 설계하세요.</li>
+                <li>레지스트리 연합이란 무엇이며 왜 유용합니까?</li>
+                <li>새 모델을 등록하기 전에 실행할 검증 체크리스트를 생성하세요.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

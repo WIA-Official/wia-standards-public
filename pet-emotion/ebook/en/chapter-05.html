@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 5: Real-Time Monitoring - WIA-PET-EMOTION</title>
+</head>
+<body>
+<h1>Chapter 5: Real-Time Monitoring</h1>
+
+<blockquote>
+"Hong-ik Ingan: Continuous awareness enables timely response, transforming understanding into compassionate action."
+</blockquote>
+
+<hr>
+
+<h2>5.1 Streaming Architecture</h2>
+
+<pre>
+REAL-TIME MONITORING STACK
+==========================
+
++------------------+
+|  Edge Devices    |  Camera, Microphone, Wearable
++------------------+
+         |
+         v (Local Processing)
++------------------+
+|  Edge Processor  |  Privacy-first local analysis
++------------------+
+         |
+         v (Emotion Events Only)
++------------------+
+|  Message Queue   |  Kafka/RabbitMQ
++------------------+
+         |
+         v
++------------------+
+|  Stream Processor|  Real-time aggregation
++------------------+
+         |
+         v
++------------------+
+|  WebSocket Server|  Client connections
++------------------+
+         |
+         v
++------------------+
+|  Client Apps     |  Mobile, Web, Dashboard
++------------------+
+</pre>
+
+<hr>
+
+<h2>5.2 WebSocket Protocol</h2>
+
+<h3>Connection Establishment</h3>
+
+<pre>
+WEBSOCKET HANDSHAKE
+===================
+
+1. Client connects
+   ws://api.wia-emotion.org/ws/emotions/{profileId}
+
+2. Authentication
+   Client sends:
+   {
+     "action": "authenticate",
+     "token": "Bearer xxx"
+   }
+
+3. Server confirms
+   {
+     "type": "authenticated",
+     "profileId": "pet-123",
+     "subscriptions": []
+   }
+
+4. Client subscribes
+   {
+     "action": "subscribe",
+     "dataTypes": ["emotions", "alerts", "vitals"]
+   }
+
+5. Server confirms
+   {
+     "type": "subscribed",
+     "dataTypes": ["emotions", "alerts", "vitals"],
+     "updateInterval": 1000
+   }
+</pre>
+
+<h3>Message Types</h3>
+
+<table border="1">
+<tr>
+<th>Type</th>
+<th>Direction</th>
+<th>Description</th>
+</tr>
+<tr>
+<td>emotion_update</td>
+<td>Server to Client</td>
+<td>New emotion reading</td>
+</tr>
+<tr>
+<td>alert</td>
+<td>Server to Client</td>
+<td>Alert triggered</td>
+</tr>
+<tr>
+<td>vitals_update</td>
+<td>Server to Client</td>
+<td>Physiological data</td>
+</tr>
+<tr>
+<td>subscribe</td>
+<td>Client to Server</td>
+<td>Subscribe to data types</td>
+</tr>
+<tr>
+<td>unsubscribe</td>
+<td>Client to Server</td>
+<td>Unsubscribe from data</td>
+</tr>
+<tr>
+<td>ping/pong</td>
+<td>Bidirectional</td>
+<td>Connection keepalive</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>5.3 Emotion Update Message</h2>
+
+<pre>
+EMOTION UPDATE FORMAT
+=====================
+
+{
+  "type": "emotion_update",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "data": {
+    "readingId": "read-789",
+    "profileId": "pet-123",
+    "primaryEmotion": {
+      "emotionType": "HAPPY",
+      "intensity": 4,
+      "confidence": 87.5,
+      "confidenceLevel": "HIGH"
+    },
+    "secondaryEmotions": [
+      {
+        "emotionType": "EXCITED",
+        "intensity": 3,
+        "confidence": 65.2
+      }
+    ],
+    "overallMood": {
+      "valence": 0.8,
+      "arousal": 0.6,
+      "wellbeing": 85
+    },
+    "dataSources": ["visual", "physiological"]
+  }
+}
+</pre>
+
+<hr>
+
+<h2>5.4 Edge Processing</h2>
+
+<h3>Privacy-First Architecture</h3>
+
+<pre>
+EDGE PROCESSING FLOW
+====================
+
+[Camera] --> [On-Device AI]
+                  |
+                  v
+           Process locally:
+           - Face detection
+           - Keypoint extraction
+           - Expression analysis
+           - Emotion classification
+                  |
+                  v
+           Output ONLY:
+           - Emotion scores
+           - Confidence values
+           - Timestamps
+           (NO images transmitted)
+                  |
+                  v
+           [Cloud Server]
+</pre>
+
+<h3>Edge Device Requirements</h3>
+
+<table border="1">
+<tr>
+<th>Component</th>
+<th>Minimum</th>
+<th>Recommended</th>
+</tr>
+<tr>
+<td>Processor</td>
+<td>ARM Cortex-A53</td>
+<td>ARM Cortex-A72 + NPU</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>2GB</td>
+<td>4GB</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>8GB</td>
+<td>32GB</td>
+</tr>
+<tr>
+<td>AI Accelerator</td>
+<td>Optional</td>
+<td>4 TOPS NPU</td>
+</tr>
+<tr>
+<td>Camera</td>
+<td>720p 30fps</td>
+<td>1080p 60fps</td>
+</tr>
+<tr>
+<td>Microphone</td>
+<td>Single</td>
+<td>Array (2+)</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>5.5 Data Buffering</h2>
+
+<pre>
+BUFFERING STRATEGY
+==================
+
+Purpose: Handle network interruptions
+
+1. Local Buffer
+   - Capacity: 24 hours of readings
+   - Storage: SQLite on edge device
+   - Sync: Automatic when connected
+
+2. Priority Queue
+   Level 1 (Immediate): Alerts
+   Level 2 (High): Emotion changes
+   Level 3 (Normal): Regular updates
+   Level 4 (Low): Historical sync
+
+3. Offline Mode
+   - Continue local processing
+   - Store all readings locally
+   - Queue alerts for transmission
+   - Sync when connection restored
+
+4. Bandwidth Management
+   Normal mode: 1 update/second
+   Low bandwidth: 1 update/5 seconds
+   Offline: Local storage only
+</pre>
+
+<hr>
+
+<h2>5.6 Update Frequency</h2>
+
+<table border="1">
+<tr>
+<th>Scenario</th>
+<th>Update Rate</th>
+<th>Rationale</th>
+</tr>
+<tr>
+<td>Stable emotion</td>
+<td>1 per 5 seconds</td>
+<td>Reduce bandwidth</td>
+</tr>
+<tr>
+<td>Emotion transition</td>
+<td>1 per second</td>
+<td>Capture change</td>
+</tr>
+<tr>
+<td>Alert condition</td>
+<td>Immediate</td>
+<td>Urgent response</td>
+</tr>
+<tr>
+<td>High arousal state</td>
+<td>2 per second</td>
+<td>Close monitoring</td>
+</tr>
+<tr>
+<td>Sleep/rest</td>
+<td>1 per 30 seconds</td>
+<td>Minimal data needed</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>5.7 Connection Management</h2>
+
+<pre>
+WEBSOCKET LIFECYCLE
+===================
+
+Connection States:
+  CONNECTING --> AUTHENTICATED --> SUBSCRIBED
+       |              |               |
+       v              v               v
+  DISCONNECTED   AUTH_FAILED    ACTIVE_STREAMING
+       |
+       v
+  RECONNECTING (exponential backoff)
+
+Keepalive Protocol:
+  Client sends PING every 30 seconds
+  Server responds with PONG
+  No PONG in 60 seconds = reconnect
+
+Reconnection Strategy:
+  Attempt 1: Immediate
+  Attempt 2: 1 second delay
+  Attempt 3: 2 second delay
+  Attempt 4: 4 second delay
+  ...
+  Max delay: 30 seconds
+  Max attempts: Unlimited
+</pre>
+
+<hr>
+
+<h2>5.8 Client Implementation</h2>
+
+<h3>JavaScript Client Example</h3>
+
+<pre>
+CLIENT IMPLEMENTATION
+=====================
+
+class EmotionStreamClient {
+  constructor(profileId, token) {
+    this.profileId = profileId;
+    this.token = token;
+    this.ws = null;
+    this.handlers = {};
+  }
+
+  connect() {
+    const url = `wss://api.wia-emotion.org/ws/emotions/${this.profileId}`;
+    this.ws = new WebSocket(url);
+
+    this.ws.onopen = () => {
+      this.authenticate();
+    };
+
+    this.ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      this.handleMessage(message);
+    };
+
+    this.ws.onclose = () => {
+      this.scheduleReconnect();
+    };
+  }
+
+  authenticate() {
+    this.send({
+      action: "authenticate",
+      token: `Bearer ${this.token}`
+    });
+  }
+
+  subscribe(dataTypes) {
+    this.send({
+      action: "subscribe",
+      dataTypes: dataTypes
+    });
+  }
+
+  onEmotion(callback) {
+    this.handlers["emotion_update"] = callback;
+  }
+
+  onAlert(callback) {
+    this.handlers["alert"] = callback;
+  }
+}
+</pre>
+
+<hr>
+
+<h2>5.9 Dashboard Integration</h2>
+
+<pre>
+DASHBOARD COMPONENTS
+====================
+
+1. Real-Time Emotion Display
+   +---------------------------+
+   |  Current Emotion: HAPPY   |
+   |  Intensity: ****          |
+   |  Confidence: 87%          |
+   |  Duration: 5 minutes      |
+   +---------------------------+
+
+2. Mood Timeline (24h)
+   +---------------------------+
+   | Hour | Mood               |
+   |------+--------------------|
+   | 8AM  | CONTENT            |
+   | 9AM  | EXCITED (walk)     |
+   | 10AM | CALM               |
+   | ...  | ...                |
+   +---------------------------+
+
+3. Alert Panel
+   +---------------------------+
+   | [!] Anxiety detected      |
+   |     Duration: 10 min      |
+   |     Action: Check pet     |
+   +---------------------------+
+
+4. Vitals Display
+   +---------------------------+
+   | HR: 85 bpm (normal)       |
+   | Activity: Moderate        |
+   | HRV: 45ms (good)          |
+   +---------------------------+
+</pre>
+
+<hr>
+
+<h2>5.10 Performance Optimization</h2>
+
+<table border="1">
+<tr>
+<th>Optimization</th>
+<th>Implementation</th>
+<th>Benefit</th>
+</tr>
+<tr>
+<td>Delta compression</td>
+<td>Send only changed fields</td>
+<td>80% bandwidth reduction</td>
+</tr>
+<tr>
+<td>Binary protocol</td>
+<td>MessagePack instead of JSON</td>
+<td>50% size reduction</td>
+</tr>
+<tr>
+<td>Batching</td>
+<td>Group multiple updates</td>
+<td>Fewer round trips</td>
+</tr>
+<tr>
+<td>Adaptive rate</td>
+<td>Reduce updates when stable</td>
+<td>Resource efficiency</td>
+</tr>
+<tr>
+<td>Edge caching</td>
+<td>Process near user</td>
+<td>Lower latency</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] WebSocket protocol enables real-time emotion streaming</li>
+<li>[OK] Edge processing ensures privacy by local analysis</li>
+<li>[OK] Buffering handles network interruptions gracefully</li>
+<li>[OK] Adaptive update rates optimize bandwidth usage</li>
+<li>[OK] Robust connection management with auto-reconnect</li>
+<li>[OK] Dashboard integration provides visual monitoring</li>
+</ul>
+</body>
+</html>

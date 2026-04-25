@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Technical Architecture - Asset Tokenization Standard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6; color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container {
+            max-width: 1000px; margin: 0 auto; background: white;
+            border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 50px 40px; text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 15px; font-weight: 700; }
+        .header .subtitle { font-size: 1.3em; opacity: 0.95; }
+        .content { padding: 50px 40px; }
+        h2 {
+            color: #667eea; margin-top: 40px; margin-bottom: 20px; font-size: 2em;
+            padding-bottom: 10px; border-bottom: 3px solid #667eea;
+        }
+        h3 { color: #764ba2; margin-top: 30px; margin-bottom: 15px; font-size: 1.5em; }
+        p { margin-bottom: 15px; line-height: 1.8; color: #555; }
+        .code-block {
+            background: #2d3748; color: #e2e8f0; padding: 25px; border-radius: 10px;
+            overflow-x: auto; margin: 20px 0; font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em; line-height: 1.6;
+        }
+        table {
+            width: 100%; border-collapse: collapse; margin: 25px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 15px; text-align: left; font-weight: 600;
+        }
+        td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; }
+        tr:hover { background-color: #f7fafc; }
+        .key-takeaways {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 30px; border-radius: 15px; margin: 30px 0;
+        }
+        .key-takeaways h3 { color: #667eea; margin-top: 0; }
+        .key-takeaways ul { list-style: none; padding-left: 0; }
+        .key-takeaways li {
+            padding: 10px 0 10px 30px; position: relative; color: #555;
+        }
+        .key-takeaways li:before {
+            content: "✓"; position: absolute; left: 0; color: #667eea;
+            font-weight: bold; font-size: 1.2em;
+        }
+        .review-questions {
+            background: #fff4e6; padding: 30px; border-radius: 15px; margin: 30px 0;
+        }
+        .review-questions h3 { color: #f59e0b; margin-top: 0; }
+        .review-questions ol { padding-left: 25px; }
+        .review-questions li { margin: 12px 0; color: #555; line-height: 1.7; }
+        .navigation {
+            display: flex; justify-content: space-between; margin-top: 50px;
+            padding-top: 30px; border-top: 2px solid #e2e8f0;
+        }
+        .nav-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 12px 30px; border-radius: 8px;
+            text-decoration: none; font-weight: 600; transition: transform 0.2s;
+        }
+        .nav-button:hover { transform: translateY(-2px); }
+        .warning-box {
+            background: #fef2f2; border-left: 4px solid #ef4444;
+            padding: 20px; margin: 20px 0; border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Chapter 4</h1>
+            <div class="subtitle">Technical Architecture for Asset Tokenization</div>
+        </div>
+
+        <div class="content">
+            <h2>Architecture Overview</h2>
+            <p>
+                A robust tokenization architecture involves multiple layers: smart contracts for token logic and compliance, custody solutions for secure asset and key management, oracle systems for real-world data integration, identity and compliance services, and user-facing applications. Each layer must be designed for security, scalability, and regulatory compliance while maintaining interoperability with existing financial infrastructure.
+            </p>
+            <p>
+                The architecture must balance decentralization with regulatory requirements. Pure decentralization conflicts with securities regulations that require identifiable parties responsible for compliance. Successful tokenization platforms use hybrid architectures with on-chain transparency and immutability combined with off-chain identity verification, legal documentation, and regulatory reporting.
+            </p>
+
+            <h2>Smart Contract Architecture</h2>
+
+            <h3>Contract Design Patterns</h3>
+            <p>
+                Smart contract architecture for tokenized assets typically employs several key patterns. The Proxy pattern enables upgradeability, allowing bug fixes and feature additions without migrating token balances. The Access Control pattern manages different permission levels for token controllers, compliance officers, and administrators. The Circuit Breaker pattern provides emergency pause functionality to halt operations during security incidents.
+            </p>
+            <p>
+                Separation of concerns is critical. Token logic, compliance rules, and business logic should reside in separate contracts to enable independent updates and testing. A typical architecture includes a Token Contract (balance and transfer logic), Compliance Contract (transfer validation), Registry Contract (whitelist/KYC data), and Controller Contract (administrative functions).
+            </p>
+
+<div class="code-block">
+<pre>
+// TypeScript representation of modular smart contract architecture
+interface ITokenContract {
+  transfer(to: string, amount: bigint): Promise&lt;boolean&gt;;
+  balanceOf(account: string): Promise&lt;bigint&gt;;
+  totalSupply(): Promise&lt;bigint&gt;;
+  
+  // Delegates compliance check to ComplianceContract
+  setComplianceContract(address: string): Promise&lt;void&gt;;
+}
+
+interface IComplianceContract {
+  // Returns whether transfer is allowed and reason code
+  canTransfer(
+    from: string,
+    to: string,
+    amount: bigint
+  ): Promise&lt;{ allowed: boolean; reasonCode: number }&gt;;
+  
+  // Update compliance rules
+  updateTransferRules(rules: TransferRules): Promise&lt;void&gt;;
+  
+  // Link to registry for KYC/accreditation data
+  setRegistryContract(address: string): Promise&lt;void&gt;;
+}
+
+interface IRegistryContract {
+  // KYC status
+  isKYCVerified(address: string): Promise&lt;boolean&gt;;
+  setKYCStatus(address: string, verified: boolean): Promise&lt;void&gt;;
+  
+  // Accredited investor status
+  isAccredited(address: string): Promise&lt;boolean&gt;;
+  setAccreditedStatus(address: string, accredited: boolean): Promise&lt;void&gt;;
+  
+  // Jurisdiction
+  getJurisdiction(address: string): Promise&lt;string&gt;;
+  setJurisdiction(address: string, jurisdiction: string): Promise&lt;void&gt;;
+  
+  // Lock periods
+  getUnlockDate(address: string): Promise&lt;Date&gt;;
+  setLockPeriod(address: string, unlockDate: Date): Promise&lt;void&gt;;
+}
+
+interface TransferRules {
+  requireKYC: boolean;
+  requireAccreditation: boolean;
+  allowedJurisdictions: string[];
+  maxHoldersCount: number;
+  maxHoldingPercentage: number;
+  lockPeriodDays: number;
+}
+
+// Modular architecture implementation
+class ModularTokenizationSystem {
+  constructor(
+    private tokenContract: ITokenContract,
+    private complianceContract: IComplianceContract,
+    private registryContract: IRegistryContract
+  ) {}
+  
+  async initializeSystem(): Promise&lt;void&gt; {
+    // Link contracts together
+    await this.tokenContract.setComplianceContract(
+      this.getContractAddress(this.complianceContract)
+    );
+    
+    await this.complianceContract.setRegistryContract(
+      this.getContractAddress(this.registryContract)
+    );
+    
+    // Set initial compliance rules
+    const initialRules: TransferRules = {
+      requireKYC: true,
+      requireAccreditation: true,
+      allowedJurisdictions: ['US', 'UK', 'SG', 'CH'],
+      maxHoldersCount: 2000,
+      maxHoldingPercentage: 10,
+      lockPeriodDays: 365
+    };
+    
+    await this.complianceContract.updateTransferRules(initialRules);
+  }
+  
+  async registerInvestor(
+    address: string,
+    kycVerified: boolean,
+    isAccredited: boolean,
+    jurisdiction: string
+  ): Promise&lt;void&gt; {
+    await this.registryContract.setKYCStatus(address, kycVerified);
+    await this.registryContract.setAccreditedStatus(address, isAccredited);
+    await this.registryContract.setJurisdiction(address, jurisdiction);
+    
+    // Set lock period
+    const unlockDate = new Date();
+    unlockDate.setDate(unlockDate.getDate() + 365);
+    await this.registryContract.setLockPeriod(address, unlockDate);
+  }
+  
+  async executeTransfer(
+    from: string,
+    to: string,
+    amount: bigint
+  ): Promise&lt;boolean&gt; {
+    // Check compliance before transfer
+    const complianceResult = await this.complianceContract.canTransfer(
+      from,
+      to,
+      amount
+    );
+    
+    if (!complianceResult.allowed) {
+      throw new Error(
+        `Transfer not allowed. Reason code: ${complianceResult.reasonCode}`
+      );
+    }
+    
+    // Execute transfer through token contract
+    return await this.tokenContract.transfer(to, amount);
+  }
+  
+  async updateComplianceRules(newRules: Partial&lt;TransferRules&gt;): Promise&lt;void&gt; {
+    // Compliance officer can update rules without touching token contract
+    // Get current rules, merge with updates, and set new rules
+    const currentRules = await this.getCurrentRules();
+    const updatedRules = { ...currentRules, ...newRules };
+    
+    await this.complianceContract.updateTransferRules(updatedRules);
+  }
+  
+  private getContractAddress(contract: any): string {
+    // Implementation to get contract address
+    return '0x...';
+  }
+  
+  private async getCurrentRules(): Promise&lt;TransferRules&gt; {
+    // Implementation to fetch current rules
+    return {
+      requireKYC: true,
+      requireAccreditation: true,
+      allowedJurisdictions: [],
+      maxHoldersCount: 0,
+      maxHoldingPercentage: 0,
+      lockPeriodDays: 0
+    };
+  }
+}
+</pre>
+</div>
+
+            <h3>Upgradeability Patterns</h3>
+            <p>
+                Smart contracts are immutable by default, but tokenized securities may require updates for regulatory changes, bug fixes, or feature additions. The Proxy pattern enables upgradeability by separating storage (Proxy contract) from logic (Implementation contract). Users interact with the Proxy, which delegates calls to the current Implementation. Upgrades deploy a new Implementation and update the Proxy's reference.
+            </p>
+            <p>
+                The Transparent Proxy pattern prevents function selector clashes between Proxy and Implementation. The UUPS (Universal Upgradeable Proxy Standard) pattern moves upgrade logic to the Implementation, reducing Proxy complexity and gas costs. Both patterns require careful governance to prevent unauthorized upgrades. Multi-signature wallets or DAO governance should control upgrade authority.
+            </p>
+
+            <h2>Custody Solutions</h2>
+
+            <h3>Institutional Custody Requirements</h3>
+            <p>
+                Institutional investors and regulated financial institutions require custody solutions that meet stringent security, insurance, and regulatory standards. Qualified custodians must provide segregated accounts, cold storage for majority of assets, multi-signature authorization, insurance coverage (often $100M+), SOC 2 Type II certification, and regulatory compliance (banking licenses or trust charters in many jurisdictions).
+            </p>
+            <p>
+                Leading institutional custodians like Coinbase Custody, BitGo, Anchorage Digital, and Fireblocks provide these services for digital assets. For tokenized securities, custodians must also manage corporate actions (dividends, stock splits, votes), handle private key recovery procedures, and provide reporting for tax and regulatory purposes. Multi-party computation (MPC) technology is increasingly used to eliminate single points of failure in key management.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Custody Model</th>
+                        <th>Control</th>
+                        <th>Security</th>
+                        <th>Regulatory Status</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Self-Custody (Hardware Wallet)</td>
+                        <td>Full user control</td>
+                        <td>Good (if managed properly)</td>
+                        <td>User responsibility</td>
+                        <td>Retail investors, tech-savvy users</td>
+                    </tr>
+                    <tr>
+                        <td>Multi-Sig Wallet</td>
+                        <td>Shared control (M-of-N)</td>
+                        <td>Very good</td>
+                        <td>Varies by jurisdiction</td>
+                        <td>DAOs, treasury management</td>
+                    </tr>
+                    <tr>
+                        <td>MPC Custody</td>
+                        <td>Distributed (no single key)</td>
+                        <td>Excellent</td>
+                        <td>Emerging recognition</td>
+                        <td>Institutions, high-value assets</td>
+                    </tr>
+                    <tr>
+                        <td>Qualified Custodian</td>
+                        <td>Third-party custodian</td>
+                        <td>Excellent (insured)</td>
+                        <td>Fully compliant</td>
+                        <td>RIAs, institutional investors</td>
+                    </tr>
+                    <tr>
+                        <td>Smart Contract Custody</td>
+                        <td>Code-controlled</td>
+                        <td>Good (audit dependent)</td>
+                        <td>Limited recognition</td>
+                        <td>DeFi integrations, automated systems</td>
+                    </tr>
+                </tbody>
+            </table>
+
+<div class="code-block">
+<pre>
+// TypeScript interface for custody integration
+interface ICustodyProvider {
+  // Account management
+  createAccount(clientId: string): Promise&lt;CustodyAccount&gt;;
+  getAccount(accountId: string): Promise&lt;CustodyAccount&gt;;
+  
+  // Address generation and management
+  generateAddress(accountId: string, blockchain: string): Promise&lt;string&gt;;
+  getAddresses(accountId: string): Promise&lt;Address[]&gt;;
+  
+  // Transaction signing
+  signTransaction(
+    accountId: string,
+    transaction: UnsignedTransaction
+  ): Promise&lt;SignedTransaction&gt;;
+  
+  // Multi-signature workflow
+  initiateMultiSigTransaction(
+    accountId: string,
+    transaction: UnsignedTransaction,
+    requiredSignatures: number
+  ): Promise&lt;string&gt;; // returns workflow ID
+  
+  approveMultiSigTransaction(
+    workflowId: string,
+    approver: string
+  ): Promise&lt;{ approved: boolean; remainingSignatures: number }&gt;;
+  
+  // Balance and reporting
+  getBalance(accountId: string, tokenAddress: string): Promise&lt;bigint&gt;;
+  getTransactionHistory(accountId: string): Promise&lt;Transaction[]&gt;;
+  
+  // Corporate actions
+  distributeDividends(
+    accountId: string,
+    tokenAddress: string,
+    amount: bigint
+  ): Promise&lt;string&gt;; // returns transaction hash
+}
+
+interface CustodyAccount {
+  accountId: string;
+  clientId: string;
+  accountType: 'individual' | 'institutional' | 'omnibus';
+  insuranceCoverage: bigint;
+  createdAt: Date;
+  status: 'active' | 'frozen' | 'closed';
+}
+
+interface Address {
+  address: string;
+  blockchain: string;
+  label: string;
+  createdAt: Date;
+}
+
+interface UnsignedTransaction {
+  to: string;
+  value: bigint;
+  data: string;
+  chainId: number;
+  nonce: number;
+  gasLimit: bigint;
+  maxFeePerGas: bigint;
+  maxPriorityFeePerGas: bigint;
+}
+
+interface SignedTransaction extends UnsignedTransaction {
+  signature: {
+    r: string;
+    s: string;
+    v: number;
+  };
+}
+
+interface Transaction {
+  hash: string;
+  from: string;
+  to: string;
+  value: bigint;
+  timestamp: Date;
+  status: 'pending' | 'confirmed' | 'failed';
+  confirmations: number;
+}
+
+// Example custody integration
+class TokenizationPlatform {
+  constructor(private custodyProvider: ICustodyProvider) {}
+  
+  async onboardInstitutionalInvestor(
+    clientId: string,
+    blockchain: string = 'ethereum'
+  ): Promise&lt;{ accountId: string; depositAddress: string }&gt; {
+    // Create custody account
+    const account = await this.custodyProvider.createAccount(clientId);
+    
+    // Generate deposit address
+    const depositAddress = await this.custodyProvider.generateAddress(
+      account.accountId,
+      blockchain
+    );
+    
+    return {
+      accountId: account.accountId,
+      depositAddress
+    };
+  }
+  
+  async executeInstitutionalTransfer(
+    fromAccountId: string,
+    toAddress: string,
+    tokenAddress: string,
+    amount: bigint,
+    requiredApprovals: number = 2
+  ): Promise&lt;string&gt; {
+    // Create unsigned transaction
+    const unsignedTx: UnsignedTransaction = {
+      to: tokenAddress,
+      value: 0n, // token transfer, not ETH
+      data: this.encodeTransferData(toAddress, amount),
+      chainId: 1, // Ethereum mainnet
+      nonce: await this.getNonce(fromAccountId),
+      gasLimit: 100000n,
+      maxFeePerGas: 50000000000n,
+      maxPriorityFeePerGas: 2000000000n
+    };
+    
+    if (requiredApprovals > 1) {
+      // Multi-signature workflow
+      const workflowId = await this.custodyProvider.initiateMultiSigTransaction(
+        fromAccountId,
+        unsignedTx,
+        requiredApprovals
+      );
+      
+      return workflowId;
+    } else {
+      // Single signature
+      const signedTx = await this.custodyProvider.signTransaction(
+        fromAccountId,
+        unsignedTx
+      );
+      
+      // Broadcast transaction (implementation depends on blockchain client)
+      const txHash = await this.broadcastTransaction(signedTx);
+      return txHash;
+    }
+  }
+  
+  async distributeDividendsVia Custody(
+    tokenAddress: string,
+    dividendAmountPerToken: bigint
+  ): Promise&lt;void&gt; {
+    // Get all custody accounts holding this token
+    const holders = await this.getTokenHolders(tokenAddress);
+    
+    for (const holder of holders) {
+      if (holder.custodyAccountId) {
+        const balance = await this.custodyProvider.getBalance(
+          holder.custodyAccountId,
+          tokenAddress
+        );
+        
+        const dividendAmount = (balance * dividendAmountPerToken) / (10n ** 18n);
+        
+        await this.custodyProvider.distributeDividends(
+          holder.custodyAccountId,
+          tokenAddress,
+          dividendAmount
+        );
+      }
+    }
+  }
+  
+  private encodeTransferData(to: string, amount: bigint): string {
+    // ERC-20 transfer function signature and parameters
+    return '0x...';
+  }
+  
+  private async getNonce(accountId: string): Promise&lt;number&gt; {
+    return 0;
+  }
+  
+  private async broadcastTransaction(tx: SignedTransaction): Promise&lt;string&gt; {
+    return '0x...';
+  }
+  
+  private async getTokenHolders(tokenAddress: string): Promise&lt;TokenHolder[]&gt; {
+    return [];
+  }
+}
+
+interface TokenHolder {
+  address: string;
+  balance: bigint;
+  custodyAccountId?: string;
+}
+</pre>
+</div>
+
+            <h2>Oracle Integration</h2>
+
+            <h3>Need for Oracles in Asset Tokenization</h3>
+            <p>
+                Smart contracts cannot access off-chain data directly. Oracles bridge blockchain and real-world information, providing essential data for tokenized assets: asset valuations, interest rates, dividend amounts, compliance status, corporate actions, and identity verification results. Without reliable oracles, tokenized assets cannot accurately reflect real-world conditions or execute automated operations.
+            </p>
+            <p>
+                Oracle design must prioritize security and accuracy. Centralized oracles create single points of failure and trust. Decentralized oracle networks like Chainlink aggregate data from multiple sources, use cryptographic proofs, and provide economic incentives for honest reporting. For regulated securities, oracle providers may need to be licensed or approved entities, creating a hybrid model of decentralized technology with regulated data providers.
+            </p>
+
+<div class="code-block">
+<pre>
+// TypeScript oracle integration interfaces
+interface IPriceOracle {
+  // Get current price of an asset
+  getPrice(assetId: string): Promise&lt;{ price: bigint; timestamp: Date }&gt;;
+  
+  // Get historical price
+  getHistoricalPrice(
+    assetId: string,
+    timestamp: Date
+  ): Promise&lt;{ price: bigint; timestamp: Date }&gt;;
+  
+  // Subscribe to price updates
+  subscribeToPriceUpdates(
+    assetId: string,
+    callback: (price: bigint) =&gt; void
+  ): Promise&lt;string&gt;; // returns subscription ID
+}
+
+interface IComplianceOracle {
+  // Verify KYC status off-chain and report on-chain
+  verifyKYC(address: string): Promise&lt;boolean&gt;;
+  
+  // Check sanctions lists
+  checkSanctions(address: string): Promise&lt;boolean&gt;;
+  
+  // Verify accredited investor status
+  verifyAccreditation(address: string): Promise&lt;boolean&gt;;
+  
+  // Get investor jurisdiction
+  getJurisdiction(address: string): Promise&lt;string&gt;;
+}
+
+interface IAssetOracle {
+  // Get property valuation
+  getPropertyAppraisal(propertyId: string): Promise&lt;{
+    value: bigint;
+    appraisalDate: Date;
+    appraiser: string;
+    reportHash: string; // IPFS hash of full report
+  }&gt;;
+  
+  // Get rental income data
+  getRentalIncome(propertyId: string, period: string): Promise&lt;bigint&gt;;
+  
+  // Get occupancy rate
+  getOccupancyRate(propertyId: string): Promise&lt;number&gt;;
+}
+
+// Oracle integration example
+class TokenizedRealEstateWithOracles {
+  constructor(
+    private priceOracle: IPriceOracle,
+    private assetOracle: IAssetOracle,
+    private complianceOracle: IComplianceOracle
+  ) {}
+  
+  async updateTokenValuation(tokenId: string, propertyId: string): Promise&lt;void&gt; {
+    // Get latest appraisal from oracle
+    const appraisal = await this.assetOracle.getPropertyAppraisal(propertyId);
+    
+    // Update token metadata with new valuation
+    await this.updateTokenMetadata(tokenId, {
+      appraisedValue: appraisal.value,
+      lastAppraisalDate: appraisal.appraisalDate,
+      appraisalReportHash: appraisal.reportHash
+    });
+    
+    // Emit event for token holders
+    this.emitValuationUpdate(tokenId, appraisal.value);
+  }
+  
+  async calculateDividendDistribution(
+    tokenId: string,
+    propertyId: string,
+    period: string
+  ): Promise&lt;bigint&gt; {
+    // Get rental income from oracle
+    const rentalIncome = await this.assetOracle.getRentalIncome(
+      propertyId,
+      period
+    );
+    
+    // Deduct management fees (e.g., 2%)
+    const managementFee = (rentalIncome * 2n) / 100n;
+    const netIncome = rentalIncome - managementFee;
+    
+    // Calculate per-token dividend
+    const totalSupply = await this.getTotalSupply(tokenId);
+    const dividendPerToken = netIncome / totalSupply;
+    
+    return dividendPerToken;
+  }
+  
+  async verifyTransferCompliance(
+    from: string,
+    to: string,
+    amount: bigint
+  ): Promise&lt;{ allowed: boolean; reason: string }&gt; {
+    // Check recipient KYC
+    const kycVerified = await this.complianceOracle.verifyKYC(to);
+    if (!kycVerified) {
+      return { allowed: false, reason: 'Recipient not KYC verified' };
+    }
+    
+    // Check sanctions
+    const isSanctioned = await this.complianceOracle.checkSanctions(to);
+    if (isSanctioned) {
+      return { allowed: false, reason: 'Recipient on sanctions list' };
+    }
+    
+    // Check accreditation
+    const isAccredited = await this.complianceOracle.verifyAccreditation(to);
+    if (!isAccredited) {
+      return { allowed: false, reason: 'Recipient not accredited investor' };
+    }
+    
+    // Check jurisdiction
+    const jurisdiction = await this.complianceOracle.getJurisdiction(to);
+    const allowedJurisdictions = ['US', 'UK', 'SG', 'CH'];
+    if (!allowedJurisdictions.includes(jurisdiction)) {
+      return { allowed: false, reason: 'Jurisdiction not allowed' };
+    }
+    
+    return { allowed: true, reason: 'Transfer approved' };
+  }
+  
+  async monitorPropertyPerformance(propertyId: string): Promise&lt;PropertyMetrics&gt; {
+    // Get current valuation
+    const appraisal = await this.assetOracle.getPropertyAppraisal(propertyId);
+    
+    // Get occupancy
+    const occupancy = await this.assetOracle.getOccupancyRate(propertyId);
+    
+    // Get rental income
+    const monthlyIncome = await this.assetOracle.getRentalIncome(
+      propertyId,
+      'monthly'
+    );
+    
+    // Calculate metrics
+    const annualIncome = monthlyIncome * 12n;
+    const capRate = Number(annualIncome) / Number(appraisal.value);
+    
+    return {
+      propertyId,
+      currentValue: appraisal.value,
+      occupancyRate: occupancy,
+      monthlyIncome,
+      annualIncome,
+      capitalizationRate: capRate,
+      lastUpdated: new Date()
+    };
+  }
+  
+  private async updateTokenMetadata(
+    tokenId: string,
+    metadata: Partial&lt;TokenMetadata&gt;
+  ): Promise&lt;void&gt; {
+    // Implementation
+  }
+  
+  private emitValuationUpdate(tokenId: string, newValue: bigint): void {
+    // Implementation
+  }
+  
+  private async getTotalSupply(tokenId: string): Promise&lt;bigint&gt; {
+    return 1000000n;
+  }
+}
+
+interface TokenMetadata {
+  appraisedValue: bigint;
+  lastAppraisalDate: Date;
+  appraisalReportHash: string;
+}
+
+interface PropertyMetrics {
+  propertyId: string;
+  currentValue: bigint;
+  occupancyRate: number;
+  monthlyIncome: bigint;
+  annualIncome: bigint;
+  capitalizationRate: number;
+  lastUpdated: Date;
+}
+</pre>
+</div>
+
+            <h2>Security Architecture</h2>
+
+            <h3>Multi-Layer Security Approach</h3>
+            <p>
+                Tokenization platforms require defense-in-depth security spanning smart contracts, infrastructure, operational procedures, and human factors. Smart contract security includes formal verification, comprehensive testing, external audits, bug bounty programs, and gradual rollout with circuit breakers. Infrastructure security encompasses DDoS protection, encrypted communications, intrusion detection, and isolated environments for critical components.
+            </p>
+            <p>
+                Operational security involves multi-signature controls for administrative functions, time-locks for critical operations, role-based access control with least-privilege principles, comprehensive logging and monitoring, and incident response procedures. Human factors include security training, phishing resistance, social engineering awareness, and insider threat mitigation. Regular penetration testing and security audits from multiple firms provide validation.
+            </p>
+
+            <div class="warning-box">
+                <strong>Security Critical:</strong> Smart contract vulnerabilities in tokenized assets can result in total loss of investor funds with no recovery mechanism. Budget 15-20% of development costs for security audits, testing, and bug bounties. Never launch without multiple independent security audits from reputable firms.
+            </div>
+
+            <div class="key-takeaways">
+                <h3>Key Takeaways</h3>
+                <ul>
+                    <li>Modular smart contract architecture separates token logic, compliance, and registry functions enabling independent updates and reducing complexity</li>
+                    <li>Proxy patterns enable smart contract upgradeability essential for regulatory adaptation and bug fixes while maintaining token state</li>
+                    <li>Institutional custody requires qualified custodians with insurance, cold storage, multi-signature controls, and regulatory compliance</li>
+                    <li>Oracles bridge blockchain and real-world data, essential for asset valuations, compliance verification, and dividend calculations</li>
+                    <li>Defense-in-depth security spans smart contracts, infrastructure, operations, and human factors with multiple validation layers</li>
+                    <li>Multi-party computation (MPC) custody eliminates single points of failure in key management for institutional-grade security</li>
+                    <li>Comprehensive audits from multiple independent firms are non-negotiable before launching tokenized asset platforms</li>
+            </ul>
+            </div>
+
+            <div class="review-questions">
+                <h3>Review Questions</h3>
+                <ol>
+                    <li>Explain the benefits of separating token logic, compliance, and registry into different smart contracts. What flexibility does this provide?</li>
+                    <li>Compare the Transparent Proxy and UUPS upgradeability patterns. What are the tradeoffs of each approach?</li>
+                    <li>What are the key requirements for a custody solution to serve institutional investors? Why are these requirements necessary?</li>
+                    <li>Describe how oracles enable smart contracts to access real-world asset data. What security considerations apply to oracle design?</li>
+                    <li>What is multi-party computation (MPC) custody and how does it differ from multi-signature wallets?</li>
+                    <li>Outline a comprehensive security testing strategy for a tokenized real estate platform before launch.</li>
+                    <li>How should administrative controls (like pausing transfers or updating compliance rules) be secured? What role do multi-signature wallets play?</li>
+            </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-03.html" class="nav-button">← Previous: Token Standards</a>
+                <a href="chapter-05.html" class="nav-button">Next: API Specifications →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: ONNX - The Universal Format | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        .note strong { color: #10B981; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 3: ONNX - The Universal Format</h1>
+        <p class="chapter-meta">WIA-AI-008 Standard • Estimated reading time: 50 minutes</p>
+
+        <h2>3.1 What is ONNX?</h2>
+        <p>
+            The Open Neural Network Exchange (ONNX) is an open format designed to represent deep learning models in a
+            framework-agnostic manner. Created in 2017 by Microsoft and Facebook (now Meta), ONNX has become the de facto
+            standard for model interoperability, supported by all major frameworks including PyTorch, TensorFlow, Keras,
+            MXNet, and many others.
+        </p>
+
+        <h3>The Philosophy Behind ONNX</h3>
+        <p>
+            ONNX embodies the 弘益人間 (Benefit All Humanity) philosophy by removing barriers between different AI ecosystems.
+            It enables:
+        </p>
+        <ul>
+            <li>Researchers to share models regardless of the framework they used for training</li>
+            <li>Engineers to deploy models using optimized runtimes different from training frameworks</li>
+            <li>Organizations to avoid vendor lock-in and choose best-of-breed tools</li>
+            <li>The community to build a shared ecosystem of models and tools</li>
+        </ul>
+
+        <h2>3.2 ONNX Architecture</h2>
+        <p>
+            ONNX uses Protocol Buffers (protobuf) for serialization, defining models as directed acyclic graphs (DAGs).
+        </p>
+
+        <h3>Core Components</h3>
+        <ul>
+            <li><strong>Graph</strong>: The computational graph containing nodes and edges</li>
+            <li><strong>Nodes</strong>: Operations/operators (Conv, MatMul, ReLU, etc.)</li>
+            <li><strong>Edges</strong>: Tensors flowing between nodes</li>
+            <li><strong>Initializers</strong>: Constant tensors (weights, biases)</li>
+            <li><strong>Metadata</strong>: Model version, producer info, documentation</li>
+        </ul>
+
+        <pre><code># ONNX model structure
+ModelProto
+├── ir_version: int64
+├── opset_import: [OpsetIdProto]
+├── producer_name: string
+├── producer_version: string
+├── domain: string
+├── model_version: int64
+├── doc_string: string
+├── graph: GraphProto
+│   ├── node: [NodeProto]
+│   ├── name: string
+│   ├── input: [ValueInfoProto]
+│   ├── output: [ValueInfoProto]
+│   ├── initializer: [TensorProto]
+│   └── value_info: [ValueInfoProto]
+└── metadata_props: [StringStringEntryProto]</code></pre>
+
+        <h2>3.3 Exporting to ONNX</h2>
+
+        <h3>PyTorch to ONNX</h3>
+        <p>
+            PyTorch has excellent built-in ONNX export capabilities:
+        </p>
+        <pre><code>import torch
+import torch.nn as nn
+
+# Define a simple model
+class SimpleModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 64, 3, padding=1)
+        self.relu = nn.ReLU()
+        self.pool = nn.MaxPool2d(2)
+        self.fc = nn.Linear(64 * 112 * 112, 10)
+
+    def forward(self, x):
+        x = self.pool(self.relu(self.conv1(x)))
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+model = SimpleModel()
+model.eval()
+
+# Prepare dummy input
+dummy_input = torch.randn(1, 3, 224, 224)
+
+# Export to ONNX
+torch.onnx.export(
+    model,                                # Model being exported
+    dummy_input,                          # Model input (or tuple for multiple inputs)
+    "simple_model.onnx",                 # Where to save the model
+    export_params=True,                   # Store trained parameters
+    opset_version=15,                    # ONNX version
+    do_constant_folding=True,            # Optimize by constant folding
+    input_names=['input'],               # Input names
+    output_names=['output'],             # Output names
+    dynamic_axes={                        # Dynamic dimensions
+        'input': {0: 'batch_size'},
+        'output': {0: 'batch_size'}
+    }
+)</code></pre>
+
+        <h3>TensorFlow to ONNX</h3>
+        <p>
+            TensorFlow requires the tf2onnx tool:
+        </p>
+        <pre><code># Install tf2onnx
+# pip install tf2onnx
+
+import tensorflow as tf
+import tf2onnx
+
+# Create a simple TensorFlow model
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(64, 3, padding='same', activation='relu', input_shape=(224, 224, 3)),
+    tf.keras.layers.MaxPooling2D(2),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(10, activation='softmax')
+])
+
+# Save as SavedModel first
+model.save('tf_model')
+
+# Convert to ONNX via command line
+# python -m tf2onnx.convert --saved-model tf_model --output model.onnx --opset 15
+
+# Or programmatically
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+model_proto, _ = tf2onnx.convert.from_keras(model, input_signature=spec, opset=15)
+
+with open("tf_model.onnx", "wb") as f:
+    f.write(model_proto.SerializeToString())</code></pre>
+
+        <h3>Common Export Issues and Solutions</h3>
+        <table>
+            <tr>
+                <th>Issue</th>
+                <th>Cause</th>
+                <th>Solution</th>
+            </tr>
+            <tr>
+                <td>Unsupported operator</td>
+                <td>Custom op not in ONNX opset</td>
+                <td>Use supported alternatives or register custom op</td>
+            </tr>
+            <tr>
+                <td>Dynamic control flow</td>
+                <td>If/while loops in model</td>
+                <td>Use ONNX opset 13+ or refactor model</td>
+            </tr>
+            <tr>
+                <td>Shape inference failure</td>
+                <td>Ambiguous tensor shapes</td>
+                <td>Provide explicit shapes via dynamic_axes</td>
+            </tr>
+            <tr>
+                <td>Incorrect output values</td>
+                <td>Numerical precision issues</td>
+                <td>Check dtype conversions, use validation script</td>
+            </tr>
+        </table>
+
+        <h2>3.4 ONNX Runtime</h2>
+        <p>
+            ONNX Runtime is a high-performance inference engine optimized for ONNX models. It often outperforms native
+            framework inference due to aggressive optimizations.
+        </p>
+
+        <h3>Basic Inference</h3>
+        <pre><code>import onnxruntime as ort
+import numpy as np
+
+# Create inference session
+session = ort.InferenceSession("model.onnx")
+
+# Get input and output names
+input_name = session.get_inputs()[0].name
+output_name = session.get_outputs()[0].name
+
+# Prepare input data
+input_data = np.random.randn(1, 3, 224, 224).astype(np.float32)
+
+# Run inference
+outputs = session.run([output_name], {input_name: input_data})
+
+print(f"Output shape: {outputs[0].shape}")
+print(f"Predictions: {outputs[0]}")</code></pre>
+
+        <h3>Performance Optimization</h3>
+        <pre><code>import onnxruntime as ort
+
+# Configure session options for maximum performance
+session_options = ort.SessionOptions()
+
+# Enable graph optimizations
+session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+# Set number of threads
+session_options.intra_op_num_threads = 4
+session_options.inter_op_num_threads = 4
+
+# Enable profiling (for debugging)
+session_options.enable_profiling = True
+
+# Use specific execution providers (GPU, TensorRT, etc.)
+providers = [
+    'CUDAExecutionProvider',      # NVIDIA GPU
+    'TensorrtExecutionProvider',  # TensorRT
+    'CPUExecutionProvider'        # CPU fallback
+]
+
+session = ort.InferenceSession(
+    "model.onnx",
+    sess_options=session_options,
+    providers=providers
+)
+
+# Check which provider is being used
+print(f"Providers: {session.get_providers()}")</code></pre>
+
+        <h2>3.5 ONNX Model Inspection and Validation</h2>
+
+        <h3>Inspecting Model Structure</h3>
+        <pre><code>import onnx
+
+# Load ONNX model
+model = onnx.load("model.onnx")
+
+# Check model validity
+onnx.checker.check_model(model)
+print("✓ Model is valid")
+
+# Print model information
+print(f"IR Version: {model.ir_version}")
+print(f"Producer: {model.producer_name} {model.producer_version}")
+print(f"Domain: {model.domain}")
+print(f"Model Version: {model.model_version}")
+print(f"Doc: {model.doc_string}")
+
+# Inspect graph
+graph = model.graph
+print(f"\nGraph name: {graph.name}")
+
+# Print inputs
+print("\nInputs:")
+for input in graph.input:
+    print(f"  - {input.name}: {input.type.tensor_type.elem_type}, shape: {[d.dim_value for d in input.type.tensor_type.shape.dim]}")
+
+# Print outputs
+print("\nOutputs:")
+for output in graph.output:
+    print(f"  - {output.name}: {output.type.tensor_type.elem_type}")
+
+# Print operators
+print(f"\nNodes: {len(graph.node)}")
+op_types = {}
+for node in graph.node:
+    op_types[node.op_type] = op_types.get(node.op_type, 0) + 1
+
+print("\nOperator distribution:")
+for op_type, count in sorted(op_types.items(), key=lambda x: -x[1]):
+    print(f"  {op_type}: {count}")</code></pre>
+
+        <h3>Numerical Validation</h3>
+        <pre><code>import torch
+import onnxruntime as ort
+import numpy as np
+
+# Original PyTorch model
+model_pt = SimpleModel()
+model_pt.eval()
+
+# Export to ONNX
+torch.onnx.export(model_pt, dummy_input, "model.onnx")
+
+# Create ONNX Runtime session
+session = ort.InferenceSession("model.onnx")
+
+# Prepare test inputs
+test_input = torch.randn(10, 3, 224, 224)
+
+# PyTorch inference
+with torch.no_grad():
+    pt_output = model_pt(test_input).numpy()
+
+# ONNX Runtime inference
+ort_output = session.run(None, {
+    session.get_inputs()[0].name: test_input.numpy()
+})[0]
+
+# Compare outputs
+max_diff = np.max(np.abs(pt_output - ort_output))
+mean_diff = np.mean(np.abs(pt_output - ort_output))
+
+print(f"Max difference: {max_diff}")
+print(f"Mean difference: {mean_diff}")
+
+# Assert numerical equivalence (within tolerance)
+assert np.allclose(pt_output, ort_output, rtol=1e-3, atol=1e-5), "Outputs don't match!"
+print("✓ Numerical validation passed")</code></pre>
+
+        <h2>3.6 ONNX Operators and Opsets</h2>
+        <p>
+            ONNX defines a standardized set of operators. Different opset versions support different operators and features.
+        </p>
+
+        <h3>Opset Evolution</h3>
+        <table>
+            <tr>
+                <th>Opset</th>
+                <th>Released</th>
+                <th>Key Features</th>
+            </tr>
+            <tr>
+                <td>9</td>
+                <td>2019</td>
+                <td>Stable baseline, broad support</td>
+            </tr>
+            <tr>
+                <td>11</td>
+                <td>2020</td>
+                <td>Better RNN support, dynamic shapes</td>
+            </tr>
+            <tr>
+                <td>13</td>
+                <td>2021</td>
+                <td>Control flow (If, Loop), advanced ops</td>
+            </tr>
+            <tr>
+                <td>15</td>
+                <td>2022</td>
+                <td>Improved quantization, training support</td>
+            </tr>
+            <tr>
+                <td>17</td>
+                <td>2023</td>
+                <td>Better transformer support, LayerNorm</td>
+            </tr>
+        </table>
+
+        <h3>Common ONNX Operators</h3>
+        <pre><code># Core operators
+Conv, ConvTranspose                    # Convolution layers
+Gemm, MatMul                           # Dense layers
+Relu, Sigmoid, Tanh, Softmax          # Activations
+BatchNormalization, LayerNormalization # Normalization
+MaxPool, AveragePool, GlobalAveragePool # Pooling
+Add, Sub, Mul, Div                     # Element-wise ops
+Concat, Split, Reshape, Transpose      # Tensor manipulation
+Gather, Scatter                        # Indexing operations
+If, Loop                               # Control flow (opset 13+)
+Cast, Clip, Pad                        # Utility operations</code></pre>
+
+        <h2>3.7 Custom Operators in ONNX</h2>
+        <p>
+            When ONNX doesn't support a specific operation, you can define custom operators:
+        </p>
+
+        <pre><code>import torch
+from torch.onnx import register_custom_op_symbolic
+
+# Define custom operator behavior
+@torch.onnx.symbolic_helper.parse_args('v', 'v', 'f')
+def custom_op(g, input1, input2, alpha):
+    return g.op("custom_domain::CustomOp", input1, input2, alpha_f=alpha)
+
+# Register the symbolic function
+register_custom_op_symbolic('custom_domain::CustomOp', custom_op, 14)
+
+# Use in model export
+class ModelWithCustomOp(nn.Module):
+    def forward(self, x, y):
+        # Your custom operation
+        return custom_operation(x, y, alpha=0.5)
+
+# Export will now include the custom op
+torch.onnx.export(model, (x, y), "model_custom.onnx")</code></pre>
+
+        <h2>3.8 ONNX Model Optimization</h2>
+        <p>
+            ONNX provides tools to optimize models for better performance:
+        </p>
+
+        <pre><code>from onnxruntime.transformers import optimizer
+from onnxruntime.transformers.fusion_options import FusionOptions
+
+# Load model
+model_path = "model.onnx"
+
+# Configure optimization options
+opt_options = FusionOptions('bert')
+opt_options.enable_gelu = True
+opt_options.enable_layer_norm = True
+opt_options.enable_attention = True
+opt_options.enable_skip_layer_norm = True
+opt_options.enable_embed_layer_norm = True
+opt_options.enable_bias_skip_layer_norm = True
+opt_options.enable_bias_gelu = True
+
+# Optimize
+optimized_model = optimizer.optimize_model(
+    model_path,
+    model_type='bert',
+    num_heads=12,
+    hidden_size=768,
+    optimization_options=opt_options
+)
+
+# Save optimized model
+optimized_model.save_model_to_file("model_optimized.onnx")
+
+print(f"Original nodes: {len(onnx.load(model_path).graph.node)}")
+print(f"Optimized nodes: {len(optimized_model.model.graph.node)}")</code></pre>
+
+        <h3>Graph Optimizations</h3>
+        <ul>
+            <li><strong>Constant Folding</strong>: Evaluate constants at export time</li>
+            <li><strong>Operator Fusion</strong>: Combine multiple ops (Conv + BatchNorm + ReLU)</li>
+            <li><strong>Dead Code Elimination</strong>: Remove unused nodes</li>
+            <li><strong>Shape Inference</strong>: Propagate tensor shapes through graph</li>
+            <li><strong>Layout Transformation</strong>: Optimize NCHW vs NHWC layouts</li>
+        </ul>
+
+        <h2>3.9 ONNX for Different Model Types</h2>
+
+        <h3>Vision Models</h3>
+        <pre><code># ResNet, EfficientNet, Vision Transformers
+import torchvision.models as models
+
+resnet50 = models.resnet50(pretrained=True)
+resnet50.eval()
+
+dummy_input = torch.randn(1, 3, 224, 224)
+torch.onnx.export(
+    resnet50,
+    dummy_input,
+    "resnet50.onnx",
+    opset_version=15,
+    input_names=['image'],
+    output_names=['probabilities'],
+    dynamic_axes={'image': {0: 'batch'}, 'probabilities': {0: 'batch'}}
+)</code></pre>
+
+        <h3>NLP Models</h3>
+        <pre><code># BERT, GPT, T5
+from transformers import BertModel, BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertModel.from_pretrained('bert-base-uncased')
+model.eval()
+
+# Create dummy inputs
+text = "Hello, ONNX!"
+inputs = tokenizer(text, return_tensors='pt')
+
+# Export with multiple inputs
+torch.onnx.export(
+    model,
+    (inputs['input_ids'], inputs['attention_mask']),
+    "bert.onnx",
+    opset_version=14,
+    input_names=['input_ids', 'attention_mask'],
+    output_names=['last_hidden_state'],
+    dynamic_axes={
+        'input_ids': {0: 'batch', 1: 'sequence'},
+        'attention_mask': {0: 'batch', 1: 'sequence'},
+        'last_hidden_state': {0: 'batch', 1: 'sequence'}
+    }
+)</code></pre>
+
+        <h3>Generative Models</h3>
+        <pre><code># GANs, VAEs, Diffusion Models
+class SimpleGAN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.generator = nn.Sequential(
+            nn.Linear(100, 256),
+            nn.ReLU(),
+            nn.Linear(256, 784),
+            nn.Tanh()
+        )
+
+    def forward(self, z):
+        return self.generator(z)
+
+gan = SimpleGAN()
+gan.eval()
+
+latent = torch.randn(1, 100)
+torch.onnx.export(
+    gan,
+    latent,
+    "gan_generator.onnx",
+    opset_version=15,
+    input_names=['latent_vector'],
+    output_names=['generated_image']
+)</code></pre>
+
+        <h2>3.10 ONNX Ecosystem and Tools</h2>
+
+        <h3>Key Tools</h3>
+        <ul>
+            <li><strong>onnx</strong>: Core library for ONNX model manipulation</li>
+            <li><strong>onnxruntime</strong>: High-performance inference engine</li>
+            <li><strong>onnx-simplifier</strong>: Simplifies and optimizes ONNX graphs</li>
+            <li><strong>netron</strong>: Visual model viewer for ONNX and other formats</li>
+            <li><strong>onnx-graphsurgeon</strong>: NVIDIA tool for graph manipulation</li>
+        </ul>
+
+        <pre><code># Using onnx-simplifier
+from onnxsim import simplify
+import onnx
+
+model = onnx.load("model.onnx")
+simplified_model, check = simplify(model)
+
+assert check, "Simplified model validation failed"
+onnx.save(simplified_model, "model_simplified.onnx")
+
+# Viewing with Netron
+# Install: pip install netron
+# Usage: netron model.onnx
+# Opens interactive visualization in browser</code></pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>ONNX is an open, framework-agnostic format for deep learning models</li>
+                <li>Uses Protocol Buffers to represent models as directed acyclic graphs</li>
+                <li>Core components: Graph, Nodes (operators), Edges (tensors), Initializers (weights)</li>
+                <li>Export from PyTorch via torch.onnx.export(), from TensorFlow via tf2onnx</li>
+                <li>ONNX Runtime provides optimized inference, often faster than native frameworks</li>
+                <li>Opset versions define supported operators; newer opsets add features</li>
+                <li>Custom operators can be registered for unsupported operations</li>
+                <li>Graph optimizations: constant folding, operator fusion, dead code elimination</li>
+                <li>Supports all model types: vision, NLP, generative, multimodal</li>
+                <li>Rich ecosystem: onnxruntime, onnx-simplifier, netron, graphsurgeon</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What problem does ONNX solve in the machine learning ecosystem?</li>
+                <li>Describe the structure of an ONNX model. What are the main components?</li>
+                <li>How do you export a PyTorch model to ONNX? Include dynamic axes in your answer.</li>
+                <li>What is the difference between opset 9 and opset 15 in ONNX?</li>
+                <li>Why might ONNX Runtime be faster than native PyTorch or TensorFlow inference?</li>
+                <li>How do you validate that an ONNX model produces the same outputs as the original model?</li>
+                <li>What are common issues when exporting models to ONNX, and how can they be resolved?</li>
+                <li>Explain operator fusion and why it improves performance.</li>
+                <li>How would you handle a custom operation that's not in the ONNX opset?</li>
+                <li>Compare the process of exporting vision models vs NLP models to ONNX.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

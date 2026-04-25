@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Model Serving & Deployment | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 7: Model Serving & Deployment</h1>
+        <p class="chapter-meta">WIA-AI-008 Standard • Estimated reading time: 65 minutes</p>
+
+        <h2>7.1 Serving Infrastructure Overview</h2>
+        <p>
+            Model serving transforms trained models into production-ready inference services. A robust serving infrastructure
+            handles request routing, batching, scaling, monitoring, and failover. The choice of serving framework depends on
+            deployment target, performance requirements, and operational constraints.
+        </p>
+
+        <h3>Serving Patterns</h3>
+        <table>
+            <tr>
+                <th>Pattern</th>
+                <th>Use Case</th>
+                <th>Latency</th>
+                <th>Throughput</th>
+            </tr>
+            <tr>
+                <td>Real-time</td>
+                <td>Online inference</td>
+                <td>< 100ms</td>
+                <td>100-1000 QPS</td>
+            </tr>
+            <tr>
+                <td>Batch</td>
+                <td>Offline processing</td>
+                <td>Seconds-hours</td>
+                <td>1M+ records</td>
+            </tr>
+            <tr>
+                <td>Streaming</td>
+                <td>Event processing</td>
+                <td>< 1s</td>
+                <td>10K-100K QPS</td>
+            </tr>
+            <tr>
+                <td>Edge</td>
+                <td>On-device inference</td>
+                <td>< 50ms</td>
+                <td>Local only</td>
+            </tr>
+        </table>
+
+        <h2>7.2 TorchServe</h2>
+        <p>
+            TorchServe is the official model serving framework for PyTorch, developed jointly with AWS.
+        </p>
+
+        <h3>Creating a Model Archive (MAR)</h3>
+        <pre><code># Install TorchServe
+# pip install torchserve torch-model-archiver
+
+# Create handler (custom inference logic)
+# handler.py
+from ts.torch_handler.base_handler import BaseHandler
+import torch
+
+class CustomHandler(BaseHandler):
+    def preprocess(self, data):
+        """
+        Preprocess input data
+        """
+        # Extract input from request
+        input_data = data[0].get("data") or data[0].get("body")
+
+        # Convert to tensor
+        tensor = torch.FloatTensor(input_data)
+        return tensor
+
+    def inference(self, data):
+        """
+        Run inference
+        """
+        with torch.no_grad():
+            output = self.model(data)
+        return output
+
+    def postprocess(self, data):
+        """
+        Postprocess output
+        """
+        # Convert to list for JSON serialization
+        return data.tolist()
+
+# Archive model
+# torch-model-archiver --model-name resnet18 \
+#                      --version 1.0 \
+#                      --model-file model.py \
+#                      --serialized-file resnet18.pth \
+#                      --handler handler.py \
+#                      --extra-files index_to_name.json \
+#                      --export-path model-store/</code></pre>
+
+        <h3>Deploying with TorchServe</h3>
+        <pre><code># Start TorchServe
+# torchserve --start --model-store model-store --models resnet18=resnet18.mar
+
+# Configuration file (config.properties)
+"""
+inference_address=http://0.0.0.0:8080
+management_address=http://0.0.0.0:8081
+metrics_address=http://0.0.0.0:8082
+
+number_of_netty_threads=4
+job_queue_size=100
+number_of_gpu=1
+
+default_workers_per_model=4
+max_request_size=65535000
+max_response_size=65535000
+
+enable_metrics_api=true
+"""
+
+# Client request
+import requests
+import json
+
+url = "http://localhost:8080/predictions/resnet18"
+data = json.dumps({"data": [[1.0, 2.0, 3.0]]})
+headers = {"Content-Type": "application/json"}
+
+response = requests.post(url, data=data, headers=headers)
+print(response.json())</code></pre>
+
+        <h3>Auto-scaling</h3>
+        <pre><code># Register model with auto-scaling
+# POST http://localhost:8081/models?url=resnet18.mar&initial_workers=2&synchronous=true
+
+# Scale workers dynamically
+# PUT http://localhost:8081/models/resnet18?min_worker=2&max_worker=8
+
+# Kubernetes Horizontal Pod Autoscaler (HPA)
+"""
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: torchserve-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: torchserve
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+"""</code></pre>
+
+        <h2>7.3 TensorFlow Serving</h2>
+        <p>
+            TensorFlow Serving is a high-performance serving system for machine learning models.
+        </p>
+
+        <h3>Serving a SavedModel</h3>
+        <pre><code># Export TensorFlow model
+import tensorflow as tf
+
+model = tf.keras.applications.ResNet50(weights='imagenet')
+model.save('models/resnet50/1')  # Version 1
+
+# Directory structure:
+# models/
+#   resnet50/
+#     1/
+#       saved_model.pb
+#       variables/
+
+# Start TF Serving with Docker
+# docker run -p 8501:8501 \
+#   --mount type=bind,source=/path/to/models,target=/models \
+#   tensorflow/serving \
+#   --model_config_file=/models/models.config
+
+# models.config
+"""
+model_config_list {
+  config {
+    name: 'resnet50'
+    base_path: '/models/resnet50'
+    model_platform: 'tensorflow'
+    model_version_policy {
+      all: {}
+    }
+  }
+}
+"""</code></pre>
+
+        <h3>Client Inference</h3>
+        <pre><code>import requests
+import json
+import numpy as np
+
+# Prepare input
+image = np.random.rand(1, 224, 224, 3).tolist()
+
+# REST API
+url = "http://localhost:8501/v1/models/resnet50:predict"
+data = json.dumps({"signature_name": "serving_default", "instances": image})
+headers = {"content-type": "application/json"}
+
+response = requests.post(url, data=data, headers=headers)
+predictions = response.json()['predictions']
+
+# gRPC API (faster)
+import grpc
+from tensorflow_serving.apis import predict_pb2
+from tensorflow_serving.apis import prediction_service_pb2_grpc
+
+channel = grpc.insecure_channel('localhost:8500')
+stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
+
+request = predict_pb2.PredictRequest()
+request.model_spec.name = 'resnet50'
+request.model_spec.signature_name = 'serving_default'
+
+# Set input
+request.inputs['input'].CopyFrom(
+    tf.make_tensor_proto(image, shape=[1, 224, 224, 3])
+)
+
+# Get prediction
+result = stub.Predict(request, 10.0)  # 10 second timeout
+output = tf.make_ndarray(result.outputs['output'])
+print(output)</code></pre>
+
+        <h2>7.4 NVIDIA Triton Inference Server</h2>
+        <p>
+            Triton supports multiple frameworks (PyTorch, TensorFlow, ONNX, TensorRT) in a single serving infrastructure.
+        </p>
+
+        <h3>Model Repository Structure</h3>
+        <pre><code># Directory structure
+model_repository/
+  resnet50_pytorch/
+    config.pbtxt
+    1/
+      model.pt
+  resnet50_onnx/
+    config.pbtxt
+    1/
+      model.onnx
+  resnet50_tensorrt/
+    config.pbtxt
+    1/
+      model.plan
+
+# config.pbtxt
+"""
+name: "resnet50_onnx"
+platform: "onnxruntime_onnx"
+max_batch_size: 32
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+  }
+]
+instance_group [
+  {
+    count: 2
+    kind: KIND_GPU
+  }
+]
+dynamic_batching {
+  preferred_batch_size: [ 8, 16, 32 ]
+  max_queue_delay_microseconds: 100
+}
+"""</code></pre>
+
+        <h3>Launching Triton</h3>
+        <pre><code># Docker
+# docker run --gpus all -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+#   -v /path/to/model_repository:/models \
+#   nvcr.io/nvidia/tritonserver:23.10-py3 \
+#   tritonserver --model-repository=/models
+
+# Client
+import tritonclient.http as httpclient
+import numpy as np
+
+# Create client
+triton_client = httpclient.InferenceServerClient(url="localhost:8000")
+
+# Prepare input
+input_data = np.random.rand(1, 3, 224, 224).astype(np.float32)
+
+# Create input object
+inputs = [httpclient.InferInput("input", input_data.shape, "FP32")]
+inputs[0].set_data_from_numpy(input_data)
+
+# Create output object
+outputs = [httpclient.InferRequestedOutput("output")]
+
+# Inference
+results = triton_client.infer(
+    model_name="resnet50_onnx",
+    inputs=inputs,
+    outputs=outputs
+)
+
+# Get output
+output_data = results.as_numpy("output")
+print(f"Output shape: {output_data.shape}")</code></pre>
+
+        <h2>7.5 Serverless Deployment</h2>
+
+        <h3>AWS Lambda with ONNX Runtime</h3>
+        <pre><code># lambda_function.py
+import json
+import onnxruntime as ort
+import numpy as np
+
+# Load model (reuse across invocations)
+session = None
+
+def lambda_handler(event, context):
+    global session
+
+    # Initialize model on cold start
+    if session is None:
+        session = ort.InferenceSession("model.onnx")
+
+    # Parse input
+    input_data = np.array(json.loads(event['body'])['data'], dtype=np.float32)
+
+    # Run inference
+    input_name = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
+    result = session.run([output_name], {input_name: input_data})[0]
+
+    # Return response
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'predictions': result.tolist()
+        })
+    }
+
+# Package Lambda: zip -r function.zip lambda_function.py model.onnx
+# Deploy: aws lambda create-function ...</code></pre>
+
+        <h3>Google Cloud Functions</h3>
+        <pre><code># main.py
+import functions_framework
+import torch
+import json
+
+model = None
+
+@functions_framework.http
+def predict(request):
+    global model
+
+    # Load model on cold start
+    if model is None:
+        model = torch.jit.load("model.pt")
+        model.eval()
+
+    # Parse input
+    request_json = request.get_json()
+    input_data = torch.tensor(request_json['data'])
+
+    # Inference
+    with torch.no_grad():
+        output = model(input_data)
+
+    # Response
+    return json.dumps({
+        'predictions': output.tolist()
+    })
+
+# Deploy: gcloud functions deploy predict --runtime python39 --trigger-http</code></pre>
+
+        <h2>7.6 Edge and Mobile Deployment</h2>
+
+        <h3>TensorFlow Lite on Android</h3>
+        <pre><code>// Android (Java)
+import org.tensorflow.lite.Interpreter;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+public class ModelInference {
+    private Interpreter tflite;
+
+    public ModelInference(Context context) {
+        // Load model from assets
+        try {
+            MappedByteBuffer modelBuffer = loadModelFile(context, "model.tflite");
+            tflite = new Interpreter(modelBuffer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public float[][] predict(float[][][] input) {
+        // Allocate output
+        float[][] output = new float[1][10];
+
+        // Run inference
+        tflite.run(input, output);
+
+        return output;
+    }
+
+    private MappedByteBuffer loadModelFile(Context context, String modelPath) throws IOException {
+        AssetFileDescriptor fileDescriptor = context.getAssets().openFd(modelPath);
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        long startOffset = fileDescriptor.getStartOffset();
+        long declaredLength = fileDescriptor.getDeclaredLength();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+    }
+}</code></pre>
+
+        <h3>CoreML on iOS</h3>
+        <pre><code>// Swift
+import CoreML
+import Vision
+
+class ModelInference {
+    var model: VNCoreMLModel?
+
+    init() {
+        // Load CoreML model
+        guard let mlModel = try? MyModel(configuration: MLModelConfiguration()).model else {
+            fatalError("Failed to load model")
+        }
+
+        model = try? VNCoreMLModel(for: mlModel)
+    }
+
+    func predict(image: UIImage, completion: @escaping ([String: Double]?) -> Void) {
+        guard let model = model else {
+            completion(nil)
+            return
+        }
+
+        // Create request
+        let request = VNCoreMLRequest(model: model) { request, error in
+            guard let results = request.results as? [VNClassificationObservation] else {
+                completion(nil)
+                return
+            }
+
+            // Convert to dictionary
+            var predictions: [String: Double] = [:]
+            for result in results {
+                predictions[result.identifier] = Double(result.confidence)
+            }
+
+            completion(predictions)
+        }
+
+        // Perform inference
+        guard let ciImage = CIImage(image: image) else {
+            completion(nil)
+            return
+        }
+
+        let handler = VNImageRequestHandler(ciImage: ciImage)
+        try? handler.perform([request])
+    }
+}</code></pre>
+
+        <h2>7.7 Batch Inference</h2>
+
+        <h3>Spark-based Batch Processing</h3>
+        <pre><code>from pyspark.sql import SparkSession
+from pyspark.sql.functions import pandas_udf
+import pandas as pd
+import torch
+
+# Initialize Spark
+spark = SparkSession.builder.appName("BatchInference").getOrCreate()
+
+# Load data
+df = spark.read.parquet("s3://data/images.parquet")
+
+# Define UDF for inference
+@pandas_udf("array<float>")
+def predict_udf(images: pd.Series) -> pd.Series:
+    # Load model (broadcast to all workers)
+    model = torch.jit.load("/path/to/model.pt")
+    model.eval()
+
+    # Batch inference
+    results = []
+    for image_batch in np.array_split(images.values, len(images) // 32):
+        with torch.no_grad():
+            tensor_batch = torch.FloatTensor(list(image_batch))
+            predictions = model(tensor_batch)
+            results.extend(predictions.tolist())
+
+    return pd.Series(results)
+
+# Apply UDF
+predictions_df = df.withColumn("predictions", predict_udf(df["image"]))
+
+# Save results
+predictions_df.write.parquet("s3://results/predictions.parquet")</code></pre>
+
+        <h2>7.8 Monitoring and Observability</h2>
+
+        <h3>Metrics Collection</h3>
+        <pre><code>from prometheus_client import Counter, Histogram, Gauge, start_http_server
+import time
+
+# Define metrics
+REQUEST_COUNT = Counter('model_requests_total', 'Total requests', ['model', 'status'])
+REQUEST_LATENCY = Histogram('model_request_latency_seconds', 'Request latency', ['model'])
+ACTIVE_REQUESTS = Gauge('model_active_requests', 'Active requests', ['model'])
+MODEL_VERSION = Gauge('model_version', 'Current model version', ['model'])
+
+class MonitoredModel:
+    def __init__(self, model, model_name, version):
+        self.model = model
+        self.model_name = model_name
+        MODEL_VERSION.labels(model=model_name).set(version)
+
+    def predict(self, input_data):
+        ACTIVE_REQUESTS.labels(model=self.model_name).inc()
+
+        start_time = time.time()
+        try:
+            result = self.model(input_data)
+            REQUEST_COUNT.labels(model=self.model_name, status='success').inc()
+            return result
+        except Exception as e:
+            REQUEST_COUNT.labels(model=self.model_name, status='error').inc()
+            raise e
+        finally:
+            duration = time.time() - start_time
+            REQUEST_LATENCY.labels(model=self.model_name).observe(duration)
+            ACTIVE_REQUESTS.labels(model=self.model_name).dec()
+
+# Start Prometheus endpoint
+start_http_server(8000)
+
+# Use monitored model
+model = MonitoredModel(torch.jit.load("model.pt"), "resnet18", "1.0.0")
+result = model.predict(input_data)</code></pre>
+
+        <h3>Logging and Tracing</h3>
+        <pre><code>import logging
+import json
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Configure tracing
+trace.set_tracer_provider(TracerProvider())
+jaeger_exporter = JaegerExporter(
+    agent_host_name="localhost",
+    agent_port=6831,
+)
+trace.get_tracer_provider().add_span_processor(
+    BatchSpanProcessor(jaeger_exporter)
+)
+
+tracer = trace.get_tracer(__name__)
+
+def predict_with_tracing(model, input_data):
+    with tracer.start_as_current_span("model_inference") as span:
+        span.set_attribute("model.name", "resnet18")
+        span.set_attribute("model.version", "1.0.0")
+        span.set_attribute("input.shape", str(input_data.shape))
+
+        # Log request
+        logger.info(json.dumps({
+            "event": "inference_request",
+            "model": "resnet18",
+            "input_shape": list(input_data.shape)
+        }))
+
+        # Inference
+        start = time.time()
+        result = model(input_data)
+        latency = time.time() - start
+
+        # Log response
+        logger.info(json.dumps({
+            "event": "inference_response",
+            "model": "resnet18",
+            "latency_ms": latency * 1000,
+            "output_shape": list(result.shape)
+        }))
+
+        span.set_attribute("inference.latency_ms", latency * 1000)
+
+        return result</code></pre>
+
+        <h2>7.9 A/B Testing and Canary Deployments</h2>
+
+        <h3>Traffic Splitting</h3>
+        <pre><code>import random
+
+class ABTestingRouter:
+    def __init__(self, model_a, model_b, traffic_split=0.5):
+        self.model_a = model_a
+        self.model_b = model_b
+        self.traffic_split = traffic_split
+
+    def predict(self, input_data, user_id=None):
+        # Deterministic routing based on user_id
+        if user_id:
+            route_to_b = hash(user_id) % 100 < (self.traffic_split * 100)
+        else:
+            route_to_b = random.random() < self.traffic_split
+
+        if route_to_b:
+            return self.model_b(input_data), "model_b"
+        else:
+            return self.model_a(input_data), "model_a"
+
+# Usage
+router = ABTestingRouter(model_v1, model_v2, traffic_split=0.1)  # 10% to v2
+result, model_used = router.predict(input_data, user_id="user123")
+
+# Canary deployment (gradual rollout)
+class CanaryDeployment:
+    def __init__(self, stable_model, canary_model):
+        self.stable_model = stable_model
+        self.canary_model = canary_model
+        self.canary_percentage = 0
+
+    def increase_canary(self, step=10):
+        self.canary_percentage = min(100, self.canary_percentage + step)
+
+    def predict(self, input_data):
+        if random.random() * 100 < self.canary_percentage:
+            return self.canary_model(input_data)
+        else:
+            return self.stable_model(input_data)
+
+# Gradual rollout
+canary = CanaryDeployment(model_stable, model_canary)
+canary.increase_canary(10)  # 10% traffic
+# Monitor metrics...
+canary.increase_canary(20)  # 30% traffic
+# Monitor metrics...
+canary.increase_canary(70)  # 100% traffic</code></pre>
+
+        <h2>7.10 Production Best Practices</h2>
+
+        <h3>Checklist</h3>
+        <ul>
+            <li><strong>Health Checks</strong>: Implement liveness and readiness probes</li>
+            <li><strong>Timeouts</strong>: Set appropriate request and inference timeouts</li>
+            <li><strong>Rate Limiting</strong>: Protect against traffic spikes</li>
+            <li><strong>Circuit Breakers</strong>: Fail fast when downstream services are down</li>
+            <li><strong>Model Caching</strong>: Cache models in memory, avoid reloading</li>
+            <li><strong>Input Validation</strong>: Validate shapes, dtypes, ranges</li>
+            <li><strong>Error Handling</strong>: Return informative error messages</li>
+            <li><strong>Versioning</strong>: Include model version in API responses</li>
+            <li><strong>Graceful Shutdown</strong>: Drain connections before shutdown</li>
+            <li><strong>Blue-Green Deployment</strong>: Zero-downtime updates</li>
+        </ul>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Model serving patterns: real-time, batch, streaming, edge</li>
+                <li>TorchServe provides PyTorch-native serving with auto-scaling</li>
+                <li>TensorFlow Serving offers high-performance gRPC and REST APIs</li>
+                <li>NVIDIA Triton supports multiple frameworks in unified infrastructure</li>
+                <li>Serverless deployment (Lambda, Cloud Functions) for sporadic workloads</li>
+                <li>Edge deployment (TFLite, CoreML) for on-device inference</li>
+                <li>Batch inference with Spark for large-scale offline processing</li>
+                <li>Comprehensive monitoring with Prometheus, logging, and tracing</li>
+                <li>A/B testing and canary deployments for safe rollouts</li>
+                <li>Production best practices: health checks, rate limiting, graceful shutdown</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Compare real-time, batch, and edge serving patterns. When should each be used?</li>
+                <li>How do you create a TorchServe model archive (MAR) with a custom handler?</li>
+                <li>What are the advantages of TensorFlow Serving's gRPC API over REST?</li>
+                <li>Why might you choose NVIDIA Triton over framework-specific serving solutions?</li>
+                <li>Design a serverless inference architecture using AWS Lambda or Google Cloud Functions.</li>
+                <li>How do you deploy a TFLite model on Android? What about CoreML on iOS?</li>
+                <li>Implement a Prometheus-based monitoring system for model serving.</li>
+                <li>Explain the difference between A/B testing and canary deployments.</li>
+                <li>What health checks and error handling should be implemented for production?</li>
+                <li>Design a zero-downtime model update strategy.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Security Architecture | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: Security Architecture</h1>
+
+    <div class="highlight">
+        <strong>Chapter Overview:</strong> This chapter provides comprehensive guidance on designing secure blockchain architectures. From individual node security to network topology and smart contract design patterns, we cover the architectural decisions that determine the security posture of blockchain systems.
+    </div>
+
+    <h2>Secure Node Design Patterns</h2>
+    <p>Blockchain nodes are the fundamental building blocks of the network. A compromised node can lead to data corruption, network attacks, or financial losses. Secure node design follows defense-in-depth principles.</p>
+
+    <h3>Node Architecture Layers</h3>
+    <pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    Application Layer                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   RPC API   │  │  WebSocket  │  │  GraphQL Endpoint   │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                    Validation Layer                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  TX Validator│ │Block Validator│ │ State Validator    │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                    Consensus Layer                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Block Prod │  │  Voting     │  │  Finality Engine   │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                    Network Layer                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  P2P Gossip │  │  Discovery  │  │  Encryption (TLS)   │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                    Storage Layer                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Block Store│  │ State Trie  │  │  Transaction Pool  │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+
+    <h3>Node Isolation and Sandboxing</h3>
+    <pre><code>// Docker-based Node Isolation Configuration
+// docker-compose.security.yml
+
+version: '3.8'
+
+services:
+  blockchain-node:
+    image: blockchain/node:secure
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:seccomp-profile.json
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    volumes:
+      - blockchain-data:/data:rw
+      - ./config:/config:ro
+    networks:
+      - blockchain-internal
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "node-health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  blockchain-internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  blockchain-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /secure/blockchain/data</code></pre>
+
+    <h2>Network Topology Security</h2>
+    <p>The network topology of a blockchain affects its resilience to attacks. A well-designed topology provides redundancy, limits attack propagation, and ensures message delivery.</p>
+
+    <div class="highlight">
+        <strong>Security Principle:</strong> Network topology should balance decentralization with efficiency. Over-centralization creates single points of failure, while complete decentralization may impact performance and consensus speed.
+    </div>
+
+    <h3>Secure Peer Discovery</h3>
+    <pre><code>// Secure Peer Discovery Implementation
+interface PeerDiscoveryConfig {
+    bootstrapNodes: string[];
+    maxPeers: number;
+    verifyPeerIdentity: boolean;
+}
+
+class SecurePeerDiscovery {
+    private config: PeerDiscoveryConfig;
+    private verifiedPeers: Map<string, PeerInfo> = new Map();
+
+    async discoverPeers(): Promise<PeerInfo[]> {
+        const candidates: PeerInfo[] = [];
+
+        for (const bootstrap of this.config.bootstrapNodes) {
+            const peers = await this.queryBootstrapNode(bootstrap);
+            candidates.push(...peers);
+        }
+
+        const verified = await this.verifyPeers(candidates);
+        return this.ensureDiversity(verified);
+    }
+
+    private async verifyPeers(candidates: PeerInfo[]): Promise<PeerInfo[]> {
+        const verified: PeerInfo[] = [];
+
+        for (const peer of candidates) {
+            if (this.verifiedPeers.has(peer.id)) continue;
+
+            const isValid = await this.challengeResponse(peer);
+            if (isValid && await this.checkProtocolVersion(peer)) {
+                verified.push(peer);
+                this.verifiedPeers.set(peer.id, peer);
+            }
+        }
+        return verified;
+    }
+
+    private ensureDiversity(peers: PeerInfo[]): PeerInfo[] {
+        const byRegion = new Map<string, PeerInfo[]>();
+        for (const peer of peers) {
+            const region = peer.metadata.region || 'unknown';
+            if (!byRegion.has(region)) byRegion.set(region, []);
+            byRegion.get(region)!.push(peer);
+        }
+        return this.selectDiversePeers(byRegion, this.config.maxPeers);
+    }
+}</code></pre>
+
+    <h2>Smart Contract Security Architecture</h2>
+    <p>Smart contracts are immutable once deployed, making security architecture decisions critical. This section covers secure design patterns for smart contract systems.</p>
+
+    <h3>Secure Contract Patterns</h3>
+    <pre><code>// Solidity: Secure Smart Contract Architecture
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+/**
+ * @title SecureVault
+ * @notice Implements security best practices for asset management
+ */
+contract SecureVault is ReentrancyGuard, Pausable, AccessControl {
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
+
+    // State variables
+    mapping(address => uint256) private _balances;
+    mapping(address => uint256) private _withdrawalTimestamps;
+
+    uint256 public constant WITHDRAWAL_DELAY = 24 hours;
+    uint256 public constant MAX_WITHDRAWAL = 100 ether;
+
+    // Events for monitoring
+    event DepositReceived(address indexed user, uint256 amount);
+    event WithdrawalRequested(address indexed user, uint256 amount);
+    event WithdrawalExecuted(address indexed user, uint256 amount);
+    event EmergencyPause(address indexed guardian);
+
+    constructor() {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(GUARDIAN_ROLE, msg.sender);
+    }
+
+    /**
+     * @notice Deposit funds with checks
+     */
+    function deposit() external payable whenNotPaused {
+        require(msg.value > 0, "Deposit must be positive");
+
+        // Checks-Effects-Interactions pattern
+        _balances[msg.sender] += msg.value;
+
+        emit DepositReceived(msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Request withdrawal with time delay
+     */
+    function requestWithdrawal(uint256 amount) external whenNotPaused {
+        require(amount <= _balances[msg.sender], "Insufficient balance");
+        require(amount <= MAX_WITHDRAWAL, "Exceeds max withdrawal");
+
+        _withdrawalTimestamps[msg.sender] = block.timestamp;
+
+        emit WithdrawalRequested(msg.sender, amount);
+    }
+
+    /**
+     * @notice Execute withdrawal after delay
+     */
+    function executeWithdrawal(uint256 amount)
+        external
+        nonReentrant
+        whenNotPaused
+    {
+        require(
+            block.timestamp >= _withdrawalTimestamps[msg.sender] + WITHDRAWAL_DELAY,
+            "Withdrawal delay not met"
+        );
+        require(amount <= _balances[msg.sender], "Insufficient balance");
+
+        // Effects before interactions
+        _balances[msg.sender] -= amount;
+        _withdrawalTimestamps[msg.sender] = 0;
+
+        // Interaction last
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit WithdrawalExecuted(msg.sender, amount);
+    }
+
+    /**
+     * @notice Emergency pause by guardian
+     */
+    function emergencyPause() external onlyRole(GUARDIAN_ROLE) {
+        _pause();
+        emit EmergencyPause(msg.sender);
+    }
+
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+}</code></pre>
+
+    <h3>Upgradeable Contract Security</h3>
+    <div class="highlight">
+        <strong>Warning:</strong> Upgradeable contracts introduce additional attack vectors. The proxy pattern must be implemented correctly to prevent storage collisions and unauthorized upgrades.
+    </div>
+
+    <pre><code>// Secure Proxy Pattern Implementation
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+
+contract SecureProxyAdmin is ProxyAdmin {
+    uint256 public constant UPGRADE_DELAY = 48 hours;
+    uint256 public constant MIN_SIGNATURES = 3;
+
+    struct UpgradeProposal {
+        address proxy;
+        address newImplementation;
+        uint256 proposedAt;
+        uint256 signatures;
+        bool executed;
+    }
+
+    mapping(bytes32 => UpgradeProposal) public proposals;
+
+    function proposeUpgrade(address proxy, address newImpl) external returns (bytes32) {
+        bytes32 proposalId = keccak256(abi.encode(proxy, newImpl, block.timestamp));
+        proposals[proposalId] = UpgradeProposal(proxy, newImpl, block.timestamp, 0, false);
+        return proposalId;
+    }
+
+    function executeUpgrade(bytes32 proposalId) external {
+        UpgradeProposal storage p = proposals[proposalId];
+        require(!p.executed && p.signatures >= MIN_SIGNATURES);
+        require(block.timestamp >= p.proposedAt + UPGRADE_DELAY);
+        p.executed = true;
+    }
+}</code></pre>
+
+    <h2>API Security Architecture</h2>
+    <p>Blockchain nodes expose APIs for transaction submission and data queries. Securing these APIs is essential to prevent unauthorized access and denial-of-service attacks.</p>
+
+    <table>
+        <tr><th>Security Control</th><th>Implementation</th><th>Purpose</th></tr>
+        <tr><td>Rate Limiting</td><td>Token bucket algorithm</td><td>Prevent DoS attacks</td></tr>
+        <tr><td>Authentication</td><td>API keys, JWT tokens</td><td>Identify clients</td></tr>
+        <tr><td>Authorization</td><td>RBAC, method allowlists</td><td>Control access</td></tr>
+        <tr><td>Input Validation</td><td>Schema validation, sanitization</td><td>Prevent injection</td></tr>
+        <tr><td>TLS Encryption</td><td>TLS 1.3, certificate pinning</td><td>Protect in transit</td></tr>
+    </table>
+
+    <div class="highlight">
+        <strong>Summary:</strong> Security architecture for blockchain systems requires careful consideration at every layer. From node isolation to smart contract design patterns, each architectural decision impacts the overall security posture. The patterns and practices in this chapter provide a foundation for building robust, secure blockchain infrastructure.
+    </div>
+
+</body>
+</html>

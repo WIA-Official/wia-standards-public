@@ -1,306 +1,619 @@
-# WIA Cryo-Legal Standard - Phase 1: Data Format Specification
+# CRYO-LEGAL Phase 1: Data Format Specification
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #06B6D4 (Cyan)
+## Overview
 
----
+This document defines the data structures for legal status management of cryopreserved individuals.
 
-## 1. Overview
+## Core Data Structures
 
-### 1.1 Purpose
+### Legal Status Record
 
-The WIA Cryo-Legal Standard defines the data format for managing legal frameworks, documentation, and compliance requirements related to cryopreservation procedures. This specification ensures standardized handling of legal documents, consent records, jurisdiction mapping, and regulatory compliance across international cryopreservation facilities.
+```typescript
+interface LegalStatusRecord {
+  recordId: string;
+  subjectId: string;
+  identityId: string;
+  currentStatus: LegalStatus;
+  statusHistory: StatusTransition[];
+  deathCertificate: DeathCertificate;
+  preservationDeclaration: PreservationDeclaration;
+  restorationCertificate?: RestorationCertificate;
+  jurisdictions: JurisdictionRecord[];
+  documents: LegalDocument[];
+  guardianship: GuardianshipRecord;
+  lastUpdated: string;
+  createdAt: string;
+}
 
-### 1.2 Scope
+type LegalStatus =
+  | 'LIVING'
+  | 'LEGALLY_DECEASED'
+  | 'PRESERVED_STATUS'
+  | 'REVIVAL_PENDING'
+  | 'LEGALLY_RESTORED'
+  | 'PERMANENT_DEATH';
 
-This standard covers:
+interface StatusTransition {
+  transitionId: string;
+  fromStatus: LegalStatus;
+  toStatus: LegalStatus;
+  transitionDate: string;
+  authority: LegalAuthority;
+  documentRef: string;
+  reason: string;
+  witnesses: Witness[];
+}
+```
 
-| Category | Description |
-|----------|-------------|
-| Legal Documents | Contracts, wills, advance directives |
-| Jurisdiction Mapping | Country-specific legal requirements |
-| Compliance Records | Regulatory audit trails |
-| Consent Verification | Legal consent chain validation |
-| Trust Management | Cryopreservation trust structures |
+### Death Certificate
 
-### 1.3 Design Principles
+```typescript
+interface DeathCertificate {
+  certificateId: string;
+  certificateNumber: string;
+  jurisdiction: Jurisdiction;
 
-1. **Legal Integrity**: Cryptographic verification of all documents
-2. **Jurisdictional Awareness**: Multi-jurisdiction support
-3. **Temporal Validity**: Long-term document validity management
-4. **Auditability**: Complete legal audit trails
-5. **Privacy Compliance**: GDPR, HIPAA, and international privacy law support
+  deceasedInfo: {
+    fullName: string;
+    dateOfBirth: string;
+    placeOfBirth: string;
+    nationality: string[];
+    identificationNumbers: IdentificationNumber[];
+  };
 
----
+  deathInfo: {
+    dateOfDeath: string;
+    timeOfDeath: string;
+    placeOfDeath: string;
+    causeOfDeath: string;
+    mannerOfDeath: MannerOfDeath;
+    certifyingPhysician: string;
+    physicianLicense: string;
+  };
 
-## 2. Data Schema
+  preservationAnnotation?: {
+    annotated: boolean;
+    annotationDate: string;
+    annotationType: 'CRYOPRESERVATION_PENDING' | 'CRYOPRESERVED';
+    facilityId: string;
+    facilityName: string;
+  };
 
-### 2.1 CryoLegalDocument Schema
+  issuingAuthority: {
+    name: string;
+    title: string;
+    jurisdiction: string;
+    registrationNumber: string;
+  };
+
+  issueDate: string;
+  registrationDate: string;
+  certified: boolean;
+  certificationDate: string;
+}
+
+type MannerOfDeath =
+  | 'NATURAL'
+  | 'ACCIDENT'
+  | 'SUICIDE'
+  | 'HOMICIDE'
+  | 'UNDETERMINED'
+  | 'PENDING_INVESTIGATION';
+
+interface IdentificationNumber {
+  type: 'SSN' | 'NATIONAL_ID' | 'PASSPORT' | 'DRIVERS_LICENSE' | 'OTHER';
+  number: string;
+  issuingCountry: string;
+  verified: boolean;
+}
+```
+
+### Preservation Declaration
+
+```typescript
+interface PreservationDeclaration {
+  declarationId: string;
+  subjectId: string;
+
+  declarationType: DeclarationType;
+
+  legalBasis: {
+    statute: string;
+    jurisdiction: Jurisdiction;
+    effectiveDate: string;
+    expirationDate?: string;
+  };
+
+  preservationDetails: {
+    facilityId: string;
+    facilityName: string;
+    facilityJurisdiction: string;
+    preservationDate: string;
+    preservationMethod: string;
+    expectedDuration: string;
+  };
+
+  legalEffects: {
+    deathCertificateStatus: 'SUSPENDED' | 'ANNOTATED' | 'UNCHANGED';
+    propertyRights: PropertyRightsStatus;
+    contractualObligations: ContractStatus;
+    familyRelations: FamilyRelationsStatus;
+    votingRights: 'SUSPENDED' | 'TERMINATED';
+    taxObligations: TaxStatus;
+  };
+
+  conditions: {
+    revivalConditions: string[];
+    terminationConditions: string[];
+    reviewPeriod: string;
+  };
+
+  issuingAuthority: LegalAuthority;
+  issueDate: string;
+  effectiveDate: string;
+  signatures: Signature[];
+}
+
+type DeclarationType =
+  | 'JUDICIAL_ORDER'
+  | 'ADMINISTRATIVE_DECLARATION'
+  | 'NOTARIZED_DECLARATION'
+  | 'TREATY_BASED';
+
+interface PropertyRightsStatus {
+  status: 'SUSPENDED' | 'TRUST_MANAGED' | 'ESTATE_DISTRIBUTED';
+  trustId?: string;
+  trusteeId?: string;
+  reviewDate: string;
+}
+
+interface ContractStatus {
+  status: 'SUSPENDED' | 'TERMINATED' | 'CONTINUED';
+  exceptions: string[];
+}
+
+interface FamilyRelationsStatus {
+  status: 'PRESERVED' | 'MODIFIED';
+  marriageStatus: 'SUSPENDED' | 'DISSOLVED' | 'PRESERVED';
+  parentalRights: 'SUSPENDED' | 'TRANSFERRED' | 'PRESERVED';
+  guardianshipAssigned: boolean;
+}
+
+interface TaxStatus {
+  status: 'SUSPENDED' | 'FINAL_RETURN_FILED' | 'TRUST_FILING';
+  lastFilingYear: number;
+  trustTaxId?: string;
+}
+```
+
+### Restoration Certificate
+
+```typescript
+interface RestorationCertificate {
+  certificateId: string;
+  subjectId: string;
+  identityId: string;
+
+  revivalInfo: {
+    revivalProcedureId: string;
+    revivalDate: string;
+    revivalFacility: string;
+    revivalJurisdiction: string;
+    outcomeAssessment: string;
+  };
+
+  identityVerification: {
+    verificationMethod: IdentityVerificationMethod[];
+    verificationDate: string;
+    verifiedBy: string;
+    confidenceScore: number;
+    biometricMatch: boolean;
+  };
+
+  restoredRights: {
+    legalPersonhood: boolean;
+    propertyRights: boolean;
+    contractualCapacity: boolean;
+    familyRelations: RestoredFamilyRelations;
+    votingRights: boolean;
+    professionalLicenses: LicenseRestoration[];
+  };
+
+  newIdentifiers: {
+    newIdNumber?: string;
+    idContinuity: boolean;
+    socialSecurityStatus: 'RESTORED' | 'NEW_NUMBER' | 'PENDING';
+    passportStatus: 'RESTORED' | 'NEW_ISSUED' | 'PENDING';
+  };
+
+  conditions: {
+    probationaryPeriod?: string;
+    medicalReview: boolean;
+    mentalCapacityReview: boolean;
+    financialReview: boolean;
+  };
+
+  issuingAuthority: LegalAuthority;
+  issueDate: string;
+  effectiveDate: string;
+  signatures: Signature[];
+  courtApproval?: CourtApproval;
+}
+
+type IdentityVerificationMethod =
+  | 'BIOMETRIC_DNA'
+  | 'BIOMETRIC_FINGERPRINT'
+  | 'BIOMETRIC_FACIAL'
+  | 'BIOMETRIC_IRIS'
+  | 'DOCUMENT_VERIFICATION'
+  | 'WITNESS_TESTIMONY'
+  | 'CRYO_IDENTITY_VERIFICATION';
+
+interface RestoredFamilyRelations {
+  maritalStatus: 'RESTORED' | 'DISSOLVED' | 'NOT_APPLICABLE';
+  spouseConsent: boolean;
+  parentalRights: 'RESTORED' | 'MODIFIED' | 'TERMINATED';
+  childrenAcknowledged: string[];
+}
+
+interface LicenseRestoration {
+  licenseType: string;
+  originalLicenseId: string;
+  status: 'RESTORED' | 'REQUIRES_REEXAMINATION' | 'EXPIRED' | 'NOT_APPLICABLE';
+  restorationDate?: string;
+  conditions?: string[];
+}
+
+interface CourtApproval {
+  courtName: string;
+  caseNumber: string;
+  judgeName: string;
+  approvalDate: string;
+  orderText: string;
+}
+```
+
+### Jurisdiction Record
+
+```typescript
+interface JurisdictionRecord {
+  jurisdiction: Jurisdiction;
+  recognitionStatus: RecognitionStatus;
+  localStatusEquivalent: string;
+  registrationId: string;
+  registrationDate: string;
+  lastVerified: string;
+  documents: JurisdictionDocument[];
+  contacts: JurisdictionContact[];
+}
+
+interface Jurisdiction {
+  country: string;
+  countryCode: string;
+  region?: string;
+  locality?: string;
+  legalSystem: LegalSystem;
+  treatyMember: boolean;
+  bilateralAgreements: string[];
+}
+
+type LegalSystem =
+  | 'COMMON_LAW'
+  | 'CIVIL_LAW'
+  | 'RELIGIOUS_LAW'
+  | 'CUSTOMARY_LAW'
+  | 'MIXED';
+
+type RecognitionStatus =
+  | 'FULL_RECOGNITION'
+  | 'PARTIAL_RECOGNITION'
+  | 'PENDING_RECOGNITION'
+  | 'NOT_RECOGNIZED'
+  | 'TREATY_BASED';
+
+interface JurisdictionDocument {
+  documentId: string;
+  documentType: string;
+  localReference: string;
+  issueDate: string;
+  validUntil?: string;
+  certified: boolean;
+}
+
+interface JurisdictionContact {
+  authority: string;
+  contactType: string;
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+}
+```
+
+### Guardianship Record
+
+```typescript
+interface GuardianshipRecord {
+  guardianshipId: string;
+  subjectId: string;
+  status: GuardianshipStatus;
+
+  guardians: Guardian[];
+
+  scope: {
+    personalDecisions: boolean;
+    medicalDecisions: boolean;
+    financialDecisions: boolean;
+    legalRepresentation: boolean;
+    revivalDecisions: boolean;
+  };
+
+  appointment: {
+    appointmentDate: string;
+    appointingAuthority: LegalAuthority;
+    courtOrder?: string;
+    expirationDate?: string;
+  };
+
+  duties: GuardianDuty[];
+  reportingRequirements: ReportingRequirement[];
+
+  succession: {
+    successorGuardians: Guardian[];
+    successionRules: string;
+  };
+
+  termination?: {
+    terminationDate: string;
+    reason: TerminationReason;
+    authority: LegalAuthority;
+  };
+}
+
+type GuardianshipStatus =
+  | 'ACTIVE'
+  | 'SUSPENDED'
+  | 'TERMINATED'
+  | 'TRANSFERRED';
+
+interface Guardian {
+  guardianId: string;
+  name: string;
+  relationship: string;
+  priority: number;
+  contactInfo: ContactInfo;
+  appointmentDate: string;
+  qualifications: string[];
+  bondAmount?: number;
+  bondProvider?: string;
+}
+
+interface GuardianDuty {
+  dutyType: string;
+  description: string;
+  frequency: string;
+  reportingRequired: boolean;
+}
+
+interface ReportingRequirement {
+  reportType: string;
+  frequency: string;
+  recipient: string;
+  lastReport?: string;
+  nextDue: string;
+}
+
+type TerminationReason =
+  | 'REVIVAL_SUCCESSFUL'
+  | 'PERMANENT_DEATH'
+  | 'GUARDIAN_RESIGNATION'
+  | 'GUARDIAN_REMOVAL'
+  | 'COURT_ORDER';
+```
+
+### Legal Document
+
+```typescript
+interface LegalDocument {
+  documentId: string;
+  documentType: LegalDocumentType;
+  title: string;
+
+  content: {
+    format: 'PDF' | 'TEXT' | 'STRUCTURED';
+    hash: string;
+    hashAlgorithm: string;
+    size: number;
+    encryptionStatus: 'ENCRYPTED' | 'PLAINTEXT';
+  };
+
+  metadata: {
+    language: string;
+    version: string;
+    previousVersionId?: string;
+    createdAt: string;
+    createdBy: string;
+    lastModified: string;
+    modifiedBy: string;
+  };
+
+  authentication: {
+    signed: boolean;
+    signatures: Signature[];
+    notarized: boolean;
+    notarizationDetails?: NotarizationDetails;
+    apostille?: ApostilleDetails;
+  };
+
+  jurisdiction: Jurisdiction;
+  effectiveDate: string;
+  expirationDate?: string;
+  status: DocumentStatus;
+}
+
+type LegalDocumentType =
+  | 'DEATH_CERTIFICATE'
+  | 'PRESERVATION_DECLARATION'
+  | 'RESTORATION_CERTIFICATE'
+  | 'COURT_ORDER'
+  | 'GUARDIANSHIP_ORDER'
+  | 'TRUST_DOCUMENT'
+  | 'POWER_OF_ATTORNEY'
+  | 'CONSENT_DOCUMENT'
+  | 'IDENTITY_VERIFICATION'
+  | 'INTERNATIONAL_RECOGNITION';
+
+type DocumentStatus =
+  | 'DRAFT'
+  | 'PENDING_SIGNATURE'
+  | 'ACTIVE'
+  | 'SUPERSEDED'
+  | 'REVOKED'
+  | 'EXPIRED';
+
+interface Signature {
+  signerId: string;
+  signerName: string;
+  signerRole: string;
+  signatureDate: string;
+  signatureType: 'HANDWRITTEN' | 'DIGITAL' | 'ELECTRONIC';
+  digitalSignature?: string;
+  certificateId?: string;
+  verified: boolean;
+}
+
+interface NotarizationDetails {
+  notaryId: string;
+  notaryName: string;
+  notaryJurisdiction: string;
+  notarizationDate: string;
+  notaryCommission: string;
+  commissionExpiration: string;
+  sealNumber: string;
+}
+
+interface ApostilleDetails {
+  apostilleNumber: string;
+  issuingCountry: string;
+  issuingAuthority: string;
+  issueDate: string;
+  targetCountry?: string;
+}
+```
+
+### Legal Authority
+
+```typescript
+interface LegalAuthority {
+  authorityId: string;
+  authorityType: AuthorityType;
+  name: string;
+  jurisdiction: Jurisdiction;
+
+  officialInfo: {
+    officialName: string;
+    title: string;
+    department: string;
+    appointmentDate: string;
+    termExpiration?: string;
+  };
+
+  contact: {
+    address: string;
+    phone: string;
+    email: string;
+    website: string;
+  };
+
+  powers: {
+    canIssueDeath: boolean;
+    canIssuePreservation: boolean;
+    canIssueRestoration: boolean;
+    canAppointGuardian: boolean;
+    jurisdictionalLimits: string[];
+  };
+
+  verification: {
+    verified: boolean;
+    verificationDate: string;
+    verificationMethod: string;
+  };
+}
+
+type AuthorityType =
+  | 'COURT'
+  | 'GOVERNMENT_AGENCY'
+  | 'VITAL_RECORDS_OFFICE'
+  | 'MEDICAL_EXAMINER'
+  | 'NOTARY_PUBLIC'
+  | 'INTERNATIONAL_BODY';
+```
+
+### Witness
+
+```typescript
+interface Witness {
+  witnessId: string;
+  name: string;
+  relationship: string;
+  contactInfo: ContactInfo;
+  identificationProvided: boolean;
+  identificationTypes: string[];
+  witnessDate: string;
+  statement?: string;
+  signature: Signature;
+}
+
+interface ContactInfo {
+  address: string;
+  city: string;
+  region: string;
+  country: string;
+  postalCode: string;
+  phone: string;
+  email: string;
+}
+```
+
+## JSON Schema
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wia.live/cryo-legal/v1/document.schema.json",
-  "title": "WIA Cryo-Legal Document",
-  "type": "object",
-  "required": [
-    "documentId",
-    "version",
-    "documentType",
-    "jurisdiction",
-    "createdAt",
-    "parties",
-    "content",
-    "signatures"
-  ],
-  "properties": {
-    "$schema": {
-      "type": "string",
-      "format": "uri"
-    },
-    "documentId": {
-      "type": "string",
-      "format": "uuid",
-      "description": "Unique document identifier"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "documentType": {
+  "$id": "https://wia.org/schemas/cryo-legal/v1",
+  "definitions": {
+    "LegalStatus": {
       "type": "string",
       "enum": [
-        "cryopreservation_contract",
-        "advance_directive",
-        "last_will",
-        "trust_document",
-        "consent_form",
-        "power_of_attorney",
-        "medical_directive",
-        "revival_instruction",
-        "asset_disposition",
-        "identity_verification"
+        "LIVING",
+        "LEGALLY_DECEASED",
+        "PRESERVED_STATUS",
+        "REVIVAL_PENDING",
+        "LEGALLY_RESTORED",
+        "PERMANENT_DEATH"
       ]
     },
-    "jurisdiction": {
+    "LegalStatusRecord": {
       "type": "object",
-      "required": ["primaryCountry", "governingLaw"],
+      "required": ["recordId", "subjectId", "currentStatus"],
       "properties": {
-        "primaryCountry": {
-          "type": "string",
-          "pattern": "^[A-Z]{2}$"
-        },
-        "secondaryCountries": {
+        "recordId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "currentStatus": { "$ref": "#/definitions/LegalStatus" },
+        "statusHistory": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[A-Z]{2}$" }
-        },
-        "governingLaw": {
-          "type": "string"
-        },
-        "disputeResolution": {
-          "type": "string",
-          "enum": ["arbitration", "litigation", "mediation"]
-        },
-        "venue": {
-          "type": "string"
+          "items": { "$ref": "#/definitions/StatusTransition" }
         }
       }
     },
-    "createdAt": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "effectiveDate": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "expirationDate": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "parties": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/definitions/Party"
-      }
-    },
-    "content": {
-      "$ref": "#/definitions/DocumentContent"
-    },
-    "signatures": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Signature"
-      }
-    },
-    "witnesses": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Witness"
-      }
-    },
-    "notarization": {
-      "$ref": "#/definitions/Notarization"
-    },
-    "attachments": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Attachment"
-      }
-    },
-    "auditLog": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/AuditEntry"
-      }
-    },
-    "metadata": {
+    "StatusTransition": {
       "type": "object",
+      "required": ["transitionId", "fromStatus", "toStatus", "transitionDate"],
       "properties": {
-        "language": { "type": "string" },
-        "classification": { "type": "string" },
-        "retentionPeriod": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } }
-      }
-    }
-  },
-  "definitions": {
-    "Party": {
-      "type": "object",
-      "required": ["partyId", "role", "identity"],
-      "properties": {
-        "partyId": { "type": "string", "format": "uuid" },
-        "role": {
-          "type": "string",
-          "enum": ["subject", "facility", "trustee", "beneficiary", "executor", "witness", "notary", "legal_representative"]
-        },
-        "identity": {
-          "type": "object",
-          "properties": {
-            "type": { "type": "string", "enum": ["individual", "organization"] },
-            "legalName": { "type": "string" },
-            "identificationNumber": { "type": "string" },
-            "identificationType": { "type": "string" },
-            "dateOfBirth": { "type": "string", "format": "date" },
-            "nationality": { "type": "string" },
-            "address": { "$ref": "#/definitions/Address" }
-          }
-        },
-        "contact": {
-          "type": "object",
-          "properties": {
-            "email": { "type": "string", "format": "email" },
-            "phone": { "type": "string" },
-            "preferredMethod": { "type": "string" }
-          }
-        }
-      }
-    },
-    "Address": {
-      "type": "object",
-      "properties": {
-        "street": { "type": "string" },
-        "city": { "type": "string" },
-        "state": { "type": "string" },
-        "postalCode": { "type": "string" },
-        "country": { "type": "string", "pattern": "^[A-Z]{2}$" }
-      }
-    },
-    "DocumentContent": {
-      "type": "object",
-      "required": ["format", "body"],
-      "properties": {
-        "format": { "type": "string", "enum": ["plaintext", "markdown", "html", "pdf_base64"] },
-        "body": { "type": "string" },
-        "sections": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "sectionId": { "type": "string" },
-              "title": { "type": "string" },
-              "content": { "type": "string" },
-              "required": { "type": "boolean" }
-            }
-          }
-        },
-        "hash": { "type": "string" },
-        "hashAlgorithm": { "type": "string", "enum": ["SHA-256", "SHA-384", "SHA-512"] }
-      }
-    },
-    "Signature": {
-      "type": "object",
-      "required": ["signerId", "timestamp", "signatureData"],
-      "properties": {
-        "signerId": { "type": "string", "format": "uuid" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "signatureType": {
-          "type": "string",
-          "enum": ["electronic", "digital", "handwritten_scanned", "biometric"]
-        },
-        "signatureData": { "type": "string" },
-        "certificate": { "type": "string" },
-        "ipAddress": { "type": "string" },
-        "deviceInfo": { "type": "string" },
-        "verificationStatus": {
-          "type": "string",
-          "enum": ["pending", "verified", "failed", "revoked"]
-        }
-      }
-    },
-    "Witness": {
-      "type": "object",
-      "required": ["witnessId", "identity", "timestamp"],
-      "properties": {
-        "witnessId": { "type": "string", "format": "uuid" },
-        "identity": { "$ref": "#/definitions/Party/properties/identity" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "attestation": { "type": "string" },
-        "signature": { "$ref": "#/definitions/Signature" }
-      }
-    },
-    "Notarization": {
-      "type": "object",
-      "properties": {
-        "notaryId": { "type": "string" },
-        "notaryName": { "type": "string" },
-        "commission": { "type": "string" },
-        "jurisdiction": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "seal": { "type": "string" },
-        "certificate": { "type": "string" }
-      }
-    },
-    "Attachment": {
-      "type": "object",
-      "required": ["attachmentId", "filename", "mimeType"],
-      "properties": {
-        "attachmentId": { "type": "string", "format": "uuid" },
-        "filename": { "type": "string" },
-        "mimeType": { "type": "string" },
-        "size": { "type": "integer" },
-        "hash": { "type": "string" },
-        "url": { "type": "string", "format": "uri" },
-        "description": { "type": "string" }
-      }
-    },
-    "AuditEntry": {
-      "type": "object",
-      "required": ["timestamp", "action", "actorId"],
-      "properties": {
-        "timestamp": { "type": "string", "format": "date-time" },
-        "action": {
-          "type": "string",
-          "enum": ["created", "viewed", "modified", "signed", "notarized", "revoked", "archived"]
-        },
-        "actorId": { "type": "string" },
-        "details": { "type": "string" },
-        "ipAddress": { "type": "string" }
+        "transitionId": { "type": "string" },
+        "fromStatus": { "$ref": "#/definitions/LegalStatus" },
+        "toStatus": { "$ref": "#/definitions/LegalStatus" },
+        "transitionDate": { "type": "string", "format": "date-time" }
       }
     }
   }
@@ -309,459 +622,4 @@ This standard covers:
 
 ---
 
-## 3. Field Specifications
-
-### 3.1 Core Fields
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `documentId` | string (UUID) | Yes | Unique identifier | `"550e8400-e29b-41d4-a716-446655440000"` |
-| `version` | string | Yes | Semantic version | `"1.0.0"` |
-| `documentType` | enum | Yes | Type of legal document | `"cryopreservation_contract"` |
-| `jurisdiction.primaryCountry` | string | Yes | ISO 3166-1 alpha-2 code | `"US"` |
-| `jurisdiction.governingLaw` | string | Yes | Applicable law | `"State of Arizona"` |
-| `createdAt` | datetime | Yes | Creation timestamp | `"2025-01-15T10:30:00Z"` |
-| `effectiveDate` | datetime | No | When document takes effect | `"2025-02-01T00:00:00Z"` |
-| `expirationDate` | datetime | No | Document expiration | `null` (perpetual) |
-
-### 3.2 Party Fields
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `parties[].partyId` | string (UUID) | Yes | Party identifier | `"a1b2c3d4-..."` |
-| `parties[].role` | enum | Yes | Role in document | `"subject"` |
-| `parties[].identity.type` | enum | Yes | Individual or organization | `"individual"` |
-| `parties[].identity.legalName` | string | Yes | Full legal name | `"John Michael Smith"` |
-| `parties[].identity.identificationNumber` | string | No | ID number | `"123-45-6789"` |
-| `parties[].identity.dateOfBirth` | date | No | Birth date | `"1980-05-15"` |
-| `parties[].identity.nationality` | string | No | Country of citizenship | `"US"` |
-
-### 3.3 Signature Fields
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `signatures[].signerId` | string (UUID) | Yes | Signer's party ID | `"a1b2c3d4-..."` |
-| `signatures[].timestamp` | datetime | Yes | Signing time | `"2025-01-15T14:30:00Z"` |
-| `signatures[].signatureType` | enum | Yes | Type of signature | `"digital"` |
-| `signatures[].signatureData` | string | Yes | Base64 encoded signature | `"MEUCIQDx..."` |
-| `signatures[].certificate` | string | No | X.509 certificate | `"-----BEGIN CERTIFICATE-----..."` |
-| `signatures[].verificationStatus` | enum | No | Verification state | `"verified"` |
-
----
-
-## 4. Data Types
-
-### 4.1 Document Types
-
-| Value | Description |
-|-------|-------------|
-| `cryopreservation_contract` | Main service agreement with facility |
-| `advance_directive` | Medical care preferences |
-| `last_will` | Testament with cryopreservation provisions |
-| `trust_document` | Financial trust for cryopreservation |
-| `consent_form` | Informed consent documentation |
-| `power_of_attorney` | Legal representative authorization |
-| `medical_directive` | Healthcare proxy instructions |
-| `revival_instruction` | Post-revival care preferences |
-| `asset_disposition` | Asset management instructions |
-| `identity_verification` | Identity proof documentation |
-
-### 4.2 Party Roles
-
-| Value | Description |
-|-------|-------------|
-| `subject` | Person to be cryopreserved |
-| `facility` | Cryopreservation service provider |
-| `trustee` | Trust administrator |
-| `beneficiary` | Trust beneficiary |
-| `executor` | Will executor |
-| `witness` | Document witness |
-| `notary` | Notary public |
-| `legal_representative` | Attorney or legal agent |
-
-### 4.3 Verification Status
-
-| Value | Description |
-|-------|-------------|
-| `pending` | Awaiting verification |
-| `verified` | Successfully verified |
-| `failed` | Verification failed |
-| `revoked` | Previously valid, now revoked |
-
----
-
-## 5. Validation Rules
-
-### 5.1 Document Validation
-
-| Rule ID | Field | Validation | Error Code |
-|---------|-------|------------|------------|
-| VAL-001 | `documentId` | Must be valid UUID v4 | `INVALID_DOCUMENT_ID` |
-| VAL-002 | `version` | Must match semantic versioning | `INVALID_VERSION` |
-| VAL-003 | `jurisdiction.primaryCountry` | Must be valid ISO 3166-1 alpha-2 | `INVALID_COUNTRY_CODE` |
-| VAL-004 | `createdAt` | Must be valid ISO 8601 datetime | `INVALID_DATETIME` |
-| VAL-005 | `effectiveDate` | Must be >= createdAt if present | `INVALID_EFFECTIVE_DATE` |
-| VAL-006 | `parties` | Must have at least one party | `NO_PARTIES` |
-| VAL-007 | `signatures` | All required signers must sign | `MISSING_SIGNATURES` |
-
-### 5.2 Signature Validation
-
-| Rule ID | Field | Validation | Error Code |
-|---------|-------|------------|------------|
-| SIG-001 | `signerId` | Must reference valid party | `INVALID_SIGNER` |
-| SIG-002 | `timestamp` | Must be <= current time | `FUTURE_SIGNATURE` |
-| SIG-003 | `signatureData` | Must be valid Base64 | `INVALID_SIGNATURE_DATA` |
-| SIG-004 | `certificate` | Must be valid X.509 if digital | `INVALID_CERTIFICATE` |
-
-### 5.3 Error Codes
-
-| Code | Message | Description |
-|------|---------|-------------|
-| `INVALID_DOCUMENT_ID` | Document ID format invalid | UUID format required |
-| `INVALID_VERSION` | Version format invalid | Use MAJOR.MINOR.PATCH |
-| `INVALID_COUNTRY_CODE` | Country code not recognized | Use ISO 3166-1 alpha-2 |
-| `INVALID_DATETIME` | DateTime format invalid | Use ISO 8601 format |
-| `INVALID_EFFECTIVE_DATE` | Effective date before creation | Effective must be >= created |
-| `NO_PARTIES` | No parties defined | At least one party required |
-| `MISSING_SIGNATURES` | Required signatures missing | All parties must sign |
-| `INVALID_SIGNER` | Signer not in parties list | Signer must be a party |
-| `FUTURE_SIGNATURE` | Signature timestamp in future | Cannot sign in future |
-| `INVALID_SIGNATURE_DATA` | Signature data corrupted | Valid Base64 required |
-| `INVALID_CERTIFICATE` | Certificate validation failed | Valid X.509 required |
-
----
-
-## 6. Examples
-
-### 6.1 Valid Cryopreservation Contract
-
-```json
-{
-  "$schema": "https://wia.live/cryo-legal/v1/document.schema.json",
-  "documentId": "550e8400-e29b-41d4-a716-446655440000",
-  "version": "1.0.0",
-  "documentType": "cryopreservation_contract",
-  "jurisdiction": {
-    "primaryCountry": "US",
-    "governingLaw": "State of Arizona",
-    "disputeResolution": "arbitration",
-    "venue": "Phoenix, Arizona"
-  },
-  "createdAt": "2025-01-15T10:30:00Z",
-  "effectiveDate": "2025-02-01T00:00:00Z",
-  "parties": [
-    {
-      "partyId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "role": "subject",
-      "identity": {
-        "type": "individual",
-        "legalName": "John Michael Smith",
-        "identificationNumber": "DL-AZ-123456",
-        "identificationType": "driver_license",
-        "dateOfBirth": "1980-05-15",
-        "nationality": "US",
-        "address": {
-          "street": "123 Main Street",
-          "city": "Scottsdale",
-          "state": "AZ",
-          "postalCode": "85251",
-          "country": "US"
-        }
-      },
-      "contact": {
-        "email": "john.smith@email.com",
-        "phone": "+1-480-555-0123",
-        "preferredMethod": "email"
-      }
-    },
-    {
-      "partyId": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
-      "role": "facility",
-      "identity": {
-        "type": "organization",
-        "legalName": "CryoLife Preservation Inc.",
-        "identificationNumber": "EIN-12-3456789",
-        "identificationType": "ein",
-        "address": {
-          "street": "456 Research Parkway",
-          "city": "Scottsdale",
-          "state": "AZ",
-          "postalCode": "85260",
-          "country": "US"
-        }
-      }
-    }
-  ],
-  "content": {
-    "format": "markdown",
-    "body": "# Cryopreservation Services Agreement\n\n## Article 1: Services\n\nThe Facility agrees to provide whole-body cryopreservation services...",
-    "sections": [
-      {
-        "sectionId": "art-1",
-        "title": "Services",
-        "content": "The Facility agrees to provide whole-body cryopreservation services to the Subject upon legal death...",
-        "required": true
-      },
-      {
-        "sectionId": "art-2",
-        "title": "Payment Terms",
-        "content": "Subject agrees to fund cryopreservation through life insurance policy assignment...",
-        "required": true
-      }
-    ],
-    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "hashAlgorithm": "SHA-256"
-  },
-  "signatures": [
-    {
-      "signerId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "timestamp": "2025-01-15T14:30:00Z",
-      "signatureType": "digital",
-      "signatureData": "MEUCIQDxN2qc8Kj2c5y...",
-      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDXTCCAkWgAwIBAgIJAJC1...",
-      "verificationStatus": "verified"
-    },
-    {
-      "signerId": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
-      "timestamp": "2025-01-15T15:00:00Z",
-      "signatureType": "digital",
-      "signatureData": "MEQCIGhKl4R2m8f...",
-      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDYTCCAkmgAwIBAgIJAKD2...",
-      "verificationStatus": "verified"
-    }
-  ],
-  "witnesses": [
-    {
-      "witnessId": "c3d4e5f6-a7b8-9012-cdef-345678901234",
-      "identity": {
-        "type": "individual",
-        "legalName": "Mary Jane Wilson"
-      },
-      "timestamp": "2025-01-15T14:35:00Z",
-      "attestation": "I witnessed the Subject sign this document voluntarily."
-    }
-  ],
-  "notarization": {
-    "notaryId": "NP-AZ-12345",
-    "notaryName": "Sarah Johnson",
-    "commission": "Arizona Notary #12345",
-    "jurisdiction": "US-AZ",
-    "timestamp": "2025-01-15T16:00:00Z",
-    "seal": "base64-encoded-seal-image"
-  },
-  "auditLog": [
-    {
-      "timestamp": "2025-01-15T10:30:00Z",
-      "action": "created",
-      "actorId": "system",
-      "details": "Document created from template v2.1"
-    },
-    {
-      "timestamp": "2025-01-15T14:30:00Z",
-      "action": "signed",
-      "actorId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "details": "Subject signed digitally"
-    }
-  ],
-  "metadata": {
-    "language": "en-US",
-    "classification": "confidential",
-    "retentionPeriod": "perpetual",
-    "tags": ["cryopreservation", "whole-body", "arizona"]
-  }
-}
-```
-
-### 6.2 Valid Trust Document
-
-```json
-{
-  "$schema": "https://wia.live/cryo-legal/v1/document.schema.json",
-  "documentId": "660f9511-f30c-52e5-b827-557766551111",
-  "version": "1.0.0",
-  "documentType": "trust_document",
-  "jurisdiction": {
-    "primaryCountry": "US",
-    "governingLaw": "State of Delaware",
-    "disputeResolution": "litigation",
-    "venue": "Wilmington, Delaware"
-  },
-  "createdAt": "2025-01-20T09:00:00Z",
-  "parties": [
-    {
-      "partyId": "d4e5f6a7-b8c9-0123-def4-567890123456",
-      "role": "subject",
-      "identity": {
-        "type": "individual",
-        "legalName": "Robert James Miller",
-        "nationality": "US"
-      }
-    },
-    {
-      "partyId": "e5f6a7b8-c9d0-1234-ef56-789012345678",
-      "role": "trustee",
-      "identity": {
-        "type": "organization",
-        "legalName": "Delaware Trust Company"
-      }
-    }
-  ],
-  "content": {
-    "format": "markdown",
-    "body": "# Cryopreservation Maintenance Trust\n\nThis trust is established for the purpose of funding long-term cryopreservation...",
-    "hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
-    "hashAlgorithm": "SHA-256"
-  },
-  "signatures": [
-    {
-      "signerId": "d4e5f6a7-b8c9-0123-def4-567890123456",
-      "timestamp": "2025-01-20T10:00:00Z",
-      "signatureType": "digital",
-      "signatureData": "MEUCIQCabc123...",
-      "verificationStatus": "verified"
-    }
-  ],
-  "metadata": {
-    "language": "en-US",
-    "classification": "confidential",
-    "retentionPeriod": "perpetual",
-    "tags": ["trust", "maintenance-fund", "delaware"]
-  }
-}
-```
-
-### 6.3 Valid Advance Directive
-
-```json
-{
-  "$schema": "https://wia.live/cryo-legal/v1/document.schema.json",
-  "documentId": "771a0622-a41d-63f6-c938-668877662222",
-  "version": "1.0.0",
-  "documentType": "advance_directive",
-  "jurisdiction": {
-    "primaryCountry": "US",
-    "secondaryCountries": ["CA", "GB"],
-    "governingLaw": "State of California"
-  },
-  "createdAt": "2025-01-25T11:00:00Z",
-  "effectiveDate": "2025-01-25T11:00:00Z",
-  "parties": [
-    {
-      "partyId": "f6a7b8c9-d0e1-2345-fa67-890123456789",
-      "role": "subject",
-      "identity": {
-        "type": "individual",
-        "legalName": "Emily Chen Wang"
-      }
-    }
-  ],
-  "content": {
-    "format": "markdown",
-    "body": "# Advance Healthcare Directive for Cryopreservation\n\nI direct that upon determination of legal death, cryopreservation procedures begin immediately...",
-    "hash": "b2c3d4e5f6a789012345678901234567890abcdef1234567890abcdef1234567",
-    "hashAlgorithm": "SHA-256"
-  },
-  "signatures": [
-    {
-      "signerId": "f6a7b8c9-d0e1-2345-fa67-890123456789",
-      "timestamp": "2025-01-25T11:30:00Z",
-      "signatureType": "electronic",
-      "signatureData": "SGVsbG8gV29ybGQ=",
-      "verificationStatus": "verified"
-    }
-  ],
-  "metadata": {
-    "language": "en-US",
-    "classification": "confidential",
-    "retentionPeriod": "perpetual"
-  }
-}
-```
-
-### 6.4 Invalid Example: Missing Required Fields
-
-```json
-{
-  "documentId": "invalid-uuid-format",
-  "version": "1.0",
-  "documentType": "contract",
-  "jurisdiction": {
-    "primaryCountry": "USA"
-  },
-  "parties": []
-}
-```
-
-**Validation Errors:**
-- `INVALID_DOCUMENT_ID`: documentId must be UUID v4
-- `INVALID_VERSION`: version must be MAJOR.MINOR.PATCH
-- `INVALID_DOCUMENT_TYPE`: "contract" not in enum
-- `INVALID_COUNTRY_CODE`: "USA" should be "US"
-- `NO_PARTIES`: parties array is empty
-- `MISSING_REQUIRED_FIELD`: createdAt is required
-
-### 6.5 Invalid Example: Future Signature
-
-```json
-{
-  "documentId": "882b1733-b52e-74a7-da49-779988773333",
-  "version": "1.0.0",
-  "documentType": "consent_form",
-  "jurisdiction": {
-    "primaryCountry": "US",
-    "governingLaw": "Federal"
-  },
-  "createdAt": "2025-01-01T00:00:00Z",
-  "parties": [
-    {
-      "partyId": "a7b8c9d0-e1f2-3456-ab78-901234567890",
-      "role": "subject",
-      "identity": {
-        "type": "individual",
-        "legalName": "Test User"
-      }
-    }
-  ],
-  "content": {
-    "format": "plaintext",
-    "body": "Test content"
-  },
-  "signatures": [
-    {
-      "signerId": "a7b8c9d0-e1f2-3456-ab78-901234567890",
-      "timestamp": "2099-12-31T23:59:59Z",
-      "signatureType": "electronic",
-      "signatureData": "dGVzdA=="
-    }
-  ]
-}
-```
-
-**Validation Errors:**
-- `FUTURE_SIGNATURE`: signature timestamp is in the future
-
----
-
-## 7. Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial release |
-
----
-
-<div align="center">
-
-**WIA Cryo-Legal Standard v1.0.0**
-
-Phase 1: Data Format Specification
-
-**弘益人間 (홍익인간)** · Benefit All Humanity
-
----
-
-© 2025 WIA Standards Committee
-
-MIT License
-
-</div>
+*WIA Technical Committee - Cryopreservation Working Group*

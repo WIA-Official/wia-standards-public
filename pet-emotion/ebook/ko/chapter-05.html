@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제5장: 실시간 모니터링 - WIA-PET-EMOTION</title>
+</head>
+<body>
+<h1>제5장: 실시간 모니터링</h1>
+
+<blockquote>
+"홍익인간: 지속적인 인식은 시의적절한 대응을 가능하게 하여, 이해를 자비로운 행동으로 변환합니다."
+</blockquote>
+
+<hr>
+
+<h2>5.1 스트리밍 아키텍처</h2>
+
+<pre>
+실시간 모니터링 스택
+==================
+
++------------------+
+|   엣지 장치      |  카메라, 마이크, 웨어러블
++------------------+
+         |
+         v (로컬 처리)
++------------------+
+|   엣지 프로세서  |  개인정보 우선 로컬 분석
++------------------+
+         |
+         v (감정 이벤트만)
++------------------+
+|   메시지 큐      |  Kafka/RabbitMQ
++------------------+
+         |
+         v
++------------------+
+|   스트림 프로세서|  실시간 집계
++------------------+
+         |
+         v
++------------------+
+|   WebSocket 서버 |  클라이언트 연결
++------------------+
+         |
+         v
++------------------+
+|   클라이언트 앱  |  모바일, 웹, 대시보드
++------------------+
+</pre>
+
+<hr>
+
+<h2>5.2 WebSocket 프로토콜</h2>
+
+<h3>연결 수립</h3>
+
+<pre>
+WEBSOCKET 핸드셰이크
+===================
+
+1. 클라이언트 연결
+   ws://api.wia-emotion.org/ws/emotions/{profileId}
+
+2. 인증
+   클라이언트 전송:
+   {
+     "action": "authenticate",
+     "token": "Bearer xxx"
+   }
+
+3. 서버 확인
+   {
+     "type": "authenticated",
+     "profileId": "pet-123",
+     "subscriptions": []
+   }
+
+4. 클라이언트 구독
+   {
+     "action": "subscribe",
+     "dataTypes": ["emotions", "alerts", "vitals"]
+   }
+
+5. 서버 확인
+   {
+     "type": "subscribed",
+     "dataTypes": ["emotions", "alerts", "vitals"],
+     "updateInterval": 1000
+   }
+</pre>
+
+<h3>메시지 유형</h3>
+
+<table border="1">
+<tr>
+<th>유형</th>
+<th>방향</th>
+<th>설명</th>
+</tr>
+<tr>
+<td>emotion_update</td>
+<td>서버 -> 클라이언트</td>
+<td>새 감정 읽기</td>
+</tr>
+<tr>
+<td>alert</td>
+<td>서버 -> 클라이언트</td>
+<td>경보 발생</td>
+</tr>
+<tr>
+<td>vitals_update</td>
+<td>서버 -> 클라이언트</td>
+<td>생리 데이터</td>
+</tr>
+<tr>
+<td>subscribe</td>
+<td>클라이언트 -> 서버</td>
+<td>데이터 유형 구독</td>
+</tr>
+<tr>
+<td>unsubscribe</td>
+<td>클라이언트 -> 서버</td>
+<td>데이터 구독 해제</td>
+</tr>
+<tr>
+<td>ping/pong</td>
+<td>양방향</td>
+<td>연결 유지</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>5.3 감정 업데이트 메시지</h2>
+
+<pre>
+감정 업데이트 형식
+=================
+
+{
+  "type": "emotion_update",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "data": {
+    "readingId": "read-789",
+    "profileId": "pet-123",
+    "primaryEmotion": {
+      "emotionType": "HAPPY",
+      "intensity": 4,
+      "confidence": 87.5,
+      "confidenceLevel": "HIGH"
+    },
+    "secondaryEmotions": [
+      {
+        "emotionType": "EXCITED",
+        "intensity": 3,
+        "confidence": 65.2
+      }
+    ],
+    "overallMood": {
+      "valence": 0.8,
+      "arousal": 0.6,
+      "wellbeing": 85
+    },
+    "dataSources": ["visual", "physiological"]
+  }
+}
+</pre>
+
+<hr>
+
+<h2>5.4 엣지 처리</h2>
+
+<h3>개인정보 우선 아키텍처</h3>
+
+<pre>
+엣지 처리 흐름
+=============
+
+[카메라] --> [온디바이스 AI]
+                  |
+                  v
+           로컬 처리:
+           - 얼굴 감지
+           - 키포인트 추출
+           - 표정 분석
+           - 감정 분류
+                  |
+                  v
+           출력 전용:
+           - 감정 점수
+           - 신뢰도 값
+           - 타임스탬프
+           (이미지 전송 없음)
+                  |
+                  v
+           [클라우드 서버]
+</pre>
+
+<h3>엣지 장치 요구사항</h3>
+
+<table border="1">
+<tr>
+<th>구성요소</th>
+<th>최소</th>
+<th>권장</th>
+</tr>
+<tr>
+<td>프로세서</td>
+<td>ARM Cortex-A53</td>
+<td>ARM Cortex-A72 + NPU</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>2GB</td>
+<td>4GB</td>
+</tr>
+<tr>
+<td>저장소</td>
+<td>8GB</td>
+<td>32GB</td>
+</tr>
+<tr>
+<td>AI 가속기</td>
+<td>선택</td>
+<td>4 TOPS NPU</td>
+</tr>
+<tr>
+<td>카메라</td>
+<td>720p 30fps</td>
+<td>1080p 60fps</td>
+</tr>
+<tr>
+<td>마이크</td>
+<td>단일</td>
+<td>어레이 (2개 이상)</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>5.5 데이터 버퍼링</h2>
+
+<pre>
+버퍼링 전략
+==========
+
+목적: 네트워크 중단 처리
+
+1. 로컬 버퍼
+   - 용량: 24시간 읽기
+   - 저장소: 엣지 장치의 SQLite
+   - 동기화: 연결 시 자동
+
+2. 우선순위 큐
+   레벨 1 (즉시): 경보
+   레벨 2 (높음): 감정 변화
+   레벨 3 (보통): 일반 업데이트
+   레벨 4 (낮음): 과거 동기화
+
+3. 오프라인 모드
+   - 로컬 처리 계속
+   - 모든 읽기 로컬 저장
+   - 전송 대기 경보 큐잉
+   - 연결 복원 시 동기화
+
+4. 대역폭 관리
+   일반 모드: 1 업데이트/초
+   낮은 대역폭: 1 업데이트/5초
+   오프라인: 로컬 저장만
+</pre>
+
+<hr>
+
+<h2>5.6 업데이트 빈도</h2>
+
+<table border="1">
+<tr>
+<th>시나리오</th>
+<th>업데이트 속도</th>
+<th>근거</th>
+</tr>
+<tr>
+<td>안정적 감정</td>
+<td>5초당 1회</td>
+<td>대역폭 감소</td>
+</tr>
+<tr>
+<td>감정 전환</td>
+<td>초당 1회</td>
+<td>변화 캡처</td>
+</tr>
+<tr>
+<td>경보 조건</td>
+<td>즉시</td>
+<td>긴급 대응</td>
+</tr>
+<tr>
+<td>높은 각성 상태</td>
+<td>초당 2회</td>
+<td>면밀한 모니터링</td>
+</tr>
+<tr>
+<td>수면/휴식</td>
+<td>30초당 1회</td>
+<td>최소 데이터 필요</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>5.7 연결 관리</h2>
+
+<pre>
+WEBSOCKET 수명주기
+=================
+
+연결 상태:
+  CONNECTING --> AUTHENTICATED --> SUBSCRIBED
+       |              |               |
+       v              v               v
+  DISCONNECTED   AUTH_FAILED    ACTIVE_STREAMING
+       |
+       v
+  RECONNECTING (지수적 백오프)
+
+킵얼라이브 프로토콜:
+  클라이언트 30초마다 PING 전송
+  서버 PONG으로 응답
+  60초 내 PONG 없음 = 재연결
+
+재연결 전략:
+  시도 1: 즉시
+  시도 2: 1초 지연
+  시도 3: 2초 지연
+  시도 4: 4초 지연
+  ...
+  최대 지연: 30초
+  최대 시도: 무제한
+</pre>
+
+<hr>
+
+<h2>5.8 클라이언트 구현</h2>
+
+<h3>JavaScript 클라이언트 예제</h3>
+
+<pre>
+클라이언트 구현
+==============
+
+class EmotionStreamClient {
+  constructor(profileId, token) {
+    this.profileId = profileId;
+    this.token = token;
+    this.ws = null;
+    this.handlers = {};
+  }
+
+  connect() {
+    const url = `wss://api.wia-emotion.org/ws/emotions/${this.profileId}`;
+    this.ws = new WebSocket(url);
+
+    this.ws.onopen = () => {
+      this.authenticate();
+    };
+
+    this.ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      this.handleMessage(message);
+    };
+
+    this.ws.onclose = () => {
+      this.scheduleReconnect();
+    };
+  }
+
+  authenticate() {
+    this.send({
+      action: "authenticate",
+      token: `Bearer ${this.token}`
+    });
+  }
+
+  subscribe(dataTypes) {
+    this.send({
+      action: "subscribe",
+      dataTypes: dataTypes
+    });
+  }
+
+  onEmotion(callback) {
+    this.handlers["emotion_update"] = callback;
+  }
+
+  onAlert(callback) {
+    this.handlers["alert"] = callback;
+  }
+}
+</pre>
+
+<hr>
+
+<h2>5.9 대시보드 통합</h2>
+
+<pre>
+대시보드 구성요소
+================
+
+1. 실시간 감정 표시
+   +---------------------------+
+   |  현재 감정: HAPPY         |
+   |  강도: ****               |
+   |  신뢰도: 87%              |
+   |  지속시간: 5분            |
+   +---------------------------+
+
+2. 기분 타임라인 (24시간)
+   +---------------------------+
+   | 시간 | 기분               |
+   |------+--------------------|
+   | 8AM  | CONTENT            |
+   | 9AM  | EXCITED (산책)     |
+   | 10AM | CALM               |
+   | ...  | ...                |
+   +---------------------------+
+
+3. 경보 패널
+   +---------------------------+
+   | [!] 불안 감지             |
+   |     지속시간: 10분        |
+   |     조치: 반려동물 확인   |
+   +---------------------------+
+
+4. 생체 표시
+   +---------------------------+
+   | HR: 85 bpm (정상)         |
+   | 활동: 보통                |
+   | HRV: 45ms (양호)          |
+   +---------------------------+
+</pre>
+
+<hr>
+
+<h2>5.10 성능 최적화</h2>
+
+<table border="1">
+<tr>
+<th>최적화</th>
+<th>구현</th>
+<th>이점</th>
+</tr>
+<tr>
+<td>델타 압축</td>
+<td>변경된 필드만 전송</td>
+<td>80% 대역폭 감소</td>
+</tr>
+<tr>
+<td>바이너리 프로토콜</td>
+<td>JSON 대신 MessagePack</td>
+<td>50% 크기 감소</td>
+</tr>
+<tr>
+<td>배칭</td>
+<td>여러 업데이트 그룹화</td>
+<td>왕복 감소</td>
+</tr>
+<tr>
+<td>적응형 속도</td>
+<td>안정 시 업데이트 감소</td>
+<td>리소스 효율</td>
+</tr>
+<tr>
+<td>엣지 캐싱</td>
+<td>사용자 근처 처리</td>
+<td>낮은 지연</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] WebSocket 프로토콜이 실시간 감정 스트리밍 활성화</li>
+<li>[OK] 엣지 처리가 로컬 분석으로 개인정보 보장</li>
+<li>[OK] 버퍼링이 네트워크 중단 우아하게 처리</li>
+<li>[OK] 적응형 업데이트 속도가 대역폭 최적화</li>
+<li>[OK] 자동 재연결로 견고한 연결 관리</li>
+<li>[OK] 대시보드 통합이 시각적 모니터링 제공</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-04.html">이전: 제4장 - 분석 알고리즘</a> | <a href="chapter-06.html">다음: 제6장 - 웰빙 평가</a></p>
+</body>
+</html>

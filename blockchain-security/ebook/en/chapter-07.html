@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Operations and Compliance | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: Operations and Compliance</h1>
+
+    <div class="highlight">
+        <strong>Chapter Overview:</strong> Security operations transform security policies into ongoing practice. This chapter covers continuous monitoring, threat detection systems, SIEM integration, and regulatory compliance frameworks for blockchain systems.
+    </div>
+
+    <h2>Security Operations Center (SOC)</h2>
+    <p>A blockchain-focused Security Operations Center monitors network health, transaction patterns, and potential threats in real-time. The SOC serves as the nerve center for security operations.</p>
+
+    <h3>SOC Architecture</h3>
+    <pre><code>Blockchain Security Operations Center Architecture:
+
+┌─────────────────────────────────────────────────────────────────┐
+│                        SOC Dashboard                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐ │
+│  │  Alerts  │  │ Metrics  │  │ Incidents│  │ Compliance Status│ │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────────┬─────────┘ │
+└───────┼─────────────┼─────────────┼─────────────────┼───────────┘
+        │             │             │                 │
+        ▼             ▼             ▼                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SIEM / Log Aggregation                        │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  - Log correlation and analysis                              │ │
+│  │  - Anomaly detection algorithms                              │ │
+│  │  - Threat intelligence correlation                           │ │
+│  │  - Automated playbook execution                              │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+        ▲             ▲             ▲                 ▲
+        │             │             │                 │
+┌───────┴───────┬─────┴─────┬───────┴───────┬─────────┴───────────┐
+│ Node Agents   │ Network   │ Smart Contract│ API & Application   │
+│               │ Monitors  │ Monitors      │ Logs                │
+│ - Peer status │ - Traffic │ - Event logs  │ - Access logs       │
+│ - Sync state  │ - Latency │ - State changes│ - Error logs       │
+│ - Resources   │ - Anomalies│ - Function calls│ - Audit trails   │
+└───────────────┴───────────┴───────────────┴─────────────────────┘</code></pre>
+
+    <h3>Monitoring Implementation</h3>
+    <pre><code>// Comprehensive Security Monitoring System
+import { EventEmitter } from 'events';
+import { InfluxDB, Point } from '@influxdata/influxdb-client';
+
+interface MonitoringConfig {
+    influxUrl: string;
+    influxToken: string;
+    org: string;
+    bucket: string;
+    alertThresholds: AlertThresholds;
+}
+
+interface AlertThresholds {
+    transactionVolumeSpike: number;     // Percentage increase
+    failedTransactionRate: number;       // Percentage
+    nodeLatencyMs: number;               // Milliseconds
+    memoryUsagePercent: number;          // Percentage
+    peerCountMinimum: number;            // Count
+}
+
+class BlockchainSecurityMonitor extends EventEmitter {
+    private influx: InfluxDB;
+    private writeApi: any;
+    private thresholds: AlertThresholds;
+
+    constructor(config: MonitoringConfig) {
+        super();
+        this.influx = new InfluxDB({
+            url: config.influxUrl,
+            token: config.influxToken
+        });
+        this.writeApi = this.influx.getWriteApi(config.org, config.bucket);
+        this.thresholds = config.alertThresholds;
+    }
+
+    async monitorNode(nodeId: string): Promise<void> {
+        const metrics = await this.collectNodeMetrics(nodeId);
+
+        // Write metrics to InfluxDB
+        const point = new Point('node_metrics')
+            .tag('node_id', nodeId)
+            .floatField('cpu_usage', metrics.cpuUsage)
+            .floatField('memory_usage', metrics.memoryUsage)
+            .intField('peer_count', metrics.peerCount)
+            .intField('block_height', metrics.blockHeight)
+            .intField('pending_tx_count', metrics.pendingTxCount)
+            .floatField('sync_progress', metrics.syncProgress);
+
+        this.writeApi.writePoint(point);
+
+        // Check thresholds
+        this.checkThresholds(nodeId, metrics);
+    }
+
+    private checkThresholds(nodeId: string, metrics: NodeMetrics): void {
+        // Memory usage check
+        if (metrics.memoryUsage > this.thresholds.memoryUsagePercent) {
+            this.emit('alert', {
+                type: 'HIGH_MEMORY_USAGE',
+                severity: 'warning',
+                nodeId,
+                value: metrics.memoryUsage,
+                threshold: this.thresholds.memoryUsagePercent,
+                message: `Node ${nodeId} memory usage at ${metrics.memoryUsage}%`
+            });
+        }
+
+        // Peer count check
+        if (metrics.peerCount < this.thresholds.peerCountMinimum) {
+            this.emit('alert', {
+                type: 'LOW_PEER_COUNT',
+                severity: 'warning',
+                nodeId,
+                value: metrics.peerCount,
+                threshold: this.thresholds.peerCountMinimum,
+                message: `Node ${nodeId} has only ${metrics.peerCount} peers`
+            });
+        }
+
+        // Sync status check
+        if (metrics.syncProgress < 0.99 && metrics.syncProgress > 0) {
+            this.emit('alert', {
+                type: 'NODE_SYNCING',
+                severity: 'info',
+                nodeId,
+                value: metrics.syncProgress,
+                message: `Node ${nodeId} syncing: ${(metrics.syncProgress * 100).toFixed(2)}%`
+            });
+        }
+    }
+
+    async monitorTransactions(chainId: number): Promise<void> {
+        const window = 60000; // 1 minute window
+        const currentTx = await this.getTransactionCount(chainId, window);
+        const previousTx = await this.getTransactionCount(chainId, window, -window);
+
+        // Calculate change
+        const changePercent = previousTx > 0
+            ? ((currentTx - previousTx) / previousTx) * 100
+            : 0;
+
+        if (Math.abs(changePercent) > this.thresholds.transactionVolumeSpike) {
+            this.emit('alert', {
+                type: changePercent > 0 ? 'TX_VOLUME_SPIKE' : 'TX_VOLUME_DROP',
+                severity: changePercent > 100 ? 'high' : 'warning',
+                chainId,
+                currentVolume: currentTx,
+                previousVolume: previousTx,
+                changePercent,
+                message: `Transaction volume ${changePercent > 0 ? 'increased' : 'decreased'} by ${Math.abs(changePercent).toFixed(1)}%`
+            });
+        }
+    }
+}</code></pre>
+
+    <h2>Threat Detection Systems</h2>
+    <p>Advanced threat detection combines rule-based detection with machine learning to identify both known attack patterns and novel threats.</p>
+
+    <h3>Detection Rule Engine</h3>
+    <pre><code>// Threat Detection Rule Engine
+interface DetectionRule {
+    id: string;
+    name: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    conditions: RuleCondition[];
+    enabled: boolean;
+}
+
+class ThreatDetectionEngine {
+    private rules: DetectionRule[];
+
+    constructor(rules: DetectionRule[]) {
+        this.rules = rules.filter(r => r.enabled);
+    }
+
+    async evaluate(event: SecurityEvent): Promise<DetectionResult[]> {
+        const results: DetectionResult[] = [];
+
+        for (const rule of this.rules) {
+            const allMet = rule.conditions.every(c =>
+                this.evaluateCondition(c, this.getFieldValue(event, c.field))
+            );
+
+            if (allMet) {
+                results.push({
+                    ruleId: rule.id,
+                    ruleName: rule.name,
+                    severity: rule.severity,
+                    timestamp: Date.now()
+                });
+            }
+        }
+        return results;
+    }
+
+    private evaluateCondition(c: RuleCondition, value: any): boolean {
+        switch (c.operator) {
+            case 'eq': return value === c.value;
+            case 'gt': return value > c.value;
+            case 'contains': return String(value).includes(c.value);
+            default: return false;
+        }
+    }
+}
+
+// Example Detection Rules
+const blockchainDetectionRules: DetectionRule[] = [
+    { id: 'REEN-001', name: 'Reentrancy Attack', severity: 'critical',
+      conditions: [{ field: 'event.type', operator: 'eq', value: 'CONTRACT_CALL' }], enabled: true },
+    { id: 'FLASH-001', name: 'Flash Loan Detection', severity: 'medium',
+      conditions: [{ field: 'transaction.value', operator: 'gt', value: 1000000 }], enabled: true }
+];</code></pre>
+
+    <h2>Regulatory Compliance Frameworks</h2>
+    <p>Blockchain systems must comply with various regulatory requirements depending on jurisdiction and use case. Key compliance areas include AML/KYC, data protection, and financial regulations.</p>
+
+    <div class="highlight">
+        <strong>Compliance is Continuous:</strong> Regulatory requirements evolve constantly. Organizations must establish processes for monitoring regulatory changes and adapting their compliance programs accordingly.
+    </div>
+
+    <h3>Compliance Framework Mapping</h3>
+    <table>
+        <tr><th>Regulation</th><th>Jurisdiction</th><th>Key Requirements</th><th>Blockchain Impact</th></tr>
+        <tr><td>GDPR</td><td>EU</td><td>Data protection, right to erasure</td><td>Off-chain PII, privacy layers</td></tr>
+        <tr><td>MiCA</td><td>EU</td><td>Crypto asset regulation</td><td>Token classification, custody</td></tr>
+        <tr><td>FATF Travel Rule</td><td>Global</td><td>Transaction originator info</td><td>KYC for transfers > $3000</td></tr>
+        <tr><td>SOC 2</td><td>US</td><td>Security controls</td><td>Node security, access controls</td></tr>
+        <tr><td>PCI-DSS</td><td>Global</td><td>Payment card security</td><td>Key management, encryption</td></tr>
+        <tr><td>BSA/AML</td><td>US</td><td>Anti-money laundering</td><td>Transaction monitoring, SAR</td></tr>
+    </table>
+
+    <h3>Compliance Monitoring System</h3>
+    <pre><code>// Automated Compliance Monitoring
+interface ComplianceCheck {
+    id: string;
+    regulation: string;
+    checkFunction: () => Promise<ComplianceResult>;
+    frequency: 'realtime' | 'daily' | 'weekly';
+}
+
+interface ComplianceResult {
+    compliant: boolean;
+    score: number;
+    findings: Finding[];
+}
+
+class ComplianceMonitor {
+    private checks: ComplianceCheck[];
+
+    async runComplianceAudit(): Promise<ComplianceReport> {
+        const results = new Map<string, ComplianceResult>();
+
+        for (const check of this.checks) {
+            const result = await check.checkFunction();
+            results.set(check.id, result);
+        }
+
+        const scores = Array.from(results.values()).map(r => r.score);
+        const overallScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+        return {
+            timestamp: new Date(),
+            overallScore,
+            overallCompliant: overallScore >= 80,
+            detailedResults: Object.fromEntries(results)
+        };
+    }
+}
+
+// Example: FATF Travel Rule Check
+const travelRuleCheck: ComplianceCheck = {
+    id: 'FATF-TR-001',
+    regulation: 'FATF Travel Rule',
+    frequency: 'realtime',
+    checkFunction: async () => {
+        const txs = await getRecentTransactions({ minValue: 3000 });
+        const findings = txs.filter(tx => !tx.originatorInfo)
+            .map(tx => ({ type: 'violation', message: `${tx.hash} missing info` }));
+        return { compliant: findings.length === 0, score: Math.max(0, 100 - findings.length * 10), findings };
+    }
+};</code></pre>
+
+    <div class="highlight">
+        <strong>Summary:</strong> Security operations and compliance form the foundation for maintaining a secure blockchain environment over time. Continuous monitoring, threat detection, and regulatory compliance require dedicated processes and tools that evolve with the threat landscape and regulatory environment.
+    </div>
+
+</body>
+</html>

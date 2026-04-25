@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Model Registries & Version Control | WIA-AI-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; border-radius: 20px; }
+        .nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; margin-right: 20px; }
+        h1 { color: #10B981; font-size: 2.8em; margin-bottom: 10px; }
+        .chapter-meta { color: #64748b; margin-bottom: 40px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #cbd5e1; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #0f172a; padding: 2px 8px; border-radius: 4px; color: #10B981; }
+        pre { background: #0f172a; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; overflow-x: auto; margin: 20px 0; }
+        .note { background: #334155; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin-left: 40px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .summary { background: #10B981; color: white; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .summary h2 { color: white; border-bottom: 2px solid white; }
+        .review { background: #0f172a; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review h2 { color: #10B981; }
+        footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; text-align: center; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        tr:hover { background: #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Model Registries & Version Control</h1>
+        <p class="chapter-meta">WIA-AI-008 Standard • Estimated reading time: 40 minutes</p>
+
+        <h2>6.1 Why Model Registries?</h2>
+        <p>
+            As organizations scale their ML operations, managing dozens or hundreds of models becomes challenging. Model
+            registries provide centralized storage, versioning, metadata management, and access control for machine learning
+            models. They enable collaboration, reproducibility, and governance across teams.
+        </p>
+
+        <h3>Key Benefits</h3>
+        <ul>
+            <li><strong>Centralized Storage</strong>: Single source of truth for all models</li>
+            <li><strong>Version Control</strong>: Track model evolution over time</li>
+            <li><strong>Metadata Management</strong>: Store training metrics, datasets, configurations</li>
+            <li><strong>Access Control</strong>: Manage permissions and audit logs</li>
+            <li><strong>Deployment Tracking</strong>: Know which models are in production</li>
+            <li><strong>Collaboration</strong>: Share models across teams and organizations</li>
+        </ul>
+
+        <h2>6.2 MLflow Model Registry</h2>
+        <p>
+            MLflow is an open-source platform for managing the ML lifecycle, including a robust model registry.
+        </p>
+
+        <h3>Setting Up MLflow</h3>
+        <pre><code># Install MLflow
+# pip install mlflow
+
+# Start MLflow tracking server
+# mlflow server --host 0.0.0.0 --port 5000
+
+import mlflow
+import mlflow.pytorch
+
+# Set tracking URI
+mlflow.set_tracking_uri("http://localhost:5000")
+
+# Create experiment
+mlflow.set_experiment("image-classification")
+
+# Train and log model
+with mlflow.start_run():
+    # Training code
+    model = train_model()
+
+    # Log parameters
+    mlflow.log_param("learning_rate", 0.001)
+    mlflow.log_param("batch_size", 32)
+    mlflow.log_param("epochs", 10)
+
+    # Log metrics
+    mlflow.log_metric("train_accuracy", 0.95)
+    mlflow.log_metric("val_accuracy", 0.92)
+
+    # Log model
+    mlflow.pytorch.log_model(
+        model,
+        "model",
+        registered_model_name="ResNet18Classifier"
+    )
+
+    print(f"Model logged with run_id: {mlflow.active_run().info.run_id}")</code></pre>
+
+        <h3>Model Versioning</h3>
+        <pre><code>from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+
+# Register new version
+result = client.create_model_version(
+    name="ResNet18Classifier",
+    source="runs:/abc123/model",
+    run_id="abc123"
+)
+
+print(f"Created version: {result.version}")
+
+# List all versions
+versions = client.search_model_versions("name='ResNet18Classifier'")
+for v in versions:
+    print(f"Version {v.version}: {v.current_stage} - {v.creation_timestamp}")
+
+# Transition to staging
+client.transition_model_version_stage(
+    name="ResNet18Classifier",
+    version=2,
+    stage="Staging"
+)
+
+# Promote to production
+client.transition_model_version_stage(
+    name="ResNet18Classifier",
+    version=2,
+    stage="Production"
+)
+
+# Archive old version
+client.transition_model_version_stage(
+    name="ResNet18Classifier",
+    version=1,
+    stage="Archived"
+)</code></pre>
+
+        <h3>Loading Models from Registry</h3>
+        <pre><code>import mlflow.pytorch
+
+# Load latest production model
+model_uri = "models:/ResNet18Classifier/Production"
+model = mlflow.pytorch.load_model(model_uri)
+
+# Load specific version
+model_uri = "models:/ResNet18Classifier/2"
+model = mlflow.pytorch.load_model(model_uri)
+
+# Use for inference
+import torch
+input_data = torch.randn(1, 3, 224, 224)
+output = model(input_data)
+print(f"Predictions: {output}")</code></pre>
+
+        <h2>6.3 Hugging Face Hub</h2>
+        <p>
+            Hugging Face Hub is a popular platform for sharing and discovering models, particularly for NLP and multimodal AI.
+        </p>
+
+        <h3>Uploading Models</h3>
+        <pre><code>from huggingface_hub import HfApi, create_repo
+from transformers import AutoModel, AutoTokenizer
+
+# Create repository
+repo_id = "username/my-awesome-model"
+create_repo(repo_id, exist_ok=True)
+
+# Save model and tokenizer
+model = AutoModel.from_pretrained("bert-base-uncased")
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+model.save_pretrained("./model")
+tokenizer.save_pretrained("./model")
+
+# Upload to Hub
+api = HfApi()
+api.upload_folder(
+    folder_path="./model",
+    repo_id=repo_id,
+    repo_type="model"
+)
+
+print(f"Model uploaded to: https://huggingface.co/{repo_id}")</code></pre>
+
+        <h3>Model Cards on Hugging Face</h3>
+        <pre><code># Create README.md (model card)
+model_card = """---
+language: en
+license: apache-2.0
+tags:
+- text-classification
+- sentiment-analysis
+datasets:
+- imdb
+metrics:
+- accuracy
+---
+
+# My Awesome Model
+
+## Model Description
+Fine-tuned BERT for sentiment analysis on IMDB dataset.
+
+## Intended Uses
+Classify movie reviews as positive or negative.
+
+## Training Data
+IMDB dataset (50,000 reviews)
+
+## Training Procedure
+- Batch size: 16
+- Learning rate: 2e-5
+- Epochs: 3
+
+## Evaluation Results
+- Accuracy: 93.2%
+- F1 Score: 0.928
+
+## Limitations
+- English only
+- May not generalize to other domains
+
+弘益人間 - Benefit All Humanity
+"""
+
+with open("./model/README.md", "w") as f:
+    f.write(model_card)
+
+# Upload model card
+api.upload_file(
+    path_or_fileobj="./model/README.md",
+    path_in_repo="README.md",
+    repo_id=repo_id
+)</code></pre>
+
+        <h3>Loading from Hugging Face Hub</h3>
+        <pre><code>from transformers import AutoModel, AutoTokenizer
+
+# Load model
+model = AutoModel.from_pretrained("username/my-awesome-model")
+tokenizer = AutoTokenizer.from_pretrained("username/my-awesome-model")
+
+# Use for inference
+inputs = tokenizer("This movie was great!", return_tensors="pt")
+outputs = model(**inputs)
+print(outputs)</code></pre>
+
+        <h2>6.4 Git-Based Model Versioning</h2>
+        <p>
+            Git LFS (Large File Storage) enables versioning large model files alongside code.
+        </p>
+
+        <h3>Setting Up Git LFS</h3>
+        <pre><code># Install Git LFS
+# brew install git-lfs  (macOS)
+# apt-get install git-lfs  (Ubuntu)
+
+# Initialize in repository
+git lfs install
+
+# Track model files
+git lfs track "*.pth"
+git lfs track "*.onnx"
+git lfs track "*.h5"
+git lfs track "*.tflite"
+
+# Add .gitattributes
+git add .gitattributes
+
+# Add and commit models
+git add models/resnet18.pth
+git commit -m "Add ResNet-18 v1.0"
+
+# Push to remote (LFS files uploaded separately)
+git push origin main</code></pre>
+
+        <h3>Model Versioning with Tags</h3>
+        <pre><code># Tag model versions
+git tag -a v1.0.0 -m "ResNet-18 baseline model"
+git tag -a v1.1.0 -m "ResNet-18 with improved augmentation"
+git tag -a v2.0.0 -m "ResNet-50 architecture upgrade"
+
+# Push tags
+git push origin --tags
+
+# Checkout specific version
+git checkout v1.0.0
+
+# List all versions
+git tag -l</code></pre>
+
+        <h2>6.5 DVC (Data Version Control)</h2>
+        <p>
+            DVC extends Git to handle large datasets and models, providing ML-specific versioning.
+        </p>
+
+        <h3>DVC Workflow</h3>
+        <pre><code># Install DVC
+# pip install dvc
+
+# Initialize DVC
+dvc init
+
+# Configure remote storage (S3, Azure, GCS, etc.)
+dvc remote add -d myremote s3://my-bucket/dvc-storage
+
+# Track model files
+dvc add models/resnet18.pth
+
+# This creates models/resnet18.pth.dvc
+
+# Commit DVC metadata (not the actual file)
+git add models/resnet18.pth.dvc models/.gitignore
+git commit -m "Track ResNet-18 model with DVC"
+
+# Push data to remote storage
+dvc push
+
+# Pull data from remote
+dvc pull
+
+# Switch to different version
+git checkout v1.0.0
+dvc checkout</code></pre>
+
+        <h3>DVC Pipelines</h3>
+        <pre><code># Define ML pipeline in dvc.yaml
+# dvc.yaml
+stages:
+  train:
+    cmd: python train.py
+    deps:
+      - train.py
+      - data/train.csv
+    params:
+      - train.learning_rate
+      - train.epochs
+    outs:
+      - models/model.pth
+
+  evaluate:
+    cmd: python evaluate.py
+    deps:
+      - evaluate.py
+      - models/model.pth
+      - data/test.csv
+    metrics:
+      - metrics.json:
+          cache: false
+
+# Run pipeline
+dvc repro
+
+# Compare experiments
+dvc metrics show
+dvc metrics diff</code></pre>
+
+        <h2>6.6 Model Metadata Standards</h2>
+
+        <h3>Comprehensive Model Card</h3>
+        <pre><code>model_metadata = {
+    # Model Identity
+    "model_name": "sentiment-classifier-v2",
+    "model_version": "2.1.0",
+    "model_type": "text-classification",
+    "architecture": "BERT-base",
+
+    # Training Information
+    "training": {
+        "framework": "pytorch",
+        "framework_version": "2.0.1",
+        "dataset": "imdb",
+        "dataset_version": "1.0",
+        "training_date": "2025-01-15",
+        "training_duration_hours": 4.2,
+        "hyperparameters": {
+            "learning_rate": 2e-5,
+            "batch_size": 16,
+            "epochs": 3,
+            "optimizer": "AdamW",
+            "scheduler": "linear"
+        }
+    },
+
+    # Performance Metrics
+    "metrics": {
+        "accuracy": 0.932,
+        "f1_score": 0.928,
+        "precision": 0.941,
+        "recall": 0.915,
+        "validation_loss": 0.234
+    },
+
+    # Model Characteristics
+    "characteristics": {
+        "input_shape": [1, 512],
+        "output_shape": [1, 2],
+        "num_parameters": 110_000_000,
+        "model_size_mb": 420,
+        "quantized": False,
+        "fp16": False
+    },
+
+    # Deployment
+    "deployment": {
+        "target_platform": "cloud",
+        "serving_framework": "torchserve",
+        "inference_latency_ms": 45,
+        "throughput_qps": 100,
+        "hardware": "NVIDIA A100"
+    },
+
+    # Governance
+    "governance": {
+        "owner": "ml-team@company.com",
+        "license": "apache-2.0",
+        "ethical_review": True,
+        "bias_analysis": True,
+        "privacy_compliant": True,
+        "intended_use": "Sentiment analysis for movie reviews",
+        "limitations": "English language only, may not generalize to other domains",
+        "ethical_considerations": "Potential bias in movie genre representation"
+    },
+
+    # Provenance
+    "provenance": {
+        "base_model": "bert-base-uncased",
+        "derived_from": "sentiment-classifier-v1",
+        "git_commit": "abc123def456",
+        "mlflow_run_id": "xyz789"
+    },
+
+    # Philosophy
+    "philosophy": "弘益人間 - Benefit All Humanity"
+}
+
+import json
+with open("model_card.json", "w") as f:
+    json.dump(model_metadata, f, indent=2)</code></pre>
+
+        <h2>6.7 Access Control and Security</h2>
+
+        <h3>Role-Based Access Control (RBAC)</h3>
+        <pre><code># Define roles and permissions
+roles = {
+    "data_scientist": {
+        "permissions": ["read", "write", "register"],
+        "models": ["development/*"]
+    },
+    "ml_engineer": {
+        "permissions": ["read", "write", "register", "promote"],
+        "models": ["*"]
+    },
+    "data_analyst": {
+        "permissions": ["read"],
+        "models": ["production/*"]
+    },
+    "admin": {
+        "permissions": ["*"],
+        "models": ["*"]
+    }
+}
+
+# Implement in MLflow
+from mlflow.server import handlers
+
+def check_permission(user, action, model_name):
+    user_role = get_user_role(user)
+    permissions = roles.get(user_role, {}).get("permissions", [])
+
+    if "*" in permissions or action in permissions:
+        # Check model access
+        allowed_models = roles[user_role]["models"]
+        if "*" in allowed_models or model_name in allowed_models:
+            return True
+
+    return False</code></pre>
+
+        <h3>Model Signing and Verification</h3>
+        <pre><code>import hashlib
+import hmac
+
+def sign_model(model_path, secret_key):
+    """
+    Create cryptographic signature for model
+    """
+    with open(model_path, 'rb') as f:
+        model_data = f.read()
+
+    signature = hmac.new(
+        secret_key.encode(),
+        model_data,
+        hashlib.sha256
+    ).hexdigest()
+
+    return signature
+
+def verify_model(model_path, signature, secret_key):
+    """
+    Verify model integrity
+    """
+    expected_signature = sign_model(model_path, secret_key)
+    return hmac.compare_digest(signature, expected_signature)
+
+# Usage
+secret_key = "my-secret-key"  # Store securely!
+
+# Sign model
+signature = sign_model("model.pth", secret_key)
+print(f"Model signature: {signature}")
+
+# Verify before loading
+if verify_model("model.pth", signature, secret_key):
+    model = torch.load("model.pth")
+    print("✓ Model verified and loaded")
+else:
+    print("✗ Model verification failed!")</code></pre>
+
+        <h2>6.8 Model Lifecycle Management</h2>
+
+        <h3>Stage Transitions</h3>
+        <pre><code>class ModelLifecycle:
+    """
+    Manage model progression through lifecycle stages
+    """
+    STAGES = ["Development", "Staging", "Production", "Archived"]
+
+    def __init__(self, registry_client):
+        self.client = registry_client
+
+    def promote_to_staging(self, model_name, version, checks=None):
+        """
+        Promote model to staging after validation
+        """
+        if checks:
+            # Run validation checks
+            if not self.run_checks(model_name, version, checks):
+                raise ValueError("Model failed validation checks")
+
+        self.client.transition_model_version_stage(
+            name=model_name,
+            version=version,
+            stage="Staging"
+        )
+
+        print(f"✓ {model_name} v{version} promoted to Staging")
+
+    def promote_to_production(self, model_name, version, approval_required=True):
+        """
+        Promote to production with optional approval
+        """
+        if approval_required:
+            approval = input(f"Approve {model_name} v{version} for production? (yes/no): ")
+            if approval.lower() != "yes":
+                print("Production deployment cancelled")
+                return
+
+        # Archive current production model
+        current_prod = self.get_production_version(model_name)
+        if current_prod:
+            self.client.transition_model_version_stage(
+                name=model_name,
+                version=current_prod.version,
+                stage="Archived"
+            )
+
+        # Promote new version
+        self.client.transition_model_version_stage(
+            name=model_name,
+            version=version,
+            stage="Production"
+        )
+
+        print(f"✓ {model_name} v{version} deployed to Production")
+
+    def rollback(self, model_name, to_version):
+        """
+        Rollback to previous version
+        """
+        self.client.transition_model_version_stage(
+            name=model_name,
+            version=to_version,
+            stage="Production"
+        )
+
+        print(f"✓ Rolled back to {model_name} v{to_version}")
+
+# Usage
+lifecycle = ModelLifecycle(mlflow_client)
+lifecycle.promote_to_staging("ResNet18", version=3, checks=["accuracy", "latency"])
+lifecycle.promote_to_production("ResNet18", version=3)</code></pre>
+
+        <h2>6.9 Registry Federation</h2>
+
+        <h3>Multi-Registry Architecture</h3>
+        <pre><code>class FederatedRegistry:
+    """
+    Aggregate models from multiple registries
+    """
+    def __init__(self):
+        self.registries = {
+            "mlflow": MLflowRegistry("http://mlflow.company.com"),
+            "huggingface": HuggingFaceRegistry("company-org"),
+            "s3": S3Registry("s3://company-models")
+        }
+
+    def search_models(self, query):
+        """
+        Search across all registries
+        """
+        results = []
+        for name, registry in self.registries.items():
+            matches = registry.search(query)
+            for match in matches:
+                match['source'] = name
+                results.append(match)
+
+        return results
+
+    def load_model(self, model_uri):
+        """
+        Load model from appropriate registry
+        """
+        # Parse URI: registry://model-name/version
+        registry_name, model_path = self.parse_uri(model_uri)
+        registry = self.registries[registry_name]
+        return registry.load(model_path)
+
+# Usage
+fed_registry = FederatedRegistry()
+models = fed_registry.search_models("sentiment-analysis")
+model = fed_registry.load_model("mlflow://ResNet18/Production")</code></pre>
+
+        <h2>6.10 Best Practices</h2>
+
+        <h3>1. Consistent Naming Conventions</h3>
+        <pre><code># Model naming convention
+# Format: {use-case}-{architecture}-{variant}-v{version}
+# Examples:
+#   - sentiment-analysis-bert-base-v1.2.0
+#   - image-classification-resnet50-quantized-v2.1.0
+#   - object-detection-yolov8-large-v1.0.0</code></pre>
+
+        <h3>2. Automated Testing Before Registration</h3>
+        <pre><code>def validate_before_registration(model, test_data):
+    """
+    Run validation before registering model
+    """
+    tests = {
+        "accuracy_threshold": lambda: evaluate_accuracy(model) > 0.90,
+        "latency_threshold": lambda: measure_latency(model) < 100,  # ms
+        "memory_limit": lambda: get_model_size(model) < 500,  # MB
+        "numerical_stability": lambda: test_numerical_stability(model, test_data)
+    }
+
+    results = {}
+    for test_name, test_fn in tests.items():
+        try:
+            passed = test_fn()
+            results[test_name] = "PASS" if passed else "FAIL"
+        except Exception as e:
+            results[test_name] = f"ERROR: {str(e)}"
+
+    all_passed = all(v == "PASS" for v in results.values())
+
+    return all_passed, results</code></pre>
+
+        <h3>3. Comprehensive Logging</h3>
+        <pre><code># Log everything about the model
+with mlflow.start_run():
+    # Code version
+    mlflow.log_param("git_commit", get_git_commit())
+
+    # Data version
+    mlflow.log_param("dataset_version", "v2.1")
+
+    # All hyperparameters
+    mlflow.log_params(hyperparameters)
+
+    # Training metrics over time
+    for epoch in range(num_epochs):
+        mlflow.log_metric("train_loss", train_loss, step=epoch)
+        mlflow.log_metric("val_loss", val_loss, step=epoch)
+
+    # Final evaluation
+    mlflow.log_metrics(final_metrics)
+
+    # Model artifacts
+    mlflow.log_artifact("confusion_matrix.png")
+    mlflow.log_artifact("feature_importance.csv")
+
+    # Model itself
+    mlflow.pytorch.log_model(model, "model")</code></pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Model registries provide centralized storage, versioning, and metadata management</li>
+                <li>MLflow offers open-source registry with staging/production workflow</li>
+                <li>Hugging Face Hub excels at sharing models with comprehensive model cards</li>
+                <li>Git LFS and DVC enable versioning large models alongside code</li>
+                <li>Comprehensive metadata standards ensure reproducibility and governance</li>
+                <li>RBAC and model signing provide security and access control</li>
+                <li>Lifecycle management automates model promotion and rollback</li>
+                <li>Federated registries aggregate models from multiple sources</li>
+                <li>Automated validation ensures quality before registration</li>
+                <li>Consistent naming and logging practices improve discoverability</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the key benefits of using a model registry?</li>
+                <li>Explain the MLflow model versioning and staging workflow.</li>
+                <li>How do you create and upload a model card to Hugging Face Hub?</li>
+                <li>Compare Git LFS and DVC for model versioning. When would you use each?</li>
+                <li>What information should be included in comprehensive model metadata?</li>
+                <li>Describe a role-based access control (RBAC) system for model registries.</li>
+                <li>How do you cryptographically sign and verify models?</li>
+                <li>Design a model lifecycle with stages from development to production.</li>
+                <li>What is registry federation and why is it useful?</li>
+                <li>Create a checklist of validations to run before registering a new model.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

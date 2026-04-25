@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제8장: 구현 가이드 - WIA-PET-EMOTION</title>
+</head>
+<body>
+<h1>제8장: 구현 가이드</h1>
+
+<blockquote>
+"홍익인간: 사려 깊은 구현은 표준을 돌봄과 연결의 살아있는 경험으로 변환합니다."
+</blockquote>
+
+<hr>
+
+<h2>8.1 구현 개요</h2>
+
+<pre>
+구현 단계
+=========
+
+1단계: 기반 (1-4주)
+  - 인프라 설정
+  - 핵심 서비스 배포
+  - 기본 감정 감지
+
+2단계: 통합 (5-8주)
+  - 장치 통합
+  - 다중 모달 융합
+  - 실시간 스트리밍
+
+3단계: 인텔리전스 (9-12주)
+  - 웰빙 분석
+  - 경보 시스템
+  - 인사이트 생성
+
+4단계: 최적화 (지속적)
+  - 모델 개선
+  - 성능 튜닝
+  - 기능 확장
+</pre>
+
+<hr>
+
+<h2>8.2 시스템 아키텍처</h2>
+
+<pre>
+배포 아키텍처
+============
+
++--------------------+     +--------------------+
+|   엣지 장치        |     |   모바일 앱        |
+|  카메라, 웨어러블  |     |   iOS, Android     |
++--------------------+     +--------------------+
+         |                          |
+         v                          v
++------------------------------------------------+
+|              API 게이트웨이 (Kong/Nginx)       |
++------------------------------------------------+
+         |                          |
+         v                          v
++--------------------+     +--------------------+
+|  감정 서비스       |     |  프로필 서비스     |
+|  (Rust/Python)     |     |  (Rust)            |
++--------------------+     +--------------------+
+         |                          |
+         v                          v
++------------------------------------------------+
+|              메시지 큐 (Kafka)                 |
++------------------------------------------------+
+         |                          |
+         v                          v
++--------------------+     +--------------------+
+|  분석 서비스       |     |  경보 서비스       |
+|  (Python)          |     |  (Rust)            |
++--------------------+     +--------------------+
+         |                          |
+         v                          v
++------------------------------------------------+
+|           PostgreSQL + TimescaleDB             |
++------------------------------------------------+
+</pre>
+
+<hr>
+
+<h2>8.3 데이터베이스 스키마</h2>
+
+<pre>
+핵심 테이블
+==========
+
+-- 반려동물 감정 프로필
+CREATE TABLE emotion_profiles (
+    profile_id UUID PRIMARY KEY,
+    pet_id UUID NOT NULL,
+    owner_id UUID NOT NULL,
+    species VARCHAR(50) NOT NULL,
+    breed VARCHAR(100),
+    name VARCHAR(100),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 감정 읽기 (시계열)
+CREATE TABLE emotion_readings (
+    reading_id UUID PRIMARY KEY,
+    profile_id UUID REFERENCES emotion_profiles,
+    timestamp TIMESTAMPTZ NOT NULL,
+    primary_emotion VARCHAR(20) NOT NULL,
+    intensity SMALLINT CHECK (intensity BETWEEN 1 AND 5),
+    confidence DECIMAL(5,2),
+    valence DECIMAL(3,2),
+    arousal DECIMAL(3,2),
+    data_sources JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 하이퍼테이블 생성 (시계열용)
+SELECT create_hypertable('emotion_readings', 'timestamp');
+
+-- 경보
+CREATE TABLE alerts (
+    alert_id UUID PRIMARY KEY,
+    profile_id UUID REFERENCES emotion_profiles,
+    alert_type VARCHAR(50) NOT NULL,
+    priority VARCHAR(20) NOT NULL,
+    message TEXT,
+    emotion_data JSONB,
+    acknowledged BOOLEAN DEFAULT FALSE,
+    resolved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 기준선
+CREATE TABLE emotion_baselines (
+    baseline_id UUID PRIMARY KEY,
+    profile_id UUID REFERENCES emotion_profiles,
+    resting_heart_rate DECIMAL(5,2),
+    resting_hrv DECIMAL(5,2),
+    normal_activity DECIMAL(5,2),
+    calibration_date TIMESTAMPTZ,
+    calibration_quality DECIMAL(5,2)
+);
+</pre>
+
+<hr>
+
+<h2>8.4 API 구현</h2>
+
+<h3>핵심 엔드포인트</h3>
+
+<pre>
+API 라우트
+==========
+
+프로필:
+  POST   /api/v1/profiles          프로필 생성
+  GET    /api/v1/profiles          프로필 목록
+  GET    /api/v1/profiles/{id}     프로필 조회
+  PUT    /api/v1/profiles/{id}     프로필 업데이트
+  POST   /api/v1/profiles/{id}/baseline  교정
+
+읽기:
+  POST   /api/v1/readings          읽기 제출
+  GET    /api/v1/readings/{profileId}/current   현재 상태
+  GET    /api/v1/readings/{profileId}/history   히스토리
+  WS     /ws/emotions/{profileId}  실시간 스트림
+
+분석:
+  POST   /api/v1/analysis/detect   원샷 감지
+  GET    /api/v1/analysis/{id}/summary    요약
+  GET    /api/v1/analysis/{id}/trends     추세
+  GET    /api/v1/analysis/{id}/wellbeing  웰빙
+
+경보:
+  GET    /api/v1/alerts/{profileId}       경보 조회
+  POST   /api/v1/alerts/{id}/acknowledge  확인
+  PUT    /api/v1/alerts/settings/{id}     설정
+</pre>
+
+<hr>
+
+<h2>8.5 감정 감지 서비스</h2>
+
+<pre>
+감지 서비스 구조
+===============
+
+emotion_service/
+  src/
+    main.rs              # 진입점
+    api/
+      mod.rs             # API 핸들러
+      readings.rs        # 읽기 엔드포인트
+      analysis.rs        # 분석 엔드포인트
+    detection/
+      mod.rs             # 감지 코디네이터
+      visual.rs          # 시각 분석
+      audio.rs           # 청각 분석
+      physiological.rs   # 생리 분석
+      fusion.rs          # 다중 모달 융합
+    models/
+      mod.rs             # 데이터 구조
+      emotion.rs         # 감정 타입
+      reading.rs         # 읽기 타입
+    db/
+      mod.rs             # 데이터베이스 연산
+      queries.rs         # SQL 쿼리
+  Cargo.toml             # 의존성
+  Dockerfile             # 컨테이너 빌드
+</pre>
+
+<hr>
+
+<h2>8.6 엣지 장치 통합</h2>
+
+<h3>장치 SDK</h3>
+
+<pre>
+엣지 SDK 인터페이스
+=================
+
+class WiaEmotionEdgeSDK {
+  // 자격 증명으로 초기화
+  constructor(config: EdgeConfig)
+
+  // 장치 등록
+  async registerDevice(deviceInfo: DeviceInfo): Promise&lt;DeviceId&gt;
+
+  // 감정 처리 시작
+  async startProcessing(profileId: string): Promise&lt;void&gt;
+
+  // 처리 중지
+  async stopProcessing(): Promise&lt;void&gt;
+
+  // 이벤트 핸들러
+  onEmotionDetected(callback: (emotion: EmotionReading) =&gt; void)
+  onAlert(callback: (alert: Alert) =&gt; void)
+  onConnectionChange(callback: (status: ConnectionStatus) =&gt; void)
+
+  // 데이터 입력
+  submitVisualFrame(frame: ImageData): void
+  submitAudioChunk(audio: AudioBuffer): void
+  submitPhysiological(data: PhysioData): void
+
+  // 로컬 처리 상태
+  getProcessingStatus(): ProcessingStatus
+  getLocalBuffer(): BufferedReading[]
+}
+</pre>
+
+<hr>
+
+<h2>8.7 배포 구성</h2>
+
+<h3>Docker Compose</h3>
+
+<pre>
+DOCKER COMPOSE 구성
+==================
+
+version: '3.8'
+services:
+  emotion-api:
+    image: wia/emotion-api:latest
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://db:5432/emotion
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - db
+      - kafka
+
+  emotion-processor:
+    image: wia/emotion-processor:latest
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      MODEL_PATH: /models
+    volumes:
+      - ./models:/models
+    deploy:
+      replicas: 3
+
+  alert-service:
+    image: wia/alert-service:latest
+    environment:
+      DATABASE_URL: postgres://db:5432/emotion
+      KAFKA_BROKERS: kafka:9092
+      PUSH_SERVICE_URL: https://push.wia.org
+    depends_on:
+      - db
+      - kafka
+
+  db:
+    image: timescale/timescaledb:latest-pg14
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: emotion
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    depends_on:
+      - zookeeper
+
+volumes:
+  pgdata:
+</pre>
+
+<hr>
+
+<h2>8.8 테스트 전략</h2>
+
+<table border="1">
+<tr>
+<th>테스트 유형</th>
+<th>범위</th>
+<th>도구</th>
+</tr>
+<tr>
+<td>유닛 테스트</td>
+<td>개별 함수</td>
+<td>pytest, cargo test</td>
+</tr>
+<tr>
+<td>통합 테스트</td>
+<td>서비스 상호작용</td>
+<td>Docker Compose, Testcontainers</td>
+</tr>
+<tr>
+<td>모델 검증</td>
+<td>감정 감지 정확도</td>
+<td>레이블된 데이터셋, 혼동 행렬</td>
+</tr>
+<tr>
+<td>부하 테스트</td>
+<td>스트레스 하 성능</td>
+<td>k6, Locust</td>
+</tr>
+<tr>
+<td>엔드투엔드</td>
+<td>전체 사용자 흐름</td>
+<td>Cypress, Playwright</td>
+</tr>
+</table>
+
+<h3>검증 데이터셋 요구사항</h3>
+
+<pre>
+데이터셋 사양
+============
+
+최소 크기:
+  - 10,000개 레이블된 감정 샘플
+  - 감정 카테고리당 최소 500개
+  - 여러 종 대표
+
+레이블링 요구사항:
+  - 전문 수의 행동 전문가 검증
+  - 다중 주석자 동의 (>80%)
+  - 명확한 맥락 문서화
+
+분포:
+  - 70% 훈련
+  - 15% 검증
+  - 15% 테스트 (홀드아웃)
+
+품질 지표:
+  - 주석자 간 동의: Kappa > 0.75
+  - 샘플에서 명확한 감정 표현
+  - 강도 전반에 균형 잡힌 대표
+</pre>
+
+<hr>
+
+<h2>8.9 보안 고려사항</h2>
+
+<pre>
+보안 요구사항
+============
+
+1. 인증
+   - OAuth 2.0 / OpenID Connect
+   - 장치 인증용 API 키
+   - 짧은 만료의 JWT 토큰
+
+2. 인가
+   - 역할 기반 접근 제어 (RBAC)
+   - 보호자는 자신의 반려동물만 접근
+   - 케어기버를 위한 명시적 공유
+
+3. 데이터 보호
+   - 모든 통신에 TLS 1.3
+   - 저장 시 AES-256 암호화
+   - 개인정보용 엣지 처리
+
+4. 개인정보 규정 준수
+   - GDPR 준수
+   - 데이터 최소화
+   - 삭제권
+   - 동의 관리
+
+5. 감사 로깅
+   - 모든 데이터 접근 로깅
+   - 변조 방지 감사 추적
+   - 보존 정책 시행
+</pre>
+
+<hr>
+
+<h2>8.10 규정 준수 체크리스트</h2>
+
+<table border="1">
+<tr>
+<th>요구사항</th>
+<th>상태</th>
+<th>참고</th>
+</tr>
+<tr>
+<td>WIA-PET-EMOTION 데이터 형식 준수</td>
+<td>[  ]</td>
+<td>모든 스키마 사양 일치</td>
+</tr>
+<tr>
+<td>16가지 감정 유형 지원</td>
+<td>[  ]</td>
+<td>전체 열거형</td>
+</tr>
+<tr>
+<td>5단계 강도 척도</td>
+<td>[  ]</td>
+<td>1-5 범위 적용</td>
+</tr>
+<tr>
+<td>신뢰도 수준 계산</td>
+<td>[  ]</td>
+<td>알고리즘 준수</td>
+</tr>
+<tr>
+<td>다중 모달 융합 구현</td>
+<td>[  ]</td>
+<td>시각 + 청각 + 생리</td>
+</tr>
+<tr>
+<td>실시간 스트리밍 WebSocket</td>
+<td>[  ]</td>
+<td>프로토콜 준수</td>
+</tr>
+<tr>
+<td>경보 우선순위 수준</td>
+<td>[  ]</td>
+<td>4단계 구현</td>
+</tr>
+<tr>
+<td>웰빙 점수 계산</td>
+<td>[  ]</td>
+<td>알고리즘 준수</td>
+</tr>
+<tr>
+<td>엣지 처리 옵션</td>
+<td>[  ]</td>
+<td>개인정보 보존</td>
+</tr>
+<tr>
+<td>API 버전 관리</td>
+<td>[  ]</td>
+<td>/v1/ 접두사</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>8.11 향후 로드맵</h2>
+
+<pre>
+계획된 개선사항
+==============
+
+버전 1.1:
+  - 추가 종 지원 (새, 말)
+  - 향상된 표정 모델
+  - 다중 반려동물 가정 최적화
+
+버전 1.2:
+  - 예측적 감정 모델링
+  - 건강 상관관계 분석
+  - 케어기버 추천 엔진
+
+버전 2.0:
+  - 종간 커뮤니케이션 인사이트
+  - 고급 행동 예측
+  - 스마트 홈 생태계 통합
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 4단계 구현 접근법</li>
+<li>[OK] 명확한 분리의 마이크로서비스 아키텍처</li>
+<li>[OK] 효율적 시계열 저장을 위한 TimescaleDB</li>
+<li>[OK] 엣지 SDK가 개인정보 보호 처리 활성화</li>
+<li>[OK] 포괄적 테스트 전략 필요</li>
+<li>[OK] 보안 및 규정 준수가 설계에 내장</li>
+</ul>
+
+<hr>
+
+<h2>문서 정보</h2>
+
+<table border="1">
+<tr><td>표준</td><td>WIA-PET-EMOTION 버전 1.0.0</td></tr>
+<tr><td>문서</td><td>구현 Ebook</td></tr>
+<tr><td>상태</td><td>활성</td></tr>
+<tr><td>철학</td><td>홍익인간</td></tr>
+</table>
+</body>
+</html>

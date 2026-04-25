@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Integration and Security APIs | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Integration and Security APIs</h1>
+
+    <div class="highlight">
+        <strong>Chapter Overview:</strong> This chapter covers the integration of security tools and APIs into blockchain applications. Learn how to design security monitoring interfaces, implement incident response automation, and integrate with existing security infrastructure.
+    </div>
+
+    <h2>Security API Architecture</h2>
+    <p>Well-designed security APIs provide programmatic access to security functions while maintaining strict access controls and comprehensive audit logging.</p>
+
+    <h3>API Design Principles</h3>
+    <pre><code>Security API Design Principles:
+
+1. Authentication & Authorization
+   ├── API key authentication for services
+   ├── OAuth 2.0 for user-facing applications
+   ├── mTLS for service-to-service communication
+   └── Role-based access control (RBAC)
+
+2. Input Validation
+   ├── Schema validation (JSON Schema, OpenAPI)
+   ├── Parameter sanitization
+   ├── Request size limits
+   └── Rate limiting by client/endpoint
+
+3. Secure Communication
+   ├── TLS 1.3 mandatory
+   ├── Certificate pinning for mobile clients
+   ├── Request signing for critical operations
+   └── Replay attack prevention (nonces)
+
+4. Audit & Monitoring
+   ├── Log all API requests
+   ├── Track request origin and authentication
+   ├── Monitor for anomalous patterns
+   └── Alert on security-relevant events
+
+5. Error Handling
+   ├── Generic error messages (no info leakage)
+   ├── Detailed logging internally
+   ├── Consistent error format
+   └── Graceful degradation</code></pre>
+
+    <h3>Security Monitoring API</h3>
+    <pre><code>// Security Monitoring API Implementation
+import express from 'express';
+import { authenticateApiKey, authorize } from './middleware/auth';
+import { validateRequest } from './middleware/validation';
+import { rateLimiter } from './middleware/rateLimit';
+
+const router = express.Router();
+
+// OpenAPI Schema for transaction monitoring
+const monitorTransactionSchema = {
+    type: 'object',
+    required: ['transactionHash', 'chainId'],
+    properties: {
+        transactionHash: {
+            type: 'string',
+            pattern: '^0x[a-fA-F0-9]{64}$'
+        },
+        chainId: {
+            type: 'integer',
+            minimum: 1
+        },
+        riskThreshold: {
+            type: 'number',
+            minimum: 0,
+            maximum: 100,
+            default: 50
+        }
+    }
+};
+
+/**
+ * @route POST /api/v1/monitor/transaction
+ * @description Analyze transaction for security risks
+ */
+router.post(
+    '/monitor/transaction',
+    authenticateApiKey,
+    authorize(['security:read']),
+    rateLimiter({ windowMs: 60000, max: 100 }),
+    validateRequest(monitorTransactionSchema),
+    async (req, res, next) => {
+        try {
+            const { transactionHash, chainId, riskThreshold } = req.body;
+
+            // Analyze transaction
+            const analysis = await transactionAnalyzer.analyze({
+                hash: transactionHash,
+                chainId,
+                options: {
+                    checkKnownExploits: true,
+                    checkSanctionedAddresses: true,
+                    checkFlashLoan: true,
+                    checkReentrancy: true
+                }
+            });
+
+            // Generate risk score
+            const riskScore = calculateRiskScore(analysis);
+
+            // Log analysis for audit
+            await auditLog.record({
+                action: 'TRANSACTION_ANALYSIS',
+                requestId: req.id,
+                clientId: req.apiKey.clientId,
+                transactionHash,
+                riskScore,
+                timestamp: Date.now()
+            });
+
+            // Alert if above threshold
+            if (riskScore >= riskThreshold) {
+                await alertService.trigger({
+                    type: 'HIGH_RISK_TRANSACTION',
+                    severity: riskScore >= 80 ? 'critical' : 'warning',
+                    data: { transactionHash, riskScore, analysis }
+                });
+            }
+
+            res.json({
+                success: true,
+                data: {
+                    transactionHash,
+                    riskScore,
+                    riskLevel: getRiskLevel(riskScore),
+                    findings: analysis.findings,
+                    recommendations: analysis.recommendations
+                }
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+/**
+ * @route POST /api/v1/monitor/address
+ * @description Screen address against security databases
+ */
+router.post(
+    '/monitor/address',
+    authenticateApiKey,
+    authorize(['security:read']),
+    rateLimiter({ windowMs: 60000, max: 200 }),
+    async (req, res, next) => {
+        const { address, chainId } = req.body;
+
+        const screening = await addressScreener.screen(address, {
+            checkSanctions: true,
+            checkMixers: true,
+            checkDarknet: true,
+            checkScamDb: true,
+            chainId
+        });
+
+        res.json({
+            success: true,
+            data: {
+                address,
+                risk: screening.riskLevel,
+                flags: screening.flags,
+                labels: screening.labels,
+                lastActivity: screening.lastActivity
+            }
+        });
+    }
+);
+
+export default router;</code></pre>
+
+    <h2>Incident Response Automation</h2>
+    <p>Automated incident response enables rapid reaction to security threats, reducing the window of opportunity for attackers.</p>
+
+    <div class="highlight">
+        <strong>Response Time Matters:</strong> Studies show that automated incident response can reduce breach impact by up to 95% compared to manual response. Every second counts when dealing with blockchain exploits where transactions are irreversible.
+    </div>
+
+    <h3>Incident Response Framework</h3>
+    <pre><code>// Automated Incident Response System
+interface SecurityIncident {
+    id: string;
+    type: IncidentType;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    source: string;
+    timestamp: number;
+    data: any;
+    status: 'detected' | 'analyzing' | 'responding' | 'resolved';
+}
+
+type IncidentType =
+    | 'EXPLOIT_DETECTED'
+    | 'ANOMALOUS_TRANSACTION'
+    | 'KEY_COMPROMISE'
+    | 'DOS_ATTACK'
+    | 'ORACLE_MANIPULATION'
+    | 'BRIDGE_ATTACK';
+
+class IncidentResponseEngine {
+    private handlers: Map<IncidentType, IncidentHandler[]> = new Map();
+    private escalationRules: EscalationRule[];
+
+    constructor(config: ResponseConfig) {
+        this.initializeHandlers(config);
+        this.escalationRules = config.escalationRules;
+    }
+
+    async handleIncident(incident: SecurityIncident): Promise<ResponseResult> {
+        // Log incident detection
+        await this.logIncident(incident);
+
+        // Determine response handlers
+        const handlers = this.handlers.get(incident.type) || [];
+
+        // Execute automated responses
+        const responses: ResponseAction[] = [];
+
+        for (const handler of handlers) {
+            if (this.shouldExecute(handler, incident)) {
+                try {
+                    const action = await handler.execute(incident);
+                    responses.push(action);
+
+                    // Log action
+                    await this.logAction(incident.id, action);
+                } catch (error) {
+                    await this.logError(incident.id, handler.name, error);
+                }
+            }
+        }
+
+        // Check escalation rules
+        await this.checkEscalation(incident, responses);
+
+        return {
+            incidentId: incident.id,
+            responses,
+            status: 'handled',
+            timestamp: Date.now()
+        };
+    }
+
+    private initializeHandlers(config: ResponseConfig): void {
+        // Exploit detection handlers
+        this.handlers.set('EXPLOIT_DETECTED', [
+            new PauseContractHandler(),
+            new AlertSecurityTeamHandler(),
+            new BlockAttackerAddressHandler(),
+            new PreserveEvidenceHandler()
+        ]);
+
+        // Key compromise handlers
+        this.handlers.set('KEY_COMPROMISE', [
+            new RevokeKeyHandler(),
+            new RotateSecretsHandler(),
+            new NotifyAffectedUsersHandler(),
+            new ForensicAnalysisHandler()
+        ]);
+
+        // Oracle manipulation handlers
+        this.handlers.set('ORACLE_MANIPULATION', [
+            new SwitchToBackupOracleHandler(),
+            new PausePriceUpdatesHandler(),
+            new AlertProtocolOwnersHandler()
+        ]);
+    }
+}
+
+// Example: Pause Contract Handler
+class PauseContractHandler implements IncidentHandler {
+    name = 'PauseContract';
+
+    async execute(incident: SecurityIncident): Promise<ResponseAction> {
+        const contract = await this.getContract(incident.data.contractAddress);
+
+        // Check if pausable
+        if (!await this.isPausable(contract)) {
+            return {
+                handler: this.name,
+                success: false,
+                reason: 'Contract not pausable'
+            };
+        }
+
+        // Execute pause via multi-sig or emergency key
+        const tx = await this.emergencyPause(contract);
+
+        return {
+            handler: this.name,
+            success: true,
+            transactionHash: tx.hash,
+            action: 'Contract paused',
+            timestamp: Date.now()
+        };
+    }
+}</code></pre>
+
+    <h2>Threat Intelligence Integration</h2>
+    <p>Integrating threat intelligence feeds enables proactive defense by identifying known malicious addresses, attack patterns, and emerging threats.</p>
+
+    <h3>Threat Intelligence Pipeline</h3>
+    <pre><code>// Threat Intelligence Integration
+interface ThreatIntelFeed {
+    name: string;
+    type: 'sanctions' | 'exploits' | 'malware' | 'phishing' | 'mixer';
+    endpoint: string;
+}
+
+class ThreatIntelligenceService {
+    private feeds: ThreatIntelFeed[];
+    private cache: Map<string, ThreatData> = new Map();
+
+    async checkAddress(address: string): Promise<ThreatAssessment> {
+        const findings: ThreatFinding[] = [];
+
+        for (const feed of this.feeds) {
+            const feedData = this.cache.get(feed.name);
+            const match = feedData?.addresses.get(address.toLowerCase());
+            if (match) {
+                findings.push({ source: feed.name, type: feed.type, confidence: match.confidence });
+            }
+        }
+
+        return {
+            address,
+            riskScore: this.calculateRiskScore(findings),
+            findings,
+            checkedAt: Date.now()
+        };
+    }
+
+    private calculateRiskScore(findings: ThreatFinding[]): number {
+        const weights = { sanctions: 100, exploits: 90, malware: 85, mixer: 70, phishing: 60 };
+        if (findings.length === 0) return 0;
+        let total = findings.reduce((sum, f) => sum + (weights[f.type] || 50) * f.confidence, 0);
+        return Math.min(100, total / findings.length);
+    }
+}</code></pre>
+
+    <h2>Security Dashboard Integration</h2>
+    <p>A comprehensive security dashboard provides real-time visibility into the security posture of blockchain systems.</p>
+
+    <table>
+        <tr><th>Dashboard Component</th><th>Data Source</th><th>Update Frequency</th></tr>
+        <tr><td>Transaction Risk Monitor</td><td>Real-time analysis API</td><td>Real-time</td></tr>
+        <tr><td>Address Screening Status</td><td>Threat intelligence feeds</td><td>15 minutes</td></tr>
+        <tr><td>Smart Contract Health</td><td>Static analysis tools</td><td>On deploy</td></tr>
+        <tr><td>Network Node Status</td><td>Node monitoring agents</td><td>30 seconds</td></tr>
+        <tr><td>Incident Timeline</td><td>Incident response system</td><td>Real-time</td></tr>
+        <tr><td>Compliance Status</td><td>Compliance monitoring</td><td>Daily</td></tr>
+    </table>
+
+    <pre><code>// Security Dashboard WebSocket API
+import { WebSocketServer } from 'ws';
+
+class SecurityDashboardServer {
+    private wss: WebSocketServer;
+    private clients: Map<string, DashboardClient> = new Map();
+
+    constructor(port: number) {
+        this.wss = new WebSocketServer({ port });
+        this.wss.on('connection', (ws, req) => {
+            const clientId = this.authenticateClient(req);
+            if (!clientId) { ws.close(4001, 'Auth failed'); return; }
+
+            this.clients.set(clientId, { id: clientId, ws, subscriptions: new Set() });
+            ws.on('close', () => this.clients.delete(clientId));
+        });
+
+        securityEventEmitter.on('incident', (incident) => this.broadcast('incident', incident));
+        securityEventEmitter.on('alert', (alert) => this.broadcast('alert', alert));
+    }
+
+    private broadcast(event: string, data: any): void {
+        for (const [_, client] of this.clients) {
+            client.ws.send(JSON.stringify({ event, data, timestamp: Date.now() }));
+        }
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Summary:</strong> Security API integration enables automated threat detection and response while providing visibility into the security posture of blockchain systems. Well-designed APIs with proper authentication, validation, and monitoring form the backbone of enterprise blockchain security operations.
+    </div>
+
+</body>
+</html>

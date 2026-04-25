@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-FIN-011 KYC/AML Simulator</title>
+    <style>
+        :root {
+            --primary: #22C55E;
+            --primary-dark: #16A34A;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --info: #3B82F6;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; color: var(--primary); }
+        .header p { color: var(--text-muted); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .tab:hover { border-color: var(--primary); }
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Tab Content */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
+
+        /* Results */
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .result.success { border-color: var(--primary); }
+        .result.warning { border-color: var(--warning); }
+        .result.danger { border-color: var(--danger); }
+
+        /* Risk Score */
+        .risk-score {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .risk-low { color: var(--primary); }
+        .risk-medium { color: var(--warning); }
+        .risk-high { color: var(--danger); }
+
+        /* Progress Steps */
+        .steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--border);
+            z-index: 0;
+        }
+        .step {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            flex: 1;
+        }
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-weight: bold;
+        }
+        .step.active .step-circle {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .step.completed .step-circle {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .step-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Document Upload */
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(34, 197, 94, 0.05);
+        }
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: var(--bg-card);
+            color: var(--primary);
+            font-weight: 600;
+        }
+        tr:hover {
+            background: rgba(34, 197, 94, 0.05);
+        }
+
+        /* Alert */
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--info);
+            color: #93C5FD;
+        }
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--warning);
+            color: #FCD34D;
+        }
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+            color: #FCA5A5;
+        }
+
+        /* Checkbox List */
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Back Button */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            margin-bottom: 20px;
+            transition: color 0.2s;
+        }
+        .back-link:hover {
+            color: var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .steps {
+                flex-wrap: wrap;
+            }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added 2026-04-25 for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">KYC / AML</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <a href="../" class="back-link">← Back to KYC/AML Standard</a>
+
+        <div class="header">
+            <h1>🔍 KYC/AML Simulator</h1>
+            <p>Interactive demonstration of Know Your Customer & Anti-Money Laundering processes</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(0)">1️⃣ Customer Onboarding</div>
+            <div class="tab" onclick="switchTab(1)">2️⃣ Document Verification</div>
+            <div class="tab" onclick="switchTab(2)">3️⃣ Risk Assessment</div>
+            <div class="tab" onclick="switchTab(3)">4️⃣ Transaction Monitoring</div>
+            <div class="tab" onclick="switchTab(4)">5️⃣ SAR Generator</div>
+        </div>
+
+        <!-- Tab 1: Customer Onboarding Flow -->
+        <div id="tab-0" class="tab-content active">
+            <div class="card">
+                <h2 class="card-title">Customer Onboarding Flow</h2>
+
+                <div class="steps">
+                    <div class="step active">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Basic Info</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Identity</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Verification</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Risk Profile</div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Info:</strong> This simulator demonstrates a standard KYC onboarding process. All data is simulated and not stored.
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Full Legal Name *</label>
+                        <input type="text" id="fullName" placeholder="John Michael Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Birth *</label>
+                        <input type="date" id="dob">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nationality *</label>
+                        <select id="nationality">
+                            <option value="">Select...</option>
+                            <option value="US">United States</option>
+                            <option value="UK">United Kingdom</option>
+                            <option value="KR">South Korea</option>
+                            <option value="JP">Japan</option>
+                            <option value="CN">China</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>ID Type *</label>
+                        <select id="idType">
+                            <option value="">Select...</option>
+                            <option value="passport">Passport</option>
+                            <option value="drivers_license">Driver's License</option>
+                            <option value="national_id">National ID Card</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>ID Number *</label>
+                    <input type="text" id="idNumber" placeholder="e.g., A12345678">
+                </div>
+
+                <div class="form-group">
+                    <label>Residential Address *</label>
+                    <textarea id="address" placeholder="Full residential address including street, city, state/province, country, and postal code"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email Address *</label>
+                        <input type="email" id="email" placeholder="john.smith@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number *</label>
+                        <input type="tel" id="phone" placeholder="+1-555-123-4567">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Occupation *</label>
+                    <input type="text" id="occupation" placeholder="e.g., Software Engineer">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Source of Funds *</label>
+                        <select id="sourceOfFunds">
+                            <option value="">Select...</option>
+                            <option value="employment">Employment Income</option>
+                            <option value="business">Business Income</option>
+                            <option value="inheritance">Inheritance</option>
+                            <option value="investments">Investments</option>
+                            <option value="savings">Savings</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Expected Transaction Volume *</label>
+                        <select id="txVolume">
+                            <option value="">Select...</option>
+                            <option value="low">Low (< $10,000/month)</option>
+                            <option value="medium">Medium ($10,000 - $100,000/month)</option>
+                            <option value="high">High (> $100,000/month)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Purpose of Account *</label>
+                    <select id="purpose">
+                        <option value="">Select...</option>
+                        <option value="personal">Personal Banking</option>
+                        <option value="business">Business Operations</option>
+                        <option value="investment">Investment</option>
+                        <option value="savings">Savings</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary" onclick="submitOnboarding()">Submit Application →</button>
+
+                <div id="onboardingResult"></div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Document Verification -->
+        <div id="tab-1" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Document Verification</h2>
+
+                <div class="alert alert-info">
+                    <strong>Info:</strong> Upload and verify identity documents. This simulator uses AI-powered OCR and validation.
+                </div>
+
+                <div class="form-group">
+                    <label>Document Type</label>
+                    <select id="docType" onchange="updateDocumentFields()">
+                        <option value="passport">Passport</option>
+                        <option value="drivers_license">Driver's License</option>
+                        <option value="national_id">National ID Card</option>
+                        <option value="utility_bill">Utility Bill (Proof of Address)</option>
+                        <option value="bank_statement">Bank Statement</option>
+                    </select>
+                </div>
+
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📄</div>
+                    <p>Click to upload document or drag and drop</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">Supported: JPG, PNG, PDF (Max 10MB)</p>
+                    <input type="file" id="fileInput" style="display: none" onchange="handleFileUpload(event)">
+                </div>
+
+                <div id="uploadedDoc" style="display: none; margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px;">Extracted Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Document Number</label>
+                            <input type="text" id="extractedDocNum" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="extractedName" readonly>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date of Birth</label>
+                            <input type="text" id="extractedDOB" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Expiry Date</label>
+                            <input type="text" id="extractedExpiry" readonly>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <textarea id="extractedAddress" readonly></textarea>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="verifyDocument()" style="margin-top: 20px;">Verify Document</button>
+
+                <div id="verificationResult"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Risk Assessment Calculator -->
+        <div id="tab-2" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Risk Assessment Calculator</h2>
+
+                <div class="alert alert-warning">
+                    <strong>Risk-Based Approach:</strong> This calculator uses FATF-compliant risk indicators to generate a customer risk score.
+                </div>
+
+                <h3 style="margin: 20px 0 15px;">Customer Risk Factors</h3>
+
+                <div class="form-group">
+                    <label>Customer Type</label>
+                    <select id="customerType" onchange="calculateRisk()">
+                        <option value="10">Individual - Low Risk Profession</option>
+                        <option value="25">Individual - Moderate Risk</option>
+                        <option value="50">PEP (Politically Exposed Person)</option>
+                        <option value="75">High Net Worth Individual</option>
+                        <option value="40">SME Business</option>
+                        <option value="60">Cash-Intensive Business</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Geographic Risk</label>
+                    <select id="geoRisk" onchange="calculateRisk()">
+                        <option value="5">Low Risk Jurisdiction (FATF Member)</option>
+                        <option value="30">Medium Risk Country</option>
+                        <option value="70">High Risk / Non-Cooperative Jurisdiction</option>
+                        <option value="90">FATF Blacklisted Country</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Product/Service Risk</label>
+                    <select id="productRisk" onchange="calculateRisk()">
+                        <option value="10">Basic Banking Services</option>
+                        <option value="25">Investment Products</option>
+                        <option value="40">Cryptocurrency Trading</option>
+                        <option value="60">International Wire Transfers</option>
+                        <option value="80">Private Banking Services</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Transaction Volume (Monthly)</label>
+                    <select id="txVolumeRisk" onchange="calculateRisk()">
+                        <option value="5">< $10,000</option>
+                        <option value="15">$10,000 - $50,000</option>
+                        <option value="30">$50,000 - $250,000</option>
+                        <option value="50">$250,000 - $1M</option>
+                        <option value="70">> $1M</option>
+                    </select>
+                </div>
+
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pepCheck" onchange="calculateRisk()">
+                        <label for="pepCheck">Politically Exposed Person (PEP) +50</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="sanctionCheck" onchange="calculateRisk()">
+                        <label for="sanctionCheck">Appears on Sanctions List +100</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="adverseCheck" onchange="calculateRisk()">
+                        <label for="adverseCheck">Adverse Media Coverage +40</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="structuringCheck" onchange="calculateRisk()">
+                        <label for="structuringCheck">Structuring Pattern Detected +60</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="cashCheck" onchange="calculateRisk()">
+                        <label for="cashCheck">High Cash Usage +30</label>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="calculateRisk()" style="margin-top: 20px;">Calculate Risk Score</button>
+
+                <div id="riskResult"></div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Transaction Monitoring -->
+        <div id="tab-3" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Transaction Monitoring</h2>
+
+                <div class="alert alert-info">
+                    <strong>Real-time Monitoring:</strong> Detect suspicious patterns and anomalies in customer transactions.
+                </div>
+
+                <h3 style="margin: 20px 0 15px;">Add Transaction</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Customer ID</label>
+                        <input type="text" id="txCustomerId" placeholder="CUST-12345">
+                    </div>
+                    <div class="form-group">
+                        <label>Transaction Type</label>
+                        <select id="txType">
+                            <option value="deposit">Deposit</option>
+                            <option value="withdrawal">Withdrawal</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="wire">International Wire</option>
+                            <option value="crypto">Cryptocurrency</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Amount (USD)</label>
+                        <input type="number" id="txAmount" placeholder="10000">
+                    </div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <select id="txCurrency">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="JPY">JPY</option>
+                            <option value="KRW">KRW</option>
+                            <option value="BTC">BTC</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Counterparty Name</label>
+                        <input type="text" id="txCounterparty" placeholder="Recipient or Sender">
+                    </div>
+                    <div class="form-group">
+                        <label>Counterparty Country</label>
+                        <select id="txCountry">
+                            <option value="US">United States</option>
+                            <option value="UK">United Kingdom</option>
+                            <option value="KR">South Korea</option>
+                            <option value="IR">Iran (High Risk)</option>
+                            <option value="KP">North Korea (Sanctioned)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Transaction Description</label>
+                    <textarea id="txDescription" placeholder="Purpose of transaction"></textarea>
+                </div>
+
+                <button class="btn btn-primary" onclick="monitorTransaction()">Analyze Transaction</button>
+
+                <div id="monitoringResult"></div>
+
+                <h3 style="margin: 30px 0 15px;">Recent Transactions</h3>
+                <table id="transactionTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Counterparty</th>
+                            <th>Status</th>
+                            <th>Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>2025-12-25 14:32</td>
+                            <td>Wire Transfer</td>
+                            <td>$45,000</td>
+                            <td>ABC Corp (US)</td>
+                            <td><span style="color: var(--primary)">✓ Cleared</span></td>
+                            <td><span style="color: var(--primary)">Low</span></td>
+                        </tr>
+                        <tr>
+                            <td>2025-12-24 09:15</td>
+                            <td>Deposit</td>
+                            <td>$9,800</td>
+                            <td>Cash Deposit</td>
+                            <td><span style="color: var(--warning)">⚠ Review</span></td>
+                            <td><span style="color: var(--warning)">Medium</span></td>
+                        </tr>
+                        <tr>
+                            <td>2025-12-23 16:45</td>
+                            <td>Transfer</td>
+                            <td>$125,000</td>
+                            <td>Unknown Entity (IR)</td>
+                            <td><span style="color: var(--danger)">⛔ Blocked</span></td>
+                            <td><span style="color: var(--danger)">High</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 5: SAR Generator -->
+        <div id="tab-4" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Suspicious Activity Report (SAR) Generator</h2>
+
+                <div class="alert alert-danger">
+                    <strong>Regulatory Requirement:</strong> File SARs for suspicious activities as required by FinCEN and FATF guidelines.
+                </div>
+
+                <h3 style="margin: 20px 0 15px;">Report Information</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Report Filing Institution</label>
+                        <input type="text" id="sarInstitution" value="Example Financial Services Inc.">
+                    </div>
+                    <div class="form-group">
+                        <label>Report ID</label>
+                        <input type="text" id="sarId" value="SAR-2025-001234" readonly>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Filing Date</label>
+                        <input type="date" id="sarDate" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Report Type</label>
+                        <select id="sarType">
+                            <option value="initial">Initial Report</option>
+                            <option value="continuing">Continuing Activity</option>
+                            <option value="corrected">Corrected Report</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h3 style="margin: 30px 0 15px;">Subject Information</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Subject Name</label>
+                        <input type="text" id="sarSubjectName" placeholder="Individual or Entity Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Subject ID/Account Number</label>
+                        <input type="text" id="sarSubjectId" placeholder="Account or ID Number">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Subject Address</label>
+                    <textarea id="sarSubjectAddress" placeholder="Full address of subject"></textarea>
+                </div>
+
+                <h3 style="margin: 30px 0 15px;">Suspicious Activity Details</h3>
+
+                <div class="form-group">
+                    <label>Activity Type (Select all that apply)</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sarStructuring" value="Structuring">
+                            <label for="sarStructuring">Structuring / Smurfing</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sarLayering" value="Layering">
+                            <label for="sarLayering">Layering Transactions</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sarUnusual" value="Unusual">
+                            <label for="sarUnusual">Unusual Transaction Patterns</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sarHighRisk" value="HighRisk">
+                            <label for="sarHighRisk">High-Risk Jurisdiction</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sarFraud" value="Fraud">
+                            <label for="sarFraud">Suspected Fraud</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sarTerrorism" value="Terrorism">
+                            <label for="sarTerrorism">Terrorism Financing</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Total Amount Involved (USD)</label>
+                    <input type="number" id="sarAmount" placeholder="100000">
+                </div>
+
+                <div class="form-group">
+                    <label>Date Range of Activity</label>
+                    <div class="form-row">
+                        <input type="date" id="sarDateFrom">
+                        <input type="date" id="sarDateTo">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Detailed Narrative *</label>
+                    <textarea id="sarNarrative" style="min-height: 150px;" placeholder="Provide a detailed description of the suspicious activity, including:
+- Specific transactions or patterns observed
+- Timeline of events
+- Why the activity is considered suspicious
+- Any attempts to conceal or structure transactions
+- Relationship to other parties involved
+- Any other relevant information"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Supporting Documentation</label>
+                    <textarea id="sarDocumentation" placeholder="List all supporting documents attached (transaction records, communications, etc.)"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Filing Officer Name</label>
+                        <input type="text" id="sarOfficer" placeholder="Compliance Officer Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Number</label>
+                        <input type="tel" id="sarContact" placeholder="+1-555-123-4567">
+                    </div>
+                </div>
+
+                <button class="btn btn-danger" onclick="generateSAR()">Generate SAR Report</button>
+
+                <div id="sarResult"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize
+        document.getElementById('sarDate').valueAsDate = new Date();
+
+        // Tab Switching
+        function switchTab(index) {
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab-content').forEach((content, i) => {
+                content.classList.toggle('active', i === index);
+            });
+        }
+
+        // Tab 1: Customer Onboarding
+        function submitOnboarding() {
+            const fullName = document.getElementById('fullName').value;
+            const dob = document.getElementById('dob').value;
+            const nationality = document.getElementById('nationality').value;
+            const idType = document.getElementById('idType').value;
+            const idNumber = document.getElementById('idNumber').value;
+
+            if (!fullName || !dob || !nationality || !idType || !idNumber) {
+                showResult('onboardingResult', 'danger', 'Please fill in all required fields marked with *');
+                return;
+            }
+
+            const age = new Date().getFullYear() - new Date(dob).getFullYear();
+            const isPEP = Math.random() > 0.9; // 10% chance
+            const sanctionsHit = Math.random() > 0.95; // 5% chance
+
+            let result = `
+                <div class="result success">
+                    <h3>✅ Application Submitted Successfully</h3>
+                    <p><strong>Customer Name:</strong> ${fullName}</p>
+                    <p><strong>Application ID:</strong> KYC-${Date.now()}</p>
+                    <p><strong>Status:</strong> Pending Review</p>
+                    <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+                    <h4>Automated Checks:</h4>
+                    <ul>
+                        <li>✓ Age Verification: ${age} years (${age >= 18 ? 'PASS' : 'FAIL - Under 18'})</li>
+                        <li>${sanctionsHit ? '⚠' : '✓'} Sanctions Screening: ${sanctionsHit ? '<span style="color: var(--danger)">MATCH FOUND</span>' : 'No Matches'}</li>
+                        <li>${isPEP ? '⚠' : '✓'} PEP Screening: ${isPEP ? '<span style="color: var(--warning)">Potential PEP Match</span>' : 'Not a PEP'}</li>
+                        <li>✓ Document Validation: Pending Upload</li>
+                        <li>✓ Address Verification: Pending</li>
+                    </ul>
+                    ${sanctionsHit ? '<div class="alert alert-danger" style="margin-top: 15px;"><strong>ACTION REQUIRED:</strong> Sanctions match detected. Application requires enhanced due diligence review.</div>' : ''}
+                    ${isPEP ? '<div class="alert alert-warning" style="margin-top: 15px;"><strong>ACTION REQUIRED:</strong> PEP status detected. Enhanced due diligence required.</div>' : ''}
+                    <p style="margin-top: 15px;"><strong>Next Steps:</strong> Upload identity documents in the Document Verification tab.</p>
+                </div>
+            `;
+
+            document.getElementById('onboardingResult').innerHTML = result;
+        }
+
+        // Tab 2: Document Verification
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Simulate OCR extraction
+            setTimeout(() => {
+                document.getElementById('uploadedDoc').style.display = 'block';
+                document.getElementById('extractedDocNum').value = 'A' + Math.floor(Math.random() * 100000000);
+                document.getElementById('extractedName').value = document.getElementById('fullName').value || 'JOHN MICHAEL SMITH';
+                document.getElementById('extractedDOB').value = '1985-06-15';
+                document.getElementById('extractedExpiry').value = '2030-12-31';
+                document.getElementById('extractedAddress').value = '123 Main Street, New York, NY 10001, United States';
+            }, 1500);
+        }
+
+        function verifyDocument() {
+            const docNum = document.getElementById('extractedDocNum').value;
+            if (!docNum) {
+                showResult('verificationResult', 'danger', 'Please upload a document first');
+                return;
+            }
+
+            const validityChecks = [
+                { name: 'Document Authenticity', pass: Math.random() > 0.1 },
+                { name: 'Expiration Date', pass: Math.random() > 0.2 },
+                { name: 'Biometric Match (Face)', pass: Math.random() > 0.15 },
+                { name: 'MRZ Code Validation', pass: Math.random() > 0.1 },
+                { name: 'Security Features', pass: Math.random() > 0.12 },
+                { name: 'Cross-Reference Database', pass: Math.random() > 0.08 }
+            ];
+
+            const allPassed = validityChecks.every(check => check.pass);
+
+            let result = `
+                <div class="result ${allPassed ? 'success' : 'danger'}">
+                    <h3>${allPassed ? '✅' : '❌'} Document Verification ${allPassed ? 'Passed' : 'Failed'}</h3>
+                    <p><strong>Document Type:</strong> ${document.getElementById('docType').value}</p>
+                    <p><strong>Verification Time:</strong> ${new Date().toLocaleString()}</p>
+                    <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+                    <h4>Verification Checks:</h4>
+                    <ul>
+                        ${validityChecks.map(check => `
+                            <li>${check.pass ? '✓' : '❌'} ${check.name}: ${check.pass ? '<span style="color: var(--primary)">PASS</span>' : '<span style="color: var(--danger)">FAIL</span>'}</li>
+                        `).join('')}
+                    </ul>
+                    ${!allPassed ? '<div class="alert alert-danger" style="margin-top: 15px;"><strong>ACTION REQUIRED:</strong> Document verification failed. Please submit a valid document or contact support.</div>' : ''}
+                    <p style="margin-top: 15px;"><strong>Confidence Score:</strong> ${Math.floor(Math.random() * 20 + 80)}%</p>
+                </div>
+            `;
+
+            document.getElementById('verificationResult').innerHTML = result;
+        }
+
+        // Tab 3: Risk Assessment
+        function calculateRisk() {
+            const customerType = parseInt(document.getElementById('customerType').value);
+            const geoRisk = parseInt(document.getElementById('geoRisk').value);
+            const productRisk = parseInt(document.getElementById('productRisk').value);
+            const txVolume = parseInt(document.getElementById('txVolumeRisk').value);
+
+            let totalScore = customerType + geoRisk + productRisk + txVolume;
+
+            // Additional factors
+            if (document.getElementById('pepCheck').checked) totalScore += 50;
+            if (document.getElementById('sanctionCheck').checked) totalScore += 100;
+            if (document.getElementById('adverseCheck').checked) totalScore += 40;
+            if (document.getElementById('structuringCheck').checked) totalScore += 60;
+            if (document.getElementById('cashCheck').checked) totalScore += 30;
+
+            // Cap at 100
+            totalScore = Math.min(totalScore, 100);
+
+            let riskLevel, riskClass, recommendation;
+            if (totalScore < 30) {
+                riskLevel = 'LOW';
+                riskClass = 'risk-low';
+                recommendation = 'Standard CDD (Customer Due Diligence) procedures apply. Periodic monitoring sufficient.';
+            } else if (totalScore < 70) {
+                riskLevel = 'MEDIUM';
+                riskClass = 'risk-medium';
+                recommendation = 'Enhanced monitoring required. Additional documentation may be requested. Regular reviews recommended.';
+            } else {
+                riskLevel = 'HIGH';
+                riskClass = 'risk-high';
+                recommendation = 'Enhanced Due Diligence (EDD) required. Senior management approval needed. Continuous monitoring mandatory. Consider declining relationship if unable to mitigate risks.';
+            }
+
+            let result = `
+                <div class="result ${riskClass === 'risk-low' ? 'success' : riskClass === 'risk-medium' ? 'warning' : 'danger'}">
+                    <h3>Risk Assessment Result</h3>
+                    <div class="risk-score ${riskClass}">${totalScore}</div>
+                    <h2 style="text-align: center; color: var(--primary);">${riskLevel} RISK</h2>
+                    <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+                    <h4>Score Breakdown:</h4>
+                    <ul>
+                        <li>Customer Type: ${customerType} points</li>
+                        <li>Geographic Risk: ${geoRisk} points</li>
+                        <li>Product/Service: ${productRisk} points</li>
+                        <li>Transaction Volume: ${txVolume} points</li>
+                        ${document.getElementById('pepCheck').checked ? '<li>PEP Status: +50 points</li>' : ''}
+                        ${document.getElementById('sanctionCheck').checked ? '<li>Sanctions List: +100 points</li>' : ''}
+                        ${document.getElementById('adverseCheck').checked ? '<li>Adverse Media: +40 points</li>' : ''}
+                        ${document.getElementById('structuringCheck').checked ? '<li>Structuring: +60 points</li>' : ''}
+                        ${document.getElementById('cashCheck').checked ? '<li>Cash Usage: +30 points</li>' : ''}
+                    </ul>
+                    <h4>Recommendation:</h4>
+                    <p>${recommendation}</p>
+                    ${totalScore >= 70 ? '<div class="alert alert-danger" style="margin-top: 15px;"><strong>WARNING:</strong> This customer poses a high money laundering risk. EDD procedures must be followed.</div>' : ''}
+                </div>
+            `;
+
+            document.getElementById('riskResult').innerHTML = result;
+        }
+
+        // Tab 4: Transaction Monitoring
+        function monitorTransaction() {
+            const amount = parseFloat(document.getElementById('txAmount').value);
+            const txType = document.getElementById('txType').value;
+            const country = document.getElementById('txCountry').value;
+            const counterparty = document.getElementById('txCounterparty').value;
+
+            if (!amount || !counterparty) {
+                showResult('monitoringResult', 'danger', 'Please fill in all transaction details');
+                return;
+            }
+
+            const alerts = [];
+            let riskScore = 0;
+
+            // Rule-based monitoring
+            if (amount > 10000) {
+                alerts.push('Large transaction (>$10,000) - CTR filing may be required');
+                riskScore += 30;
+            }
+            if (amount >= 9000 && amount <= 10000) {
+                alerts.push('⚠ Potential structuring - Amount just below reporting threshold');
+                riskScore += 70;
+            }
+            if (country === 'IR' || country === 'KP') {
+                alerts.push('⚠ HIGH RISK: Transaction involves sanctioned jurisdiction');
+                riskScore += 90;
+            }
+            if (txType === 'crypto') {
+                alerts.push('Cryptocurrency transaction - Enhanced monitoring');
+                riskScore += 20;
+            }
+            if (txType === 'wire') {
+                alerts.push('International wire transfer - Cross-border monitoring');
+                riskScore += 15;
+            }
+
+            const status = riskScore < 30 ? 'Cleared' : riskScore < 70 ? 'Under Review' : 'Blocked';
+            const statusClass = riskScore < 30 ? 'success' : riskScore < 70 ? 'warning' : 'danger';
+
+            let result = `
+                <div class="result ${statusClass}">
+                    <h3>Transaction Monitoring Result</h3>
+                    <p><strong>Status:</strong> ${status}</p>
+                    <p><strong>Risk Score:</strong> ${riskScore}/100</p>
+                    <p><strong>Transaction ID:</strong> TX-${Date.now()}</p>
+                    <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+                    ${alerts.length > 0 ? `
+                        <h4>Alerts Triggered:</h4>
+                        <ul>
+                            ${alerts.map(alert => `<li>${alert}</li>`).join('')}
+                        </ul>
+                    ` : '<p>✓ No alerts triggered</p>'}
+                    ${riskScore >= 70 ? '<div class="alert alert-danger" style="margin-top: 15px;"><strong>ACTION REQUIRED:</strong> Transaction blocked pending compliance review. SAR filing may be necessary.</div>' : ''}
+                    ${riskScore >= 30 && riskScore < 70 ? '<div class="alert alert-warning" style="margin-top: 15px;"><strong>REVIEW REQUIRED:</strong> Transaction flagged for manual review by compliance team.</div>' : ''}
+                </div>
+            `;
+
+            document.getElementById('monitoringResult').innerHTML = result;
+        }
+
+        // Tab 5: SAR Generator
+        function generateSAR() {
+            const subjectName = document.getElementById('sarSubjectName').value;
+            const narrative = document.getElementById('sarNarrative').value;
+            const amount = document.getElementById('sarAmount').value;
+
+            if (!subjectName || !narrative || !amount) {
+                showResult('sarResult', 'danger', 'Please fill in all required fields');
+                return;
+            }
+
+            const activityTypes = [];
+            if (document.getElementById('sarStructuring').checked) activityTypes.push('Structuring');
+            if (document.getElementById('sarLayering').checked) activityTypes.push('Layering');
+            if (document.getElementById('sarUnusual').checked) activityTypes.push('Unusual Patterns');
+            if (document.getElementById('sarHighRisk').checked) activityTypes.push('High-Risk Jurisdiction');
+            if (document.getElementById('sarFraud').checked) activityTypes.push('Fraud');
+            if (document.getElementById('sarTerrorism').checked) activityTypes.push('Terrorism Financing');
+
+            const sarReport = {
+                reportId: document.getElementById('sarId').value,
+                filingDate: document.getElementById('sarDate').value,
+                institution: document.getElementById('sarInstitution').value,
+                reportType: document.getElementById('sarType').value,
+                subject: {
+                    name: subjectName,
+                    id: document.getElementById('sarSubjectId').value,
+                    address: document.getElementById('sarSubjectAddress').value
+                },
+                activityTypes: activityTypes,
+                amount: parseFloat(amount),
+                dateRange: {
+                    from: document.getElementById('sarDateFrom').value,
+                    to: document.getElementById('sarDateTo').value
+                },
+                narrative: narrative,
+                documentation: document.getElementById('sarDocumentation').value,
+                filingOfficer: document.getElementById('sarOfficer').value,
+                contact: document.getElementById('sarContact').value
+            };
+
+            let result = `
+                <div class="result danger">
+                    <h3>🚨 SAR Report Generated</h3>
+                    <p><strong>Report ID:</strong> ${sarReport.reportId}</p>
+                    <p><strong>Status:</strong> Ready for Submission to FinCEN</p>
+                    <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+                    <h4>Report Summary:</h4>
+                    <p><strong>Subject:</strong> ${sarReport.subject.name}</p>
+                    <p><strong>Total Amount:</strong> $${sarReport.amount.toLocaleString()}</p>
+                    <p><strong>Activity Types:</strong> ${activityTypes.join(', ')}</p>
+                    <p><strong>Filing Officer:</strong> ${sarReport.filingOfficer}</p>
+                    <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+                    <h4>Narrative (Preview):</h4>
+                    <p style="background: var(--bg); padding: 15px; border-radius: 8px; margin: 10px 0;">${narrative.substring(0, 300)}${narrative.length > 300 ? '...' : ''}</p>
+                    <div class="alert alert-danger" style="margin-top: 15px;">
+                        <strong>IMPORTANT:</strong> This SAR must be filed within 30 days of initial detection. Maintain strict confidentiality. Do not notify the subject of SAR filing.
+                    </div>
+                    <button class="btn btn-danger" onclick="alert('In production, this would submit to FinCEN BSA E-Filing System')">Submit to FinCEN</button>
+                    <button class="btn btn-secondary" onclick="downloadSAR(${JSON.stringify(sarReport).replace(/"/g, '&quot;')})" style="margin-left: 10px;">Download PDF</button>
+                </div>
+            `;
+
+            document.getElementById('sarResult').innerHTML = result;
+        }
+
+        function downloadSAR(report) {
+            alert('In production, this would generate a FinCEN SAR PDF file');
+        }
+
+        // Helper function
+        function showResult(elementId, type, message) {
+            const resultClass = type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'danger';
+            document.getElementById(elementId).innerHTML = `
+                <div class="result ${resultClass}">
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+
+        function updateDocumentFields() {
+            // Can be used to show/hide specific fields based on document type
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

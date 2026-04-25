@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Key Storage and Wallet Security | WIA-BLOCKCHAIN_SECURITY</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Key Storage and Wallet Security</h1>
+
+    <div class="highlight">
+        <strong>Chapter Overview:</strong> Private key security is the foundation of blockchain asset protection. This chapter covers multi-signature wallets, cold storage architectures, hardware security modules, and best practices for key lifecycle management.
+    </div>
+
+    <h2>Key Storage Strategies</h2>
+    <p>The choice of key storage strategy depends on the security requirements, operational needs, and value at risk. Different approaches offer varying tradeoffs between security and convenience.</p>
+
+    <h3>Storage Strategy Comparison</h3>
+    <table>
+        <tr><th>Strategy</th><th>Security Level</th><th>Convenience</th><th>Best For</th></tr>
+        <tr><td>Hot Wallet</td><td>Low</td><td>High</td><td>Daily transactions, small amounts</td></tr>
+        <tr><td>Encrypted Keystore</td><td>Medium</td><td>Medium</td><td>Developer wallets, testing</td></tr>
+        <tr><td>Hardware Wallet</td><td>High</td><td>Medium</td><td>Personal holdings, individuals</td></tr>
+        <tr><td>Multi-sig Wallet</td><td>Very High</td><td>Low</td><td>Treasury, organizational assets</td></tr>
+        <tr><td>Cold Storage</td><td>Maximum</td><td>Very Low</td><td>Long-term storage, large holdings</td></tr>
+        <tr><td>HSM</td><td>Maximum</td><td>Low</td><td>Institutional custody, exchanges</td></tr>
+    </table>
+
+    <h2>Multi-Signature Wallet Implementation</h2>
+    <p>Multi-signature (multi-sig) wallets require multiple parties to authorize transactions, eliminating single points of failure and providing defense against key compromise.</p>
+
+    <h3>Multi-Sig Architecture</h3>
+    <pre><code>Multi-Signature Wallet Architecture:
+
+┌─────────────────────────────────────────────────────────────┐
+│                    Multi-Sig Wallet                          │
+│                     (3-of-5 Threshold)                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │
+│   │ Signer 1 │ │ Signer 2 │ │ Signer 3 │ │ Signer 4 │ ...  │
+│   │  (CEO)   │ │  (CFO)   │ │  (CTO)   │ │(Security)│      │
+│   └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘      │
+│        │            │            │            │             │
+│        ▼            ▼            ▼            ▼             │
+│   ┌─────────────────────────────────────────────────────┐  │
+│   │            Signature Collection Contract             │  │
+│   │  - Collects signatures from authorized signers       │  │
+│   │  - Validates signature threshold met                 │  │
+│   │  - Enforces timelock on execution                    │  │
+│   └─────────────────────────────────────────────────────┘  │
+│                          │                                  │
+│                          ▼                                  │
+│   ┌─────────────────────────────────────────────────────┐  │
+│   │              Transaction Execution                   │  │
+│   │  - Execute approved transactions                     │  │
+│   │  - Emit events for monitoring                        │  │
+│   │  - Update nonce to prevent replay                    │  │
+│   └─────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+
+    <h3>Secure Multi-Sig Implementation</h3>
+    <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract SecureMultiSig {
+    event TransactionProposed(uint256 indexed txId, address indexed proposer);
+    event TransactionExecuted(uint256 indexed txId);
+
+    uint256 public constant EXECUTION_DELAY = 24 hours;
+    address[] public signers;
+    mapping(address => bool) public isSigner;
+    uint256 public threshold;
+    uint256 public nonce;
+
+    struct Transaction {
+        address to;
+        uint256 value;
+        bytes data;
+        uint256 proposedAt;
+        uint256 signatureCount;
+        bool executed;
+    }
+
+    mapping(uint256 => Transaction) public transactions;
+
+    modifier onlySigner() { require(isSigner[msg.sender], "Not a signer"); _; }
+
+    constructor(address[] memory _signers, uint256 _threshold) {
+        require(_signers.length >= _threshold && _threshold > 0);
+        for (uint256 i = 0; i < _signers.length; i++) {
+            isSigner[_signers[i]] = true;
+            signers.push(_signers[i]);
+        }
+        threshold = _threshold;
+    }
+
+    function proposeTransaction(address to, uint256 value, bytes calldata data)
+        external onlySigner returns (uint256 txId) {
+        txId = nonce++;
+        transactions[txId] = Transaction(to, value, data, block.timestamp, 1, false);
+        emit TransactionProposed(txId, msg.sender);
+    }
+
+    function executeTransaction(uint256 txId) external onlySigner {
+        Transaction storage txn = transactions[txId];
+        require(!txn.executed && txn.signatureCount >= threshold);
+        require(block.timestamp >= txn.proposedAt + EXECUTION_DELAY);
+        txn.executed = true;
+        (bool success, ) = txn.to.call{value: txn.value}(txn.data);
+        require(success);
+        emit TransactionExecuted(txId);
+    }
+
+    receive() external payable {}
+}</code></pre>
+
+    <h2>Cold Storage Architecture</h2>
+    <p>Cold storage keeps private keys completely offline, providing maximum security against remote attacks. Proper cold storage implementation requires careful protocol design.</p>
+
+    <div class="highlight">
+        <strong>Cold Storage Principle:</strong> Private keys in cold storage should never be exposed to internet-connected devices. All transaction signing occurs on air-gapped systems, with signed transactions transferred via secure methods.
+    </div>
+
+    <h3>Cold Storage Protocol</h3>
+    <pre><code>Cold Storage Transaction Protocol:
+
+Step 1: Transaction Preparation (Online)
+├── Create unsigned transaction on hot system
+├── Verify destination and amount
+├── Generate transaction hash for signing
+└── Export to QR code or USB device
+
+Step 2: Air-Gap Transfer
+├── Verify device has never been connected to network
+├── Transfer unsigned transaction via:
+│   ├── QR code scanning (preferred)
+│   ├── USB device (single-use, formatted after)
+│   └── Manual entry (for simple transactions)
+└── Verify transaction details on cold device
+
+Step 3: Offline Signing
+├── Review transaction on cold storage device
+├── Verify all transaction parameters
+├── Enter PIN/passphrase to unlock signing key
+├── Sign transaction
+└── Export signed transaction
+
+Step 4: Broadcast (Online)
+├── Transfer signed transaction to hot system
+├── Final verification of signed transaction
+├── Broadcast to blockchain network
+└── Monitor for confirmation
+
+Security Measures:
+├── Cold storage room with physical access control
+├── Faraday cage to prevent wireless signals
+├── Multiple witness requirement for signing
+├── Video recording of signing ceremonies
+└── Hardware wallet with tamper-evident seals</code></pre>
+
+    <h2>Hardware Security Module (HSM) Integration</h2>
+    <p>HSMs provide the highest level of key protection for institutional use, offering tamper resistance, audit logging, and cryptographic acceleration.</p>
+
+    <h3>HSM Configuration</h3>
+    <pre><code>// HSM Integration for Blockchain Signing
+import { HSMClient, KeyType, SignatureAlgorithm } from '@hsm/client';
+
+interface HSMConfig {
+    endpoint: string;
+    partition: string;
+    credentials: { type: 'certificate' | 'password'; value: string; };
+    keyPolicy: { algorithm: string; quorumSize: number; };
+}
+
+class BlockchainHSMSigner {
+    private client: HSMClient;
+
+    constructor(config: HSMConfig) {
+        this.client = new HSMClient(config);
+    }
+
+    async initialize(): Promise<void> {
+        await this.client.connect();
+        const status = await this.client.getStatus();
+        if (status.tamperStatus !== 'CLEAR') throw new Error('HSM tamper detected');
+    }
+
+    async generateKey(keyId: string): Promise<string> {
+        const keyHandle = await this.client.generateKey({
+            id: keyId, type: KeyType.ECDSA, curve: 'secp256k1'
+        });
+        return await this.client.getPublicKey(keyHandle);
+    }
+
+    async signTransaction(keyId: string, txHash: Buffer, auth: AuthToken[]): Promise<Signature> {
+        if (auth.length < this.config.keyPolicy.quorumSize) {
+            throw new Error('Insufficient authorization');
+        }
+        const sig = await this.client.sign({ keyId, data: txHash, authorization: auth });
+        return { r: sig.r, s: sig.s, v: sig.recoveryParam };
+    }
+}</code></pre>
+
+    <h2>Key Lifecycle Management</h2>
+    <p>Proper key lifecycle management ensures keys remain secure throughout their useful life and are properly retired when no longer needed.</p>
+
+    <pre><code>Key Lifecycle Stages:
+
+1. Generation
+   ├── Use cryptographically secure RNG
+   ├── Generate in secure environment (HSM/air-gapped)
+   ├── Implement key ceremony with witnesses
+   └── Document generation parameters
+
+2. Distribution
+   ├── Secure key share distribution (Shamir)
+   ├── Verify share integrity
+   ├── Establish custody chain
+   └── Document share holders
+
+3. Storage
+   ├── Encrypt keys at rest
+   ├── Implement access controls
+   ├── Regular backup verification
+   └── Geographic distribution
+
+4. Usage
+   ├── Audit all key usage
+   ├── Implement rate limiting
+   ├── Monitor for anomalies
+   └── Enforce authorization policies
+
+5. Rotation
+   ├── Regular rotation schedule
+   ├── Emergency rotation capability
+   ├── Overlap period for migrations
+   └── Update all dependent systems
+
+6. Retirement
+   ├── Secure deletion from all systems
+   ├── Revoke any remaining access
+   ├── Archive audit logs
+   └── Document destruction</code></pre>
+
+    <div class="highlight">
+        <strong>Summary:</strong> Key storage and wallet security are fundamental to protecting blockchain assets. Multi-signature wallets eliminate single points of failure, cold storage provides maximum protection for long-term holdings, and HSMs offer institutional-grade security. Implementing proper key lifecycle management ensures security throughout the key's useful life.
+    </div>
+
+</body>
+</html>

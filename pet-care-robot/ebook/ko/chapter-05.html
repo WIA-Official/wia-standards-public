@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 2단계 - API 인터페이스 | WIA-ROB-014 반려동물 돌봄 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--pet-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--pet-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--pet-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--pet-color);margin:40px 0 20px;border-bottom:2px solid var(--pet-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--pet-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--pet-color);text-decoration:none;padding:10px 20px;border:2px solid var(--pet-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--pet-color)}
+        strong{color:var(--pet-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border:1px solid var(--pet-color)}
+        code{color:#22d3ee;font-family:'Courier New',monospace}
+        .summary{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:40px 0;border-left:4px solid var(--pet-color)}
+        .questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:40px 0}
+        .questions ol{margin-left:25px;margin-top:15px}
+        .questions li{margin:10px 0}
+        ul{margin:15px 0 15px 40px}
+        li{margin:8px 0}
+        .philosophy{text-align:center;padding:20px;background:var(--bg-tertiary);border-radius:8px;margin:30px 0;border:2px solid var(--pet-color)}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제5장: 2단계 - API 인터페이스</h1>
+
+        <h2>5.1 RESTful API 설계</h2>
+        <p>WIA-ROB-014는 <strong>OpenAPI 3.0</strong> 스펙을 기반으로 RESTful API를 정의합니다.</p>
+
+        <h3>5.1.1 API 엔드포인트 구조</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>리소스</th>
+                    <th>엔드포인트</th>
+                    <th>메서드</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td rowspan="5">Pets</td>
+                    <td>/v1/pets</td>
+                    <td>GET</td>
+                    <td>모든 반려동물 목록 조회</td>
+                </tr>
+                <tr>
+                    <td>/v1/pets</td>
+                    <td>POST</td>
+                    <td>새 반려동물 등록</td>
+                </tr>
+                <tr>
+                    <td>/v1/pets/{petId}</td>
+                    <td>GET</td>
+                    <td>특정 반려동물 조회</td>
+                </tr>
+                <tr>
+                    <td>/v1/pets/{petId}</td>
+                    <td>PATCH</td>
+                    <td>반려동물 정보 수정</td>
+                </tr>
+                <tr>
+                    <td>/v1/pets/{petId}</td>
+                    <td>DELETE</td>
+                    <td>반려동물 삭제</td>
+                </tr>
+                <tr>
+                    <td rowspan="3">Activities</td>
+                    <td>/v1/pets/{petId}/activities</td>
+                    <td>GET</td>
+                    <td>활동 기록 조회</td>
+                </tr>
+                <tr>
+                    <td>/v1/pets/{petId}/activities</td>
+                    <td>POST</td>
+                    <td>활동 기록 추가</td>
+                </tr>
+                <tr>
+                    <td>/v1/pets/{petId}/activities/{activityId}</td>
+                    <td>GET</td>
+                    <td>특정 활동 조회</td>
+                </tr>
+                <tr>
+                    <td rowspan="2">Health</td>
+                    <td>/v1/pets/{petId}/health</td>
+                    <td>GET</td>
+                    <td>건강 데이터 조회</td>
+                </tr>
+                <tr>
+                    <td>/v1/pets/{petId}/health</td>
+                    <td>POST</td>
+                    <td>건강 측정 기록</td>
+                </tr>
+                <tr>
+                    <td rowspan="3">Devices</td>
+                    <td>/v1/devices</td>
+                    <td>GET</td>
+                    <td>등록된 디바이스 목록</td>
+                </tr>
+                <tr>
+                    <td>/v1/devices/{deviceId}</td>
+                    <td>GET</td>
+                    <td>디바이스 정보 조회</td>
+                </tr>
+                <tr>
+                    <td>/v1/devices/{deviceId}/control</td>
+                    <td>POST</td>
+                    <td>디바이스 제어</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.1.2 반려동물 조회 API</h3>
+        <pre><code>GET /v1/pets/{petId}
+Host: api.wia-rob014.org
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+
+// 응답 200 OK
+{
+  "petId": "pet-a1b2c3d4e5f67890a1b2c3d4e5f67890",
+  "name": "맥스",
+  "species": "dog",
+  "breed": "Golden Retriever",
+  "birthDate": "2022-03-15",
+  "gender": "neutered-male",
+  "weight": {
+    "value": 28.5,
+    "unit": "kg",
+    "measuredAt": "2025-01-15T10:30:00Z"
+  },
+  "ownerId": "user-f9e8d7c6b5a4321098765432109876543",
+  "medicalInfo": {
+    "allergies": ["chicken", "wheat"],
+    "vaccinations": [...]
+  },
+  "createdAt": "2022-03-20T14:22:00Z",
+  "updatedAt": "2025-01-15T10:30:00Z",
+  "_links": {
+    "self": "/v1/pets/pet-a1b2c3d4e5f67890a1b2c3d4e5f67890",
+    "activities": "/v1/pets/pet-a1b2c3d4e5f67890a1b2c3d4e5f67890/activities",
+    "health": "/v1/pets/pet-a1b2c3d4e5f67890a1b2c3d4e5f67890/health"
+  }
+}</code></pre>
+
+        <h2>5.2 급식 제어 API</h2>
+        <p>자동 급식기를 <strong>원격 제어</strong>하는 API입니다.</p>
+
+        <h3>5.2.1 급식 실행 API</h3>
+        <pre><code>POST /v1/devices/{deviceId}/control
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "action": "dispense",
+  "parameters": {
+    "amount": {
+      "value": 150,
+      "unit": "grams"
+    },
+    "petId": "pet-a1b2c3d4e5f67890a1b2c3d4e5f67890",
+    "schedule": false,
+    "notify": true
+  }
+}
+
+// 응답 202 Accepted
+{
+  "requestId": "req-b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+  "status": "processing",
+  "estimatedCompletion": "2025-01-20T10:30:15Z",
+  "_links": {
+    "status": "/v1/requests/req-b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5"
+  }
+}
+
+// 상태 확인
+GET /v1/requests/req-b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5
+
+// 응답 200 OK (완료 시)
+{
+  "requestId": "req-b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+  "status": "completed",
+  "completedAt": "2025-01-20T10:30:12Z",
+  "result": {
+    "success": true,
+    "dispensed": {
+      "value": 150,
+      "unit": "grams"
+    },
+    "remainingFood": {
+      "value": 1850,
+      "unit": "grams"
+    }
+  }
+}</code></pre>
+
+        <h3>5.2.2 급식 스케줄 관리</h3>
+        <pre><code>POST /v1/devices/{deviceId}/schedules
+Content-Type: application/json
+
+{
+  "scheduleId": "schedule-c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+  "petId": "pet-a1b2c3d4e5f67890a1b2c3d4e5f67890",
+  "enabled": true,
+  "times": [
+    {
+      "time": "08:00",
+      "amount": { "value": 150, "unit": "grams" },
+      "daysOfWeek": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    },
+    {
+      "time": "18:00",
+      "amount": { "value": 150, "unit": "grams" },
+      "daysOfWeek": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    }
+  ],
+  "timezone": "Asia/Seoul"
+}
+
+// 스케줄 목록 조회
+GET /v1/devices/{deviceId}/schedules
+
+// 특정 스케줄 삭제
+DELETE /v1/devices/{deviceId}/schedules/{scheduleId}</code></pre>
+
+        <h2>5.3 실시간 모니터링 API</h2>
+        <p>펫 카메라 및 센서의 <strong>실시간 데이터</strong>를 처리합니다.</p>
+
+        <h3>5.3.1 영상 스트리밍 세션 시작</h3>
+        <pre><code>POST /v1/devices/{deviceId}/stream/start
+Content-Type: application/json
+
+{
+  "quality": "hd",        // "sd", "hd", "fhd"
+  "audio": true,
+  "twoWay": true,         // 양방향 음성
+  "duration": 3600        // 초 (1시간)
+}
+
+// 응답 201 Created
+{
+  "sessionId": "stream-d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1",
+  "protocol": "webrtc",
+  "urls": {
+    "offer": "wss://stream.wia-rob014.org/sessions/stream-d4e5f6...",
+    "turn": [
+      "turn:turn1.wia-rob014.org:3478",
+      "turn:turn2.wia-rob014.org:3478"
+    ]
+  },
+  "credentials": {
+    "username": "1234567890:stream-d4e5f6...",
+    "password": "temporary-token-xyz"
+  },
+  "expiresAt": "2025-01-20T11:30:00Z"
+}</code></pre>
+
+        <h3>5.3.2 실시간 센서 데이터 구독</h3>
+        <pre><code>// HTTP SSE (Server-Sent Events) 사용
+GET /v1/devices/{deviceId}/sensors/stream
+Accept: text/event-stream
+Authorization: Bearer {token}
+
+// 서버 응답 (지속적인 스트림)
+event: heartbeat
+data: {"timestamp": "2025-01-20T10:30:00Z", "status": "connected"}
+
+event: sensor-data
+data: {"type": "temperature", "value": 22.5, "unit": "celsius", "timestamp": "2025-01-20T10:30:05Z"}
+
+event: sensor-data
+data: {"type": "humidity", "value": 55, "unit": "percent", "timestamp": "2025-01-20T10:30:05Z"}
+
+event: alert
+data: {"level": "warning", "message": "온도가 정상 범위를 벗어났습니다", "value": 28}</code></pre>
+
+        <h2>5.4 건강 분석 API</h2>
+        <p>AI 기반 <strong>건강 인사이트</strong>를 제공합니다.</p>
+
+        <h3>5.4.1 건강 요약 조회</h3>
+        <pre><code>GET /v1/pets/{petId}/health/summary?period=7d
+Authorization: Bearer {token}
+
+// 응답 200 OK
+{
+  "petId": "pet-a1b2c3d4e5f67890a1b2c3d4e5f67890",
+  "period": {
+    "start": "2025-01-14T00:00:00Z",
+    "end": "2025-01-20T23:59:59Z"
+  },
+  "overallHealth": {
+    "score": 85,
+    "trend": "stable",
+    "status": "good"
+  },
+  "vitals": {
+    "heartRate": {
+      "average": 88,
+      "range": [75, 102],
+      "trend": "stable"
+    },
+    "weight": {
+      "current": 28.5,
+      "change": -0.2,
+      "trend": "decreasing"
+    },
+    "activityLevel": {
+      "dailyAverage": 8500,  // steps
+      "trend": "increasing",
+      "percentile": 75       // 같은 품종 대비
+    }
+  },
+  "insights": [
+    {
+      "type": "positive",
+      "message": "활동량이 지난주 대비 15% 증가했습니다.",
+      "confidence": 0.92
+    },
+    {
+      "type": "attention",
+      "message": "체중이 소폭 감소 중입니다. 식욕을 관찰해주세요.",
+      "confidence": 0.78
+    }
+  ],
+  "recommendations": [
+    {
+      "category": "nutrition",
+      "message": "현재 활동량을 고려하여 일일 칼로리를 350kcal로 유지하세요.",
+      "priority": "medium"
+    }
+  ]
+}</code></pre>
+
+        <h3>5.4.2 이상 패턴 감지 API</h3>
+        <pre><code>POST /v1/pets/{petId}/health/analyze
+Content-Type: application/json
+
+{
+  "dataTypes": ["activity", "vitals", "feeding"],
+  "timeRange": {
+    "start": "2025-01-01T00:00:00Z",
+    "end": "2025-01-20T23:59:59Z"
+  },
+  "aiModel": "health-anomaly-v2.1"
+}
+
+// 응답 200 OK
+{
+  "analysisId": "analysis-e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "petId": "pet-a1b2c3d4e5f67890a1b2c3d4e5f67890",
+  "analyzedAt": "2025-01-20T11:00:00Z",
+  "anomalies": [
+    {
+      "type": "feeding-pattern",
+      "severity": "medium",
+      "description": "지난 3일간 아침 식사량이 평균 대비 25% 감소",
+      "detectedAt": "2025-01-18T08:00:00Z",
+      "confidence": 0.87,
+      "recommendation": "수의사 상담 권장"
+    }
+  ],
+  "normalPatterns": [
+    {
+      "type": "sleep-pattern",
+      "description": "수면 패턴 정상 범위 내"
+    }
+  ]
+}</code></pre>
+
+        <h2>5.5 알림 및 이벤트 API</h2>
+        <p>중요한 이벤트를 사용자에게 <strong>실시간 전달</strong>합니다.</p>
+
+        <h3>5.5.1 알림 설정</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>알림 타입</th>
+                    <th>트리거 조건</th>
+                    <th>우선순위</th>
+                    <th>채널</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>급식 완료</td>
+                    <td>자동 급식 완료 시</td>
+                    <td>Low</td>
+                    <td>앱 푸시</td>
+                </tr>
+                <tr>
+                    <td>사료 부족</td>
+                    <td>사료량 &lt; 10%</td>
+                    <td>Medium</td>
+                    <td>앱 푸시, 이메일</td>
+                </tr>
+                <tr>
+                    <td>건강 경고</td>
+                    <td>바이탈 이상 감지</td>
+                    <td>High</td>
+                    <td>앱 푸시, SMS, 이메일</td>
+                </tr>
+                <tr>
+                    <td>긴급 상황</td>
+                    <td>AI 위험 감지</td>
+                    <td>Critical</td>
+                    <td>모든 채널 + 전화</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.5.2 알림 구독 API</h3>
+        <pre><code>POST /v1/notifications/subscriptions
+Content-Type: application/json
+
+{
+  "userId": "user-f9e8d7c6b5a4321098765432109876543",
+  "channels": {
+    "push": {
+      "enabled": true,
+      "deviceTokens": ["fcm-token-123", "apns-token-456"]
+    },
+    "email": {
+      "enabled": true,
+      "address": "user@example.com"
+    },
+    "sms": {
+      "enabled": true,
+      "phoneNumber": "+821012345678"
+    }
+  },
+  "preferences": {
+    "feeding": { "enabled": true, "minPriority": "low" },
+    "health": { "enabled": true, "minPriority": "medium" },
+    "activity": { "enabled": false },
+    "device": { "enabled": true, "minPriority": "high" }
+  },
+  "quietHours": {
+    "enabled": true,
+    "start": "22:00",
+    "end": "07:00",
+    "allowCritical": true
+  }
+}</code></pre>
+
+        <h2>5.6 데이터 내보내기 API</h2>
+        <p>사용자 데이터의 <strong>이동 가능성</strong>을 보장합니다.</p>
+
+        <h3>5.6.1 데이터 내보내기 요청</h3>
+        <pre><code>POST /v1/export
+Content-Type: application/json
+
+{
+  "userId": "user-f9e8d7c6b5a4321098765432109876543",
+  "dataTypes": ["pets", "activities", "health", "devices"],
+  "format": "json",       // "json", "csv", "xml"
+  "timeRange": {
+    "start": "2024-01-01T00:00:00Z",
+    "end": "2025-01-20T23:59:59Z"
+  },
+  "includeMedia": true
+}
+
+// 응답 202 Accepted
+{
+  "exportId": "export-f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+  "status": "processing",
+  "estimatedCompletion": "2025-01-20T12:00:00Z",
+  "_links": {
+    "status": "/v1/export/export-f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"
+  }
+}
+
+// 완료 후 다운로드
+GET /v1/export/export-f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3/download
+
+// 응답 200 OK
+{
+  "exportId": "export-f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+  "downloadUrl": "https://cdn.wia-rob014.org/exports/xyz.zip",
+  "expiresAt": "2025-01-27T12:00:00Z",
+  "fileSize": 52428800,  // bytes
+  "checksum": "sha256:abc123..."
+}</code></pre>
+
+        <h2>5.7 에러 처리</h2>
+        <p>표준화된 <strong>에러 응답</strong> 형식을 정의합니다.</p>
+
+        <h3>5.7.1 에러 응답 구조</h3>
+        <pre><code>// 400 Bad Request
+{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "요청 데이터가 유효하지 않습니다",
+    "details": [
+      {
+        "field": "amount.value",
+        "issue": "음수 값은 허용되지 않습니다",
+        "value": -10
+      }
+    ],
+    "requestId": "req-xyz123",
+    "timestamp": "2025-01-20T10:30:00Z"
+  }
+}
+
+// 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "인증 토큰이 유효하지 않습니다",
+    "requestId": "req-xyz124",
+    "timestamp": "2025-01-20T10:31:00Z"
+  }
+}
+
+// 404 Not Found
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "요청한 반려동물을 찾을 수 없습니다",
+    "resourceType": "Pet",
+    "resourceId": "pet-nonexistent",
+    "requestId": "req-xyz125",
+    "timestamp": "2025-01-20T10:32:00Z"
+  }
+}
+
+// 429 Too Many Requests
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "요청 한도를 초과했습니다",
+    "limit": 100,
+    "remaining": 0,
+    "resetAt": "2025-01-20T11:00:00Z",
+    "requestId": "req-xyz126",
+    "timestamp": "2025-01-20T10:33:00Z"
+  }
+}</code></pre>
+
+        <h3>5.7.2 표준 에러 코드</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>HTTP 상태</th>
+                    <th>에러 코드</th>
+                    <th>설명</th>
+                    <th>재시도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>400</td>
+                    <td>INVALID_REQUEST</td>
+                    <td>요청 데이터 유효성 오류</td>
+                    <td>수정 후 재시도</td>
+                </tr>
+                <tr>
+                    <td>401</td>
+                    <td>UNAUTHORIZED</td>
+                    <td>인증 실패</td>
+                    <td>재인증 후 재시도</td>
+                </tr>
+                <tr>
+                    <td>403</td>
+                    <td>FORBIDDEN</td>
+                    <td>권한 없음</td>
+                    <td>재시도 불가</td>
+                </tr>
+                <tr>
+                    <td>404</td>
+                    <td>RESOURCE_NOT_FOUND</td>
+                    <td>리소스 없음</td>
+                    <td>재시도 불가</td>
+                </tr>
+                <tr>
+                    <td>409</td>
+                    <td>CONFLICT</td>
+                    <td>데이터 충돌</td>
+                    <td>확인 후 재시도</td>
+                </tr>
+                <tr>
+                    <td>429</td>
+                    <td>RATE_LIMIT_EXCEEDED</td>
+                    <td>요청 한도 초과</td>
+                    <td>대기 후 재시도</td>
+                </tr>
+                <tr>
+                    <td>500</td>
+                    <td>INTERNAL_ERROR</td>
+                    <td>서버 내부 오류</td>
+                    <td>자동 재시도</td>
+                </tr>
+                <tr>
+                    <td>503</td>
+                    <td>SERVICE_UNAVAILABLE</td>
+                    <td>서비스 일시 중단</td>
+                    <td>대기 후 재시도</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>5.8 API 버전 관리</h2>
+        <p>API의 <strong>안정적인 진화</strong>를 위한 버전 관리 정책입니다.</p>
+
+        <h3>5.8.1 버전 지정 방법</h3>
+        <pre><code>// URL 경로에 버전 포함 (권장)
+GET /v1/pets/{petId}
+GET /v2/pets/{petId}
+
+// 헤더로 버전 지정 (선택)
+GET /pets/{petId}
+Accept: application/vnd.wia.rob014.v1+json
+
+// 버전별 지원 기간
+{
+  "v1": {
+    "released": "2025-01-01",
+    "deprecated": null,
+    "sunset": null,
+    "status": "stable"
+  },
+  "v2": {
+    "released": "2026-01-01",
+    "deprecated": null,
+    "sunset": null,
+    "status": "beta"
+  }
+}</code></pre>
+
+        <h2>5.9 Rate Limiting</h2>
+        <p>공정한 리소스 사용을 위한 <strong>요청 제한</strong> 정책입니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>사용자 티어</th>
+                    <th>분당 요청</th>
+                    <th>일일 요청</th>
+                    <th>동시 연결</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Free</td>
+                    <td>60</td>
+                    <td>10,000</td>
+                    <td>5</td>
+                </tr>
+                <tr>
+                    <td>Basic</td>
+                    <td>300</td>
+                    <td>100,000</td>
+                    <td>20</td>
+                </tr>
+                <tr>
+                    <td>Pro</td>
+                    <td>1,000</td>
+                    <td>1,000,000</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td>Enterprise</td>
+                    <td>협의</td>
+                    <td>협의</td>
+                    <td>협의</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>5.10 SDK 및 클라이언트 라이브러리</h2>
+        <p>개발자를 위한 <strong>공식 SDK</strong>를 제공합니다.</p>
+
+        <h3>5.10.1 TypeScript SDK 예제</h3>
+        <pre><code>import { WIARob014Client } from '@wia/rob-014-sdk';
+
+const client = new WIARob014Client({
+  apiKey: process.env.WIA_API_KEY,
+  region: 'us-east-1'
+});
+
+// 반려동물 조회
+const pet = await client.pets.get('pet-a1b2c3d4e5f67890a1b2c3d4e5f67890');
+console.log(`반려동물 이름: ${pet.name}`);
+
+// 급식 실행
+const feedResult = await client.devices.control('device-feeder-001', {
+  action: 'dispense',
+  parameters: {
+    amount: { value: 150, unit: 'grams' },
+    petId: pet.petId
+  }
+});
+
+// 건강 요약 조회
+const healthSummary = await client.health.getSummary(pet.petId, {
+  period: '7d'
+});
+console.log(`건강 점수: ${healthSummary.overallHealth.score}`);</code></pre>
+
+        <div class="philosophy">
+            <h3>🌟 弘益人間 (홍익인간)</h3>
+            <p><strong>널리 인간을 이롭게 하라</strong></p>
+            <p style="margin-top:10px;">표준 API는 모든 개발자가 쉽게 접근하고<br>혁신적인 펫케어 솔루션을 만들 수 있게 합니다.</p>
+        </div>
+
+        <div class="summary">
+            <h3>📌 핵심 내용 요약</h3>
+            <ul>
+                <li><strong>RESTful API</strong>: OpenAPI 3.0 스펙, Pets/Activities/Health/Devices 리소스</li>
+                <li><strong>급식 제어</strong>: 즉시 급식, 스케줄 관리, 비동기 처리 패턴</li>
+                <li><strong>실시간 모니터링</strong>: WebRTC 영상 스트리밍, SSE 센서 데이터 스트림</li>
+                <li><strong>건강 분석</strong>: AI 기반 건강 요약, 이상 패턴 감지, 맞춤형 권장사항</li>
+                <li><strong>알림</strong>: 우선순위별 채널(앱 푸시, 이메일, SMS, 전화), 조용한 시간 설정</li>
+                <li><strong>데이터 내보내기</strong>: JSON/CSV/XML 형식, 미디어 포함 가능</li>
+                <li><strong>에러 처리</strong>: 표준화된 에러 응답, 8가지 주요 에러 코드</li>
+                <li><strong>버전 관리</strong>: URL 경로 버전, 명확한 지원 기간 정책</li>
+                <li><strong>Rate Limiting</strong>: 티어별 차등 제한 (Free: 60/분, Enterprise: 협의)</li>
+                <li><strong>SDK</strong>: TypeScript, Python, Java 공식 라이브러리 제공</li>
+            </ul>
+        </div>
+
+        <div class="questions">
+            <h3>🤔 복습 질문</h3>
+            <ol>
+                <li>WIA-ROB-014 RESTful API의 4가지 주요 리소스와 각각의 대표 엔드포인트를 설명하세요.</li>
+                <li>급식 제어 API의 비동기 처리 패턴(202 Accepted → 상태 확인)을 설명하고, 이 패턴의 장점은 무엇인가요?</li>
+                <li>실시간 영상 스트리밍에서 WebRTC를 사용하는 이유와, 세션 시작 API의 응답에 포함되는 주요 정보를 설명하세요.</li>
+                <li>건강 분석 API에서 제공하는 3가지 주요 정보(요약, 인사이트, 권장사항)의 차이점을 설명하세요.</li>
+                <li>알림의 4가지 우선순위(Low, Medium, High, Critical)와 각각에 해당하는 트리거 조건 및 채널을 설명하세요.</li>
+                <li>데이터 내보내기 API가 사용자의 데이터 이동권을 보장하는 방법과 지원하는 형식을 설명하세요.</li>
+                <li>표준 에러 응답의 구조와 8가지 주요 에러 코드의 의미 및 재시도 정책을 설명하세요.</li>
+                <li>Rate Limiting의 4가지 사용자 티어와 각각의 제한을 설명하고, 이러한 제한이 필요한 이유는 무엇인가요?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>
