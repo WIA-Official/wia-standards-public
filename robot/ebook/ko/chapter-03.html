@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: API 인터페이스와 ROS 2 게이트웨이 — WIA 로봇</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제3장: API 인터페이스와 ROS 2 게이트웨이</h1>
+
+    <h2>3.1 WIA 로봇 게이트웨이 구조</h2>
+    <p>
+        WIA 로봇 게이트웨이는 외부 애플리케이션(임상 대시보드, 원격 조작 콘솔, 시뮬레이션 환경)과 내부 ROS 2 노드 그래프를 연결하는 HTTP/WebSocket 서버입니다. WIA-ROBOT OpenAPI 3.1 명세를 구현하며, REST 호출을 ROS 2 토픽 발행, 서비스 호출, 액션 목표로 변환합니다.
+    </p>
+    <pre><code>ros2 run wia_robot_gateway gateway_node \
+  --ros-args \
+  -p host:=0.0.0.0 \
+  -p port:=8080 \
+  -p jwt_secret_env:=WIA_JWT_SECRET \
+  -p estop_deadline_ms:=10</code></pre>
+
+    <h2>3.2 핵심 REST 엔드포인트</h2>
+    <table>
+        <tr><th>메서드</th><th>경로</th><th>설명</th><th>ROS 2 동작</th></tr>
+        <tr><td>GET</td><td>/v2/robots</td><td>등록된 로봇 목록</td><td>ROS 2 그래프 스캔 + /diagnostics 구독</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}</td><td>로봇 디스크립터 + 상태</td><td>파라미터 읽기 + /diagnostics 스냅샷</td></tr>
+        <tr><td>POST</td><td>/v2/robots/{id}/command</td><td>동작 명령 전송</td><td>/execute_trajectory 액션 목표</td></tr>
+        <tr><td>POST</td><td>/v2/robots/{id}/command/estop</td><td>비상 정지</td><td>/emergency_stop RELIABLE 발행</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/telemetry</td><td>최신 센서 스냅샷</td><td>최신 /joint_states 메시지</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/telemetry/stream</td><td>WebSocket 스트림 (최대 50 Hz)</td><td>/joint_states 구독자 브리지</td></tr>
+        <tr><td>POST</td><td>/v2/robots/{id}/plan</td><td>MoveIt 2 계획 요청</td><td>/plan_kinematic_path 서비스 호출</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/slam/map</td><td>SLAM 점유 격자 지도</td><td>최신 /map 메시지</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/slam/pose</td><td>로봇 위치 추정</td><td>최신 /amcl_pose 메시지</td></tr>
+    </table>
+
+    <h2>3.3 WebSocket 텔레메트리 스트리밍</h2>
+    <p>
+        <code>/v2/robots/{id}/telemetry/stream</code> WebSocket 엔드포인트는 설정 가능한 속도(1–50 Hz, 기본 10 Hz)로 텔레메트리 프레임을 스트리밍합니다. 병원 네트워크에서는 대역폭 절약을 위해 5–10 Hz로 제한하는 것을 권장합니다.
+    </p>
+    <pre><code># Python 클라이언트 예시
+import asyncio, json, websockets
+
+async def stream_telemetry(robot_id: str, token: str):
+    uri = f"wss://robot-api.wia.global/v2/robots/{robot_id}/telemetry/stream?hz=10"
+    async with websockets.connect(uri,
+                                   extra_headers={"Authorization": f"Bearer {token}"}) as ws:
+        async for msg in ws:
+            frame = json.loads(msg)
+            joints = frame["joint_state"]
+            print(f"고관절_좌={joints['position'][0]:.3f} rad  "
+                  f"무릎_좌={joints['position'][1]:.3f} rad")</code></pre>
+
+    <h2>3.4 인증 — JWT Bearer 토큰</h2>
+    <p>
+        모든 엔드포인트에는 WIA Identity Service에서 발급한 JWT Bearer 토큰이 필요합니다. 필수 클레임:
+    </p>
+    <pre><code>{
+  "iss": "https://auth.wia.global",
+  "sub": "operator-12345",
+  "aud": "robot-gateway-v2",
+  "robot_ids": ["550e8400-e29b-41d4-a716-446655440000"],
+  "scopes": ["robot:read", "robot:command"],
+  "safety_cert_level": "SIL-2",
+  "operator_type": "clinical"
+}</code></pre>
+    <p>토큰은 ECDSA P-256 서명으로 검증됩니다. 명령 토큰 유효기간: 1시간. 읽기 전용 토큰: 8시간.</p>
+
+    <h2>3.5 비상 정지 API (안전 임계 경로)</h2>
+    <p>
+        비상 정지 경로는 일반 명령 큐를 우회하여 RELIABLE + TRANSIENT_LOCAL QoS로 <code>/emergency_stop</code>에 직접 발행합니다. WIA 게이트웨이는 HTTP 요청 수신 후 <strong>10 ms 이내</strong>에 응답을 보장합니다 (ISO 10218-1 §5.4.2 준수).
+    </p>
+    <pre><code># curl 예시 — 비상 정지 트리거
+curl -X POST https://robot-api.wia.global/v2/robots/550e8400.../command/estop \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "safety_zone_breach", "source_system": "ward2-dashboard"}'
+
+# 응답 (10 ms 이내):
+# {"status": "E-Stop acknowledged", "timestamp": "...", "robot_id": "..."}</code></pre>
+
+    <h2>3.6 오류 응답 (RFC 9457 Problem Details)</h2>
+    <p>
+        모든 오류 응답은 RFC 9457 Problem Details 형식(<code>application/problem+json</code>)을 따릅니다:
+    </p>
+    <pre><code>{
+  "type": "https://standards.wia.global/robot/errors/estop-active",
+  "title": "비상 정지 활성화",
+  "status": 409,
+  "detail": "로봇 550e8400이 비상 정지 상태입니다. 결함을 해제한 후 동작 명령을 전송하세요.",
+  "instance": "/robots/550e8400-e29b-41d4-a716-446655440000"
+}</code></pre>
+    <p>주요 오류 타입: <code>estop-active</code>(409), <code>robot-not-found</code>(404), <code>invalid-joint-names</code>(400), <code>ik-no-solution</code>(422), <code>planning-timeout</code>(504).</p>
+
+    <h2>3.7 병원 EMR 연동 (국내)</h2>
+    <p>
+        국내 병원 EMR(삼성의료원 Darwin, 서울아산 Asan Medical Information System)과의 연동은 보건복지부 의료정보교환 표준(MOCI) 및 HL7 FHIR R4/R5 API를 통해 이루어집니다. WIA 게이트웨이는 재활 로봇 세션 결과를 FHIR <code>Procedure</code> 리소스로 자동 기록할 수 있습니다.
+    </p>
+
+    <footer><p>WIA 로봇 표준 · 제3장 · © 2026 WIA</p></footer>
+</body>
+</html>

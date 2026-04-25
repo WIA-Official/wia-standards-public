@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: NVIDIA Isaac Sim Integration — WIA Robot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">Table of Contents</a></nav>
+
+    <h1>Chapter 7: NVIDIA Isaac Sim Integration</h1>
+
+    <h2>7.1 Isaac Sim Overview</h2>
+    <p>
+        <strong>NVIDIA Isaac Sim</strong> (based on Omniverse Kit and the USD Composer framework) provides a physically accurate robot simulation environment for WIA-ROBOT development, testing, and synthetic data generation. Isaac Sim integrates natively with ROS 2 via the <code>isaacsim.ros2_bridge</code> extension, exposing the same topics, services, and actions as a physical robot — enabling seamless sim-to-real transfer.
+    </p>
+    <p>
+        Key capabilities relevant to WIA assistive robot development:
+    </p>
+    <ul>
+        <li><strong>Physics simulation</strong> — NVIDIA PhysX 5.3 rigid body dynamics; articulation drives for motorised joints.</li>
+        <li><strong>Sensor simulation</strong> — synthetic LiDAR (RTX ray-traced), RGB-D cameras, IMU, contact sensors.</li>
+        <li><strong>Synthetic data generation</strong> — domain randomisation for training object detection / gait analysis models.</li>
+        <li><strong>Occupancy map generation</strong> — export Nav2-compatible maps from 3D hospital environment USD scenes.</li>
+    </ul>
+
+    <h2>7.2 ROS 2 Bridge Setup</h2>
+    <p>
+        The Isaac Sim ROS 2 bridge publishes and subscribes to ROS 2 topics within the same DDS domain as the physical robot test bench. After launching Isaac Sim, enable the bridge via the Extension Manager or programmatically:
+    </p>
+    <pre><code># Isaac Sim Python scripting (Omniverse Kit)
+import omni.kit.app
+from isaacsim.ros2_bridge import ROS2Bridge
+
+bridge = ROS2Bridge()
+bridge.start(
+    ros_domain_id=200,       # Isaac Sim virtual robot domain
+    robot_namespace="/wia_robot_sim",
+    publish_joint_states=True,
+    joint_state_hz=50,
+    publish_clock=True       # /clock topic for use_sim_time=true
+)
+print("ROS 2 bridge active on domain 200")</code></pre>
+
+    <h2>7.3 URDF Import and Articulation</h2>
+    <p>
+        Import the WIA exoskeleton URDF into Isaac Sim using the URDF importer:
+    </p>
+    <pre><code>from isaacsim.robot.import_utils import URDFImporter
+
+importer = URDFImporter()
+result = importer.import_robot(
+    urdf_path="/opt/wia_robot/urdf/wia_exoskeleton.urdf.xacro",
+    dest_path="/World/WIAExoskeleton",
+    import_inertia_tensor=True,
+    import_materials=True,
+    convex_decomp=True,          # convex hull collision shapes
+    fix_base=False,              # exoskeleton is mobile
+    merge_fixed_joints=False
+)
+# Creates USD prim at /World/WIAExoskeleton with ArticulationRoot</code></pre>
+
+    <h2>7.4 Synthetic Training Data Generation</h2>
+    <p>
+        WIA-ROBOT uses Isaac Sim's domain randomisation pipeline (<code>omni.replicator</code>) to generate synthetic RGB-D datasets for training gait analysis and obstacle detection models:
+    </p>
+    <pre><code>import omni.replicator.core as rep
+
+with rep.new_layer():
+    # Randomise robot pose and lighting
+    robot = rep.get.prims(path_pattern="/World/WIAExoskeleton")
+    lights = rep.create.light(light_type="Sphere", count=3)
+
+    with rep.trigger.on_frame(num_frames=5000):
+        rep.modify.pose(robot,
+                        position=rep.distribution.uniform((-2,0,-2),(2,0,2)),
+                        rotation=rep.distribution.uniform((0,-10,0),(0,10,360)))
+        rep.modify.attribute(lights, "intensity",
+                             rep.distribution.uniform(500, 3000))
+
+rep.orchestrator.run()
+# Output: 5000 frames with ground-truth joint angles and depth images</code></pre>
+
+    <h2>7.5 Sim-to-Real Transfer Workflow</h2>
+    <p>
+        The WIA sim-to-real transfer protocol ensures controllers validated in Isaac Sim deploy safely on physical hardware:
+    </p>
+    <table>
+        <tr><th>Stage</th><th>Action</th><th>Validation Criterion</th></tr>
+        <tr><td>1. Sim validation</td><td>Run controller in Isaac Sim for 10,000 steps</td><td>Zero E-Stop triggers; joint limits respected</td></tr>
+        <tr><td>2. Hardware-in-the-loop</td><td>Isaac Sim drives simulated joints; real-time controller runs on actual hardware</td><td>Latency below 20 ms; no divergence</td></tr>
+        <tr><td>3. Slow-speed real test</td><td>Deploy on physical robot at 10% velocity scaling</td><td>Trajectory tracking error below 0.02 rad</td></tr>
+        <tr><td>4. Full-speed clinical trial</td><td>Supervised clinical test with physiotherapist</td><td>ISO 13482 person-safety assessment</td></tr>
+    </table>
+
+    <h2>7.6 Isaac Sim Hospital Environment USD</h2>
+    <p>
+        WIA provides a pre-built hospital ward USD scene for testing mobility-aid robot navigation:
+    </p>
+    <pre><code># Load WIA hospital ward USD scene
+import omni.usd
+
+stage = omni.usd.get_context().get_stage()
+stage.GetRootLayer().subLayerPaths.append(
+    "omniverse://hospital-assets.wia.global/WIA/HospitalWard_v2.usd"
+)
+
+# Generate Nav2-compatible 2D occupancy map from the 3D scene
+from isaacsim.nav2_utils import OccupancyMapGenerator
+
+gen = OccupancyMapGenerator(resolution=0.05)
+gen.generate_from_scene(
+    output_yaml="/opt/wia_robot/maps/isaac_ward.yaml",
+    output_pgm="/opt/wia_robot/maps/isaac_ward.pgm",
+    height=1.0,    # slice plane at 1 m above floor
+    free_thresh=0.25,
+    occupied_thresh=0.65
+)</code></pre>
+
+    <h2>7.7 Performance Benchmarks</h2>
+    <table>
+        <tr><th>Metric</th><th>Isaac Sim 4.x GPU (A100)</th><th>Physical Robot</th></tr>
+        <tr><td>Joint state publish rate</td><td>1000 Hz (PhysX step)</td><td>50–200 Hz (hardware)</td></tr>
+        <tr><td>RGB-D camera</td><td>30 fps @ 1280x720 (RTX)</td><td>30 fps (RealSense D435i)</td></tr>
+        <tr><td>MoveIt 2 planning (RRTConnect)</td><td>0.8 s avg (6-DOF)</td><td>1.2 s avg (including network)</td></tr>
+        <tr><td>SLAM map update rate</td><td>5 Hz (Cartographer sim)</td><td>3–5 Hz (real LiDAR)</td></tr>
+        <tr><td>Synthetic data generation</td><td>5000 frames/min</td><td>N/A</td></tr>
+    </table>
+
+    <footer><p>WIA Robot Standard · Chapter 7 · © 2026 WIA</p></footer>
+</body>
+</html>

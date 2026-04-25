@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Interface and ROS 2 Gateway — WIA Robot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">Table of Contents</a></nav>
+
+    <h1>Chapter 3: API Interface and ROS 2 Gateway</h1>
+
+    <h2>3.1 WIA Robot Gateway Architecture</h2>
+    <p>
+        The WIA Robot Gateway is an HTTP/WebSocket server that bridges external applications (clinical dashboards, teleoperation consoles, simulation environments) to the internal ROS 2 node graph. It implements the WIA-ROBOT OpenAPI 3.1 specification, translating REST calls into ROS 2 topic publications, service calls, and action goals.
+    </p>
+    <p>
+        The gateway is implemented as a ROS 2 package (<code>wia_robot_gateway</code>) using <code>rclpy</code> with an embedded FastAPI ASGI server (via <code>uvicorn</code>). REST calls are converted to ROS 2 operations within the same event loop using <code>asyncio</code> bridges.
+    </p>
+    <pre><code>ros2 run wia_robot_gateway gateway_node \
+  --ros-args \
+  -p host:=0.0.0.0 \
+  -p port:=8080 \
+  -p jwt_secret_env:=WIA_JWT_SECRET \
+  -p estop_deadline_ms:=10</code></pre>
+
+    <h2>3.2 Core REST Endpoints</h2>
+    <table>
+        <tr><th>Method</th><th>Path</th><th>Description</th><th>ROS 2 Operation</th></tr>
+        <tr><td>GET</td><td>/v2/robots</td><td>List registered robots</td><td>ROS 2 graph scan + /diagnostics subscribe</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}</td><td>Robot descriptor + status</td><td>Parameter read + /diagnostics snapshot</td></tr>
+        <tr><td>POST</td><td>/v2/robots/{id}/command</td><td>Send motion command</td><td>Action goal to /execute_trajectory</td></tr>
+        <tr><td>POST</td><td>/v2/robots/{id}/command/estop</td><td>Emergency stop</td><td>Publish to /emergency_stop RELIABLE</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/telemetry</td><td>Latest sensor snapshot</td><td>Latest /joint_states message</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/telemetry/stream</td><td>WebSocket stream (50 Hz max)</td><td>/joint_states subscriber bridge</td></tr>
+        <tr><td>POST</td><td>/v2/robots/{id}/plan</td><td>Request MoveIt 2 plan</td><td>Service call to /plan_kinematic_path</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/slam/map</td><td>SLAM occupancy grid</td><td>Latest /map message</td></tr>
+        <tr><td>GET</td><td>/v2/robots/{id}/slam/pose</td><td>Robot pose estimate</td><td>Latest /amcl_pose message</td></tr>
+    </table>
+
+    <h2>3.3 WebSocket Telemetry Streaming</h2>
+    <p>
+        The WebSocket endpoint at <code>/v2/robots/{id}/telemetry/stream</code> streams telemetry frames at a configurable rate (1–50 Hz, default 10 Hz). The server subscribes to <code>/joint_states</code> and bridges each ROS 2 message to connected WebSocket clients.
+    </p>
+    <pre><code># Python client example (websockets library)
+import asyncio, json, websockets
+
+async def stream_telemetry(robot_id: str, token: str):
+    uri = f"wss://robot-api.wia.global/v2/robots/{robot_id}/telemetry/stream?hz=25"
+    headers = {"Authorization": f"Bearer {token}"}
+    async with websockets.connect(uri, extra_headers=headers) as ws:
+        async for msg in ws:
+            frame = json.loads(msg)
+            joints = frame["joint_state"]
+            print(f"hip_l={joints['position'][0]:.3f} rad  "
+                  f"knee_l={joints['position'][1]:.3f} rad")</code></pre>
+
+    <h2>3.4 Authentication — JWT Bearer Tokens</h2>
+    <p>
+        All endpoints require a JWT Bearer token issued by the WIA Identity Service. Required JWT claims:
+    </p>
+    <pre><code>{
+  "iss": "https://auth.wia.global",
+  "sub": "operator-12345",
+  "aud": "robot-gateway-v2",
+  "exp": 1745539200,
+  "robot_ids": ["550e8400-e29b-41d4-a716-446655440000"],
+  "scopes": ["robot:read", "robot:command"],
+  "safety_cert_level": "SIL-2",
+  "operator_type": "clinical"
+}</code></pre>
+    <p>
+        Tokens are validated using ECDSA P-256 signatures. Token lifetime is 1 hour for command tokens and 8 hours for read-only tokens. The <code>safety_cert_level</code> claim must be <code>SIL-2</code> for any endpoint that can trigger robot motion or E-Stop.
+    </p>
+
+    <h2>3.5 ROS 2 Action Interface (FollowJointTrajectory)</h2>
+    <p>
+        Motion commands are forwarded as ROS 2 actions of type <code>control_msgs/action/FollowJointTrajectory</code>. The gateway translates REST <code>RobotCommand</code> payloads into action goals and monitors goal status feedback asynchronously.
+    </p>
+    <pre><code>ros2 action send_goal /wia_robot/execute_trajectory \
+  control_msgs/action/FollowJointTrajectory \
+  '{
+    trajectory: {
+      joint_names: ["hip_l","knee_l","ankle_l","hip_r","knee_r","ankle_r"],
+      points: [{
+        positions: [0.2, -0.35, 0.1, 0.2, -0.35, 0.1],
+        time_from_start: {sec: 1, nanosec: 0}
+      }]
+    },
+    goal_time_tolerance: {sec: 0, nanosec: 500000000}
+  }'</code></pre>
+
+    <h2>3.6 E-Stop API (Safety-Critical Path)</h2>
+    <p>
+        The E-Stop path bypasses the normal command queue and publishes directly to <code>/emergency_stop</code> with RELIABLE + TRANSIENT_LOCAL QoS. The WIA gateway guarantees a response acknowledgement within <strong>10 ms</strong> of receiving the HTTP request, complying with ISO 10218-1 §5.4.2.
+    </p>
+    <pre><code># curl example — trigger E-Stop
+curl -X POST https://robot-api.wia.global/v2/robots/550e8400.../command/estop \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "safety_zone_breach", "source_system": "dashboard-v2"}'
+
+# Expected response within 10 ms:
+# {"status": "E-Stop acknowledged", "timestamp": "...", "robot_id": "..."}</code></pre>
+
+    <h2>3.7 Error Handling (RFC 9457 Problem Details)</h2>
+    <p>
+        All error responses follow <a href="https://datatracker.ietf.org/doc/html/rfc9457">RFC 9457</a> Problem Details for HTTP APIs, using <code>application/problem+json</code> content type:
+    </p>
+    <pre><code>{
+  "type": "https://standards.wia.global/robot/errors/estop-active",
+  "title": "Emergency Stop Active",
+  "status": 409,
+  "detail": "Robot 550e8400 is in E-Stop state. Clear fault before issuing motion commands.",
+  "instance": "/robots/550e8400-e29b-41d4-a716-446655440000"
+}</code></pre>
+    <p>Common error types: <code>estop-active</code> (409), <code>robot-not-found</code> (404), <code>invalid-joint-names</code> (400), <code>ik-no-solution</code> (422), <code>planning-timeout</code> (504).</p>
+
+    <footer><p>WIA Robot Standard · Chapter 3 · © 2026 WIA</p></footer>
+</body>
+</html>

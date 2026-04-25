@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 1: Introduction to Assistive Robot Standards — WIA Robot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← Table of Contents</a></nav>
+
+    <h1>Chapter 1: Introduction to Assistive Robot Standards</h1>
+
+    <h2>1.1 The WIA Robot Standard Landscape</h2>
+    <p>
+        Assistive robotics spans a remarkable breadth of human need — from powered exoskeletons that restore walking after spinal cord injury, to collaborative surgical robots that extend a surgeon's precision beyond natural limits. The WIA Robot Standard (WIA-ROBOT) provides a unified interoperability layer across all these domains, built on three pillars: <strong>safety</strong> (ISO 10218-1/2, ISO 15066), <strong>data exchange</strong> (ROS 2 REP-2000 lifecycle, HL7 FHIR R5 for health data), and <strong>open interfaces</strong> (OpenAPI 3.1 REST gateway, DDS-RTPS at the middleware layer).
+    </p>
+
+    <h2>1.2 Robot Taxonomy</h2>
+    <p>The standard covers six primary robot types, each with distinct regulatory and technical requirements:</p>
+    <table>
+        <tr><th>Type</th><th>Definition</th><th>Key Standards</th><th>Examples</th></tr>
+        <tr><td>Exoskeleton</td><td>Wearable powered orthosis augmenting limb function</td><td>ISO 13482:2014, FDA 510(k)</td><td>ReWalk 6.0, Ekso GT, CYBERDYNE HAL</td></tr>
+        <tr><td>Prosthetic</td><td>External limb replacement with active control</td><td>ISO 22523:2006, EU MDR 2017/745</td><td>LUKE Arm, Hero Arm, Ottobock Michelangelo</td></tr>
+        <tr><td>Rehabilitation</td><td>Therapeutic motion support for recovery</td><td>IEC 60601-1, ISO 10218-2</td><td>InMotion ARM, Lokomat, Amadeo</td></tr>
+        <tr><td>Care Robot</td><td>Social/physical assistance for daily living</td><td>ISO 13482:2014 Type C</td><td>Pepper, PARO, LOVOT</td></tr>
+        <tr><td>Surgical</td><td>Teleoperated or semi-autonomous surgical assistant</td><td>IEC 60601-2-77, FDA PMA</td><td>da Vinci Xi, Hugo RAS, CMR Versius</td></tr>
+        <tr><td>Mobility Aid</td><td>Powered wheelchair, smart walker, transfer robot</td><td>ISO 7176-1, IEC 60601-1-2</td><td>Whill Model C2, Permobil M3, Toyota HSR</td></tr>
+    </table>
+
+    <h2>1.3 The ROS 2 Foundation</h2>
+    <p>
+        All WIA Robot implementations are expected to expose a ROS 2 interface. ROS 2 (Robot Operating System 2), standardised under <strong>REP-2000</strong> (platform support policy) and <strong>REP-2004</strong> (package quality categories), provides the inter-process communication backbone via DDS/RTPS. As of 2025, the active LTS release is <strong>ROS 2 Jazzy Jalisco</strong> (EOL 2029-05); prior LTS releases include <strong>Humble Hawksbill</strong> (EOL 2027-05) and <strong>Iron Irwini</strong> (EOL 2024-11).
+    </p>
+    <p>The minimum ROS 2 node lifecycle required by WIA-ROBOT:</p>
+    <pre><code>ros2 lifecycle list /wia_robot_node
+# Managed lifecycle states (REP-146):
+# unconfigured → configuring → inactive → activating → active
+# active → deactivating → inactive → cleaning_up → unconfigured
+# any state → errorprocessing → unconfigured</code></pre>
+
+    <h2>1.4 DDS/RTPS Middleware</h2>
+    <p>
+        The DDS (Data Distribution Service, OMG standard) transport layer handles publish/subscribe communication between robot nodes. WIA-ROBOT mandates QoS profiles calibrated to safety-critical constraints:
+    </p>
+    <ul>
+        <li><strong>RELIABLE + TRANSIENT_LOCAL</strong> for all command and E-Stop topics — guaranteed delivery with late-joiner durability.</li>
+        <li><strong>BEST_EFFORT + VOLATILE</strong> for high-rate sensor streams (joint states, IMU at 50 Hz) — minimise latency, accept occasional drops.</li>
+        <li><strong>Deadline</strong> of 100 ms on command topics per ISO 10218-1 §5.4.2 response budget.</li>
+    </ul>
+    <p>Supported RMW (ROS Middleware) implementations: <code>rmw_fastrtps_cpp</code> (eProsima FastDDS 3.x), <code>rmw_cyclonedds_cpp</code> (Eclipse Cyclone DDS 0.10), <code>rmw_connextdds</code> (RTI Connext DDS 7.x).</p>
+
+    <h2>1.5 Functional Safety Overview</h2>
+    <p>
+        WIA-ROBOT safety requirements are grounded in two IEC standards:
+    </p>
+    <ul>
+        <li><strong>IEC 61508</strong> — Functional Safety of E/E/PE Safety-related Systems. Assistive robots targeting SIL-2 require a probability of dangerous failure per hour (PFH) of 10⁻⁷ to 10⁻⁶.</li>
+        <li><strong>IEC 62061:2021</strong> — Safety of Machinery: Functional Safety. Defines Safety Integrity Levels for machine control systems; Care Robots typically target SIL 1–2.</li>
+    </ul>
+    <p>
+        Emergency stop (E-Stop) signals are published to <code>/emergency_stop</code> with RELIABLE/TRANSIENT_LOCAL QoS and must be processed within <strong>10 ms</strong> of publication. The hardware watchdog must verify E-Stop circuit continuity at a minimum of 10 Hz.
+    </p>
+
+    <h2>1.6 Structure of This Ebook</h2>
+    <p>This ebook follows the WIA four-phase architecture:</p>
+    <ul>
+        <li><strong>Chapter 2 — Data Formats</strong>: URDF/XACRO robot models, joint state schemas, sensor message types.</li>
+        <li><strong>Chapter 3 — API Interface</strong>: OpenAPI 3.1 REST gateway, WebSocket telemetry streaming, JWT authentication.</li>
+        <li><strong>Chapter 4 — Communication Protocols</strong>: DDS QoS profiles, ROS 2 topic architecture, MQTT 5 bridge for clinical systems.</li>
+        <li><strong>Chapter 5 — MoveIt 2 Motion Planning</strong>: OMPL planners, STOMP, PILZ industrial profiles, collision checking.</li>
+        <li><strong>Chapter 6 — SLAM and Navigation</strong>: Cartographer 2D, ORB-SLAM3, ROS 2 Nav2 planner stack.</li>
+        <li><strong>Chapter 7 — Isaac Sim Integration</strong>: NVIDIA Omniverse, sim-to-real transfer, synthetic data for training.</li>
+        <li><strong>Chapter 8 — Compliance and Certification</strong>: ISO 10218, ISO 15066, IEC 61508, FDA 510(k)/PMA pathways.</li>
+    </ul>
+
+    <footer><p>WIA Robot Standard · Chapter 1 · © 2026 WIA</p></footer>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: SLAM과 자율 내비게이션 — WIA 로봇</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제6장: SLAM과 자율 내비게이션</h1>
+
+    <h2>6.1 보조 로봇에서의 SLAM</h2>
+    <p>
+        동시 위치 추정 및 지도 작성(SLAM)은 이동 보조 로봇(스마트 휠체어, 돌봄 로봇)이 환경 지도를 구축하면서 자신의 위치를 추적할 수 있게 합니다. 한국의 병원·요양원 환경은 좁은 복도, 자동문, 환자 침대 이동 등 동적 장애물이 많아 강건한 SLAM 구성이 필요합니다.
+    </p>
+    <table>
+        <tr><th>시스템</th><th>센서</th><th>알고리즘</th><th>ROS 2 패키지</th></tr>
+        <tr><td>Cartographer</td><td>2D LiDAR (SICK TiM, RPLiDAR A3)</td><td>서브맵 기반 그래프 SLAM (Google)</td><td>cartographer_ros</td></tr>
+        <tr><td>ORB-SLAM3</td><td>RGB-D 카메라 / 스테레오 / IMU</td><td>ORB 특징 시각-관성 SLAM</td><td>orb_slam3_ros2_wrapper</td></tr>
+        <tr><td>RTAB-Map</td><td>RGB-D + LiDAR 융합</td><td>루프 클로저 그래프 기반</td><td>rtabmap_ros</td></tr>
+    </table>
+
+    <h2>6.2 Cartographer 2D SLAM</h2>
+    <p>
+        Google Cartographer는 2D LiDAR를 사용하는 실내 이동 보조 로봇의 권장 SLAM 시스템입니다. RELIABLE + TRANSIENT_LOCAL QoS로 <code>/map</code> 토픽에 <code>nav_msgs/OccupancyGrid</code>를 발행합니다. 서울아산병원 재활로봇센터에서는 SICK TiM571과 Cartographer를 조합하여 병동 내비게이션 지도 구축에 활용하고 있습니다.
+    </p>
+    <pre><code>ros2 launch cartographer_ros cartographer.launch.py \
+  configuration_directory:=/opt/wia_robot/cartographer \
+  configuration_basename:=wia_ward.lua
+
+# wia_ward.lua 핵심 설정
+options = {
+  map_frame = "map",
+  tracking_frame = "base_link",
+  provide_odom_frame = true,
+  use_odometry = true,
+  num_laser_scans = 1,
+  rangefinder_sampling_ratio = 1.0,
+}</code></pre>
+
+    <h2>6.3 ORB-SLAM3 시각-관성 SLAM</h2>
+    <p>
+        ORB-SLAM3는 LiDAR가 비실용적인 외골격 및 재활 환경에 적합합니다. Intel RealSense D435i(RGB-D + IMU)와 함께 사용하며, KAIST 전기전자공학부 로봇비전 연구실(2024 IROS)에서 병원 복도 시각-관성 SLAM으로 위치 오차 2.3 cm를 달성한 연구를 발표했습니다.
+    </p>
+    <pre><code>ros2 run orb_slam3_ros2_wrapper rgbd_inertial_node \
+  --ros-args \
+  -p vocabulary_file:=/opt/ORB_SLAM3/Vocabulary/ORBvoc.txt \
+  -p settings_file:=/opt/ORB_SLAM3/Examples/RGB-D-Inertial/RealSenseD435i.yaml \
+  -p enable_pangolin:=false</code></pre>
+
+    <h2>6.4 ROS 2 Nav2 내비게이션 스택</h2>
+    <p>
+        <strong>Nav2</strong>는 전역 경로 계획, 지역 장애물 회피, 복구 행동을 포함하는 완전한 자율 내비게이션 파이프라인을 제공합니다. WIA-ROBOT 이동 보조 로봇은 병원 환경 설정으로 Nav2를 사용합니다.
+    </p>
+    <pre><code>ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=false \
+  map:=/opt/wia_robot/maps/ward_2.yaml \
+  params_file:=/opt/wia_robot/nav2/wia_nav2_params.yaml</code></pre>
+
+    <h2>6.5 병원 환경 코스트맵 설정</h2>
+    <p>
+        병원 환경은 침대·휠체어 이용 환자를 위한 보수적인 장애물 팽창(더 넓은 여유 공간)과 이동하는 사람에 대한 동적 장애물 추적이 필요합니다:
+    </p>
+    <pre><code># wia_nav2_params.yaml
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 6
+      height: 6
+      resolution: 0.05          # 5 cm/셀
+      robot_radius: 0.40        # 휠체어 + 외골격 발자국
+      plugins: ["obstacle_layer", "inflation_layer"]
+      inflation_layer:
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.75  # 장애물에서 75 cm 여유</code></pre>
+
+    <h2>6.6 AMCL 위치 추정 (지도 이후)</h2>
+    <p>
+        Cartographer로 지도를 구축한 후 정상 운용 시에는 <strong>AMCL</strong>(적응형 몬테 카를로 위치 추정)을 사용합니다. AMCL은 <code>/amcl_pose</code>에 <code>geometry_msgs/PoseWithCovarianceStamped</code>를 발행하며, WIA REST API의 <code>GET /slam/pose</code>로 조회 가능합니다.
+    </p>
+
+    <h2>6.7 지도 지속성 및 버전 관리</h2>
+    <p>
+        병동 배치가 변경될 때 지도를 버전 관리하고 백업해야 합니다. WIA-ROBOT은 <code>nav2_map_server</code>로 지도를 저장·불러옵니다:
+    </p>
+    <pre><code># 현재 SLAM 지도 저장
+ros2 service call /map_server/save_map nav2_msgs/srv/SaveMap \
+  '{map_topic: "/map",
+    map_url: "/opt/wia_robot/maps/ward_2_20260425",
+    image_format: "pgm",
+    map_mode: "trinary",
+    free_thresh: 0.25,
+    occupied_thresh: 0.65}'
+
+# 출력 파일:
+# ward_2_20260425.pgm  -- 흑백 점유 이미지
+# ward_2_20260425.yaml -- 지도 메타데이터 (해상도, 원점, 임계값)</code></pre>
+    <p>
+        한국 노인장기요양보험 적용 요양원에서 이동 보조 로봇을 운용하는 경우, 분기별 지도 검증 및 안전 재인증이 요구됩니다(보건복지부 장기요양 로봇 안전 가이드라인, 2025).
+    </p>
+
+    <footer><p>WIA 로봇 표준 · 제6장 · © 2026 WIA</p></footer>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Formats and Robot Models — WIA Robot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">Table of Contents</a></nav>
+
+    <h1>Chapter 2: Data Formats and Robot Models</h1>
+
+    <h2>2.1 URDF — Unified Robot Description Format</h2>
+    <p>
+        The <strong>URDF</strong> (Unified Robot Description Format) is the canonical XML schema for robot kinematic and dynamic models in ROS 2. A URDF file defines <em>links</em> (rigid bodies) and <em>joints</em> (kinematic constraints between links), enabling collision checking, visualisation in RViz, and kinematic planning in MoveIt 2.
+    </p>
+    <pre><code>&lt;robot name="wia_exoskeleton"&gt;
+  &lt;link name="pelvis"&gt;
+    &lt;inertial&gt;
+      &lt;mass value="5.0"/&gt;
+      &lt;inertia ixx="0.08" ixy="0" ixz="0" iyy="0.06" iyz="0" izz="0.04"/&gt;
+    &lt;/inertial&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size="0.35 0.25 0.1"/&gt;&lt;/geometry&gt;
+      &lt;material name="wia_orange"&gt;&lt;color rgba="0.976 0.451 0.086 1"/&gt;&lt;/material&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;box size="0.35 0.25 0.1"/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+  &lt;/link&gt;
+
+  &lt;joint name="hip_l" type="revolute"&gt;
+    &lt;parent link="pelvis"/&gt;
+    &lt;child link="thigh_l"/&gt;
+    &lt;origin xyz="-0.1 -0.12 -0.05" rpy="0 0 0"/&gt;
+    &lt;axis xyz="0 1 0"/&gt;
+    &lt;limit lower="-0.35" upper="1.0" effort="120" velocity="1.5"/&gt;
+    &lt;dynamics damping="2.0" friction="0.5"/&gt;
+  &lt;/joint&gt;
+&lt;/robot&gt;</code></pre>
+
+    <h2>2.2 XACRO — XML Macros for Robot Models</h2>
+    <p>
+        XACRO (XML Macros) extends URDF with parametric macros, enabling reuse of leg/arm templates across left/right sides and robot variants. WIA-ROBOT mandates XACRO for all production robot descriptions.
+    </p>
+    <pre><code>&lt;xacro:macro name="leg" params="side reflect"&gt;
+  &lt;link name="thigh_${side}"&gt;...&lt;/link&gt;
+  &lt;link name="shank_${side}"&gt;...&lt;/link&gt;
+  &lt;joint name="knee_${side}" type="revolute"&gt;
+    &lt;parent link="thigh_${side}"/&gt;
+    &lt;child link="shank_${side}"/&gt;
+    &lt;origin xyz="0 0 -0.42" rpy="0 0 0"/&gt;
+    &lt;axis xyz="0 1 0"/&gt;
+    &lt;limit lower="-1.57" upper="0.1" effort="100" velocity="2.0"/&gt;
+  &lt;/joint&gt;
+&lt;/xacro:macro&gt;
+
+&lt;xacro:leg side="l" reflect="1"/&gt;
+&lt;xacro:leg side="r" reflect="-1"/&gt;</code></pre>
+
+    <h2>2.3 Joint State Schema (sensor_msgs/JointState)</h2>
+    <p>
+        The primary sensor data type for robot joint feedback is <code>sensor_msgs/msg/JointState</code>. WIA-ROBOT publishes joint states at up to 50 Hz on the <code>/joint_states</code> topic with BEST_EFFORT QoS.
+    </p>
+    <pre><code># sensor_msgs/msg/JointState
+std_msgs/Header header
+string[]  name        # joint names matching URDF
+float64[] position    # radians (revolute) or meters (prismatic)
+float64[] velocity    # rad/s or m/s
+float64[] effort      # N·m or N</code></pre>
+    <p>
+        The WIA Phase 1 JSON serialisation wraps this in a typed envelope with: <code>robot_id</code> (UUID), <code>seq</code> (monotonic counter for packet-loss detection), and a <code>safety</code> object embedding E-Stop and watchdog state.
+    </p>
+
+    <h2>2.4 IMU Data (sensor_msgs/Imu)</h2>
+    <p>
+        Inertial measurement unit data, essential for balance control in exoskeletons, is published as <code>sensor_msgs/msg/Imu</code>. A covariance value of -1 in position [0] indicates the field is not populated. Kalman-filtered orientation (from <code>imu_filter_madgwick</code> ROS 2 package) feeds directly into the Centre-of-Mass controller.
+    </p>
+    <pre><code># sensor_msgs/msg/Imu
+std_msgs/Header header
+geometry_msgs/Quaternion orientation
+float64[9] orientation_covariance       # row-major 3x3
+geometry_msgs/Vector3 angular_velocity
+float64[9] angular_velocity_covariance
+geometry_msgs/Vector3 linear_acceleration
+float64[9] linear_acceleration_covariance</code></pre>
+
+    <h2>2.5 Force-Torque Data (ISO 15066)</h2>
+    <p>
+        ISO 15066:2016 collaborative robot safety requires real-time force monitoring. WIA-ROBOT publishes <code>geometry_msgs/msg/WrenchStamped</code> at 1 kHz from six-axis F/T sensors. Contact force thresholds per ISO 15066 Table A.1: body region 3 (chest/back) — maximum transient contact force 140 N; quasi-static force 65 N. The WIA safety zone controller triggers Category 0 stop if these limits are exceeded.
+    </p>
+    <pre><code># geometry_msgs/msg/WrenchStamped
+std_msgs/Header header
+geometry_msgs/Wrench wrench
+  geometry_msgs/Vector3 force   # Fx, Fy, Fz (Newtons)
+  geometry_msgs/Vector3 torque  # Tx, Ty, Tz (N·m)</code></pre>
+
+    <h2>2.6 EMG / Prosthetic Control Signals</h2>
+    <p>
+        For prosthetic and exoskeleton control driven by surface electromyography (sEMG), WIA-ROBOT defines a custom message type <code>wia_robot_msgs/msg/EmgArray</code>. The standard mandates 2 kHz sampling rate minimum for Hudgins pattern recognition classifiers (MAV, ZC, SSC, WL — Hudgins et al. 1993).
+    </p>
+    <pre><code>std_msgs/Header header
+uint8 num_channels           # 8 (Thalmic Myo) or 16 (Delsys Trigno)
+float32[] raw_uv             # raw EMG in microvolts
+float32[] rms_uv             # 200 ms RMS window
+float32[] mav                # mean absolute value window
+string[]  electrode_labels   # ["FCR","ECR","BB","TB","FDS"...]</code></pre>
+
+    <h2>2.7 FHIR R5 Health Data Integration</h2>
+    <p>
+        Clinical outcomes from robot-assisted rehabilitation are represented using HL7 FHIR R5 resources. Key resources used by WIA-ROBOT:
+    </p>
+    <table>
+        <tr><th>FHIR Resource</th><th>Usage</th></tr>
+        <tr><td>Observation</td><td>Gait metrics (cadence, stride length, symmetry index), force measurements, EMG quality</td></tr>
+        <tr><td>Procedure</td><td>Rehabilitation session records linked to robot device</td></tr>
+        <tr><td>Device</td><td>Robot registration with FDA UDI, model, manufacturer, software version</td></tr>
+        <tr><td>DeviceMetric</td><td>Real-time joint angle and torque observables</td></tr>
+    </table>
+    <pre><code>{
+  "resourceType": "Observation",
+  "status": "final",
+  "code": {"coding": [{"system": "http://loinc.org",
+                        "code": "80316-3",
+                        "display": "Gait speed [Length/time]"}]},
+  "subject": {"reference": "Patient/patient-001"},
+  "device": {"reference": "Device/wia-exoskeleton-042"},
+  "valueQuantity": {"value": 0.72, "unit": "m/s",
+                    "system": "http://unitsofmeasure.org"}
+}</code></pre>
+
+    <footer><p>WIA Robot Standard · Chapter 2 · © 2026 WIA</p></footer>
+</body>
+</html>

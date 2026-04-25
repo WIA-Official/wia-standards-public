@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Robot - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #F97316;
+            --primary-dark: #EA580C;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #FB923C); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .robot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
+        .robot-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .robot-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .robot-card.selected { border-color: var(--primary); background: rgba(249, 115, 22, 0.1); }
+        .robot-icon { font-size: 3rem; margin-bottom: 15px; }
+        .robot-name { font-size: 1rem; font-weight: 600; margin-bottom: 5px; }
+        .robot-desc { font-size: 0.8rem; color: var(--text-muted); }
+
+        .control-panel { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 30px; margin: 20px 0; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .control-row:last-child { border-bottom: none; }
+        .control-label { font-weight: 500; }
+        .control-value { display: flex; align-items: center; gap: 15px; }
+        .control-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg-card); color: var(--text); cursor: pointer; font-size: 1.2rem; }
+        .control-btn:hover { border-color: var(--primary); }
+        .control-display { min-width: 60px; text-align: center; font-weight: bold; font-size: 1.2rem; color: var(--primary); }
+
+        .safety-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .safety-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .safety-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .safety-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .safety-item:last-child { border-bottom: none; }
+        .safety-status { padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+        .safety-status.ok { background: rgba(16, 185, 129, 0.2); color: var(--secondary); }
+        .safety-status.warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .safety-status.danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        .estop-btn { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(145deg, #ef4444, #b91c1c); border: 5px solid #7f1d1d; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4); transition: all 0.2s; margin: 20px auto; display: block; }
+        .estop-btn:hover { transform: scale(1.05); }
+        .estop-btn:active { transform: scale(0.95); }
+
+        .telemetry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0; }
+        .telemetry-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; }
+        .telemetry-value { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        .telemetry-unit { font-size: 0.9rem; color: var(--text-muted); }
+        .telemetry-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .access-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .access-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .access-card h5 { color: var(--primary); margin-bottom: 15px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .safety-grid, .access-grid { grid-template-columns: 1fr; }
+        }
+            .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Robot</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🤖 WIA Robot</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Accessible Robotics" data-ko="접근 가능한 로봇공학">Accessible Robotics</h1>
+            <p data-en="Exoskeletons, prosthetics, care robots" data-ko="외골격, 의수의족, 케어로봇">Exoskeletons, prosthetics, care robots</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🤖 Types" data-ko="🤖 유형">🤖 Types</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🦿 Control" data-ko="🦿 제어">🦿 Control</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🛡️ Safety" data-ko="🛡️ 안전">🛡️ Safety</div>
+            <div class="tab" onclick="showPanel(3)" data-en="♿ Accessibility" data-ko="♿ 접근성">♿ Accessibility</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📊 Telemetry" data-ko="📊 텔레메트리">📊 Telemetry</div>
+        </div>
+
+        <!-- Panel 0: Types -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🤖 Robot Types" data-ko="🤖 로봇 유형">🤖 Robot Types</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select a robot type to configure" data-ko="구성할 로봇 유형을 선택하세요">Select robot type</p>
+
+            <div class="robot-grid">
+                <div class="robot-card selected" onclick="selectRobot('exoskeleton')">
+                    <div class="robot-icon">🦿</div>
+                    <div class="robot-name" data-en="Exoskeleton" data-ko="외골격">Exoskeleton</div>
+                    <div class="robot-desc" data-en="Wearable walking assist" data-ko="착용형 보행 보조">Walking assist</div>
+                </div>
+                <div class="robot-card" onclick="selectRobot('prosthetics')">
+                    <div class="robot-icon">🦾</div>
+                    <div class="robot-name" data-en="Prosthetics" data-ko="의수의족">Prosthetics</div>
+                    <div class="robot-desc" data-en="Bionic limbs" data-ko="바이오닉 사지">Bionic limbs</div>
+                </div>
+                <div class="robot-card" onclick="selectRobot('rehab')">
+                    <div class="robot-icon">🏥</div>
+                    <div class="robot-name" data-en="Rehabilitation" data-ko="재활">Rehabilitation</div>
+                    <div class="robot-desc" data-en="Therapy robots" data-ko="치료 로봇">Therapy robots</div>
+                </div>
+                <div class="robot-card" onclick="selectRobot('care')">
+                    <div class="robot-icon">🤗</div>
+                    <div class="robot-name" data-en="Care Robot" data-ko="케어로봇">Care Robot</div>
+                    <div class="robot-desc" data-en="Service & companion" data-ko="서비스 & 동반자">Service robot</div>
+                </div>
+                <div class="robot-card" onclick="selectRobot('surgical')">
+                    <div class="robot-icon">⚕️</div>
+                    <div class="robot-name" data-en="Surgical" data-ko="수술">Surgical</div>
+                    <div class="robot-desc" data-en="Surgery assist" data-ko="수술 보조">Surgery assist</div>
+                </div>
+                <div class="robot-card" onclick="selectRobot('mobility')">
+                    <div class="robot-icon">♿</div>
+                    <div class="robot-name" data-en="Mobility Aid" data-ko="이동보조">Mobility Aid</div>
+                    <div class="robot-desc" data-en="Smart wheelchair" data-ko="스마트 휠체어">Smart wheelchair</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="configureRobot()" data-en="⚙️ Configure" data-ko="⚙️ 구성">⚙️ Configure</button>
+            </div>
+            <div class="output" id="typeOutput"></div>
+        </div>
+
+        <!-- Panel 1: Control -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🦿 Robot Control" data-ko="🦿 로봇 제어">🦿 Robot Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Control robot parameters" data-ko="로봇 파라미터 제어">Control parameters</p>
+
+            <div class="control-panel">
+                <div class="control-row">
+                    <span class="control-label" data-en="Speed" data-ko="속도">Speed</span>
+                    <div class="control-value">
+                        <button class="control-btn" onclick="adjustValue('speed', -10)">−</button>
+                        <span class="control-display" id="speedValue">50</span>
+                        <span style="color: var(--text-muted);">%</span>
+                        <button class="control-btn" onclick="adjustValue('speed', 10)">+</button>
+                    </div>
+                </div>
+                <div class="control-row">
+                    <span class="control-label" data-en="Torque" data-ko="토크">Torque</span>
+                    <div class="control-value">
+                        <button class="control-btn" onclick="adjustValue('torque', -5)">−</button>
+                        <span class="control-display" id="torqueValue">70</span>
+                        <span style="color: var(--text-muted);">%</span>
+                        <button class="control-btn" onclick="adjustValue('torque', 5)">+</button>
+                    </div>
+                </div>
+                <div class="control-row">
+                    <span class="control-label" data-en="Sensitivity" data-ko="민감도">Sensitivity</span>
+                    <div class="control-value">
+                        <button class="control-btn" onclick="adjustValue('sensitivity', -1)">−</button>
+                        <span class="control-display" id="sensitivityValue">5</span>
+                        <span style="color: var(--text-muted);">/10</span>
+                        <button class="control-btn" onclick="adjustValue('sensitivity', 1)">+</button>
+                    </div>
+                </div>
+                <div class="control-row">
+                    <span class="control-label" data-en="Mode" data-ko="모드">Mode</span>
+                    <div class="control-value">
+                        <select id="controlMode" style="padding: 10px; border-radius: 6px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border);">
+                            <option value="auto">Auto</option>
+                            <option value="assist">Assist</option>
+                            <option value="manual">Manual</option>
+                            <option value="training">Training</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="applyControl()" data-en="✅ Apply" data-ko="✅ 적용">✅ Apply</button>
+                <button class="btn btn-secondary" onclick="resetControl()" data-en="🔄 Reset" data-ko="🔄 초기화">🔄 Reset</button>
+            </div>
+            <div class="output" id="controlOutput"></div>
+        </div>
+
+        <!-- Panel 2: Safety -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🛡️ Safety System" data-ko="🛡️ 안전 시스템">🛡️ Safety System</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Monitor safety status and emergency controls" data-ko="안전 상태 모니터링 및 비상 제어">Safety monitoring</p>
+
+            <button class="estop-btn" onclick="emergencyStop()" data-en="E-STOP" data-ko="비상정지">E-STOP</button>
+
+            <div class="safety-grid">
+                <div class="safety-card">
+                    <h5>🔋 <span data-en="System Status" data-ko="시스템 상태">System Status</span></h5>
+                    <div class="safety-item">
+                        <span data-en="Battery" data-ko="배터리">Battery</span>
+                        <span class="safety-status ok">85%</span>
+                    </div>
+                    <div class="safety-item">
+                        <span data-en="Temperature" data-ko="온도">Temperature</span>
+                        <span class="safety-status ok">Normal</span>
+                    </div>
+                    <div class="safety-item">
+                        <span data-en="Motors" data-ko="모터">Motors</span>
+                        <span class="safety-status ok">OK</span>
+                    </div>
+                    <div class="safety-item">
+                        <span data-en="Sensors" data-ko="센서">Sensors</span>
+                        <span class="safety-status ok">Active</span>
+                    </div>
+                </div>
+                <div class="safety-card">
+                    <h5>⚠️ <span data-en="Safety Limits" data-ko="안전 한계">Safety Limits</span></h5>
+                    <div class="safety-item">
+                        <span data-en="Max Torque" data-ko="최대 토크">Max Torque</span>
+                        <span class="safety-status ok">Within</span>
+                    </div>
+                    <div class="safety-item">
+                        <span data-en="ROM Limits" data-ko="ROM 한계">ROM Limits</span>
+                        <span class="safety-status ok">Safe</span>
+                    </div>
+                    <div class="safety-item">
+                        <span data-en="Collision" data-ko="충돌">Collision</span>
+                        <span class="safety-status ok">Clear</span>
+                    </div>
+                    <div class="safety-item">
+                        <span data-en="E-Stop" data-ko="비상정지">E-Stop</span>
+                        <span class="safety-status ok">Ready</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runDiagnostics()" data-en="🔍 Run Diagnostics" data-ko="🔍 진단 실행">🔍 Diagnostics</button>
+            </div>
+            <div class="output" id="safetyOutput"></div>
+        </div>
+
+        <!-- Panel 3: Accessibility -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="♿ Accessibility Settings" data-ko="♿ 접근성 설정">♿ Accessibility</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Configure robot accessibility features" data-ko="로봇 접근성 기능 구성">Configure accessibility</p>
+
+            <div class="access-grid">
+                <div class="access-card">
+                    <h5>🔊 <span data-en="Audio Feedback" data-ko="음성 피드백">Audio Feedback</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Voice Guide" data-ko="음성 안내">Voice Guide</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Status Beeps" data-ko="상태 비프음">Status Beeps</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Error Alerts" data-ko="오류 알림">Error Alerts</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>📳 <span data-en="Haptic Feedback" data-ko="햅틱 피드백">Haptic Feedback</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Vibration" data-ko="진동">Vibration</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Force Feedback" data-ko="힘 피드백">Force Feedback</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Texture Simulation" data-ko="텍스처 시뮬">Texture Sim</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>🎮 <span data-en="Input Methods" data-ko="입력 방식">Input Methods</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="EMG Control" data-ko="근전도 제어">EMG Control</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Voice Command" data-ko="음성 명령">Voice Command</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Brain Interface" data-ko="뇌-기계 연결">Brain Interface</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>👁️ <span data-en="Visual Display" data-ko="시각 표시">Visual Display</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="LED Indicators" data-ko="LED 표시">LED Indicators</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="High Contrast" data-ko="고대비">High Contrast</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Large Text" data-ko="큰 글씨">Large Text</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="saveAccessibility()" data-en="💾 Save Settings" data-ko="💾 설정 저장">💾 Save</button>
+            </div>
+            <div class="output" id="accessOutput"></div>
+        </div>
+
+        <!-- Panel 4: Telemetry -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📊 Real-time Telemetry" data-ko="📊 실시간 텔레메트리">📊 Telemetry</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Monitor robot sensor data in real-time" data-ko="로봇 센서 데이터 실시간 모니터링">Real-time monitoring</p>
+
+            <div class="telemetry-grid">
+                <div class="telemetry-item">
+                    <div class="telemetry-value" id="telSpeed">0.8</div>
+                    <div class="telemetry-unit">m/s</div>
+                    <div class="telemetry-label" data-en="Speed" data-ko="속도">Speed</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-value" id="telTorque">45</div>
+                    <div class="telemetry-unit">Nm</div>
+                    <div class="telemetry-label" data-en="Torque" data-ko="토크">Torque</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-value" id="telAngle">15°</div>
+                    <div class="telemetry-unit">deg</div>
+                    <div class="telemetry-label" data-en="Joint Angle" data-ko="관절 각도">Joint Angle</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-value" id="telEMG">0.65</div>
+                    <div class="telemetry-unit">mV</div>
+                    <div class="telemetry-label" data-en="EMG Signal" data-ko="EMG 신호">EMG Signal</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-value" id="telBattery">85</div>
+                    <div class="telemetry-unit">%</div>
+                    <div class="telemetry-label" data-en="Battery" data-ko="배터리">Battery</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-value" id="telTemp">38</div>
+                    <div class="telemetry-unit">°C</div>
+                    <div class="telemetry-label" data-en="Temperature" data-ko="온도">Temperature</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startTelemetry()" data-en="▶️ Start Stream" data-ko="▶️ 스트림 시작">▶️ Start</button>
+                <button class="btn btn-secondary" onclick="stopTelemetry()" data-en="⏹️ Stop" data-ko="⏹️ 중지">⏹️ Stop</button>
+                <button class="btn btn-secondary" onclick="exportTelemetry()" data-en="📥 Export" data-ko="📥 내보내기">📥 Export</button>
+            </div>
+            <div class="output" id="telemetryOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Robot: Empowering mobility for all" data-ko="WIA Robot: 모두를 위한 이동성 강화">WIA Robot: Empowering mobility</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedRobot = 'exoskeleton';
+        let telemetryInterval = null;
+        let values = { speed: 50, torque: 70, sensitivity: 5 };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function selectRobot(type) {
+            selectedRobot = type;
+            document.querySelectorAll('.robot-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.robot-card').classList.add('selected');
+        }
+
+        function configureRobot() {
+            const robots = {
+                exoskeleton: { dof: 12, type: 'Wearable', weight: '15kg' },
+                prosthetics: { dof: 6, type: 'Bionic Limb', weight: '2kg' },
+                rehab: { dof: 4, type: 'Therapy', weight: '50kg' },
+                care: { dof: 7, type: 'Service', weight: '45kg' },
+                surgical: { dof: 6, type: 'Precision', weight: '800kg' },
+                mobility: { dof: 4, type: 'Wheelchair', weight: '35kg' }
+            };
+            document.getElementById('typeOutput').textContent = JSON.stringify({
+                robotType: selectedRobot, ...robots[selectedRobot],
+                rosCompatible: true, wiaVersion: '1.0.0',
+                message: currentLang === 'ko' ? '로봇 구성 로드됨' : 'Robot config loaded'
+            }, null, 2);
+        }
+
+        function adjustValue(type, delta) {
+            const limits = { speed: [0, 100], torque: [0, 100], sensitivity: [1, 10] };
+            values[type] = Math.max(limits[type][0], Math.min(limits[type][1], values[type] + delta));
+            document.getElementById(type + 'Value').textContent = values[type];
+        }
+
+        function applyControl() {
+            document.getElementById('controlOutput').textContent = JSON.stringify({
+                speed: values.speed + '%', torque: values.torque + '%',
+                sensitivity: values.sensitivity + '/10',
+                mode: document.getElementById('controlMode').value,
+                message: currentLang === 'ko' ? '제어 설정 적용됨' : 'Control settings applied'
+            }, null, 2);
+        }
+
+        function resetControl() {
+            values = { speed: 50, torque: 70, sensitivity: 5 };
+            document.getElementById('speedValue').textContent = 50;
+            document.getElementById('torqueValue').textContent = 70;
+            document.getElementById('sensitivityValue').textContent = 5;
+        }
+
+        function emergencyStop() {
+            document.getElementById('safetyOutput').textContent = JSON.stringify({
+                action: 'EMERGENCY_STOP', timestamp: new Date().toISOString(),
+                status: 'ALL_MOTORS_STOPPED', safe: true,
+                message: currentLang === 'ko' ? '⚠️ 비상 정지 활성화!' : '⚠️ EMERGENCY STOP ACTIVATED!'
+            }, null, 2);
+        }
+
+        function runDiagnostics() {
+            document.getElementById('safetyOutput').textContent = JSON.stringify({
+                diagnostics: 'complete',
+                battery: { level: 85, health: 'good' },
+                motors: { status: 'ok', temperature: 'normal' },
+                sensors: { imu: 'ok', emg: 'ok', force: 'ok' },
+                message: currentLang === 'ko' ? '진단 완료: 모든 시스템 정상' : 'Diagnostics complete: All systems OK'
+            }, null, 2);
+        }
+
+        function saveAccessibility() {
+            document.getElementById('accessOutput').textContent = JSON.stringify({
+                audio: { voiceGuide: true, statusBeeps: true, errorAlerts: true },
+                haptic: { vibration: true, forceFeedback: false },
+                input: { emg: true, voice: false, bci: false },
+                visual: { led: true, highContrast: false },
+                message: currentLang === 'ko' ? '접근성 설정 저장됨' : 'Accessibility settings saved'
+            }, null, 2);
+        }
+
+        function startTelemetry() {
+            if (telemetryInterval) return;
+            telemetryInterval = setInterval(() => {
+                document.getElementById('telSpeed').textContent = (0.5 + Math.random() * 0.5).toFixed(2);
+                document.getElementById('telTorque').textContent = Math.floor(40 + Math.random() * 20);
+                document.getElementById('telAngle').textContent = Math.floor(10 + Math.random() * 20) + '°';
+                document.getElementById('telEMG').textContent = (0.5 + Math.random() * 0.3).toFixed(2);
+                document.getElementById('telTemp').textContent = Math.floor(35 + Math.random() * 8);
+            }, 500);
+            document.getElementById('telemetryOutput').textContent = currentLang === 'ko' ? '📡 텔레메트리 스트림 시작됨...' : '📡 Telemetry stream started...';
+        }
+
+        function stopTelemetry() {
+            if (telemetryInterval) { clearInterval(telemetryInterval); telemetryInterval = null; }
+            document.getElementById('telemetryOutput').textContent = currentLang === 'ko' ? '⏹️ 텔레메트리 스트림 중지됨' : '⏹️ Telemetry stream stopped';
+        }
+
+        function exportTelemetry() {
+            document.getElementById('telemetryOutput').textContent = JSON.stringify({
+                format: 'WIA-ROBOT-TELEMETRY-1.0', rosCompatible: true,
+                dataPoints: 1024, duration: '5 minutes',
+                message: currentLang === 'ko' ? '텔레메트리 데이터 내보내기 준비됨' : 'Telemetry data ready for export'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

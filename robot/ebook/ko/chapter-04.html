@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: DDS 통신 프로토콜 — WIA 로봇</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제4장: DDS 통신 프로토콜</h1>
+
+    <h2>4.1 DDS/RTPS 개요</h2>
+    <p>
+        ROS 2는 OMG DDS(Data Distribution Service) 표준과 유선 프로토콜 RTPS(Real-Time Publish-Subscribe, RTPS 2.5)를 기본 미들웨어로 사용합니다. DDS는 데이터 중심 발행/구독(DCPS) 모델에 선언적 QoS 정책을 제공하여 안전 임계 로봇 시스템의 전달 신뢰성, 지연 시간, 리소스 사용을 세밀하게 제어할 수 있습니다.
+    </p>
+    <p>WIA-ROBOT 지원 RMW(ROS 미들웨어) 구현체:</p>
+    <table>
+        <tr><th>RMW</th><th>DDS 구현체</th><th>용도</th></tr>
+        <tr><td>rmw_fastrtps_cpp</td><td>eProsima FastDDS 3.x</td><td>기본값; Linux에서 최고 성능</td></tr>
+        <tr><td>rmw_cyclonedds_cpp</td><td>Eclipse Cyclone DDS 0.10</td><td>저지연; 임베디드 시스템 적합</td></tr>
+        <tr><td>rmw_connextdds</td><td>RTI Connext DDS 7.x</td><td>엔터프라이즈; DO-178C 항공 인증 지원</td></tr>
+    </table>
+
+    <h2>4.2 QoS 프로파일</h2>
+    <p>WIA-ROBOT은 세 가지 QoS 프로파일 계층을 정의합니다:</p>
+
+    <h3>Tier 1 — 안전 임계 명령</h3>
+    <p>적용: <code>/emergency_stop</code>, <code>/wia_robot/execute_trajectory</code> 액션 목표, <code>/robot_description</code></p>
+    <pre><code>qos_commands:
+  reliability: RELIABLE           # 보장 전달, 손실 시 재전송
+  durability: TRANSIENT_LOCAL     # 지연 참여자에게 최근 N개 메시지 전달
+  history: KEEP_LAST
+  depth: 10
+  deadline: {nsec: 100000000}     # 100 ms — ISO 10218-1 응답 예산
+  liveliness_lease_duration: {nsec: 500000000}  # 500 ms 워치독</code></pre>
+
+    <h3>Tier 2 — 고속 텔레메트리</h3>
+    <p>적용: <code>/joint_states</code>(50 Hz), <code>/imu/data_raw</code>, <code>/wrench</code>(1 kHz)</p>
+    <pre><code>qos_telemetry_fast:
+  reliability: BEST_EFFORT        # 오래된 프레임 폐기; 지연 최소화
+  durability: VOLATILE
+  history: KEEP_LAST
+  depth: 1
+  lifespan: {nsec: 25000000}      # 25 ms 후 폐기 (50 Hz에서 2프레임)</code></pre>
+
+    <h3>Tier 3 — 지도/정적 상태</h3>
+    <p>적용: <code>/map</code>(SLAM 점유 격자), <code>/tf_static</code></p>
+    <pre><code>qos_map_static:
+  reliability: RELIABLE
+  durability: TRANSIENT_LOCAL
+  history: KEEP_LAST
+  depth: 1</code></pre>
+
+    <h2>4.3 ROS 2 도메인 ID 격리</h2>
+    <p>
+        <code>ROS_DOMAIN_ID</code>(0–232)는 DDS 통신을 분리합니다. WIA-ROBOT 배포 가이드라인:
+    </p>
+    <table>
+        <tr><th>도메인 ID</th><th>환경</th></tr>
+        <tr><td>0</td><td>개발 / 시뮬레이션 기본값</td></tr>
+        <tr><td>10–19</td><td>임상 / 병동 로봇 (병동당 1개 ID)</td></tr>
+        <tr><td>20–29</td><td>산업 / 공장 바닥 로봇</td></tr>
+        <tr><td>100–109</td><td>테스트 벤치 / QA 환경</td></tr>
+        <tr><td>200–209</td><td>Isaac Sim 가상 로봇</td></tr>
+    </table>
+
+    <h2>4.4 FastDDS 3.x XML 설정</h2>
+    <pre><code>&lt;!-- FASTRTPS_DEFAULT_PROFILES_FILE=/opt/wia_robot/dds/wia_profiles.xml --&gt;
+&lt;profiles&gt;
+  &lt;participant profile_name="wia_safety" is_default_participant="true"&gt;
+    &lt;rtps&gt;
+      &lt;builtin&gt;
+        &lt;discovery_config&gt;
+          &lt;leaseDuration&gt;&lt;sec&gt;DURATION_INFINITY&lt;/sec&gt;&lt;/leaseDuration&gt;
+          &lt;initial_announcements&gt;
+            &lt;count&gt;5&lt;/count&gt;
+            &lt;period&gt;&lt;nanosec&gt;100000000&lt;/nanosec&gt;&lt;/period&gt;
+          &lt;/initial_announcements&gt;
+        &lt;/discovery_config&gt;
+      &lt;/builtin&gt;
+      &lt;sendBufferSize&gt;1048576&lt;/sendBufferSize&gt;
+      &lt;receiveBufferSize&gt;4194304&lt;/receiveBufferSize&gt;
+    &lt;/rtps&gt;
+  &lt;/participant&gt;
+&lt;/profiles&gt;</code></pre>
+
+    <h2>4.5 MQTT 5 병원 시스템 브리지</h2>
+    <p>
+        병원 EMR 및 간호사 호출 시스템은 전체 ROS 2 스택을 실행하기 어렵습니다. WIA-ROBOT MQTT 5 브리지(<code>wia_robot_mqtt_bridge</code>)는 중요 이벤트를 MQTT 5 브로커로 재발행하여 표준 병원 네트워크 인프라로 임상 대시보드를 연결합니다.
+    </p>
+    <pre><code>bridge_config:
+  mqtt_broker: mqtts://hospital-iot.internal:8883
+  subscriptions:
+    - ros2_topic: /emergency_stop
+      mqtt_topic: wia/robot/{robot_id}/estop
+      qos: 2        # MQTT QoS 2 = 정확히 한 번 (RELIABLE DDS와 매핑)
+    - ros2_topic: /joint_states
+      mqtt_topic: wia/robot/{robot_id}/joints
+      qos: 0        # MQTT QoS 0 = 최대 한 번 (BEST_EFFORT DDS와 매핑)
+      rate_limit_hz: 5   # 임상 대시보드용 50 Hz → 5 Hz 다운샘플</code></pre>
+
+    <h2>4.6 DDS 발견 문제 해결 (병원 네트워크)</h2>
+    <p>
+        병원 네트워크는 보안 정책상 UDP 멀티캐스트를 차단하는 경우가 많습니다. 이 경우 유니캐스트 전용 FastDDS 프로파일을 사용합니다:
+    </p>
+    <pre><code># 멀티캐스트 차단 환경에서 유니캐스트 강제
+export RMW_FASTRTPS_USE_QOS_FROM_XML=1
+export FASTRTPS_DEFAULT_PROFILES_FILE=/opt/wia_robot/dds/unicast_profiles.xml
+
+# 진단 명령
+ros2 topic hz /joint_states      # 예상: ~50 Hz
+ros2 topic info /joint_states --verbose  # QoS 확인
+ros2 daemon status               # ROS 2 데몬 상태 확인</code></pre>
+
+    <footer><p>WIA 로봇 표준 · 제4장 · © 2026 WIA</p></footer>
+</body>
+</html>

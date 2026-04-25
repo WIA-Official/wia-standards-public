@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: SLAM and Autonomous Navigation — WIA Robot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">Table of Contents</a></nav>
+
+    <h1>Chapter 6: SLAM and Autonomous Navigation</h1>
+
+    <h2>6.1 SLAM in Assistive Robotics</h2>
+    <p>
+        Simultaneous Localisation and Mapping (SLAM) enables mobility-aid robots (smart wheelchairs, care robots) to build a map of their environment while tracking their own position. WIA-ROBOT supports two primary SLAM implementations, selectable based on sensor configuration:
+    </p>
+    <table>
+        <tr><th>System</th><th>Sensor</th><th>Algorithm</th><th>ROS 2 Package</th></tr>
+        <tr><td>Cartographer</td><td>2D LiDAR (SICK TiM, RPLiDAR)</td><td>Submap-based graph SLAM (Google)</td><td>cartographer_ros</td></tr>
+        <tr><td>ORB-SLAM3</td><td>RGB-D camera / stereo / IMU</td><td>ORB feature visual-inertial SLAM</td><td>orb_slam3_ros2_wrapper</td></tr>
+        <tr><td>RTAB-Map</td><td>RGB-D + LiDAR fusion</td><td>Graph-based with loop closure</td><td>rtabmap_ros</td></tr>
+    </table>
+
+    <h2>6.2 Cartographer 2D SLAM</h2>
+    <p>
+        Google Cartographer is the recommended SLAM system for indoor mobility-aid robots using 2D LiDAR. It produces an occupancy grid map published as <code>nav_msgs/OccupancyGrid</code> on <code>/map</code> with RELIABLE + TRANSIENT_LOCAL QoS.
+    </p>
+    <pre><code># cartographer_ros launch
+ros2 launch cartographer_ros cartographer.launch.py \
+  configuration_directory:=/opt/wia_robot/cartographer \
+  configuration_basename:=wia_ward.lua
+
+# cartographer config: wia_ward.lua
+include "map_builder.lua"
+include "trajectory_builder.lua"
+
+options = {
+  map_builder = MAP_BUILDER,
+  trajectory_builder = TRAJECTORY_BUILDER,
+  map_frame = "map",
+  tracking_frame = "base_link",
+  published_frame = "base_link",
+  odom_frame = "odom",
+  provide_odom_frame = true,
+  use_odometry = true,
+  use_nav_sat = false,
+  num_laser_scans = 1,
+  rangefinder_sampling_ratio = 1.0,
+}</code></pre>
+
+    <h2>6.3 ORB-SLAM3 Visual-Inertial SLAM</h2>
+    <p>
+        ORB-SLAM3 is preferred for exoskeletons and prosthetic control environments where LiDAR is impractical. It uses oriented FAST and rotated BRIEF (ORB) features from RGB-D cameras (Intel RealSense D435i, Microsoft Azure Kinect) fused with IMU data for robust localisation.
+    </p>
+    <pre><code># ORB-SLAM3 with RealSense D435i (RGB-D + IMU mode)
+ros2 run orb_slam3_ros2_wrapper rgbd_inertial_node \
+  --ros-args \
+  -p vocabulary_file:=/opt/ORB_SLAM3/Vocabulary/ORBvoc.txt \
+  -p settings_file:=/opt/ORB_SLAM3/Examples/RGB-D-Inertial/RealSenseD435i.yaml \
+  -p enable_pangolin:=false   # headless mode for embedded systems</code></pre>
+
+    <h2>6.4 ROS 2 Nav2 Navigation Stack</h2>
+    <p>
+        The <strong>Nav2</strong> (Navigation 2) stack provides the complete autonomous navigation pipeline: global path planning, local obstacle avoidance, and recovery behaviours. WIA-ROBOT mobility-aid robots use Nav2 in a hospital environment configuration.
+    </p>
+    <pre><code># Nav2 component architecture:
+# - BT Navigator (behaviour tree executor)
+# - Global Planner: NavFn (Dijkstra) or Smac Lattice Planner
+# - Local Planner: DWB (Dynamic Window Approach) or TEB
+# - Costmap 2D: static layer + inflation layer + obstacle layer
+# - Recovery Behaviours: spin, back-up, clear costmap
+
+ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=false \
+  map:=/opt/wia_robot/maps/ward_2.yaml \
+  params_file:=/opt/wia_robot/nav2/wia_nav2_params.yaml</code></pre>
+
+    <h2>6.5 Costmap Configuration for Hospital Environments</h2>
+    <p>
+        Hospital environments require conservative obstacle inflation (wider clearance for patients in beds and wheelchairs) and dynamic obstacle tracking for moving people:
+    </p>
+    <pre><code># wia_nav2_params.yaml (relevant section)
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 6
+      height: 6
+      resolution: 0.05          # 5 cm/cell
+      robot_radius: 0.40        # wheelchair + exoskeleton footprint
+      plugins: ["obstacle_layer", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.75  # 75 cm clearance from obstacles</code></pre>
+
+    <h2>6.6 AMCL Localisation (Post-Mapping)</h2>
+    <p>
+        Once a map is built with Cartographer, the robot uses <strong>AMCL</strong> (Adaptive Monte Carlo Localisation) for localisation during normal operation. AMCL publishes a pose estimate as <code>geometry_msgs/PoseWithCovarianceStamped</code> on <code>/amcl_pose</code>, which the WIA REST API exposes at <code>GET /slam/pose</code>.
+    </p>
+    <pre><code>ros2 launch nav2_bringup localization_launch.py \
+  map:=/opt/wia_robot/maps/ward_2.yaml \
+  use_lifecycle_mgr:=true
+
+# Set initial pose (required after robot startup)
+ros2 topic pub -1 /initialpose geometry_msgs/msg/PoseWithCovarianceStamped \
+  '{header: {frame_id: "map"},
+    pose: {pose: {position: {x: 1.5, y: 2.3, z: 0.0},
+                  orientation: {w: 1.0}},
+           covariance: [0.25,0,0,0,0,0, 0,0.25,0,0,0,0,
+                        0,0,0,0,0,0, 0,0,0,0,0,0,
+                        0,0,0,0,0,0, 0,0,0,0,0,0.068]}}'</code></pre>
+
+    <h2>6.7 Map Persistence and Versioning</h2>
+    <p>
+        Hospital ward maps must be versioned and backed up when layout changes occur. WIA-ROBOT uses the <code>nav2_map_server</code> to save and load maps:
+    </p>
+    <pre><code># Save current SLAM map
+ros2 service call /map_server/save_map nav2_msgs/srv/SaveMap \
+  '{map_topic: "/map", map_url: "/opt/wia_robot/maps/ward_2_20260425",
+    image_format: "pgm", map_mode: "trinary", free_thresh: 0.25,
+    occupied_thresh: 0.65}'
+
+# File output:
+# ward_2_20260425.pgm  -- grayscale occupancy image
+# ward_2_20260425.yaml -- map metadata (resolution, origin, thresholds)</code></pre>
+
+    <footer><p>WIA Robot Standard · Chapter 6 · © 2026 WIA</p></footer>
+</body>
+</html>

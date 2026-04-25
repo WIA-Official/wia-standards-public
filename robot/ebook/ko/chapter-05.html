@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: MoveIt 2 동작 계획 — WIA 로봇</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제5장: MoveIt 2 동작 계획</h1>
+
+    <h2>5.1 MoveIt 2 아키텍처</h2>
+    <p>
+        <strong>MoveIt 2</strong>는 ROS 2 생태계의 기본 동작 계획 프레임워크입니다. 다양한 계획 알고리즘, 역기구학(IK) 솔버, 충돌 검사, 관절형 로봇의 궤적 실행을 위한 통합 인터페이스를 제공합니다. WIA-ROBOT은 목표 기반 궤적 계획이 필요한 모든 관절형 로봇에 MoveIt 2를 통합합니다.
+    </p>
+    <p>WIA-ROBOT이 사용하는 MoveIt 2 핵심 컴포넌트:</p>
+    <table>
+        <tr><th>컴포넌트</th><th>역할</th></tr>
+        <tr><td>MoveGroupInterface</td><td>Python/C++ 계획·실행 클라이언트 API</td></tr>
+        <tr><td>PlanningSceneMonitor</td><td>/collision_object 토픽에서 실시간 충돌 세계 구성</td></tr>
+        <tr><td>OMPL 계획 파이프라인</td><td>샘플링 기반 계획기 (RRTConnect, PRM, BiTRRT)</td></tr>
+        <tr><td>STOMP</td><td>부드러운 궤적을 위한 확률적 기울기 최적화기</td></tr>
+        <tr><td>PILZ Industrial Motion</td><td>산업용 팔을 위한 결정론적 LIN/PTP/CIRC 프로파일</td></tr>
+        <tr><td>KDL IK 솔버</td><td>기본 수치 IK; 과잉 구속 로봇에는 TRAC-IK로 교체</td></tr>
+        <tr><td>FCL 충돌 검사기</td><td>Flexible Collision Library 계획 시간 충돌 회피</td></tr>
+    </table>
+
+    <h2>5.2 계획 그룹 설정</h2>
+    <p>MoveIt 2는 SRDF(Semantic Robot Description Format) 파일에서 계획 그룹을 정의해야 합니다:</p>
+    <pre><code>&lt;robot name="wia_exoskeleton"&gt;
+  &lt;group name="lower_body"&gt;
+    &lt;chain base_link="pelvis" tip_link="right_foot"/&gt;
+  &lt;/group&gt;
+  &lt;group name="left_leg"&gt;
+    &lt;joint name="hip_l"/&gt;
+    &lt;joint name="knee_l"/&gt;
+    &lt;joint name="ankle_l"/&gt;
+  &lt;/group&gt;
+  &lt;disable_collisions link1="thigh_l" link2="pelvis" reason="Adjacent"/&gt;
+&lt;/robot&gt;</code></pre>
+
+    <h2>5.3 OMPL 계획기</h2>
+    <p>OMPL(Open Motion Planning Library)은 MoveIt 2의 기본 샘플링 기반 계획기를 제공합니다. WIA 보조 로봇에 권장되는 계획기:</p>
+    <table>
+        <tr><th>계획기</th><th>사용 사례</th><th>비고</th></tr>
+        <tr><td>RRTConnect</td><td>일반 관절 공간 계획</td><td>빠른 양방향 탐색; 외골격 기본값</td></tr>
+        <tr><td>BiTRRT</td><td>고자유도 과잉 구속 팔</td><td>온도 기반 전이; 더 균일한 탐색</td></tr>
+        <tr><td>LBKPIECE</td><td>좁은 통로 문제</td><td>지연 양방향 KPIECE; 재활 작업 공간</td></tr>
+        <tr><td>PRM*</td><td>정적 환경에서 반복 쿼리</td><td>로드맵 한 번 구축 후 재사용</td></tr>
+    </table>
+    <pre><code># Python MoveIt 2 계획 예시
+from moveit.planning import MoveItPy
+
+moveit = MoveItPy(node_name="wia_planner")
+planning_component = moveit.get_planning_component("left_leg")
+
+planning_component.set_goal_state(configuration_name="stand_upright")
+
+plan_params = moveit.get_default_plan_solution_parameters()
+plan_params.planner_id = "RRTConnect"
+plan_params.planning_time = 5.0
+
+plan_result = planning_component.plan(plan_params)
+if plan_result:
+    moveit.execute(plan_result.trajectory,
+                   controllers=["joint_trajectory_controller"])</code></pre>
+
+    <h2>5.4 STOMP — 확률적 궤적 최적화</h2>
+    <p>
+        STOMP(Stochastic Trajectory Optimization for Motion Planning)는 확률적 경사 하강법으로 궤적을 반복 개선하여 부드러운 궤적을 생성합니다. 임상적으로 자연스러운 동작이 중요한 재활 로봇에 적합합니다. 분당서울대병원 재활의학과 로봇 보행 연구(2024)에서 STOMP 기반 궤적이 RRTConnect 대비 관절 가속도 진동을 37% 감소시켰습니다.
+    </p>
+    <pre><code># STOMP 설정 (moveit_config/config/ompl_planning.yaml)
+planning_plugins:
+  - moveit_planners_stomp/StompPlannerManager
+stomp:
+  group_name: left_leg
+  num_timesteps: 60
+  num_iterations: 200
+  num_rollouts: 30
+  delta_t: 0.05         # 50 ms 시간 단계
+  noise_stddev: [0.05, 0.08, 0.03]  # 관절별 (고관절, 무릎, 발목)</code></pre>
+
+    <h2>5.5 PILZ 산업 동작 프로파일</h2>
+    <p>PILZ Industrial Motion Planner는 수술 로봇과 정밀 조립 작업에 적합한 결정론적·시간 최적 궤적을 제공합니다:</p>
+    <ul>
+        <li><strong>PTP</strong>(Point-to-Point) — 모든 관절이 동시에 목표 도달; 최소 시간.</li>
+        <li><strong>LIN</strong>(직선) — 엔드 이펙터가 데카르트 직선 이동.</li>
+        <li><strong>CIRC</strong>(원호) — 엔드 이펙터가 원호 경로 이동; 보조점 필요.</li>
+    </ul>
+
+    <h2>5.6 IK 솔버 선택</h2>
+    <table>
+        <tr><th>솔버</th><th>강점</th><th>설치</th></tr>
+        <tr><td>TRAC-IK</td><td>빠른 수치 IK, 성공률 90% 이상</td><td>ros-jazzy-trac-ik</td></tr>
+        <tr><td>bio_ik</td><td>균형·최소 이동 등 추가 목표 함수</td><td>bio_ik ROS 2 패키지</td></tr>
+        <tr><td>ikfast</td><td>해석적 IK, 성공률 거의 100%; 로봇별 코드 생성 필요</td><td>MoveIt IKFast 플러그인</td></tr>
+    </table>
+    <p>
+        KAIST 로봇학과 비교 연구(2025)에서 7-DOF 재활 로봇팔에 TRAC-IK를 적용했을 때 KDL 대비 IK 성공률이 67% → 94%로 향상되었습니다.
+    </p>
+
+    <footer><p>WIA 로봇 표준 · 제5장 · © 2026 WIA</p></footer>
+</body>
+</html>

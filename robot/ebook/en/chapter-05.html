@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: MoveIt 2 Motion Planning — WIA Robot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">Table of Contents</a></nav>
+
+    <h1>Chapter 5: MoveIt 2 Motion Planning</h1>
+
+    <h2>5.1 MoveIt 2 Architecture</h2>
+    <p>
+        <strong>MoveIt 2</strong> is the primary motion planning framework in the ROS 2 ecosystem. It provides a unified interface to multiple planning algorithms, inverse kinematics (IK) solvers, collision checking, and trajectory execution for manipulators and robot arms. WIA-ROBOT integrates MoveIt 2 for all robots with articulated joints requiring goal-based trajectory planning.
+    </p>
+    <p>Key MoveIt 2 components used by WIA-ROBOT:</p>
+    <table>
+        <tr><th>Component</th><th>Role</th></tr>
+        <tr><td>MoveGroupInterface</td><td>Python/C++ client API for planning and execution</td></tr>
+        <tr><td>PlanningSceneMonitor</td><td>Real-time collision world from /collision_object topic</td></tr>
+        <tr><td>OMPL Planning Pipeline</td><td>Sampling-based planners (RRTConnect, PRM, BiTRRT)</td></tr>
+        <tr><td>STOMP</td><td>Stochastic gradient optimiser for smooth trajectories</td></tr>
+        <tr><td>PILZ Industrial Motion</td><td>Deterministic LIN/PTP/CIRC profiles for industrial arms</td></tr>
+        <tr><td>KDL IK Solver</td><td>Default numerical IK; replaced by TRAC-IK or bio_ik for redundant robots</td></tr>
+        <tr><td>FCL Collision Checker</td><td>Flexible Collision Library for planning-time collision avoidance</td></tr>
+    </table>
+
+    <h2>5.2 Planning Group Configuration</h2>
+    <p>MoveIt 2 requires a SRDF (Semantic Robot Description Format) file defining planning groups:</p>
+    <pre><code>&lt;robot name="wia_exoskeleton"&gt;
+  &lt;group name="lower_body"&gt;
+    &lt;chain base_link="pelvis" tip_link="right_foot"/&gt;
+  &lt;/group&gt;
+  &lt;group name="left_leg"&gt;
+    &lt;joint name="hip_l"/&gt;
+    &lt;joint name="knee_l"/&gt;
+    &lt;joint name="ankle_l"/&gt;
+  &lt;/group&gt;
+  &lt;group name="right_leg"&gt;
+    &lt;joint name="hip_r"/&gt;
+    &lt;joint name="knee_r"/&gt;
+    &lt;joint name="ankle_r"/&gt;
+  &lt;/group&gt;
+  &lt;disable_collisions link1="thigh_l" link2="pelvis" reason="Adjacent"/&gt;
+  &lt;disable_collisions link1="thigh_r" link2="pelvis" reason="Adjacent"/&gt;
+&lt;/robot&gt;</code></pre>
+
+    <h2>5.3 OMPL Planners</h2>
+    <p>
+        The <strong>Open Motion Planning Library (OMPL)</strong> provides the default sampling-based planners in MoveIt 2. For WIA assistive robots, the recommended planners are:
+    </p>
+    <table>
+        <tr><th>Planner</th><th>Use Case</th><th>Notes</th></tr>
+        <tr><td>RRTConnect</td><td>General joint-space planning</td><td>Fast bidirectional search; default for exoskeletons</td></tr>
+        <tr><td>BiTRRT</td><td>High-DOF redundant arms</td><td>Temperature-based transition; more uniform exploration</td></tr>
+        <tr><td>LBKPIECE</td><td>Narrow-passage problems</td><td>Lazy bidirectional KPIECE; good for confined rehab workspaces</td></tr>
+        <tr><td>PRM*</td><td>Repeated queries in static environments</td><td>Build roadmap once; reuse for fast planning</td></tr>
+    </table>
+    <pre><code># Python MoveIt 2 planning with RRTConnect
+from moveit.core.robot_model import RobotModel
+from moveit.planning import MoveItPy
+
+moveit = MoveItPy(node_name="wia_planner")
+robot = moveit.get_robot()
+planning_component = moveit.get_planning_component("left_leg")
+
+# Set goal state
+planning_component.set_goal_state(configuration_name="stand_upright")
+
+# Plan with OMPL RRTConnect
+plan_params = moveit.get_default_plan_solution_parameters()
+plan_params.planner_id = "RRTConnect"
+plan_params.planning_time = 5.0
+plan_params.num_planning_attempts = 3
+
+plan_result = planning_component.plan(plan_params)
+if plan_result:
+    moveit.execute(plan_result.trajectory, controllers=["joint_trajectory_controller"])</code></pre>
+
+    <h2>5.4 STOMP — Stochastic Trajectory Optimisation</h2>
+    <p>
+        STOMP (Stochastic Trajectory Optimization for Motion Planning) generates smooth trajectories by iteratively improving a trajectory with stochastic gradient descent. It is preferred for rehabilitation robots where smooth, human-like motion is clinically important.
+    </p>
+    <pre><code># moveit_config/config/ompl_planning.yaml
+planning_plugins:
+  - moveit_planners_stomp/StompPlannerManager
+
+stomp:
+  group_name: left_leg
+  num_timesteps: 60
+  num_iterations: 200
+  num_rollouts: 30
+  delta_t: 0.05              # 50 ms time step
+  noise_stddev: [0.05, 0.08, 0.03]  # per joint (hip, knee, ankle)
+  cost_function:
+    obstacle_cost_weight: 1.0
+    smoothness_cost_weight: 0.1
+    constraint_cost_weight: 5.0</code></pre>
+
+    <h2>5.5 PILZ Industrial Motion Profiles</h2>
+    <p>
+        PILZ Industrial Motion Planner provides deterministic, time-optimal trajectories conforming to industrial robot motion profiles — appropriate for surgical robots and precise assembly tasks:
+    </p>
+    <ul>
+        <li><strong>PTP</strong> (Point-to-Point) — all joints reach goal simultaneously; minimum time.</li>
+        <li><strong>LIN</strong> (Linear) — end-effector moves in a straight Cartesian line.</li>
+        <li><strong>CIRC</strong> (Circular) — end-effector follows a circular arc; requires auxiliary point.</li>
+    </ul>
+    <pre><code># PILZ LIN Cartesian move for surgical robot
+from moveit_msgs.msg import MotionPlanRequest
+
+req = MotionPlanRequest()
+req.planner_id = "LIN"
+req.group_name = "right_arm"
+req.max_velocity_scaling_factor = 0.3   # 30% of rated velocity
+req.max_acceleration_scaling_factor = 0.2</code></pre>
+
+    <h2>5.6 Collision Checking with FCL</h2>
+    <p>
+        The Flexible Collision Library (FCL) performs real-time collision checking against a 3D planning scene. WIA-ROBOT populates the planning scene with:
+    </p>
+    <ul>
+        <li><strong>Static objects</strong> — room geometry loaded from a 3D map or SLAM-generated point cloud.</li>
+        <li><strong>Dynamic objects</strong> — published as <code>moveit_msgs/CollisionObject</code> on <code>/collision_object</code> topic.</li>
+        <li><strong>Attached objects</strong> — objects held by the robot (e.g. rehabilitation handle) as <code>/attached_collision_object</code>.</li>
+        <li><strong>Octomap</strong> — 3D occupancy from depth camera, published as <code>octomap_msgs/Octomap</code>.</li>
+    </ul>
+
+    <h2>5.7 IK Solvers</h2>
+    <p>
+        The default KDL numerical IK solver struggles with redundant robots (DOF > 6). WIA-ROBOT recommends:
+    </p>
+    <table>
+        <tr><th>Solver</th><th>Strengths</th><th>Installation</th></tr>
+        <tr><td>TRAC-IK</td><td>Fast, reliable numerical IK with bounds; 90%+ success rate</td><td>ros-jazzy-trac-ik</td></tr>
+        <tr><td>bio_ik</td><td>Goal functions beyond end-effector pose (e.g. minimal joint displacement, balance)</td><td>bio_ik ROS 2 package</td></tr>
+        <tr><td>ikfast</td><td>Analytic IK, near-100% success; requires robot-specific code generation</td><td>MoveIt IKFast plugin</td></tr>
+    </table>
+
+    <footer><p>WIA Robot Standard · Chapter 5 · © 2026 WIA</p></footer>
+</body>
+</html>

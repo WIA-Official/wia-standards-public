@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: DDS Communication Protocols — WIA Robot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">Table of Contents</a></nav>
+
+    <h1>Chapter 4: DDS Communication Protocols</h1>
+
+    <h2>4.1 DDS/RTPS Overview</h2>
+    <p>
+        ROS 2 uses the <strong>DDS</strong> (Data Distribution Service) standard (OMG DDS 1.4) and its wire protocol <strong>RTPS</strong> (Real-Time Publish-Subscribe, OMG RTPS 2.5) as the default middleware. DDS provides a data-centric publish/subscribe (DCPS) model with declarative QoS policies, enabling fine-grained control over delivery reliability, latency, and resource consumption — critical requirements for safety-critical robot systems.
+    </p>
+    <p>
+        WIA-ROBOT supports three RMW (ROS Middleware) implementations:
+    </p>
+    <table>
+        <tr><th>RMW</th><th>DDS Implementation</th><th>Use Case</th></tr>
+        <tr><td>rmw_fastrtps_cpp</td><td>eProsima FastDDS 3.x</td><td>Default; best performance on Linux</td></tr>
+        <tr><td>rmw_cyclonedds_cpp</td><td>Eclipse Cyclone DDS 0.10</td><td>Low-latency, good for embedded</td></tr>
+        <tr><td>rmw_connextdds</td><td>RTI Connext DDS 7.x</td><td>Enterprise; DO-178C avionics cert</td></tr>
+    </table>
+
+    <h2>4.2 QoS Profiles</h2>
+    <p>WIA-ROBOT defines three QoS profile tiers:</p>
+
+    <h3>Tier 1 — Safety-Critical Commands</h3>
+    <p>Used for: <code>/emergency_stop</code>, <code>/wia_robot/execute_trajectory</code> action goals, <code>/robot_description</code>.</p>
+    <pre><code>qos_commands:
+  reliability: RELIABLE           # guaranteed delivery, retransmit on loss
+  durability: TRANSIENT_LOCAL     # late joiners receive last N messages
+  history: KEEP_LAST
+  depth: 10
+  deadline: {nsec: 100000000}     # 100 ms -- ISO 10218-1 budget
+  liveliness: AUTOMATIC
+  liveliness_lease_duration: {nsec: 500000000}  # 500 ms watchdog</code></pre>
+
+    <h3>Tier 2 — High-Rate Telemetry</h3>
+    <p>Used for: <code>/joint_states</code> (50 Hz), <code>/imu/data_raw</code>, <code>/wrench</code> (1 kHz).</p>
+    <pre><code>qos_telemetry_fast:
+  reliability: BEST_EFFORT        # drop stale frames; prioritise latency
+  durability: VOLATILE            # no late-joiner buffering
+  history: KEEP_LAST
+  depth: 1
+  lifespan: {nsec: 25000000}      # discard after 25 ms (2 frames at 50 Hz)</code></pre>
+
+    <h3>Tier 3 — Map/State</h3>
+    <p>Used for: <code>/map</code> (SLAM occupancy grid), <code>/tf_static</code>, <code>/robot_state_publisher</code> outputs.</p>
+    <pre><code>qos_map_static:
+  reliability: RELIABLE
+  durability: TRANSIENT_LOCAL
+  history: KEEP_LAST
+  depth: 1</code></pre>
+
+    <h2>4.3 ROS 2 Domain ID Isolation</h2>
+    <p>
+        <code>ROS_DOMAIN_ID</code> (0–232) partitions DDS communication. WIA-ROBOT deployment guidelines:
+    </p>
+    <table>
+        <tr><th>Domain ID</th><th>Environment</th></tr>
+        <tr><td>0</td><td>Development / simulation default</td></tr>
+        <tr><td>10–19</td><td>Clinical / ward robots (one ID per ward)</td></tr>
+        <tr><td>20–29</td><td>Industrial / factory floor robots</td></tr>
+        <tr><td>100–109</td><td>Test bench / QA environments</td></tr>
+        <tr><td>200–209</td><td>Isaac Sim virtual robots</td></tr>
+    </table>
+    <pre><code>export ROS_DOMAIN_ID=12   # Ward 2 exoskeleton fleet
+ros2 run wia_robot_gateway gateway_node</code></pre>
+
+    <h2>4.4 FastDDS 3.x Configuration</h2>
+    <p>
+        FastDDS 3.x (eProsima) is the default RMW for WIA-ROBOT. Key XML configuration for WIA safety-critical profiles:
+    </p>
+    <pre><code>&lt;!-- FASTRTPS_DEFAULT_PROFILES_FILE=/opt/wia_robot/dds/wia_profiles.xml --&gt;
+&lt;profiles&gt;
+  &lt;participant profile_name="wia_safety" is_default_participant="true"&gt;
+    &lt;rtps&gt;
+      &lt;builtin&gt;
+        &lt;discovery_config&gt;
+          &lt;leaseDuration&gt;&lt;sec&gt;DURATION_INFINITY&lt;/sec&gt;&lt;/leaseDuration&gt;
+          &lt;initial_announcements&gt;
+            &lt;count&gt;5&lt;/count&gt;
+            &lt;period&gt;&lt;nanosec&gt;100000000&lt;/nanosec&gt;&lt;/period&gt;
+          &lt;/initial_announcements&gt;
+        &lt;/discovery_config&gt;
+      &lt;/builtin&gt;
+      &lt;sendBufferSize&gt;1048576&lt;/sendBufferSize&gt;
+      &lt;receiveBufferSize&gt;4194304&lt;/receiveBufferSize&gt;
+    &lt;/rtps&gt;
+  &lt;/participant&gt;
+&lt;/profiles&gt;</code></pre>
+
+    <h2>4.5 MQTT 5 Bridge for Clinical Systems</h2>
+    <p>
+        Hospital EMR and nurse call systems often cannot run a full ROS 2 stack. The WIA-ROBOT MQTT 5 bridge (<code>wia_robot_mqtt_bridge</code>) re-publishes critical events to an MQTT 5 broker, enabling integration with clinical dashboards over standard hospital network infrastructure.
+    </p>
+    <pre><code>bridge_config:
+  mqtt_broker: mqtts://hospital-iot.internal:8883
+  client_id: wia_robot_bridge_ward2
+  tls_cert: /etc/wia_robot/mqtt_client.crt
+  tls_key: /etc/wia_robot/mqtt_client.key
+
+  subscriptions:
+    - ros2_topic: /emergency_stop
+      mqtt_topic: wia/robot/{robot_id}/estop
+      qos: 2        # MQTT QoS 2 = exactly-once (matches RELIABLE DDS)
+
+    - ros2_topic: /joint_states
+      mqtt_topic: wia/robot/{robot_id}/joints
+      qos: 0        # MQTT QoS 0 = at-most-once (matches BEST_EFFORT DDS)
+      rate_limit_hz: 5   # downsample from 50 Hz to 5 Hz for clinical dashboard</code></pre>
+
+    <h2>4.6 Troubleshooting DDS Discovery</h2>
+    <pre><code># Verify topic discovery
+ros2 topic list
+ros2 topic info /joint_states --verbose
+ros2 topic hz /joint_states        # expect ~50 Hz
+
+# Check DDS participant count
+ros2 multicast receive              # test multicast reachability
+ros2 daemon status                  # is the ROS 2 daemon running?
+
+# Force unicast if multicast blocked (hospital networks often block multicast)
+export RMW_FASTRTPS_USE_QOS_FROM_XML=1
+export FASTRTPS_DEFAULT_PROFILES_FILE=/opt/wia_robot/dds/unicast_profiles.xml</code></pre>
+
+    <footer><p>WIA Robot Standard · Chapter 4 · © 2026 WIA</p></footer>
+</body>
+</html>

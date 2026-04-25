@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 데이터 형식과 로봇 모델 — WIA 로봇</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제2장: 데이터 형식과 로봇 모델</h1>
+
+    <h2>2.1 URDF — 통합 로봇 기술 형식</h2>
+    <p>
+        <strong>URDF</strong>(Unified Robot Description Format)는 ROS 2에서 로봇의 기구학·동역학 모델을 기술하는 표준 XML 스키마입니다. <em>링크</em>(강체)와 <em>관절</em>(운동학적 구속 조건)로 구성되며, MoveIt 2 충돌 검사, RViz 시각화, 동작 계획에 사용됩니다.
+    </p>
+    <pre><code>&lt;robot name="wia_exoskeleton"&gt;
+  &lt;link name="pelvis"&gt;
+    &lt;inertial&gt;
+      &lt;mass value="5.0"/&gt;
+      &lt;inertia ixx="0.08" ixy="0" ixz="0" iyy="0.06" iyz="0" izz="0.04"/&gt;
+    &lt;/inertial&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size="0.35 0.25 0.1"/&gt;&lt;/geometry&gt;
+      &lt;material name="wia_orange"&gt;&lt;color rgba="0.976 0.451 0.086 1"/&gt;&lt;/material&gt;
+    &lt;/visual&gt;
+  &lt;/link&gt;
+
+  &lt;joint name="hip_l" type="revolute"&gt;
+    &lt;parent link="pelvis"/&gt;
+    &lt;child link="thigh_l"/&gt;
+    &lt;axis xyz="0 1 0"/&gt;
+    &lt;limit lower="-0.35" upper="1.0" effort="120" velocity="1.5"/&gt;
+    &lt;dynamics damping="2.0" friction="0.5"/&gt;
+  &lt;/joint&gt;
+&lt;/robot&gt;</code></pre>
+
+    <h2>2.2 XACRO — XML 매크로 확장</h2>
+    <p>
+        XACRO는 매개변수화된 매크로로 URDF를 확장해 좌우 다리/팔 템플릿 재사용을 가능하게 합니다. 국내 외골격 제조사(큐렉소, 현대로보틱스)의 모델은 XACRO 기반으로 WIA 표준 저장소에 기여될 수 있습니다.
+    </p>
+    <pre><code>&lt;xacro:macro name="leg" params="side reflect"&gt;
+  &lt;link name="thigh_${side}"&gt;...&lt;/link&gt;
+  &lt;link name="shank_${side}"&gt;...&lt;/link&gt;
+  &lt;joint name="knee_${side}" type="revolute"&gt;
+    &lt;parent link="thigh_${side}"/&gt;
+    &lt;child link="shank_${side}"/&gt;
+    &lt;axis xyz="0 1 0"/&gt;
+    &lt;limit lower="-1.57" upper="0.1" effort="100" velocity="2.0"/&gt;
+  &lt;/joint&gt;
+&lt;/xacro:macro&gt;
+
+&lt;xacro:leg side="l" reflect="1"/&gt;
+&lt;xacro:leg side="r" reflect="-1"/&gt;</code></pre>
+
+    <h2>2.3 관절 상태 스키마 (sensor_msgs/JointState)</h2>
+    <p>
+        로봇 관절 피드백의 기본 ROS 2 메시지 타입은 <code>sensor_msgs/msg/JointState</code>입니다. WIA-ROBOT은 BEST_EFFORT QoS로 최대 50 Hz에서 <code>/joint_states</code> 토픽에 발행합니다.
+    </p>
+    <pre><code>std_msgs/Header header
+string[]  name        # URDF와 일치하는 관절 이름
+float64[] position    # 라디안 (회전 관절) / 미터 (직선 관절)
+float64[] velocity    # rad/s 또는 m/s
+float64[] effort      # N·m 또는 N</code></pre>
+    <p>
+        WIA Phase 1 JSON 직렬화는 이를 <code>robot_id</code>(UUID), <code>seq</code>(단조 증가 카운터), <code>safety</code>(비상 정지·워치독 상태) 객체로 감싸는 타입 있는 봉투 형식으로 제공합니다.
+    </p>
+
+    <h2>2.4 IMU 데이터 (sensor_msgs/Imu)</h2>
+    <p>
+        외골격의 균형 제어에 필수적인 관성 측정 장치(IMU) 데이터는 <code>sensor_msgs/msg/Imu</code>로 발행됩니다. 국내 외골격 제품에서는 Xsens MTi-3, InvenSense ICM-42688-P 등이 주로 사용되며, <code>imu_filter_madgwick</code> ROS 2 패키지로 쿼터니언 방향을 필터링합니다.
+    </p>
+    <pre><code>std_msgs/Header header
+geometry_msgs/Quaternion orientation
+float64[9] orientation_covariance   # 위치[0]=-1이면 미제공
+geometry_msgs/Vector3 angular_velocity
+geometry_msgs/Vector3 linear_acceleration</code></pre>
+
+    <h2>2.5 힘/토크 데이터 (ISO 15066)</h2>
+    <p>
+        협동 로봇 안전(ISO 15066)을 위해 WIA-ROBOT은 6축 힘/토크 센서에서 1 kHz로 <code>geometry_msgs/msg/WrenchStamped</code>를 발행합니다. ISO 15066 표 A.1 접촉 한계: 흉부·등 — 과도 접촉력 140 N, 준정적 65 N. 이 한계 초과 시 Category 0 정지 트리거.
+    </p>
+    <pre><code>geometry_msgs/Wrench wrench
+  geometry_msgs/Vector3 force   # Fx, Fy, Fz (뉴턴)
+  geometry_msgs/Vector3 torque  # Tx, Ty, Tz (N·m)</code></pre>
+
+    <h2>2.6 근전도(sEMG) / 의수 제어 신호</h2>
+    <p>
+        표면 근전도(sEMG) 기반 의수·외골격 제어를 위해 WIA-ROBOT은 커스텀 메시지 <code>wia_robot_msgs/msg/EmgArray</code>를 정의합니다. 국내 연구기관(서울대 바이오로보틱스 연구실, KAIST 로봇학과)이 사용하는 Delsys Trigno IM 시스템(16채널, 2 kHz)과 호환됩니다. Hudgins(1993) 특징 집합(MAV, ZC, SSC, WL) 기반 패턴 인식 분류기를 위해 최소 2 kHz 샘플링 레이트를 권장합니다.
+    </p>
+    <pre><code>uint8 num_channels           # 8 (Thalmic) 또는 16 (Delsys Trigno)
+float32[] raw_uv             # 원시 근전도 (마이크로볼트)
+float32[] rms_uv             # 200 ms RMS 윈도우
+float32[] mav                # 평균 절댓값 윈도우
+string[]  electrode_labels   # ["FCR","ECR","BB","TB","FDS"...]</code></pre>
+
+    <h2>2.7 FHIR R5 임상 데이터 연동</h2>
+    <p>
+        로봇 보조 재활의 임상 결과는 HL7 FHIR R5 리소스로 표현됩니다. 국내 대형 병원(서울아산, 삼성서울, 세브란스)의 전자의무기록(EMR) 시스템은 FHIR API를 지원하기 시작했으며, 보건복지부 디지털 헬스케어 로드맵(2025–2027)도 FHIR R5 채택을 권고하고 있습니다.
+    </p>
+    <pre><code>{
+  "resourceType": "Observation",
+  "status": "final",
+  "code": {"coding": [{"system": "http://loinc.org",
+                        "code": "80316-3",
+                        "display": "보행 속도 [거리/시간]"}]},
+  "subject": {"reference": "Patient/환자-001"},
+  "device": {"reference": "Device/wia-exoskeleton-042"},
+  "valueQuantity": {"value": 0.72, "unit": "m/s"}
+}</code></pre>
+
+    <footer><p>WIA 로봇 표준 · 제2장 · © 2026 WIA</p></footer>
+</body>
+</html>

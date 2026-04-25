@@ -16,7 +16,7 @@
 
 ---
 
-**弘益人間** - *Benefit All Humanity*
+**홍익인간 (弘益人間)** - *Benefit All Humanity*
 
 </div>
 
@@ -374,7 +374,7 @@ MIT License - This standard belongs to humanity.
 
 <div align="center">
 
-🤟 **弘益人間** - Benefit All Humanity
+🤟 **홍익인간 (弘益人間)** - Benefit All Humanity
 
 *다시 걸을 수 있는 기회를 더 많은 사람들에게*
 
