@@ -1151,7 +1151,7 @@ Content-Type: application/json
     "dewar.alert.critical",
     "emergency.activated"
   ],
-  "secret": "whsec_7f8d9e0a1b2c3d4e5f6g7h8i9j0k1l2m"
+  "secret": "EXAMPLE_WEBHOOK_SECRET_REPLACE_ME"
 }
 ```
 
