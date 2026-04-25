@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 실제 응용 사례 | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .case-study{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:25px 0;border-left:4px solid var(--ai-color)}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>7장: 실제 응용 사례</h1>
+
+        <h2>7.1 실제 센서 융합</h2>
+        <p>센서 융합은 이론적 개념에서 수많은 산업에 배포된 필수 기술로 발전했습니다. 이 장에서는 다중 센서 통합이 개별 센서만으로는 달성할 수 없는 중요한 기능을 제공하는 실제 응용 프로그램을 탐색합니다.</p>
+
+        <p>각 응용 분야는 고유한 과제를 제시합니다: 다른 센서 조합, 다양한 환경 조건, 뚜렷한 신뢰성 요구 사항 및 특정 규제 제약. 이러한 실제 구현을 이해하면 새로운 컨텍스트에서 센서 융합 시스템을 설계하고 배포하는 데 귀중한 통찰력을 얻을 수 있습니다.</p>
+
+        <h2>7.2 자율 주행차</h2>
+        <p>자율 주행차는 센서 융합 기술의 가장 까다로운 응용 프로그램으로, 다양한 조건에서 강력한 인식을 요구하면서 안전에 중요한 성능을 유지해야 합니다:</p>
+
+        <h3>센서 구성</h3>
+        <table>
+            <tr>
+                <th>센서</th>
+                <th>수량</th>
+                <th>커버리지</th>
+                <th>주요 기능</th>
+            </tr>
+            <tr>
+                <td><strong>카메라</strong></td>
+                <td>8-12개</td>
+                <td>360도 서라운드 뷰</td>
+                <td>객체 분류, 차선 감지, 교통 표지판</td>
+            </tr>
+            <tr>
+                <td><strong>LiDAR</strong></td>
+                <td>1-5개</td>
+                <td>장거리 3D 매핑</td>
+                <td>정밀 거리 측정, 3D 구조</td>
+            </tr>
+            <tr>
+                <td><strong>레이더</strong></td>
+                <td>4-6개</td>
+                <td>전면, 후면, 코너</td>
+                <td>속도 감지, 전천후 작동</td>
+            </tr>
+            <tr>
+                <td><strong>초음파</strong></td>
+                <td>12개</td>
+                <td>근접</td>
+                <td>주차 지원, 근거리 장애물 감지</td>
+            </tr>
+            <tr>
+                <td><strong>GNSS/IMU</strong></td>
+                <td>1개</td>
+                <td>전역 위치</td>
+                <td>위치 추정, 추측 항법</td>
+            </tr>
+        </table>
+
+        <pre><code>class AutonomousVehicleFusion:
+    """
+    자율 주행차를 위한 프로덕션급 센서 융합
+
+    우아한 성능 저하를 통한 중복 인식 구현
+    """
+    def __init__(self, config):
+        self.config = config
+
+        # 다중 모달 인식 파이프라인
+        self.camera_pipeline = CameraPerceptionPipeline(config.camera)
+        self.lidar_pipeline = LiDARPerceptionPipeline(config.lidar)
+        self.radar_pipeline = RadarPerceptionPipeline(config.radar)
+
+        # 위치 추정 융합
+        self.localization = LocalizationFusion(config.localization)
+
+        # 다중 센서 융합을 통한 객체 추적
+        self.tracker = MultiSensorTracker(config.tracking)
+
+    def process_frame(self, sensor_data, timestamp):
+        """
+        센서 데이터 프레임 처리
+
+        융합된 인식 출력 반환
+        """
+        # 인식 파이프라인 병렬 실행
+        camera_detections = self.camera_pipeline.detect(sensor_data['cameras'])
+        lidar_detections = self.lidar_pipeline.detect(sensor_data['lidar'])
+        radar_detections = self.radar_pipeline.detect(sensor_data['radar'])
+
+        # 위치 추정 업데이트
+        pose = self.localization.update(
+            sensor_data['gnss'],
+            sensor_data['imu'],
+            sensor_data['wheel_odometry'],
+            lidar_detections['scan_matching_pose']
+        )
+
+        # 감지를 트랙으로 융합
+        tracks = self.tracker.update(
+            camera_detections,
+            lidar_detections,
+            radar_detections,
+            pose,
+            timestamp
+        )
+
+        return {
+            'pose': pose,
+            'tracks': tracks,
+            'confidence': self.compute_perception_confidence(tracks)
+        }</code></pre>
+
+        <div class="case-study">
+            <h3>사례 연구: 카메라-LiDAR 융합을 통한 보행자 감지</h3>
+            <p><strong>과제:</strong> 다양한 조명 조건, 가려짐, 다양한 보행자 외모가 있는 도시 환경에서 보행자를 안정적으로 감지합니다.</p>
+            <p><strong>솔루션:</strong> 카메라 시맨틱 세그멘테이션과 LiDAR 3D 감지를 융합합니다. 카메라는 분류를 위한 풍부한 외관 특징을 제공하고 LiDAR는 정확한 3D 위치 추정을 제공합니다.</p>
+            <p><strong>결과:</strong> 단일 센서 접근 방식에 비해 감지율 15% 향상, 오탐 40% 감소. 카메라만으로는 어려운 황혼 조건에서 중요한 개선.</p>
+        </div>
+
+        <h2>7.3 모바일 로봇공학 및 SLAM</h2>
+        <p>모바일 로봇은 GPS가 거부된 환경에서 SLAM(동시 위치 추정 및 지도 작성)을 위해 센서 융합에 의존합니다:</p>
+
+        <pre><code>class VisualInertialSLAM:
+    """
+    센서 융합을 통한 시각-관성 SLAM
+
+    강건한 위치 추정을 위해 카메라, IMU, 휠 오도메트리 결합
+    """
+    def __init__(self, config):
+        # 특징 추적기
+        self.feature_tracker = FeatureTracker(config.features)
+
+        # IMU 사전 적분
+        self.imu_preintegrator = IMUPreintegrator(config.imu)
+
+        # 그래프 최적화 백엔드
+        self.graph = FactorGraph()
+
+        # 키프레임 관리
+        self.keyframes = []
+        self.current_pose = np.eye(4)
+
+    def process_imu(self, imu_measurement):
+        """
+        고속 IMU 측정 처리
+        """
+        self.imu_preintegrator.integrate(
+            imu_measurement.accel,
+            imu_measurement.gyro,
+            imu_measurement.dt
+        )
+
+        # IMU 속도로 자세 추정 전파
+        self.current_pose = self.propagate_pose(
+            self.current_pose,
+            self.imu_preintegrator.delta_pose
+        )
+
+    def process_camera(self, image, timestamp):
+        """
+        시각-관성 융합으로 카메라 키프레임 처리
+        """
+        # 특징 추적
+        features = self.feature_tracker.track(image)
+
+        if self.is_keyframe(features):
+            # 새 키프레임 생성
+            keyframe = Keyframe(
+                pose=self.current_pose.copy(),
+                features=features,
+                timestamp=timestamp
+            )
+
+            # 키프레임 간 IMU 팩터 추가
+            if len(self.keyframes) > 0:
+                imu_factor = self.imu_preintegrator.get_factor()
+                self.graph.add_factor(
+                    IMUFactor(
+                        self.keyframes[-1].id,
+                        keyframe.id,
+                        imu_factor
+                    )
+                )
+
+            self.keyframes.append(keyframe)
+            self.imu_preintegrator.reset()
+
+            # 그래프 최적화
+            if len(self.keyframes) % 5 == 0:
+                self.optimize()
+
+    def get_map(self):
+        """
+        랜드마크 및 궤적이 포함된 현재 지도 반환
+        """
+        return {
+            'trajectory': [kf.pose for kf in self.keyframes],
+            'landmarks': self.graph.get_landmarks()
+        }</code></pre>
+
+        <h3>로봇 내비게이션 응용</h3>
+        <table>
+            <tr>
+                <th>응용</th>
+                <th>센서</th>
+                <th>주요 과제</th>
+                <th>융합 접근 방식</th>
+            </tr>
+            <tr>
+                <td><strong>창고 AMR</strong></td>
+                <td>2D LiDAR, 휠 인코더, IMU</td>
+                <td>동적 장애물, 반복 환경</td>
+                <td>파티클 필터 SLAM, 반사판 기반 위치 추정</td>
+            </tr>
+            <tr>
+                <td><strong>서비스 로봇</strong></td>
+                <td>RGB-D 카메라, IMU, 범퍼 센서</td>
+                <td>인간 상호작용, 가구 변경</td>
+                <td>시맨틱 랜드마크를 사용한 시각 SLAM</td>
+            </tr>
+            <tr>
+                <td><strong>농업 로봇</strong></td>
+                <td>RTK-GPS, 스테레오 카메라, IMU</td>
+                <td>GPS 다중 경로, 작물 가려짐</td>
+                <td>행 감지를 통한 GPS-시각-관성 융합</td>
+            </tr>
+            <tr>
+                <td><strong>검사 드론</strong></td>
+                <td>스테레오 카메라, LiDAR, IMU, 기압계</td>
+                <td>GPS 거부, 근접 비행</td>
+                <td>깊이 향상 장애물 회피를 통한 VIO</td>
+            </tr>
+        </table>
+
+        <h2>7.4 항공우주 및 항공</h2>
+        <p>항공 응용 프로그램은 가장 높은 수준의 신뢰성을 요구하며 많은 센서 융합 기술을 개척했습니다:</p>
+
+        <pre><code>class IntegratedNavigationSystem:
+    """
+    무결성 모니터링이 포함된 항공급 INS/GPS 융합
+
+    안전에 중요한 내비게이션을 위한 결함 감지 및 제외 구현
+    """
+    def __init__(self, config):
+        # 내비게이션급 IMU
+        self.imu = NavigationIMU(config.imu)
+
+        # 다중 위성 시스템 GNSS 수신기
+        self.gnss = GNSSReceiver(config.gnss)
+
+        # 항공 데이터 시스템
+        self.air_data = AirDataSystem(config.air_data)
+
+        # 융합 필터
+        self.filter = FederatedKalmanFilter(
+            num_channels=4,
+            state_dim=15
+        )
+
+        # 무결성 모니터
+        self.integrity = IntegrityMonitor(config.integrity)
+
+    def navigate(self, measurements):
+        """
+        무결성이 있는 내비게이션 솔루션 계산
+        """
+        # IMU 기계화 (고속)
+        imu_solution = self.imu.mechanize(measurements['imu'])
+
+        # GNSS 처리
+        gnss_solution = self.gnss.process(measurements['gnss'])
+
+        # 연합 필터 업데이트
+        nav_solution = self.filter.update({
+            'imu': imu_solution,
+            'gnss': gnss_solution,
+            'air_data': measurements['air_data']
+        })
+
+        # 보호 수준 계산
+        protection_levels = self.integrity.compute_protection_levels(
+            self.filter.get_geometry(),
+            self.filter.get_residuals()
+        )
+
+        return {
+            'position': nav_solution['position'],
+            'velocity': nav_solution['velocity'],
+            'attitude': nav_solution['attitude'],
+            'horizontal_protection_level': protection_levels['hpl'],
+            'vertical_protection_level': protection_levels['vpl'],
+            'integrity_status': 'OK'
+        }</code></pre>
+
+        <h2>7.5 의료 및 웨어러블</h2>
+        <p>의료 응용 프로그램의 센서 융합은 진단 정확도를 향상시키고 지속적인 건강 모니터링을 가능하게 합니다:</p>
+
+        <pre><code>class WearableHealthMonitor:
+    """
+    융합을 통한 다중 센서 건강 모니터링
+
+    포괄적인 건강 평가를 위해 여러 생리학적 센서 결합
+    """
+    def __init__(self):
+        # 센서 인터페이스
+        self.ppg = PPGSensor()           # 광혈류측정
+        self.ecg = ECGSensor()           # 심전도
+        self.accelerometer = Accelerometer()
+        self.temperature = TemperatureSensor()
+
+        # 융합 알고리즘
+        self.hr_fusion = HeartRateFusion()
+        self.activity_classifier = ActivityClassifier()
+
+    def process_continuous(self, sensor_data):
+        """
+        다중 센서 융합을 통한 지속적인 건강 모니터링
+        """
+        # 모션 센서에서 활동 인식
+        activity = self.activity_classifier.classify(
+            sensor_data['accel'],
+            sensor_data['gyro']
+        )
+
+        # PPG 및 ECG에서 융합된 심박수
+        heart_rate = self.hr_fusion.fuse(
+            ppg_hr=self.ppg.extract_hr(sensor_data['ppg']),
+            ecg_hr=self.ecg.extract_hr(sensor_data['ecg']),
+            activity=activity,
+            motion=sensor_data['accel']
+        )
+
+        # 스트레스 감지를 위한 심박변이도
+        hrv_features = self.ecg.extract_hrv(sensor_data['ecg'])
+
+        return {
+            'heart_rate': heart_rate,
+            'heart_rate_variability': hrv_features,
+            'activity': activity,
+            'skin_temperature': sensor_data['temperature']
+        }</code></pre>
+
+        <h2>7.6 스마트 시티 및 인프라</h2>
+        <p>도시 환경은 교통 관리, 환경 모니터링 및 공공 안전을 위해 센서 융합의 혜택을 받습니다:</p>
+
+        <pre><code>class SmartIntersectionFusion:
+    """
+    지능형 교통 교차로를 위한 다중 센서 융합
+
+    포괄적인 교통 모니터링을 위해 카메라, 레이더, 유도 루프 결합
+    """
+    def __init__(self, intersection_config):
+        self.config = intersection_config
+
+        # 센서 시스템
+        self.cameras = [Camera(c) for c in intersection_config['cameras']]
+        self.radars = [Radar(r) for r in intersection_config['radars']]
+        self.loop_detectors = intersection_config['loop_detectors']
+
+        # 차량 추적기
+        self.tracker = MultiObjectTracker(max_age=30)
+
+    def process_sensors(self):
+        """
+        모든 교차로 센서 융합
+        """
+        # 카메라 감지 (차량, 보행자, 자전거)
+        camera_detections = []
+        for cam in self.cameras:
+            dets = cam.detect_objects()
+            camera_detections.extend(cam.project_to_ground(dets))
+
+        # 레이더 감지 (속도 포함 차량)
+        radar_detections = []
+        for radar in self.radars:
+            radar_detections.extend(radar.detect())
+
+        # 융합 및 추적
+        fused_detections = self.fuse_detections(
+            camera_detections,
+            radar_detections
+        )
+
+        tracks = self.tracker.update(fused_detections)
+
+        return {
+            'vehicle_tracks': tracks,
+            'queue_lengths': self.estimate_queue_lengths(tracks),
+            'pedestrian_presence': self.detect_pedestrians(camera_detections)
+        }</code></pre>
+
+        <h2>7.7 AR/VR 및 소비자 전자제품</h2>
+        <p>스마트폰과 확장 현실 장치는 향상된 사용자 경험을 위해 여러 센서를 결합합니다:</p>
+
+        <table>
+            <tr>
+                <th>기능</th>
+                <th>사용 센서</th>
+                <th>융합 알고리즘</th>
+            </tr>
+            <tr>
+                <td><strong>장치 방향</strong></td>
+                <td>가속도계, 자이로스코프, 자력계</td>
+                <td>상보 필터, Madgwick/Mahony</td>
+            </tr>
+            <tr>
+                <td><strong>걸음 수 계산</strong></td>
+                <td>가속도계, 기압계</td>
+                <td>고도 검증을 통한 피크 감지</td>
+            </tr>
+            <tr>
+                <td><strong>실내 위치</strong></td>
+                <td>WiFi, 블루투스, IMU, 기압계</td>
+                <td>지도 제약이 있는 파티클 필터</td>
+            </tr>
+            <tr>
+                <td><strong>ARKit/ARCore</strong></td>
+                <td>카메라, IMU, 깊이</td>
+                <td>시각-관성 오도메트리 (VIO)</td>
+            </tr>
+        </table>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>자율 주행차는 강력한 360도 인식을 위해 카메라, LiDAR, 레이더, GPS/IMU를 결합합니다</li>
+                <li>모바일 로봇공학은 드리프트 보정을 가능하게 하는 센서 융합으로 GPS 거부 내비게이션을 위해 시각-관성 SLAM을 사용합니다</li>
+                <li>항공 응용 프로그램은 현재 센서 융합 시스템 전체에서 사용되는 무결성 모니터링 기술을 개척했습니다</li>
+                <li>의료 웨어러블은 포괄적인 건강 모니터링을 위해 여러 생리학적 센서를 융합합니다</li>
+                <li>스마트 시티 인프라는 지능형 교통 관리를 위해 카메라, 레이더, 루프를 결합합니다</li>
+                <li>AR/VR 시스템은 별도의 빠르고 정확한 처리 경로가 있는 초저지연 융합이 필요합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>자율 주행차에 여러 겹치는 센서 모달리티가 필요한 이유는 무엇입니까?</li>
+                <li>시각-관성 SLAM이 카메라와 IMU 데이터를 어떻게 결합하는지 설명하세요.</li>
+                <li>항공에서 무결성 모니터링이란 무엇입니까? 보호 수준과 경보 한계는 어떻게 작동합니까?</li>
+                <li>의료 웨어러블용 센서 융합 시스템을 설계하세요. 어떤 센서를 포함하고 그 이유는?</li>
+                <li>스마트 교차로가 카메라와 레이더 감지를 어떻게 융합합니까?</li>
+                <li>AR/VR 시스템에 별도의 빠르고 정확한 추적 경로가 필요한 이유는 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+        </div>
+
+        </div>
+</body>
+</html>

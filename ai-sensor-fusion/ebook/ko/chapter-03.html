@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 칼만 필터링 및 상태 추정 | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .formula{background:var(--bg-tertiary);padding:15px;border-radius:5px;margin:15px 0;font-family:monospace;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>3장: 칼만 필터링 및 상태 추정</h1>
+
+        <h2>3.1 칼만 필터 소개</h2>
+        <p>칼만 필터는 센서 융합에서 가장 중요하고 널리 사용되는 알고리즘입니다. 1960년 루돌프 칼만이 개발한 이 알고리즘은 노이즈가 있는 측정에서 동적 시스템의 상태를 최적으로 추정합니다.</p>
+
+        <p>칼만 필터는 두 단계로 작동합니다: 예측 단계에서 시스템 모델을 사용하여 다음 상태를 예측하고, 업데이트 단계에서 새로운 측정을 사용하여 예측을 수정합니다. 이 재귀적 접근 방식은 계산적으로 효율적이며 실시간 응용 프로그램에 이상적입니다.</p>
+
+        <h2>3.2 선형 칼만 필터</h2>
+        <p>선형 칼만 필터는 선형 시스템 및 측정 모델에 적용됩니다:</p>
+
+        <div class="formula">
+            상태 전이: x_k = F * x_{k-1} + B * u_k + w_k<br>
+            측정 모델: z_k = H * x_k + v_k<br>
+            여기서 w_k ~ N(0, Q), v_k ~ N(0, R)
+        </div>
+
+        <pre><code>class KalmanFilter:
+    """
+    표준 선형 칼만 필터 구현
+
+    선형 시스템 및 측정 모델에 대한 최적 상태 추정
+    """
+    def __init__(self, state_dim, measurement_dim, control_dim=0):
+        self.state_dim = state_dim
+        self.measurement_dim = measurement_dim
+        self.control_dim = control_dim
+
+        # 상태 및 공분산 초기화
+        self.x = np.zeros(state_dim)           # 상태 벡터
+        self.P = np.eye(state_dim)             # 상태 공분산
+
+        # 시스템 행렬
+        self.F = np.eye(state_dim)             # 상태 전이 행렬
+        self.H = np.zeros((measurement_dim, state_dim))  # 측정 행렬
+        self.Q = np.eye(state_dim)             # 프로세스 노이즈 공분산
+        self.R = np.eye(measurement_dim)       # 측정 노이즈 공분산
+
+        if control_dim > 0:
+            self.B = np.zeros((state_dim, control_dim))  # 제어 입력 행렬
+
+    def predict(self, u=None, dt=None):
+        """
+        예측 단계: 시스템 모델을 사용하여 상태 예측
+
+        x_pred = F * x + B * u
+        P_pred = F * P * F^T + Q
+        """
+        # 시간 간격에 따라 F 업데이트 (필요한 경우)
+        if dt is not None:
+            self.update_transition_matrix(dt)
+
+        # 상태 예측
+        self.x = self.F @ self.x
+
+        if u is not None and self.control_dim > 0:
+            self.x += self.B @ u
+
+        # 공분산 예측
+        self.P = self.F @ self.P @ self.F.T + self.Q
+
+        return self.x, self.P
+
+    def update(self, z):
+        """
+        업데이트 단계: 측정을 사용하여 예측 수정
+
+        K = P * H^T * (H * P * H^T + R)^{-1}  (칼만 이득)
+        x = x + K * (z - H * x)               (상태 업데이트)
+        P = (I - K * H) * P                   (공분산 업데이트)
+        """
+        # 혁신 (측정 잔차)
+        y = z - self.H @ self.x
+
+        # 혁신 공분산
+        S = self.H @ self.P @ self.H.T + self.R
+
+        # 칼만 이득
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+
+        # 상태 업데이트
+        self.x = self.x + K @ y
+
+        # 공분산 업데이트 (Joseph 형태 - 수치적으로 안정)
+        I_KH = np.eye(self.state_dim) - K @ self.H
+        self.P = I_KH @ self.P @ I_KH.T + K @ self.R @ K.T
+
+        return self.x, self.P, y, S
+
+    def update_transition_matrix(self, dt):
+        """
+        시간 간격에 따라 상태 전이 행렬 업데이트
+
+        등속 모델 예:
+        [x]   [1 dt 0  0] [x]
+        [vx] = [0  1 0  0] [vx]
+        [y]   [0  0 1 dt] [y]
+        [vy]  [0  0 0  1] [vy]
+        """
+        # 등속 모델 (2D 위치 + 속도)
+        if self.state_dim == 4:
+            self.F = np.array([
+                [1, dt, 0, 0],
+                [0, 1,  0, 0],
+                [0, 0,  1, dt],
+                [0, 0,  0, 1]
+            ])
+
+
+class ConstantVelocityTracker(KalmanFilter):
+    """
+    2D 등속 추적을 위한 칼만 필터
+
+    상태: [x, vx, y, vy]
+    측정: [x, y]
+    """
+    def __init__(self, process_noise=1.0, measurement_noise=1.0):
+        super().__init__(state_dim=4, measurement_dim=2)
+
+        # 측정 행렬: 위치만 관찰
+        self.H = np.array([
+            [1, 0, 0, 0],
+            [0, 0, 1, 0]
+        ])
+
+        # 노이즈 공분산
+        self.R = measurement_noise * np.eye(2)
+
+        # 프로세스 노이즈 (가속도 기반)
+        self.base_q = process_noise
+
+    def predict(self, dt):
+        # 전이 행렬 업데이트
+        self.F = np.array([
+            [1, dt, 0, 0],
+            [0, 1,  0, 0],
+            [0, 0,  1, dt],
+            [0, 0,  0, 1]
+        ])
+
+        # 프로세스 노이즈 (등가속 모델)
+        q = self.base_q
+        self.Q = np.array([
+            [dt**4/4, dt**3/2, 0,       0],
+            [dt**3/2, dt**2,   0,       0],
+            [0,       0,       dt**4/4, dt**3/2],
+            [0,       0,       dt**3/2, dt**2]
+        ]) * q
+
+        return super().predict()</code></pre>
+
+        <h2>3.3 확장 칼만 필터 (EKF)</h2>
+        <p>비선형 시스템에 대해 확장 칼만 필터는 비선형 함수를 선형화하여 처리합니다:</p>
+
+        <pre><code>class ExtendedKalmanFilter:
+    """
+    확장 칼만 필터 (EKF) 구현
+
+    비선형 시스템을 야코비안을 통해 선형화하여 처리
+    """
+    def __init__(self, state_dim, measurement_dim):
+        self.state_dim = state_dim
+        self.measurement_dim = measurement_dim
+
+        self.x = np.zeros(state_dim)
+        self.P = np.eye(state_dim)
+        self.Q = np.eye(state_dim) * 0.1
+        self.R = np.eye(measurement_dim) * 0.1
+
+    def predict(self, f, u=None, dt=1.0):
+        """
+        비선형 예측 단계
+
+        매개변수:
+        - f: 상태 전이 함수 f(x, u, dt)
+        """
+        # 비선형 상태 전이
+        if u is not None:
+            self.x = f(self.x, u, dt)
+        else:
+            self.x = f(self.x, dt)
+
+        # 야코비안 계산
+        F = self.compute_jacobian_f(f, self.x, u, dt)
+
+        # 공분산 예측
+        self.P = F @ self.P @ F.T + self.Q
+
+        return self.x, self.P
+
+    def update(self, z, h):
+        """
+        비선형 업데이트 단계
+
+        매개변수:
+        - z: 측정
+        - h: 측정 함수 h(x)
+        """
+        # 예측된 측정
+        z_pred = h(self.x)
+
+        # 야코비안 계산
+        H = self.compute_jacobian_h(h, self.x)
+
+        # 혁신
+        y = z - z_pred
+
+        # 혁신 공분산
+        S = H @ self.P @ H.T + self.R
+
+        # 칼만 이득
+        K = self.P @ H.T @ np.linalg.inv(S)
+
+        # 상태 업데이트
+        self.x = self.x + K @ y
+
+        # 공분산 업데이트
+        I_KH = np.eye(self.state_dim) - K @ H
+        self.P = I_KH @ self.P
+
+        return self.x, self.P
+
+    def compute_jacobian_f(self, f, x, u, dt, eps=1e-7):
+        """
+        상태 전이 함수의 야코비안 수치 계산
+        """
+        n = len(x)
+        F = np.zeros((n, n))
+
+        for i in range(n):
+            x_plus = x.copy()
+            x_minus = x.copy()
+            x_plus[i] += eps
+            x_minus[i] -= eps
+
+            if u is not None:
+                f_plus = f(x_plus, u, dt)
+                f_minus = f(x_minus, u, dt)
+            else:
+                f_plus = f(x_plus, dt)
+                f_minus = f(x_minus, dt)
+
+            F[:, i] = (f_plus - f_minus) / (2 * eps)
+
+        return F
+
+    def compute_jacobian_h(self, h, x, eps=1e-7):
+        """
+        측정 함수의 야코비안 수치 계산
+        """
+        n = len(x)
+        m = len(h(x))
+        H = np.zeros((m, n))
+
+        for i in range(n):
+            x_plus = x.copy()
+            x_minus = x.copy()
+            x_plus[i] += eps
+            x_minus[i] -= eps
+
+            H[:, i] = (h(x_plus) - h(x_minus)) / (2 * eps)
+
+        return H
+
+
+class RobotLocalizationEKF(ExtendedKalmanFilter):
+    """
+    로봇 위치 추정을 위한 EKF
+
+    상태: [x, y, theta]
+    측정: 랜드마크까지의 거리 및 방위각
+    """
+    def __init__(self):
+        super().__init__(state_dim=3, measurement_dim=2)
+
+    def motion_model(self, x, u, dt):
+        """
+        비선형 운동 모델
+
+        u = [v, omega] (속도, 각속도)
+        """
+        v, omega = u
+        theta = x[2]
+
+        if abs(omega) < 1e-6:
+            # 직선 운동
+            x_new = x.copy()
+            x_new[0] += v * dt * np.cos(theta)
+            x_new[1] += v * dt * np.sin(theta)
+        else:
+            # 원형 운동
+            x_new = np.array([
+                x[0] + v/omega * (np.sin(theta + omega*dt) - np.sin(theta)),
+                x[1] + v/omega * (np.cos(theta) - np.cos(theta + omega*dt)),
+                x[2] + omega * dt
+            ])
+
+        return x_new
+
+    def measurement_model(self, x, landmark):
+        """
+        비선형 측정 모델
+
+        랜드마크까지의 거리 및 방위각 반환
+        """
+        dx = landmark[0] - x[0]
+        dy = landmark[1] - x[1]
+
+        range_ = np.sqrt(dx**2 + dy**2)
+        bearing = np.arctan2(dy, dx) - x[2]
+
+        # 각도 정규화
+        bearing = np.arctan2(np.sin(bearing), np.cos(bearing))
+
+        return np.array([range_, bearing])</code></pre>
+
+        <h2>3.4 무향 칼만 필터 (UKF)</h2>
+        <p>무향 칼만 필터는 야코비안 계산 없이 비선형 시스템을 처리합니다:</p>
+
+        <pre><code>class UnscentedKalmanFilter:
+    """
+    무향 칼만 필터 (UKF) 구현
+
+    시그마 포인트를 사용하여 비선형 변환의 평균과 공분산 근사
+    """
+    def __init__(self, state_dim, measurement_dim, alpha=1e-3, beta=2, kappa=0):
+        self.n = state_dim
+        self.m = measurement_dim
+
+        # UKF 매개변수
+        self.alpha = alpha
+        self.beta = beta
+        self.kappa = kappa
+        self.lambda_ = alpha**2 * (self.n + kappa) - self.n
+
+        # 상태 및 공분산
+        self.x = np.zeros(state_dim)
+        self.P = np.eye(state_dim)
+        self.Q = np.eye(state_dim) * 0.1
+        self.R = np.eye(measurement_dim) * 0.1
+
+        # 가중치 계산
+        self._compute_weights()
+
+    def _compute_weights(self):
+        """
+        시그마 포인트 가중치 계산
+        """
+        n = self.n
+        lambda_ = self.lambda_
+
+        # 평균 가중치
+        self.Wm = np.zeros(2 * n + 1)
+        self.Wm[0] = lambda_ / (n + lambda_)
+        self.Wm[1:] = 1 / (2 * (n + lambda_))
+
+        # 공분산 가중치
+        self.Wc = self.Wm.copy()
+        self.Wc[0] += (1 - self.alpha**2 + self.beta)
+
+    def _compute_sigma_points(self, x, P):
+        """
+        시그마 포인트 생성
+        """
+        n = self.n
+        lambda_ = self.lambda_
+
+        # 스케일된 공분산의 제곱근
+        sqrt_P = np.linalg.cholesky((n + lambda_) * P)
+
+        # 시그마 포인트
+        sigma_points = np.zeros((2 * n + 1, n))
+        sigma_points[0] = x
+
+        for i in range(n):
+            sigma_points[i + 1] = x + sqrt_P[i]
+            sigma_points[n + i + 1] = x - sqrt_P[i]
+
+        return sigma_points
+
+    def predict(self, f, dt=1.0):
+        """
+        무향 변환을 사용한 예측 단계
+        """
+        # 시그마 포인트 생성
+        sigma_points = self._compute_sigma_points(self.x, self.P)
+
+        # 시그마 포인트 전파
+        sigma_points_pred = np.array([f(sp, dt) for sp in sigma_points])
+
+        # 예측된 평균
+        self.x = np.sum(self.Wm[:, np.newaxis] * sigma_points_pred, axis=0)
+
+        # 예측된 공분산
+        self.P = self.Q.copy()
+        for i, sp in enumerate(sigma_points_pred):
+            diff = sp - self.x
+            self.P += self.Wc[i] * np.outer(diff, diff)
+
+        return self.x, self.P
+
+    def update(self, z, h):
+        """
+        무향 변환을 사용한 업데이트 단계
+        """
+        # 시그마 포인트 생성
+        sigma_points = self._compute_sigma_points(self.x, self.P)
+
+        # 측정 공간으로 변환
+        z_sigma = np.array([h(sp) for sp in sigma_points])
+
+        # 예측된 측정 평균
+        z_pred = np.sum(self.Wm[:, np.newaxis] * z_sigma, axis=0)
+
+        # 측정 공분산 및 교차 공분산
+        Pzz = self.R.copy()
+        Pxz = np.zeros((self.n, self.m))
+
+        for i in range(2 * self.n + 1):
+            dz = z_sigma[i] - z_pred
+            dx = sigma_points[i] - self.x
+
+            Pzz += self.Wc[i] * np.outer(dz, dz)
+            Pxz += self.Wc[i] * np.outer(dx, dz)
+
+        # 칼만 이득
+        K = Pxz @ np.linalg.inv(Pzz)
+
+        # 상태 업데이트
+        self.x = self.x + K @ (z - z_pred)
+
+        # 공분산 업데이트
+        self.P = self.P - K @ Pzz @ K.T
+
+        return self.x, self.P</code></pre>
+
+        <h2>3.5 칼만 필터 비교</h2>
+        <table>
+            <tr>
+                <th>필터 유형</th>
+                <th>적용 범위</th>
+                <th>정확도</th>
+                <th>계산 복잡도</th>
+            </tr>
+            <tr>
+                <td><strong>KF</strong></td>
+                <td>선형 시스템</td>
+                <td>최적</td>
+                <td>O(n^3)</td>
+            </tr>
+            <tr>
+                <td><strong>EKF</strong></td>
+                <td>약한 비선형</td>
+                <td>좋음 (선형화 오차)</td>
+                <td>O(n^3) + 야코비안</td>
+            </tr>
+            <tr>
+                <td><strong>UKF</strong></td>
+                <td>강한 비선형</td>
+                <td>매우 좋음</td>
+                <td>O(n^3) (더 큰 상수)</td>
+            </tr>
+            <tr>
+                <td><strong>파티클 필터</strong></td>
+                <td>임의의 비선형/비가우시안</td>
+                <td>정확 (충분한 파티클)</td>
+                <td>O(N * n)</td>
+            </tr>
+        </table>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>칼만 필터는 예측-업데이트 사이클을 통해 최적의 상태 추정을 제공합니다</li>
+                <li>선형 칼만 필터는 선형 시스템에서 최적이며 분석적으로 유도됩니다</li>
+                <li>EKF는 야코비안을 통한 선형화로 비선형 시스템을 처리합니다</li>
+                <li>UKF는 시그마 포인트를 사용하여 야코비안 없이 비선형을 처리합니다</li>
+                <li>칼만 이득은 예측과 측정 사이의 최적 가중치를 결정합니다</li>
+                <li>공분산 행렬은 추정 불확실성을 추적합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>칼만 필터의 예측 단계와 업데이트 단계는 각각 무엇을 수행합니까?</li>
+                <li>칼만 이득의 물리적 의미는 무엇입니까?</li>
+                <li>EKF가 KF와 다른 점은 무엇입니까? 언제 EKF가 필요합니까?</li>
+                <li>UKF가 EKF보다 정확한 이유는 무엇입니까?</li>
+                <li>프로세스 노이즈 Q와 측정 노이즈 R의 역할은 무엇입니까?</li>
+                <li>Joseph 형태의 공분산 업데이트가 왜 수치적으로 더 안정적입니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+        </div>
+
+        </div>
+</body>
+</html>

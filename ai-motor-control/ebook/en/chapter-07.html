@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Advanced Control Techniques | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 7: Advanced Control Techniques</h1>
+
+        <h2>7.1 Introduction to Advanced Control</h2>
+        <p>While PID control and cascaded loops form the foundation of motor control, advanced techniques enable superior performance in demanding applications. These methods address limitations of classical control when dealing with nonlinearities, model uncertainties, multiple inputs/outputs, and complex performance objectives.</p>
+
+        <p>This chapter covers state-space control, model predictive control (MPC), sliding mode control, adaptive control, and observer design. These techniques are increasingly important as motor control systems integrate with AI and require higher precision, faster response, and greater robustness.</p>
+
+        <h2>7.2 State-Space Control</h2>
+        <p>State-space representation provides a powerful framework for analyzing and designing motor control systems, especially for multi-variable and higher-order systems:</p>
+
+        <h3>State-Space Model of DC Motor</h3>
+        <pre><code>// DC Motor State-Space Model
+// State vector: x = [theta, omega, i]^T (position, velocity, current)
+// Input: u = V (voltage)
+// Output: y = theta (position)
+
+State equations:
+dx/dt = A*x + B*u
+y = C*x
+
+where:
+A = [  0       1        0    ]
+    [  0    -B/J     Kt/J   ]
+    [  0   -Ke/L    -R/L    ]
+
+B = [  0  ]
+    [  0  ]
+    [ 1/L ]
+
+C = [ 1  0  0 ]
+
+Parameters:
+- J: Moment of inertia
+- B: Viscous friction coefficient
+- Kt: Torque constant
+- Ke: Back-EMF constant
+- R: Armature resistance
+- L: Armature inductance</code></pre>
+
+        <h3>State Feedback Control</h3>
+        <pre><code>// Full State Feedback Controller
+class StateSpaceController {
+private:
+    // System matrices
+    Matrix A, B, C;
+
+    // Feedback gain matrix (1 x n)
+    Matrix K;
+
+    // Reference gain for zero steady-state error
+    float N_bar;
+
+    // State vector
+    Vector x;
+
+    // State observer (if needed)
+    StateObserver* observer;
+
+public:
+    StateSpaceController(Matrix& A_sys, Matrix& B_sys, Matrix& C_sys) {
+        A = A_sys;
+        B = B_sys;
+        C = C_sys;
+
+        // Design feedback gains using pole placement or LQR
+        K = design_lqr_gains();
+        N_bar = compute_reference_scaling();
+    }
+
+    float compute_control(float reference, Vector& measured_state) {
+        // If full state not available, use observer
+        if (observer != nullptr) {
+            x = observer->estimate(measured_state);
+        } else {
+            x = measured_state;
+        }
+
+        // State feedback control law: u = N_bar*r - K*x
+        float u = N_bar * reference - K.dot(x);
+
+        return u;
+    }
+
+    Matrix design_lqr_gains() {
+        // Linear Quadratic Regulator design
+        // Minimize: J = integral(x'Qx + u'Ru) dt
+
+        Matrix Q = Matrix::identity(3) * 100;  // State penalty
+        Q(0,0) = 1000;  // Heavy penalty on position error
+
+        Matrix R = Matrix::identity(1) * 1;    // Control effort penalty
+
+        // Solve Algebraic Riccati Equation: A'P + PA - PBR^-1B'P + Q = 0
+        Matrix P = solve_are(A, B, Q, R);
+
+        // Optimal gain: K = R^-1 * B' * P
+        K = R.inverse() * B.transpose() * P;
+
+        return K;
+    }
+
+    float compute_reference_scaling() {
+        // N_bar ensures zero steady-state error for step reference
+        // N_bar = -1 / (C * (A - B*K)^-1 * B)
+        Matrix A_cl = A - B * K;
+        return -1.0f / (C * A_cl.inverse() * B)(0,0);
+    }
+};</code></pre>
+
+        <h2>7.3 Linear Quadratic Regulator (LQR)</h2>
+        <p>LQR provides optimal state feedback gains by minimizing a quadratic cost function:</p>
+
+        <div class="formula">J = integral from 0 to infinity of (x'Qx + u'Ru) dt</div>
+
+        <pre><code>// LQR Design for Motor Position Control
+class LQRMotorController {
+private:
+    // LQR gains for position control
+    float k_theta;   // Position gain
+    float k_omega;   // Velocity gain
+    float k_i;       // Current gain (if current measured)
+
+    // Integral augmentation for disturbance rejection
+    float k_integral;
+    float integral_error;
+
+    // Motor parameters
+    MotorParams params;
+
+public:
+    LQRMotorController(MotorParams& p) : params(p) {
+        // Design LQR with typical Q and R weights
+        design_gains();
+        integral_error = 0;
+    }
+
+    void design_gains() {
+        // State: [theta, omega]
+        // Q matrix: penalize position error heavily
+        float q11 = 10000.0f;  // Position error weight
+        float q22 = 100.0f;    // Velocity error weight
+
+        // R: control effort weight
+        float r = 1.0f;
+
+        // For second-order system, closed-form solution exists
+        // Using Bryson's rule as starting point
+        float omega_n = sqrt(params.Kt / (params.J * params.R));
+        float zeta = 0.7f;
+
+        // Resulting gains (approximate for second-order system)
+        k_theta = q11 / r;
+        k_omega = 2 * zeta * sqrt(k_theta * params.J / params.Kt);
+
+        // Integral gain for steady-state error elimination
+        k_integral = k_theta * 0.1f;
+    }
+
+    float compute(float theta_ref, float theta, float omega) {
+        // Position error
+        float error = theta_ref - theta;
+
+        // Integral error (with anti-windup)
+        integral_error += error * dt;
+        integral_error = clamp(integral_error, -max_integral, max_integral);
+
+        // LQR control law with integral augmentation
+        float voltage = k_theta * error - k_omega * omega + k_integral * integral_error;
+
+        return clamp(voltage, -max_voltage, max_voltage);
+    }
+
+    // Gain scheduling for varying operating points
+    void update_gains(float operating_speed) {
+        // Adjust gains based on operating condition
+        if (operating_speed > high_speed_threshold) {
+            // Reduce gains at high speed for stability
+            k_theta *= 0.8f;
+            k_omega *= 1.2f;
+        }
+    }
+
+private:
+    float dt = 0.0001f;
+    float max_integral = 10.0f;
+    float max_voltage = 48.0f;
+    float high_speed_threshold = 3000.0f;  // RPM
+};</code></pre>
+
+        <h2>7.4 Model Predictive Control (MPC)</h2>
+        <p>MPC optimizes control over a future horizon while explicitly handling constraints, making it ideal for motor control with current, voltage, and position limits:</p>
+
+        <pre><code>// Model Predictive Controller for Motor Control
+class MPCMotorController {
+private:
+    // Prediction horizon
+    int N_horizon;
+
+    // Discrete-time system model
+    Matrix A_d, B_d, C_d;  // Discretized state-space
+
+    // Cost function weights
+    Matrix Q;  // State tracking weight
+    Matrix R;  // Control effort weight
+    Matrix P;  // Terminal cost weight
+
+    // Constraints
+    float u_min, u_max;      // Control limits (voltage)
+    float x_min[3], x_max[3]; // State limits
+    float du_max;             // Control rate limit
+
+    // QP solver
+    QPSolver qp;
+
+    // Previous control for rate limiting
+    float u_prev;
+
+public:
+    MPCMotorController(MotorParams& params, MPCConfig& config) {
+        N_horizon = config.horizon;
+
+        // Discretize continuous model
+        discretize_model(params, config.dt);
+
+        // Setup cost matrices
+        Q = config.Q;
+        R = config.R;
+        P = compute_terminal_cost();  // Lyapunov terminal cost
+
+        // Set constraints
+        u_min = -params.max_voltage;
+        u_max = params.max_voltage;
+        x_max[0] = params.max_position;
+        x_max[1] = params.max_velocity;
+        x_max[2] = params.max_current;
+
+        du_max = config.max_control_rate;
+        u_prev = 0;
+    }
+
+    float solve(Vector& x_current, Vector& x_reference) {
+        // Build QP problem
+        // minimize: sum_{k=0}^{N-1} (x_k - x_ref)'Q(x_k - x_ref) + u_k'R*u_k
+        //           + (x_N - x_ref)'P(x_N - x_ref)
+        // subject to: x_{k+1} = A_d*x_k + B_d*u_k
+        //             u_min <= u_k <= u_max
+        //             x_min <= x_k <= x_max
+        //             |u_k - u_{k-1}| <= du_max
+
+        // Construct prediction matrices
+        Matrix Phi, Gamma;
+        build_prediction_matrices(Phi, Gamma);
+
+        // QP cost: 0.5 * U' * H * U + f' * U
+        Matrix H = Gamma.transpose() * Q_bar * Gamma + R_bar;
+        Vector f = Gamma.transpose() * Q_bar * (Phi * x_current - X_ref);
+
+        // Constraint matrices
+        Matrix A_ineq;
+        Vector b_ineq;
+        build_constraint_matrices(A_ineq, b_ineq, x_current);
+
+        // Solve QP
+        Vector U_optimal = qp.solve(H, f, A_ineq, b_ineq);
+
+        // Apply first control only (receding horizon)
+        float u = U_optimal(0);
+        u_prev = u;
+
+        return u;
+    }
+
+    void build_prediction_matrices(Matrix& Phi, Matrix& Gamma) {
+        // Phi: relates current state to future states
+        // Gamma: relates control sequence to future states
+
+        int nx = A_d.rows();
+        int nu = B_d.cols();
+
+        Phi = Matrix::zeros(nx * N_horizon, nx);
+        Gamma = Matrix::zeros(nx * N_horizon, nu * N_horizon);
+
+        Matrix A_power = Matrix::identity(nx);
+
+        for (int i = 0; i < N_horizon; i++) {
+            A_power = A_power * A_d;
+
+            // Phi block
+            Phi.block(i * nx, 0, nx, nx) = A_power;
+
+            // Gamma blocks
+            Matrix A_j = Matrix::identity(nx);
+            for (int j = 0; j <= i; j++) {
+                Gamma.block(i * nx, j * nu, nx, nu) = A_j * B_d;
+                A_j = A_j * A_d;
+            }
+        }
+    }
+
+private:
+    void discretize_model(MotorParams& p, float dt);
+    Matrix compute_terminal_cost();
+    void build_constraint_matrices(Matrix& A, Vector& b, Vector& x);
+    Matrix Q_bar, R_bar;
+    Vector X_ref;
+};</code></pre>
+
+        <h3>MPC with Explicit Solution</h3>
+        <pre><code>// Explicit MPC using precomputed lookup table
+class ExplicitMPC {
+private:
+    // Polyhedral regions and corresponding control laws
+    struct Region {
+        Matrix A;  // Region: A*x <= b
+        Vector b;
+        Matrix K;  // Control law: u = K*x + k
+        Vector k;
+    };
+
+    vector&lt;Region&gt; regions;
+    int num_regions;
+
+public:
+    ExplicitMPC(const char* region_file) {
+        // Load precomputed regions from offline computation
+        load_regions(region_file);
+    }
+
+    float evaluate(Vector& x) {
+        // Find active region (point location)
+        for (int i = 0; i < num_regions; i++) {
+            if ((regions[i].A * x <= regions[i].b).all()) {
+                // Found region, apply affine control law
+                return (regions[i].K * x + regions[i].k)(0);
+            }
+        }
+
+        // Fallback if no region found (shouldn't happen)
+        return 0;
+    }
+
+    // Benefits: O(log N) lookup vs O(N^3) QP solve
+    // Suitable for high-frequency motor control (>10 kHz)
+};</code></pre>
+
+        <h2>7.5 Sliding Mode Control (SMC)</h2>
+        <p>Sliding mode control provides robustness to parameter variations and disturbances through high-frequency switching:</p>
+
+        <pre><code>// Sliding Mode Controller for Motor Position
+class SlidingModeController {
+private:
+    // Sliding surface parameters
+    float lambda;  // Surface slope (affects convergence speed)
+
+    // Control parameters
+    float eta;     // Reaching gain
+    float phi;     // Boundary layer thickness (for chattering reduction)
+
+    // Motor parameters (nominal values)
+    float J_nom, B_nom, Kt_nom;
+
+    // Disturbance bounds
+    float d_max;   // Maximum disturbance magnitude
+
+public:
+    SlidingModeController(MotorParams& params, SMCConfig& config) {
+        J_nom = params.J;
+        B_nom = params.B;
+        Kt_nom = params.Kt;
+
+        lambda = config.lambda;
+        eta = config.eta;
+        phi = config.phi;
+        d_max = config.disturbance_bound;
+    }
+
+    float compute(float theta_ref, float theta, float omega,
+                  float theta_ref_dot, float theta_ref_ddot) {
+        // Position and velocity errors
+        float e = theta - theta_ref;
+        float e_dot = omega - theta_ref_dot;
+
+        // Sliding surface: s = e_dot + lambda * e
+        float s = e_dot + lambda * e;
+
+        // Equivalent control (keeps system on sliding surface)
+        float u_eq = (J_nom / Kt_nom) * (theta_ref_ddot - lambda * e_dot)
+                   + (B_nom / Kt_nom) * omega;
+
+        // Switching control (drives system to sliding surface)
+        float u_sw = (J_nom / Kt_nom) * (eta + d_max) * sat(s / phi);
+
+        // Total control
+        float u = u_eq + u_sw;
+
+        return u;
+    }
+
+    // Saturation function for chattering reduction
+    float sat(float x) {
+        if (x > 1.0f) return 1.0f;
+        if (x < -1.0f) return -1.0f;
+        return x;
+    }
+
+    // Sign function (pure sliding mode - more chattering)
+    float sign(float x) {
+        if (x > 0) return 1.0f;
+        if (x < 0) return -1.0f;
+        return 0.0f;
+    }
+};
+
+// Super-Twisting Algorithm (reduces chattering further)
+class SuperTwistingController {
+private:
+    float alpha, beta;  // Gains
+    float z;            // Integral term state
+
+public:
+    SuperTwistingController(float bound) {
+        // Gain selection based on disturbance bound
+        alpha = 1.5f * sqrt(bound);
+        beta = 1.1f * bound;
+        z = 0;
+    }
+
+    float compute(float s, float dt) {
+        // Super-twisting algorithm
+        // u = -alpha * |s|^0.5 * sign(s) + z
+        // z_dot = -beta * sign(s)
+
+        float s_sqrt = sqrt(fabs(s));
+        float u = -alpha * s_sqrt * sign(s) + z;
+
+        // Integrate
+        z += -beta * sign(s) * dt;
+
+        return u;
+    }
+
+    float sign(float x) {
+        return (x > 0) ? 1.0f : ((x < 0) ? -1.0f : 0.0f);
+    }
+};</code></pre>
+
+        <h2>7.6 Adaptive Control</h2>
+        <p>Adaptive control adjusts controller parameters online to compensate for unknown or varying system parameters:</p>
+
+        <pre><code>// Model Reference Adaptive Control (MRAC)
+class MRACController {
+private:
+    // Reference model parameters (desired closed-loop behavior)
+    float omega_m;  // Natural frequency
+    float zeta_m;   // Damping ratio
+
+    // Adaptive gains
+    float theta_hat[4];  // Parameter estimates
+
+    // Adaptation rates
+    float gamma[4];      // Learning rates
+
+    // Reference model state
+    float x_m, x_m_dot;
+
+    // Filters for parameter estimation
+    float w1, w2;  // Filtered signals
+
+public:
+    MRACController(MRACConfig& config) {
+        omega_m = config.reference_omega;
+        zeta_m = config.reference_zeta;
+
+        // Initialize parameter estimates
+        for (int i = 0; i < 4; i++) {
+            theta_hat[i] = config.initial_estimates[i];
+            gamma[i] = config.adaptation_rates[i];
+        }
+
+        x_m = 0;
+        x_m_dot = 0;
+    }
+
+    float compute(float r, float y, float y_dot, float dt) {
+        // Reference model: x_m_ddot + 2*zeta_m*omega_m*x_m_dot + omega_m^2*x_m = omega_m^2*r
+        float x_m_ddot = omega_m * omega_m * (r - x_m) - 2 * zeta_m * omega_m * x_m_dot;
+        x_m_dot += x_m_ddot * dt;
+        x_m += x_m_dot * dt;
+
+        // Tracking error
+        float e = y - x_m;
+        float e_dot = y_dot - x_m_dot;
+
+        // Filtered error for stability
+        float s = e_dot + lambda * e;
+
+        // Regressor vector
+        float phi[4] = {r, y, y_dot, sign(y_dot)};  // For position, velocity, acceleration, friction
+
+        // Adaptive control law
+        float u = 0;
+        for (int i = 0; i < 4; i++) {
+            u += theta_hat[i] * phi[i];
+        }
+
+        // Parameter adaptation (gradient descent)
+        for (int i = 0; i < 4; i++) {
+            float theta_dot = -gamma[i] * s * phi[i];
+            theta_hat[i] += theta_dot * dt;
+
+            // Projection to prevent drift
+            theta_hat[i] = clamp(theta_hat[i], theta_min[i], theta_max[i]);
+        }
+
+        return u;
+    }
+
+private:
+    float lambda = 10.0f;
+    float theta_min[4] = {0.1f, -10.0f, -1.0f, -5.0f};
+    float theta_max[4] = {10.0f, 10.0f, 1.0f, 5.0f};
+
+    float sign(float x) {
+        return (x > 0) ? 1.0f : ((x < 0) ? -1.0f : 0.0f);
+    }
+};
+
+// Recursive Least Squares for Online Parameter Identification
+class RLSIdentifier {
+private:
+    Vector theta;      // Parameter estimates
+    Matrix P;          // Covariance matrix
+    float lambda;      // Forgetting factor (0.95-0.99)
+    int n_params;
+
+public:
+    RLSIdentifier(int num_params, float forgetting_factor) {
+        n_params = num_params;
+        lambda = forgetting_factor;
+
+        theta = Vector::zeros(n_params);
+        P = Matrix::identity(n_params) * 1000;  // High initial uncertainty
+    }
+
+    void update(Vector& phi, float y_measured) {
+        // Prediction error
+        float y_pred = theta.dot(phi);
+        float e = y_measured - y_pred;
+
+        // Kalman gain
+        Vector K = P * phi / (lambda + phi.dot(P * phi));
+
+        // Update estimates
+        theta = theta + K * e;
+
+        // Update covariance (with forgetting)
+        P = (P - K * phi.transpose() * P) / lambda;
+    }
+
+    Vector get_estimates() { return theta; }
+};</code></pre>
+
+        <h2>7.7 State Observers</h2>
+        <p>Observers estimate unmeasured states from available measurements, essential when velocity or current sensors are unavailable:</p>
+
+        <pre><code>// Luenberger Observer for Motor State Estimation
+class LuenbergerObserver {
+private:
+    // Observer state
+    Vector x_hat;  // [theta_hat, omega_hat, i_hat]
+
+    // System matrices
+    Matrix A, B, C;
+
+    // Observer gain matrix
+    Matrix L;
+
+    // Sampling time
+    float dt;
+
+public:
+    LuenbergerObserver(MotorParams& params, float sample_time) {
+        dt = sample_time;
+
+        // Initialize system matrices
+        setup_system_matrices(params);
+
+        // Design observer gains (pole placement)
+        // Observer poles should be 2-5x faster than controller poles
+        float observer_bandwidth = 5.0f;  // Times faster than system
+        design_observer_gains(observer_bandwidth);
+
+        x_hat = Vector::zeros(3);
+    }
+
+    Vector estimate(float u, float y_measured) {
+        // Prediction step: x_hat_pred = A*x_hat + B*u
+        Vector x_pred = A * x_hat + B * u;
+
+        // Correction step: x_hat = x_pred + L*(y - C*x_pred)
+        float y_pred = C.dot(x_pred);
+        float innovation = y_measured - y_pred;
+
+        x_hat = x_pred + L * innovation;
+
+        return x_hat;
+    }
+
+    void design_observer_gains(float speed_factor) {
+        // Place observer poles at speed_factor * controller poles
+        // For motor system, use Ackermann's formula or direct placement
+
+        float p1 = -500.0f * speed_factor;  // Fast pole
+        float p2 = -600.0f * speed_factor;
+        float p3 = -700.0f * speed_factor;
+
+        // Characteristic polynomial coefficients
+        float a1 = -(p1 + p2 + p3);
+        float a2 = p1*p2 + p1*p3 + p2*p3;
+        float a3 = -p1*p2*p3;
+
+        // Compute L using Ackermann's formula
+        L = ackermann_formula(A, C, a1, a2, a3);
+    }
+
+private:
+    void setup_system_matrices(MotorParams& p);
+    Matrix ackermann_formula(Matrix& A, Matrix& C, float a1, float a2, float a3);
+};
+
+// Extended Kalman Filter for Nonlinear Motor Systems
+class ExtendedKalmanFilter {
+private:
+    Vector x_hat;      // State estimate
+    Matrix P;          // Error covariance
+    Matrix Q;          // Process noise covariance
+    Matrix R;          // Measurement noise covariance
+    float dt;
+
+public:
+    ExtendedKalmanFilter(EKFConfig& config) {
+        dt = config.sample_time;
+
+        x_hat = Vector::zeros(3);
+        P = Matrix::identity(3) * config.initial_covariance;
+        Q = config.Q;
+        R = config.R;
+    }
+
+    Vector estimate(float u, float y_measured) {
+        // Prediction step
+        Vector x_pred = predict_state(x_hat, u);
+        Matrix F = compute_jacobian_F(x_hat, u);  // State transition Jacobian
+        Matrix P_pred = F * P * F.transpose() + Q;
+
+        // Measurement update
+        Matrix H = compute_jacobian_H(x_pred);    // Measurement Jacobian
+        float y_pred = h(x_pred);                 // Predicted measurement
+        float innovation = y_measured - y_pred;
+
+        // Kalman gain
+        float S = H * P_pred * H.transpose() + R(0,0);
+        Vector K = P_pred * H.transpose() / S;
+
+        // Update
+        x_hat = x_pred + K * innovation;
+        P = (Matrix::identity(3) - K * H) * P_pred;
+
+        return x_hat;
+    }
+
+private:
+    Vector predict_state(Vector& x, float u) {
+        // Nonlinear state prediction
+        float theta = x(0);
+        float omega = x(1);
+        float i = x(2);
+
+        Vector x_next(3);
+        x_next(0) = theta + omega * dt;
+        x_next(1) = omega + (Kt * i - B * omega - T_friction(omega)) / J * dt;
+        x_next(2) = i + (u - R * i - Ke * omega) / L * dt;
+
+        return x_next;
+    }
+
+    Matrix compute_jacobian_F(Vector& x, float u);
+    Matrix compute_jacobian_H(Vector& x);
+    float h(Vector& x) { return x(0); }  // Position measurement
+    float T_friction(float omega);  // Nonlinear friction model
+
+    // Motor parameters
+    float J, B, Kt, Ke, R_motor, L;
+};
+
+// Disturbance Observer (DOB)
+class DisturbanceObserver {
+private:
+    // Low-pass filter for disturbance estimation
+    float Q_filter;    // Filter bandwidth
+    float d_hat;       // Disturbance estimate
+
+    // Inverse model
+    float J_nom, B_nom;
+
+public:
+    DisturbanceObserver(MotorParams& params, float bandwidth) {
+        J_nom = params.J;
+        B_nom = params.B;
+        Q_filter = bandwidth;
+        d_hat = 0;
+    }
+
+    float estimate(float u, float omega, float omega_dot, float dt) {
+        // Disturbance = actual torque - nominal model torque
+        // d = J*omega_dot + B*omega - u_torque
+
+        float d_raw = J_nom * omega_dot + B_nom * omega - u;
+
+        // Low-pass filter the estimate
+        float alpha = Q_filter * dt / (1 + Q_filter * dt);
+        d_hat = alpha * d_raw + (1 - alpha) * d_hat;
+
+        return d_hat;
+    }
+
+    float compensate(float u_nominal) {
+        // Add disturbance compensation to control
+        return u_nominal + d_hat;
+    }
+};</code></pre>
+
+        <h2>7.8 Robust Control</h2>
+        <p>Robust control ensures stability and performance despite model uncertainties:</p>
+
+        <pre><code>// H-infinity Controller Concept
+class HInfinityController {
+private:
+    // Controller state-space
+    Matrix A_c, B_c, C_c, D_c;
+    Vector x_c;  // Controller state
+
+    // Weighting functions
+    float W1_gain;  // Performance weight
+    float W2_gain;  // Control effort weight
+    float W3_gain;  // Robustness weight
+
+public:
+    HInfinityController(MotorParams& params, RobustnessConfig& config) {
+        // H-infinity design is typically done offline using tools like MATLAB
+        // Here we load precomputed controller
+        load_controller(config.controller_file);
+
+        x_c = Vector::zeros(A_c.rows());
+    }
+
+    float compute(Vector& measurements) {
+        // Controller dynamics: x_c_dot = A_c*x_c + B_c*y
+        //                      u = C_c*x_c + D_c*y
+
+        Vector x_c_dot = A_c * x_c + B_c * measurements;
+        float u = (C_c * x_c + D_c * measurements)(0);
+
+        // Integrate controller state
+        x_c = x_c + x_c_dot * dt;
+
+        return u;
+    }
+
+private:
+    float dt;
+    void load_controller(const char* file);
+};
+
+// Mu-Synthesis Controller (structured uncertainty)
+// Provides guaranteed stability margins for modeled uncertainties</code></pre>
+
+        <h2>7.9 Sensorless Control Techniques</h2>
+        <p>Eliminate position/velocity sensors by estimating states from electrical measurements:</p>
+
+        <pre><code>// Back-EMF Based Sensorless Control for BLDC
+class SensorlessController {
+private:
+    // Back-EMF estimation
+    float bemf_alpha, bemf_beta;  // Alpha-beta frame
+
+    // Position/velocity estimation
+    float theta_est;
+    float omega_est;
+
+    // Phase-Locked Loop for position tracking
+    float pll_kp, pll_ki;
+    float pll_integral;
+
+    // Zero-crossing detection
+    int last_zc_sector;
+    float zc_times[6];
+    int zc_index;
+
+public:
+    SensorlessController(MotorParams& params, SensorlessConfig& config) {
+        pll_kp = config.pll_bandwidth * 2;
+        pll_ki = config.pll_bandwidth * config.pll_bandwidth;
+
+        theta_est = 0;
+        omega_est = 0;
+        pll_integral = 0;
+    }
+
+    void estimate_position(float v_alpha, float v_beta,
+                           float i_alpha, float i_beta, float dt) {
+        // Back-EMF estimation: e = v - R*i - L*di/dt
+        static float i_alpha_prev = 0, i_beta_prev = 0;
+
+        float di_alpha = (i_alpha - i_alpha_prev) / dt;
+        float di_beta = (i_beta - i_beta_prev) / dt;
+
+        bemf_alpha = v_alpha - R * i_alpha - L * di_alpha;
+        bemf_beta = v_beta - R * i_beta - L * di_beta;
+
+        i_alpha_prev = i_alpha;
+        i_beta_prev = i_beta;
+
+        // PLL-based position estimation
+        // Error = cross product of estimated and actual BEMF direction
+        float sin_theta = sin(theta_est);
+        float cos_theta = cos(theta_est);
+
+        float error = bemf_alpha * cos_theta + bemf_beta * sin_theta;
+
+        // PI controller for PLL
+        pll_integral += pll_ki * error * dt;
+        omega_est = pll_kp * error + pll_integral;
+
+        // Integrate for position
+        theta_est += omega_est * dt;
+
+        // Wrap to [0, 2*pi]
+        while (theta_est > 2 * M_PI) theta_est -= 2 * M_PI;
+        while (theta_est < 0) theta_est += 2 * M_PI;
+    }
+
+    float get_position() { return theta_est; }
+    float get_velocity() { return omega_est; }
+
+private:
+    float R, L;  // Motor parameters
+};
+
+// High-Frequency Injection for Low-Speed Sensorless
+class HFInjectionEstimator {
+private:
+    float injection_freq;
+    float injection_amplitude;
+    float theta_est;
+
+    // Demodulation filters
+    BandpassFilter bp_filter;
+    LowpassFilter lp_filter;
+
+public:
+    HFInjectionEstimator(float freq, float amplitude) {
+        injection_freq = freq;
+        injection_amplitude = amplitude;
+        theta_est = 0;
+
+        bp_filter = BandpassFilter(freq, 100);  // Q = 100
+        lp_filter = LowpassFilter(50);  // 50 Hz cutoff
+    }
+
+    void inject_and_estimate(float* v_dq, float* i_dq, float t, float dt) {
+        // Inject high-frequency voltage in estimated d-axis
+        v_dq[0] += injection_amplitude * sin(2 * M_PI * injection_freq * t);
+
+        // Demodulate q-axis current response
+        float i_q_hf = bp_filter.filter(i_dq[1]);
+        float demod = i_q_hf * sin(2 * M_PI * injection_freq * t);
+        float error = lp_filter.filter(demod);
+
+        // Position error is proportional to filtered signal
+        // Update estimate using PI
+        theta_est += error * dt;
+    }
+};</code></pre>
+
+        <h2>7.10 Multi-Axis Coordinated Control</h2>
+        <p>Coordinate multiple motors for synchronized motion in robotic systems:</p>
+
+        <pre><code>// Multi-Axis Synchronized Controller
+class MultiAxisController {
+private:
+    int num_axes;
+    vector&lt;SingleAxisController*&gt; axis_controllers;
+
+    // Cross-coupling gains for synchronization
+    Matrix Kc;  // Cross-coupling gain matrix
+
+    // Master-slave or peer synchronization
+    enum SyncMode { MASTER_SLAVE, PEER_TO_PEER, VIRTUAL_MASTER };
+    SyncMode sync_mode;
+
+    // Virtual master for gantry-type systems
+    float virtual_position;
+    float virtual_velocity;
+
+public:
+    MultiAxisController(int axes, MultiAxisConfig& config) {
+        num_axes = axes;
+        sync_mode = config.sync_mode;
+
+        // Initialize individual axis controllers
+        for (int i = 0; i < axes; i++) {
+            axis_controllers.push_back(
+                new SingleAxisController(config.axis_params[i])
+            );
+        }
+
+        // Cross-coupling matrix
+        Kc = config.cross_coupling_gains;
+    }
+
+    void compute(Vector& refs, Vector& positions, Vector& velocities,
+                 Vector& outputs) {
+        // Compute synchronization errors
+        Vector sync_errors(num_axes);
+
+        if (sync_mode == VIRTUAL_MASTER) {
+            // All axes follow virtual master
+            for (int i = 0; i < num_axes; i++) {
+                sync_errors(i) = positions(i) - virtual_position;
+            }
+        } else if (sync_mode == PEER_TO_PEER) {
+            // Axes try to match each other
+            float avg_pos = positions.mean();
+            for (int i = 0; i < num_axes; i++) {
+                sync_errors(i) = positions(i) - avg_pos;
+            }
+        }
+
+        // Compute individual axis control with cross-coupling
+        for (int i = 0; i < num_axes; i++) {
+            // Individual axis control
+            float u_individual = axis_controllers[i]->compute(
+                refs(i), positions(i), velocities(i)
+            );
+
+            // Cross-coupling compensation
+            float u_coupling = 0;
+            for (int j = 0; j < num_axes; j++) {
+                if (i != j) {
+                    u_coupling -= Kc(i, j) * (positions(i) - positions(j));
+                }
+            }
+
+            outputs(i) = u_individual + u_coupling;
+        }
+    }
+
+    void update_virtual_master(float ref, float dt) {
+        // S-curve or trapezoidal profile for virtual master
+        // All axes then follow this virtual trajectory
+        virtual_velocity = compute_profile_velocity(ref, virtual_position);
+        virtual_position += virtual_velocity * dt;
+    }
+
+private:
+    float compute_profile_velocity(float target, float current);
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>State-space methods provide a unified framework for multi-variable motor control systems</li>
+                <li>LQR provides optimal state feedback gains by minimizing a quadratic cost function</li>
+                <li>MPC optimizes control over a prediction horizon while handling constraints explicitly</li>
+                <li>Sliding mode control offers robustness to parameter variations and disturbances</li>
+                <li>Adaptive control adjusts parameters online to compensate for unknown dynamics</li>
+                <li>State observers (Luenberger, EKF) estimate unmeasured states from available measurements</li>
+                <li>Disturbance observers improve control by estimating and compensating for disturbances</li>
+                <li>Sensorless control eliminates position sensors using back-EMF estimation or HF injection</li>
+                <li>Multi-axis coordination ensures synchronized motion across multiple motors</li>
+                <li>Advanced control techniques are essential for high-performance AI-integrated motor systems</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What advantages does state-space representation offer over transfer function models for motor control?</li>
+                <li>Explain the meaning of the Q and R matrices in LQR design. How do their values affect closed-loop behavior?</li>
+                <li>Why is MPC particularly suited for motor control systems with constraints?</li>
+                <li>What is chattering in sliding mode control, and what techniques reduce it?</li>
+                <li>Describe the difference between direct and indirect adaptive control approaches.</li>
+                <li>Why should observer poles be faster than controller poles? What problems arise if they are slower?</li>
+                <li>How does the Extended Kalman Filter handle nonlinear motor dynamics?</li>
+                <li>Explain the principle of back-EMF based sensorless control. What are its limitations at low speeds?</li>
+                <li>What is cross-coupling control in multi-axis systems, and why is it important?</li>
+                <li>How do advanced control techniques support AI integration in motor control systems?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

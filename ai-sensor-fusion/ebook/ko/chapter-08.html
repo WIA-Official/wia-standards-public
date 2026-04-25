@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8장: 고급 기법 및 미래 동향 | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .future-box{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:25px 0;border-left:4px solid var(--ai-color)}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>8장: 고급 기법 및 미래 동향</h1>
+
+        <h2>8.1 센서 융합의 진화하는 환경</h2>
+        <p>센서 융합 기술은 감지 하드웨어, 계산 능력 및 알고리즘 혁신의 개선에 힘입어 빠르게 발전하고 있습니다. 이 장에서는 현재 개발 중인 최첨단 기술과 다중 센서 인식 시스템의 미래를 형성할 새로운 트렌드를 탐구합니다.</p>
+
+        <p>전례 없는 측정 정밀도를 약속하는 양자 센싱부터 뇌에서 영감을 받은 융합을 가능하게 하는 뉴로모픽 프로세서까지, 차세대 센서 융합 시스템은 현재의 한계를 초월할 것입니다.</p>
+
+        <h2>8.2 그래프 신경망을 사용한 센서 융합</h2>
+        <p>그래프 신경망(GNN)은 센서와 그 관계를 그래프의 노드와 에지로 모델링하여 센서 융합을 위한 자연스러운 프레임워크를 제공합니다:</p>
+
+        <pre><code>import torch
+import torch.nn as nn
+from torch_geometric.nn import GATConv, global_mean_pool
+
+class SensorGraphNetwork(nn.Module):
+    """
+    이종 센서 융합을 위한 그래프 신경망
+
+    센서를 노드로, 공간/시간 관계를 에지로 모델링
+    """
+    def __init__(self, sensor_configs, hidden_dim=256, num_heads=8):
+        super().__init__()
+
+        self.sensor_configs = sensor_configs
+
+        # 센서별 인코더
+        self.sensor_encoders = nn.ModuleDict({
+            name: SensorEncoder(config['dim'], hidden_dim)
+            for name, config in sensor_configs.items()
+        })
+
+        # 그래프 어텐션 레이어
+        self.gat_layers = nn.ModuleList([
+            GATConv(hidden_dim, hidden_dim, heads=num_heads, concat=False)
+            for _ in range(3)
+        ])
+
+        # 에지 유형 임베딩
+        self.edge_type_embed = nn.Embedding(4, hidden_dim)
+
+        # 출력 투영
+        self.output_proj = nn.Linear(hidden_dim, hidden_dim)
+
+    def forward(self, sensor_data, graph_structure):
+        """
+        sensor_data: {sensor_name: sensor_features} 딕셔너리
+        graph_structure: edge_index, edge_type, batch
+        """
+        # 각 센서 데이터 인코딩
+        node_features = []
+        for sensor_name, data in sensor_data.items():
+            encoded = self.sensor_encoders[sensor_name](data)
+            node_features.append(encoded)
+
+        x = torch.cat(node_features, dim=0)
+
+        # 에지 유형 정보 추가
+        edge_attr = self.edge_type_embed(graph_structure['edge_type'])
+
+        # 그래프 어텐션 메시지 전달
+        for gat_layer in self.gat_layers:
+            x = x + gat_layer(x, graph_structure['edge_index'], edge_attr=edge_attr)
+            x = F.relu(x)
+
+        # 그래프 수준 출력을 위한 전역 풀링
+        graph_output = global_mean_pool(x, graph_structure['batch'])
+
+        return self.output_proj(graph_output)</code></pre>
+
+        <h2>8.3 암시적 신경 표현을 사용한 센서 융합</h2>
+        <p>신경 암시적 표현은 연속 센서 필드를 인코딩하여 서로 다른 공간 해상도의 센서 원활한 융합을 가능하게 합니다:</p>
+
+        <pre><code>class NeuralSensorField(nn.Module):
+    """
+    연속 센서 융합을 위한 신경 암시적 표현
+
+    센서 측정을 임의의 지점에서 쿼리할 수 있는 연속 필드로 인코딩
+    """
+    def __init__(self, latent_dim=256, output_dim=3):
+        super().__init__()
+
+        # 위치 인코딩
+        self.pos_encoding = SinusoidalPositionalEncoding(
+            num_frequencies=10,
+            include_input=True
+        )
+
+        # 좌표 네트워크 (NeRF 스타일)
+        encoded_dim = 3 + 3 * 2 * 10
+
+        self.network = nn.Sequential(
+            nn.Linear(encoded_dim + latent_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, output_dim)
+        )
+
+        # 조건화를 위한 센서 인코더
+        self.lidar_encoder = PointCloudEncoder(latent_dim)
+        self.camera_encoder = ImageEncoder(latent_dim)
+
+    def forward(self, query_points, sensor_data):
+        """
+        임의의 3D 지점에서 융합된 센서 필드 쿼리
+
+        query_points: 쿼리할 (N, 3) 좌표
+        sensor_data: 센서 측정 딕셔너리
+        """
+        # 센서 데이터 인코딩
+        latent = self.encode_sensors(sensor_data)
+
+        # 쿼리 지점의 위치 인코딩
+        encoded_points = self.pos_encoding(query_points)
+
+        # 쿼리 지점에 맞게 잠재 확장
+        latent_expanded = latent.unsqueeze(0).expand(query_points.shape[0], -1)
+
+        # 연결하고 네트워크 쿼리
+        features = torch.cat([encoded_points, latent_expanded], dim=-1)
+        output = self.network(features)
+
+        return output</code></pre>
+
+        <h2>8.4 뉴로모픽 센서 융합</h2>
+        <p>생물학적 신경 시스템에서 영감을 받은 뉴로모픽 컴퓨팅은 초저지연 및 전력 효율적인 센서 융합을 제공합니다:</p>
+
+        <pre><code>class SpikingFusionNetwork:
+    """
+    이벤트 기반 센서 융합을 위한 스파이킹 신경망
+
+    최소 지연으로 비동기 센서 이벤트 처리
+    """
+    def __init__(self, config):
+        self.config = config
+
+        # 스파이킹 뉴런 레이어
+        self.input_layer = SpikingInputLayer(config.input_dim)
+        self.hidden_layers = [
+            SpikingHiddenLayer(config.hidden_dim, config.tau_membrane)
+            for _ in range(config.num_layers)
+        ]
+        self.output_layer = SpikingOutputLayer(config.output_dim)
+
+        self.reset_state()
+
+    def process_event(self, event):
+        """
+        단일 센서 이벤트를 비동기적으로 처리
+
+        event: {sensor_id, timestamp, value}
+        """
+        # 이벤트를 입력 스파이크로 변환
+        input_spikes = self.input_layer.encode(event)
+
+        # 네트워크를 통해 전파
+        spikes = input_spikes
+        for layer in self.hidden_layers:
+            spikes = layer.forward(spikes)
+
+        # 출력 디코딩
+        output = self.output_layer.decode(spikes)
+
+        return output
+
+    def fuse_event_streams(self, event_streams, duration):
+        """
+        여러 비동기 이벤트 스트림 융합
+
+        event_streams: {sensor_id: events} 딕셔너리
+        """
+        # 타임스탬프로 이벤트 병합 및 정렬
+        all_events = []
+        for sensor_id, events in event_streams.items():
+            for event in events:
+                all_events.append({
+                    'sensor': sensor_id,
+                    'timestamp': event['timestamp'],
+                    'value': event['value']
+                })
+
+        all_events.sort(key=lambda x: x['timestamp'])
+
+        # 시간 순서로 이벤트 처리
+        outputs = []
+        for event in all_events:
+            output = self.process_event(event)
+            if output is not None:
+                outputs.append({
+                    'timestamp': event['timestamp'],
+                    'output': output
+                })
+
+        return outputs</code></pre>
+
+        <h2>8.5 양자 센싱 및 융합</h2>
+        <p>양자 센서는 전례 없는 측정 정밀도를 제공하여 센서 융합에서 새로운 기능을 가능하게 합니다:</p>
+
+        <div class="future-box">
+            <h3>양자 센싱 기술</h3>
+            <table>
+                <tr>
+                    <th>기술</th>
+                    <th>측정</th>
+                    <th>기존 대비 장점</th>
+                    <th>상태</th>
+                </tr>
+                <tr>
+                    <td><strong>양자 자력계</strong></td>
+                    <td>자기장</td>
+                    <td>1000배 더 민감</td>
+                    <td>실험실 프로토타입</td>
+                </tr>
+                <tr>
+                    <td><strong>양자 가속도계</strong></td>
+                    <td>가속도</td>
+                    <td>시간에 따른 드리프트 없음</td>
+                    <td>초기 상용화</td>
+                </tr>
+                <tr>
+                    <td><strong>양자 중력계</strong></td>
+                    <td>중력 기울기</td>
+                    <td>지하 구조물 감지</td>
+                    <td>연구 단계</td>
+                </tr>
+                <tr>
+                    <td><strong>양자 레이더</strong></td>
+                    <td>거리, 속도</td>
+                    <td>스텔스 표적 감지</td>
+                    <td>실험 단계</td>
+                </tr>
+                <tr>
+                    <td><strong>양자 LiDAR</strong></td>
+                    <td>3D 구조</td>
+                    <td>단일 광자 감도</td>
+                    <td>부상 중</td>
+                </tr>
+            </table>
+        </div>
+
+        <h2>8.6 엣지 AI 및 분산 융합</h2>
+        <p>엣지 컴퓨팅은 데이터 소스에서 센서 융합을 가능하게 하여 지연 시간 및 대역폭 요구 사항을 줄입니다:</p>
+
+        <pre><code>class DistributedFusionNetwork:
+    """
+    엣지와 클라우드에 걸친 계층적 분산 센서 융합
+
+    지연 시간, 대역폭 및 계산 리소스 최적화
+    """
+    def __init__(self, topology):
+        self.topology = topology
+
+        # 로컬 융합이 있는 엣지 노드
+        self.edge_nodes = {
+            node_id: EdgeFusionNode(config)
+            for node_id, config in topology['edge_nodes'].items()
+        }
+
+        # 클라우드 집계기
+        self.cloud_aggregator = CloudFusionAggregator(topology['cloud'])
+
+    def process_distributed(self, sensor_data_by_node):
+        """
+        분산 네트워크에서 센서 데이터 처리
+        """
+        edge_results = {}
+
+        # 1단계: 엣지 노드에서 로컬 융합 (병렬, 저지연)
+        for node_id, local_data in sensor_data_by_node.items():
+            edge_results[node_id] = self.edge_nodes[node_id].fuse_local(local_data)
+
+        # 클라우드에 보낼 내용 결정
+        to_upload = self.comm_optimizer.select_for_upload(edge_results)
+
+        # 2단계: 클라우드 집계 (더 높은 지연, 전역 뷰)
+        if to_upload:
+            global_result = self.cloud_aggregator.aggregate(to_upload)
+
+            # 3단계: 엣지 노드로 피드백 정제
+            for node_id in edge_results:
+                self.edge_nodes[node_id].refine_with_global(global_result)
+
+        return {
+            'edge_results': edge_results,
+            'global_result': global_result if to_upload else None
+        }
+
+
+class EdgeFusionNode:
+    """
+    로컬 다중 센서 융합이 있는 엣지 노드
+
+    임베디드 하드웨어에서 실행 (Jetson, RPi 등)
+    """
+    def __init__(self, config):
+        self.local_sensors = config['sensors']
+
+        # 엣지용 경량 융합 모델
+        self.fusion_model = LightweightFusionNet(
+            input_configs=config['sensors'],
+            quantization='int8'
+        )
+
+    def fuse_local(self, sensor_data):
+        """
+        지연 시간 예산으로 로컬 융합 수행
+        """
+        start_time = time.time()
+
+        # 양자화된 추론 실행
+        with torch.no_grad():
+            local_estimate = self.fusion_model(sensor_data)
+
+        inference_time = time.time() - start_time
+
+        return {
+            'state': local_estimate['state'],
+            'covariance': local_estimate['covariance'],
+            'inference_time': inference_time
+        }</code></pre>
+
+        <h2>8.7 파운데이션 모델을 사용한 센서 융합</h2>
+        <p>대규모 다중 모달 데이터셋에서 사전 훈련된 대규모 파운데이션 모델은 센서 융합을 위한 강력한 전이 학습을 가능하게 합니다:</p>
+
+        <pre><code>class SensorFusionFoundationModel:
+    """
+    센서 융합을 위한 파운데이션 모델 접근 방식
+
+    다양한 다중 센서 데이터셋에서 사전 훈련, 특정 작업에 미세 조정
+    """
+    def __init__(self, pretrained_path):
+        # 사전 훈련된 다중 모달 인코더 로드
+        self.encoder = MultiModalEncoder.from_pretrained(pretrained_path)
+
+        # 모달리티별 토크나이저
+        self.tokenizers = {
+            'image': ImageTokenizer(patch_size=16),
+            'point_cloud': PointCloudTokenizer(num_groups=256),
+            'radar': RadarTokenizer(),
+            'imu': IMUTokenizer(window_size=100),
+            'text': TextTokenizer()  # 자연어 컨텍스트용
+        }
+
+        # 작업별 헤드
+        self.task_heads = nn.ModuleDict()
+
+    def zero_shot_fusion(self, sensor_data, text_query):
+        """
+        자연어로 안내되는 제로샷 센서 융합
+
+        예: "차량 근처의 보행자 감지"
+        """
+        # 센서 데이터 토큰화
+        sensor_tokens = self.tokenize_sensors(sensor_data)
+
+        # 텍스트 쿼리 토큰화
+        text_tokens = self.tokenizers['text'].tokenize(text_query)
+
+        # 결합된 인코딩
+        all_tokens = torch.cat([sensor_tokens, text_tokens], dim=1)
+        encoded = self.encoder(all_tokens)
+
+        # 텍스트와 센서 특징 간의 크로스 어텐션
+        query_result = self.cross_attention(
+            query=encoded[:, -text_tokens.shape[1]:],
+            key_value=encoded[:, :-text_tokens.shape[1]]
+        )
+
+        return query_result</code></pre>
+
+        <h2>8.8 자기 지도 학습을 사용한 센서 융합</h2>
+        <p>자기 지도 접근 방식은 비용이 많이 드는 레이블된 다중 센서 데이터셋에 대한 필요성을 줄입니다:</p>
+
+        <pre><code>class SelfSupervisedFusionPretraining:
+    """
+    다중 모달 센서 융합을 위한 자기 지도 사전 훈련
+
+    수동 레이블 없이 표현 학습
+    """
+    def __init__(self, encoder, modalities):
+        self.encoder = encoder
+        self.modalities = modalities
+
+        # 대조 학습을 위한 투영 헤드
+        self.projectors = nn.ModuleDict({
+            m: ProjectionHead(encoder.hidden_dim, 128)
+            for m in modalities
+        })
+
+    def contrastive_loss(self, batch):
+        """
+        교차 모달 대조 학습
+
+        해당 센서 데이터의 표현 정렬
+        """
+        # 각 모달리티 인코딩
+        embeddings = {}
+        for modality in self.modalities:
+            if modality in batch:
+                features = self.encoder.encode_modality(batch[modality], modality)
+                embeddings[modality] = self.projectors[modality](features)
+
+        # 모달리티 쌍 간의 대조 손실
+        total_loss = 0
+        num_pairs = 0
+
+        for m1 in embeddings:
+            for m2 in embeddings:
+                if m1 >= m2:
+                    continue
+
+                loss = self.info_nce_loss(embeddings[m1], embeddings[m2])
+                total_loss += loss
+                num_pairs += 1
+
+        return total_loss / max(num_pairs, 1)
+
+    def masked_modeling_loss(self, batch, mask_ratio=0.5):
+        """
+        마스크된 다중 모달 모델링
+
+        각 모달리티의 일부를 마스크하고 다른 것들에서 예측
+        """
+        total_loss = 0
+
+        for target_modality in self.modalities:
+            if target_modality not in batch:
+                continue
+
+            # 대상 모달리티 마스크
+            masked_data, mask = self.random_mask(
+                batch[target_modality],
+                mask_ratio
+            )
+
+            # 마스크된 대상으로 입력 생성
+            masked_batch = batch.copy()
+            masked_batch[target_modality] = masked_data
+
+            # 모든 모달리티 인코딩
+            features = self.encoder(masked_batch)
+
+            # 마스크된 영역 재구성
+            reconstruction = self.decoders[target_modality](features)
+
+            # 마스크된 영역에서만 손실
+            loss = self.reconstruction_loss(
+                reconstruction[mask],
+                batch[target_modality][mask]
+            )
+            total_loss += loss
+
+        return total_loss / len(self.modalities)</code></pre>
+
+        <h2>8.9 신흥 센서 기술</h2>
+        <table>
+            <tr>
+                <th>기술</th>
+                <th>기능</th>
+                <th>융합 영향</th>
+                <th>타임라인</th>
+            </tr>
+            <tr>
+                <td><strong>4D 이미징 레이더</strong></td>
+                <td>고해상도 3D + 속도</td>
+                <td>LiDAR 의존성 감소 가능</td>
+                <td>현재 - 2025</td>
+            </tr>
+            <tr>
+                <td><strong>FMCW LiDAR</strong></td>
+                <td>직접 속도 측정</td>
+                <td>향상된 모션 추정</td>
+                <td>2024 - 2026</td>
+            </tr>
+            <tr>
+                <td><strong>열화상 어레이</strong></td>
+                <td>고해상도 열화상</td>
+                <td>야간 시야, 보행자 감지</td>
+                <td>현재 - 2025</td>
+            </tr>
+            <tr>
+                <td><strong>솔리드 스테이트 LiDAR</strong></td>
+                <td>움직이는 부품 없음, 저비용</td>
+                <td>차량당 더 많은 센서</td>
+                <td>현재 - 2025</td>
+            </tr>
+            <tr>
+                <td><strong>신경 센서</strong></td>
+                <td>온센서 AI 처리</td>
+                <td>분산 지능형 융합</td>
+                <td>2025 - 2028</td>
+            </tr>
+        </table>
+
+        <h2>8.10 미래 연구 방향</h2>
+        <div class="future-box">
+            <h3>공개 연구 과제</h3>
+            <ul>
+                <li><strong>지속적 학습:</strong> 망각 없이 배포 수명 동안 개선되는 융합 시스템</li>
+                <li><strong>교차 도메인 전이:</strong> 하나의 센서 세트에서 훈련된 모델이 다른 구성에 적응</li>
+                <li><strong>적대적 강건성:</strong> 다중 센서 인식 시스템에 대한 공격 방어</li>
+                <li><strong>불확실성 보정:</strong> 예측된 불확실성이 조건에 따라 신뢰할 수 있도록 보장</li>
+                <li><strong>해석 가능성:</strong> 융합 시스템이 특정 결정을 내리는 이유 이해</li>
+                <li><strong>에너지 효율성:</strong> 성능을 유지하면서 전력 소비 감소</li>
+                <li><strong>표준화:</strong> 플러그 앤 플레이 센서 융합을 가능하게 하는 공통 인터페이스</li>
+            </ul>
+        </div>
+
+        <h2>8.11 WIA-AI-SENSOR-FUSION 표준: 미래 진화</h2>
+        <p>WIA-AI-SENSOR-FUSION 표준은 새로운 요구를 해결하기 위해 계속 발전할 것입니다:</p>
+
+        <pre><code>WIA-AI-SENSOR-FUSION 로드맵
+============================
+
+버전 2.0 (현재)
+- 다중 모달 융합 프레임워크
+- 불확실성 전파
+- 실시간 처리 지원
+- 결함 허용 메커니즘
+
+버전 3.0 (계획)
+- 신경망 융합 통합
+- 엣지 배포 사양
+- 자기 지도 학습 프로토콜
+- 교차 도메인 적응 API
+
+버전 4.0 (미래)
+- 양자 센서 통합
+- 뉴로모픽 컴퓨팅 지원
+- 파운데이션 모델 인터페이스
+- 연합 학습 프로토콜
+
+기본 원칙 (불변):
+- 弘益人間 (홍익인간)
+- 모달리티 불가지론적 설계
+- 불확실성 인식
+- 안전 및 신뢰성 우선
+- 개방적이고 확장 가능</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>그래프 신경망은 이종 융합을 위해 센서 관계를 자연스럽게 모델링합니다</li>
+                <li>신경 암시적 표현은 해상도에 걸쳐 연속 센서 필드 융합을 가능하게 합니다</li>
+                <li>뉴로모픽 컴퓨팅은 이벤트 기반 센서 융합을 위한 마이크로초 지연을 제공합니다</li>
+                <li>양자 센서는 전례 없는 정밀도를 약속하며 새로운 융합 알고리즘이 필요합니다</li>
+                <li>엣지 AI는 지연 및 대역폭 최적화를 통한 분산 계층적 융합을 가능하게 합니다</li>
+                <li>다중 모달 데이터에서 사전 훈련된 파운데이션 모델은 강력한 전이 학습을 가능하게 합니다</li>
+                <li>자기 지도 학습은 비용이 많이 드는 레이블된 데이터셋에 대한 의존성을 줄입니다</li>
+                <li>4D 레이더 및 FMCW LiDAR와 같은 신흥 센서는 융합 아키텍처를 재형성할 것입니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>그래프 신경망이 다중 센서 융합을 어떻게 모델링합니까? 노드와 에지는 무엇입니까?</li>
+                <li>신경 암시적 표현이 서로 다른 공간 해상도의 센서 융합을 어떻게 가능하게 하는지 설명하세요.</li>
+                <li>이벤트 카메라와 뉴로모픽 컴퓨팅이 센서 융합에 어떤 장점을 제공합니까?</li>
+                <li>양자 센서는 노이즈 특성에서 기존 센서와 어떻게 다릅니까?</li>
+                <li>자율 주행차 플릿을 위한 분산 융합 아키텍처를 설계하세요. 엣지와 클라우드에서 무엇이 실행됩니까?</li>
+                <li>파운데이션 모델이 센서 융합에 어떻게 적용될 수 있습니까? 제로샷 융합이란 무엇입니까?</li>
+                <li>다중 모달 센서 융합을 위한 세 가지 자기 지도 학습 목표를 설명하세요.</li>
+                <li>향후 5년 동안 융합 시스템 설계에 가장 큰 영향을 미칠 신흥 센서 기술은 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:16px;margin-top:10px;color:#94a3b8">© 2025 SmileStory Inc. / WIA</p>
+        </div>
+
+        </div>
+</body>
+</html>

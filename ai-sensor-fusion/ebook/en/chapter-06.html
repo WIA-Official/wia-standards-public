@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Uncertainty Management & Reliability | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .formula{background:var(--bg-tertiary);padding:15px;border-radius:5px;margin:15px 0;font-family:monospace;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Uncertainty Management & Reliability</h1>
+
+        <h2>6.1 The Importance of Uncertainty</h2>
+        <p>Uncertainty management is the cornerstone of reliable sensor fusion. Every measurement, model, and prediction carries some degree of uncertainty. Failing to properly quantify and propagate this uncertainty can lead to overconfident decisions with potentially catastrophic consequences in safety-critical applications.</p>
+
+        <p>A sensor fusion system must answer not only "What is the state?" but also "How confident are we in this estimate?" The ability to recognize when estimates are unreliable enables appropriate responses such as requesting additional sensor data, slowing down, or handing control to a human operator.</p>
+
+        <p>This chapter provides comprehensive coverage of uncertainty representation, propagation, calibration, and management in sensor fusion systems, along with fault detection and recovery mechanisms that ensure system reliability.</p>
+
+        <h2>6.2 Sources of Uncertainty</h2>
+        <p>Understanding the sources of uncertainty is essential for proper modeling and management:</p>
+
+        <table>
+            <tr>
+                <th>Source</th>
+                <th>Type</th>
+                <th>Characteristics</th>
+                <th>Mitigation</th>
+            </tr>
+            <tr>
+                <td><strong>Sensor Noise</strong></td>
+                <td>Aleatoric</td>
+                <td>Inherent measurement randomness</td>
+                <td>Filtering, averaging, better sensors</td>
+            </tr>
+            <tr>
+                <td><strong>Model Error</strong></td>
+                <td>Epistemic</td>
+                <td>Imperfect system models</td>
+                <td>Better models, adaptive estimation</td>
+            </tr>
+            <tr>
+                <td><strong>Calibration Error</strong></td>
+                <td>Systematic</td>
+                <td>Biases from imperfect calibration</td>
+                <td>Online calibration, bias estimation</td>
+            </tr>
+            <tr>
+                <td><strong>Environmental</strong></td>
+                <td>Context-dependent</td>
+                <td>Weather, lighting, interference</td>
+                <td>Multi-sensor fusion, adaptation</td>
+            </tr>
+            <tr>
+                <td><strong>Association</strong></td>
+                <td>Discrete</td>
+                <td>Incorrect data correspondence</td>
+                <td>Probabilistic association, MHT</td>
+            </tr>
+            <tr>
+                <td><strong>Occlusion/Missing Data</strong></td>
+                <td>Structural</td>
+                <td>Objects hidden or sensors failing</td>
+                <td>Multi-view fusion, prediction</td>
+            </tr>
+        </table>
+
+        <h2>6.3 Covariance Representation and Propagation</h2>
+        <p>The covariance matrix is the primary representation of uncertainty in Gaussian-based fusion systems:</p>
+
+        <pre><code>class CovarianceManager:
+    """
+    Manage uncertainty representation and propagation in sensor fusion
+    """
+    def __init__(self, state_dim):
+        self.state_dim = state_dim
+
+    def propagate_linear(self, P, F, Q):
+        """
+        Propagate covariance through linear transformation
+
+        P_new = F @ P @ F.T + Q
+        """
+        return F @ P @ F.T + Q
+
+    def propagate_unscented(self, P, f, Q, alpha=1e-3, beta=2, kappa=0):
+        """
+        Propagate covariance using unscented transform
+
+        More accurate for nonlinear functions
+        """
+        n = self.state_dim
+        lambda_ = alpha**2 * (n + kappa) - n
+
+        # Generate sigma points
+        sqrt_P = np.linalg.cholesky((n + lambda_) * P)
+        sigma_points = np.zeros((2*n + 1, n))
+        sigma_points[0] = self.x  # Mean
+
+        for i in range(n):
+            sigma_points[i + 1] = self.x + sqrt_P[i]
+            sigma_points[n + i + 1] = self.x - sqrt_P[i]
+
+        # Transform sigma points
+        transformed = np.array([f(sp) for sp in sigma_points])
+
+        # Compute weights
+        Wm = np.zeros(2*n + 1)
+        Wc = np.zeros(2*n + 1)
+        Wm[0] = lambda_ / (n + lambda_)
+        Wc[0] = Wm[0] + (1 - alpha**2 + beta)
+        Wm[1:] = Wc[1:] = 1 / (2 * (n + lambda_))
+
+        # Compute mean and covariance
+        mean = np.sum(Wm[:, np.newaxis] * transformed, axis=0)
+        P_new = Q.copy()
+
+        for i, sp in enumerate(transformed):
+            diff = sp - mean
+            P_new += Wc[i] * np.outer(diff, diff)
+
+        return mean, P_new
+
+    def marginalize(self, P, keep_indices):
+        """
+        Extract marginal covariance for subset of state
+        """
+        return P[np.ix_(keep_indices, keep_indices)]
+
+    def condition(self, P, observed_indices, observed_values, observed_cov):
+        """
+        Compute conditional covariance given observations
+
+        Uses Schur complement for Gaussian conditioning
+        """
+        n = P.shape[0]
+        hidden_indices = [i for i in range(n) if i not in observed_indices]
+
+        P_aa = P[np.ix_(hidden_indices, hidden_indices)]
+        P_ab = P[np.ix_(hidden_indices, observed_indices)]
+        P_bb = P[np.ix_(observed_indices, observed_indices)]
+
+        # Add observation noise
+        P_bb_noisy = P_bb + observed_cov
+
+        # Conditional covariance via Schur complement
+        P_cond = P_aa - P_ab @ np.linalg.solve(P_bb_noisy, P_ab.T)
+
+        return P_cond
+
+    def ensure_positive_definite(self, P, min_eigenvalue=1e-6):
+        """
+        Ensure covariance matrix is positive definite
+
+        Essential for numerical stability
+        """
+        # Symmetrize
+        P = (P + P.T) / 2
+
+        # Eigendecomposition
+        eigenvalues, eigenvectors = np.linalg.eigh(P)
+
+        # Clamp eigenvalues
+        eigenvalues = np.maximum(eigenvalues, min_eigenvalue)
+
+        # Reconstruct
+        P_fixed = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+
+        return P_fixed</code></pre>
+
+        <h2>6.4 Confidence Calibration</h2>
+        <p>A well-calibrated system produces uncertainty estimates that accurately reflect the true error distribution. Overconfident estimates are dangerous; underconfident estimates are inefficient.</p>
+
+        <pre><code>class ConfidenceCalibrator:
+    """
+    Calibrate confidence estimates to match empirical error distributions
+    """
+    def __init__(self, num_bins=10):
+        self.num_bins = num_bins
+        self.calibration_data = []
+
+    def collect_sample(self, predicted_mean, predicted_cov, ground_truth):
+        """
+        Collect calibration sample
+        """
+        # Compute Mahalanobis distance (normalized error)
+        error = ground_truth - predicted_mean
+        mahal_dist = error @ np.linalg.solve(predicted_cov, error)
+
+        self.calibration_data.append({
+            'mahal_dist': mahal_dist,
+            'predicted_cov': np.trace(predicted_cov),
+            'actual_error': np.linalg.norm(error)
+        })
+
+    def compute_calibration_metrics(self):
+        """
+        Compute calibration metrics
+
+        For well-calibrated Gaussian estimates:
+        - Mahalanobis distance should follow chi-squared distribution
+        - X% confidence intervals should contain X% of true values
+        """
+        mahal_dists = [d['mahal_dist'] for d in self.calibration_data]
+        n = len(mahal_dists)
+        dim = self.get_state_dim()
+
+        # Expected vs actual quantiles
+        expected_quantiles = [0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+        chi2_thresholds = [scipy.stats.chi2.ppf(q, dim) for q in expected_quantiles]
+
+        actual_quantiles = []
+        for threshold in chi2_thresholds:
+            actual = sum(1 for d in mahal_dists if d <= threshold) / n
+            actual_quantiles.append(actual)
+
+        # Calibration error
+        calibration_error = np.mean(np.abs(
+            np.array(expected_quantiles) - np.array(actual_quantiles)
+        ))
+
+        # Normalized Estimation Error Squared (NEES)
+        nees = np.mean(mahal_dists) / dim  # Should be ~1 for well-calibrated
+
+        return {
+            'expected_quantiles': expected_quantiles,
+            'actual_quantiles': actual_quantiles,
+            'calibration_error': calibration_error,
+            'nees': nees,
+            'is_overconfident': nees > 1.2,
+            'is_underconfident': nees < 0.8
+        }
+
+    def fit_recalibration(self):
+        """
+        Learn recalibration mapping using isotonic regression
+
+        Maps predicted confidence to calibrated confidence
+        """
+        predicted_confidence = []
+        actual_correctness = []
+
+        for sample in self.calibration_data:
+            # Predicted confidence (from covariance)
+            conf = 1.0 / (1.0 + sample['predicted_cov'])
+            predicted_confidence.append(conf)
+
+            # Actual correctness (1 if error below threshold)
+            correct = sample['actual_error'] < self.error_threshold
+            actual_correctness.append(correct)
+
+        # Fit isotonic regression
+        self.recalibrator = IsotonicRegression(
+            y_min=0, y_max=1, out_of_bounds='clip'
+        )
+        self.recalibrator.fit(predicted_confidence, actual_correctness)
+
+    def recalibrate(self, predicted_cov):
+        """
+        Apply recalibration to get calibrated covariance
+        """
+        if not hasattr(self, 'recalibrator'):
+            return predicted_cov
+
+        # Get predicted confidence
+        predicted_conf = 1.0 / (1.0 + np.trace(predicted_cov))
+
+        # Get calibrated confidence
+        calibrated_conf = self.recalibrator.predict([predicted_conf])[0]
+
+        # Convert back to covariance scale
+        scale_factor = (1.0 / calibrated_conf - 1.0) / (1.0 / predicted_conf - 1.0)
+
+        return predicted_cov * scale_factor</code></pre>
+
+        <h2>6.5 Fault Detection and Isolation</h2>
+        <p>Reliable sensor fusion requires detecting and handling sensor faults, which can include sensor failure, degradation, or providing erroneous data:</p>
+
+        <pre><code>class FaultDetector:
+    """
+    Detect and isolate sensor faults in fusion systems
+    """
+    def __init__(self, sensors, chi2_threshold=0.99):
+        self.sensors = sensors
+        self.chi2_threshold = chi2_threshold
+        self.fault_history = {s: [] for s in sensors}
+        self.sensor_status = {s: 'healthy' for s in sensors}
+
+    def detect_innovation_fault(self, sensor_id, innovation, innovation_cov):
+        """
+        Chi-squared test on innovation (measurement residual)
+
+        Large innovations indicate sensor fault or model mismatch
+        """
+        dim = len(innovation)
+        threshold = scipy.stats.chi2.ppf(self.chi2_threshold, dim)
+
+        # Normalized innovation squared (NIS)
+        try:
+            nis = innovation @ np.linalg.solve(innovation_cov, innovation)
+        except np.linalg.LinAlgError:
+            nis = float('inf')
+
+        fault_detected = nis > threshold
+
+        self.fault_history[sensor_id].append({
+            'timestamp': time.time(),
+            'nis': nis,
+            'threshold': threshold,
+            'fault': fault_detected
+        })
+
+        return fault_detected, nis, threshold
+
+    def detect_consistency_fault(self, sensor_measurements, fused_state, fused_cov):
+        """
+        Check if individual sensor measurements are consistent with fused state
+        """
+        faults = {}
+
+        for sensor_id, measurement in sensor_measurements.items():
+            H = self.sensors[sensor_id]['H']
+            R = self.sensors[sensor_id]['R']
+
+            # Predicted measurement from fused state
+            predicted = H @ fused_state
+            residual = measurement - predicted
+
+            # Residual covariance
+            residual_cov = H @ fused_cov @ H.T + R
+
+            # Chi-squared test
+            fault, nis, threshold = self.detect_innovation_fault(
+                sensor_id, residual, residual_cov
+            )
+            faults[sensor_id] = {
+                'fault': fault,
+                'nis': nis,
+                'severity': nis / threshold
+            }
+
+        return faults
+
+    def update_sensor_status(self, sensor_id, fault_detected):
+        """
+        Update sensor health status based on fault history
+        """
+        history = self.fault_history[sensor_id][-10:]  # Last 10 samples
+
+        if len(history) < 5:
+            return  # Not enough history
+
+        fault_rate = sum(1 for h in history if h['fault']) / len(history)
+
+        if fault_rate > 0.8:
+            self.sensor_status[sensor_id] = 'failed'
+        elif fault_rate > 0.5:
+            self.sensor_status[sensor_id] = 'degraded'
+        elif fault_rate > 0.2:
+            self.sensor_status[sensor_id] = 'suspicious'
+        else:
+            self.sensor_status[sensor_id] = 'healthy'
+
+    def isolate_faulty_sensor(self, sensor_measurements, predicted_state, predicted_cov):
+        """
+        Identify which sensor is likely faulty using pairwise consistency
+
+        When multiple sensors disagree, find the outlier
+        """
+        n_sensors = len(sensor_measurements)
+        sensor_ids = list(sensor_measurements.keys())
+
+        if n_sensors < 2:
+            return None
+
+        # Pairwise consistency matrix
+        consistency = np.zeros((n_sensors, n_sensors))
+
+        for i, sid1 in enumerate(sensor_ids):
+            for j, sid2 in enumerate(sensor_ids):
+                if i >= j:
+                    continue
+
+                # Check if sensors agree with each other
+                score = self._pairwise_consistency(
+                    sensor_measurements[sid1], self.sensors[sid1],
+                    sensor_measurements[sid2], self.sensors[sid2]
+                )
+                consistency[i, j] = consistency[j, i] = score
+
+        # Sensor with lowest average consistency is likely faulty
+        avg_consistency = consistency.sum(axis=1) / (n_sensors - 1)
+        faulty_idx = np.argmin(avg_consistency)
+
+        if avg_consistency[faulty_idx] < 0.3:  # Threshold for fault
+            return sensor_ids[faulty_idx]
+
+        return None
+
+    def _pairwise_consistency(self, meas1, sensor1_config, meas2, sensor2_config):
+        """
+        Check consistency between two sensor measurements
+        """
+        # Simple overlap check for position measurements
+        # More sophisticated checks for different sensor types
+
+        H1, R1 = sensor1_config['H'], sensor1_config['R']
+        H2, R2 = sensor2_config['H'], sensor2_config['R']
+
+        # This is a simplified check - real implementation depends on sensor types
+        diff = meas1[:min(len(meas1), len(meas2))] - meas2[:min(len(meas1), len(meas2))]
+        combined_var = np.diag(R1)[:len(diff)] + np.diag(R2)[:len(diff)]
+
+        # Normalized difference
+        norm_diff = np.sum(diff**2 / combined_var)
+        consistency = np.exp(-norm_diff / 2)
+
+        return consistency
+
+
+class FaultTolerantFusion:
+    """
+    Sensor fusion with built-in fault tolerance
+    """
+    def __init__(self, sensors, estimator):
+        self.sensors = sensors
+        self.estimator = estimator
+        self.fault_detector = FaultDetector(list(sensors.keys()))
+
+    def fuse_with_fault_handling(self, measurements, dt):
+        """
+        Perform fusion with automatic fault detection and recovery
+        """
+        # Prediction step
+        self.estimator.predict(dt)
+
+        # Detect faults before update
+        faults = self.fault_detector.detect_consistency_fault(
+            measurements,
+            self.estimator.x,
+            self.estimator.P
+        )
+
+        # Filter out faulty measurements
+        valid_measurements = {}
+        for sensor_id, meas in measurements.items():
+            if not faults.get(sensor_id, {}).get('fault', False):
+                valid_measurements[sensor_id] = meas
+            else:
+                logging.warning(f"Excluding faulty sensor: {sensor_id}")
+                self.fault_detector.update_sensor_status(sensor_id, True)
+
+        # If too few valid sensors, increase uncertainty
+        if len(valid_measurements) < 2:
+            self.estimator.P *= 1.5  # Inflate covariance
+
+        # Update with valid measurements only
+        for sensor_id, meas in valid_measurements.items():
+            H = self.sensors[sensor_id]['H']
+            R = self.sensors[sensor_id]['R']
+            self.estimator.update(meas, H, R)
+            self.fault_detector.update_sensor_status(sensor_id, False)
+
+        return self.estimator.x, self.estimator.P, faults</code></pre>
+
+        <h2>6.6 Graceful Degradation</h2>
+        <p>When sensors fail or degrade, the system should gracefully reduce capability rather than fail catastrophically:</p>
+
+        <pre><code>class GracefulDegradationManager:
+    """
+    Manage system capability as sensors fail or degrade
+    """
+    def __init__(self, sensor_configs, capability_requirements):
+        self.sensor_configs = sensor_configs
+        self.requirements = capability_requirements
+        self.current_capability = 'full'
+
+    def assess_capability(self, sensor_status):
+        """
+        Determine current system capability based on available sensors
+        """
+        healthy_sensors = [s for s, status in sensor_status.items()
+                         if status == 'healthy']
+        degraded_sensors = [s for s, status in sensor_status.items()
+                          if status == 'degraded']
+
+        # Check capability requirements
+        capabilities = {
+            'full_autonomous': self._check_full_autonomous(healthy_sensors),
+            'limited_autonomous': self._check_limited_autonomous(healthy_sensors + degraded_sensors),
+            'assisted': self._check_assisted(healthy_sensors + degraded_sensors),
+            'manual_only': True  # Always available as fallback
+        }
+
+        # Determine highest available capability
+        for cap in ['full_autonomous', 'limited_autonomous', 'assisted', 'manual_only']:
+            if capabilities[cap]:
+                return cap
+
+        return 'emergency_stop'
+
+    def _check_full_autonomous(self, sensors):
+        """
+        Requirements for full autonomous operation
+        """
+        required = self.requirements['full_autonomous']
+        return all(
+            any(s in sensors for s in sensor_group)
+            for sensor_group in required['sensor_groups']
+        )
+
+    def get_operating_envelope(self, capability_level):
+        """
+        Return safe operating envelope for capability level
+        """
+        envelopes = {
+            'full_autonomous': {
+                'max_speed': 130,  # km/h
+                'environments': ['highway', 'urban', 'rural'],
+                'weather': ['clear', 'light_rain', 'cloudy'],
+                'lighting': ['day', 'night', 'tunnel']
+            },
+            'limited_autonomous': {
+                'max_speed': 80,
+                'environments': ['highway', 'urban'],
+                'weather': ['clear', 'cloudy'],
+                'lighting': ['day', 'tunnel']
+            },
+            'assisted': {
+                'max_speed': 50,
+                'environments': ['urban'],
+                'weather': ['clear'],
+                'lighting': ['day']
+            },
+            'manual_only': {
+                'max_speed': 30,
+                'environments': ['all'],
+                'weather': ['all'],
+                'lighting': ['all'],
+                'requires_human': True
+            }
+        }
+        return envelopes.get(capability_level, envelopes['manual_only'])
+
+    def plan_recovery(self, current_status, target_capability):
+        """
+        Plan recovery actions to restore capability
+        """
+        recovery_actions = []
+
+        for sensor_id, status in current_status.items():
+            if status == 'failed':
+                recovery_actions.append({
+                    'action': 'restart_sensor',
+                    'sensor': sensor_id,
+                    'priority': 'high'
+                })
+            elif status == 'degraded':
+                recovery_actions.append({
+                    'action': 'recalibrate_sensor',
+                    'sensor': sensor_id,
+                    'priority': 'medium'
+                })
+
+        return recovery_actions</code></pre>
+
+        <h2>6.7 Adaptive Noise Estimation</h2>
+        <p>Process and measurement noise parameters significantly affect fusion performance. Adaptive algorithms can estimate these parameters online:</p>
+
+        <pre><code>class AdaptiveNoiseEstimator:
+    """
+    Online estimation of process and measurement noise covariances
+    """
+    def __init__(self, state_dim, window_size=50):
+        self.state_dim = state_dim
+        self.window_size = window_size
+        self.innovation_history = []
+        self.residual_history = []
+
+    def estimate_R(self, innovations, H, P_pred):
+        """
+        Estimate measurement noise covariance from innovation sequence
+
+        Based on innovation covariance: E[y*y'] = H*P*H' + R
+        """
+        self.innovation_history.append(innovations)
+
+        if len(self.innovation_history) < self.window_size:
+            return None
+
+        # Use recent innovations
+        recent = np.array(self.innovation_history[-self.window_size:])
+
+        # Sample innovation covariance
+        S_sample = np.cov(recent.T)
+
+        # R = S - H * P_pred * H'
+        R_estimated = S_sample - H @ P_pred @ H.T
+
+        # Ensure positive definite
+        R_estimated = self._ensure_positive_definite(R_estimated)
+
+        return R_estimated
+
+    def estimate_Q(self, residuals, F, P):
+        """
+        Estimate process noise covariance from prediction residuals
+
+        Uses the difference between predicted and updated states
+        """
+        self.residual_history.append(residuals)
+
+        if len(self.residual_history) < self.window_size:
+            return None
+
+        recent = np.array(self.residual_history[-self.window_size:])
+
+        # Sample residual covariance
+        Q_sample = np.cov(recent.T)
+
+        return self._ensure_positive_definite(Q_sample)
+
+    def adapt_covariances(self, estimator, innovation, residual, adaptation_rate=0.1):
+        """
+        Gradually adapt noise covariances based on observed statistics
+        """
+        # Estimate ideal covariances from data
+        R_new = self.estimate_R(innovation, estimator.H, estimator.P)
+        Q_new = self.estimate_Q(residual, estimator.F, estimator.P)
+
+        if R_new is not None:
+            estimator.R = (1 - adaptation_rate) * estimator.R + adaptation_rate * R_new
+
+        if Q_new is not None:
+            estimator.Q = (1 - adaptation_rate) * estimator.Q + adaptation_rate * Q_new
+
+    def _ensure_positive_definite(self, M, min_eig=1e-6):
+        """Ensure matrix is positive definite"""
+        M = (M + M.T) / 2
+        eigvals, eigvecs = np.linalg.eigh(M)
+        eigvals = np.maximum(eigvals, min_eig)
+        return eigvecs @ np.diag(eigvals) @ eigvecs.T</code></pre>
+
+        <h2>6.8 Integrity Monitoring</h2>
+        <p>For safety-critical applications, integrity monitoring ensures the fusion output meets required protection levels:</p>
+
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Definition</th>
+                <th>Typical Requirement</th>
+            </tr>
+            <tr>
+                <td><strong>Protection Level (PL)</strong></td>
+                <td>Bound on position error that can be guaranteed</td>
+                <td>Must exceed Alert Limit</td>
+            </tr>
+            <tr>
+                <td><strong>Alert Limit (AL)</strong></td>
+                <td>Maximum allowable error for safe operation</td>
+                <td>Application-dependent</td>
+            </tr>
+            <tr>
+                <td><strong>Time to Alert (TTA)</strong></td>
+                <td>Time to detect and alert on integrity failure</td>
+                <td>Seconds to minutes</td>
+            </tr>
+            <tr>
+                <td><strong>Integrity Risk</strong></td>
+                <td>Probability that error exceeds AL without alert</td>
+                <td>10^-7 to 10^-9 per hour</td>
+            </tr>
+        </table>
+
+        <pre><code>class IntegrityMonitor:
+    """
+    RAIM-style integrity monitoring for sensor fusion
+
+    Provides protection levels and integrity alerts
+    """
+    def __init__(self, integrity_risk=1e-7, false_alert_rate=1e-5):
+        self.integrity_risk = integrity_risk
+        self.false_alert_rate = false_alert_rate
+
+    def compute_protection_level(self, P, H_sensors, R_sensors, k_md=5.33):
+        """
+        Compute horizontal and vertical protection levels
+
+        Based on weighted least squares geometry and fault detection capability
+        """
+        # Number of measurements
+        n_meas = sum(H.shape[0] for H in H_sensors)
+        n_state = P.shape[0]
+
+        # Geometry matrix
+        H_all = np.vstack(H_sensors)
+        R_all = scipy.linalg.block_diag(*R_sensors)
+
+        # Weighted geometry
+        W = np.linalg.inv(R_all)
+        G = np.linalg.inv(H_all.T @ W @ H_all) @ H_all.T @ W
+
+        # Slope for each measurement (sensitivity to fault)
+        slopes = []
+        for i in range(n_meas):
+            # Effect of error in measurement i on position
+            slope_i = np.linalg.norm(G[:2, i])  # Horizontal
+            slopes.append(slope_i)
+
+        # Protection level = k * max_slope * sqrt(variance)
+        sigma = np.sqrt(np.max(np.diag(P[:2, :2])))
+        hpl = k_md * max(slopes) * sigma
+
+        # Vertical protection level
+        vpl = k_md * np.sqrt(P[2, 2]) if P.shape[0] > 2 else None
+
+        return {
+            'horizontal_protection_level': hpl,
+            'vertical_protection_level': vpl,
+            'geometry_matrix': G,
+            'slopes': slopes
+        }
+
+    def check_integrity(self, protection_level, alert_limit, position_error=None):
+        """
+        Check if system meets integrity requirements
+        """
+        status = {
+            'available': protection_level < alert_limit,
+            'protection_level': protection_level,
+            'alert_limit': alert_limit,
+            'margin': alert_limit - protection_level
+        }
+
+        if position_error is not None:
+            status['actual_error'] = position_error
+            status['misleading_info'] = position_error > alert_limit and protection_level < alert_limit
+
+        return status
+
+    def fault_detection_test(self, innovations, innovation_cov, threshold=None):
+        """
+        Solution separation test for fault detection
+
+        Compare solutions with and without each measurement
+        """
+        if threshold is None:
+            threshold = scipy.stats.chi2.ppf(1 - self.false_alert_rate, len(innovations))
+
+        # Test statistic
+        test_stat = innovations @ np.linalg.solve(innovation_cov, innovations)
+
+        return {
+            'test_statistic': test_stat,
+            'threshold': threshold,
+            'fault_detected': test_stat > threshold,
+            'p_value': 1 - scipy.stats.chi2.cdf(test_stat, len(innovations))
+        }</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Uncertainty quantification is essential for reliable sensor fusion and safe decision making</li>
+                <li>Sources of uncertainty include sensor noise, model error, calibration error, and environmental factors</li>
+                <li>Covariance propagation through linear and nonlinear transformations requires appropriate techniques</li>
+                <li>Confidence calibration ensures predicted uncertainties match actual error distributions</li>
+                <li>Fault detection using innovation tests can identify sensor failures or model mismatches</li>
+                <li>Graceful degradation maintains safe operation as sensors fail</li>
+                <li>Adaptive noise estimation improves fusion by learning noise parameters online</li>
+                <li>Integrity monitoring provides protection levels for safety-critical applications</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Distinguish between aleatoric and epistemic uncertainty. How is each represented and reduced?</li>
+                <li>Explain the NEES (Normalized Estimation Error Squared) metric. What does a NEES > 1 indicate?</li>
+                <li>Describe how chi-squared tests on innovation can detect sensor faults.</li>
+                <li>What is the difference between fault detection and fault isolation? Why is isolation harder?</li>
+                <li>Design a graceful degradation strategy for an autonomous vehicle losing its LiDAR sensor.</li>
+                <li>Explain how adaptive noise estimation works. What are its benefits and risks?</li>
+                <li>Define protection level and alert limit in integrity monitoring. How are they related?</li>
+                <li>How would you validate that a sensor fusion system's uncertainty estimates are well-calibrated?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

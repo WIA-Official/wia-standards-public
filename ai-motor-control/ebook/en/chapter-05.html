@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Position & Velocity Control | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Position & Velocity Control</h1>
+
+        <h2>5.1 Introduction to Position Control</h2>
+        <p>Position control is the highest level in the motor control hierarchy, ensuring the motor shaft reaches and maintains a desired angular or linear position. Precise position control is fundamental to robotics, CNC machines, automated manufacturing, and countless other applications where accuracy matters.</p>
+
+        <p>Position control builds upon the velocity and current loops discussed in previous chapters. The cascaded control architecture allows each loop to be designed independently while maintaining stability and performance.</p>
+
+        <h2>5.2 Position Feedback Systems</h2>
+        <p>Accurate position feedback is essential for closed-loop control. Different encoder types suit different applications:</p>
+
+        <table>
+            <tr>
+                <th>Encoder Type</th>
+                <th>Resolution</th>
+                <th>Accuracy</th>
+                <th>Pros</th>
+                <th>Cons</th>
+            </tr>
+            <tr>
+                <td><strong>Optical Incremental</strong></td>
+                <td>500-10,000+ PPR</td>
+                <td>±1-5 arc-min</td>
+                <td>High resolution, low cost</td>
+                <td>Needs homing, dust sensitive</td>
+            </tr>
+            <tr>
+                <td><strong>Optical Absolute</strong></td>
+                <td>12-23 bit</td>
+                <td>±10-30 arc-sec</td>
+                <td>No homing, power loss recovery</td>
+                <td>Higher cost, complexity</td>
+            </tr>
+            <tr>
+                <td><strong>Magnetic Incremental</strong></td>
+                <td>256-4096 PPR</td>
+                <td>±5-15 arc-min</td>
+                <td>Rugged, dust resistant</td>
+                <td>Lower resolution</td>
+            </tr>
+            <tr>
+                <td><strong>Magnetic Absolute</strong></td>
+                <td>10-14 bit</td>
+                <td>±0.1-0.5°</td>
+                <td>Compact, rugged, low cost</td>
+                <td>Magnet alignment critical</td>
+            </tr>
+            <tr>
+                <td><strong>Resolver</strong></td>
+                <td>12-16 bit effective</td>
+                <td>±2-5 arc-min</td>
+                <td>Extremely rugged, no bearings</td>
+                <td>Requires RDC, analog</td>
+            </tr>
+            <tr>
+                <td><strong>Linear Encoder</strong></td>
+                <td>0.1-5 µm</td>
+                <td>±1-10 µm</td>
+                <td>Direct position, no backlash</td>
+                <td>Cost, installation</td>
+            </tr>
+        </table>
+
+        <h3>Encoder Interface Implementation</h3>
+        <pre><code>// High-Resolution Encoder Interface
+class EncoderInterface {
+private:
+    // Hardware interface
+    volatile uint32_t* counter_register;
+    volatile uint32_t* index_register;
+
+    // Configuration
+    uint32_t counts_per_rev;
+    bool quadrature_4x;
+    float mechanical_ratio;     // Gear ratio
+
+    // State
+    int32_t raw_count;
+    int32_t index_offset;
+    int32_t revolutions;
+    float position_rad;
+
+    // Velocity estimation
+    int32_t prev_count;
+    float velocity_rad_s;
+    float velocity_filter_alpha;
+
+    uint32_t sample_time_us;
+
+public:
+    EncoderInterface(EncoderConfig config) {
+        counts_per_rev = config.ppr;
+        if (config.quadrature_4x) {
+            counts_per_rev *= 4;
+        }
+        mechanical_ratio = config.gear_ratio;
+        velocity_filter_alpha = 0.1f;  // Low-pass filter
+    }
+
+    void update() {
+        // Read raw count from hardware
+        int32_t new_count = *counter_register;
+
+        // Handle rollover (32-bit counter)
+        int32_t delta = new_count - raw_count;
+        if (delta > (int32_t)(counts_per_rev / 2)) {
+            revolutions--;
+        } else if (delta < -(int32_t)(counts_per_rev / 2)) {
+            revolutions++;
+        }
+        raw_count = new_count;
+
+        // Calculate absolute position
+        int64_t total_counts = (int64_t)revolutions * counts_per_rev + raw_count - index_offset;
+        position_rad = (float)total_counts / counts_per_rev * 2.0f * M_PI / mechanical_ratio;
+
+        // Velocity estimation (filtered difference)
+        float raw_velocity = (float)(raw_count - prev_count) / counts_per_rev
+                           * 2.0f * M_PI / (sample_time_us * 1e-6f) / mechanical_ratio;
+        velocity_rad_s = velocity_filter_alpha * raw_velocity
+                       + (1.0f - velocity_filter_alpha) * velocity_rad_s;
+        prev_count = raw_count;
+    }
+
+    void home_on_index() {
+        // Wait for index pulse and zero position
+        if (*index_register) {
+            index_offset = raw_count;
+            revolutions = 0;
+        }
+    }
+
+    float get_position() { return position_rad; }
+    float get_velocity() { return velocity_rad_s; }
+    int32_t get_raw_count() { return raw_count; }
+};</code></pre>
+
+        <h2>5.3 Velocity Estimation Techniques</h2>
+        <p>Accurate velocity information is critical for velocity control loops and position control damping:</p>
+
+        <pre><code>// Advanced Velocity Estimation
+class VelocityEstimator {
+private:
+    // Method selection
+    enum Method { DIFFERENCE, PULSE_TIMING, OBSERVER, HYBRID };
+    Method current_method;
+
+    // Differentiation parameters
+    float prev_position;
+    float dt;
+
+    // Pulse timing (for low speeds)
+    uint32_t last_edge_time;
+    float counts_per_rad;
+
+    // Observer-based estimation
+    float observed_velocity;
+    float observer_gain;
+    float inertia;
+    float friction;
+
+    // Velocity buffer for filtering
+    static const int BUFFER_SIZE = 8;
+    float velocity_buffer[BUFFER_SIZE];
+    int buffer_index;
+
+public:
+    VelocityEstimator(float sample_time, VelocityConfig config) {
+        dt = sample_time;
+        current_method = HYBRID;
+        counts_per_rad = config.encoder_ppr * 4 / (2.0f * M_PI);
+
+        observer_gain = 100.0f;
+        inertia = config.inertia;
+        friction = config.friction;
+
+        buffer_index = 0;
+        for (int i = 0; i < BUFFER_SIZE; i++) {
+            velocity_buffer[i] = 0;
+        }
+    }
+
+    float estimate(float position, float current, uint32_t edge_time) {
+        float velocity;
+
+        switch (current_method) {
+            case DIFFERENCE:
+                velocity = (position - prev_position) / dt;
+                break;
+
+            case PULSE_TIMING:
+                velocity = pulse_timing_velocity(edge_time);
+                break;
+
+            case OBSERVER:
+                velocity = observer_velocity(position, current);
+                break;
+
+            case HYBRID:
+            default:
+                velocity = hybrid_velocity(position, current, edge_time);
+                break;
+        }
+
+        prev_position = position;
+        return velocity;
+    }
+
+private:
+    float pulse_timing_velocity(uint32_t edge_time) {
+        // Time between encoder edges (high resolution at low speeds)
+        float period_us = (float)(edge_time - last_edge_time);
+        last_edge_time = edge_time;
+
+        if (period_us < 1.0f) return 0;  // Prevent division by zero
+
+        // Velocity = (1 count / period) * (rad/count)
+        return 1e6f / period_us / counts_per_rad;
+    }
+
+    float observer_velocity(float position, float current) {
+        // Luenberger observer for velocity
+        float torque = current * 0.1f;  // Kt * I
+        float pos_error = position - (prev_position + observed_velocity * dt);
+
+        // Observer dynamics
+        observed_velocity += (torque / inertia - friction * observed_velocity / inertia
+                             + observer_gain * pos_error) * dt;
+
+        return observed_velocity;
+    }
+
+    float hybrid_velocity(float position, float current, uint32_t edge_time) {
+        // Use pulse timing at low speeds, differentiation at high speeds
+        float diff_velocity = (position - prev_position) / dt;
+        float pulse_velocity = pulse_timing_velocity(edge_time);
+
+        // Cross-fade based on speed
+        float speed = fabs(diff_velocity);
+        float alpha = min(speed / 10.0f, 1.0f);  // Full difference above 10 rad/s
+
+        float raw_velocity = alpha * diff_velocity + (1.0f - alpha) * pulse_velocity;
+
+        // Moving average filter
+        velocity_buffer[buffer_index] = raw_velocity;
+        buffer_index = (buffer_index + 1) % BUFFER_SIZE;
+
+        float sum = 0;
+        for (int i = 0; i < BUFFER_SIZE; i++) {
+            sum += velocity_buffer[i];
+        }
+        return sum / BUFFER_SIZE;
+    }
+};</code></pre>
+
+        <h2>5.4 Velocity Control Loop</h2>
+        <p>The velocity controller regulates motor speed and provides the current reference for the inner loop:</p>
+
+        <pre><code>// Velocity Controller with Feed-Forward
+class VelocityController {
+private:
+    // Controller
+    PIController velocity_pi;
+
+    // Feed-forward parameters
+    float Kt_inv;           // 1/Kt for torque to current
+    float inertia;          // Total reflected inertia
+    float friction;         // Viscous friction coefficient
+
+    // Limits
+    float max_current;
+    float max_acceleration;
+
+    // Rate limiter for reference
+    float velocity_ref_prev;
+    float max_ref_slew;
+
+    float dt;
+
+public:
+    VelocityController(VelocityControllerParams params) {
+        dt = params.sample_time;
+        max_current = params.current_limit;
+        Kt_inv = 1.0f / params.torque_constant;
+        inertia = params.inertia;
+        friction = params.friction;
+
+        // PI tuning based on mechanical time constant
+        float tau_mech = inertia / friction;  // Mechanical time constant
+        float bandwidth = 100.0f;  // 100 rad/s velocity loop bandwidth
+
+        velocity_pi.set_gains(inertia * bandwidth, friction * bandwidth);
+        velocity_pi.set_limits(-max_current * params.torque_constant,
+                               max_current * params.torque_constant);
+
+        max_ref_slew = params.max_acceleration;
+        velocity_ref_prev = 0;
+    }
+
+    float compute(float velocity_ref, float velocity_measured,
+                  float acceleration_ff) {
+        // Rate limit velocity reference
+        float ref_change = velocity_ref - velocity_ref_prev;
+        float max_change = max_ref_slew * dt;
+        if (ref_change > max_change) {
+            velocity_ref = velocity_ref_prev + max_change;
+        } else if (ref_change < -max_change) {
+            velocity_ref = velocity_ref_prev - max_change;
+        }
+        velocity_ref_prev = velocity_ref;
+
+        // PI feedback controller
+        float torque_fb = velocity_pi.compute(velocity_ref, velocity_measured);
+
+        // Feed-forward: inertia acceleration + friction compensation
+        float torque_ff = inertia * acceleration_ff + friction * velocity_ref;
+
+        // Total torque command
+        float torque_total = torque_fb + torque_ff;
+
+        // Convert torque to current
+        float current_ref = torque_total * Kt_inv;
+
+        // Apply current limit
+        current_ref = clamp(current_ref, -max_current, max_current);
+
+        return current_ref;
+    }
+
+    void reset() {
+        velocity_pi.reset();
+        velocity_ref_prev = 0;
+    }
+};</code></pre>
+
+        <h2>5.5 Position Control Loop</h2>
+        <p>The position controller generates velocity references to achieve desired positions:</p>
+
+        <pre><code>// Position Controller with Multiple Modes
+class PositionController {
+private:
+    // Control modes
+    enum Mode { P_ONLY, PD, PID, STATE_FEEDBACK };
+    Mode control_mode;
+
+    // PID controller
+    float Kp, Ki, Kd;
+    float integral;
+    float prev_error;
+
+    // State feedback gains
+    float K_pos, K_vel;
+
+    // Feed-forward
+    float velocity_ff_gain;
+    float accel_ff_gain;
+
+    // Limits
+    float max_velocity;
+    float max_position_error;
+
+    // Filters
+    float error_filter_alpha;
+    float filtered_error;
+
+    float dt;
+
+public:
+    PositionController(PositionControllerParams params) {
+        dt = params.sample_time;
+        max_velocity = params.velocity_limit;
+        control_mode = PD;
+
+        // Standard position loop tuning
+        // Rule of thumb: Kp ≈ ωn², Kd ≈ 2*ζ*ωn
+        float wn = params.bandwidth;    // Natural frequency
+        float zeta = 0.7f;              // Damping ratio
+
+        Kp = wn * wn;
+        Kd = 2.0f * zeta * wn;
+        Ki = 0;  // Often not needed with velocity loop
+
+        // Feed-forward defaults
+        velocity_ff_gain = 1.0f;
+        accel_ff_gain = 0.0f;
+
+        error_filter_alpha = 0.2f;
+        filtered_error = 0;
+    }
+
+    float compute(float position_ref, float position_measured,
+                  float velocity_measured,
+                  float velocity_ff, float accel_ff) {
+
+        // Position error
+        float error = position_ref - position_measured;
+
+        // Error filtering (noise reduction)
+        filtered_error = error_filter_alpha * error
+                       + (1.0f - error_filter_alpha) * filtered_error;
+
+        float velocity_ref;
+
+        switch (control_mode) {
+            case P_ONLY:
+                velocity_ref = Kp * filtered_error;
+                break;
+
+            case PD:
+                velocity_ref = Kp * filtered_error - Kd * velocity_measured;
+                break;
+
+            case PID:
+                integral += filtered_error * dt;
+                integral = clamp(integral, -max_velocity / Ki, max_velocity / Ki);
+                velocity_ref = Kp * filtered_error + Ki * integral - Kd * velocity_measured;
+                break;
+
+            case STATE_FEEDBACK:
+                velocity_ref = K_pos * filtered_error - K_vel * velocity_measured;
+                break;
+
+            default:
+                velocity_ref = Kp * filtered_error;
+        }
+
+        // Add feed-forward
+        velocity_ref += velocity_ff_gain * velocity_ff;
+
+        // Clamp to velocity limit
+        velocity_ref = clamp(velocity_ref, -max_velocity, max_velocity);
+
+        return velocity_ref;
+    }
+
+    // For cascaded architecture
+    void compute_with_accel(float pos_ref, float pos_fb, float vel_fb,
+                            float vel_ff, float accel_ff,
+                            float* vel_ref_out, float* accel_ref_out) {
+        *vel_ref_out = compute(pos_ref, pos_fb, vel_fb, vel_ff, 0);
+        *accel_ref_out = accel_ff_gain * accel_ff;
+    }
+
+    void reset() {
+        integral = 0;
+        prev_error = 0;
+        filtered_error = 0;
+    }
+
+    void set_gains(float kp, float ki, float kd) {
+        Kp = kp; Ki = ki; Kd = kd;
+    }
+};</code></pre>
+
+        <h2>5.6 Complete Cascaded Control System</h2>
+        <pre><code>// Complete Servo Control System
+class ServoController {
+private:
+    // Nested controllers
+    PositionController position_ctrl;
+    VelocityController velocity_ctrl;
+    CurrentController current_ctrl;
+
+    // Trajectory generator
+    OnlineTrajectoryGenerator trajectory;
+
+    // Feedback
+    EncoderInterface encoder;
+    CurrentSensor current_sensor;
+    VelocityEstimator vel_estimator;
+
+    // Control modes
+    enum ControlMode { TORQUE, VELOCITY, POSITION, TRAJECTORY };
+    ControlMode mode;
+
+    // State
+    bool enabled;
+    bool fault;
+
+    // Timing
+    float current_loop_dt;
+    float velocity_loop_dt;
+    float position_loop_dt;
+    int velocity_decimation;
+    int position_decimation;
+    int loop_counter;
+
+public:
+    ServoController(ServoConfig config) :
+        position_ctrl(config.position),
+        velocity_ctrl(config.velocity),
+        current_ctrl(config.current),
+        trajectory(config.trajectory.sample_time),
+        encoder(config.encoder),
+        vel_estimator(config.velocity.sample_time, config.velocity)
+    {
+        current_loop_dt = 1.0f / config.current_loop_freq;
+        velocity_decimation = config.current_loop_freq / config.velocity_loop_freq;
+        position_decimation = config.current_loop_freq / config.position_loop_freq;
+        loop_counter = 0;
+        mode = POSITION;
+        enabled = false;
+        fault = false;
+    }
+
+    // Called at current loop rate (fastest)
+    void control_loop_isr() {
+        if (!enabled || fault) {
+            set_output(0);
+            return;
+        }
+
+        // Read feedback
+        encoder.update();
+        float position = encoder.get_position();
+        float current = current_sensor.read();
+        float velocity = vel_estimator.estimate(position, current, 0);
+
+        // Position/velocity loops at slower rate
+        static float velocity_ref = 0;
+        static float current_ref = 0;
+        static float accel_ref = 0;
+
+        loop_counter++;
+
+        // Position loop
+        if (loop_counter % position_decimation == 0) {
+            if (mode == POSITION || mode == TRAJECTORY) {
+                float pos_ref, vel_ff, accel_ff;
+
+                if (mode == TRAJECTORY) {
+                    trajectory.update(&pos_ref, &vel_ff, &accel_ff);
+                } else {
+                    pos_ref = target_position;
+                    vel_ff = 0;
+                    accel_ff = 0;
+                }
+
+                position_ctrl.compute_with_accel(pos_ref, position, velocity,
+                                                  vel_ff, accel_ff,
+                                                  &velocity_ref, &accel_ref);
+            }
+        }
+
+        // Velocity loop
+        if (loop_counter % velocity_decimation == 0) {
+            if (mode == VELOCITY) {
+                velocity_ref = target_velocity;
+            }
+
+            if (mode == POSITION || mode == VELOCITY || mode == TRAJECTORY) {
+                current_ref = velocity_ctrl.compute(velocity_ref, velocity, accel_ref);
+            }
+        }
+
+        // Current loop (every iteration)
+        if (mode == TORQUE) {
+            current_ref = target_current;
+        }
+
+        float voltage = current_ctrl.compute(current_ref, current, velocity);
+
+        // Apply output
+        set_output(voltage);
+
+        // Check faults
+        check_faults(position, velocity, current);
+    }
+
+    // User interfaces
+    void set_target_position(float pos) {
+        mode = POSITION;
+        target_position = pos;
+    }
+
+    void set_trajectory_target(float pos) {
+        mode = TRAJECTORY;
+        trajectory.set_target(pos);
+    }
+
+    void set_target_velocity(float vel) {
+        mode = VELOCITY;
+        target_velocity = vel;
+    }
+
+    void set_target_torque(float torque) {
+        mode = TORQUE;
+        target_current = torque / motor_params.Kt;
+    }
+
+    void enable() { enabled = true; }
+    void disable() { enabled = false; set_output(0); }
+
+private:
+    float target_position, target_velocity, target_current;
+
+    void set_output(float voltage);
+    void check_faults(float pos, float vel, float curr);
+};</code></pre>
+
+        <h2>5.7 Positioning Accuracy and Repeatability</h2>
+        <table>
+            <tr>
+                <th>Factor</th>
+                <th>Effect on Accuracy</th>
+                <th>Mitigation Strategy</th>
+            </tr>
+            <tr>
+                <td><strong>Encoder Resolution</strong></td>
+                <td>Quantization error</td>
+                <td>Higher resolution encoder, interpolation</td>
+            </tr>
+            <tr>
+                <td><strong>Backlash</strong></td>
+                <td>Dead zone, hysteresis</td>
+                <td>Anti-backlash gears, preload, compensation</td>
+            </tr>
+            <tr>
+                <td><strong>Compliance</strong></td>
+                <td>Deflection under load</td>
+                <td>Stiffer mechanics, load cell feedback</td>
+            </tr>
+            <tr>
+                <td><strong>Thermal Effects</strong></td>
+                <td>Drift over temperature</td>
+                <td>Temperature compensation, low-expansion materials</td>
+            </tr>
+            <tr>
+                <td><strong>Friction</strong></td>
+                <td>Stiction, limit cycles</td>
+                <td>Friction compensation, dithering</td>
+            </tr>
+            <tr>
+                <td><strong>Control Bandwidth</strong></td>
+                <td>Tracking error</td>
+                <td>Higher bandwidth, feed-forward</td>
+            </tr>
+        </table>
+
+        <h3>Backlash Compensation</h3>
+        <pre><code>// Backlash Compensation
+class BacklashCompensator {
+private:
+    float backlash_amount;  // Total backlash in radians
+    float last_direction;
+    float accumulated_compensation;
+
+public:
+    BacklashCompensator(float backlash_rad) {
+        backlash_amount = backlash_rad;
+        last_direction = 0;
+        accumulated_compensation = 0;
+    }
+
+    float compensate(float position_ref, float velocity_ref) {
+        float direction = (velocity_ref > 0) ? 1.0f : ((velocity_ref < 0) ? -1.0f : last_direction);
+
+        // Direction reversal detection
+        if (direction != last_direction && last_direction != 0) {
+            // Add backlash compensation
+            accumulated_compensation += direction * backlash_amount;
+        }
+
+        last_direction = direction;
+
+        return position_ref + accumulated_compensation;
+    }
+
+    void reset() {
+        last_direction = 0;
+        accumulated_compensation = 0;
+    }
+};</code></pre>
+
+        <h2>5.8 Homing and Reference Procedures</h2>
+        <pre><code>// Homing Sequence State Machine
+class HomingSequence {
+public:
+    enum HomingMethod {
+        LIMIT_SWITCH,
+        ENCODER_INDEX,
+        HARD_STOP,
+        CURRENT_THRESHOLD,
+        ABSOLUTE_ENCODER
+    };
+
+    enum State {
+        IDLE,
+        SEEKING_SWITCH,
+        BACKING_OFF,
+        SEEKING_INDEX,
+        MOVING_TO_OFFSET,
+        COMPLETE,
+        FAILED
+    };
+
+private:
+    State state;
+    HomingMethod method;
+    float home_velocity;
+    float home_offset;
+    float current_threshold;
+    bool switch_active;
+    uint32_t timeout_ms;
+    uint32_t start_time;
+
+public:
+    HomingSequence(HomingConfig config) {
+        method = config.method;
+        home_velocity = config.velocity;
+        home_offset = config.offset;
+        current_threshold = config.current_threshold;
+        timeout_ms = config.timeout_ms;
+        state = IDLE;
+    }
+
+    void start() {
+        state = SEEKING_SWITCH;
+        start_time = get_time_ms();
+    }
+
+    void update(float position, float current, bool limit_switch, bool index_pulse,
+                float* velocity_command, bool* homed) {
+        *homed = false;
+        *velocity_command = 0;
+
+        // Timeout check
+        if (state != IDLE && state != COMPLETE && state != FAILED) {
+            if (get_time_ms() - start_time > timeout_ms) {
+                state = FAILED;
+                return;
+            }
+        }
+
+        switch (state) {
+            case IDLE:
+                break;
+
+            case SEEKING_SWITCH:
+                *velocity_command = -home_velocity;  // Move toward home
+
+                switch (method) {
+                    case LIMIT_SWITCH:
+                        if (limit_switch) state = BACKING_OFF;
+                        break;
+                    case HARD_STOP:
+                    case CURRENT_THRESHOLD:
+                        if (fabs(current) > current_threshold) state = BACKING_OFF;
+                        break;
+                    case ABSOLUTE_ENCODER:
+                        state = COMPLETE;
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case BACKING_OFF:
+                *velocity_command = home_velocity * 0.2f;  // Slow back-off
+
+                if (method == LIMIT_SWITCH && !limit_switch) {
+                    state = SEEKING_INDEX;
+                } else if (method == HARD_STOP || method == CURRENT_THRESHOLD) {
+                    if (fabs(current) < current_threshold * 0.5f) {
+                        state = SEEKING_INDEX;
+                    }
+                }
+                break;
+
+            case SEEKING_INDEX:
+                *velocity_command = -home_velocity * 0.1f;  // Very slow
+
+                if (index_pulse) {
+                    // Zero position at index
+                    set_position_zero();
+                    state = MOVING_TO_OFFSET;
+                }
+                break;
+
+            case MOVING_TO_OFFSET:
+                // Position controller moves to home offset
+                if (fabs(position - home_offset) < 0.001f) {
+                    state = COMPLETE;
+                }
+                break;
+
+            case COMPLETE:
+                *homed = true;
+                break;
+
+            case FAILED:
+                break;
+        }
+    }
+
+    State get_state() { return state; }
+    bool is_complete() { return state == COMPLETE; }
+    bool is_failed() { return state == FAILED; }
+
+private:
+    void set_position_zero();
+    uint32_t get_time_ms();
+};</code></pre>
+
+        <h2>5.9 Position Loop Tuning Guidelines</h2>
+        <pre><code>// Auto-Tuning for Position Loop
+class PositionAutoTuner {
+public:
+    struct TuningResult {
+        float Kp;
+        float Kd;
+        float bandwidth_achieved;
+        float phase_margin;
+        bool success;
+    };
+
+    static TuningResult tune(ServoController& servo, TuningConfig config) {
+        TuningResult result;
+        result.success = false;
+
+        // Step 1: Measure system inertia using current step
+        float inertia = measure_inertia(servo);
+
+        // Step 2: Measure friction
+        float friction = measure_friction(servo);
+
+        // Step 3: Calculate velocity loop bandwidth
+        float vel_bandwidth = servo.get_velocity_bandwidth();
+
+        // Step 4: Set position loop bandwidth (rule: 3-5x slower than velocity)
+        float pos_bandwidth = vel_bandwidth / 4.0f;
+        if (pos_bandwidth > config.max_bandwidth) {
+            pos_bandwidth = config.max_bandwidth;
+        }
+
+        // Step 5: Calculate gains
+        result.Kp = pos_bandwidth;  // Position gain = bandwidth
+        result.Kd = 0;  // Usually not needed with good velocity loop
+
+        // Step 6: Verify with step response
+        StepResponse response = measure_step_response(servo, result.Kp, result.Kd);
+
+        if (response.overshoot < config.max_overshoot &&
+            response.settling_time < config.max_settling_time) {
+            result.bandwidth_achieved = estimate_bandwidth(response);
+            result.phase_margin = estimate_phase_margin(response);
+            result.success = true;
+        }
+
+        return result;
+    }
+
+private:
+    static float measure_inertia(ServoController& servo);
+    static float measure_friction(ServoController& servo);
+    static StepResponse measure_step_response(ServoController& servo, float Kp, float Kd);
+    static float estimate_bandwidth(StepResponse& response);
+    static float estimate_phase_margin(StepResponse& response);
+};</code></pre>
+
+        <h2>5.10 Error Handling and Recovery</h2>
+        <pre><code>// Position Control Fault Handler
+class PositionFaultHandler {
+public:
+    enum FaultType {
+        NONE = 0,
+        FOLLOWING_ERROR = 1,
+        POSITION_LIMIT = 2,
+        VELOCITY_LIMIT = 4,
+        ENCODER_FAULT = 8,
+        COMMUNICATION_LOSS = 16
+    };
+
+private:
+    uint32_t active_faults;
+    float following_error_limit;
+    float position_limit_pos;
+    float position_limit_neg;
+    float velocity_limit;
+    uint32_t encoder_fault_count;
+
+public:
+    PositionFaultHandler(FaultLimits limits) {
+        following_error_limit = limits.following_error;
+        position_limit_pos = limits.max_position;
+        position_limit_neg = limits.min_position;
+        velocity_limit = limits.max_velocity;
+        active_faults = NONE;
+        encoder_fault_count = 0;
+    }
+
+    void check(float pos_ref, float pos_fb, float vel_fb, bool encoder_ok) {
+        // Following error check
+        float error = fabs(pos_ref - pos_fb);
+        if (error > following_error_limit) {
+            active_faults |= FOLLOWING_ERROR;
+        }
+
+        // Position limit check
+        if (pos_fb > position_limit_pos || pos_fb < position_limit_neg) {
+            active_faults |= POSITION_LIMIT;
+        }
+
+        // Velocity limit check
+        if (fabs(vel_fb) > velocity_limit) {
+            active_faults |= VELOCITY_LIMIT;
+        }
+
+        // Encoder fault check
+        if (!encoder_ok) {
+            encoder_fault_count++;
+            if (encoder_fault_count > 10) {
+                active_faults |= ENCODER_FAULT;
+            }
+        } else {
+            encoder_fault_count = 0;
+        }
+    }
+
+    void clear_fault(FaultType fault) {
+        active_faults &= ~fault;
+    }
+
+    bool has_fault() { return active_faults != NONE; }
+    uint32_t get_faults() { return active_faults; }
+
+    // Recovery actions
+    void recover(ServoController& servo) {
+        if (active_faults & FOLLOWING_ERROR) {
+            // Reduce velocity and re-sync position
+            servo.sync_position();
+        }
+        if (active_faults & POSITION_LIMIT) {
+            // Move slowly back within limits
+            servo.controlled_stop();
+        }
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Position control builds upon velocity and current loops in a cascaded architecture</li>
+                <li>Encoder selection impacts resolution, accuracy, and system cost</li>
+                <li>Velocity estimation requires different techniques at low and high speeds</li>
+                <li>Velocity control with feed-forward improves dynamic response</li>
+                <li>Position control typically uses P or PD with feed-forward for velocity and acceleration</li>
+                <li>Positioning accuracy depends on encoder resolution, backlash, compliance, and friction</li>
+                <li>Homing procedures establish machine coordinate systems using limit switches or index pulses</li>
+                <li>Following error detection and fault handling ensure safe operation</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Compare incremental and absolute encoders. When is each preferred?</li>
+                <li>Why is velocity estimation challenging and what techniques address different speed ranges?</li>
+                <li>Explain the role of each loop in a position-velocity-current cascaded control system.</li>
+                <li>How does feed-forward improve position tracking performance?</li>
+                <li>What causes positioning hysteresis and how can it be compensated?</li>
+                <li>Describe a typical homing sequence using a limit switch and encoder index pulse.</li>
+                <li>What is following error and why is it important for safety?</li>
+                <li>How should the position loop bandwidth relate to the velocity loop bandwidth?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

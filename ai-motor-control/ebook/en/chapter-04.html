@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Torque & Force Control | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Torque & Force Control</h1>
+
+        <h2>4.1 Introduction to Torque Control</h2>
+        <p>Torque control is the foundation of all motor control systems. Since torque is directly proportional to current in most motor types, precise current regulation enables precise torque control. This chapter explores the principles, techniques, and implementations of torque and force control for intelligent motor systems.</p>
+
+        <p>Torque control is essential for:</p>
+        <ul>
+            <li><strong>Force-sensitive applications:</strong> Assembly, polishing, human-robot interaction</li>
+            <li><strong>Velocity and position control:</strong> As the innermost loop in cascaded control</li>
+            <li><strong>Energy efficiency:</strong> Minimizing copper losses by limiting current</li>
+            <li><strong>Motor protection:</strong> Preventing thermal damage from excessive current</li>
+            <li><strong>Compliant motion:</strong> Allowing controlled interaction with the environment</li>
+        </ul>
+
+        <h2>4.2 Torque-Current Relationship</h2>
+        <p>In DC and synchronous motors, electromagnetic torque is proportional to current:</p>
+
+        <div class="formula">T = K<sub>t</sub> × I<sub>a</sub></div>
+
+        <p>Where T is torque (Nm), K<sub>t</sub> is the torque constant (Nm/A), and I<sub>a</sub> is armature current (A).</p>
+
+        <table>
+            <tr>
+                <th>Motor Type</th>
+                <th>Torque Equation</th>
+                <th>Notes</th>
+            </tr>
+            <tr>
+                <td><strong>DC Brushed</strong></td>
+                <td>T = K<sub>t</sub> × I<sub>a</sub></td>
+                <td>K<sub>t</sub> is constant</td>
+            </tr>
+            <tr>
+                <td><strong>BLDC (Trapezoidal)</strong></td>
+                <td>T = K<sub>t</sub> × I<sub>phase</sub></td>
+                <td>Two phases conducting</td>
+            </tr>
+            <tr>
+                <td><strong>PMSM (Sinusoidal)</strong></td>
+                <td>T = (3/2) × p × ψ<sub>m</sub> × i<sub>q</sub></td>
+                <td>Field-oriented control, i<sub>d</sub>=0</td>
+            </tr>
+            <tr>
+                <td><strong>Induction Motor</strong></td>
+                <td>T = (3/2) × p × (L<sub>m</sub>/L<sub>r</sub>) × ψ<sub>r</sub> × i<sub>sq</sub></td>
+                <td>Indirect vector control</td>
+            </tr>
+        </table>
+
+        <h2>4.3 Current Sensing Methods</h2>
+        <p>Accurate current measurement is critical for torque control. Common sensing methods include:</p>
+
+        <table>
+            <tr>
+                <th>Method</th>
+                <th>Principle</th>
+                <th>Pros</th>
+                <th>Cons</th>
+            </tr>
+            <tr>
+                <td><strong>Shunt Resistor</strong></td>
+                <td>Measure voltage across low-value resistor</td>
+                <td>Low cost, high bandwidth</td>
+                <td>Power loss, common-mode issues</td>
+            </tr>
+            <tr>
+                <td><strong>Hall Effect</strong></td>
+                <td>Magnetic field from current-carrying conductor</td>
+                <td>Isolated, no power loss</td>
+                <td>Offset drift, lower bandwidth</td>
+            </tr>
+            <tr>
+                <td><strong>Current Transformer</strong></td>
+                <td>Magnetic coupling, AC only</td>
+                <td>High isolation, accurate</td>
+                <td>AC only, size, saturation</td>
+            </tr>
+            <tr>
+                <td><strong>Rogowski Coil</strong></td>
+                <td>Air-core coil measures di/dt</td>
+                <td>No saturation, flexible</td>
+                <td>Requires integration, AC only</td>
+            </tr>
+            <tr>
+                <td><strong>Single-Shunt</strong></td>
+                <td>DC bus shunt with PWM timing</td>
+                <td>Lowest cost</td>
+                <td>Complex timing, limited accuracy</td>
+            </tr>
+        </table>
+
+        <h3>Current Sensor Placement</h3>
+        <pre><code>Three-Phase Motor Current Sensing Topologies:
+
+1. Three-Shunt (Most Common):
+   [Phase A]---[Shunt]---[Motor]
+   [Phase B]---[Shunt]---
+   [Phase C]---[Shunt]---
+   Advantage: Can measure all currents simultaneously
+
+2. Two-Shunt (With Kirchhoff's Law):
+   [Phase A]---[Shunt]---[Motor]
+   [Phase B]---[Shunt]---
+   [Phase C]-------------
+   Ia + Ib + Ic = 0, so Ic = -Ia - Ib
+
+3. Single-Shunt (DC Bus):
+                 +Vdc
+                   |
+                [Shunt]
+                   |
+            +------+------+
+            |      |      |
+           Q1     Q3     Q5
+            |      |      |
+            +------+------+---- Motor
+            |      |      |
+           Q2     Q4     Q6
+            |      |      |
+            +------+------+
+                   |
+                  GND
+
+   Sample current during specific PWM states</code></pre>
+
+        <h2>4.4 Current Control Loop Design</h2>
+        <p>The current controller regulates motor current to follow a reference command. A PI controller is typically used:</p>
+
+        <pre><code>// Current Controller for DC Motor
+class CurrentController {
+private:
+    // Motor parameters
+    float R;        // Armature resistance (Ohms)
+    float L;        // Armature inductance (Henries)
+    float Ke;       // Back-EMF constant (V/(rad/s))
+
+    // Controller parameters
+    float Kp;       // Proportional gain
+    float Ki;       // Integral gain
+    float integral; // Integral accumulator
+
+    // Limits
+    float v_max;    // Maximum voltage (power supply)
+    float dt;       // Sample time
+
+public:
+    CurrentController(float resistance, float inductance,
+                      float back_emf_const, float sample_time) {
+        R = resistance;
+        L = inductance;
+        Ke = back_emf_const;
+        dt = sample_time;
+        integral = 0;
+
+        // Design controller for desired bandwidth
+        design_controller(1000.0f);  // 1 kHz bandwidth
+    }
+
+    void design_controller(float bandwidth_hz) {
+        // Standard IMC (Internal Model Control) tuning
+        float bandwidth_rad = 2.0f * M_PI * bandwidth_hz;
+
+        // PI gains for first-order plant (L/R dynamics)
+        Kp = L * bandwidth_rad;
+        Ki = R * bandwidth_rad;
+    }
+
+    float compute(float i_ref, float i_measured, float velocity) {
+        // Current error
+        float error = i_ref - i_measured;
+
+        // PI controller
+        float p_term = Kp * error;
+        integral += error * dt;
+        float i_term = Ki * integral;
+
+        // Back-EMF feed-forward compensation
+        float back_emf = Ke * velocity;
+
+        // Resistance drop feed-forward
+        float r_drop = R * i_ref;
+
+        // Total voltage command
+        float voltage = p_term + i_term + back_emf + r_drop;
+
+        // Anti-windup with clamping
+        if (voltage > v_max) {
+            voltage = v_max;
+            integral -= error * dt;  // Remove last integration
+        } else if (voltage < -v_max) {
+            voltage = -v_max;
+            integral -= error * dt;
+        }
+
+        return voltage;
+    }
+
+    void reset() {
+        integral = 0;
+    }
+};</code></pre>
+
+        <h2>4.5 Field-Oriented Control (FOC)</h2>
+        <p>Field-Oriented Control (FOC) enables independent control of torque and flux in AC motors by transforming three-phase currents into a rotating reference frame:</p>
+
+        <pre><code>Field-Oriented Control Structure:
+
+                     ┌──────────────────────────────┐
+    ┌────────────┐   │        d-q Transform         │   ┌────────────┐
+    │  Torque    │   │                              │   │   Three-   │
+    │  Command   ├──►│  i_d_ref ──► PI ──► v_d     ├──►│   Phase    │
+    │  (i_q*)    │   │                              │   │  Inverter  │
+    └────────────┘   │  i_q_ref ──► PI ──► v_q     │   └─────┬──────┘
+                     │       ▲           │          │         │
+    ┌────────────┐   │       │    dq→αβ→abc         │         │
+    │  Flux      │   │       │           ▼          │         ▼
+    │  Command   ├──►│  ┌────┴────┐ ┌────────────┐  │    ┌─────────┐
+    │  (i_d*=0)  │   │  │ Clarke  │ │   Park     │  │    │  PMSM   │
+    └────────────┘   │  │ abc→αβ  │ │   αβ→dq    │  │    │  Motor  │
+                     │  └────┬────┘ └────────────┘  │    └────┬────┘
+                     │       │           ▲          │         │
+                     │       └───────────┘          │         │
+                     │              ▲               │         │
+                     │         θ (rotor angle)      │         │
+                     │              │               │         │
+                     │         ┌────┴────┐          │         │
+                     │         │ Encoder │◄─────────┼─────────┘
+                     │         └─────────┘          │
+                     └──────────────────────────────┘</code></pre>
+
+        <pre><code>// Field-Oriented Control Implementation
+class FOCController {
+private:
+    // PI controllers for d and q axes
+    PIController d_axis_pi;
+    PIController q_axis_pi;
+
+    // Motor parameters
+    float Ld, Lq;       // d and q axis inductances
+    float Rs;           // Stator resistance
+    float psi_m;        // Permanent magnet flux linkage
+    int pole_pairs;
+
+    // Electrical angle
+    float theta_e;
+
+public:
+    FOCController(MotorParams params) {
+        Ld = params.Ld;
+        Lq = params.Lq;
+        Rs = params.Rs;
+        psi_m = params.flux_linkage;
+        pole_pairs = params.pole_pairs;
+
+        // Design current controllers
+        float current_bw = 2000.0f;  // 2 kHz current loop bandwidth
+        d_axis_pi.set_gains(Ld * current_bw * 2 * M_PI,
+                            Rs * current_bw * 2 * M_PI);
+        q_axis_pi.set_gains(Lq * current_bw * 2 * M_PI,
+                            Rs * current_bw * 2 * M_PI);
+    }
+
+    void control(float torque_ref, float id_ref,
+                 float ia, float ib, float ic,
+                 float theta_mech, float omega_mech,
+                 float* va, float* vb, float* vc) {
+
+        // Electrical angle and speed
+        theta_e = theta_mech * pole_pairs;
+        float omega_e = omega_mech * pole_pairs;
+
+        // Clarke Transform: abc → αβ
+        float i_alpha = ia;
+        float i_beta = (ia + 2.0f * ib) / sqrt(3.0f);
+
+        // Park Transform: αβ → dq
+        float cos_theta = cos(theta_e);
+        float sin_theta = sin(theta_e);
+        float id = i_alpha * cos_theta + i_beta * sin_theta;
+        float iq = -i_alpha * sin_theta + i_beta * cos_theta;
+
+        // Convert torque reference to q-axis current reference
+        // T = (3/2) * p * psi_m * iq  →  iq* = T* / ((3/2) * p * psi_m)
+        float iq_ref = torque_ref / (1.5f * pole_pairs * psi_m);
+
+        // d-axis current controller (flux control)
+        float vd = d_axis_pi.compute(id_ref, id);
+
+        // q-axis current controller (torque control)
+        float vq = q_axis_pi.compute(iq_ref, iq);
+
+        // Decoupling and feed-forward
+        vd -= omega_e * Lq * iq;                    // Cross-coupling compensation
+        vq += omega_e * (Ld * id + psi_m);          // Back-EMF + cross-coupling
+
+        // Inverse Park Transform: dq → αβ
+        float v_alpha = vd * cos_theta - vq * sin_theta;
+        float v_beta = vd * sin_theta + vq * cos_theta;
+
+        // Inverse Clarke Transform: αβ → abc
+        *va = v_alpha;
+        *vb = (-v_alpha + sqrt(3.0f) * v_beta) / 2.0f;
+        *vc = (-v_alpha - sqrt(3.0f) * v_beta) / 2.0f;
+    }
+
+    // Calculate actual torque from currents
+    float get_torque(float iq) {
+        return 1.5f * pole_pairs * psi_m * iq;
+    }
+};</code></pre>
+
+        <h2>4.6 Space Vector Modulation</h2>
+        <p>Space Vector PWM (SVPWM) efficiently converts voltage commands to inverter switching signals:</p>
+
+        <pre><code>// Space Vector PWM Implementation
+class SVPWM {
+private:
+    float Vdc;          // DC bus voltage
+    float Ts;           // PWM period
+
+public:
+    SVPWM(float dc_voltage, float pwm_freq) {
+        Vdc = dc_voltage;
+        Ts = 1.0f / pwm_freq;
+    }
+
+    void modulate(float v_alpha, float v_beta,
+                  float* duty_a, float* duty_b, float* duty_c) {
+        // Calculate reference vector magnitude and angle
+        float v_ref = sqrt(v_alpha * v_alpha + v_beta * v_beta);
+        float angle = atan2(v_beta, v_alpha);
+        if (angle < 0) angle += 2.0f * M_PI;
+
+        // Determine sector (1-6)
+        int sector = (int)(angle / (M_PI / 3.0f)) + 1;
+        if (sector > 6) sector = 6;
+
+        // Angle within sector
+        float theta = angle - (sector - 1) * M_PI / 3.0f;
+
+        // Calculate times for adjacent vectors
+        float m = v_ref / (Vdc / sqrt(3.0f));  // Modulation index
+        float t1 = m * Ts * sin(M_PI / 3.0f - theta);
+        float t2 = m * Ts * sin(theta);
+        float t0 = Ts - t1 - t2;  // Zero vector time
+
+        // Limit to valid range
+        if (t1 + t2 > Ts) {
+            float scale = Ts / (t1 + t2);
+            t1 *= scale;
+            t2 *= scale;
+            t0 = 0;
+        }
+
+        // Calculate duty cycles based on sector
+        // (Centered PWM with symmetric zero vector distribution)
+        float ta, tb, tc;
+        calculate_duties(sector, t0, t1, t2, &ta, &tb, &tc);
+
+        *duty_a = ta / Ts;
+        *duty_b = tb / Ts;
+        *duty_c = tc / Ts;
+    }
+
+private:
+    void calculate_duties(int sector, float t0, float t1, float t2,
+                          float* ta, float* tb, float* tc) {
+        float t0_half = t0 / 2.0f;
+
+        switch (sector) {
+            case 1:
+                *ta = t1 + t2 + t0_half;
+                *tb = t2 + t0_half;
+                *tc = t0_half;
+                break;
+            case 2:
+                *ta = t1 + t0_half;
+                *tb = t1 + t2 + t0_half;
+                *tc = t0_half;
+                break;
+            case 3:
+                *ta = t0_half;
+                *tb = t1 + t2 + t0_half;
+                *tc = t2 + t0_half;
+                break;
+            case 4:
+                *ta = t0_half;
+                *tb = t1 + t0_half;
+                *tc = t1 + t2 + t0_half;
+                break;
+            case 5:
+                *ta = t2 + t0_half;
+                *tb = t0_half;
+                *tc = t1 + t2 + t0_half;
+                break;
+            case 6:
+                *ta = t1 + t2 + t0_half;
+                *tb = t0_half;
+                *tc = t1 + t0_half;
+                break;
+        }
+    }
+};</code></pre>
+
+        <h2>4.7 Torque Estimation and Observers</h2>
+        <p>When direct torque measurement is unavailable, observers can estimate torque from electrical measurements:</p>
+
+        <pre><code>// Torque Observer using Disturbance Observer
+class TorqueObserver {
+private:
+    float J;            // Total inertia
+    float B;            // Viscous friction
+    float Kt;           // Torque constant
+
+    float omega_hat;    // Estimated velocity
+    float torque_dist;  // Estimated disturbance torque
+    float L_obs;        // Observer gain
+
+    float dt;
+
+public:
+    TorqueObserver(float inertia, float friction,
+                   float torque_const, float bandwidth, float sample_time) {
+        J = inertia;
+        B = friction;
+        Kt = torque_const;
+        dt = sample_time;
+
+        // Observer gain for desired bandwidth
+        L_obs = bandwidth * 2.0f * M_PI;
+
+        omega_hat = 0;
+        torque_dist = 0;
+    }
+
+    float estimate(float current, float omega_measured) {
+        // Motor torque from current
+        float torque_motor = Kt * current;
+
+        // Velocity estimation error
+        float omega_error = omega_measured - omega_hat;
+
+        // Update disturbance estimate
+        // Disturbance = External load + model errors
+        torque_dist += L_obs * L_obs * J * omega_error * dt;
+
+        // Update velocity estimate
+        float accel = (torque_motor - torque_dist - B * omega_hat) / J;
+        omega_hat += (accel + L_obs * omega_error) * dt;
+
+        // Total load torque estimate
+        return torque_dist + B * omega_measured;
+    }
+
+    float get_load_torque() {
+        return torque_dist;
+    }
+};</code></pre>
+
+        <h2>4.8 Force Control for Linear Actuators</h2>
+        <p>Linear motors and lead-screw driven actuators require force (rather than torque) control:</p>
+
+        <pre><code>// Force Controller for Linear Actuator
+class ForceController {
+private:
+    // Actuator parameters
+    float Kf;           // Force constant (N/A) for linear motor
+                        // or Kt/lead for lead-screw
+    float actuator_mass;
+    float friction;
+
+    // Force sensor
+    bool has_force_sensor;
+    float force_sensor_gain;
+
+    // Controller
+    PIController force_pi;
+    float max_current;
+
+public:
+    ForceController(ActuatorParams params, bool use_force_sensor) {
+        Kf = params.force_constant;
+        actuator_mass = params.mass;
+        friction = params.friction;
+        has_force_sensor = use_force_sensor;
+        max_current = params.max_current;
+
+        // Force control bandwidth (typically lower than current)
+        force_pi.set_gains(50.0f, 200.0f);
+    }
+
+    float compute(float force_ref, float force_measured,
+                  float velocity, float current_measured) {
+
+        float current_command;
+
+        if (has_force_sensor) {
+            // Direct force feedback control
+            float force_error = force_ref - force_measured;
+            current_command = force_pi.compute(force_error);
+        } else {
+            // Force control via current (open-loop force)
+            // With disturbance observer compensation
+            float current_for_force = force_ref / Kf;
+            float friction_comp = friction * sign(velocity) / Kf;
+            current_command = current_for_force + friction_comp;
+        }
+
+        // Current limiting
+        current_command = clamp(current_command, -max_current, max_current);
+
+        return current_command;
+    }
+
+    // Impedance control mode
+    float impedance_control(float pos_ref, float pos_actual,
+                            float vel_actual, float force_measured,
+                            float stiffness, float damping) {
+        // Virtual spring-damper
+        float pos_error = pos_ref - pos_actual;
+        float force_ref = stiffness * pos_error - damping * vel_actual;
+
+        return compute(force_ref, force_measured, vel_actual, 0);
+    }
+};</code></pre>
+
+        <h2>4.9 Torque Ripple Compensation</h2>
+        <p>Motors exhibit torque ripple due to cogging, harmonics, and commutation effects. AI and signal processing techniques can compensate:</p>
+
+        <pre><code>// Torque Ripple Compensation
+class TorqueRippleCompensator {
+private:
+    // Harmonic compensation table (function of rotor angle)
+    int table_size;
+    float* compensation_table;
+
+    // Learning parameters
+    float learning_rate;
+    bool learning_enabled;
+
+    // Harmonic amplitudes and phases
+    vector<float> harmonic_amplitude;
+    vector<float> harmonic_phase;
+    int num_harmonics;
+
+public:
+    TorqueRippleCompensator(int harmonics, int table_entries) {
+        num_harmonics = harmonics;
+        table_size = table_entries;
+        compensation_table = new float[table_size];
+
+        harmonic_amplitude.resize(harmonics);
+        harmonic_phase.resize(harmonics);
+
+        // Initialize to zero
+        for (int i = 0; i < table_size; i++) {
+            compensation_table[i] = 0;
+        }
+
+        learning_rate = 0.01f;
+        learning_enabled = true;
+    }
+
+    float compensate(float theta_electrical, float velocity) {
+        // Only compensate during constant velocity (avoid transients)
+        if (fabs(velocity) < 10.0f) return 0;
+
+        // Table lookup with interpolation
+        float index_f = theta_electrical / (2.0f * M_PI) * table_size;
+        int index = (int)index_f % table_size;
+        int next_index = (index + 1) % table_size;
+        float frac = index_f - (int)index_f;
+
+        float comp = compensation_table[index] * (1.0f - frac)
+                   + compensation_table[next_index] * frac;
+
+        return comp;
+    }
+
+    void learn(float theta_electrical, float torque_error, float velocity) {
+        if (!learning_enabled) return;
+        if (fabs(velocity) < 10.0f) return;  // Need sufficient speed
+
+        // Update table at current angle
+        int index = (int)(theta_electrical / (2.0f * M_PI) * table_size) % table_size;
+        compensation_table[index] += learning_rate * torque_error;
+    }
+
+    // Fourier-based compensation
+    float compensate_fourier(float theta_electrical) {
+        float comp = 0;
+        for (int h = 0; h < num_harmonics; h++) {
+            int harmonic_order = (h + 1) * 6;  // 6th, 12th, 18th... for 3-phase
+            comp += harmonic_amplitude[h] *
+                    sin(harmonic_order * theta_electrical + harmonic_phase[h]);
+        }
+        return comp;
+    }
+};</code></pre>
+
+        <h2>4.10 Current Limiting and Protection</h2>
+        <p>Proper current limiting protects the motor and drive from damage:</p>
+
+        <pre><code>// Comprehensive Current Protection
+class CurrentProtection {
+private:
+    // Limits
+    float I_continuous;     // Continuous current limit
+    float I_peak;           // Peak current limit
+    float I_instantaneous;  // Absolute maximum (hardware trip)
+
+    // Thermal model
+    float I2t_limit;        // I²t energy limit
+    float I2t_accumulator;  // Running I²t value
+    float I2t_decay_rate;   // Thermal decay constant
+
+    // Derating
+    float temperature;
+    float temp_derating_start;
+    float temp_derating_full;
+
+    float dt;
+
+public:
+    CurrentProtection(CurrentLimits limits, float sample_time) {
+        I_continuous = limits.continuous;
+        I_peak = limits.peak;
+        I_instantaneous = limits.instantaneous;
+        I2t_limit = limits.i2t;
+        I2t_decay_rate = 1.0f / limits.thermal_time_constant;
+        dt = sample_time;
+        I2t_accumulator = 0;
+        temp_derating_start = 80.0f;  // Start derating at 80°C
+        temp_derating_full = 120.0f;  // Full derating at 120°C
+    }
+
+    float limit_current(float current_ref, float temperature_celsius) {
+        temperature = temperature_celsius;
+
+        // Temperature derating
+        float temp_factor = 1.0f;
+        if (temperature > temp_derating_start) {
+            temp_factor = 1.0f - (temperature - temp_derating_start)
+                               / (temp_derating_full - temp_derating_start);
+            temp_factor = clamp(temp_factor, 0.0f, 1.0f);
+        }
+
+        // Derated continuous limit
+        float I_limit = I_continuous * temp_factor;
+
+        // Allow peak current if I²t budget available
+        float I2t_margin = I2t_limit - I2t_accumulator;
+        if (I2t_margin > 0) {
+            // Can exceed continuous up to peak
+            float I_max_now = sqrt(I_limit * I_limit + I2t_margin / dt);
+            I_max_now = min(I_max_now, I_peak * temp_factor);
+            I_limit = I_max_now;
+        }
+
+        // Apply limit
+        float limited = clamp(current_ref, -I_limit, I_limit);
+
+        // Update I²t accumulator
+        float I_actual_squared = limited * limited;
+        float I_cont_squared = I_continuous * I_continuous * temp_factor * temp_factor;
+
+        if (I_actual_squared > I_cont_squared) {
+            I2t_accumulator += (I_actual_squared - I_cont_squared) * dt;
+        } else {
+            I2t_accumulator -= I2t_decay_rate * I2t_accumulator * dt;
+        }
+        I2t_accumulator = max(I2t_accumulator, 0.0f);
+
+        return limited;
+    }
+
+    bool is_overload() {
+        return I2t_accumulator >= I2t_limit;
+    }
+
+    float get_available_capacity() {
+        return 1.0f - (I2t_accumulator / I2t_limit);
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Torque is directly proportional to current in DC and synchronous motors (T = K<sub>t</sub> x I)</li>
+                <li>Current sensing methods include shunt resistors, Hall effect sensors, and current transformers</li>
+                <li>PI controllers with feed-forward compensation provide fast current regulation</li>
+                <li>Field-Oriented Control (FOC) enables independent torque and flux control in AC motors</li>
+                <li>Space Vector PWM efficiently implements FOC voltage commands</li>
+                <li>Torque observers estimate load torque from electrical measurements</li>
+                <li>Force control applies torque control principles to linear actuators</li>
+                <li>Torque ripple compensation uses lookup tables or Fourier harmonics</li>
+                <li>Current protection with I²t limiting prevents thermal damage while allowing peak torque</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain the relationship between motor current and torque. How does this relationship differ for PMSM vs DC motors?</li>
+                <li>Compare shunt resistor and Hall effect current sensing. What are the trade-offs?</li>
+                <li>What is the purpose of back-EMF feed-forward in current control?</li>
+                <li>Describe the Clarke and Park transforms used in Field-Oriented Control.</li>
+                <li>Why is the d-axis current typically set to zero in surface-mount PMSM control?</li>
+                <li>How does a disturbance observer estimate load torque?</li>
+                <li>What causes torque ripple in motors and how can it be compensated?</li>
+                <li>Explain the I²t protection concept and why it allows temporary overcurrent.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

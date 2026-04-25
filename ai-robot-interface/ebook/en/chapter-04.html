@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Phase 1 - Data Format | WIA-AI-ROBOT</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Phase 1 - Data Format Standardization</h1>
+
+        <h2>4.1 The Importance of Data Format Standards</h2>
+        <p>Data format standardization forms the foundation of the WIA-AI-ROBOT standard. Without consistent data structures, AI models and robots cannot communicate effectively. Phase 1 establishes universal formats for all data exchanged between AI systems and robots.</p>
+
+        <p>Key objectives of data format standardization:</p>
+        <ul>
+            <li><strong>Interoperability:</strong> Any AI model can understand any robot's data</li>
+            <li><strong>Clarity:</strong> Unambiguous representation of commands and sensor data</li>
+            <li><strong>Efficiency:</strong> Compact formats for low-latency transmission</li>
+            <li><strong>Extensibility:</strong> Easy to add new fields without breaking compatibility</li>
+        </ul>
+
+        <h2>4.2 AI Prompt Templates</h2>
+        <p>Structured prompt templates enable LLMs to understand robot context and generate appropriate commands:</p>
+
+        <h3>System Prompt Template</h3>
+        <pre><code>{
+  "role": "system",
+  "content": {
+    "identity": "Robot Task Planner and Commander",
+    "robot_type": "{{ROBOT_TYPE}}",
+    "capabilities": [
+      {{CAPABILITY_LIST}}
+    ],
+    "constraints": {
+      "workspace": {{WORKSPACE_BOUNDS}},
+      "payload": "{{MAX_PAYLOAD}}",
+      "speed_limits": {{SPEED_LIMITS}},
+      "safety_zones": [{{SAFETY_ZONES}}]
+    },
+    "output_format": {
+      "type": "structured_commands",
+      "schema": "wia-airi-v1",
+      "validation_required": true
+    }
+  }
+}</code></pre>
+
+        <h3>User Context Template</h3>
+        <pre><code>{
+  "role": "user",
+  "content": {
+    "instruction": "{{USER_COMMAND}}",
+    "context": {
+      "robot_state": {
+        "position": {"x": 1.2, "y": 3.4, "z": 0.0},
+        "orientation": {"roll": 0, "pitch": 0, "yaw": 1.57},
+        "joints": [0.0, -0.5, 1.2, 0.0, 1.0, 0.0],
+        "gripper": "open",
+        "battery": 87,
+        "mode": "idle"
+      },
+      "environment": {
+        "detected_objects": [
+          {"id": "obj_001", "type": "box", "color": "red",
+           "position": {"x": 2.0, "y": 3.5, "z": 0.5}},
+          {"id": "obj_002", "type": "basket", "color": "blue",
+           "position": {"x": 3.0, "y": 4.0, "z": 0.3}}
+        ],
+        "obstacles": [
+          {"type": "wall", "position": {"x": 0.0, "y": 0.0},
+           "dimensions": {"length": 5.0, "height": 2.5}}
+        ]
+      },
+      "recent_actions": [
+        {"action": "navigate_to", "target": "home", "result": "success"}
+      ]
+    }
+  }
+}</code></pre>
+
+        <h2>4.3 Robot Command Schema</h2>
+        <p>All robot commands follow a standardized JSON schema:</p>
+
+        <h3>Base Command Structure</h3>
+        <pre><code>{
+  "command_id": "cmd_{{UUID}}",
+  "timestamp": "{{ISO8601_TIMESTAMP}}",
+  "version": "1.0",
+  "type": "{{COMMAND_TYPE}}",
+  "priority": "normal|high|critical",
+  "parameters": {
+    // Command-specific parameters
+  },
+  "safety": {
+    "require_validation": true,
+    "allow_override": false,
+    "timeout_ms": 30000,
+    "collision_check": true
+  },
+  "metadata": {
+    "source": "ai|human|system",
+    "session_id": "{{SESSION_ID}}",
+    "user_id": "{{USER_ID}}"
+  }
+}</code></pre>
+
+        <h3>Standard Command Types</h3>
+        <table>
+            <tr>
+                <th>Command Type</th>
+                <th>Purpose</th>
+                <th>Key Parameters</th>
+            </tr>
+            <tr>
+                <td><strong>navigate_to</strong></td>
+                <td>Move to target location</td>
+                <td>target, waypoints, speed, avoid_obstacles</td>
+            </tr>
+            <tr>
+                <td><strong>grasp</strong></td>
+                <td>Pick up object</td>
+                <td>object_id, approach_vector, force_limit</td>
+            </tr>
+            <tr>
+                <td><strong>release</strong></td>
+                <td>Release held object</td>
+                <td>location, placement_pose, gentle</td>
+            </tr>
+            <tr>
+                <td><strong>scan_area</strong></td>
+                <td>Visually survey region</td>
+                <td>region, resolution, modality</td>
+            </tr>
+            <tr>
+                <td><strong>manipulate</strong></td>
+                <td>Complex manipulation task</td>
+                <td>tool, operation, target</td>
+            </tr>
+            <tr>
+                <td><strong>wait</strong></td>
+                <td>Pause execution</td>
+                <td>duration_ms, condition</td>
+            </tr>
+            <tr>
+                <td><strong>abort</strong></td>
+                <td>Cancel current action</td>
+                <td>reason, safe_stop</td>
+            </tr>
+        </table>
+
+        <h3>Example: Navigation Command</h3>
+        <pre><code>{
+  "command_id": "cmd_a7b3c9d1",
+  "timestamp": "2025-01-15T10:30:45.123Z",
+  "version": "1.0",
+  "type": "navigate_to",
+  "priority": "normal",
+  "parameters": {
+    "target": {
+      "type": "coordinates",
+      "x": 5.0,
+      "y": 3.2,
+      "z": 0.0,
+      "frame": "map"
+    },
+    "waypoints": [
+      {"x": 2.0, "y": 2.0},
+      {"x": 4.0, "y": 3.0}
+    ],
+    "speed": 0.5,
+    "avoid_obstacles": true,
+    "orientation": "auto"
+  },
+  "safety": {
+    "require_validation": true,
+    "allow_override": false,
+    "timeout_ms": 60000,
+    "collision_check": true
+  },
+  "metadata": {
+    "source": "ai",
+    "session_id": "sess_12345",
+    "user_id": "user_jane"
+  }
+}</code></pre>
+
+        <h2>4.4 Sensor Data Formats</h2>
+        <p>Standardized formats for sensor data enable AI systems to understand robot perception:</p>
+
+        <h3>Camera Image Data</h3>
+        <pre><code>{
+  "sensor_type": "camera",
+  "sensor_id": "cam_front",
+  "timestamp": "2025-01-15T10:30:45.500Z",
+  "frame_id": "12345",
+  "image": {
+    "encoding": "jpeg",
+    "width": 1920,
+    "height": 1080,
+    "data": "{{BASE64_ENCODED_IMAGE}}",
+    "compression": 85
+  },
+  "camera_info": {
+    "fov_horizontal": 90,
+    "fov_vertical": 60,
+    "focal_length": 3.6,
+    "distortion": [0.01, -0.02, 0.0, 0.0]
+  },
+  "pose": {
+    "position": {"x": 0.1, "y": 0.0, "z": 1.5},
+    "orientation": {"roll": 0, "pitch": 0, "yaw": 0}
+  }
+}</code></pre>
+
+        <h3>LiDAR Point Cloud Data</h3>
+        <pre><code>{
+  "sensor_type": "lidar",
+  "sensor_id": "lidar_360",
+  "timestamp": "2025-01-15T10:30:45.500Z",
+  "point_cloud": {
+    "format": "xyz_intensity",
+    "points": 65536,
+    "data": "{{BINARY_OR_BASE64}}",
+    "range_min": 0.1,
+    "range_max": 30.0,
+    "angle_min": -3.14159,
+    "angle_max": 3.14159
+  },
+  "pose": {
+    "position": {"x": 0.0, "y": 0.0, "z": 0.3},
+    "orientation": {"roll": 0, "pitch": 0, "yaw": 0}
+  }
+}</code></pre>
+
+        <h3>IMU Data</h3>
+        <pre><code>{
+  "sensor_type": "imu",
+  "sensor_id": "imu_base",
+  "timestamp": "2025-01-15T10:30:45.500Z",
+  "orientation": {
+    "x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0
+  },
+  "angular_velocity": {
+    "x": 0.01, "y": -0.02, "z": 0.03
+  },
+  "linear_acceleration": {
+    "x": 0.1, "y": 0.0, "z": 9.81
+  }
+}</code></pre>
+
+        <h2>4.5 Response Specifications</h2>
+        <p>Robots provide structured feedback to AI systems:</p>
+
+        <h3>Command Acknowledgment</h3>
+        <pre><code>{
+  "response_type": "acknowledgment",
+  "command_id": "cmd_a7b3c9d1",
+  "timestamp": "2025-01-15T10:30:45.200Z",
+  "status": "accepted|rejected|queued",
+  "validation_result": {
+    "passed": true,
+    "checks": {
+      "syntax": "pass",
+      "safety": "pass",
+      "feasibility": "pass",
+      "resource": "pass"
+    },
+    "warnings": [],
+    "errors": []
+  },
+  "estimated_duration": 30000
+}</code></pre>
+
+        <h3>Execution Status</h3>
+        <pre><code>{
+  "response_type": "status",
+  "command_id": "cmd_a7b3c9d1",
+  "timestamp": "2025-01-15T10:31:15.500Z",
+  "state": "executing|completed|failed|aborted",
+  "progress": 0.75,
+  "current_action": "approaching target",
+  "telemetry": {
+    "position": {"x": 4.2, "y": 3.0, "z": 0.0},
+    "velocity": {"linear": 0.5, "angular": 0.1},
+    "battery": 85,
+    "temperature": 42
+  },
+  "obstacles_detected": 2,
+  "time_remaining": 7500
+}</code></pre>
+
+        <h3>Completion Report</h3>
+        <pre><code>{
+  "response_type": "completion",
+  "command_id": "cmd_a7b3c9d1",
+  "timestamp": "2025-01-15T10:31:23.000Z",
+  "result": "success|partial_success|failure",
+  "execution_time": 37500,
+  "final_state": {
+    "position": {"x": 5.0, "y": 3.2, "z": 0.0},
+    "orientation": {"yaw": 1.57}
+  },
+  "metrics": {
+    "distance_traveled": 5.2,
+    "energy_consumed": 120,
+    "obstacles_avoided": 2
+  },
+  "issues": [],
+  "sensor_snapshots": [
+    {"type": "camera", "timestamp": "2025-01-15T10:31:22.900Z"}
+  ]
+}</code></pre>
+
+        <h2>4.6 Vision AI Data Formats</h2>
+        <p>Standardized formats for vision AI results:</p>
+
+        <h3>Object Detection Results</h3>
+        <pre><code>{
+  "vision_type": "object_detection",
+  "model": "yolov8",
+  "timestamp": "2025-01-15T10:30:46.000Z",
+  "image_id": "frame_12345",
+  "detections": [
+    {
+      "object_id": "det_001",
+      "class": "person",
+      "confidence": 0.95,
+      "bounding_box": {
+        "x_min": 100, "y_min": 50,
+        "x_max": 250, "y_max": 400
+      },
+      "center": {"x": 175, "y": 225},
+      "pose_estimate": {
+        "keypoints": [...],
+        "skeleton": [...]
+      }
+    },
+    {
+      "object_id": "det_002",
+      "class": "cup",
+      "confidence": 0.87,
+      "bounding_box": {
+        "x_min": 500, "y_min": 300,
+        "x_max": 580, "y_max": 450
+      },
+      "3d_position": {"x": 1.2, "y": 0.5, "z": 0.8},
+      "graspable": true,
+      "grasp_poses": [
+        {"approach": "top", "confidence": 0.92}
+      ]
+    }
+  ]
+}</code></pre>
+
+        <h3>Scene Understanding</h3>
+        <pre><code>{
+  "vision_type": "scene_understanding",
+  "model": "claude-vision",
+  "timestamp": "2025-01-15T10:30:46.500Z",
+  "scene_description": "Office environment with desk, chair, and laptop",
+  "objects": [
+    {"name": "desk", "location": "center", "state": "occupied"},
+    {"name": "chair", "location": "in front of desk", "state": "empty"},
+    {"name": "laptop", "location": "on desk", "state": "open"}
+  ],
+  "spatial_relationships": [
+    {"subject": "chair", "relation": "in_front_of", "object": "desk"},
+    {"subject": "laptop", "relation": "on", "object": "desk"}
+  ],
+  "safety_assessment": {
+    "hazards": [],
+    "clearance": "safe",
+    "human_presence": false
+  }
+}</code></pre>
+
+        <h2>4.7 Capability Description Format</h2>
+        <p>Robots advertise their capabilities in a machine-readable format:</p>
+
+        <pre><code>{
+  "robot_id": "rb_industrial_001",
+  "model": "UR10e",
+  "manufacturer": "Universal Robots",
+  "capabilities": {
+    "manipulation": {
+      "available": true,
+      "dof": 6,
+      "reach": 1.3,
+      "payload": 12.5,
+      "precision": 0.05,
+      "end_effectors": ["gripper", "vacuum"]
+    },
+    "navigation": {
+      "available": true,
+      "max_speed": 1.5,
+      "max_acceleration": 0.5,
+      "localization": ["odometry", "lidar"],
+      "obstacle_avoidance": true
+    },
+    "perception": {
+      "cameras": [
+        {"id": "cam_wrist", "resolution": "1920x1080", "fps": 30},
+        {"id": "cam_head", "resolution": "1920x1080", "fps": 30}
+      ],
+      "lidar": [
+        {"id": "lidar_360", "range": 30.0, "fov": 360}
+      ],
+      "force_torque": true
+    },
+    "ai_integration": {
+      "local_inference": true,
+      "models_supported": ["vision", "nlp"],
+      "cloud_connected": true
+    }
+  },
+  "supported_commands": [
+    "navigate_to", "grasp", "release", "scan_area",
+    "manipulate", "wait", "abort"
+  ],
+  "safety_features": {
+    "emergency_stop": true,
+    "collision_detection": true,
+    "force_limiting": true,
+    "safety_rated": "PLd"
+  }
+}</code></pre>
+
+        <h2>4.8 Error and Exception Formats</h2>
+        <p>Standardized error reporting:</p>
+
+        <pre><code>{
+  "error_type": "execution_error",
+  "command_id": "cmd_a7b3c9d1",
+  "timestamp": "2025-01-15T10:31:10.000Z",
+  "severity": "critical|error|warning|info",
+  "code": "E_COLLISION_DETECTED",
+  "message": "Collision detected during navigation",
+  "details": {
+    "position": {"x": 3.5, "y": 2.8, "z": 0.0},
+    "obstacle": "unexpected_object",
+    "sensor_data": {...}
+  },
+  "recovery_actions": [
+    "back_up",
+    "replan_path",
+    "request_assistance"
+  ],
+  "safe_state": true
+}</code></pre>
+
+        <h2>4.9 Data Format Versioning</h2>
+        <p>All data formats include version information for evolution:</p>
+
+        <table>
+            <tr>
+                <th>Version Field</th>
+                <th>Location</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td><strong>schema_version</strong></td>
+                <td>Root of all messages</td>
+                <td>Overall format version</td>
+            </tr>
+            <tr>
+                <td><strong>api_version</strong></td>
+                <td>HTTP headers</td>
+                <td>API compatibility</td>
+            </tr>
+            <tr>
+                <td><strong>protocol_version</strong></td>
+                <td>Protocol handshake</td>
+                <td>Communication protocol</td>
+            </tr>
+        </table>
+
+        <h3>Version Negotiation</h3>
+        <pre><code>Client: "I support WIA-AIRI v1.0, v1.1"
+Server: "I support WIA-AIRI v1.1, v1.2"
+Result: Both use v1.1 (highest common version)</code></pre>
+
+        <h2>4.10 Best Practices for Data Formats</h2>
+        <ul>
+            <li><strong>Use JSON for Human-Readable Data:</strong> Configuration, commands, responses</li>
+            <li><strong>Use Binary for High-Volume Data:</strong> Point clouds, images, telemetry</li>
+            <li><strong>Include Timestamps:</strong> All messages must have ISO 8601 timestamps</li>
+            <li><strong>Validate Everything:</strong> Use JSON Schema validation</li>
+            <li><strong>Be Explicit:</strong> Include units (meters, radians, milliseconds)</li>
+            <li><strong>Support Extensions:</strong> Allow custom fields without breaking compatibility</li>
+            <li><strong>Document Examples:</strong> Provide real-world examples for each format</li>
+        </ul>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Data format standardization enables interoperability between any AI model and any robot</li>
+                <li>AI prompt templates structure LLM interactions with robot context and constraints</li>
+                <li>Robot commands follow a unified JSON schema with safety parameters</li>
+                <li>Standard command types include navigate_to, grasp, release, scan_area, manipulate, wait, abort</li>
+                <li>Sensor data formats cover cameras, LiDAR, IMU, and other perception systems</li>
+                <li>Response specifications include acknowledgment, status updates, and completion reports</li>
+                <li>Vision AI results have standardized formats for object detection and scene understanding</li>
+                <li>Capability descriptions enable dynamic discovery of robot features</li>
+                <li>Error formats provide structured exception reporting with recovery actions</li>
+                <li>Version negotiation ensures compatibility across implementations</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the four key objectives of data format standardization?</li>
+                <li>Describe the structure of an AI prompt template for robot control.</li>
+                <li>What are the required fields in the base robot command structure?</li>
+                <li>List seven standard command types and explain their purposes.</li>
+                <li>What information is included in the camera image data format?</li>
+                <li>How do robots provide feedback to AI systems? Describe the three types of responses.</li>
+                <li>What does an object detection result include according to the standard?</li>
+                <li>How does the capability description format help with AI-robot integration?</li>
+                <li>Explain the version negotiation process between client and server.</li>
+                <li>What are the best practices for choosing between JSON and binary formats?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

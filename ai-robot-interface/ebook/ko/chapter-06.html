@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 3단계 - 프로토콜 | WIA-AI-ROBOT</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .warning{background:#dc2626;color:#fff;padding:15px;border-radius:5px;margin:20px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>6장: 3단계 - 통신 프로토콜</h1>
+
+        <h2>6.1 AIRI 프로토콜 개요</h2>
+        <p>AI-로봇 인터페이스(AIRI) 프로토콜은 실시간, 안전 중요 AI-로봇 통신을 위해 설계된 WIA-AI-ROBOT 표준의 핵심 통신 프로토콜입니다.</p>
+
+        <h2>6.2 메시지 형식 사양</h2>
+        <p>AIRI 메시지는 선택적 JSON 인코딩과 함께 효율적인 바이너리 형식을 사용합니다:</p>
+
+        <h3>바이너리 메시지 구조</h3>
+        <pre><code>AIRI 메시지 형식 (바이너리):
+┌──────────┬──────────┬──────────┬────────────┬─────────┬────────┐
+│  Magic   │ Version  │  Type    │  Length    │ Payload │   CRC  │
+│ (4바이트)│ (2바이트)│ (2바이트)│  (4바이트) │ (N바이트│(4바이트│
+└──────────┴──────────┴──────────┴────────────┴─────────┴────────┘
+
+Magic: 0x41495249 (ASCII로 'AIRI')
+Version: 프로토콜 버전 (예: v1.0의 경우 0x0100)
+Type: 메시지 유형 식별자
+Length: 페이로드 길이 (바이트)
+Payload: 메시지 데이터 (유형별로 다름)
+CRC: 오류 감지를 위한 CRC32 체크섬</code></pre>
+
+        <h3>메시지 유형</h3>
+        <table>
+            <tr>
+                <th>유형 코드</th>
+                <th>메시지 유형</th>
+                <th>목적</th>
+            </tr>
+            <tr>
+                <td><strong>0x0001</strong></td>
+                <td>HANDSHAKE</td>
+                <td>연결 수립</td>
+            </tr>
+            <tr>
+                <td><strong>0x0002</strong></td>
+                <td>HEARTBEAT</td>
+                <td>연결 유지 및 상태 확인</td>
+            </tr>
+            <tr>
+                <td><strong>0x0010</strong></td>
+                <td>COMMAND</td>
+                <td>로봇 명령 실행</td>
+            </tr>
+            <tr>
+                <td><strong>0x0011</strong></td>
+                <td>COMMAND_ACK</td>
+                <td>명령 확인</td>
+            </tr>
+            <tr>
+                <td><strong>0x0012</strong></td>
+                <td>STATUS</td>
+                <td>로봇 상태 업데이트</td>
+            </tr>
+            <tr>
+                <td><strong>0x0020</strong></td>
+                <td>TELEMETRY</td>
+                <td>센서 데이터 스트리밍</td>
+            </tr>
+            <tr>
+                <td><strong>0x0030</strong></td>
+                <td>AI_REQUEST</td>
+                <td>AI 추론 요청</td>
+            </tr>
+            <tr>
+                <td><strong>0x0031</strong></td>
+                <td>AI_RESPONSE</td>
+                <td>AI 추론 결과</td>
+            </tr>
+            <tr>
+                <td><strong>0x0040</strong></td>
+                <td>SAFETY_STOP</td>
+                <td>비상 정지 신호</td>
+            </tr>
+            <tr>
+                <td><strong>0x00FF</strong></td>
+                <td>ERROR</td>
+                <td>오류 알림</td>
+            </tr>
+        </table>
+
+        <h2>6.3 연결 수립</h2>
+        <p>AIRI 프로토콜은 핸드셰이크 프로세스를 사용하여 보안 연결을 수립합니다:</p>
+
+        <pre><code>클라이언트                                    서버
+  │                                           │
+  │─────── 핸드셰이크 요청 ──────────────────>│
+  │  (기능, 인증 토큰, 버전)                   │
+  │                                           │
+  │<──────── 핸드셰이크 응답 ──────────────────│
+  │  (수락됨, session_id, 구성)               │
+  │                                           │
+  │─────── 하트비트 ──────────────────────>  │
+  │                                           │
+  │<──────── 하트비트 ACK ─────────────────────│
+  │                                           │
+  │           [연결 활성]                     │</code></pre>
+
+        <h2>6.4 실시간 통신</h2>
+        <p>AIRI는 서로 다른 지연 시간 요구사항을 위한 여러 전송 메커니즘을 지원합니다:</p>
+
+        <table>
+            <tr>
+                <th>전송</th>
+                <th>지연 시간</th>
+                <th>신뢰성</th>
+                <th>사용 사례</th>
+            </tr>
+            <tr>
+                <td><strong>WebSocket</strong></td>
+                <td>10-50ms</td>
+                <td>높음 (TCP)</td>
+                <td>명령, 상태, 일반 데이터</td>
+            </tr>
+            <tr>
+                <td><strong>UDP</strong></td>
+                <td>1-10ms</td>
+                <td>최선 노력</td>
+                <td>고주파 원격 측정</td>
+            </tr>
+            <tr>
+                <td><strong>MQTT</strong></td>
+                <td>50-200ms</td>
+                <td>구성 가능 QoS</td>
+                <td>플릿 조정, 이벤트</td>
+            </tr>
+            <tr>
+                <td><strong>gRPC</strong></td>
+                <td>5-30ms</td>
+                <td>높음 (HTTP/2)</td>
+                <td>AI 추론, RPC 호출</td>
+            </tr>
+        </table>
+
+        <h2>6.5 안전 인터록</h2>
+        <p>다층 안전 메커니즘은 위험한 작업을 방지합니다:</p>
+
+        <h3>안전 아키텍처</h3>
+        <pre><code>계층 1: 명령 검증
+├── 구문 확인
+├── 매개변수 범위 검증
+├── 기능 확인
+└── 작업 공간 경계 확인
+
+계층 2: 충돌 감지
+├── 리소스 충돌 확인
+├── 동시 명령 검증
+└── 우선 순위 해결
+
+계층 3: 안전 규칙
+├── 속도 제한 시행
+├── 힘 제한 확인
+├── 안전 구역 준수
+└── 충돌 예측
+
+계층 4: 실시간 모니터링
+├── 센서 기반 장애물 감지
+├── 비상 정지 모니터링
+└── 와치독 타이머
+
+계층 5: 안전 장치
+├── 연결 손실 처리
+├── 하트비트 타임아웃
+└── 안전 상태 보장</code></pre>
+
+        <h3>안전 정지 프로토콜</h3>
+        <pre><code>// 비상 정지 메시지 (최고 우선 순위)
+{
+  "type": "safety_stop",
+  "priority": "critical",
+  "timestamp": "2025-01-15T10:30:45.123Z",
+  "reason": "obstacle_detected|emergency_button|connection_loss",
+  "source": "sensor|operator|system",
+  "stop_type": "immediate|controlled"
+}
+
+// 로봇은 반드시:
+1. 100ms 이내에 모든 동작 정지
+2. 안전하게 위치 유지
+3. 확인 전송
+4. 재개 명령 대기</code></pre>
+
+        <div class="warning">
+            <strong>안전 중요:</strong> 안전 정지 명령은 모든 대기열을 우회하며 100ms 이내에 처리되어야 합니다. 명시적인 운영자 승인 없이 재정의할 수 없습니다.
+        </div>
+
+        <h2>6.6 오류 처리 및 복구</h2>
+        <p>견고한 오류 처리는 시스템 신뢰성을 보장합니다:</p>
+
+        <h3>오류 분류</h3>
+        <table>
+            <tr>
+                <th>오류 수준</th>
+                <th>조치</th>
+                <th>복구</th>
+            </tr>
+            <tr>
+                <td><strong>치명적</strong></td>
+                <td>즉시 정지</td>
+                <td>수동 개입 필요</td>
+            </tr>
+            <tr>
+                <td><strong>오류</strong></td>
+                <td>현재 명령 중단</td>
+                <td>자동 재시도 또는 대체</td>
+            </tr>
+            <tr>
+                <td><strong>경고</strong></td>
+                <td>로그 및 계속</td>
+                <td>확대 모니터링</td>
+            </tr>
+            <tr>
+                <td><strong>정보</strong></td>
+                <td>로그만</td>
+                <td>조치 불필요</td>
+            </tr>
+        </table>
+
+        <h2>6.7 상태 동기화</h2>
+        <p>분산 시스템 간 일관된 상태 유지:</p>
+
+        <pre><code>// 버전 제어가 있는 상태 업데이트
+{
+  "type": "state_update",
+  "robot_id": "rb_001",
+  "timestamp": "2025-01-15T10:30:45.123Z",
+  "version": 1234, // 단조 증가
+  "state": {
+    "position": {"x": 4.2, "y": 3.0, "z": 0.0},
+    "mode": "executing",
+    "battery": 85
+  },
+  "checksum": "sha256_hash_of_state"
+}
+
+// 충돌 해결: 버전과 함께 마지막 쓰기 우선
+if (incoming.version > local.version) {
+  local.state = incoming.state;
+  local.version = incoming.version;
+}</code></pre>
+
+        <h2>6.8 서비스 품질(QoS)</h2>
+        <p>서로 다른 메시지 유형은 서로 다른 전달 보장이 필요합니다:</p>
+
+        <table>
+            <tr>
+                <th>메시지 유형</th>
+                <th>QoS 수준</th>
+                <th>보장</th>
+            </tr>
+            <tr>
+                <td><strong>명령</strong></td>
+                <td>QoS 2</td>
+                <td>정확히 한 번 전달</td>
+            </tr>
+            <tr>
+                <td><strong>상태</strong></td>
+                <td>QoS 1</td>
+                <td>최소 한 번 전달</td>
+            </tr>
+            <tr>
+                <td><strong>원격 측정</strong></td>
+                <td>QoS 0</td>
+                <td>최선 노력 (최신 값)</td>
+            </tr>
+            <tr>
+                <td><strong>안전 정지</strong></td>
+                <td>QoS 2</td>
+                <td>정확히 한 번, 높은 우선 순위</td>
+            </tr>
+        </table>
+
+        <h2>6.9 대역폭 최적화</h2>
+        <p>네트워크 리소스의 효율적인 사용:</p>
+
+        <h3>압축 전략</h3>
+        <pre><code>// 페이로드 크기에 따른 적응형 압축
+function selectCompression(payload) {
+  if (payload.size < 1KB) {
+    return "none"; // 오버헤드가 가치 없음
+  } else if (payload.type === "image") {
+    return "jpeg"; // 이미지용 손실 압축
+  } else if (payload.type === "point_cloud") {
+    return "lz4"; // 빠른 압축
+  } else {
+    return "gzip"; // 범용
+  }
+}
+
+// 원격 측정용 델타 인코딩
+{
+  "type": "telemetry_delta",
+  "base_version": 1000,
+  "changes": {
+    "position.x": 4.2, // 변경된 필드만
+    "battery": 84
+  }
+}</code></pre>
+
+        <h2>6.10 프로토콜 보안</h2>
+        <p>통신을 보호하기 위한 보안 조치:</p>
+
+        <h3>보안 계층</h3>
+        <ul>
+            <li><strong>전송 보안:</strong> 모든 연결에 TLS 1.3 암호화</li>
+            <li><strong>인증:</strong> 인증서 또는 토큰을 사용한 상호 인증</li>
+            <li><strong>메시지 무결성:</strong> CRC32 체크섬 및 선택적 HMAC 서명</li>
+            <li><strong>재생 보호:</strong> 타임스탬프 검증 및 nonce 추적</li>
+            <li><strong>명령 권한 부여:</strong> 실행 전 권한 확인</li>
+        </ul>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>AIRI 프로토콜은 AI-로봇 시스템을 위한 실시간, 안전 중요 통신을 제공합니다</li>
+                <li>Magic, Version, Type, Length, Payload, CRC 필드가 있는 바이너리 메시지 형식</li>
+                <li>핸드셰이크부터 안전 정지까지 10가지 표준 메시지 유형</li>
+                <li>다양한 지연 시간 요구사항을 위한 여러 전송 옵션 (WebSocket, UDP, MQTT, gRPC)</li>
+                <li>명령 검증부터 안전 장치까지 5계층 안전 아키텍처</li>
+                <li>안전 정지 명령은 100ms 이내에 처리되어야 하며 재정의할 수 없습니다</li>
+                <li>오류 처리에는 분류, 재시도 전략, 복구 절차가 포함됩니다</li>
+                <li>QoS 수준은 다양한 메시지 유형에 적절한 전달 보장을 보장합니다</li>
+                <li>TLS 암호화, 인증, 메시지 서명, 재생 보호를 통한 보안</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>AIRI 바이너리 메시지 형식의 여섯 가지 필드는 무엇인가?</li>
+                <li>AIRI 프로토콜의 다섯 가지 메시지 유형을 나열하고 목적을 설명하시오.</li>
+                <li>AIRI 연결을 수립하기 위한 핸드셰이크 순서를 설명하시오.</li>
+                <li>지연 시간과 신뢰성 측면에서 네 가지 전송 메커니즘을 비교하시오.</li>
+                <li>안전 아키텍처의 다섯 계층을 설명하시오.</li>
+                <li>안전 정지 명령을 받으면 무엇을 해야 하는가?</li>
+                <li>프로토콜이 오류를 분류하는 방법과 각 수준에 대해 취하는 복구 조치는 무엇인가?</li>
+                <li>AIRI 프로토콜 통신을 보호하는 다섯 가지 보안 계층은 무엇인가?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (널리 인간을 이롭게 하라)</p>
+        </div>
+
+        </div>
+</body>
+</html>

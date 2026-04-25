@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Emergency Response & Fail-Safe | WIA-AI-SAFETY-PHYSICAL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .warning{background:#7f1d1d;border-left:4px solid #dc2626;padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+        .info{background:#1e3a5f;border-left:4px solid var(--ai-color);padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Emergency Response & Fail-Safe</h1>
+
+        <h2>5.1 The Critical Nature of Emergency Response</h2>
+        <p>When prevention fails, emergency response systems become the last line of defense against harm. The WIA-AI-SAFETY-PHYSICAL standard mandates that all physical AI systems include robust emergency response mechanisms capable of bringing the system to a safe state within defined time limits, regardless of the nature of the emergency.</p>
+
+        <div class="warning">
+            <strong>Critical Requirement:</strong> Emergency response systems must function correctly even when other system components have failed. This means emergency circuits must be independent, hardwired where possible, and never rely on software that could be compromised.
+        </div>
+
+        <h2>5.2 Stop Categories and Response Times</h2>
+        <p>International standards define three categories of stops, each with specific characteristics and use cases:</p>
+
+        <table>
+            <tr>
+                <th>Category</th>
+                <th>Method</th>
+                <th>Characteristics</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td><strong>Category 0</strong></td>
+                <td>Immediate power removal</td>
+                <td>Uncontrolled stop, potential mechanical shock</td>
+                <td>True emergency, imminent danger</td>
+            </tr>
+            <tr>
+                <td><strong>Category 1</strong></td>
+                <td>Controlled stop then power removal</td>
+                <td>Deceleration followed by power cut</td>
+                <td>Standard emergency stop</td>
+            </tr>
+            <tr>
+                <td><strong>Category 2</strong></td>
+                <td>Controlled stop, power maintained</td>
+                <td>Stop with holding torque</td>
+                <td>Protective stop, resume possible</td>
+            </tr>
+        </table>
+
+        <h3>Response Time Requirements</h3>
+        <pre><code>// Stop Response Time Requirements
+interface StopTimeRequirements {
+    // Time from trigger to safe state
+    emergencyStop: {
+        detection: 10,      // ms - detect E-stop activation
+        processing: 5,      // ms - safety controller processing
+        actuation: 50,      // ms - brake engagement
+        deceleration: 500,  // ms - maximum deceleration time
+        totalMax: 565       // ms - total maximum
+    };
+
+    protectiveStop: {
+        detection: 20,      // ms - sensor processing
+        processing: 10,     // ms - safety logic
+        actuation: 50,      // ms - controlled decel start
+        deceleration: 1000, // ms - smooth deceleration
+        totalMax: 1080      // ms - total maximum
+    };
+
+    safetyRatedStop: {
+        detection: 100,     // ms - complex condition processing
+        processing: 50,     // ms - safety-rated software
+        actuation: 100,     // ms - controlled trajectory
+        deceleration: 2000, // ms - gradual stop
+        totalMax: 2250      // ms - total maximum
+    };
+}
+
+// Maximum stopping distance calculation
+function calculateStoppingDistance(
+    velocity: number,     // m/s
+    deceleration: number, // m/s^2
+    reactionTime: number  // s
+): number {
+    const reactionDistance = velocity * reactionTime;
+    const brakingDistance = (velocity * velocity) / (2 * deceleration);
+    return reactionDistance + brakingDistance;
+}</code></pre>
+
+        <h2>5.3 Emergency Stop System Design</h2>
+        <p>Emergency stop systems require careful design to ensure reliability and accessibility:</p>
+
+        <h3>E-Stop Button Requirements</h3>
+        <ul>
+            <li><strong>Color:</strong> Red mushroom head on yellow background</li>
+            <li><strong>Operation:</strong> Direct-operated (not software-dependent)</li>
+            <li><strong>Latching:</strong> Self-latching, requires deliberate reset</li>
+            <li><strong>Accessibility:</strong> Within reach from all operator positions</li>
+            <li><strong>Quantity:</strong> Multiple buttons covering all access points</li>
+            <li><strong>Wiring:</strong> Normally closed (NC) contacts, fail-safe</li>
+        </ul>
+
+        <pre><code>// Emergency Stop Circuit Design
+class EmergencyStopCircuit {
+    // Dual-channel safety relay architecture
+    private channel1: SafetyRelay;
+    private channel2: SafetyRelay;
+
+    // E-stop buttons connected in series (all NC)
+    private estopButtons: EStopButton[] = [];
+
+    constructor(config: EStopConfig) {
+        // Initialize dual redundant channels
+        this.channel1 = new SafetyRelay('CH1', config.relay1);
+        this.channel2 = new SafetyRelay('CH2', config.relay2);
+
+        // Register all E-stop buttons
+        for (const buttonConfig of config.buttons) {
+            const button = new EStopButton(buttonConfig);
+            this.estopButtons.push(button);
+        }
+
+        // Cross-monitoring between channels
+        this.setupCrossMonitoring();
+    }
+
+    // E-stop activation sequence
+    activateEmergencyStop(source: string): void {
+        const activationTime = Date.now();
+
+        // Log activation source
+        this.logActivation(source, activationTime);
+
+        // Channel 1: Immediate power cut to motors
+        this.channel1.open();
+
+        // Channel 2: Engage mechanical brakes
+        this.channel2.triggerBrakes();
+
+        // Verify stop achieved
+        setTimeout(() => {
+            this.verifyStop(activationTime);
+        }, 500); // Verify within 500ms
+    }
+
+    // Reset sequence (requires deliberate action)
+    reset(): ResetResult {
+        // Check all E-stop buttons released
+        for (const button of this.estopButtons) {
+            if (button.isPressed()) {
+                return {
+                    success: false,
+                    reason: `E-stop button ${button.id} still pressed`
+                };
+            }
+        }
+
+        // Check safe conditions
+        if (!this.checkSafeConditions()) {
+            return {
+                success: false,
+                reason: 'Unsafe conditions persist'
+            };
+        }
+
+        // Require manual reset button
+        if (!this.manualResetPressed) {
+            return {
+                success: false,
+                reason: 'Manual reset required'
+            };
+        }
+
+        // Reset safety relays
+        this.channel1.close();
+        this.channel2.close();
+
+        return { success: true };
+    }
+
+    // Cross-monitoring to detect discrepancies
+    setupCrossMonitoring(): void {
+        setInterval(() => {
+            const ch1State = this.channel1.getState();
+            const ch2State = this.channel2.getState();
+
+            if (ch1State !== ch2State) {
+                // Channel discrepancy - fault condition
+                this.triggerSafeState('Channel discrepancy detected');
+            }
+        }, 10); // 100Hz monitoring
+    }
+}</code></pre>
+
+        <h2>5.4 Fail-Safe Design Principles</h2>
+        <p>Fail-safe design ensures that failures result in safe conditions rather than dangerous ones:</p>
+
+        <table>
+            <tr>
+                <th>Component</th>
+                <th>Fail-Safe Behavior</th>
+                <th>Implementation</th>
+            </tr>
+            <tr>
+                <td><strong>Power Supply</strong></td>
+                <td>Loss triggers brakes</td>
+                <td>Spring-applied, power-release brakes</td>
+            </tr>
+            <tr>
+                <td><strong>Communication</strong></td>
+                <td>Loss triggers stop</td>
+                <td>Watchdog timer, heartbeat protocol</td>
+            </tr>
+            <tr>
+                <td><strong>Sensors</strong></td>
+                <td>Failure assumes hazard</td>
+                <td>Conservative default, redundancy</td>
+            </tr>
+            <tr>
+                <td><strong>Controllers</strong></td>
+                <td>Hang triggers stop</td>
+                <td>Hardware watchdog, dual processors</td>
+            </tr>
+            <tr>
+                <td><strong>Actuators</strong></td>
+                <td>Failure holds position</td>
+                <td>Mechanical position locks</td>
+            </tr>
+            <tr>
+                <td><strong>Software</strong></td>
+                <td>Exception triggers stop</td>
+                <td>Defensive programming, safe defaults</td>
+            </tr>
+        </table>
+
+        <pre><code>// Fail-Safe State Machine
+enum SafetyState {
+    NORMAL = 'NORMAL',
+    WARNING = 'WARNING',
+    PROTECTIVE_STOP = 'PROTECTIVE_STOP',
+    EMERGENCY_STOP = 'EMERGENCY_STOP',
+    FAULT = 'FAULT',
+    SAFE = 'SAFE'
+}
+
+class FailSafeStateMachine {
+    private currentState: SafetyState = SafetyState.SAFE;
+    private stateHistory: StateTransition[] = [];
+
+    // Valid state transitions (fail-safe: can always go to safer states)
+    private validTransitions: Map&lt;SafetyState, SafetyState[]&gt; = new Map([
+        [SafetyState.NORMAL, [SafetyState.WARNING, SafetyState.PROTECTIVE_STOP,
+                             SafetyState.EMERGENCY_STOP, SafetyState.FAULT]],
+        [SafetyState.WARNING, [SafetyState.NORMAL, SafetyState.PROTECTIVE_STOP,
+                              SafetyState.EMERGENCY_STOP, SafetyState.FAULT]],
+        [SafetyState.PROTECTIVE_STOP, [SafetyState.NORMAL, SafetyState.WARNING,
+                                       SafetyState.EMERGENCY_STOP, SafetyState.FAULT]],
+        [SafetyState.EMERGENCY_STOP, [SafetyState.SAFE]], // Can only go to SAFE
+        [SafetyState.FAULT, [SafetyState.SAFE]], // Can only go to SAFE
+        [SafetyState.SAFE, [SafetyState.NORMAL]] // Requires deliberate restart
+    ]);
+
+    transitionTo(newState: SafetyState, reason: string): boolean {
+        const validTargets = this.validTransitions.get(this.currentState);
+
+        // Emergency transitions always allowed to safer states
+        const safetyOrder = [SafetyState.NORMAL, SafetyState.WARNING,
+                            SafetyState.PROTECTIVE_STOP, SafetyState.EMERGENCY_STOP,
+                            SafetyState.FAULT, SafetyState.SAFE];
+
+        const currentIndex = safetyOrder.indexOf(this.currentState);
+        const newIndex = safetyOrder.indexOf(newState);
+
+        // Always allow transition to safer state (higher index)
+        if (newIndex > currentIndex || validTargets?.includes(newState)) {
+            this.stateHistory.push({
+                from: this.currentState,
+                to: newState,
+                reason,
+                timestamp: Date.now()
+            });
+            this.currentState = newState;
+            this.executeStateActions(newState);
+            return true;
+        }
+
+        return false;
+    }
+
+    executeStateActions(state: SafetyState): void {
+        switch (state) {
+            case SafetyState.PROTECTIVE_STOP:
+                this.executeProtectiveStop();
+                break;
+            case SafetyState.EMERGENCY_STOP:
+                this.executeEmergencyStop();
+                break;
+            case SafetyState.FAULT:
+                this.executeFaultResponse();
+                break;
+            case SafetyState.SAFE:
+                this.verifySafeState();
+                break;
+        }
+    }
+}</code></pre>
+
+        <h2>5.5 Redundancy and Fault Tolerance</h2>
+        <p>Critical safety systems require redundancy to tolerate single faults:</p>
+
+        <h3>Redundancy Architectures</h3>
+        <table>
+            <tr>
+                <th>Architecture</th>
+                <th>Description</th>
+                <th>Fault Tolerance</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td><strong>1oo1 (Single)</strong></td>
+                <td>Single channel</td>
+                <td>0</td>
+                <td>Low-risk applications</td>
+            </tr>
+            <tr>
+                <td><strong>1oo2 (Dual)</strong></td>
+                <td>Two channels, either triggers</td>
+                <td>1</td>
+                <td>Standard safety</td>
+            </tr>
+            <tr>
+                <td><strong>2oo2 (Dual voting)</strong></td>
+                <td>Both must agree</td>
+                <td>0 (high availability)</td>
+                <td>High availability</td>
+            </tr>
+            <tr>
+                <td><strong>2oo3 (TMR)</strong></td>
+                <td>Majority voting</td>
+                <td>1</td>
+                <td>High reliability + availability</td>
+            </tr>
+            <tr>
+                <td><strong>1oo2D</strong></td>
+                <td>Dual with diagnostics</td>
+                <td>1 (detected)</td>
+                <td>Common in robotics</td>
+            </tr>
+        </table>
+
+        <pre><code>// Triple Modular Redundancy Implementation
+class TMRVoter&lt;T&gt; {
+    private channels: Channel&lt;T&gt;[];
+    private comparator: (a: T, b: T) => boolean;
+
+    constructor(
+        channel1: Channel&lt;T&gt;,
+        channel2: Channel&lt;T&gt;,
+        channel3: Channel&lt;T&gt;,
+        comparator: (a: T, b: T) => boolean
+    ) {
+        this.channels = [channel1, channel2, channel3];
+        this.comparator = comparator;
+    }
+
+    vote(): VoteResult&lt;T&gt; {
+        const values = this.channels.map(ch => ch.getValue());
+
+        // Check for 3-way agreement
+        if (this.comparator(values[0], values[1]) &&
+            this.comparator(values[1], values[2])) {
+            return {
+                value: values[0],
+                confidence: 1.0,
+                faultDetected: false
+            };
+        }
+
+        // Check for 2-way agreement (one faulty channel)
+        if (this.comparator(values[0], values[1])) {
+            return {
+                value: values[0],
+                confidence: 0.67,
+                faultDetected: true,
+                faultyChannel: 2
+            };
+        }
+        if (this.comparator(values[1], values[2])) {
+            return {
+                value: values[1],
+                confidence: 0.67,
+                faultDetected: true,
+                faultyChannel: 0
+            };
+        }
+        if (this.comparator(values[0], values[2])) {
+            return {
+                value: values[0],
+                confidence: 0.67,
+                faultDetected: true,
+                faultyChannel: 1
+            };
+        }
+
+        // No agreement - all channels different
+        return {
+            value: null,
+            confidence: 0,
+            faultDetected: true,
+            faultyChannel: 'MULTIPLE'
+        };
+    }
+}
+
+// Dual-Channel Safety Controller
+class DualChannelController {
+    private primary: SafetyProcessor;
+    private secondary: SafetyProcessor;
+
+    async executeSafetyFunction(input: SafetyInput): Promise&lt;SafetyOutput&gt; {
+        // Execute on both channels
+        const [result1, result2] = await Promise.all([
+            this.primary.execute(input),
+            this.secondary.execute(input)
+        ]);
+
+        // Compare results
+        if (!this.compareResults(result1, result2)) {
+            // Discrepancy detected - safe state
+            return {
+                action: SafetyAction.STOP,
+                reason: 'Channel discrepancy',
+                diagnosticCode: 'DC_MISMATCH'
+            };
+        }
+
+        return result1;
+    }
+}</code></pre>
+
+        <h2>5.6 Graceful Degradation</h2>
+        <p>When non-critical components fail, the system should continue operating safely with reduced capability:</p>
+
+        <pre><code>// Graceful Degradation System
+class GracefulDegradation {
+    private capabilities: Map&lt;string, Capability&gt; = new Map();
+    private degradationLevels: DegradationLevel[] = [];
+
+    // Register capability with fallback options
+    registerCapability(
+        name: string,
+        implementation: () => void,
+        fallbacks: Fallback[]
+    ): void {
+        this.capabilities.set(name, {
+            name,
+            primary: implementation,
+            fallbacks,
+            currentLevel: 0
+        });
+    }
+
+    // Handle component failure
+    handleFailure(componentId: string): DegradationResult {
+        const affectedCapabilities = this.findAffectedCapabilities(componentId);
+
+        for (const capability of affectedCapabilities) {
+            const cap = this.capabilities.get(capability);
+            if (!cap) continue;
+
+            // Try next fallback level
+            if (cap.currentLevel < cap.fallbacks.length) {
+                cap.currentLevel++;
+                const fallback = cap.fallbacks[cap.currentLevel - 1];
+
+                // Apply degraded mode
+                this.applyDegradedMode(cap.name, fallback);
+
+                this.logDegradation(cap.name, fallback);
+            } else {
+                // No more fallbacks - disable capability
+                this.disableCapability(cap.name);
+            }
+        }
+
+        return this.generateDegradationReport();
+    }
+
+    // Example: Vision system degradation
+    visionDegradationLevels: Fallback[] = [
+        {
+            name: 'Reduced Resolution',
+            description: 'Process at half resolution',
+            speedReduction: 0.8, // 80% speed
+            implement: () => this.visionSystem.setResolution('HALF')
+        },
+        {
+            name: 'Single Camera',
+            description: 'Use only primary camera',
+            speedReduction: 0.5,
+            implement: () => this.visionSystem.useSingleCamera()
+        },
+        {
+            name: 'Basic Detection Only',
+            description: 'Disable pose estimation, basic detection only',
+            speedReduction: 0.3,
+            implement: () => this.visionSystem.setMode('BASIC')
+        },
+        {
+            name: 'Proximity Sensors Only',
+            description: 'Fall back to non-vision sensors',
+            speedReduction: 0.2,
+            implement: () => this.disableVisionCompletely()
+        }
+    ];
+}</code></pre>
+
+        <h2>5.7 Recovery Procedures</h2>
+        <p>Safe recovery from emergency and fault conditions requires careful sequencing:</p>
+
+        <pre><code>// Recovery Procedure Manager
+class RecoveryManager {
+    async executeRecovery(fromState: SafetyState): Promise&lt;RecoveryResult&gt; {
+        // Step 1: Verify current state
+        const currentState = await this.verifyCurrentState();
+        if (currentState !== fromState) {
+            return { success: false, reason: 'State changed during recovery' };
+        }
+
+        // Step 2: Run pre-recovery diagnostics
+        const diagnostics = await this.runDiagnostics();
+        if (!diagnostics.allPassed) {
+            return {
+                success: false,
+                reason: 'Diagnostics failed',
+                failedTests: diagnostics.failed
+            };
+        }
+
+        // Step 3: Clear fault conditions
+        const faults = await this.getFaultConditions();
+        for (const fault of faults) {
+            const cleared = await this.attemptFaultClear(fault);
+            if (!cleared) {
+                return {
+                    success: false,
+                    reason: `Cannot clear fault: ${fault.description}`
+                };
+            }
+        }
+
+        // Step 4: Verify safe conditions for restart
+        const safetyCheck = await this.verifySafeConditions();
+        if (!safetyCheck.safe) {
+            return {
+                success: false,
+                reason: 'Unsafe conditions exist',
+                conditions: safetyCheck.unsafeConditions
+            };
+        }
+
+        // Step 5: Execute controlled restart sequence
+        const restartSequence = [
+            () => this.initializeSafetyControllers(),
+            () => this.enableSafetySensors(),
+            () => this.verifySensorCoverage(),
+            () => this.enableMotionController(),
+            () => this.enableBrakes(),
+            () => this.releaseBrakes(),
+            () => this.verifyMotionCapability()
+        ];
+
+        for (let i = 0; i < restartSequence.length; i++) {
+            try {
+                await restartSequence[i]();
+            } catch (error) {
+                // Abort restart on any failure
+                await this.abortRestart();
+                return {
+                    success: false,
+                    reason: `Restart failed at step ${i}`,
+                    error
+                };
+            }
+        }
+
+        // Step 6: Transition to normal operation
+        await this.transitionToNormal();
+
+        return { success: true, newState: SafetyState.NORMAL };
+    }
+
+    // Manual restart with operator confirmation
+    async manualRestart(operatorId: string): Promise&lt;RecoveryResult&gt; {
+        // Verify operator authorization
+        if (!await this.verifyOperatorAuthorization(operatorId)) {
+            return { success: false, reason: 'Unauthorized operator' };
+        }
+
+        // Require physical reset button
+        console.log('Waiting for physical reset button...');
+        const resetPressed = await this.waitForResetButton(30000); // 30s timeout
+
+        if (!resetPressed) {
+            return { success: false, reason: 'Reset button timeout' };
+        }
+
+        // Execute recovery
+        return this.executeRecovery(SafetyState.EMERGENCY_STOP);
+    }
+}</code></pre>
+
+        <h2>5.8 Incident Recording and Analysis</h2>
+        <p>Every safety event must be recorded for analysis and continuous improvement:</p>
+
+        <pre><code>// Safety Event Recorder
+class SafetyEventRecorder {
+    private eventLog: SafetyEvent[] = [];
+    private blackBox: CircularBuffer&lt;SystemState&gt;;
+
+    constructor() {
+        // Keep last 60 seconds of system state at 100Hz
+        this.blackBox = new CircularBuffer(6000);
+    }
+
+    recordEvent(event: SafetyEvent): void {
+        // Capture current system state
+        const systemState = this.captureSystemState();
+
+        // Add contextual data
+        event.systemState = systemState;
+        event.timestamp = Date.now();
+        event.blackBoxSnapshot = this.blackBox.getSnapshot();
+
+        // Store event
+        this.eventLog.push(event);
+
+        // Persist to non-volatile storage
+        this.persistEvent(event);
+
+        // Notify safety management system
+        this.notifySafetyManagement(event);
+    }
+
+    captureSystemState(): SystemState {
+        return {
+            robotState: {
+                jointPositions: this.robot.getJointPositions(),
+                jointVelocities: this.robot.getJointVelocities(),
+                jointTorques: this.robot.getJointTorques(),
+                tcpPose: this.robot.getTCPPose(),
+                tcpVelocity: this.robot.getTCPVelocity()
+            },
+            safetyState: {
+                currentState: this.safetyStateMachine.getCurrentState(),
+                activeSafetyFunctions: this.getActiveSafetyFunctions(),
+                sensorHealth: this.getSensorHealth()
+            },
+            environmentState: {
+                humanPositions: this.humanDetection.getPositions(),
+                obstacles: this.obstacleDetection.getObstacles(),
+                zoneOccupancy: this.getZoneOccupancy()
+            },
+            controllerState: {
+                activeProgram: this.controller.getActiveProgram(),
+                executionPoint: this.controller.getExecutionPoint(),
+                commandedVelocity: this.controller.getCommandedVelocity()
+            }
+        };
+    }
+
+    // Generate incident report
+    generateIncidentReport(eventId: string): IncidentReport {
+        const event = this.eventLog.find(e => e.id === eventId);
+        if (!event) throw new Error('Event not found');
+
+        return {
+            eventId,
+            timestamp: event.timestamp,
+            type: event.type,
+            severity: event.severity,
+            description: event.description,
+            rootCause: this.analyzeRootCause(event),
+            timeline: this.reconstructTimeline(event),
+            systemState: event.systemState,
+            recommendations: this.generateRecommendations(event)
+        };
+    }
+}</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Emergency stop systems must be independent, hardwired, and fail-safe</li>
+                <li>Three stop categories (0, 1, 2) provide different levels of response</li>
+                <li>Response times must be specified and verified for each safety function</li>
+                <li>Fail-safe design ensures failures result in safe conditions</li>
+                <li>Redundancy architectures (1oo2, 2oo3) provide fault tolerance</li>
+                <li>Graceful degradation maintains safe operation with reduced capability</li>
+                <li>Recovery procedures must include verification steps and operator confirmation</li>
+                <li>Incident recording enables analysis and continuous improvement</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the differences between Category 0, 1, and 2 stops?</li>
+                <li>What are the requirements for emergency stop button design and placement?</li>
+                <li>Explain the concept of fail-safe design with three examples.</li>
+                <li>Compare 1oo2 and 2oo3 redundancy architectures.</li>
+                <li>What is graceful degradation and why is it important?</li>
+                <li>What steps should a recovery procedure include?</li>
+                <li>What information should be captured in safety event recording?</li>
+                <li>How does dual-channel safety control detect faults?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+            <p style="font-size:14px;margin-top:10px;color:#94a3b8">"When all else fails, fail safe"</p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 구현 및 인증 | WIA-ROB-007 농업 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--agri-color:#22C55E;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--agri-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--agri-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--agri-color);margin:40px 0 20px;border-bottom:2px solid var(--agri-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--agri-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--agri-color);margin:20px 0;font-size:18px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--agri-color);text-decoration:none;padding:10px 20px;border:2px solid var(--agri-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;text-align:left;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--agri-color)}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--agri-color);padding:20px;margin:25px 0;border-radius:5px}
+        strong{color:var(--agri-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:monospace;color:#22C55E}
+        ul,ol{margin-left:30px;margin-top:15px}
+        li{margin:10px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제8장: 구현 및 인증</h1>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) - 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>8.1 구현 가이드 개요</h2>
+        <p>
+            이 장에서는 WIA-ROB-007 표준을 실제로 구현하는 방법과 인증 절차를 다룹니다.
+            제조사가 표준을 준수하는 제품을 개발하고, WIA 인증을 획득하는 전체 과정을
+            단계별로 설명합니다.
+        </p>
+        <p>
+            弘益人間의 철학에 따라, 구현 가이드는 최대한 명확하고 실용적으로 작성되어
+            누구나 쉽게 따라할 수 있도록 하였습니다.
+        </p>
+
+        <h2>8.2 개발 환경 설정</h2>
+
+        <h3>8.2.1 필수 소프트웨어</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>구성 요소</th>
+                    <th>권장 버전</th>
+                    <th>용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Python</td>
+                    <td>3.9+</td>
+                    <td>로봇 제어 로직</td>
+                </tr>
+                <tr>
+                    <td>Node.js</td>
+                    <td>18 LTS+</td>
+                    <td>API 서버, 웹 대시보드</td>
+                </tr>
+                <tr>
+                    <td>MQTT Broker</td>
+                    <td>Mosquitto 2.0+</td>
+                    <td>실시간 통신</td>
+                </tr>
+                <tr>
+                    <td>PostgreSQL</td>
+                    <td>14+</td>
+                    <td>데이터 저장소</td>
+                </tr>
+                <tr>
+                    <td>Redis</td>
+                    <td>7.0+</td>
+                    <td>캐싱, 세션 관리</td>
+                </tr>
+                <tr>
+                    <td>Docker</td>
+                    <td>20.10+</td>
+                    <td>컨테이너화</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.2.2 개발 환경 구축</h3>
+<pre><code># Docker Compose로 개발 환경 설정
+version: '3.8'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: wia_rob_007
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secure_password
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api_server:
+    build: ./api-server
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://admin:secure_password@postgres:5432/wia_rob_007
+      MQTT_BROKER: mosquitto:1883
+      REDIS_URL: redis://redis:6379
+</code></pre>
+
+        <h2>8.3 1단계 구현: 데이터 형식</h2>
+
+        <h3>8.3.1 JSON 스키마 검증</h3>
+<pre><code>// Python 예제: JSON 스키마 검증
+from jsonschema import validate, ValidationError
+import json
+
+# WIA-ROB-007 스키마 정의
+schema = {
+    "type": "object",
+    "required": ["version", "timestamp", "robot_id", "payload"],
+    "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "robot_id": {"type": "string"},
+        "payload": {"type": "object"}
+    }
+}
+
+# 데이터 검증
+def validate_message(message):
+    try:
+        validate(instance=message, schema=schema)
+        return True, None
+    except ValidationError as e:
+        return False, str(e)
+
+# 사용 예
+message = {
+    "version": "1.0",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "robot_id": "ROB-001",
+    "payload": {"temperature_celsius": 22.5}
+}
+
+is_valid, error = validate_message(message)
+if is_valid:
+    print("✓ Message is valid")
+else:
+    print(f"✗ Validation error: {error}")
+</code></pre>
+
+        <h3>8.3.2 데이터 변환 유틸리티</h3>
+<pre><code>// TypeScript 예제: 단위 변환
+class UnitConverter {
+    static celsiusToKelvin(celsius: number): number {
+        return celsius + 273.15;
+    }
+
+    static kelvinToCelsius(kelvin: number): number {
+        return kelvin - 273.15;
+    }
+
+    static percentToRatio(percent: number): number {
+        return percent / 100.0;
+    }
+
+    static ratioToPercent(ratio: number): number {
+        return ratio * 100.0;
+    }
+}
+
+// WIA-ROB-007 표준 형식으로 변환
+interface SensorData {
+    temperature_celsius: number;
+    moisture_percent: number;
+    ph: number;
+}
+
+function toWIA007Format(raw: any): SensorData {
+    return {
+        temperature_celsius: parseFloat(raw.temp.toFixed(1)),
+        moisture_percent: parseFloat(raw.moisture.toFixed(1)),
+        ph: parseFloat(raw.ph.toFixed(2))
+    };
+}
+</code></pre>
+
+        <h2>8.4 2단계 구현: API 인터페이스</h2>
+
+        <h3>8.4.1 Express.js API 서버</h3>
+<pre><code>// Node.js Express 예제
+import express from 'express';
+import { authenticate, authorize } from './auth';
+
+const app = express();
+app.use(express.json());
+
+// 로봇 상태 조회
+app.get('/wia-rob-007/v1/robots/:robotId',
+    authenticate,
+    authorize('robot:read'),
+    async (req, res) => {
+        const { robotId } = req.params;
+
+        try {
+            const robot = await db.robots.findOne({ robot_id: robotId });
+
+            if (!robot) {
+                return res.status(404).json({
+                    status: 'error',
+                    error: {
+                        code: 'ROBOT_NOT_FOUND',
+                        message: `Robot ${robotId} not found`
+                    }
+                });
+            }
+
+            res.json({
+                status: 'success',
+                data: robot
+            });
+        } catch (error) {
+            res.status(500).json({
+                status: 'error',
+                error: {
+                    code: 'INTERNAL_ERROR',
+                    message: error.message
+                }
+            });
+        }
+    }
+);
+
+// 새 작업 생성
+app.post('/wia-rob-007/v1/tasks',
+    authenticate,
+    authorize('task:manage'),
+    async (req, res) => {
+        const task = req.body;
+
+        // 유효성 검증
+        if (!task.robot_id || !task.task_type) {
+            return res.status(400).json({
+                status: 'error',
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: 'robot_id and task_type are required'
+                }
+            });
+        }
+
+        const newTask = await db.tasks.create(task);
+
+        res.status(201).json({
+            status: 'success',
+            message: 'Task created successfully',
+            data: newTask
+        });
+    }
+);
+
+app.listen(3000, () => {
+    console.log('WIA-ROB-007 API Server running on port 3000');
+});
+</code></pre>
+
+        <h3>8.4.2 OAuth 2.0 인증 구현</h3>
+<pre><code>// JWT 기반 인증
+import jwt from 'jsonwebtoken';
+
+const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key';
+
+export function generateToken(userId: string, scopes: string[]): string {
+    return jwt.sign(
+        { userId, scopes },
+        SECRET_KEY,
+        { expiresIn: '1h' }
+    );
+}
+
+export function authenticate(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+            status: 'error',
+            error: { code: 'UNAUTHORIZED', message: 'Missing or invalid token' }
+        });
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+        const decoded = jwt.verify(token, SECRET_KEY);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            status: 'error',
+            error: { code: 'TOKEN_EXPIRED', message: 'Token has expired' }
+        });
+    }
+}
+
+export function authorize(...requiredScopes: string[]) {
+    return (req, res, next) => {
+        const userScopes = req.user.scopes || [];
+
+        const hasPermission = requiredScopes.some(scope =>
+            userScopes.includes(scope) || userScopes.includes('admin')
+        );
+
+        if (!hasPermission) {
+            return res.status(403).json({
+                status: 'error',
+                error: { code: 'FORBIDDEN', message: 'Insufficient permissions' }
+            });
+        }
+
+        next();
+    };
+}
+</code></pre>
+
+        <h2>8.5 3단계 구현: 통신 프로토콜</h2>
+
+        <h3>8.5.1 MQTT 클라이언트 구현</h3>
+<pre><code>// Python paho-mqtt 예제
+import paho.mqtt.client as mqtt
+import json
+import ssl
+from datetime import datetime
+
+class WIA007MQTTClient:
+    def __init__(self, robot_id, farm_id, broker_host):
+        self.robot_id = robot_id
+        self.farm_id = farm_id
+        self.broker_host = broker_host
+        self.client = mqtt.Client(client_id=robot_id)
+
+        # 콜백 설정
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.client.on_disconnect = self.on_disconnect
+
+        # TLS 설정
+        self.client.tls_set(
+            ca_certs="/path/to/ca.crt",
+            tls_version=ssl.PROTOCOL_TLSv1_2
+        )
+
+        # Last Will 설정
+        will_topic = f"wia-rob-007/{farm_id}/robots/{robot_id}/status"
+        will_payload = json.dumps({
+            "version": "1.0",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "robot_id": robot_id,
+            "operational_state": "disconnected"
+        })
+        self.client.will_set(will_topic, will_payload, qos=1, retain=True)
+
+    def on_connect(self, client, userdata, flags, rc):
+        if rc == 0:
+            print(f"✓ Connected to MQTT broker")
+            # 명령 토픽 구독
+            command_topic = f"wia-rob-007/{self.farm_id}/robots/{self.robot_id}/command"
+            client.subscribe(command_topic, qos=2)
+        else:
+            print(f"✗ Connection failed with code {rc}")
+
+    def on_message(self, client, userdata, msg):
+        try:
+            command = json.loads(msg.payload.decode())
+            print(f"Received command: {command['command_type']}")
+            self.handle_command(command)
+        except Exception as e:
+            print(f"Error processing message: {e}")
+
+    def on_disconnect(self, client, userdata, rc):
+        if rc != 0:
+            print("Unexpected disconnect. Reconnecting...")
+            self.reconnect_with_backoff()
+
+    def connect(self):
+        self.client.connect(self.broker_host, 8883, 60)
+        self.client.loop_start()
+
+    def publish_status(self, status_data):
+        topic = f"wia-rob-007/{self.farm_id}/robots/{self.robot_id}/status"
+        payload = json.dumps({
+            "version": "1.0",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "robot_id": self.robot_id,
+            **status_data
+        })
+        self.client.publish(topic, payload, qos=1, retain=True)
+
+    def publish_telemetry(self, sensor_data):
+        topic = f"wia-rob-007/{self.farm_id}/robots/{self.robot_id}/telemetry"
+        payload = json.dumps({
+            "version": "1.0",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "robot_id": self.robot_id,
+            **sensor_data
+        })
+        self.client.publish(topic, payload, qos=0)
+
+    def handle_command(self, command):
+        # 명령 처리 로직
+        if command['command_type'] == 'start_task':
+            self.start_task(command['parameters'])
+        elif command['command_type'] == 'stop_task':
+            self.stop_task()
+
+        # 응답 전송
+        self.send_response(command['command_id'], "success")
+
+    def send_response(self, command_id, status):
+        topic = f"wia-rob-007/{self.farm_id}/robots/{self.robot_id}/response"
+        payload = json.dumps({
+            "version": "1.0",
+            "command_id": command_id,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "status": status
+        })
+        self.client.publish(topic, payload, qos=2)
+
+# 사용 예
+robot = WIA007MQTTClient("ROB-001", "FARM-001", "mqtt.farm.example.com")
+robot.connect()
+
+# 상태 발행
+robot.publish_status({"operational_state": "working", "battery_percent": 85.0})
+
+# 센서 데이터 발행
+robot.publish_telemetry({
+    "sensor_type": "soil",
+    "measurements": {
+        "temperature_celsius": 18.5,
+        "moisture_percent": 65.0
+    }
+})
+</code></pre>
+
+        <h2>8.6 4단계 구현: 시스템 통합</h2>
+
+        <h3>8.6.1 Docker 컨테이너 배포</h3>
+<pre><code># Dockerfile for Robot Controller
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["python", "robot_controller.py"]
+
+# docker-compose.yml for complete system
+version: '3.8'
+
+services:
+  mqtt_broker:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./certs:/mosquitto/certs
+
+  api_server:
+    build: ./api-server
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+      - mqtt_broker
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "8080:80"
+    depends_on:
+      - api_server
+
+  robot_simulator:
+    build: ./robot-simulator
+    deploy:
+      replicas: 5
+    depends_on:
+      - mqtt_broker
+</code></pre>
+
+        <h2>8.7 인증 프로세스</h2>
+        <p>
+            WIA-ROB-007 인증은 제품이 표준을 올바르게 구현했는지 검증하는 공식 절차입니다.
+        </p>
+
+        <h3>8.7.1 인증 절차</h3>
+        <ol>
+            <li><strong>사전 준비 (1-2주)</strong>
+                <ul>
+                    <li>표준 문서 검토 및 구현 완료</li>
+                    <li>자체 테스트 수행 및 문제 수정</li>
+                    <li>인증 신청서 작성</li>
+                </ul>
+            </li>
+            <li><strong>신청 (1주)</strong>
+                <ul>
+                    <li>WIA 인증 기관에 신청서 제출</li>
+                    <li>제품 정보 및 문서 제공</li>
+                    <li>인증 수수료 납부</li>
+                </ul>
+            </li>
+            <li><strong>문서 검토 (2주)</strong>
+                <ul>
+                    <li>기술 문서 및 구현 명세 검토</li>
+                    <li>보안 정책 및 데이터 관리 검토</li>
+                    <li>피드백 및 수정 요청</li>
+                </ul>
+            </li>
+            <li><strong>기술 테스트 (2-3주)</strong>
+                <ul>
+                    <li>기능 적합성 테스트</li>
+                    <li>상호운용성 테스트</li>
+                    <li>성능 및 안정성 테스트</li>
+                    <li>보안 테스트</li>
+                </ul>
+            </li>
+            <li><strong>최종 검토 (1주)</strong>
+                <ul>
+                    <li>테스트 결과 분석</li>
+                    <li>미비점 보완</li>
+                    <li>인증 위원회 최종 승인</li>
+                </ul>
+            </li>
+            <li><strong>인증 발급 (1주)</strong>
+                <ul>
+                    <li>인증서 발급</li>
+                    <li>인증 마크 사용 권한 부여</li>
+                    <li>인증 제품 등록부에 등재</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>8.7.2 테스트 체크리스트</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>테스트 영역</th>
+                    <th>테스트 항목</th>
+                    <th>합격 기준</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td rowspan="3">1단계: 데이터 형식</td>
+                    <td>JSON 스키마 준수</td>
+                    <td>100% 준수</td>
+                </tr>
+                <tr>
+                    <td>단위 시스템 정확성</td>
+                    <td>오차 < 0.1%</td>
+                </tr>
+                <tr>
+                    <td>타임스탬프 형식</td>
+                    <td>ISO 8601 준수</td>
+                </tr>
+                <tr>
+                    <td rowspan="3">2단계: API</td>
+                    <td>엔드포인트 구현</td>
+                    <td>필수 API 100%</td>
+                </tr>
+                <tr>
+                    <td>HTTP 상태 코드</td>
+                    <td>표준 준수</td>
+                </tr>
+                <tr>
+                    <td>인증 메커니즘</td>
+                    <td>OAuth 2.0 구현</td>
+                </tr>
+                <tr>
+                    <td rowspan="3">3단계: 통신</td>
+                    <td>MQTT QoS</td>
+                    <td>0/1/2 모두 지원</td>
+                </tr>
+                <tr>
+                    <td>토픽 구조</td>
+                    <td>표준 토픽 사용</td>
+                </tr>
+                <tr>
+                    <td>TLS 암호화</td>
+                    <td>TLS 1.2+ 필수</td>
+                </tr>
+                <tr>
+                    <td rowspan="3">4단계: 통합</td>
+                    <td>오케스트레이션</td>
+                    <td>다중 로봇 제어</td>
+                </tr>
+                <tr>
+                    <td>모니터링</td>
+                    <td>실시간 상태 추적</td>
+                </tr>
+                <tr>
+                    <td>고가용성</td>
+                    <td>Uptime > 99.9%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>8.8 인증 레벨 및 비용</h2>
+
+        <h3>8.8.1 인증 레벨별 요구사항</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>레벨</th>
+                    <th>요구사항</th>
+                    <th>테스트 기간</th>
+                    <th>인증 비용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Basic</td>
+                    <td>1단계만 준수</td>
+                    <td>1-2주</td>
+                    <td>$1,000</td>
+                </tr>
+                <tr>
+                    <td>Standard</td>
+                    <td>1-2단계 준수</td>
+                    <td>2-3주</td>
+                    <td>$3,000</td>
+                </tr>
+                <tr>
+                    <td>Advanced</td>
+                    <td>1-3단계 준수</td>
+                    <td>3-4주</td>
+                    <td>$5,000</td>
+                </tr>
+                <tr>
+                    <td>Enterprise</td>
+                    <td>1-4단계 모두 준수</td>
+                    <td>4-6주</td>
+                    <td>$10,000</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.8.2 인증 유효기간 및 갱신</h3>
+        <ul>
+            <li><strong>유효기간:</strong> 인증 발급일로부터 3년</li>
+            <li><strong>갱신:</strong> 만료 3개월 전 갱신 신청</li>
+            <li><strong>갱신 비용:</strong> 최초 인증 비용의 50%</li>
+            <li><strong>버전 업그레이드:</strong> 상위 레벨로 업그레이드 시 차액만 납부</li>
+        </ul>
+
+        <h2>8.9 오픈소스 참조 구현</h2>
+        <p>
+            WIA는 표준 채택을 촉진하기 위해 오픈소스 참조 구현을 제공합니다.
+        </p>
+
+        <h3>8.9.1 참조 구현 저장소</h3>
+        <div class="highlight-box">
+            <ul>
+                <li><strong>GitHub:</strong> https://github.com/WIA-Official/wia-rob-007</li>
+                <li><strong>Python SDK:</strong> wia-rob-007-python</li>
+                <li><strong>Node.js SDK:</strong> wia-rob-007-js</li>
+                <li><strong>API 서버:</strong> wia-rob-007-api-server</li>
+                <li><strong>시뮬레이터:</strong> wia-rob-007-simulator</li>
+                <li><strong>대시보드:</strong> wia-rob-007-dashboard</li>
+            </ul>
+        </div>
+
+        <h3>8.9.2 커뮤니티 지원</h3>
+        <ul>
+            <li><strong>포럼:</strong> https://forum.wia.org/rob-007</li>
+            <li><strong>Discord:</strong> WIA-ROB-007 채널</li>
+            <li><strong>이메일:</strong> rob-007-support@wia.org</li>
+            <li><strong>문서:</strong> https://docs.wia.org/rob-007</li>
+        </ul>
+
+        <h2>8.10 실전 배포 가이드</h2>
+
+        <h3>8.10.1 프로덕션 체크리스트</h3>
+        <div class="highlight-box">
+            <ol>
+                <li>✓ 모든 환경 변수를 안전하게 관리 (Secrets Manager 사용)</li>
+                <li>✓ TLS/SSL 인증서 적용 (Let's Encrypt 또는 상용 CA)</li>
+                <li>✓ 데이터베이스 백업 자동화 (일 1회 이상)</li>
+                <li>✓ 모니터링 및 알림 설정 (Prometheus + Grafana)</li>
+                <li>✓ 로그 수집 및 분석 (ELK Stack 또는 CloudWatch)</li>
+                <li>✓ 로드 밸런싱 설정 (Nginx 또는 AWS ELB)</li>
+                <li>✓ Auto-scaling 정책 설정</li>
+                <li>✓ 재해 복구 계획 수립 및 테스트</li>
+                <li>✓ 보안 감사 수행</li>
+                <li>✓ 성능 테스트 (부하 테스트, 스트레스 테스트)</li>
+            </ol>
+        </div>
+
+        <h3>8.10.2 성능 최적화 팁</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>영역</th>
+                    <th>최적화 방법</th>
+                    <th>예상 개선</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>API</td>
+                    <td>Redis 캐싱, 응답 압축</td>
+                    <td>응답 시간 70% 감소</td>
+                </tr>
+                <tr>
+                    <td>MQTT</td>
+                    <td>페이로드 압축, 배치 전송</td>
+                    <td>대역폭 50% 절감</td>
+                </tr>
+                <tr>
+                    <td>데이터베이스</td>
+                    <td>인덱스 최적화, 읽기 복제</td>
+                    <td>쿼리 속도 80% 향상</td>
+                </tr>
+                <tr>
+                    <td>프론트엔드</td>
+                    <td>CDN, 코드 스플리팅</td>
+                    <td>로딩 시간 60% 감소</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>8.11 弘益人間의 실천: 인증의 사회적 의미</h2>
+        <p>
+            WIA-ROB-007 인증은 단순한 기술 검증을 넘어 弘益人間의 가치를 실천하는 과정입니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>인증이 만드는 가치</h3>
+            <ul>
+                <li><strong>신뢰 구축:</strong> 표준 준수로 소비자 신뢰 확보</li>
+                <li><strong>시장 확대:</strong> 글로벌 호환성으로 시장 진입 용이</li>
+                <li><strong>혁신 가속:</strong> 표준 플랫폼 위에서 빠른 혁신 가능</li>
+                <li><strong>비용 절감:</strong> 개발 및 통합 비용 대폭 감소</li>
+                <li><strong>공정 경쟁:</strong> 기술력 중심의 공정한 경쟁 환경</li>
+                <li><strong>지속 가능성:</strong> 장기적 호환성 보장으로 투자 보호</li>
+            </ul>
+        </div>
+
+        <h2>8.12 결론: 함께 만드는 미래 농업</h2>
+        <p>
+            WIA-ROB-007 표준은 기술 명세를 넘어 <strong>弘益人間</strong>의 철학을 실현하는
+            도구입니다. 이 표준을 통해 우리는 다음을 달성할 수 있습니다:
+        </p>
+
+        <div class="highlight-box">
+            <ul>
+                <li>안정적이고 지속 가능한 식량 생산으로 <strong>인류 전체의 복지 향상</strong></li>
+                <li>농업 기술의 민주화로 <strong>기술 격차 해소</strong></li>
+                <li>환경 친화적 농업으로 <strong>미래 세대를 위한 자원 보존</strong></li>
+                <li>농업인의 삶의 질 향상으로 <strong>농촌 사회 활성화</strong></li>
+                <li>개방형 표준으로 <strong>협력과 혁신의 생태계 조성</strong></li>
+            </ul>
+        </div>
+
+        <p style="text-align:center; font-size:20px; margin-top:40px; color:var(--agri-color)">
+            <strong>弘益人間 (홍익인간) - 널리 인간을 이롭게 하라</strong>
+        </p>
+
+        <p style="text-align:center; margin-top:20px;">
+            WIA-ROB-007 표준은 계속 진화합니다.<br>
+            여러분의 참여와 기여를 기다립니다.
+        </p>
+
+        <div class="highlight-box">
+            <h2>핵심 내용 요약</h2>
+            <ul>
+                <li>개발 환경: Python, Node.js, MQTT, PostgreSQL, Redis, Docker</li>
+                <li>1단계: JSON 스키마 검증과 데이터 변환 유틸리티 구현</li>
+                <li>2단계: Express.js 기반 REST API와 OAuth 2.0 인증 구현</li>
+                <li>3단계: paho-mqtt로 MQTT 클라이언트, TLS 암호화, LWT 구현</li>
+                <li>4단계: Docker Compose로 전체 시스템 컨테이너화 및 배포</li>
+                <li>인증 절차: 6단계 (준비→신청→문서검토→테스트→최종검토→발급)</li>
+                <li>인증 레벨: Basic, Standard, Advanced, Enterprise (비용 $1K-$10K)</li>
+                <li>오픈소스 참조 구현 제공으로 쉬운 도입 지원</li>
+                <li>프로덕션 배포 시 보안, 백업, 모니터링 필수</li>
+                <li>弘益人間 철학으로 인류 전체에 이로운 농업 실현</li>
+            </ul>
+        </div>
+
+        <div class="highlight-box">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>WIA-ROB-007 구현에 필요한 필수 소프트웨어 6가지를 나열하시오.</li>
+                <li>JSON 스키마 검증의 목적과 중요성을 설명하시오.</li>
+                <li>Express.js로 REST API를 구현할 때 필요한 주요 미들웨어를 나열하시오.</li>
+                <li>OAuth 2.0 인증 흐름을 단계별로 설명하시오.</li>
+                <li>MQTT 클라이언트에서 Last Will을 설정하는 이유를 설명하시오.</li>
+                <li>WIA-ROB-007 인증 절차 6단계를 순서대로 나열하시오.</li>
+                <li>4가지 인증 레벨의 차이점과 비용을 비교하시오.</li>
+                <li>프로덕션 배포 전 체크해야 할 항목 10가지를 나열하시오.</li>
+                <li>성능 최적화를 위한 방법을 4개 영역별로 제시하시오.</li>
+                <li>WIA-ROB-007이 弘益人間 철학을 실현하는 방법을 종합적으로 설명하시오.</li>
+            </ol>
+        </div>
+
+        <div style="text-align:center; margin-top:60px; padding:40px; background:var(--bg-tertiary); border-radius:8px;">
+            <h2 style="color:var(--agri-color); margin-bottom:20px;">감사합니다</h2>
+            <p>이 전자책을 읽어주셔서 감사합니다.</p>
+            <p>WIA-ROB-007 표준이 여러분의 농업 로봇 개발에 도움이 되기를 바랍니다.</p>
+            <p style="margin-top:30px;">© 2025 SmileStory Inc. / WIA (World Certification Industry Association)</p>
+            <p style="margin-top:10px; color:var(--agri-color)"><strong>弘益人間 (홍익인간) · Benefit All Humanity</strong></p>
+        </div>
+
+        </div>
+</body>
+</html>

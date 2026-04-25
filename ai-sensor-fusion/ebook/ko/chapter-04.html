@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 다중 센서 처리 아키텍처 | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>4장: 다중 센서 처리 아키텍처</h1>
+
+        <h2>4.1 융합 아키텍처 개요</h2>
+        <p>다중 센서 융합 시스템의 아키텍처는 성능, 확장성, 결함 허용성에 큰 영향을 미칩니다. 적절한 아키텍처 선택은 응용 프로그램 요구 사항, 센서 특성, 계산 리소스에 따라 달라집니다.</p>
+
+        <h2>4.2 중앙 집중식 융합</h2>
+        <p>중앙 집중식 아키텍처에서는 모든 센서 데이터가 단일 융합 노드로 전송됩니다:</p>
+
+        <pre><code>┌──────────────────────────────────────┐
+│          중앙 집중식 융합             │
+└──────────────────────────────────────┘
+
+[센서 1] ─────┐
+[센서 2] ─────┼─────→ [중앙 융합 노드] ─→ [출력]
+[센서 3] ─────┤              │
+[센서 N] ─────┘              │
+                            ▼
+                    통합 상태 추정
+                    (전역 최적)</code></pre>
+
+        <pre><code>class CentralizedFusion:
+    """
+    중앙 집중식 센서 융합 아키텍처
+
+    장점: 전역 최적 융합, 일관된 상태 추정
+    단점: 단일 실패점, 높은 통신 대역폭, 확장성 제한
+    """
+    def __init__(self, sensor_configs):
+        self.sensors = sensor_configs
+
+        # 단일 융합 필터
+        total_state_dim = self._compute_state_dim()
+        self.filter = ExtendedKalmanFilter(
+            state_dim=total_state_dim,
+            measurement_dim=self._compute_measurement_dim()
+        )
+
+        # 센서 상태 매핑
+        self.sensor_state_mapping = self._create_state_mapping()
+
+    def process(self, sensor_data):
+        """
+        모든 센서 데이터를 중앙에서 처리
+        """
+        # 예측 단계
+        self.filter.predict(self.motion_model)
+
+        # 모든 센서에서 업데이트
+        for sensor_id, measurement in sensor_data.items():
+            if measurement is not None:
+                H = self._get_measurement_matrix(sensor_id)
+                R = self.sensors[sensor_id]['noise_cov']
+
+                self.filter.update_with_matrix(measurement, H, R)
+
+        return self.filter.x, self.filter.P
+
+    def _get_measurement_matrix(self, sensor_id):
+        """
+        센서별 측정 행렬 생성
+
+        각 센서가 전체 상태의 어떤 부분을 관찰하는지 정의
+        """
+        H = np.zeros((self.sensors[sensor_id]['dim'], self.filter.state_dim))
+
+        indices = self.sensor_state_mapping[sensor_id]
+        for i, state_idx in enumerate(indices):
+            H[i, state_idx] = 1
+
+        return H</code></pre>
+
+        <h2>4.3 분산식 융합</h2>
+        <p>분산식 아키텍처에서는 각 센서가 로컬 처리를 수행한 후 결과를 결합합니다:</p>
+
+        <pre><code>┌──────────────────────────────────────┐
+│            분산식 융합                │
+└──────────────────────────────────────┘
+
+[센서 1] → [로컬 필터 1] ─┐
+[센서 2] → [로컬 필터 2] ─┼→ [융합 노드] → [출력]
+[센서 3] → [로컬 필터 3] ─┤
+[센서 N] → [로컬 필터 N] ─┘</code></pre>
+
+        <pre><code>class DistributedFusion:
+    """
+    분산식 센서 융합 아키텍처
+
+    장점: 결함 허용, 낮은 통신 대역폭, 확장성
+    단점: 차선의 융합, 일관성 유지 어려움
+    """
+    def __init__(self, sensor_configs):
+        self.sensors = sensor_configs
+
+        # 각 센서에 대한 로컬 필터
+        self.local_filters = {
+            sensor_id: KalmanFilter(
+                state_dim=config['state_dim'],
+                measurement_dim=config['dim']
+            )
+            for sensor_id, config in sensor_configs.items()
+        }
+
+        # 융합 알고리즘
+        self.fusion_method = 'covariance_intersection'
+
+    def process_local(self, sensor_id, measurement):
+        """
+        단일 센서의 로컬 처리
+
+        독립적으로 실행 가능
+        """
+        local_filter = self.local_filters[sensor_id]
+
+        local_filter.predict()
+        local_filter.update(measurement)
+
+        return local_filter.x, local_filter.P
+
+    def fuse_estimates(self, local_estimates):
+        """
+        로컬 추정치 융합
+
+        공분산 교차를 사용하여 보수적 융합
+        """
+        if self.fusion_method == 'covariance_intersection':
+            return self.covariance_intersection(local_estimates)
+        elif self.fusion_method == 'naive_average':
+            return self.naive_average(local_estimates)
+        else:
+            raise ValueError(f"알 수 없는 융합 방법: {self.fusion_method}")
+
+    def covariance_intersection(self, estimates):
+        """
+        공분산 교차 (Covariance Intersection)
+
+        상관관계가 알려지지 않은 추정치의 보수적 융합
+        """
+        # 정보 형태로 변환
+        info_matrices = []
+        info_vectors = []
+
+        for x, P in estimates:
+            info_matrices.append(np.linalg.inv(P))
+            info_vectors.append(np.linalg.inv(P) @ x)
+
+        # 최적 가중치 찾기 (간단한 균등 가중치)
+        n = len(estimates)
+        weights = [1/n] * n
+
+        # 융합
+        P_fused_inv = sum(w * I for w, I in zip(weights, info_matrices))
+        P_fused = np.linalg.inv(P_fused_inv)
+
+        x_fused = P_fused @ sum(w * i for w, i in zip(weights, info_vectors))
+
+        return x_fused, P_fused</code></pre>
+
+        <h2>4.4 하이브리드 융합 (연합 필터)</h2>
+        <p>연합 칼만 필터는 중앙 집중식과 분산식의 장점을 결합합니다:</p>
+
+        <pre><code>class FederatedKalmanFilter:
+    """
+    연합 칼만 필터
+
+    마스터 필터와 로컬 필터의 계층 구조
+    고장 분리 및 재구성 기능 포함
+    """
+    def __init__(self, state_dim, sensor_configs):
+        self.state_dim = state_dim
+        self.sensors = sensor_configs
+
+        # 마스터 필터
+        self.master_filter = KalmanFilter(state_dim, state_dim)
+
+        # 로컬 필터
+        self.local_filters = {
+            sensor_id: KalmanFilter(state_dim, config['dim'])
+            for sensor_id, config in sensor_configs.items()
+        }
+
+        # 정보 분배 계수
+        self.info_sharing = self._compute_info_sharing()
+
+    def process(self, sensor_data):
+        """
+        연합 필터 처리 사이클
+        """
+        # 1단계: 마스터에서 로컬로 정보 분배
+        self._distribute_info()
+
+        # 2단계: 로컬 필터 예측 및 업데이트
+        local_estimates = {}
+        for sensor_id, measurement in sensor_data.items():
+            if measurement is not None:
+                local_filter = self.local_filters[sensor_id]
+                local_filter.predict()
+                local_filter.update(measurement)
+                local_estimates[sensor_id] = (
+                    local_filter.x.copy(),
+                    local_filter.P.copy()
+                )
+
+        # 3단계: 로컬에서 마스터로 정보 수집
+        self._collect_info(local_estimates)
+
+        return self.master_filter.x, self.master_filter.P
+
+    def _distribute_info(self):
+        """
+        마스터 필터 정보를 로컬 필터로 분배
+
+        정보 보존: sum(P_local^-1) = P_master^-1
+        """
+        P_master_inv = np.linalg.inv(self.master_filter.P)
+
+        for sensor_id, local_filter in self.local_filters.items():
+            beta = self.info_sharing[sensor_id]
+
+            # 정보 행렬 분배
+            P_local_inv = beta * P_master_inv
+            local_filter.P = np.linalg.inv(P_local_inv)
+            local_filter.x = self.master_filter.x.copy()
+
+    def _collect_info(self, local_estimates):
+        """
+        로컬 추정치를 마스터 필터로 수집
+
+        정보 융합: P_master^-1 = sum(P_local^-1)
+        """
+        info_matrix = np.zeros((self.state_dim, self.state_dim))
+        info_vector = np.zeros(self.state_dim)
+
+        for sensor_id, (x_local, P_local) in local_estimates.items():
+            P_local_inv = np.linalg.inv(P_local)
+
+            info_matrix += P_local_inv
+            info_vector += P_local_inv @ x_local
+
+        self.master_filter.P = np.linalg.inv(info_matrix)
+        self.master_filter.x = self.master_filter.P @ info_vector
+
+    def isolate_faulty_sensor(self, sensor_id):
+        """
+        결함 센서 분리
+
+        해당 로컬 필터를 융합에서 제외
+        """
+        if sensor_id in self.local_filters:
+            # 정보 분배 계수 재계산
+            del self.local_filters[sensor_id]
+            del self.sensors[sensor_id]
+            self.info_sharing = self._compute_info_sharing()
+
+    def _compute_info_sharing(self):
+        """
+        센서별 정보 분배 계수 계산
+
+        센서 신뢰성 및 정보량에 따라 가중치 부여
+        """
+        n = len(self.sensors)
+        return {sensor_id: 1/n for sensor_id in self.sensors}</code></pre>
+
+        <h2>4.5 계층적 융합</h2>
+        <p>계층적 아키텍처는 다중 수준의 융합을 제공합니다:</p>
+
+        <pre><code>┌──────────────────────────────────────────┐
+│            계층적 융합 아키텍처           │
+└──────────────────────────────────────────┘
+
+수준 1:   [카메라1] [카메라2]    [LiDAR] [레이더]
+              │       │            │       │
+수준 2:       └───┬───┘            └───┬───┘
+          [비전 융합]           [거리 융합]
+              │                     │
+수준 3:       └─────────┬───────────┘
+                  [전역 융합]
+                       │
+수준 4:             [출력]</code></pre>
+
+        <pre><code>class HierarchicalFusion:
+    """
+    계층적 센서 융합 아키텍처
+
+    센서 모달리티별 그룹화 및 다중 수준 융합
+    """
+    def __init__(self, hierarchy_config):
+        self.config = hierarchy_config
+
+        # 각 수준의 융합 노드 생성
+        self.levels = {}
+        for level_name, level_config in hierarchy_config.items():
+            self.levels[level_name] = FusionNode(level_config)
+
+    def process(self, sensor_data):
+        """
+        계층적 융합 처리
+        """
+        # 수준 1: 센서별 전처리
+        preprocessed = {}
+        for sensor_id, data in sensor_data.items():
+            preprocessed[sensor_id] = self.preprocess(sensor_id, data)
+
+        # 수준 2: 모달리티별 융합
+        vision_fused = self.levels['vision'].fuse([
+            preprocessed[s] for s in ['camera_front', 'camera_rear']
+            if s in preprocessed
+        ])
+
+        range_fused = self.levels['range'].fuse([
+            preprocessed[s] for s in ['lidar', 'radar']
+            if s in preprocessed
+        ])
+
+        # 수준 3: 전역 융합
+        global_fused = self.levels['global'].fuse([
+            vision_fused,
+            range_fused
+        ])
+
+        return global_fused
+
+
+class FusionNode:
+    """
+    계층 구조의 단일 융합 노드
+    """
+    def __init__(self, config):
+        self.config = config
+        self.fusion_method = config.get('method', 'kalman')
+
+    def fuse(self, inputs):
+        """
+        입력 융합
+        """
+        valid_inputs = [i for i in inputs if i is not None]
+
+        if len(valid_inputs) == 0:
+            return None
+        elif len(valid_inputs) == 1:
+            return valid_inputs[0]
+
+        if self.fusion_method == 'kalman':
+            return self.kalman_fuse(valid_inputs)
+        elif self.fusion_method == 'weighted_average':
+            return self.weighted_average(valid_inputs)
+        else:
+            raise ValueError(f"알 수 없는 융합 방법: {self.fusion_method}")
+
+    def kalman_fuse(self, inputs):
+        """
+        칼만 필터 기반 융합
+        """
+        # 정보 형태에서 융합
+        info_sum = sum(np.linalg.inv(inp['cov']) for inp in inputs)
+        state_sum = sum(
+            np.linalg.inv(inp['cov']) @ inp['state']
+            for inp in inputs
+        )
+
+        fused_cov = np.linalg.inv(info_sum)
+        fused_state = fused_cov @ state_sum
+
+        return {'state': fused_state, 'cov': fused_cov}</code></pre>
+
+        <h2>4.6 아키텍처 비교</h2>
+        <table>
+            <tr>
+                <th>아키텍처</th>
+                <th>장점</th>
+                <th>단점</th>
+                <th>사용 사례</th>
+            </tr>
+            <tr>
+                <td><strong>중앙 집중식</strong></td>
+                <td>전역 최적, 일관성</td>
+                <td>단일 실패점, 대역폭</td>
+                <td>소규모 시스템</td>
+            </tr>
+            <tr>
+                <td><strong>분산식</strong></td>
+                <td>결함 허용, 확장성</td>
+                <td>차선 최적, 일관성</td>
+                <td>대규모, 분산 시스템</td>
+            </tr>
+            <tr>
+                <td><strong>연합</strong></td>
+                <td>균형 잡힌 장점</td>
+                <td>구현 복잡성</td>
+                <td>항공, 자율주행</td>
+            </tr>
+            <tr>
+                <td><strong>계층적</strong></td>
+                <td>모듈성, 유연성</td>
+                <td>지연 시간</td>
+                <td>다중 모달리티</td>
+            </tr>
+        </table>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>중앙 집중식 융합은 전역 최적이지만 단일 실패점이 있습니다</li>
+                <li>분산식 융합은 결함 허용과 확장성을 제공하지만 차선 최적입니다</li>
+                <li>연합 칼만 필터는 중앙 집중식과 분산식의 장점을 결합합니다</li>
+                <li>계층적 융합은 모달리티별 그룹화로 복잡성을 관리합니다</li>
+                <li>공분산 교차는 상관관계가 알려지지 않은 추정치의 보수적 융합을 제공합니다</li>
+                <li>아키텍처 선택은 응용 프로그램 요구 사항에 따라 달라집니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>중앙 집중식 융합의 주요 장단점은 무엇입니까?</li>
+                <li>분산식 융합에서 공분산 교차가 필요한 이유는 무엇입니까?</li>
+                <li>연합 칼만 필터에서 정보 분배가 어떻게 작동합니까?</li>
+                <li>계층적 융합의 장점은 무엇입니까?</li>
+                <li>결함 센서를 분리하는 방법을 설명하세요.</li>
+                <li>자율 주행차에 적합한 융합 아키텍처는 무엇이며 그 이유는?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+        </div>
+
+        </div>
+</body>
+</html>

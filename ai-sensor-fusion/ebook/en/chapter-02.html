@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Integration & Synchronization | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .formula{background:var(--bg-tertiary);padding:15px;border-radius:5px;margin:15px 0;font-family:monospace;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 2: Data Integration & Synchronization</h1>
+
+        <h2>2.1 The Challenge of Multi-Sensor Integration</h2>
+        <p>Integrating data from multiple sensors presents fundamental challenges that must be addressed before any fusion algorithm can operate effectively. Sensors differ in their output formats, sampling rates, coordinate systems, and timing characteristics. This chapter explores the techniques and best practices for achieving robust data integration and synchronization.</p>
+
+        <p>Consider a typical autonomous vehicle sensor suite: cameras capture images at 30 Hz, LiDAR scans the environment at 10 Hz, radar updates at 20 Hz, and the IMU provides measurements at 200 Hz. Each sensor has its own clock, processing latency, and spatial mounting position. Without careful integration, attempting to fuse these disparate data streams would produce meaningless or even dangerous results.</p>
+
+        <p>The WIA-AI-SENSOR-FUSION standard defines comprehensive protocols for data integration and synchronization that ensure reliable, accurate fusion across any sensor combination.</p>
+
+        <h2>2.2 Unified Data Representation</h2>
+        <p>The first step in integration is establishing a common data representation that can accommodate diverse sensor modalities while preserving essential information:</p>
+
+        <pre><code>// WIA-AI-SENSOR-FUSION: Unified Sensor Message Format
+interface SensorMessage {
+    // Header information
+    header: {
+        sensor_id: string;           // Unique sensor identifier
+        sensor_type: SensorType;     // Camera, LiDAR, Radar, IMU, etc.
+        timestamp: Timestamp;        // Acquisition time
+        frame_id: string;            // Reference coordinate frame
+        sequence: number;            // Message sequence number
+    };
+
+    // Sensor-specific data (polymorphic)
+    data: SensorData;
+
+    // Uncertainty information
+    uncertainty: {
+        covariance?: Matrix;         // Measurement covariance
+        confidence?: number;         // 0-1 confidence score
+        quality_flags: QualityFlags; // Validity indicators
+    };
+
+    // Metadata
+    metadata: {
+        calibration_id: string;      // Reference to calibration data
+        processing_latency_ms: number;
+        additional_info: Map<string, any>;
+    };
+}
+
+// Timestamp with nanosecond precision
+interface Timestamp {
+    seconds: number;      // Seconds since epoch
+    nanoseconds: number;  // Nanosecond component
+    clock_source: ClockSource;  // GPS, PTP, System, etc.
+}</code></pre>
+
+        <h3>Sensor-Specific Data Types</h3>
+        <p>Each sensor modality has its standardized data representation:</p>
+
+        <pre><code>// Camera Image Data
+interface ImageData extends SensorData {
+    encoding: 'rgb8' | 'bgr8' | 'mono8' | 'mono16' | 'bayer_rggb8';
+    width: number;
+    height: number;
+    step: number;          // Full row length in bytes
+    data: Uint8Array;      // Raw pixel data
+    intrinsics: CameraIntrinsics;
+}
+
+// LiDAR Point Cloud
+interface PointCloudData extends SensorData {
+    point_format: 'xyzi' | 'xyzrgb' | 'xyzirt';  // Point structure
+    width: number;         // Points per row (or total for unstructured)
+    height: number;        // Rows (1 for unstructured cloud)
+    is_dense: boolean;     // True if no invalid points
+    points: Float32Array;  // Interleaved point data
+}
+
+// Radar Detection List
+interface RadarData extends SensorData {
+    detections: RadarDetection[];
+}
+
+interface RadarDetection {
+    range: number;         // Distance in meters
+    azimuth: number;       // Horizontal angle in radians
+    elevation: number;     // Vertical angle in radians
+    range_rate: number;    // Radial velocity (Doppler) in m/s
+    rcs: number;           // Radar cross-section in dBsm
+    snr: number;           // Signal-to-noise ratio in dB
+}
+
+// IMU Measurement
+interface IMUData extends SensorData {
+    linear_acceleration: Vector3;  // m/s^2 in sensor frame
+    angular_velocity: Vector3;     // rad/s in sensor frame
+    orientation?: Quaternion;      // If IMU provides orientation
+    temperature?: number;          // Sensor temperature for compensation
+}</code></pre>
+
+        <h2>2.3 Time Synchronization</h2>
+        <p>Accurate time synchronization is the foundation of reliable sensor fusion. Without precise temporal alignment, fusing data from different sensors leads to inconsistent and erroneous results.</p>
+
+        <h3>Clock Sources and Hierarchy</h3>
+        <table>
+            <tr>
+                <th>Clock Source</th>
+                <th>Accuracy</th>
+                <th>Availability</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td><strong>GPS Time (PPS)</strong></td>
+                <td>< 100 ns</td>
+                <td>Outdoor, clear sky</td>
+                <td>Primary reference clock</td>
+            </tr>
+            <tr>
+                <td><strong>PTP (IEEE 1588)</strong></td>
+                <td>< 1 us</td>
+                <td>Networked systems</td>
+                <td>Distributed sensor networks</td>
+            </tr>
+            <tr>
+                <td><strong>NTP</strong></td>
+                <td>1-50 ms</td>
+                <td>Network available</td>
+                <td>Non-critical applications</td>
+            </tr>
+            <tr>
+                <td><strong>Hardware Trigger</strong></td>
+                <td>< 10 us</td>
+                <td>Wired connection</td>
+                <td>Synchronized capture</td>
+            </tr>
+            <tr>
+                <td><strong>System Clock</strong></td>
+                <td>Variable</td>
+                <td>Always</td>
+                <td>Fallback only</td>
+            </tr>
+        </table>
+
+        <h3>PTP (Precision Time Protocol) Implementation</h3>
+        <pre><code>class PTPTimeSync:
+    """
+    IEEE 1588 Precision Time Protocol implementation for sensor synchronization
+    """
+    def __init__(self, interface='eth0', domain=0):
+        self.interface = interface
+        self.domain = domain
+        self.offset = 0.0
+        self.drift_rate = 0.0
+
+    def sync_event_handler(self, sync_msg, follow_up_msg):
+        """
+        Handle PTP sync messages and update local clock offset
+        """
+        # Extract timestamps
+        t1 = sync_msg.origin_timestamp      # Master send time
+        t2 = sync_msg.receive_timestamp     # Slave receive time
+        t3 = self.delay_req_timestamp       # Slave send delay request
+        t4 = self.delay_resp_timestamp      # Master receive delay request
+
+        # Calculate offset and delay
+        # offset = ((t2 - t1) - (t4 - t3)) / 2
+        # delay = ((t2 - t1) + (t4 - t3)) / 2
+
+        offset = ((t2 - t1) - (t4 - t3)) / 2
+        delay = ((t2 - t1) + (t4 - t3)) / 2
+
+        # Apply filtering to reduce noise
+        self.offset = self.offset_filter.update(offset)
+
+        # Update drift estimation
+        self.update_drift_estimation(offset)
+
+        return self.offset, delay
+
+    def get_synchronized_time(self):
+        """
+        Get current time synchronized to PTP master
+        """
+        local_time = time.time_ns()
+
+        # Apply offset and drift compensation
+        elapsed = local_time - self.last_sync_time
+        drift_correction = elapsed * self.drift_rate
+
+        synchronized_time = local_time - int(self.offset * 1e9) - drift_correction
+
+        return synchronized_time</code></pre>
+
+        <h2>2.4 Temporal Interpolation and Extrapolation</h2>
+        <p>When sensors operate at different rates, we need to estimate sensor values at times between (interpolation) or beyond (extrapolation) actual measurements:</p>
+
+        <pre><code>class TemporalAlignment:
+    """
+    Temporal alignment of multi-rate sensor data
+    """
+    def __init__(self, max_buffer_duration=1.0):
+        self.sensor_buffers = {}  # sensor_id -> circular buffer
+        self.max_duration = max_buffer_duration
+
+    def add_measurement(self, sensor_id, timestamp, data, uncertainty):
+        """
+        Add a new measurement to the sensor buffer
+        """
+        if sensor_id not in self.sensor_buffers:
+            self.sensor_buffers[sensor_id] = CircularBuffer(max_size=1000)
+
+        self.sensor_buffers[sensor_id].push({
+            'timestamp': timestamp,
+            'data': data,
+            'uncertainty': uncertainty
+        })
+
+        # Prune old data
+        self.prune_buffer(sensor_id)
+
+    def interpolate(self, sensor_id, target_time, method='linear'):
+        """
+        Interpolate sensor data to target timestamp
+        """
+        buffer = self.sensor_buffers[sensor_id]
+
+        # Find bracketing measurements
+        before, after = buffer.find_bracketing(target_time)
+
+        if before is None or after is None:
+            return None, None
+
+        # Calculate interpolation weight
+        dt_total = after['timestamp'] - before['timestamp']
+        dt_target = target_time - before['timestamp']
+        alpha = dt_target / dt_total
+
+        if method == 'linear':
+            interpolated = self.linear_interpolate(
+                before['data'], after['data'], alpha
+            )
+            # Uncertainty increases with interpolation
+            uncertainty = self.interpolate_uncertainty(
+                before['uncertainty'], after['uncertainty'], alpha
+            )
+        elif method == 'slerp':  # For orientations
+            interpolated = self.slerp(
+                before['data'], after['data'], alpha
+            )
+            uncertainty = self.interpolate_uncertainty(
+                before['uncertainty'], after['uncertainty'], alpha
+            )
+
+        return interpolated, uncertainty
+
+    def extrapolate(self, sensor_id, target_time, motion_model=None):
+        """
+        Extrapolate sensor data beyond last measurement
+        Requires motion model for accurate prediction
+        """
+        buffer = self.sensor_buffers[sensor_id]
+        latest = buffer.get_latest()
+
+        dt = target_time - latest['timestamp']
+
+        if motion_model:
+            predicted = motion_model.predict(latest['data'], dt)
+            # Uncertainty grows with extrapolation time
+            uncertainty = motion_model.predict_uncertainty(
+                latest['uncertainty'], dt
+            )
+        else:
+            # Simple constant model
+            predicted = latest['data']
+            uncertainty = latest['uncertainty'] * (1 + abs(dt) * 10)
+
+        return predicted, uncertainty
+
+    def get_synchronized_set(self, target_time, sensor_ids):
+        """
+        Get synchronized measurements from all requested sensors
+        at the specified target time
+        """
+        synchronized = {}
+
+        for sensor_id in sensor_ids:
+            data, uncertainty = self.interpolate(sensor_id, target_time)
+            if data is not None:
+                synchronized[sensor_id] = {
+                    'data': data,
+                    'uncertainty': uncertainty,
+                    'original_time': self.get_nearest_timestamp(sensor_id, target_time)
+                }
+
+        return synchronized</code></pre>
+
+        <h2>2.5 Coordinate Frame Management</h2>
+        <p>Different sensors measure data in their own local coordinate frames. Fusion requires transforming all data to a common reference frame:</p>
+
+        <pre><code>class TransformManager:
+    """
+    Manages coordinate frame transformations between sensors
+    """
+    def __init__(self):
+        self.transforms = {}  # (from_frame, to_frame) -> Transform
+        self.frame_tree = {}  # Build tree structure for chained transforms
+
+    def set_transform(self, from_frame, to_frame, transform, static=True):
+        """
+        Register a transform between coordinate frames
+
+        Parameters:
+        - from_frame: Source frame ID
+        - to_frame: Target frame ID
+        - transform: SE3 transformation matrix (4x4)
+        - static: True if transform is fixed (e.g., sensor mounting)
+        """
+        self.transforms[(from_frame, to_frame)] = {
+            'matrix': transform,
+            'static': static,
+            'timestamp': time.time()
+        }
+
+        # Also store inverse
+        self.transforms[(to_frame, from_frame)] = {
+            'matrix': np.linalg.inv(transform),
+            'static': static,
+            'timestamp': time.time()
+        }
+
+        self._rebuild_tree()
+
+    def get_transform(self, from_frame, to_frame, timestamp=None):
+        """
+        Get transformation between any two frames
+        Automatically chains transforms through frame tree
+        """
+        if from_frame == to_frame:
+            return np.eye(4)
+
+        # Direct transform exists?
+        if (from_frame, to_frame) in self.transforms:
+            return self.transforms[(from_frame, to_frame)]['matrix']
+
+        # Find path through frame tree
+        path = self._find_path(from_frame, to_frame)
+
+        if path is None:
+            raise ValueError(f"No transform path from {from_frame} to {to_frame}")
+
+        # Chain transforms along path
+        result = np.eye(4)
+        for i in range(len(path) - 1):
+            T = self.transforms[(path[i], path[i+1])]['matrix']
+            result = result @ T
+
+        return result
+
+    def transform_point_cloud(self, points, from_frame, to_frame):
+        """
+        Transform point cloud between coordinate frames
+        """
+        T = self.get_transform(from_frame, to_frame)
+
+        # Convert to homogeneous coordinates
+        ones = np.ones((points.shape[0], 1))
+        points_h = np.hstack([points[:, :3], ones])
+
+        # Apply transform
+        transformed_h = (T @ points_h.T).T
+
+        # Return with any additional attributes (intensity, color, etc.)
+        if points.shape[1] > 3:
+            return np.hstack([transformed_h[:, :3], points[:, 3:]])
+        return transformed_h[:, :3]
+
+    def transform_pose(self, pose, from_frame, to_frame):
+        """
+        Transform 6-DOF pose between coordinate frames
+        pose: (x, y, z, qx, qy, qz, qw)
+        """
+        T = self.get_transform(from_frame, to_frame)
+
+        # Convert pose to transformation matrix
+        T_pose = self._pose_to_matrix(pose)
+
+        # Apply frame transformation
+        T_transformed = T @ T_pose
+
+        # Convert back to pose
+        return self._matrix_to_pose(T_transformed)</code></pre>
+
+        <h2>2.6 Data Association</h2>
+        <p>Data association is the process of determining which measurements from different sensors correspond to the same physical entity. This is crucial for feature-level and track-level fusion:</p>
+
+        <h3>Association Approaches</h3>
+        <table>
+            <tr>
+                <th>Method</th>
+                <th>Description</th>
+                <th>Complexity</th>
+                <th>Best For</th>
+            </tr>
+            <tr>
+                <td><strong>Nearest Neighbor</strong></td>
+                <td>Associate with closest match</td>
+                <td>O(nm)</td>
+                <td>Sparse, well-separated targets</td>
+            </tr>
+            <tr>
+                <td><strong>Global Nearest Neighbor</strong></td>
+                <td>Optimal 1-to-1 assignment</td>
+                <td>O(n^3)</td>
+                <td>Moderate clutter</td>
+            </tr>
+            <tr>
+                <td><strong>JPDA</strong></td>
+                <td>Probabilistic soft assignment</td>
+                <td>O(n^m)</td>
+                <td>Dense, uncertain targets</td>
+            </tr>
+            <tr>
+                <td><strong>MHT</strong></td>
+                <td>Multiple hypothesis tracking</td>
+                <td>Exponential</td>
+                <td>Complex scenarios</td>
+            </tr>
+            <tr>
+                <td><strong>Learning-Based</strong></td>
+                <td>Neural network matching</td>
+                <td>O(nm)</td>
+                <td>Complex appearance matching</td>
+            </tr>
+        </table>
+
+        <pre><code>class DataAssociation:
+    """
+    Multi-sensor data association algorithms
+    """
+    def global_nearest_neighbor(self, sensor1_detections, sensor2_detections,
+                                  max_distance=5.0):
+        """
+        Optimal assignment using Hungarian algorithm
+        """
+        n1 = len(sensor1_detections)
+        n2 = len(sensor2_detections)
+
+        if n1 == 0 or n2 == 0:
+            return []
+
+        # Build cost matrix
+        cost_matrix = np.full((n1, n2), max_distance * 2)
+
+        for i, det1 in enumerate(sensor1_detections):
+            for j, det2 in enumerate(sensor2_detections):
+                # Mahalanobis distance considering uncertainties
+                distance = self.mahalanobis_distance(
+                    det1.position, det2.position,
+                    det1.covariance, det2.covariance
+                )
+                if distance < max_distance:
+                    cost_matrix[i, j] = distance
+
+        # Solve assignment problem
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+        # Filter valid associations
+        associations = []
+        for i, j in zip(row_ind, col_ind):
+            if cost_matrix[i, j] < max_distance:
+                associations.append({
+                    'sensor1_idx': i,
+                    'sensor2_idx': j,
+                    'cost': cost_matrix[i, j]
+                })
+
+        return associations
+
+    def probabilistic_data_association(self, predictions, measurements, gate_threshold=9.21):
+        """
+        Joint Probabilistic Data Association (JPDA)
+        Returns association probabilities instead of hard assignments
+        """
+        n_tracks = len(predictions)
+        n_meas = len(measurements)
+
+        # Validation gate (chi-square test for association feasibility)
+        validation_matrix = np.zeros((n_tracks, n_meas), dtype=bool)
+        likelihood_matrix = np.zeros((n_tracks, n_meas))
+
+        for i, pred in enumerate(predictions):
+            for j, meas in enumerate(measurements):
+                # Compute innovation
+                innovation = meas.position - pred.position
+                S = pred.covariance + meas.covariance  # Innovation covariance
+
+                # Mahalanobis distance
+                d2 = innovation.T @ np.linalg.inv(S) @ innovation
+
+                if d2 < gate_threshold:  # 99% gate for 2D
+                    validation_matrix[i, j] = True
+                    # Gaussian likelihood
+                    likelihood_matrix[i, j] = np.exp(-0.5 * d2) / np.sqrt(np.linalg.det(2 * np.pi * S))
+
+        # Compute association probabilities
+        association_probs = self._compute_jpda_probabilities(
+            validation_matrix, likelihood_matrix
+        )
+
+        return association_probs
+
+    def mahalanobis_distance(self, x1, x2, cov1, cov2):
+        """
+        Compute Mahalanobis distance between two uncertain positions
+        """
+        diff = x1 - x2
+        combined_cov = cov1 + cov2
+
+        try:
+            cov_inv = np.linalg.inv(combined_cov)
+            distance = np.sqrt(diff.T @ cov_inv @ diff)
+        except np.linalg.LinAlgError:
+            distance = np.linalg.norm(diff)  # Fallback to Euclidean
+
+        return distance</code></pre>
+
+        <h2>2.7 Buffer Management and Message Queuing</h2>
+        <p>Efficient buffer management is essential for real-time sensor fusion systems. Buffers must accommodate different sensor rates, handle out-of-order arrivals, and manage memory efficiently:</p>
+
+        <pre><code>class SensorBuffer:
+    """
+    Thread-safe sensor data buffer with temporal ordering
+    """
+    def __init__(self, sensor_id, max_age=2.0, max_size=1000):
+        self.sensor_id = sensor_id
+        self.max_age = max_age
+        self.max_size = max_size
+        self.buffer = sortedcontainers.SortedList(key=lambda x: x['timestamp'])
+        self.lock = threading.Lock()
+        self.condition = threading.Condition(self.lock)
+
+    def push(self, timestamp, data, uncertainty):
+        """
+        Add measurement to buffer, maintaining temporal order
+        """
+        with self.lock:
+            self.buffer.add({
+                'timestamp': timestamp,
+                'data': data,
+                'uncertainty': uncertainty,
+                'arrival_time': time.time()
+            })
+
+            # Prune old entries
+            self._prune()
+
+            # Notify waiting consumers
+            self.condition.notify_all()
+
+    def get_range(self, start_time, end_time):
+        """
+        Get all measurements within time range
+        """
+        with self.lock:
+            result = []
+            for entry in self.buffer:
+                if entry['timestamp'] >= start_time and entry['timestamp'] <= end_time:
+                    result.append(entry)
+                elif entry['timestamp'] > end_time:
+                    break
+            return result
+
+    def wait_for_data(self, target_time, timeout=0.1):
+        """
+        Wait until data for target_time is available or timeout
+        """
+        with self.lock:
+            deadline = time.time() + timeout
+
+            while True:
+                # Check if we have data bracketing target time
+                if self._has_data_for_time(target_time):
+                    return True
+
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    return False
+
+                self.condition.wait(timeout=remaining)
+
+    def _prune(self):
+        """
+        Remove entries older than max_age or exceeding max_size
+        """
+        current_time = time.time()
+        cutoff_time = current_time - self.max_age
+
+        while len(self.buffer) > 0:
+            if self.buffer[0]['timestamp'] < cutoff_time:
+                self.buffer.pop(0)
+            elif len(self.buffer) > self.max_size:
+                self.buffer.pop(0)
+            else:
+                break</code></pre>
+
+        <h2>2.8 Handling Missing and Delayed Data</h2>
+        <p>Real-world sensor systems experience data loss, delays, and out-of-order arrivals. Robust fusion systems must handle these gracefully:</p>
+
+        <table>
+            <tr>
+                <th>Scenario</th>
+                <th>Detection Method</th>
+                <th>Handling Strategy</th>
+            </tr>
+            <tr>
+                <td><strong>Missing Data</strong></td>
+                <td>Gap in sequence numbers or timestamps</td>
+                <td>Interpolate, predict, or proceed with available sensors</td>
+            </tr>
+            <tr>
+                <td><strong>Delayed Data</strong></td>
+                <td>Arrival time >> timestamp</td>
+                <td>Buffer and reprocess, or discard if too old</td>
+            </tr>
+            <tr>
+                <td><strong>Out-of-Order</strong></td>
+                <td>Timestamp < last processed</td>
+                <td>Reorder buffer, sliding window processing</td>
+            </tr>
+            <tr>
+                <td><strong>Corrupted Data</strong></td>
+                <td>CRC failure, value bounds check</td>
+                <td>Discard, request retransmission</td>
+            </tr>
+            <tr>
+                <td><strong>Sensor Dropout</strong></td>
+                <td>No data for extended period</td>
+                <td>Continue with remaining sensors, alert</td>
+            </tr>
+        </table>
+
+        <pre><code>class RobustDataIntegration:
+    """
+    Handles missing, delayed, and out-of-order sensor data
+    """
+    def __init__(self, fusion_latency=0.05, max_delay=0.2):
+        self.fusion_latency = fusion_latency  # Wait time for late data
+        self.max_delay = max_delay  # Maximum acceptable delay
+        self.sensor_health = {}  # Track sensor status
+
+    def process_with_delay_tolerance(self, target_time):
+        """
+        Wait for data, process with delay tolerance
+        """
+        # Wait for fusion latency to allow delayed data
+        wait_until = target_time + self.fusion_latency
+
+        while time.time() < wait_until:
+            time.sleep(0.001)
+
+        # Collect available data
+        synchronized_data = {}
+        for sensor_id, buffer in self.sensor_buffers.items():
+            data, uncertainty = buffer.interpolate(target_time)
+
+            if data is not None:
+                synchronized_data[sensor_id] = {
+                    'data': data,
+                    'uncertainty': uncertainty,
+                    'status': 'valid'
+                }
+            else:
+                # Try prediction if recent data exists
+                last_data = buffer.get_latest()
+                if last_data and (target_time - last_data['timestamp']) < self.max_delay:
+                    predicted, uncertainty = self.predict(sensor_id, last_data, target_time)
+                    synchronized_data[sensor_id] = {
+                        'data': predicted,
+                        'uncertainty': uncertainty,
+                        'status': 'predicted'
+                    }
+                else:
+                    self.sensor_health[sensor_id] = 'missing'
+
+        return synchronized_data
+
+    def handle_delayed_arrival(self, sensor_id, delayed_data):
+        """
+        Process data that arrived after its timestamp was already fused
+        """
+        timestamp = delayed_data['timestamp']
+        delay = time.time() - timestamp
+
+        if delay > self.max_delay:
+            # Too old to use
+            logging.warning(f"Discarding delayed data from {sensor_id}: {delay:.3f}s old")
+            return False
+
+        # Option 1: Re-fuse recent window (more accurate, more expensive)
+        if self.enable_refusion:
+            self.refuse_window(timestamp, time.time())
+
+        # Option 2: Use for future predictions (less accurate, cheaper)
+        else:
+            self.sensor_buffers[sensor_id].push(delayed_data)
+
+        return True</code></pre>
+
+        <h2>2.9 Quality Metrics and Monitoring</h2>
+        <p>Continuous monitoring of data integration quality is essential for reliable fusion:</p>
+
+        <pre><code>class IntegrationQualityMonitor:
+    """
+    Monitor and report data integration quality metrics
+    """
+    def __init__(self):
+        self.metrics = defaultdict(list)
+
+    def compute_metrics(self, synchronized_data, expected_sensors):
+        """
+        Compute comprehensive quality metrics
+        """
+        metrics = {
+            'timestamp': time.time(),
+            'sensor_availability': len(synchronized_data) / len(expected_sensors),
+            'sensors_missing': list(set(expected_sensors) - set(synchronized_data.keys())),
+            'predicted_count': sum(1 for s in synchronized_data.values() if s['status'] == 'predicted'),
+        }
+
+        # Compute synchronization quality
+        if len(synchronized_data) > 1:
+            timestamps = [s.get('original_time', 0) for s in synchronized_data.values()]
+            metrics['max_time_spread'] = max(timestamps) - min(timestamps)
+            metrics['sync_quality'] = 1.0 / (1.0 + metrics['max_time_spread'] * 100)
+
+        # Compute average uncertainty
+        uncertainties = [s['uncertainty'] for s in synchronized_data.values() if s['uncertainty'] is not None]
+        if uncertainties:
+            metrics['avg_uncertainty'] = np.mean([np.trace(u) for u in uncertainties])
+
+        self.metrics['history'].append(metrics)
+
+        return metrics
+
+    def get_sensor_health_report(self):
+        """
+        Generate comprehensive sensor health report
+        """
+        if len(self.metrics['history']) < 10:
+            return None
+
+        recent = self.metrics['history'][-100:]
+
+        report = {
+            'overall_availability': np.mean([m['sensor_availability'] for m in recent]),
+            'sync_quality_mean': np.mean([m.get('sync_quality', 1.0) for m in recent]),
+            'prediction_rate': np.mean([m['predicted_count'] for m in recent]) / len(expected_sensors),
+        }
+
+        # Per-sensor statistics
+        sensor_stats = defaultdict(lambda: {'present': 0, 'missing': 0})
+        for m in recent:
+            for sensor in expected_sensors:
+                if sensor in m.get('sensors_missing', []):
+                    sensor_stats[sensor]['missing'] += 1
+                else:
+                    sensor_stats[sensor]['present'] += 1
+
+        report['per_sensor'] = dict(sensor_stats)
+
+        return report</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Unified data representation enables seamless integration across diverse sensor modalities</li>
+                <li>PTP and GPS provide sub-microsecond time synchronization essential for accurate fusion</li>
+                <li>Temporal interpolation and extrapolation bridge different sensor sampling rates</li>
+                <li>Coordinate frame management transforms all data to a common reference frame</li>
+                <li>Data association algorithms determine which measurements correspond to the same entity</li>
+                <li>Robust buffer management handles out-of-order arrivals and variable latencies</li>
+                <li>Missing and delayed data require graceful degradation strategies</li>
+                <li>Continuous quality monitoring ensures reliable integration over time</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Why is a unified data representation important for sensor fusion? What key elements should it include?</li>
+                <li>Compare PTP, NTP, and GPS-based time synchronization. When would you use each?</li>
+                <li>Explain the difference between interpolation and extrapolation. How does uncertainty differ?</li>
+                <li>Describe the role of the TransformManager in a multi-sensor system.</li>
+                <li>Compare Global Nearest Neighbor and JPDA for data association. What are the trade-offs?</li>
+                <li>How should a fusion system handle data that arrives 50ms late?</li>
+                <li>What quality metrics would you monitor to ensure reliable data integration?</li>
+                <li>Design a buffer management strategy for a system with cameras (30Hz), LiDAR (10Hz), and IMU (200Hz).</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

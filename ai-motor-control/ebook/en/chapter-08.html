@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Safety, Limits & Integration | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+        .warning{background:#7f1d1d;border:2px solid #dc2626;padding:20px;border-radius:8px;margin:20px 0}
+        .warning h3{color:#fca5a5;margin-top:0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 8: Safety, Limits & Integration</h1>
+
+        <h2>8.1 Safety-Critical Motor Control</h2>
+        <p>Motor control systems can pose significant safety risks including mechanical injury, electrical hazards, and property damage. Implementing robust safety mechanisms is not optional but a fundamental requirement. This chapter covers safety architectures, limit enforcement, fault detection, and system integration for reliable motor control.</p>
+
+        <div class="warning">
+            <h3>Safety First Principle</h3>
+            <p>In motor control systems, safety mechanisms must be independent of the main control loop. Hardware interlocks, watchdog timers, and fail-safe designs ensure that no single software failure can lead to hazardous conditions. Always follow applicable safety standards (IEC 61508, ISO 13849, IEC 62443) for your application domain.</p>
+        </div>
+
+        <h2>8.2 Safety Architecture</h2>
+        <pre><code>// Multi-Layer Safety Architecture
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 4: Application Safety                                     │
+│  - Task-level collision avoidance                                │
+│  - Workspace boundary enforcement                                │
+│  - Human-robot collaboration zones                               │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3: Motion Safety                                          │
+│  - Trajectory validation                                         │
+│  - Speed/acceleration limiting                                   │
+│  - Force/torque limiting                                         │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 2: Drive-Level Safety                                     │
+│  - Current limiting                                              │
+│  - Voltage limiting                                              │
+│  - Temperature protection                                        │
+│  - Position/velocity limits                                      │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: Hardware Safety (Independent)                          │
+│  - Emergency stop circuits                                       │
+│  - Hardware current limiters                                     │
+│  - Watchdog timers                                               │
+│  - Safe torque off (STO)                                         │
+└─────────────────────────────────────────────────────────────────┘</code></pre>
+
+        <h3>Safety Controller Implementation</h3>
+        <pre><code>// Comprehensive Safety Controller
+class SafetyController {
+private:
+    // Safety limits
+    struct SafetyLimits {
+        float max_position;
+        float min_position;
+        float max_velocity;
+        float max_acceleration;
+        float max_jerk;
+        float max_current;
+        float max_torque;
+        float max_temperature;
+        float max_voltage;
+    } limits;
+
+    // Safety states
+    enum SafetyState {
+        NORMAL,
+        WARNING,
+        SAFE_STOP_1,    // Controlled deceleration
+        SAFE_STOP_2,    // Immediate stop with braking
+        EMERGENCY_STOP, // Safe torque off
+        FAULT
+    } current_state;
+
+    // Fault flags
+    struct FaultFlags {
+        bool position_limit;
+        bool velocity_limit;
+        bool current_limit;
+        bool temperature_high;
+        bool communication_lost;
+        bool encoder_fault;
+        bool drive_fault;
+        bool external_estop;
+        bool watchdog_timeout;
+    } faults;
+
+    // Watchdog
+    uint32_t last_heartbeat;
+    uint32_t watchdog_timeout_ms;
+
+    // Safe stop trajectory
+    float safe_stop_decel;
+    float brake_ramp_time;
+
+public:
+    SafetyController(SafetyConfig& config) {
+        limits = config.limits;
+        watchdog_timeout_ms = config.watchdog_timeout;
+        safe_stop_decel = config.safe_stop_decel;
+        brake_ramp_time = config.brake_ramp_time;
+
+        current_state = NORMAL;
+        reset_faults();
+    }
+
+    SafetyState check_and_limit(MotorState& state, float& control_output) {
+        // Check all safety conditions
+        check_position_limits(state);
+        check_velocity_limits(state);
+        check_current_limits(state);
+        check_temperature(state);
+        check_watchdog();
+        check_encoder_validity(state);
+
+        // Determine safety state based on faults
+        update_safety_state();
+
+        // Apply appropriate response
+        switch (current_state) {
+            case NORMAL:
+                // Apply soft limits only
+                control_output = apply_soft_limits(control_output, state);
+                break;
+
+            case WARNING:
+                // Reduce performance, log warning
+                control_output = apply_reduced_limits(control_output, state);
+                log_warning();
+                break;
+
+            case SAFE_STOP_1:
+                // Controlled deceleration to stop
+                control_output = compute_safe_stop_trajectory(state);
+                break;
+
+            case SAFE_STOP_2:
+                // Immediate braking
+                control_output = compute_emergency_braking(state);
+                break;
+
+            case EMERGENCY_STOP:
+                // Safe torque off - disable drive
+                control_output = 0;
+                trigger_sto();
+                break;
+
+            case FAULT:
+                // Fault state - require manual reset
+                control_output = 0;
+                trigger_sto();
+                break;
+        }
+
+        return current_state;
+    }
+
+    void check_position_limits(MotorState& state) {
+        if (state.position > limits.max_position ||
+            state.position < limits.min_position) {
+            faults.position_limit = true;
+        }
+
+        // Soft limit warning zone (90% of limit)
+        float warning_margin = 0.9f;
+        if (state.position > limits.max_position * warning_margin ||
+            state.position < limits.min_position * warning_margin) {
+            // Approaching limit - reduce velocity toward limit
+        }
+    }
+
+    void check_velocity_limits(MotorState& state) {
+        if (fabs(state.velocity) > limits.max_velocity) {
+            faults.velocity_limit = true;
+        }
+    }
+
+    void check_current_limits(MotorState& state) {
+        // Instantaneous limit
+        if (fabs(state.current) > limits.max_current) {
+            faults.current_limit = true;
+        }
+
+        // I²t thermal protection
+        static float i2t_accumulator = 0;
+        float i2t_limit = limits.max_current * limits.max_current * thermal_time_constant;
+
+        i2t_accumulator += state.current * state.current * dt;
+        i2t_accumulator -= i2t_accumulator * dt / thermal_time_constant;
+
+        if (i2t_accumulator > i2t_limit) {
+            faults.current_limit = true;
+        }
+    }
+
+    void check_temperature(MotorState& state) {
+        if (state.temperature > limits.max_temperature) {
+            faults.temperature_high = true;
+        }
+
+        // Derating based on temperature
+        if (state.temperature > limits.max_temperature * 0.8f) {
+            // Reduce current limit proportionally
+            float derating = 1.0f - (state.temperature - limits.max_temperature * 0.8f) /
+                            (limits.max_temperature * 0.2f);
+            current_limit_derating = clamp(derating, 0.5f, 1.0f);
+        }
+    }
+
+    void check_watchdog() {
+        uint32_t now = get_system_time_ms();
+        if (now - last_heartbeat > watchdog_timeout_ms) {
+            faults.watchdog_timeout = true;
+        }
+    }
+
+    void heartbeat() {
+        last_heartbeat = get_system_time_ms();
+    }
+
+    float compute_safe_stop_trajectory(MotorState& state) {
+        // Compute deceleration to stop within limits
+        float stopping_distance = state.velocity * state.velocity / (2 * safe_stop_decel);
+        float target_velocity;
+
+        if (fabs(state.velocity) < 0.01f) {
+            target_velocity = 0;
+        } else if (state.velocity > 0) {
+            target_velocity = state.velocity - safe_stop_decel * dt;
+            target_velocity = fmax(target_velocity, 0);
+        } else {
+            target_velocity = state.velocity + safe_stop_decel * dt;
+            target_velocity = fmin(target_velocity, 0);
+        }
+
+        // Return velocity command (assuming velocity control mode)
+        return target_velocity;
+    }
+
+    bool can_reset() {
+        // Check if conditions allow fault reset
+        return !faults.external_estop &&
+               !faults.drive_fault &&
+               !faults.encoder_fault;
+    }
+
+    void reset_faults() {
+        memset(&faults, 0, sizeof(faults));
+        current_state = NORMAL;
+    }
+
+private:
+    float dt = 0.0001f;
+    float thermal_time_constant = 30.0f;
+    float current_limit_derating = 1.0f;
+
+    void update_safety_state();
+    float apply_soft_limits(float output, MotorState& state);
+    float apply_reduced_limits(float output, MotorState& state);
+    float compute_emergency_braking(MotorState& state);
+    void trigger_sto();
+    void log_warning();
+    uint32_t get_system_time_ms();
+};</code></pre>
+
+        <h2>8.3 Limit Enforcement</h2>
+        <pre><code>// Multi-Level Limit Enforcement
+class LimitEnforcer {
+private:
+    // Position limits with soft zones
+    struct PositionLimits {
+        float hard_min, hard_max;      // Hardware limits (never exceed)
+        float soft_min, soft_max;      // Software limits (normal operation)
+        float warning_min, warning_max; // Warning zones
+    } pos_limits;
+
+    // Velocity limits (speed-dependent)
+    struct VelocityLimits {
+        float max_velocity;
+        float max_acceleration;
+        float max_jerk;
+    } vel_limits;
+
+    // Current/Torque limits
+    struct TorqueLimits {
+        float continuous_current;
+        float peak_current;
+        float peak_duration_ms;
+        float continuous_torque;
+        float peak_torque;
+    } torque_limits;
+
+public:
+    LimitEnforcer(LimitConfig& config) {
+        pos_limits = config.position;
+        vel_limits = config.velocity;
+        torque_limits = config.torque;
+    }
+
+    // Apply all limits to trajectory command
+    void enforce_trajectory_limits(TrajectoryPoint& cmd, MotorState& state) {
+        // Position limits with velocity reduction near boundaries
+        enforce_position_limits(cmd, state);
+
+        // Velocity limits
+        cmd.velocity = clamp(cmd.velocity, -vel_limits.max_velocity, vel_limits.max_velocity);
+
+        // Acceleration limits
+        float accel = (cmd.velocity - state.velocity) / dt;
+        if (fabs(accel) > vel_limits.max_acceleration) {
+            accel = copysign(vel_limits.max_acceleration, accel);
+            cmd.velocity = state.velocity + accel * dt;
+        }
+
+        // Jerk limits (rate of acceleration change)
+        static float last_accel = 0;
+        float jerk = (accel - last_accel) / dt;
+        if (fabs(jerk) > vel_limits.max_jerk) {
+            jerk = copysign(vel_limits.max_jerk, jerk);
+            accel = last_accel + jerk * dt;
+            cmd.velocity = state.velocity + accel * dt;
+        }
+        last_accel = accel;
+    }
+
+    void enforce_position_limits(TrajectoryPoint& cmd, MotorState& state) {
+        // Hard limits - never exceed
+        cmd.position = clamp(cmd.position, pos_limits.hard_min, pos_limits.hard_max);
+
+        // Soft limits - reduce velocity when approaching
+        float margin_to_max = pos_limits.soft_max - state.position;
+        float margin_to_min = state.position - pos_limits.soft_min;
+
+        float velocity_limit = vel_limits.max_velocity;
+
+        // Reduce velocity when approaching limits
+        float slow_zone = 0.1f * (pos_limits.soft_max - pos_limits.soft_min);
+
+        if (margin_to_max < slow_zone && cmd.velocity > 0) {
+            float scale = margin_to_max / slow_zone;
+            velocity_limit = vel_limits.max_velocity * scale;
+            cmd.velocity = fmin(cmd.velocity, velocity_limit);
+        }
+
+        if (margin_to_min < slow_zone && cmd.velocity < 0) {
+            float scale = margin_to_min / slow_zone;
+            velocity_limit = -vel_limits.max_velocity * scale;
+            cmd.velocity = fmax(cmd.velocity, velocity_limit);
+        }
+    }
+
+    // Apply current/torque limits
+    float enforce_current_limit(float current_cmd, MotorState& state) {
+        // Instantaneous peak limit
+        float limited = clamp(current_cmd, -torque_limits.peak_current, torque_limits.peak_current);
+
+        // I²t limiting for thermal protection
+        static float i2t_integral = 0;
+        static uint32_t peak_start_time = 0;
+
+        float i_continuous = torque_limits.continuous_current;
+        float i_peak = torque_limits.peak_current;
+
+        // Track time in peak current region
+        if (fabs(limited) > i_continuous) {
+            if (peak_start_time == 0) {
+                peak_start_time = get_time_ms();
+            }
+
+            uint32_t peak_duration = get_time_ms() - peak_start_time;
+            if (peak_duration > torque_limits.peak_duration_ms) {
+                // Exceeded peak duration, limit to continuous
+                limited = copysign(i_continuous, limited);
+            }
+        } else {
+            peak_start_time = 0;
+        }
+
+        // Temperature-based derating
+        float temp_factor = compute_temperature_derating(state.temperature);
+        limited *= temp_factor;
+
+        return limited;
+    }
+
+    float compute_temperature_derating(float temperature) {
+        float temp_threshold = 80.0f;   // Start derating at 80C
+        float temp_max = 120.0f;        // Full derating at 120C
+        float min_derating = 0.3f;      // Minimum 30% current at max temp
+
+        if (temperature < temp_threshold) {
+            return 1.0f;
+        } else if (temperature > temp_max) {
+            return min_derating;
+        } else {
+            float ratio = (temperature - temp_threshold) / (temp_max - temp_threshold);
+            return 1.0f - ratio * (1.0f - min_derating);
+        }
+    }
+
+private:
+    float dt = 0.0001f;
+    uint32_t get_time_ms();
+};</code></pre>
+
+        <h2>8.4 Fault Detection and Diagnostics</h2>
+        <pre><code>// Fault Detection System
+class FaultDetector {
+private:
+    // Fault detection thresholds
+    struct Thresholds {
+        float position_error_max;
+        float velocity_error_max;
+        float current_imbalance_max;
+        float encoder_velocity_mismatch;
+        float motor_temperature_max;
+        float drive_temperature_max;
+    } thresh;
+
+    // Fault counters (for filtering transients)
+    struct FaultCounters {
+        int position_error;
+        int velocity_error;
+        int encoder_fault;
+        int communication;
+        int overcurrent;
+    } counters;
+
+    int fault_threshold;  // Counts before declaring fault
+
+public:
+    FaultDetector(FaultConfig& config) {
+        thresh = config.thresholds;
+        fault_threshold = config.fault_threshold;
+        reset_counters();
+    }
+
+    FaultCode detect(MotorState& state, ControlState& ctrl) {
+        FaultCode fault = FAULT_NONE;
+
+        // Following error detection
+        if (fabs(ctrl.position_error) > thresh.position_error_max) {
+            if (++counters.position_error >= fault_threshold) {
+                fault = FAULT_FOLLOWING_ERROR;
+            }
+        } else {
+            counters.position_error = 0;
+        }
+
+        // Encoder fault detection
+        fault = check_encoder(state);
+        if (fault != FAULT_NONE) return fault;
+
+        // Overcurrent detection
+        if (fabs(state.current) > state.current_limit * 1.2f) {
+            if (++counters.overcurrent >= fault_threshold) {
+                fault = FAULT_OVERCURRENT;
+            }
+        } else {
+            counters.overcurrent = 0;
+        }
+
+        // Motor stall detection
+        fault = check_stall(state, ctrl);
+        if (fault != FAULT_NONE) return fault;
+
+        // Thermal fault
+        if (state.motor_temperature > thresh.motor_temperature_max) {
+            fault = FAULT_OVERTEMPERATURE;
+        }
+
+        return fault;
+    }
+
+    FaultCode check_encoder(MotorState& state) {
+        // Check for encoder signal validity
+        static float last_position = 0;
+        static uint32_t stuck_count = 0;
+
+        // Position not changing while current flowing
+        if (fabs(state.position - last_position) < 0.0001f &&
+            fabs(state.current) > 0.5f) {
+            stuck_count++;
+            if (stuck_count > 1000) {  // 100ms at 10kHz
+                return FAULT_ENCODER_STUCK;
+            }
+        } else {
+            stuck_count = 0;
+        }
+
+        // Check for encoder count jumps (noise or failure)
+        float expected_change = state.velocity * dt;
+        float actual_change = state.position - last_position;
+
+        if (fabs(actual_change - expected_change) > thresh.encoder_velocity_mismatch) {
+            if (++counters.encoder_fault >= fault_threshold) {
+                return FAULT_ENCODER_SIGNAL;
+            }
+        } else {
+            counters.encoder_fault = 0;
+        }
+
+        last_position = state.position;
+        return FAULT_NONE;
+    }
+
+    FaultCode check_stall(MotorState& state, ControlState& ctrl) {
+        // Motor stall: high current but no motion
+        static uint32_t stall_count = 0;
+
+        bool high_current = fabs(state.current) > 0.8f * state.current_limit;
+        bool low_velocity = fabs(state.velocity) < 0.01f * ctrl.velocity_reference;
+        bool commanding_motion = fabs(ctrl.velocity_reference) > 0.1f;
+
+        if (high_current && low_velocity && commanding_motion) {
+            stall_count++;
+            if (stall_count > 5000) {  // 500ms at 10kHz
+                return FAULT_MOTOR_STALL;
+            }
+        } else {
+            stall_count = 0;
+        }
+
+        return FAULT_NONE;
+    }
+
+    void reset_counters() {
+        memset(&counters, 0, sizeof(counters));
+    }
+
+private:
+    float dt = 0.0001f;
+};
+
+enum FaultCode {
+    FAULT_NONE = 0,
+    FAULT_FOLLOWING_ERROR,
+    FAULT_OVERCURRENT,
+    FAULT_OVERTEMPERATURE,
+    FAULT_ENCODER_STUCK,
+    FAULT_ENCODER_SIGNAL,
+    FAULT_MOTOR_STALL,
+    FAULT_COMMUNICATION,
+    FAULT_DRIVE_ERROR,
+    FAULT_EXTERNAL_ESTOP
+};</code></pre>
+
+        <h2>8.5 Safe Torque Off (STO) Implementation</h2>
+        <pre><code>// Safe Torque Off Function
+class SafeTorqueOff {
+private:
+    // STO hardware interface
+    GPIO_Pin sto_channel_1;
+    GPIO_Pin sto_channel_2;
+
+    // Dual-channel verification
+    bool channel_1_active;
+    bool channel_2_active;
+
+    // STO state
+    bool sto_engaged;
+    uint32_t sto_engage_time;
+
+public:
+    SafeTorqueOff(STOConfig& config) {
+        sto_channel_1 = config.channel_1_pin;
+        sto_channel_2 = config.channel_2_pin;
+
+        // Initialize STO in safe state (engaged)
+        engage();
+    }
+
+    void engage() {
+        // Open both STO channels (fail-safe: open = safe)
+        gpio_write(sto_channel_1, LOW);
+        gpio_write(sto_channel_2, LOW);
+
+        channel_1_active = false;
+        channel_2_active = false;
+        sto_engaged = true;
+        sto_engage_time = get_time_ms();
+    }
+
+    bool release() {
+        // Verify conditions before releasing STO
+        if (!can_release()) {
+            return false;
+        }
+
+        // Close both STO channels (closed = power enabled)
+        gpio_write(sto_channel_1, HIGH);
+        gpio_write(sto_channel_2, HIGH);
+
+        // Verify both channels closed
+        delay_us(100);  // Allow for relay settling
+
+        channel_1_active = gpio_read(sto_channel_1);
+        channel_2_active = gpio_read(sto_channel_2);
+
+        if (channel_1_active && channel_2_active) {
+            sto_engaged = false;
+            return true;
+        } else {
+            // Channel mismatch - keep safe
+            engage();
+            log_fault("STO channel mismatch");
+            return false;
+        }
+    }
+
+    bool can_release() {
+        // Check all conditions for safe release
+        // - No active faults
+        // - Emergency stop not pressed
+        // - Initialization complete
+        // - Manual reset acknowledged
+
+        return !has_active_faults() &&
+               !estop_pressed() &&
+               initialization_complete() &&
+               reset_acknowledged();
+    }
+
+    void periodic_check() {
+        // Verify STO channels match expected state
+        bool ch1_state = gpio_read(sto_channel_1);
+        bool ch2_state = gpio_read(sto_channel_2);
+
+        if (sto_engaged) {
+            // Should both be LOW (open)
+            if (ch1_state || ch2_state) {
+                log_fault("STO channel stuck closed");
+                trigger_fault();
+            }
+        } else {
+            // Should both be HIGH (closed)
+            if (!ch1_state || !ch2_state) {
+                log_fault("STO channel opened unexpectedly");
+                engage();  // Re-engage STO
+            }
+        }
+    }
+
+    bool is_engaged() { return sto_engaged; }
+
+private:
+    bool has_active_faults();
+    bool estop_pressed();
+    bool initialization_complete();
+    bool reset_acknowledged();
+    void trigger_fault();
+    void log_fault(const char* msg);
+    uint32_t get_time_ms();
+    void delay_us(int us);
+};</code></pre>
+
+        <h2>8.6 Functional Safety Standards</h2>
+        <table>
+            <tr>
+                <th>Standard</th>
+                <th>Domain</th>
+                <th>Key Requirements</th>
+            </tr>
+            <tr>
+                <td><strong>IEC 61508</strong></td>
+                <td>General functional safety</td>
+                <td>SIL 1-4 levels, hardware/software requirements</td>
+            </tr>
+            <tr>
+                <td><strong>ISO 13849</strong></td>
+                <td>Machinery safety</td>
+                <td>PL a-e levels, category B-4 architectures</td>
+            </tr>
+            <tr>
+                <td><strong>IEC 61800-5-2</strong></td>
+                <td>Adjustable speed drives</td>
+                <td>Safe torque off, safe stop functions</td>
+            </tr>
+            <tr>
+                <td><strong>IEC 62443</strong></td>
+                <td>Industrial cybersecurity</td>
+                <td>Security levels, secure development</td>
+            </tr>
+            <tr>
+                <td><strong>ISO 10218</strong></td>
+                <td>Industrial robots</td>
+                <td>Safety requirements for robot systems</td>
+            </tr>
+            <tr>
+                <td><strong>ISO/TS 15066</strong></td>
+                <td>Collaborative robots</td>
+                <td>Force/pressure limits for human contact</td>
+            </tr>
+        </table>
+
+        <h2>8.7 System Integration</h2>
+        <pre><code>// Complete Motor Control System Integration
+class MotorControlSystem {
+private:
+    // Core components
+    MotorDriver driver;
+    EncoderInterface encoder;
+    CurrentSensor current_sensor;
+    TemperatureSensor temp_sensor;
+
+    // Control components
+    PositionController position_ctrl;
+    VelocityController velocity_ctrl;
+    CurrentController current_ctrl;
+    TrajectoryGenerator trajectory;
+
+    // Safety components
+    SafetyController safety;
+    LimitEnforcer limits;
+    FaultDetector fault_detector;
+    SafeTorqueOff sto;
+
+    // Communication
+    CANInterface can;
+    EtherCATInterface ethercat;
+
+    // State
+    MotorState state;
+    ControlMode mode;
+    SystemStatus status;
+
+public:
+    MotorControlSystem(SystemConfig& config) :
+        driver(config.driver),
+        encoder(config.encoder),
+        current_sensor(config.current_sensor),
+        position_ctrl(config.position_ctrl),
+        velocity_ctrl(config.velocity_ctrl),
+        current_ctrl(config.current_ctrl),
+        safety(config.safety),
+        limits(config.limits),
+        fault_detector(config.fault_detector),
+        sto(config.sto)
+    {
+        mode = MODE_DISABLED;
+        status = STATUS_INITIALIZING;
+    }
+
+    void initialize() {
+        // Startup sequence
+        status = STATUS_INITIALIZING;
+
+        // 1. Hardware initialization
+        driver.initialize();
+        encoder.initialize();
+        current_sensor.calibrate();
+
+        // 2. Encoder homing (if needed)
+        if (encoder.needs_homing()) {
+            perform_homing_sequence();
+        }
+
+        // 3. Parameter validation
+        validate_parameters();
+
+        // 4. Safety system check
+        safety_system_check();
+
+        // 5. Ready for operation
+        status = STATUS_READY;
+    }
+
+    void control_loop() {
+        // Called at control frequency (e.g., 10 kHz)
+
+        // 1. Read sensors
+        update_state();
+
+        // 2. Safety check (always runs first)
+        safety.heartbeat();
+        FaultCode fault = fault_detector.detect(state, ctrl_state);
+
+        if (fault != FAULT_NONE) {
+            handle_fault(fault);
+            return;
+        }
+
+        SafetyState safety_state = safety.check_and_limit(state, control_output);
+
+        if (safety_state != NORMAL && safety_state != WARNING) {
+            // Safety system has taken control
+            apply_output(control_output);
+            return;
+        }
+
+        // 3. Generate/receive commands
+        TrajectoryPoint cmd;
+        if (mode == MODE_TRAJECTORY) {
+            cmd = trajectory.get_next_point();
+        } else {
+            cmd = receive_external_command();
+        }
+
+        // 4. Apply limits to command
+        limits.enforce_trajectory_limits(cmd, state);
+
+        // 5. Control computation
+        float output;
+        switch (mode) {
+            case MODE_POSITION:
+                output = position_ctrl.compute(cmd.position, state.position, state.velocity);
+                output = velocity_ctrl.compute(output, state.velocity);
+                output = current_ctrl.compute(output, state.current);
+                break;
+
+            case MODE_VELOCITY:
+                output = velocity_ctrl.compute(cmd.velocity, state.velocity);
+                output = current_ctrl.compute(output, state.current);
+                break;
+
+            case MODE_TORQUE:
+                output = current_ctrl.compute(cmd.torque / Kt, state.current);
+                break;
+
+            case MODE_DISABLED:
+                output = 0;
+                break;
+        }
+
+        // 6. Current limiting
+        float current_cmd = output;
+        current_cmd = limits.enforce_current_limit(current_cmd, state);
+
+        // 7. Apply output
+        apply_output(current_cmd);
+
+        // 8. Update telemetry
+        update_telemetry();
+    }
+
+    void update_state() {
+        state.position = encoder.get_position();
+        state.velocity = encoder.get_velocity();
+        state.current = current_sensor.get_current();
+        state.temperature = temp_sensor.get_temperature();
+        state.timestamp = get_timestamp();
+    }
+
+    void apply_output(float current_cmd) {
+        if (sto.is_engaged()) {
+            driver.set_pwm(0);
+            return;
+        }
+
+        // Convert current command to PWM
+        float voltage_cmd = current_ctrl.get_voltage_output();
+        float duty = voltage_to_duty(voltage_cmd);
+        driver.set_pwm(duty);
+    }
+
+    void handle_fault(FaultCode fault) {
+        status = STATUS_FAULT;
+
+        switch (fault) {
+            case FAULT_FOLLOWING_ERROR:
+            case FAULT_MOTOR_STALL:
+                // Safe stop 1 (controlled deceleration)
+                safety.trigger_safe_stop_1();
+                break;
+
+            case FAULT_OVERCURRENT:
+            case FAULT_OVERTEMPERATURE:
+            case FAULT_ENCODER_STUCK:
+                // Safe stop 2 (immediate stop)
+                safety.trigger_safe_stop_2();
+                break;
+
+            case FAULT_ENCODER_SIGNAL:
+            case FAULT_DRIVE_ERROR:
+            case FAULT_EXTERNAL_ESTOP:
+                // Emergency stop (STO)
+                sto.engage();
+                break;
+        }
+
+        log_fault(fault);
+        notify_host(fault);
+    }
+
+    bool enable() {
+        if (status != STATUS_READY && status != STATUS_DISABLED) {
+            return false;
+        }
+
+        if (!sto.release()) {
+            return false;
+        }
+
+        mode = MODE_POSITION;
+        status = STATUS_ENABLED;
+        return true;
+    }
+
+    void disable() {
+        mode = MODE_DISABLED;
+        sto.engage();
+        status = STATUS_DISABLED;
+    }
+
+private:
+    ControlState ctrl_state;
+    float control_output;
+    float Kt;  // Torque constant
+
+    void perform_homing_sequence();
+    void validate_parameters();
+    void safety_system_check();
+    TrajectoryPoint receive_external_command();
+    void update_telemetry();
+    float voltage_to_duty(float voltage);
+    uint64_t get_timestamp();
+    void log_fault(FaultCode fault);
+    void notify_host(FaultCode fault);
+};</code></pre>
+
+        <h2>8.8 Communication Integration</h2>
+        <pre><code>// EtherCAT Integration for Real-Time Motor Control
+class EtherCATMotorDrive {
+private:
+    // EtherCAT state machine
+    enum ECState { INIT, PREOP, SAFEOP, OP } ec_state;
+
+    // Process data objects (PDO)
+    struct TxPDO {  // Drive → Master
+        int32_t actual_position;
+        int32_t actual_velocity;
+        int16_t actual_torque;
+        uint16_t status_word;
+    } tx_pdo;
+
+    struct RxPDO {  // Master → Drive
+        int32_t target_position;
+        int32_t target_velocity;
+        int16_t target_torque;
+        uint16_t control_word;
+    } rx_pdo;
+
+    // CiA 402 state machine
+    enum DriveState {
+        NOT_READY_TO_SWITCH_ON,
+        SWITCH_ON_DISABLED,
+        READY_TO_SWITCH_ON,
+        SWITCHED_ON,
+        OPERATION_ENABLED,
+        QUICK_STOP_ACTIVE,
+        FAULT_REACTION_ACTIVE,
+        FAULT
+    } drive_state;
+
+public:
+    void process_pdo() {
+        // Called every EtherCAT cycle (typically 1ms or faster)
+
+        // Update status word based on drive state
+        tx_pdo.status_word = build_status_word();
+
+        // Process control word
+        process_control_word(rx_pdo.control_word);
+
+        // Get feedback
+        tx_pdo.actual_position = motor_system.get_position_counts();
+        tx_pdo.actual_velocity = motor_system.get_velocity_counts_per_sec();
+        tx_pdo.actual_torque = motor_system.get_torque_permille();
+
+        // Apply setpoints if in operational state
+        if (drive_state == OPERATION_ENABLED) {
+            apply_setpoints();
+        }
+    }
+
+    void process_control_word(uint16_t cw) {
+        // CiA 402 state machine transitions
+        bool switch_on = cw & 0x0001;
+        bool enable_voltage = cw & 0x0002;
+        bool quick_stop = cw & 0x0004;
+        bool enable_operation = cw & 0x0008;
+        bool fault_reset = cw & 0x0080;
+
+        switch (drive_state) {
+            case SWITCH_ON_DISABLED:
+                if (switch_on && enable_voltage && quick_stop) {
+                    drive_state = READY_TO_SWITCH_ON;
+                }
+                break;
+
+            case READY_TO_SWITCH_ON:
+                if (switch_on && enable_voltage && quick_stop) {
+                    drive_state = SWITCHED_ON;
+                    motor_system.prepare();
+                }
+                break;
+
+            case SWITCHED_ON:
+                if (enable_operation) {
+                    drive_state = OPERATION_ENABLED;
+                    motor_system.enable();
+                }
+                break;
+
+            case OPERATION_ENABLED:
+                if (!enable_operation) {
+                    drive_state = SWITCHED_ON;
+                    motor_system.disable();
+                }
+                if (!quick_stop) {
+                    drive_state = QUICK_STOP_ACTIVE;
+                    motor_system.quick_stop();
+                }
+                break;
+
+            case FAULT:
+                if (fault_reset) {
+                    motor_system.reset_faults();
+                    drive_state = SWITCH_ON_DISABLED;
+                }
+                break;
+        }
+    }
+
+    uint16_t build_status_word() {
+        uint16_t sw = 0;
+
+        // State bits
+        switch (drive_state) {
+            case NOT_READY_TO_SWITCH_ON:
+                sw = 0x0000;
+                break;
+            case SWITCH_ON_DISABLED:
+                sw = 0x0040;
+                break;
+            case READY_TO_SWITCH_ON:
+                sw = 0x0021;
+                break;
+            case SWITCHED_ON:
+                sw = 0x0023;
+                break;
+            case OPERATION_ENABLED:
+                sw = 0x0027;
+                break;
+            case QUICK_STOP_ACTIVE:
+                sw = 0x0007;
+                break;
+            case FAULT:
+                sw = 0x0008;
+                break;
+        }
+
+        // Additional status bits
+        if (motor_system.target_reached()) sw |= 0x0400;
+        if (motor_system.has_warning()) sw |= 0x0080;
+
+        return sw;
+    }
+
+private:
+    MotorControlSystem motor_system;
+    void apply_setpoints();
+};</code></pre>
+
+        <h2>8.9 Testing and Validation</h2>
+        <pre><code>// Motor Control System Test Framework
+class MotorControlTester {
+public:
+    struct TestResult {
+        string test_name;
+        bool passed;
+        float measured_value;
+        float expected_value;
+        float tolerance;
+        string failure_reason;
+    };
+
+    vector&lt;TestResult&gt; run_all_tests(MotorControlSystem& system) {
+        vector&lt;TestResult&gt; results;
+
+        // Safety tests (must pass first)
+        results.push_back(test_sto_functionality(system));
+        results.push_back(test_position_limits(system));
+        results.push_back(test_velocity_limits(system));
+        results.push_back(test_current_limits(system));
+        results.push_back(test_emergency_stop(system));
+
+        // Functional tests
+        results.push_back(test_step_response(system));
+        results.push_back(test_following_error(system));
+        results.push_back(test_trajectory_tracking(system));
+        results.push_back(test_disturbance_rejection(system));
+
+        // Performance tests
+        results.push_back(test_bandwidth(system));
+        results.push_back(test_settling_time(system));
+        results.push_back(test_steady_state_error(system));
+
+        return results;
+    }
+
+    TestResult test_sto_functionality(MotorControlSystem& system) {
+        TestResult result;
+        result.test_name = "STO Functionality";
+
+        // Engage STO
+        system.trigger_sto();
+        delay_ms(10);
+
+        // Verify motor output is zero
+        float output = system.get_output();
+        if (fabs(output) > 0.01f) {
+            result.passed = false;
+            result.failure_reason = "Output not zero with STO engaged";
+            return result;
+        }
+
+        // Verify STO cannot be released with faults active
+        system.inject_fault(FAULT_OVERCURRENT);
+        bool released = system.release_sto();
+        if (released) {
+            result.passed = false;
+            result.failure_reason = "STO released with active fault";
+            return result;
+        }
+
+        // Clear fault and verify release
+        system.clear_faults();
+        released = system.release_sto();
+        if (!released) {
+            result.passed = false;
+            result.failure_reason = "STO did not release after fault clear";
+            return result;
+        }
+
+        result.passed = true;
+        return result;
+    }
+
+    TestResult test_step_response(MotorControlSystem& system) {
+        TestResult result;
+        result.test_name = "Step Response";
+
+        // Apply step input
+        float step_size = 1.0f;  // 1 radian
+        system.set_position_command(step_size);
+
+        // Measure response
+        float rise_time = 0;
+        float overshoot = 0;
+        float settling_time = 0;
+        float steady_state_error = 0;
+
+        float start_time = get_time_sec();
+        float last_position = 0;
+        float max_position = 0;
+        bool reached_90_percent = false;
+        bool settled = false;
+
+        while (get_time_sec() - start_time < 5.0f) {
+            float position = system.get_position();
+
+            // Rise time (10% to 90%)
+            if (!reached_90_percent && position > 0.9f * step_size) {
+                rise_time = get_time_sec() - start_time;
+                reached_90_percent = true;
+            }
+
+            // Track maximum for overshoot
+            if (position > max_position) {
+                max_position = position;
+            }
+
+            // Settling check (+/- 2%)
+            if (reached_90_percent && !settled) {
+                if (fabs(position - step_size) < 0.02f * step_size) {
+                    settling_time = get_time_sec() - start_time;
+                    settled = true;
+                }
+            }
+
+            delay_ms(1);
+        }
+
+        overshoot = (max_position - step_size) / step_size * 100;
+        steady_state_error = fabs(system.get_position() - step_size);
+
+        // Evaluate against criteria
+        result.passed = (rise_time < 0.1f) &&
+                       (overshoot < 10.0f) &&
+                       (settling_time < 0.3f) &&
+                       (steady_state_error < 0.001f);
+
+        result.measured_value = settling_time;
+        result.expected_value = 0.3f;
+        result.tolerance = 0.05f;
+
+        return result;
+    }
+
+    TestResult test_position_limits(MotorControlSystem& system) {
+        TestResult result;
+        result.test_name = "Position Limits";
+
+        // Command position beyond limit
+        float limit = system.get_position_limit();
+        system.set_position_command(limit * 1.1f);
+
+        delay_ms(500);
+
+        float actual = system.get_position();
+        result.passed = (actual <= limit * 1.001f);  // Allow 0.1% margin
+        result.measured_value = actual;
+        result.expected_value = limit;
+
+        if (!result.passed) {
+            result.failure_reason = "Position exceeded limit";
+        }
+
+        return result;
+    }
+
+private:
+    void delay_ms(int ms);
+    float get_time_sec();
+};</code></pre>
+
+        <h2>8.10 Best Practices Summary</h2>
+        <ul>
+            <li><strong>Defense in Depth:</strong> Implement multiple independent safety layers</li>
+            <li><strong>Fail-Safe Design:</strong> Default to safe state on any failure</li>
+            <li><strong>Hardware Independence:</strong> Safety-critical functions should not rely solely on software</li>
+            <li><strong>Watchdog Timers:</strong> Monitor control loop execution and communication</li>
+            <li><strong>Limit Enforcement:</strong> Apply limits at multiple levels (trajectory, velocity, current)</li>
+            <li><strong>Fault Detection:</strong> Monitor for following errors, encoder faults, overcurrent, and stalls</li>
+            <li><strong>Safe Stop Functions:</strong> Implement controlled deceleration and emergency stop</li>
+            <li><strong>Testing:</strong> Validate all safety functions before deployment</li>
+            <li><strong>Documentation:</strong> Maintain complete safety analysis and test records</li>
+            <li><strong>Standards Compliance:</strong> Follow applicable functional safety standards</li>
+        </ul>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Safety is the highest priority in motor control systems and must be designed in from the start</li>
+                <li>Multi-layer safety architecture provides defense in depth against failures</li>
+                <li>Hardware safety mechanisms (STO, watchdog, interlocks) must be independent of software</li>
+                <li>Limit enforcement operates at multiple levels: position, velocity, acceleration, and current</li>
+                <li>Fault detection monitors following error, encoder validity, overcurrent, and motor stall</li>
+                <li>Safe Torque Off (STO) is a critical safety function that must be fail-safe</li>
+                <li>Functional safety standards (IEC 61508, ISO 13849) provide frameworks for safety design</li>
+                <li>System integration requires careful coordination of control, safety, and communication</li>
+                <li>EtherCAT and CiA 402 provide industry-standard interfaces for motor drives</li>
+                <li>Comprehensive testing validates safety functions and control performance</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the four layers of a multi-layer safety architecture for motor control?</li>
+                <li>Explain the difference between Safe Stop 1, Safe Stop 2, and Emergency Stop (STO).</li>
+                <li>How does I2t protection work, and why is it important for motor thermal protection?</li>
+                <li>What conditions should be checked before releasing Safe Torque Off?</li>
+                <li>Describe three types of encoder faults that should be detected.</li>
+                <li>What is the purpose of temperature-based current derating?</li>
+                <li>Explain the CiA 402 drive state machine and its main states.</li>
+                <li>What safety tests should be performed before deploying a motor control system?</li>
+                <li>How do functional safety standards like IEC 61508 and ISO 13849 differ in their approach?</li>
+                <li>Why is it important for hardware safety mechanisms to be independent of software?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+            <p style="font-size:16px;margin-top:10px;">Safe motor control systems protect people, property, and enable technology to serve humanity's greater good.</p>
+        </div>
+
+        </div>
+</body>
+</html>

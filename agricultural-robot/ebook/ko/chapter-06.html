@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 3단계: 통신 프로토콜 | WIA-ROB-007 농업 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--agri-color:#22C55E;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--agri-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--agri-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--agri-color);margin:40px 0 20px;border-bottom:2px solid var(--agri-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--agri-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--agri-color);margin:20px 0;font-size:18px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--agri-color);text-decoration:none;padding:10px 20px;border:2px solid var(--agri-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;text-align:left;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--agri-color)}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--agri-color);padding:20px;margin:25px 0;border-radius:5px}
+        strong{color:var(--agri-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:monospace;color:#22C55E}
+        ul,ol{margin-left:30px;margin-top:15px}
+        li{margin:10px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: 3단계: 통신 프로토콜</h1>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) - 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>6.1 통신 프로토콜의 필요성</h2>
+        <p>
+            농업 로봇은 실시간으로 데이터를 전송하고 명령을 받아야 합니다. HTTP 기반 REST API는
+            요청-응답 방식이므로 실시간 양방향 통신에는 적합하지 않습니다. WIA-ROB-007의 3단계는
+            <strong>실시간 통신</strong>을 위한 프로토콜을 정의합니다.
+        </p>
+        <p>
+            농장 환경은 네트워크 연결이 불안정할 수 있으며, 수십 대의 로봇이 동시에 통신할 수 있습니다.
+            따라서 경량화되고 신뢰성 있으며 확장 가능한 프로토콜이 필요합니다.
+        </p>
+
+        <h2>6.2 MQTT 프로토콜</h2>
+        <p>
+            WIA-ROB-007은 <strong>MQTT (Message Queuing Telemetry Transport)</strong>를
+            기본 통신 프로토콜로 채택합니다. MQTT는 IoT 환경에 최적화된 경량 프로토콜로,
+            다음과 같은 장점이 있습니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>MQTT의 장점</h3>
+            <ul>
+                <li><strong>경량성:</strong> 헤더 크기가 작아 대역폭 사용 최소화</li>
+                <li><strong>신뢰성:</strong> QoS(Quality of Service) 레벨로 메시지 전달 보장</li>
+                <li><strong>Pub/Sub 모델:</strong> 느슨한 결합으로 확장성 향상</li>
+                <li><strong>지속 연결:</strong> Keep-alive로 연결 상태 유지</li>
+                <li><strong>Last Will:</strong> 연결 끊김 시 자동 알림</li>
+                <li><strong>저전력:</strong> 배터리 구동 로봇에 적합</li>
+            </ul>
+        </div>
+
+        <h3>6.2.1 MQTT 아키텍처</h3>
+        <p>
+            MQTT는 발행-구독(Publish-Subscribe) 패턴을 사용합니다. 로봇(클라이언트)은
+            브로커(Broker)를 통해 메시지를 주고받습니다.
+        </p>
+
+<pre><code>┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│  Robot A    │────────▶│   MQTT      │◀────────│  Robot B    │
+│ (Publisher) │         │  Broker     │         │(Subscriber) │
+└─────────────┘         └─────────────┘         └─────────────┘
+      │                       │                       │
+      │                       │                       │
+      └───────────────────────┴───────────────────────┘
+                    Farm Management System
+</code></pre>
+
+        <h2>6.3 토픽 구조</h2>
+        <p>
+            WIA-ROB-007은 계층적 토픽 구조를 정의하여 메시지를 체계적으로 관리합니다.
+        </p>
+
+        <h3>6.3.1 표준 토픽 계층</h3>
+<pre><code>wia-rob-007/{farm_id}/{category}/{robot_id}/{data_type}
+
+예시:
+wia-rob-007/FARM-001/robots/ROB-001/status
+wia-rob-007/FARM-001/robots/ROB-001/telemetry
+wia-rob-007/FARM-001/robots/ROB-001/command
+wia-rob-007/FARM-001/farm/weather
+wia-rob-007/FARM-001/system/alerts
+</code></pre>
+
+        <h3>6.3.2 주요 토픽 카테고리</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>카테고리</th>
+                    <th>토픽 패턴</th>
+                    <th>설명</th>
+                    <th>방향</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>로봇 상태</td>
+                    <td>robots/{robot_id}/status</td>
+                    <td>로봇 상태 정보</td>
+                    <td>Robot → Server</td>
+                </tr>
+                <tr>
+                    <td>센서 데이터</td>
+                    <td>robots/{robot_id}/telemetry</td>
+                    <td>센서 측정값</td>
+                    <td>Robot → Server</td>
+                </tr>
+                <tr>
+                    <td>명령</td>
+                    <td>robots/{robot_id}/command</td>
+                    <td>제어 명령</td>
+                    <td>Server → Robot</td>
+                </tr>
+                <tr>
+                    <td>응답</td>
+                    <td>robots/{robot_id}/response</td>
+                    <td>명령 응답</td>
+                    <td>Robot → Server</td>
+                </tr>
+                <tr>
+                    <td>이벤트</td>
+                    <td>robots/{robot_id}/events</td>
+                    <td>특별 이벤트</td>
+                    <td>Robot → Server</td>
+                </tr>
+                <tr>
+                    <td>농장 정보</td>
+                    <td>farm/{farm_id}/weather</td>
+                    <td>농장 전체 데이터</td>
+                    <td>Broadcast</td>
+                </tr>
+                <tr>
+                    <td>조정</td>
+                    <td>coordination/{area_id}</td>
+                    <td>로봇 간 조정</td>
+                    <td>Bidirectional</td>
+                </tr>
+                <tr>
+                    <td>시스템</td>
+                    <td>system/{type}</td>
+                    <td>시스템 메시지</td>
+                    <td>Broadcast</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.4 QoS (Quality of Service) 레벨</h2>
+        <p>
+            MQTT는 3가지 QoS 레벨을 제공하여 메시지 전달 보장 수준을 선택할 수 있습니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>QoS</th>
+                    <th>이름</th>
+                    <th>보장 수준</th>
+                    <th>사용 예</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0</td>
+                    <td>At most once</td>
+                    <td>최대 1회 전달 (손실 가능)</td>
+                    <td>빈번한 센서 데이터</td>
+                </tr>
+                <tr>
+                    <td>1</td>
+                    <td>At least once</td>
+                    <td>최소 1회 전달 (중복 가능)</td>
+                    <td>중요 상태 정보</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Exactly once</td>
+                    <td>정확히 1회 전달</td>
+                    <td>제어 명령, 작업 지시</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.4.1 WIA-ROB-007 QoS 권장 사항</h3>
+        <div class="highlight-box">
+            <ul>
+                <li><strong>QoS 0:</strong> 센서 텔레메트리 (1초 이하 간격)</li>
+                <li><strong>QoS 1:</strong> 로봇 상태, 이벤트 알림</li>
+                <li><strong>QoS 2:</strong> 제어 명령, 작업 시작/정지, 긴급 정지</li>
+            </ul>
+        </div>
+
+        <h2>6.5 메시지 페이로드</h2>
+        <p>
+            MQTT 메시지의 페이로드는 1단계에서 정의한 JSON 형식을 사용합니다.
+        </p>
+
+        <h3>6.5.1 상태 메시지 예제</h3>
+<pre><code>Topic: wia-rob-007/FARM-001/robots/ROB-001/status
+QoS: 1
+Payload:
+{
+    "version": "1.0",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "robot_id": "ROB-FARM-001",
+    "operational_state": "working",
+    "battery_percent": 85.0,
+    "location": {
+        "latitude": 37.5665,
+        "longitude": 126.9780
+    },
+    "current_task_id": "TASK-001"
+}
+</code></pre>
+
+        <h3>6.5.2 센서 텔레메트리 예제</h3>
+<pre><code>Topic: wia-rob-007/FARM-001/robots/ROB-001/telemetry
+QoS: 0
+Payload:
+{
+    "version": "1.0",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "robot_id": "ROB-FARM-001",
+    "sensor_type": "soil",
+    "measurements": {
+        "temperature_celsius": 18.5,
+        "moisture_percent": 65.0,
+        "ph": 6.8
+    }
+}
+</code></pre>
+
+        <h3>6.5.3 명령 메시지 예제</h3>
+<pre><code>Topic: wia-rob-007/FARM-001/robots/ROB-001/command
+QoS: 2
+Payload:
+{
+    "version": "1.0",
+    "command_id": "CMD-001",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "command_type": "start_task",
+    "parameters": {
+        "task_id": "TASK-001",
+        "task_type": "harvest",
+        "area_id": "field-A-section-3"
+    }
+}
+</code></pre>
+
+        <h3>6.5.4 응답 메시지 예제</h3>
+<pre><code>Topic: wia-rob-007/FARM-001/robots/ROB-001/response
+QoS: 2
+Payload:
+{
+    "version": "1.0",
+    "command_id": "CMD-001",
+    "timestamp": "2025-01-15T14:30:05.000Z",
+    "status": "success",
+    "message": "Task started successfully",
+    "data": {
+        "task_id": "TASK-001",
+        "started_at": "2025-01-15T14:30:05.000Z"
+    }
+}
+</code></pre>
+
+        <h2>6.6 Retained Messages와 Last Will</h2>
+
+        <h3>6.6.1 Retained Messages</h3>
+        <p>
+            Retained 플래그를 사용하면 새로 구독하는 클라이언트가 최신 상태를 즉시 받을 수 있습니다.
+        </p>
+
+<pre><code>// 로봇 상태는 Retained로 발행
+Topic: wia-rob-007/FARM-001/robots/ROB-001/status
+Retained: true
+Payload: { "operational_state": "working", ... }
+
+// 새 클라이언트가 구독하면 즉시 마지막 상태 수신
+</code></pre>
+
+        <h3>6.6.2 Last Will and Testament (LWT)</h3>
+        <p>
+            로봇 연결이 예기치 않게 끊어졌을 때 자동으로 알림을 보냅니다.
+        </p>
+
+<pre><code>// MQTT 연결 시 LWT 설정
+Will Topic: wia-rob-007/FARM-001/robots/ROB-001/status
+Will QoS: 1
+Will Retain: true
+Will Payload:
+{
+    "version": "1.0",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "robot_id": "ROB-FARM-001",
+    "operational_state": "disconnected",
+    "reason": "connection_lost"
+}
+</code></pre>
+
+        <h2>6.7 WebSocket 프로토콜</h2>
+        <p>
+            웹 기반 대시보드나 모바일 앱을 위해 WIA-ROB-007은 <strong>WebSocket</strong>도
+            지원합니다. WebSocket은 브라우저에서 쉽게 사용할 수 있는 실시간 양방향 통신 프로토콜입니다.
+        </p>
+
+        <h3>6.7.1 WebSocket 연결</h3>
+<pre><code>// WebSocket 연결
+ws://api.farm.example.com/wia-rob-007/v1/ws
+
+// 인증 메시지 (첫 메시지)
+{
+    "type": "auth",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+// 구독 메시지
+{
+    "type": "subscribe",
+    "topics": [
+        "robots/ROB-001/status",
+        "robots/ROB-001/telemetry"
+    ]
+}
+</code></pre>
+
+        <h3>6.7.2 WebSocket 메시지 형식</h3>
+<pre><code>// 서버 → 클라이언트 (상태 업데이트)
+{
+    "type": "message",
+    "topic": "robots/ROB-001/status",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "payload": {
+        "operational_state": "working",
+        "battery_percent": 85.0
+    }
+}
+
+// 클라이언트 → 서버 (명령 전송)
+{
+    "type": "command",
+    "robot_id": "ROB-001",
+    "command_type": "start_task",
+    "parameters": {
+        "task_id": "TASK-001"
+    }
+}
+</code></pre>
+
+        <h2>6.8 보안 및 암호화</h2>
+        <p>
+            모든 통신은 암호화되어야 하며, 인증된 클라이언트만 접속할 수 있어야 합니다.
+        </p>
+
+        <h3>6.8.1 TLS/SSL 암호화</h3>
+        <div class="highlight-box">
+            <ul>
+                <li><strong>MQTT over TLS:</strong> MQTTS (포트 8883) 사용 필수</li>
+                <li><strong>WebSocket Secure:</strong> WSS 프로토콜 사용</li>
+                <li><strong>TLS 버전:</strong> TLS 1.2 이상 (TLS 1.3 권장)</li>
+                <li><strong>인증서:</strong> CA 서명 인증서 또는 자체 서명 인증서</li>
+            </ul>
+        </div>
+
+        <h3>6.8.2 클라이언트 인증</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>인증 방법</th>
+                    <th>설명</th>
+                    <th>보안 수준</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Username/Password</td>
+                    <td>사용자명과 비밀번호</td>
+                    <td>기본</td>
+                </tr>
+                <tr>
+                    <td>Client Certificate</td>
+                    <td>X.509 클라이언트 인증서</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td>Token-based</td>
+                    <td>JWT 토큰</td>
+                    <td>중간</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.8.3 MQTT 연결 보안 설정</h3>
+<pre><code>// Python paho-mqtt 예제
+import paho.mqtt.client as mqtt
+import ssl
+
+client = mqtt.Client(client_id="ROB-FARM-001")
+
+# TLS 설정
+client.tls_set(
+    ca_certs="/path/to/ca.crt",
+    certfile="/path/to/client.crt",
+    keyfile="/path/to/client.key",
+    tls_version=ssl.PROTOCOL_TLSv1_2
+)
+
+# 인증
+client.username_pw_set("robot001", "secure_password")
+
+# 연결
+client.connect("mqtt.farm.example.com", 8883, 60)
+</code></pre>
+
+        <h2>6.9 메시지 압축 및 최적화</h2>
+        <p>
+            네트워크 대역폭을 절약하기 위한 최적화 기법입니다.
+        </p>
+
+        <h3>6.9.1 페이로드 압축</h3>
+<pre><code>// 큰 페이로드는 gzip으로 압축
+Topic: wia-rob-007/FARM-001/robots/ROB-001/telemetry_compressed
+Payload: [gzip compressed JSON]
+
+// 메타데이터로 압축 여부 표시
+{
+    "compressed": true,
+    "compression_type": "gzip",
+    "data": "H4sIAAAAAAAA..."
+}
+</code></pre>
+
+        <h3>6.9.2 배치 전송</h3>
+<pre><code>// 여러 측정값을 배치로 전송
+Topic: wia-rob-007/FARM-001/robots/ROB-001/telemetry_batch
+Payload:
+{
+    "version": "1.0",
+    "batch_count": 100,
+    "start_time": "2025-01-15T14:00:00.000Z",
+    "end_time": "2025-01-15T14:30:00.000Z",
+    "measurements": [
+        { "timestamp": "...", "temperature_celsius": 18.5 },
+        // ... 99개 더
+    ]
+}
+</code></pre>
+
+        <h2>6.10 헬스체크 및 Keep-Alive</h2>
+        <p>
+            로봇과 서버의 연결 상태를 지속적으로 확인합니다.
+        </p>
+
+        <h3>6.10.1 MQTT Keep-Alive</h3>
+<pre><code>// MQTT 연결 시 Keep-Alive 간격 설정 (초)
+client.connect("mqtt.farm.example.com", 8883, keepalive=60)
+
+// 60초마다 PINGREQ/PINGRESP 교환
+// 응답 없으면 연결 끊김으로 간주
+</code></pre>
+
+        <h3>6.10.2 하트비트 메시지</h3>
+<pre><code>Topic: wia-rob-007/FARM-001/robots/ROB-001/heartbeat
+QoS: 0
+Payload:
+{
+    "version": "1.0",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "robot_id": "ROB-FARM-001",
+    "uptime_seconds": 86400,
+    "health": "ok"
+}
+
+// 30초마다 발행 (권장)
+</code></pre>
+
+        <h2>6.11 에러 처리 및 재연결</h2>
+        <p>
+            네트워크 장애 시 자동으로 재연결하고 메시지를 재전송해야 합니다.
+        </p>
+
+        <h3>6.11.1 재연결 전략</h3>
+<pre><code>// 지수 백오프(Exponential Backoff) 재연결
+def reconnect_with_backoff():
+    retry_count = 0
+    max_retries = 10
+    base_delay = 1  # 1초
+
+    while retry_count < max_retries:
+        try:
+            client.reconnect()
+            return True
+        except:
+            delay = min(base_delay * (2 ** retry_count), 300)  # 최대 5분
+            time.sleep(delay)
+            retry_count += 1
+
+    return False
+</code></pre>
+
+        <h3>6.11.2 메시지 버퍼링</h3>
+<pre><code>// 연결 끊김 시 메시지를 로컬에 저장
+// 재연결 후 순서대로 전송
+
+class BufferedMQTTClient:
+    def __init__(self):
+        self.buffer = []
+        self.max_buffer_size = 1000
+
+    def publish_with_buffer(self, topic, payload, qos):
+        try:
+            self.client.publish(topic, payload, qos)
+        except:
+            if len(self.buffer) < self.max_buffer_size:
+                self.buffer.append((topic, payload, qos))
+
+    def flush_buffer(self):
+        while self.buffer:
+            topic, payload, qos = self.buffer.pop(0)
+            self.client.publish(topic, payload, qos)
+</code></pre>
+
+        <div class="highlight-box">
+            <h2>핵심 내용 요약</h2>
+            <ul>
+                <li>WIA-ROB-007은 MQTT를 기본 실시간 통신 프로토콜로 사용</li>
+                <li>계층적 토픽 구조: wia-rob-007/{farm_id}/{category}/{robot_id}/{type}</li>
+                <li>QoS 0/1/2를 용도에 따라 선택하여 신뢰성과 효율성 균형</li>
+                <li>Retained 메시지로 최신 상태 유지, LWT로 연결 끊김 감지</li>
+                <li>WebSocket도 지원하여 웹/모바일 앱 통합 용이</li>
+                <li>TLS/SSL 암호화 필수, 클라이언트 인증으로 보안 보장</li>
+                <li>페이로드 압축과 배치 전송으로 대역폭 최적화</li>
+                <li>Keep-Alive와 하트비트로 연결 상태 모니터링</li>
+                <li>지수 백오프 재연결과 메시지 버퍼링으로 안정성 확보</li>
+            </ul>
+        </div>
+
+        <div class="highlight-box">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>MQTT가 농업 로봇 통신에 적합한 이유 5가지를 설명하시오.</li>
+                <li>WIA-ROB-007의 표준 토픽 구조를 설명하시오.</li>
+                <li>QoS 0, 1, 2의 차이점과 각각의 사용 예를 제시하시오.</li>
+                <li>Retained 메시지와 Last Will의 목적을 설명하시오.</li>
+                <li>MQTT와 WebSocket의 차이점과 각각의 장점을 설명하시오.</li>
+                <li>MQTT 통신에서 TLS/SSL 암호화가 필요한 이유를 설명하시오.</li>
+                <li>네트워크 대역폭을 절약하기 위한 최적화 기법 2가지를 제시하시오.</li>
+                <li>연결 끊김 시 재연결 전략을 설명하시오.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

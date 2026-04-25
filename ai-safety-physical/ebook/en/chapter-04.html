@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Monitoring & Detection Systems | WIA-AI-SAFETY-PHYSICAL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .warning{background:#7f1d1d;border-left:4px solid #dc2626;padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+        .info{background:#1e3a5f;border-left:4px solid var(--ai-color);padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Monitoring & Detection Systems</h1>
+
+        <h2>4.1 The Role of Monitoring in Safety</h2>
+        <p>Safety monitoring systems provide the sensory foundation for physical AI safety. They continuously observe the environment, the robot state, and human presence to enable proactive hazard avoidance and reactive emergency response. A comprehensive monitoring strategy employs multiple sensor modalities with overlapping coverage to ensure no hazard goes undetected.</p>
+
+        <div class="info">
+            <strong>Defense in Depth Monitoring:</strong> Just as safety systems employ multiple layers of protection, monitoring systems should use multiple sensor types, overlapping coverage areas, and redundant processing to ensure no single point of failure can compromise safety awareness.
+        </div>
+
+        <h2>4.2 Proximity and Presence Detection</h2>
+        <p>Detecting human presence is the first line of defense in preventing collisions and managing safety zones:</p>
+
+        <h3>Sensor Technologies for Proximity Detection</h3>
+        <table>
+            <tr>
+                <th>Technology</th>
+                <th>Range</th>
+                <th>Resolution</th>
+                <th>Strengths</th>
+                <th>Limitations</th>
+            </tr>
+            <tr>
+                <td><strong>LiDAR</strong></td>
+                <td>0.1 - 100m</td>
+                <td>mm-level</td>
+                <td>High accuracy, 3D mapping</td>
+                <td>Cost, reflective surfaces</td>
+            </tr>
+            <tr>
+                <td><strong>Time-of-Flight Camera</strong></td>
+                <td>0.5 - 10m</td>
+                <td>cm-level</td>
+                <td>Dense depth data, moderate cost</td>
+                <td>Sunlight interference</td>
+            </tr>
+            <tr>
+                <td><strong>Ultrasonic</strong></td>
+                <td>0.02 - 5m</td>
+                <td>cm-level</td>
+                <td>Low cost, works in dust/smoke</td>
+                <td>Wide beam, slow update</td>
+            </tr>
+            <tr>
+                <td><strong>Radar</strong></td>
+                <td>0.5 - 50m</td>
+                <td>cm-level</td>
+                <td>Works through walls, velocity</td>
+                <td>Lower spatial resolution</td>
+            </tr>
+            <tr>
+                <td><strong>Safety Light Curtain</strong></td>
+                <td>0 - 20m</td>
+                <td>mm-level</td>
+                <td>Safety certified, fast response</td>
+                <td>2D only, line of sight</td>
+            </tr>
+            <tr>
+                <td><strong>Capacitive</strong></td>
+                <td>0 - 0.3m</td>
+                <td>mm-level</td>
+                <td>Skin-mounted, pre-contact</td>
+                <td>Very short range</td>
+            </tr>
+        </table>
+
+        <pre><code>// Proximity Detection System
+class ProximityDetectionSystem {
+    private sensors: ProximitySensor[] = [];
+    private fusedModel: OccupancyGrid;
+
+    constructor(config: ProximityConfig) {
+        // Initialize sensor array
+        this.sensors = [
+            new LidarSensor(config.lidar),
+            new ToFCamera(config.tofCamera),
+            new SafetyLightCurtain(config.lightCurtain),
+            new CapacitiveSkin(config.capacitive)
+        ];
+
+        this.fusedModel = new OccupancyGrid(config.gridResolution);
+    }
+
+    async updateProximityModel(): Promise<ProximityResult> {
+        // Get readings from all sensors in parallel
+        const readings = await Promise.all(
+            this.sensors.map(s => s.getReading())
+        );
+
+        // Fuse sensor data
+        const fusedData = this.fuseSensorData(readings);
+
+        // Update occupancy grid
+        this.fusedModel.update(fusedData);
+
+        // Find nearest human
+        const nearestHuman = this.findNearestHuman(fusedData);
+
+        return {
+            minDistance: nearestHuman.distance,
+            position: nearestHuman.position,
+            velocity: nearestHuman.velocity,
+            confidence: nearestHuman.confidence,
+            zone: this.determineZone(nearestHuman.distance)
+        };
+    }
+
+    fuseSensorData(readings: SensorReading[]): FusedData {
+        const fused = new FusedData();
+
+        for (const reading of readings) {
+            // Weight by sensor reliability and agreement with others
+            const reliability = this.calculateReliability(reading, readings);
+
+            // Apply Bayesian sensor fusion
+            fused.updateBelief(reading.points, reliability);
+        }
+
+        return fused;
+    }
+
+    // Validate sensor health
+    validateSensors(): SensorHealthReport {
+        const report: SensorHealthReport = {
+            timestamp: Date.now(),
+            sensors: [],
+            overallHealth: true
+        };
+
+        for (const sensor of this.sensors) {
+            const health = sensor.selfTest();
+            report.sensors.push({
+                id: sensor.id,
+                type: sensor.type,
+                healthy: health.passed,
+                diagnostics: health.details
+            });
+
+            if (!health.passed && sensor.isSafetyCritical) {
+                report.overallHealth = false;
+            }
+        }
+
+        return report;
+    }
+}</code></pre>
+
+        <h2>4.3 Force-Torque Monitoring</h2>
+        <p>Force-torque sensors enable detection of unexpected contacts and ensure force limits are maintained during intentional interactions:</p>
+
+        <h3>Force Sensing Locations</h3>
+        <table>
+            <tr>
+                <th>Location</th>
+                <th>Sensor Type</th>
+                <th>Purpose</th>
+                <th>Response Time</th>
+            </tr>
+            <tr>
+                <td><strong>Joint Torque</strong></td>
+                <td>Strain gauge</td>
+                <td>Detect unexpected resistance</td>
+                <td>&lt; 1ms</td>
+            </tr>
+            <tr>
+                <td><strong>Wrist F/T</strong></td>
+                <td>6-axis load cell</td>
+                <td>End-effector force control</td>
+                <td>&lt; 1ms</td>
+            </tr>
+            <tr>
+                <td><strong>Base</strong></td>
+                <td>Multi-axis load cell</td>
+                <td>Ground reaction forces</td>
+                <td>&lt; 2ms</td>
+            </tr>
+            <tr>
+                <td><strong>Link surface</strong></td>
+                <td>Tactile skin</td>
+                <td>Collision localization</td>
+                <td>&lt; 5ms</td>
+            </tr>
+        </table>
+
+        <pre><code>// Force-Torque Monitoring System
+class ForceTorqueMonitor {
+    private jointTorqueSensors: TorqueSensor[];
+    private wristFTSensor: FTSensor;
+    private expectedTorques: number[];
+
+    constructor(robot: RobotModel) {
+        this.jointTorqueSensors = robot.joints.map(j => j.torqueSensor);
+        this.wristFTSensor = robot.endEffector.ftSensor;
+    }
+
+    async detectCollision(): Promise<CollisionDetection> {
+        // Get current joint torques
+        const measuredTorques = await this.getMeasuredTorques();
+
+        // Get expected torques from dynamics model
+        const expectedTorques = await this.calculateExpectedTorques();
+
+        // Calculate residuals
+        const residuals = measuredTorques.map((m, i) =>
+            Math.abs(m - expectedTorques[i])
+        );
+
+        // Collision detection using residual thresholding
+        const collisionThreshold = 5.0; // Nm
+        const collisionDetected = residuals.some(r => r > collisionThreshold);
+
+        if (collisionDetected) {
+            const collisionJoint = residuals.findIndex(r => r > collisionThreshold);
+            return {
+                detected: true,
+                location: this.estimateCollisionLocation(collisionJoint, residuals),
+                force: this.estimateCollisionForce(residuals),
+                timestamp: Date.now()
+            };
+        }
+
+        return { detected: false };
+    }
+
+    // Real-time force limiting
+    enforceForceLimit(
+        desiredTorques: number[],
+        maxForce: number
+    ): number[] {
+        const currentForce = this.wristFTSensor.getForce();
+
+        if (currentForce.magnitude() > maxForce * 0.9) {
+            // Approaching limit - scale down torques
+            const scale = maxForce * 0.9 / currentForce.magnitude();
+            return desiredTorques.map(t => t * scale);
+        }
+
+        return desiredTorques;
+    }
+
+    // Observer-based collision detection
+    calculateCollisionResidual(
+        jointPosition: number[],
+        jointVelocity: number[],
+        jointTorque: number[]
+    ): number[] {
+        // r = M(q)q'' + C(q,q')q' + g(q) - tau
+        // Using momentum observer approach
+
+        const M = this.robot.massMatrix(jointPosition);
+        const C = this.robot.coriolisMatrix(jointPosition, jointVelocity);
+        const g = this.robot.gravityVector(jointPosition);
+
+        // Observer state update
+        const K = this.observerGain;
+        const p = M.multiply(jointVelocity); // Momentum
+
+        // Residual = observer estimate - measured
+        return this.observerState.subtract(p);
+    }
+}</code></pre>
+
+        <h2>4.4 Vision-Based Safety Monitoring</h2>
+        <p>Computer vision provides rich environmental understanding for safety applications:</p>
+
+        <h3>Vision Safety Functions</h3>
+        <table>
+            <tr>
+                <th>Function</th>
+                <th>Method</th>
+                <th>Latency</th>
+                <th>Safety Application</th>
+            </tr>
+            <tr>
+                <td><strong>Human Detection</strong></td>
+                <td>Deep learning (YOLO, etc.)</td>
+                <td>20-50ms</td>
+                <td>Presence awareness</td>
+            </tr>
+            <tr>
+                <td><strong>Pose Estimation</strong></td>
+                <td>OpenPose, MediaPipe</td>
+                <td>30-100ms</td>
+                <td>Predict human motion</td>
+            </tr>
+            <tr>
+                <td><strong>Gesture Recognition</strong></td>
+                <td>CNN/RNN</td>
+                <td>50-200ms</td>
+                <td>Stop gestures, commands</td>
+            </tr>
+            <tr>
+                <td><strong>Anomaly Detection</strong></td>
+                <td>Autoencoders, GANs</td>
+                <td>100-500ms</td>
+                <td>Unusual situations</td>
+            </tr>
+            <tr>
+                <td><strong>PPE Detection</strong></td>
+                <td>Object detection</td>
+                <td>30-100ms</td>
+                <td>Verify safety equipment</td>
+            </tr>
+        </table>
+
+        <pre><code>// Vision-Based Safety System
+class VisionSafetySystem {
+    private humanDetector: HumanDetector;
+    private poseEstimator: PoseEstimator;
+    private trajectoryPredictor: TrajectoryPredictor;
+    private gestureRecognizer: GestureRecognizer;
+
+    async processFrame(frame: VideoFrame): Promise<VisionSafetyResult> {
+        // Parallel processing for speed
+        const [humans, anomalies] = await Promise.all([
+            this.detectHumans(frame),
+            this.detectAnomalies(frame)
+        ]);
+
+        const results: VisionSafetyResult = {
+            humans: [],
+            anomalies,
+            emergencyGesture: false
+        };
+
+        // Process each detected human
+        for (const human of humans) {
+            const pose = await this.poseEstimator.estimate(frame, human.bbox);
+            const trajectory = this.trajectoryPredictor.predict(pose);
+            const gesture = this.gestureRecognizer.recognize(pose);
+
+            results.humans.push({
+                id: human.id,
+                bbox: human.bbox,
+                pose,
+                predictedTrajectory: trajectory,
+                gesture
+            });
+
+            // Check for emergency stop gesture
+            if (gesture === 'STOP' || gesture === 'EMERGENCY') {
+                results.emergencyGesture = true;
+            }
+        }
+
+        return results;
+    }
+
+    // Predict potential collision
+    predictCollision(
+        robotTrajectory: Trajectory,
+        humanTrajectories: PredictedTrajectory[]
+    ): CollisionPrediction {
+        const predictions: CollisionPrediction[] = [];
+
+        for (const humanTraj of humanTrajectories) {
+            // Sample trajectories at fine time resolution
+            for (let t = 0; t < 2.0; t += 0.05) { // 2 second horizon, 50ms steps
+                const robotPos = robotTrajectory.positionAt(t);
+                const humanPos = humanTraj.positionAt(t);
+                const humanUncertainty = humanTraj.uncertaintyAt(t);
+
+                const distance = robotPos.distanceTo(humanPos);
+                const safeDistance = this.calculateSafeDistance(humanUncertainty);
+
+                if (distance < safeDistance) {
+                    predictions.push({
+                        timeToCollision: t,
+                        probability: humanTraj.confidenceAt(t),
+                        location: humanPos,
+                        recommendedAction: this.determineAction(t, distance)
+                    });
+                }
+            }
+        }
+
+        return this.aggregatePredictions(predictions);
+    }
+}</code></pre>
+
+        <h2>4.5 Speed and Separation Monitoring</h2>
+        <p>Real-time monitoring of the protective separation distance between robot and humans:</p>
+
+        <pre><code>// Speed and Separation Monitoring (ISO/TS 15066)
+class SpeedSeparationMonitor {
+    // Calculate required separation distance
+    calculateProtectiveSeparation(
+        robotSpeed: number,      // m/s
+        humanSpeed: number,      // m/s (assumed or measured)
+        systemReactionTime: number, // seconds
+        robotStoppingTime: number,  // seconds
+        intrusion: number        // m (human body intrusion)
+    ): number {
+        // Sp = Sh + Sr + Ss + C + Zd + Zr
+        // Where:
+        // Sh = human contribution to separation distance
+        // Sr = robot reaction distance
+        // Ss = robot stopping distance
+        // C = intrusion distance
+        // Zd = position uncertainty of robot
+        // Zr = position uncertainty of human detection
+
+        const Sh = humanSpeed * (systemReactionTime + robotStoppingTime);
+        const Sr = robotSpeed * systemReactionTime;
+        const Ss = robotSpeed * robotStoppingTime / 2; // Assuming linear deceleration
+        const C = intrusion;
+        const Zd = 0.05; // 50mm robot position uncertainty
+        const Zr = 0.10; // 100mm detection uncertainty
+
+        return Sh + Sr + Ss + C + Zd + Zr;
+    }
+
+    // Real-time monitoring loop
+    async monitorSeparation(): Promise<void> {
+        while (this.running) {
+            const robotState = await this.getRobotState();
+            const humanPositions = await this.getHumanPositions();
+
+            for (const human of humanPositions) {
+                const currentDistance = this.calculateDistance(
+                    robotState.position,
+                    human.position
+                );
+
+                const requiredSeparation = this.calculateProtectiveSeparation(
+                    robotState.speed,
+                    human.estimatedSpeed,
+                    this.systemReactionTime,
+                    this.calculateStoppingTime(robotState.speed),
+                    0.1 // intrusion distance
+                );
+
+                if (currentDistance < requiredSeparation) {
+                    // Violation - reduce speed or stop
+                    const allowedSpeed = this.calculateAllowedSpeed(
+                        currentDistance,
+                        human.estimatedSpeed
+                    );
+
+                    if (allowedSpeed <= 0) {
+                        await this.triggerProtectiveStop('Separation distance violated');
+                    } else {
+                        await this.limitSpeed(allowedSpeed);
+                    }
+                }
+            }
+
+            await this.sleep(10); // 100Hz monitoring rate
+        }
+    }
+
+    // Calculate maximum allowed robot speed for current separation
+    calculateAllowedSpeed(
+        currentDistance: number,
+        humanSpeed: number
+    ): number {
+        // Solve for Vr in: S = Sh + Sr + Ss + C + Zd + Zr
+        // Simplified: Vr_max = (S - Sh - C - Zd - Zr) / (Tr + Ts/2)
+
+        const S = currentDistance;
+        const Sh = humanSpeed * (this.systemReactionTime + this.maxStoppingTime);
+        const C = 0.1;
+        const Zd = 0.05;
+        const Zr = 0.10;
+
+        const numerator = S - Sh - C - Zd - Zr;
+        const denominator = this.systemReactionTime + this.maxStoppingTime / 2;
+
+        return Math.max(0, numerator / denominator);
+    }
+}</code></pre>
+
+        <h2>4.6 Sensor Fusion for Safety</h2>
+        <p>Combining multiple sensor modalities improves reliability and coverage:</p>
+
+        <pre><code>// Multi-Modal Sensor Fusion
+class SafetySensorFusion {
+    private sensors: SafetySensor[] = [];
+    private fusionEngine: BayesianFusion;
+
+    async fuseForSafety(): Promise<FusedSafetyState> {
+        // Collect all sensor data
+        const sensorData = await Promise.all(
+            this.sensors.map(s => s.getData())
+        );
+
+        // Check sensor agreement
+        const agreement = this.checkSensorAgreement(sensorData);
+
+        if (agreement.level < 0.7) {
+            // Significant disagreement - be conservative
+            return this.conservativeFusion(sensorData);
+        }
+
+        // Bayesian sensor fusion
+        const fused = this.fusionEngine.fuse(sensorData);
+
+        // Apply safety margins
+        return this.applySafetyMargins(fused);
+    }
+
+    checkSensorAgreement(data: SensorData[]): Agreement {
+        // Compare human position estimates from different sensors
+        const humanPositions = data
+            .filter(d => d.detectedHumans.length > 0)
+            .flatMap(d => d.detectedHumans);
+
+        if (humanPositions.length < 2) {
+            return { level: 1.0, note: 'Insufficient data for comparison' };
+        }
+
+        // Cluster positions and check for outliers
+        const clusters = this.clusterPositions(humanPositions);
+        const outlierRatio = clusters.outliers.length / humanPositions.length;
+
+        return {
+            level: 1 - outlierRatio,
+            note: outlierRatio > 0 ? 'Some sensors disagree' : 'Good agreement'
+        };
+    }
+
+    conservativeFusion(data: SensorData[]): FusedSafetyState {
+        // Use minimum distance reported by any sensor
+        let minDistance = Infinity;
+        let nearestHuman = null;
+
+        for (const sensorData of data) {
+            for (const human of sensorData.detectedHumans) {
+                if (human.distance < minDistance) {
+                    minDistance = human.distance;
+                    nearestHuman = human;
+                }
+            }
+        }
+
+        // Add extra safety margin for uncertainty
+        const safetyMargin = 0.2; // 200mm extra
+
+        return {
+            minHumanDistance: minDistance - safetyMargin,
+            nearestHuman,
+            confidence: 0.5, // Lower confidence due to disagreement
+            fusionMethod: 'CONSERVATIVE'
+        };
+    }
+}</code></pre>
+
+        <h2>4.7 Real-Time Safety Supervision</h2>
+        <p>The safety supervisor integrates all monitoring subsystems and makes real-time safety decisions:</p>
+
+        <pre><code>// Safety Supervisor System
+class SafetySupervisor {
+    private proximitySystem: ProximityDetectionSystem;
+    private forceMonitor: ForceTorqueMonitor;
+    private visionSystem: VisionSafetySystem;
+    private separationMonitor: SpeedSeparationMonitor;
+    private sensorFusion: SafetySensorFusion;
+
+    private currentSafetyState: SafetyState = SafetyState.NORMAL;
+
+    async supervise(): Promise<void> {
+        const cycleTime = 10; // 100Hz supervision rate
+
+        while (this.running) {
+            const cycleStart = Date.now();
+
+            // Gather all safety inputs
+            const [proximity, force, vision, separation] = await Promise.all([
+                this.proximitySystem.updateProximityModel(),
+                this.forceMonitor.detectCollision(),
+                this.visionSystem.processLatestFrame(),
+                this.separationMonitor.getCurrentStatus()
+            ]);
+
+            // Fuse sensor data
+            const fusedState = await this.sensorFusion.fuseForSafety();
+
+            // Determine required safety response
+            const response = this.determineSafetyResponse({
+                proximity,
+                force,
+                vision,
+                separation,
+                fusedState
+            });
+
+            // Execute safety response
+            await this.executeSafetyResponse(response);
+
+            // Log and report
+            this.logSafetyState(response);
+
+            // Maintain cycle time
+            const elapsed = Date.now() - cycleStart;
+            if (elapsed < cycleTime) {
+                await this.sleep(cycleTime - elapsed);
+            } else {
+                this.logWarning(`Safety cycle overrun: ${elapsed}ms`);
+            }
+        }
+    }
+
+    determineSafetyResponse(inputs: SafetyInputs): SafetyResponse {
+        // Priority 1: Collision detected
+        if (inputs.force.detected) {
+            return {
+                action: SafetyAction.EMERGENCY_STOP,
+                reason: 'Collision detected',
+                priority: 1
+            };
+        }
+
+        // Priority 2: Emergency gesture
+        if (inputs.vision.emergencyGesture) {
+            return {
+                action: SafetyAction.PROTECTIVE_STOP,
+                reason: 'Emergency gesture detected',
+                priority: 2
+            };
+        }
+
+        // Priority 3: Separation violation
+        if (inputs.separation.violated) {
+            if (inputs.separation.allowedSpeed <= 0) {
+                return {
+                    action: SafetyAction.PROTECTIVE_STOP,
+                    reason: 'Separation distance violated',
+                    priority: 3
+                };
+            } else {
+                return {
+                    action: SafetyAction.SPEED_LIMIT,
+                    speedLimit: inputs.separation.allowedSpeed,
+                    reason: 'Reduced separation distance',
+                    priority: 4
+                };
+            }
+        }
+
+        // Priority 4: Zone-based speed limiting
+        const zone = inputs.fusedState.currentZone;
+        if (zone.maxSpeed < this.currentSpeed) {
+            return {
+                action: SafetyAction.SPEED_LIMIT,
+                speedLimit: zone.maxSpeed,
+                reason: `Zone ${zone.name} speed limit`,
+                priority: 5
+            };
+        }
+
+        return {
+            action: SafetyAction.CONTINUE,
+            reason: 'No safety concerns',
+            priority: 10
+        };
+    }
+}</code></pre>
+
+        <h2>4.8 Diagnostic Coverage and Self-Monitoring</h2>
+        <p>Safety sensors must continuously verify their own correct operation:</p>
+
+        <table>
+            <tr>
+                <th>Diagnostic Method</th>
+                <th>Coverage</th>
+                <th>Interval</th>
+                <th>Faults Detected</th>
+            </tr>
+            <tr>
+                <td><strong>Watchdog Timer</strong></td>
+                <td>90%</td>
+                <td>Continuous</td>
+                <td>Processor hang, loop failure</td>
+            </tr>
+            <tr>
+                <td><strong>Reference Measurement</strong></td>
+                <td>95%</td>
+                <td>Per cycle</td>
+                <td>Sensor drift, calibration loss</td>
+            </tr>
+            <tr>
+                <td><strong>Plausibility Check</strong></td>
+                <td>80%</td>
+                <td>Per reading</td>
+                <td>Gross errors, disconnection</td>
+            </tr>
+            <tr>
+                <td><strong>Cross-Comparison</strong></td>
+                <td>99%</td>
+                <td>Per cycle</td>
+                <td>Single sensor failure</td>
+            </tr>
+            <tr>
+                <td><strong>Periodic Self-Test</strong></td>
+                <td>99%</td>
+                <td>Hourly</td>
+                <td>Degradation, accumulated errors</td>
+            </tr>
+        </table>
+
+        <pre><code>// Sensor Self-Monitoring System
+class SensorDiagnostics {
+    performDiagnostics(sensor: SafetySensor): DiagnosticResult {
+        const results: DiagnosticCheck[] = [];
+
+        // Watchdog check
+        results.push(this.checkWatchdog(sensor));
+
+        // Reference measurement
+        if (sensor.hasReference) {
+            results.push(this.checkReference(sensor));
+        }
+
+        // Plausibility check
+        results.push(this.checkPlausibility(sensor));
+
+        // Cross-comparison with redundant sensor
+        if (sensor.redundantPair) {
+            results.push(this.crossCompare(sensor, sensor.redundantPair));
+        }
+
+        // Calculate diagnostic coverage
+        const coverage = this.calculateDC(results);
+
+        return {
+            sensorId: sensor.id,
+            healthy: results.every(r => r.passed),
+            diagnosticCoverage: coverage,
+            checks: results
+        };
+    }
+
+    checkPlausibility(sensor: SafetySensor): DiagnosticCheck {
+        const reading = sensor.getReading();
+
+        // Check within physical limits
+        if (reading.value < sensor.physicalMin ||
+            reading.value > sensor.physicalMax) {
+            return {
+                name: 'Plausibility',
+                passed: false,
+                detail: `Value ${reading.value} outside physical range`
+            };
+        }
+
+        // Check rate of change
+        const previousReading = sensor.getPreviousReading();
+        const rateOfChange = Math.abs(reading.value - previousReading.value) /
+                             (reading.timestamp - previousReading.timestamp);
+
+        if (rateOfChange > sensor.maxRateOfChange) {
+            return {
+                name: 'Plausibility',
+                passed: false,
+                detail: `Rate of change ${rateOfChange} exceeds maximum`
+            };
+        }
+
+        return { name: 'Plausibility', passed: true };
+    }
+}</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Multiple sensor modalities (LiDAR, ToF, ultrasonic, vision) provide complementary safety coverage</li>
+                <li>Force-torque monitoring enables collision detection through dynamic model residuals</li>
+                <li>Vision systems provide rich understanding for human detection, pose estimation, and gesture recognition</li>
+                <li>Speed and separation monitoring (per ISO/TS 15066) calculates protective distances in real-time</li>
+                <li>Sensor fusion improves reliability but must handle disagreement conservatively</li>
+                <li>Safety supervisors integrate all monitoring and make real-time decisions at 100Hz+</li>
+                <li>Self-diagnostics with high coverage ensure sensor reliability</li>
+                <li>Redundancy and cross-comparison detect single sensor failures</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Compare the strengths and limitations of LiDAR vs. Time-of-Flight cameras for proximity detection.</li>
+                <li>How does model-based collision detection work using joint torque measurements?</li>
+                <li>What vision-based safety functions can be performed and what are their typical latencies?</li>
+                <li>Explain the protective separation distance calculation from ISO/TS 15066.</li>
+                <li>How should a sensor fusion system handle disagreement between sensors?</li>
+                <li>What is the role of the safety supervisor and what is an appropriate supervision rate?</li>
+                <li>What diagnostic methods are used to verify sensor health and what coverage do they provide?</li>
+                <li>How can trajectory prediction from pose estimation improve proactive safety?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+            <p style="font-size:14px;margin-top:10px;color:#94a3b8">"See everything, miss nothing, respond instantly"</p>
+        </div>
+
+        </div>
+</body>
+</html>

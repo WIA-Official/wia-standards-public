@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 위치 및 속도 제어 | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>5장: 위치 및 속도 제어</h1>
+
+        <h2>5.1 위치 제어 개요</h2>
+        <p>위치 제어는 모터 축을 원하는 각도나 위치로 정확하게 이동시키는 것을 목표로 합니다. 로봇 팔, CNC 기계, 정밀 위치 결정 시스템 등 대부분의 자동화 응용에서 핵심적인 제어 모드입니다.</p>
+
+        <p>위치 제어의 주요 성능 지표:</p>
+        <ul>
+            <li><strong>위치 정밀도:</strong> 목표 위치와 실제 위치의 차이</li>
+            <li><strong>반복 정밀도:</strong> 동일 명령에 대한 도달 위치의 일관성</li>
+            <li><strong>정착 시간:</strong> 최종 위치에 안정되는 시간</li>
+            <li><strong>오버슈트:</strong> 목표를 초과하는 정도</li>
+        </ul>
+
+        <h2>5.2 기본 위치 제어기</h2>
+        <pre><code>// P 위치 제어기 + 속도 피드포워드
+class PositionController {
+private:
+    // 위치 루프 이득
+    float Kp_pos;
+
+    // 속도 제한
+    float max_velocity;
+
+    // 피드포워드 이득
+    float Kff_vel;
+
+public:
+    PositionController(float kp, float v_max, float kff = 1.0f) {
+        Kp_pos = kp;
+        max_velocity = v_max;
+        Kff_vel = kff;
+    }
+
+    // 위치 명령을 속도 명령으로 변환
+    float compute(float position_ref, float position_actual,
+                  float velocity_feedforward = 0) {
+        // 위치 오차
+        float position_error = position_ref - position_actual;
+
+        // 비례 제어
+        float velocity_cmd = Kp_pos * position_error;
+
+        // 속도 피드포워드 추가
+        velocity_cmd += Kff_vel * velocity_feedforward;
+
+        // 속도 제한
+        velocity_cmd = clamp(velocity_cmd, -max_velocity, max_velocity);
+
+        return velocity_cmd;
+    }
+
+    float clamp(float value, float min_val, float max_val) {
+        if (value > max_val) return max_val;
+        if (value < min_val) return min_val;
+        return value;
+    }
+};
+
+// PID 위치 제어기
+class PIDPositionController {
+private:
+    float Kp, Ki, Kd;
+    float integral;
+    float prev_error;
+    float dt;
+
+    float integral_limit;
+    float output_limit;
+
+public:
+    PIDPositionController(float kp, float ki, float kd, float sample_time) {
+        Kp = kp;
+        Ki = ki;
+        Kd = kd;
+        dt = sample_time;
+
+        integral = 0;
+        prev_error = 0;
+
+        integral_limit = 100.0f;
+        output_limit = 1000.0f;
+    }
+
+    float compute(float position_ref, float position_actual, float velocity_actual) {
+        float error = position_ref - position_actual;
+
+        // P 항
+        float P_term = Kp * error;
+
+        // I 항 (와인드업 방지)
+        integral += error * dt;
+        integral = clamp(integral, -integral_limit, integral_limit);
+        float I_term = Ki * integral;
+
+        // D 항 (속도 피드백 사용 - 미분 킥 방지)
+        float D_term = -Kd * velocity_actual;
+
+        prev_error = error;
+
+        float output = P_term + I_term + D_term;
+        return clamp(output, -output_limit, output_limit);
+    }
+
+    void reset() {
+        integral = 0;
+        prev_error = 0;
+    }
+
+private:
+    float clamp(float value, float min_val, float max_val);
+};</code></pre>
+
+        <h2>5.3 속도 제어</h2>
+        <p>속도 제어는 모터가 원하는 회전 속도를 유지하도록 합니다. 컨베이어, 펌프, 팬 등의 응용에서 직접 사용되며, 위치 제어의 내부 루프로도 사용됩니다:</p>
+
+        <pre><code>// PI 속도 제어기
+class VelocityController {
+private:
+    float Kp_vel, Ki_vel;
+    float integral;
+    float dt;
+
+    // 제한
+    float integral_limit;
+    float torque_limit;
+
+    // 가속도 제한
+    float max_acceleration;
+    float prev_velocity_ref;
+
+public:
+    VelocityController(float kp, float ki, float sample_time) {
+        Kp_vel = kp;
+        Ki_vel = ki;
+        dt = sample_time;
+
+        integral = 0;
+
+        integral_limit = 50.0f;
+        torque_limit = 100.0f;
+        max_acceleration = 1000.0f;  // rad/s²
+
+        prev_velocity_ref = 0;
+    }
+
+    // 속도 명령을 토크(전류) 명령으로 변환
+    float compute(float velocity_ref, float velocity_actual) {
+        // 가속도 제한 적용
+        float velocity_ref_limited = limit_acceleration(velocity_ref);
+
+        // 속도 오차
+        float error = velocity_ref_limited - velocity_actual;
+
+        // PI 제어
+        float P_term = Kp_vel * error;
+
+        integral += error * dt;
+        integral = clamp(integral, -integral_limit, integral_limit);
+        float I_term = Ki_vel * integral;
+
+        float torque_cmd = P_term + I_term;
+
+        // 토크 제한
+        torque_cmd = clamp(torque_cmd, -torque_limit, torque_limit);
+
+        return torque_cmd;
+    }
+
+    // 가속도 피드포워드 추가
+    float compute_with_ff(float velocity_ref, float velocity_actual,
+                          float acceleration_ff, float inertia) {
+        float fb_torque = compute(velocity_ref, velocity_actual);
+
+        // 피드포워드: T = J * a
+        float ff_torque = inertia * acceleration_ff;
+
+        return fb_torque + ff_torque;
+    }
+
+private:
+    float limit_acceleration(float velocity_ref) {
+        float accel = (velocity_ref - prev_velocity_ref) / dt;
+
+        if (fabs(accel) > max_acceleration) {
+            accel = copysign(max_acceleration, accel);
+            velocity_ref = prev_velocity_ref + accel * dt;
+        }
+
+        prev_velocity_ref = velocity_ref;
+        return velocity_ref;
+    }
+
+    float clamp(float value, float min_val, float max_val);
+};</code></pre>
+
+        <h2>5.4 캐스케이드 위치-속도-전류 제어</h2>
+        <p>고성능 서보 시스템에서 사용되는 3중 루프 구조입니다:</p>
+
+        <pre><code>// 완전한 서보 제어기 (3중 캐스케이드 루프)
+class ServoController {
+private:
+    // 제어기
+    PositionController position_loop;
+    VelocityController velocity_loop;
+    CurrentController current_loop;
+
+    // 궤적 생성기
+    TrajectoryGenerator trajectory;
+
+    // 상태
+    float position_ref, velocity_ref, current_ref;
+    float position_actual, velocity_actual, current_actual;
+
+    // 제어 주파수
+    float pos_freq, vel_freq, cur_freq;
+
+    // 루프 카운터
+    int pos_decimation, vel_decimation;
+    int pos_counter, vel_counter;
+
+public:
+    ServoController(ServoConfig& config) :
+        position_loop(config.pos_kp, config.max_vel),
+        velocity_loop(config.vel_kp, config.vel_ki, config.dt_current),
+        current_loop(config.cur_kp, config.cur_ki, config.dt_current)
+    {
+        pos_freq = config.pos_freq;
+        vel_freq = config.vel_freq;
+        cur_freq = config.cur_freq;
+
+        // 데시메이션 비율 계산
+        vel_decimation = (int)(cur_freq / vel_freq);
+        pos_decimation = (int)(vel_freq / pos_freq);
+
+        pos_counter = 0;
+        vel_counter = 0;
+    }
+
+    // 전류 루프 주파수로 호출 (가장 빠름)
+    float update(float pos_cmd, float vel_ff, float acc_ff,
+                 float pos_fb, float vel_fb, float cur_fb) {
+        position_actual = pos_fb;
+        velocity_actual = vel_fb;
+        current_actual = cur_fb;
+
+        // 위치 루프 (가장 느림)
+        if (++pos_counter >= pos_decimation * vel_decimation) {
+            pos_counter = 0;
+            velocity_ref = position_loop.compute(pos_cmd, position_actual, vel_ff);
+        }
+
+        // 속도 루프
+        if (++vel_counter >= vel_decimation) {
+            vel_counter = 0;
+            current_ref = velocity_loop.compute_with_ff(
+                velocity_ref, velocity_actual, acc_ff, inertia);
+        }
+
+        // 전류 루프 (가장 빠름, 매 호출)
+        float voltage = current_loop.compute(current_ref, current_actual, velocity_actual);
+
+        return voltage;
+    }
+
+    // 포인트-투-포인트 이동
+    void move_to(float target_position) {
+        trajectory.plan(position_actual, target_position);
+    }
+
+    // 궤적 추종
+    void follow_trajectory(TrajectoryPoint& tp) {
+        position_ref = tp.position;
+        velocity_ref = tp.velocity;
+        // 가속도는 속도 루프 피드포워드로 사용
+    }
+
+private:
+    float inertia = 0.001f;  // kg·m²
+};</code></pre>
+
+        <h2>5.5 피드포워드 제어</h2>
+        <p>피드포워드는 시스템 모델을 이용해 필요한 제어 입력을 미리 계산합니다:</p>
+
+        <pre><code>// 피드포워드 보상기
+class FeedforwardCompensator {
+private:
+    // 모터 파라미터
+    float J;     // 관성
+    float B;     // 점성 마찰
+    float Kt;    // 토크 상수
+    float Tc;    // 쿨롱 마찰 토크
+
+    // 기어박스 파라미터
+    float gear_ratio;
+    float gear_efficiency;
+
+public:
+    FeedforwardCompensator(MotorParams& params) {
+        J = params.J;
+        B = params.B;
+        Kt = params.Kt;
+        Tc = params.Tc;
+
+        gear_ratio = params.gear_ratio;
+        gear_efficiency = params.gear_efficiency;
+    }
+
+    // 완전 피드포워드 토크 계산
+    float compute(float velocity, float acceleration) {
+        float torque = 0;
+
+        // 관성 토크: T_inertia = J * a
+        torque += J * acceleration;
+
+        // 점성 마찰 토크: T_viscous = B * v
+        torque += B * velocity;
+
+        // 쿨롱 마찰 토크: T_coulomb = Tc * sign(v)
+        if (fabs(velocity) > 0.001f) {
+            torque += Tc * sign(velocity);
+        }
+
+        // 기어박스 손실 보상
+        torque /= gear_efficiency;
+
+        return torque;
+    }
+
+    // 피드포워드 전류 계산
+    float compute_current(float velocity, float acceleration) {
+        float torque = compute(velocity, acceleration);
+        return torque / Kt;
+    }
+
+private:
+    float sign(float x) {
+        return (x > 0) ? 1.0f : ((x < 0) ? -1.0f : 0.0f);
+    }
+};
+
+// 피드포워드가 적용된 완전 서보 제어기
+class FullServoController {
+private:
+    ServoController servo;
+    FeedforwardCompensator feedforward;
+    TrajectoryGenerator trajectory;
+
+public:
+    FullServoController(ServoConfig& config, MotorParams& params) :
+        servo(config),
+        feedforward(params)
+    {}
+
+    float update(float pos_fb, float vel_fb, float cur_fb) {
+        // 궤적 포인트 가져오기
+        TrajectoryPoint tp = trajectory.get_current();
+
+        // 피드포워드 계산
+        float ff_current = feedforward.compute_current(tp.velocity, tp.acceleration);
+
+        // 피드백 제어
+        float fb_voltage = servo.update(
+            tp.position, tp.velocity, tp.acceleration,
+            pos_fb, vel_fb, cur_fb);
+
+        // 피드포워드 + 피드백
+        // (피드포워드는 전류 루프 기준으로 추가)
+        return fb_voltage;  // 전류 루프가 내부에서 ff 처리
+    }
+};</code></pre>
+
+        <h2>5.6 속도 추정</h2>
+        <p>엔코더로부터 속도를 추정하는 다양한 방법입니다:</p>
+
+        <pre><code>// 속도 추정 방법들
+class VelocityEstimator {
+private:
+    float dt;
+
+    // 미분 방식
+    float prev_position;
+
+    // 필터링된 미분
+    LowPassFilter velocity_filter;
+
+    // M/T 방식 (엔코더 펄스 기반)
+    float encoder_resolution;
+    uint32_t pulse_count;
+    uint32_t last_pulse_count;
+    float last_pulse_time;
+
+public:
+    VelocityEstimator(float sample_time, float filter_freq, float enc_res) :
+        velocity_filter(filter_freq, sample_time)
+    {
+        dt = sample_time;
+        encoder_resolution = enc_res;
+        prev_position = 0;
+        pulse_count = 0;
+        last_pulse_count = 0;
+        last_pulse_time = 0;
+    }
+
+    // 방법 1: 단순 미분 (노이즈에 민감)
+    float estimate_simple(float position) {
+        float velocity = (position - prev_position) / dt;
+        prev_position = position;
+        return velocity;
+    }
+
+    // 방법 2: 필터링된 미분 (권장)
+    float estimate_filtered(float position) {
+        float raw_velocity = (position - prev_position) / dt;
+        prev_position = position;
+        return velocity_filter.filter(raw_velocity);
+    }
+
+    // 방법 3: M/T 방식 (저속에서 정확)
+    float estimate_MT(uint32_t encoder_count, float current_time) {
+        // M: 측정 기간 동안의 펄스 수
+        uint32_t M = encoder_count - last_pulse_count;
+
+        // T: 측정 기간
+        float T = current_time - last_pulse_time;
+
+        last_pulse_count = encoder_count;
+        last_pulse_time = current_time;
+
+        if (T < 1e-6f) return 0;
+
+        // 속도 = (펄스 수 / 분해능) * 2π / 시간
+        float velocity = (float)M / encoder_resolution * 2.0f * M_PI / T;
+
+        return velocity;
+    }
+
+    // 방법 4: 추적 미분기 (노이즈에 강함)
+    float estimate_tracking_differentiator(float position) {
+        static float x1 = 0, x2 = 0;
+        float r = 1000.0f;  // 수렴 속도
+
+        // 추적 미분기 동역학
+        float fh = fhan(x1 - position, x2, r, dt);
+        x1 += dt * x2;
+        x2 += dt * fh;
+
+        return x2;  // 추정된 속도
+    }
+
+private:
+    // 최적 제어 함수 (fhan)
+    float fhan(float x1, float x2, float r, float h) {
+        float d = r * h;
+        float d0 = d * h;
+        float y = x1 + h * x2;
+        float a0 = sqrt(d*d + 8*r*fabs(y));
+
+        float a;
+        if (fabs(y) <= d0) {
+            a = x2 + y/h;
+        } else {
+            a = x2 + 0.5f * (a0 - d) * sign(y);
+        }
+
+        float fh;
+        if (fabs(a) <= d) {
+            fh = -r * a / d;
+        } else {
+            fh = -r * sign(a);
+        }
+
+        return fh;
+    }
+
+    float sign(float x) {
+        return (x > 0) ? 1.0f : ((x < 0) ? -1.0f : 0.0f);
+    }
+};</code></pre>
+
+        <h2>5.7 위치 결정 알고리즘</h2>
+        <p>정밀 위치 결정을 위한 알고리즘입니다:</p>
+
+        <pre><code>// 위치 결정 제어기
+class PositioningController {
+private:
+    PIDPositionController position_pid;
+    VelocityController velocity_ctrl;
+
+    // 위치 결정 상태
+    enum State { IDLE, MOVING, SETTLING, COMPLETE };
+    State state;
+
+    // 파라미터
+    float position_tolerance;
+    float velocity_tolerance;
+    float settling_time;
+
+    // 타이머
+    float settling_timer;
+
+    // 타겟
+    float target_position;
+
+public:
+    PositioningController(PositioningConfig& config) :
+        position_pid(config.kp, config.ki, config.kd, config.dt),
+        velocity_ctrl(config.vel_kp, config.vel_ki, config.dt)
+    {
+        position_tolerance = config.pos_tolerance;
+        velocity_tolerance = config.vel_tolerance;
+        settling_time = config.settling_time;
+
+        state = IDLE;
+        settling_timer = 0;
+    }
+
+    void start_move(float target) {
+        target_position = target;
+        state = MOVING;
+        settling_timer = 0;
+        position_pid.reset();
+    }
+
+    struct ControlOutput {
+        float torque;
+        bool position_reached;
+        bool in_position;
+    };
+
+    ControlOutput update(float position, float velocity, float dt) {
+        ControlOutput output;
+        output.position_reached = false;
+        output.in_position = false;
+
+        float position_error = target_position - position;
+
+        switch (state) {
+            case IDLE:
+                output.torque = 0;
+                break;
+
+            case MOVING:
+                // 위치 오차가 허용 범위 내이고 속도가 충분히 작으면 settling 시작
+                if (fabs(position_error) < position_tolerance &&
+                    fabs(velocity) < velocity_tolerance) {
+                    state = SETTLING;
+                    settling_timer = 0;
+                }
+                // 일반 위치 제어
+                output.torque = position_pid.compute(target_position, position, velocity);
+                break;
+
+            case SETTLING:
+                settling_timer += dt;
+
+                // 허용 범위를 벗어나면 다시 MOVING
+                if (fabs(position_error) > position_tolerance * 1.5f ||
+                    fabs(velocity) > velocity_tolerance * 1.5f) {
+                    state = MOVING;
+                }
+                // settling 시간이 경과하면 완료
+                else if (settling_timer >= settling_time) {
+                    state = COMPLETE;
+                    output.position_reached = true;
+                }
+
+                output.torque = position_pid.compute(target_position, position, velocity);
+                break;
+
+            case COMPLETE:
+                output.in_position = true;
+                // 위치 유지
+                output.torque = position_pid.compute(target_position, position, velocity);
+                break;
+        }
+
+        return output;
+    }
+
+    bool is_complete() { return state == COMPLETE; }
+    bool is_in_position() { return state == COMPLETE; }
+};</code></pre>
+
+        <h2>5.8 노치 필터와 공진 억제</h2>
+        <p>기계적 공진으로 인한 진동을 억제합니다:</p>
+
+        <pre><code>// 노치 필터 (공진 주파수 억제)
+class NotchFilter {
+private:
+    float omega_n;  // 노치 주파수
+    float zeta;     // 노치 깊이 (작을수록 깊음)
+    float r;        // 노치 폭
+
+    // 상태 변수 (2차 필터)
+    float x1, x2;   // 입력 상태
+    float y1, y2;   // 출력 상태
+
+    // 계수
+    float b0, b1, b2;
+    float a1, a2;
+
+public:
+    NotchFilter(float notch_freq, float depth, float width, float sample_freq) {
+        omega_n = 2.0f * M_PI * notch_freq;
+        zeta = depth;
+        r = width;
+
+        // 쌍일차 변환으로 계수 계산
+        float T = 1.0f / sample_freq;
+        float omega_d = 2.0f / T * tan(omega_n * T / 2.0f);  // 주파수 프리워핑
+
+        float d = 4.0f + 4.0f * r * omega_d * T + omega_d * omega_d * T * T;
+
+        b0 = (4.0f + 4.0f * zeta * omega_d * T + omega_d * omega_d * T * T) / d;
+        b1 = (-8.0f + 2.0f * omega_d * omega_d * T * T) / d;
+        b2 = (4.0f - 4.0f * zeta * omega_d * T + omega_d * omega_d * T * T) / d;
+
+        a1 = (-8.0f + 2.0f * omega_d * omega_d * T * T) / d;
+        a2 = (4.0f - 4.0f * r * omega_d * T + omega_d * omega_d * T * T) / d;
+
+        x1 = x2 = y1 = y2 = 0;
+    }
+
+    float filter(float input) {
+        float output = b0 * input + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+
+        // 상태 업데이트
+        x2 = x1;
+        x1 = input;
+        y2 = y1;
+        y1 = output;
+
+        return output;
+    }
+
+    void reset() {
+        x1 = x2 = y1 = y2 = 0;
+    }
+};
+
+// 공진 억제가 적용된 속도 제어기
+class ResonanceSuppressedVelocityController {
+private:
+    VelocityController velocity_ctrl;
+    vector<NotchFilter> notch_filters;
+
+public:
+    ResonanceSuppressedVelocityController(VelocityConfig& config) :
+        velocity_ctrl(config.kp, config.ki, config.dt)
+    {
+        // 공진 주파수에 노치 필터 추가
+        for (auto& resonance : config.resonance_frequencies) {
+            notch_filters.push_back(
+                NotchFilter(resonance.frequency, resonance.depth,
+                           resonance.width, config.sample_freq)
+            );
+        }
+    }
+
+    float compute(float velocity_ref, float velocity_actual) {
+        // 속도 피드백에 노치 필터 적용
+        float filtered_velocity = velocity_actual;
+        for (auto& filter : notch_filters) {
+            filtered_velocity = filter.filter(filtered_velocity);
+        }
+
+        return velocity_ctrl.compute(velocity_ref, filtered_velocity);
+    }
+};</code></pre>
+
+        <h2>5.9 이득 스케줄링</h2>
+        <p>동작점에 따라 제어기 이득을 조정합니다:</p>
+
+        <pre><code>// 이득 스케줄링 제어기
+class GainScheduledController {
+private:
+    struct GainSet {
+        float Kp, Ki, Kd;
+        float velocity_threshold;  // 이 속도 이하에서 적용
+    };
+
+    vector<GainSet> gain_table;
+    PIDPositionController controller;
+    float current_velocity;
+
+public:
+    GainScheduledController(float sample_time) :
+        controller(0, 0, 0, sample_time)
+    {
+        // 기본 이득 테이블 설정
+        // 저속: 높은 이득 (정밀도 중시)
+        gain_table.push_back({200.0f, 20.0f, 5.0f, 1.0f});
+
+        // 중속: 중간 이득
+        gain_table.push_back({150.0f, 15.0f, 4.0f, 10.0f});
+
+        // 고속: 낮은 이득 (안정성 중시)
+        gain_table.push_back({100.0f, 10.0f, 3.0f, 1000.0f});
+    }
+
+    void add_gain_set(float kp, float ki, float kd, float vel_threshold) {
+        gain_table.push_back({kp, ki, kd, vel_threshold});
+        // 속도 순으로 정렬
+        sort(gain_table.begin(), gain_table.end(),
+             [](const GainSet& a, const GainSet& b) {
+                 return a.velocity_threshold < b.velocity_threshold;
+             });
+    }
+
+    float compute(float position_ref, float position_actual, float velocity_actual) {
+        current_velocity = fabs(velocity_actual);
+
+        // 적절한 이득 선택
+        GainSet* gains = &gain_table[0];
+        for (auto& g : gain_table) {
+            if (current_velocity <= g.velocity_threshold) {
+                gains = &g;
+                break;
+            }
+        }
+
+        // 이득 적용 (또는 보간)
+        controller.set_gains(gains->Kp, gains->Ki, gains->Kd);
+
+        return controller.compute(position_ref, position_actual, velocity_actual);
+    }
+
+    // 선형 보간을 사용한 부드러운 이득 전환
+    float compute_interpolated(float position_ref, float position_actual,
+                               float velocity_actual) {
+        float vel = fabs(velocity_actual);
+
+        // 인접 이득 찾기
+        int lower = 0, upper = 0;
+        for (int i = 0; i < gain_table.size() - 1; i++) {
+            if (vel >= gain_table[i].velocity_threshold &&
+                vel < gain_table[i+1].velocity_threshold) {
+                lower = i;
+                upper = i + 1;
+                break;
+            }
+        }
+
+        // 선형 보간
+        float range = gain_table[upper].velocity_threshold -
+                      gain_table[lower].velocity_threshold;
+        float t = (vel - gain_table[lower].velocity_threshold) / range;
+        t = fmax(0.0f, fmin(1.0f, t));
+
+        float Kp = gain_table[lower].Kp + t * (gain_table[upper].Kp - gain_table[lower].Kp);
+        float Ki = gain_table[lower].Ki + t * (gain_table[upper].Ki - gain_table[lower].Ki);
+        float Kd = gain_table[lower].Kd + t * (gain_table[upper].Kd - gain_table[lower].Kd);
+
+        controller.set_gains(Kp, Ki, Kd);
+        return controller.compute(position_ref, position_actual, velocity_actual);
+    }
+};</code></pre>
+
+        <h2>5.10 위치/속도 제어와 AI</h2>
+        <pre><code>// AI 기반 자동 튜닝 위치 제어기
+class AIAutoTunedController {
+private:
+    PIDPositionController pid;
+    NeuralNetwork gain_predictor;
+
+    // 성능 메트릭 수집
+    PerformanceMonitor monitor;
+
+public:
+    AIAutoTunedController(float sample_time) :
+        pid(100.0f, 10.0f, 2.0f, sample_time),
+        gain_predictor(6, 32, 3)  // 입력 6, 은닉 32, 출력 3 (Kp, Ki, Kd)
+    {}
+
+    float compute(float position_ref, float position_actual, float velocity_actual) {
+        // 현재 상태 특성 추출
+        vector<float> features = {
+            fabs(position_ref - position_actual),  // 위치 오차
+            fabs(velocity_actual),                  // 현재 속도
+            monitor.get_overshoot(),               // 최근 오버슈트
+            monitor.get_settling_time(),           // 최근 정착 시간
+            monitor.get_oscillation_level(),       // 진동 수준
+            monitor.get_load_estimate()            // 부하 추정
+        };
+
+        // AI가 최적 이득 예측
+        vector<float> gains = gain_predictor.predict(features);
+
+        // 이득 적용 (안전 범위 내)
+        float Kp = clamp(gains[0] * 100.0f, 10.0f, 500.0f);
+        float Ki = clamp(gains[1] * 10.0f, 0.0f, 100.0f);
+        float Kd = clamp(gains[2] * 5.0f, 0.0f, 20.0f);
+
+        pid.set_gains(Kp, Ki, Kd);
+
+        // 제어 계산
+        float output = pid.compute(position_ref, position_actual, velocity_actual);
+
+        // 성능 모니터링
+        monitor.update(position_ref, position_actual, velocity_actual, output);
+
+        return output;
+    }
+
+    // 온라인 학습
+    void learn_from_performance() {
+        if (monitor.episode_complete()) {
+            // 성능 메트릭을 기반으로 학습
+            float reward = monitor.calculate_reward();
+            gain_predictor.update_with_reward(reward);
+        }
+    }
+
+private:
+    float clamp(float value, float min_val, float max_val);
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>위치 제어는 목표 위치로 정확하게 이동하는 것을 목표로 합니다</li>
+                <li>속도 제어는 원하는 회전 속도를 유지하며, 위치 제어의 내부 루프로도 사용됩니다</li>
+                <li>캐스케이드 구조(위치-속도-전류)는 고성능 서보 시스템의 표준입니다</li>
+                <li>피드포워드는 시스템 모델을 이용해 응답 속도를 개선합니다</li>
+                <li>속도 추정에는 단순 미분, 필터링된 미분, M/T 방식 등이 있습니다</li>
+                <li>위치 결정 알고리즘은 정착 상태를 감지하고 완료를 판단합니다</li>
+                <li>노치 필터는 기계적 공진으로 인한 진동을 억제합니다</li>
+                <li>이득 스케줄링은 동작점에 따라 제어기 이득을 조정합니다</li>
+                <li>AI는 자동 튜닝과 적응 제어에 활용됩니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>위치 제어기에서 P 제어와 PID 제어의 차이점을 설명하시오.</li>
+                <li>캐스케이드 제어에서 각 루프의 역할과 대역폭 관계를 설명하시오.</li>
+                <li>피드포워드가 제어 성능을 개선하는 원리를 설명하시오.</li>
+                <li>저속에서 M/T 방식이 단순 미분보다 정확한 이유를 설명하시오.</li>
+                <li>정착(settling) 판단에 필요한 조건을 나열하시오.</li>
+                <li>노치 필터가 필요한 상황과 설계 파라미터를 설명하시오.</li>
+                <li>이득 스케줄링이 필요한 이유와 구현 방법을 설명하시오.</li>
+                <li>AI가 위치/속도 제어를 개선할 수 있는 방법을 설명하시오.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:16px;margin-top:10px;">널리 인간을 이롭게 하라</p>
+        </div>
+
+        </div>
+</body>
+</html>

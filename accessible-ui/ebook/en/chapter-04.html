@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Interaction Patterns - WIA-ACCESSIBLE_UI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.8; color: #e2e8f0; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; padding: 40px 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: rgba(30, 41, 59, 0.95); padding: 60px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border: 1px solid rgba(99, 102, 241, 0.2); }
+        .chapter-header { border-bottom: 3px solid #6366f1; padding-bottom: 30px; margin-bottom: 40px; }
+        .chapter-number { color: #6366f1; font-size: 1.1em; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; }
+        h1 { font-size: 2.5em; color: #f8fafc; margin: 15px 0; font-weight: 700; }
+        h2 { color: #a5b4fc; font-size: 1.8em; margin: 45px 0 25px 0; font-weight: 600; border-left: 4px solid #6366f1; padding-left: 20px; }
+        h3 { color: #c4b5fd; font-size: 1.4em; margin: 30px 0 15px 0; }
+        p { margin: 18px 0; font-size: 1.1em; color: #cbd5e1; }
+        .highlight { background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3)); padding: 3px 10px; border-radius: 6px; color: #e0e7ff; }
+        .callout { background: rgba(99, 102, 241, 0.15); border-left: 4px solid #6366f1; padding: 25px; margin: 30px 0; border-radius: 0 12px 12px 0; }
+        .callout-title { font-weight: 700; color: #a5b4fc; margin-bottom: 12px; font-size: 1.2em; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 25px; border-radius: 12px; font-family: 'Fira Code', monospace; font-size: 0.95em; overflow-x: auto; margin: 25px 0; border: 1px solid rgba(99, 102, 241, 0.3); }
+        ul { margin: 20px 0 20px 30px; color: #cbd5e1; }
+        li { margin: 12px 0; font-size: 1.05em; }
+        .key-combo { display: inline-block; background: rgba(51, 65, 85, 0.8); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; padding: 4px 10px; font-family: monospace; font-size: 0.9em; }
+        .pattern-table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+        .pattern-table th, .pattern-table td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(99, 102, 241, 0.2); }
+        .pattern-table th { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">Chapter 04</div>
+            <h1>Interaction Patterns</h1>
+        </div>
+
+        <h2>4.1 Keyboard Accessibility</h2>
+
+        <p><span class="highlight">Keyboard accessibility</span> is critical for users who cannot use a mouse due to motor or visual impairments. WCAG 2.1.1 requires all functionality be operable through keyboard.</p>
+
+        <div class="callout">
+            <div class="callout-title">Core Requirements</div>
+            <ul>
+                <li>All interactive elements must be focusable</li>
+                <li>Focus order must be logical and predictable</li>
+                <li>Focus must be visible at all times</li>
+                <li>No keyboard traps - users can always Tab away</li>
+            </ul>
+        </div>
+
+        <h2>4.2 Focus Management</h2>
+
+        <pre>
+// Focus Management Utilities
+class FocusManager {
+  static focusableSelector =
+    'a[href], button:not([disabled]), input:not([disabled]), ' +
+    'select:not([disabled]), textarea:not([disabled]), ' +
+    '[tabindex]:not([tabindex="-1"])';
+
+  static getFocusableElements(container) {
+    return Array.from(
+      container.querySelectorAll(this.focusableSelector)
+    ).filter(el => el.offsetParent !== null);
+  }
+
+  static createFocusTrap(container) {
+    const focusable = this.getFocusableElements(container);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    container.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+  }
+}
+        </pre>
+
+        <h2>4.3 Keyboard Patterns</h2>
+
+        <table class="pattern-table">
+            <thead>
+                <tr><th>Component</th><th>Key</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Button</td><td><span class="key-combo">Enter</span> <span class="key-combo">Space</span></td><td>Activate</td></tr>
+                <tr><td>Tabs</td><td><span class="key-combo">Arrow</span></td><td>Move between tabs</td></tr>
+                <tr><td>Menu</td><td><span class="key-combo">Escape</span></td><td>Close menu</td></tr>
+                <tr><td>Dialog</td><td><span class="key-combo">Tab</span></td><td>Cycle focus (trapped)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4.4 Focus Visibility</h2>
+
+        <pre>
+/* Accessible Focus Styles */
+*:focus-visible {
+  outline: 3px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  background: #6366f1;
+  color: white;
+  z-index: 9999;
+}
+.skip-link:focus { top: 0; }
+        </pre>
+
+        <h2>4.5 Touch Accessibility</h2>
+
+        <p>WCAG 2.2 requires touch targets to be at least <span class="highlight">24x24 CSS pixels</span> at Level AA. Recommend 44x44 pixels for primary actions.</p>
+
+        <pre>
+/* Touch Target Sizing */
+.button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 12px 24px;
+  margin: 8px; /* Spacing between targets */
+}
+
+/* Icon button with expanded touch area */
+.icon-button {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+.icon-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+}
+        </pre>
+
+        <h2>4.6 Motion and Animation</h2>
+
+        <pre>
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// JavaScript check
+const prefersReducedMotion =
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        </pre>
+
+        <h2>4.7 Voice Control Considerations</h2>
+
+        <p>
+            Voice control software like Dragon NaturallySpeaking, Voice Control on macOS/iOS, and Voice Access on Android enable users with motor impairments to interact through spoken commands. Ensure visible labels match accessible names for reliable voice activation.
+        </p>
+
+        <div class="callout">
+            <div class="callout-title">Voice Control Best Practices</div>
+            <ul>
+                <li>Visible button text should match the accessible name</li>
+                <li>Use unique, descriptive link text instead of "click here"</li>
+                <li>Provide text alternatives for icon-only buttons</li>
+                <li>Test interfaces with voice control software</li>
+            </ul>
+        </div>
+
+        <h2>4.8 Summary</h2>
+
+        <p>
+            Accessible interaction patterns ensure all users can operate your interface regardless of input method. Implementing proper keyboard support, visible focus indicators, adequate touch targets, and respecting motion preferences creates inclusive interactive experiences for the widest possible audience.
+        </p>
+    </div>
+</body>
+</html>

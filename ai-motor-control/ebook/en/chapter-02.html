@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: PID Control & Classical Methods | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 2: PID Control & Classical Methods</h1>
+
+        <h2>2.1 Introduction to PID Control</h2>
+        <p>Proportional-Integral-Derivative (PID) control is the most widely used control algorithm in industrial motor control systems. Despite its conceptual simplicity, PID control provides robust performance for a wide range of applications when properly tuned. Over 95% of industrial control loops use PID or its variants.</p>
+
+        <p>The PID controller continuously calculates an error value as the difference between a desired setpoint and a measured process variable. It applies a correction based on proportional, integral, and derivative terms, each addressing different aspects of control performance.</p>
+
+        <div class="formula">u(t) = K<sub>p</sub>·e(t) + K<sub>i</sub>·∫e(τ)dτ + K<sub>d</sub>·(de/dt)</div>
+
+        <p>Where u(t) is the control output, e(t) is the error (setpoint - measured value), K<sub>p</sub> is proportional gain, K<sub>i</sub> is integral gain, and K<sub>d</sub> is derivative gain.</p>
+
+        <h2>2.2 PID Components Explained</h2>
+
+        <h3>Proportional Term (P)</h3>
+        <p>The proportional term produces an output proportional to the current error. It provides the main driving force to reduce the error.</p>
+        <div class="formula">P<sub>out</sub> = K<sub>p</sub> × e(t)</div>
+        <ul>
+            <li><strong>High K<sub>p</sub>:</strong> Faster response but may cause overshoot and oscillation</li>
+            <li><strong>Low K<sub>p</sub>:</strong> Slower response, larger steady-state error</li>
+            <li><strong>Pure P control:</strong> Always has steady-state error for step inputs (droop)</li>
+        </ul>
+
+        <h3>Integral Term (I)</h3>
+        <p>The integral term accumulates past errors and eliminates steady-state error. It provides the "memory" of the controller.</p>
+        <div class="formula">I<sub>out</sub> = K<sub>i</sub> × ∫e(τ)dτ</div>
+        <ul>
+            <li><strong>High K<sub>i</sub>:</strong> Fast elimination of steady-state error but may cause overshoot and oscillation</li>
+            <li><strong>Low K<sub>i</sub>:</strong> Slow elimination of steady-state error</li>
+            <li><strong>Integral windup:</strong> When actuator saturates, integral term can grow excessively</li>
+        </ul>
+
+        <h3>Derivative Term (D)</h3>
+        <p>The derivative term predicts future error based on the rate of change. It provides damping and reduces overshoot.</p>
+        <div class="formula">D<sub>out</sub> = K<sub>d</sub> × (de/dt)</div>
+        <ul>
+            <li><strong>High K<sub>d</sub>:</strong> Strong damping but amplifies noise</li>
+            <li><strong>Low K<sub>d</sub>:</strong> Reduced damping, more overshoot</li>
+            <li><strong>Noise sensitivity:</strong> Often requires filtering or derivative on measurement</li>
+        </ul>
+
+        <h2>2.3 PID Effects Summary</h2>
+        <table>
+            <tr>
+                <th>Parameter</th>
+                <th>Rise Time</th>
+                <th>Overshoot</th>
+                <th>Settling Time</th>
+                <th>Steady-State Error</th>
+                <th>Stability</th>
+            </tr>
+            <tr>
+                <td><strong>Increase K<sub>p</sub></strong></td>
+                <td>Decrease</td>
+                <td>Increase</td>
+                <td>Small change</td>
+                <td>Decrease</td>
+                <td>Degrade</td>
+            </tr>
+            <tr>
+                <td><strong>Increase K<sub>i</sub></strong></td>
+                <td>Decrease</td>
+                <td>Increase</td>
+                <td>Increase</td>
+                <td>Eliminate</td>
+                <td>Degrade</td>
+            </tr>
+            <tr>
+                <td><strong>Increase K<sub>d</sub></strong></td>
+                <td>Minor change</td>
+                <td>Decrease</td>
+                <td>Decrease</td>
+                <td>No effect</td>
+                <td>Improve (if noise filtered)</td>
+            </tr>
+        </table>
+
+        <h2>2.4 Discrete-Time PID Implementation</h2>
+        <p>In digital control systems, the PID algorithm must be discretized. The most common approach is the backward Euler method:</p>
+
+        <pre><code>// Discrete PID Controller Implementation
+class PIDController {
+private:
+    float kp, ki, kd;           // Gains
+    float integral;              // Integral accumulator
+    float prev_error;            // Previous error for derivative
+    float output_min, output_max;// Output limits
+    float integral_min, integral_max; // Anti-windup limits
+    float dt;                    // Sample time in seconds
+
+public:
+    PIDController(float p, float i, float d, float sample_time) {
+        kp = p;
+        ki = i;
+        kd = d;
+        dt = sample_time;
+        integral = 0.0f;
+        prev_error = 0.0f;
+        output_min = -1e9f;
+        output_max = 1e9f;
+        integral_min = -1e9f;
+        integral_max = 1e9f;
+    }
+
+    void set_limits(float out_min, float out_max) {
+        output_min = out_min;
+        output_max = out_max;
+        // Anti-windup: limit integral to prevent saturation
+        integral_max = out_max / ki;
+        integral_min = out_min / ki;
+    }
+
+    float compute(float setpoint, float measurement) {
+        // Calculate error
+        float error = setpoint - measurement;
+
+        // Proportional term
+        float p_term = kp * error;
+
+        // Integral term with anti-windup
+        integral += error * dt;
+        integral = clamp(integral, integral_min, integral_max);
+        float i_term = ki * integral;
+
+        // Derivative term (on measurement to avoid derivative kick)
+        float derivative = (measurement - prev_measurement) / dt;
+        float d_term = -kd * derivative;  // Negative because derivative on measurement
+
+        prev_measurement = measurement;
+
+        // Calculate output
+        float output = p_term + i_term + d_term;
+
+        // Clamp output
+        output = clamp(output, output_min, output_max);
+
+        return output;
+    }
+
+    void reset() {
+        integral = 0.0f;
+        prev_error = 0.0f;
+    }
+
+private:
+    float prev_measurement = 0.0f;
+
+    float clamp(float value, float min_val, float max_val) {
+        if (value < min_val) return min_val;
+        if (value > max_val) return max_val;
+        return value;
+    }
+};</code></pre>
+
+        <h2>2.5 PID Tuning Methods</h2>
+        <p>Proper tuning is critical for PID performance. Several methods exist for determining optimal gains:</p>
+
+        <h3>Ziegler-Nichols Method (Closed-Loop)</h3>
+        <ol>
+            <li>Set K<sub>i</sub> = 0 and K<sub>d</sub> = 0</li>
+            <li>Increase K<sub>p</sub> until system oscillates with constant amplitude</li>
+            <li>Record critical gain K<sub>u</sub> and oscillation period T<sub>u</sub></li>
+            <li>Calculate gains using table:</li>
+        </ol>
+
+        <table>
+            <tr>
+                <th>Control Type</th>
+                <th>K<sub>p</sub></th>
+                <th>K<sub>i</sub></th>
+                <th>K<sub>d</sub></th>
+            </tr>
+            <tr>
+                <td><strong>P</strong></td>
+                <td>0.5 × K<sub>u</sub></td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><strong>PI</strong></td>
+                <td>0.45 × K<sub>u</sub></td>
+                <td>0.54 × K<sub>u</sub> / T<sub>u</sub></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><strong>PID</strong></td>
+                <td>0.6 × K<sub>u</sub></td>
+                <td>1.2 × K<sub>u</sub> / T<sub>u</sub></td>
+                <td>0.075 × K<sub>u</sub> × T<sub>u</sub></td>
+            </tr>
+        </table>
+
+        <h3>Cohen-Coon Method (Open-Loop)</h3>
+        <p>Based on step response characterization:</p>
+        <ol>
+            <li>Apply step input to open-loop system</li>
+            <li>Measure: Process gain K, Dead time L, Time constant T</li>
+            <li>Calculate gains based on response characteristics</li>
+        </ol>
+
+        <pre><code>// Cohen-Coon Tuning Calculator
+struct ProcessParameters {
+    float K;    // Process gain
+    float L;    // Dead time (delay)
+    float T;    // Time constant
+};
+
+struct PIDGains cohen_coon_tuning(ProcessParameters proc, char control_type) {
+    PIDGains gains;
+    float ratio = L / T;
+
+    switch(control_type) {
+        case 'P':
+            gains.kp = (1.03 + 0.35 * ratio) * T / (K * L);
+            gains.ki = 0;
+            gains.kd = 0;
+            break;
+
+        case 'I':  // PI
+            gains.kp = (0.9 + 0.083 * ratio) * T / (K * L);
+            gains.ki = gains.kp / (L * (0.9 + 0.083 * ratio) / (1.27 + 0.6 * ratio));
+            gains.kd = 0;
+            break;
+
+        case 'D':  // PID
+            gains.kp = (1.35 + 0.25 * ratio) * T / (K * L);
+            float ti = L * (0.54 * ratio + 0.33) / (1.35 + 0.25 * ratio);
+            float td = L * 0.5 / (1.35 + 0.25 * ratio);
+            gains.ki = gains.kp / ti;
+            gains.kd = gains.kp * td;
+            break;
+    }
+
+    return gains;
+}</code></pre>
+
+        <h3>Auto-Tuning with Relay Feedback</h3>
+        <pre><code>// Relay Auto-Tuning Algorithm
+class RelayAutoTuner {
+private:
+    float relay_amplitude;
+    float hysteresis;
+    bool relay_state;
+    float peak_value, valley_value;
+    float period_start_time;
+    int oscillation_count;
+
+public:
+    RelayAutoTuner(float amplitude, float hyst) {
+        relay_amplitude = amplitude;
+        hysteresis = hyst;
+        relay_state = true;
+        oscillation_count = 0;
+    }
+
+    float relay_output(float error, float current_time) {
+        // Relay with hysteresis
+        if (relay_state && error < -hysteresis) {
+            relay_state = false;
+            valley_value = error;
+        } else if (!relay_state && error > hysteresis) {
+            relay_state = true;
+            peak_value = error;
+            oscillation_count++;
+
+            if (oscillation_count == 1) {
+                period_start_time = current_time;
+            }
+        }
+
+        return relay_state ? relay_amplitude : -relay_amplitude;
+    }
+
+    bool is_complete() {
+        return oscillation_count >= 4;  // Need enough cycles
+    }
+
+    PIDGains calculate_gains(float elapsed_time) {
+        // Ultimate gain from describing function analysis
+        float oscillation_amplitude = (peak_value - valley_value) / 2.0f;
+        float Ku = 4.0f * relay_amplitude / (PI * oscillation_amplitude);
+
+        // Ultimate period
+        float Tu = elapsed_time / (oscillation_count - 1);
+
+        // Ziegler-Nichols PID
+        PIDGains gains;
+        gains.kp = 0.6f * Ku;
+        gains.ki = 1.2f * Ku / Tu;
+        gains.kd = 0.075f * Ku * Tu;
+
+        return gains;
+    }
+};</code></pre>
+
+        <h2>2.6 Anti-Windup Techniques</h2>
+        <p>Integral windup occurs when the actuator saturates but the integral term continues accumulating error. Several techniques prevent this:</p>
+
+        <h3>Clamping (Conditional Integration)</h3>
+        <pre><code>// Stop integration when output saturates
+if (output < output_max && output > output_min) {
+    integral += error * dt;
+} else {
+    // Don't accumulate when saturated
+}</code></pre>
+
+        <h3>Back-Calculation</h3>
+        <pre><code>// Discharge integral based on saturation difference
+float output_unsat = p_term + i_term + d_term;
+float output_sat = clamp(output_unsat, output_min, output_max);
+float saturation_error = output_sat - output_unsat;
+
+// Back-calculate integral correction
+integral += (error + saturation_error / kb) * dt;
+// kb is back-calculation gain, typically kb = sqrt(ki * kd)</code></pre>
+
+        <h2>2.7 Derivative Filtering</h2>
+        <p>Pure derivative is sensitive to noise. A first-order filter is commonly applied:</p>
+
+        <div class="formula">D(s) = K<sub>d</sub> × s / (1 + τ<sub>d</sub>s)</div>
+
+        <pre><code>// Filtered Derivative Implementation
+class FilteredDerivative {
+private:
+    float tau;           // Filter time constant
+    float filtered_deriv; // Filtered derivative value
+    float prev_measurement;
+    float dt;
+
+public:
+    FilteredDerivative(float filter_tau, float sample_time) {
+        tau = filter_tau;
+        dt = sample_time;
+        filtered_deriv = 0.0f;
+        prev_measurement = 0.0f;
+    }
+
+    float compute(float measurement, float kd) {
+        // Raw derivative
+        float raw_deriv = (measurement - prev_measurement) / dt;
+        prev_measurement = measurement;
+
+        // First-order low-pass filter
+        float alpha = dt / (tau + dt);
+        filtered_deriv = (1.0f - alpha) * filtered_deriv + alpha * raw_deriv;
+
+        return kd * filtered_deriv;
+    }
+};</code></pre>
+
+        <h2>2.8 Cascaded PID Control</h2>
+        <p>Motor control typically uses cascaded (nested) loops where the output of one controller becomes the setpoint of another:</p>
+
+        <pre><code>// Cascaded Position-Velocity-Current Control
+class CascadedMotorController {
+private:
+    PIDController position_controller;
+    PIDController velocity_controller;
+    PIDController current_controller;
+
+    float vel_limit;
+    float current_limit;
+
+public:
+    CascadedMotorController()
+        : position_controller(10.0f, 0.0f, 0.5f, 0.001f),   // P, I, D, dt
+          velocity_controller(5.0f, 20.0f, 0.0f, 0.001f),
+          current_controller(2.0f, 100.0f, 0.0f, 0.0001f)
+    {
+        vel_limit = 100.0f;      // rad/s
+        current_limit = 10.0f;   // Amps
+    }
+
+    float control(float pos_ref, float pos_fb, float vel_fb, float curr_fb) {
+        // Position loop -> velocity reference
+        float vel_ref = position_controller.compute(pos_ref, pos_fb);
+        vel_ref = clamp(vel_ref, -vel_limit, vel_limit);
+
+        // Velocity loop -> current reference
+        float curr_ref = velocity_controller.compute(vel_ref, vel_fb);
+        curr_ref = clamp(curr_ref, -current_limit, current_limit);
+
+        // Current loop -> voltage output
+        float voltage = current_controller.compute(curr_ref, curr_fb);
+
+        return voltage;
+    }
+
+    // Allow direct velocity mode (bypass position loop)
+    float velocity_control(float vel_ref, float vel_fb, float curr_fb) {
+        vel_ref = clamp(vel_ref, -vel_limit, vel_limit);
+        float curr_ref = velocity_controller.compute(vel_ref, vel_fb);
+        curr_ref = clamp(curr_ref, -current_limit, current_limit);
+        return current_controller.compute(curr_ref, curr_fb);
+    }
+
+    // Allow direct torque/current mode
+    float torque_control(float curr_ref, float curr_fb) {
+        curr_ref = clamp(curr_ref, -current_limit, current_limit);
+        return current_controller.compute(curr_ref, curr_fb);
+    }
+};</code></pre>
+
+        <h2>2.9 Feed-Forward Control</h2>
+        <p>Feed-forward compensation improves tracking by adding a model-based term that anticipates the required control effort:</p>
+
+        <pre><code>// PID with Feed-Forward
+class PIDWithFeedForward {
+private:
+    PIDController pid;
+    float kff_velocity;   // Velocity feed-forward gain
+    float kff_accel;      // Acceleration feed-forward gain
+    float kt_inv;         // Inverse torque constant (1/Kt)
+    float inertia;        // Total inertia
+
+public:
+    float compute(float pos_ref, float pos_fb,
+                  float vel_ref, float accel_ref) {
+        // Feedback term from PID
+        float feedback_term = pid.compute(pos_ref, pos_fb);
+
+        // Velocity feed-forward (back-EMF compensation)
+        float vel_ff = kff_velocity * vel_ref;
+
+        // Acceleration feed-forward (inertia compensation)
+        // Torque = J * acceleration, Current = Torque / Kt
+        float accel_ff = kff_accel * inertia * kt_inv * accel_ref;
+
+        // Combined output
+        return feedback_term + vel_ff + accel_ff;
+    }
+};</code></pre>
+
+        <h2>2.10 Advanced PID Variants</h2>
+
+        <h3>PI-D Controller (Derivative on Measurement)</h3>
+        <p>Avoids derivative kick by computing derivative on measurement instead of error:</p>
+        <div class="formula">u(t) = K<sub>p</sub>·e(t) + K<sub>i</sub>·∫e(τ)dτ - K<sub>d</sub>·(dy/dt)</div>
+
+        <h3>I-PD Controller (Proportional and Derivative on Measurement)</h3>
+        <p>Further reduces overshoot for setpoint changes:</p>
+        <div class="formula">u(t) = K<sub>i</sub>·∫e(τ)dτ - K<sub>p</sub>·y - K<sub>d</sub>·(dy/dt)</div>
+
+        <h3>Two-Degrees-of-Freedom PID</h3>
+        <p>Separate tuning for setpoint tracking and disturbance rejection:</p>
+        <pre><code>// 2-DOF PID Controller
+float compute_2dof(float setpoint, float measurement) {
+    float error = setpoint - measurement;
+
+    // Setpoint weighting factors (0-1)
+    float b = 0.7;  // Proportional setpoint weight
+    float c = 0.0;  // Derivative setpoint weight
+
+    // Modified error terms
+    float p_error = b * setpoint - measurement;  // Weighted for P
+    float i_error = error;                        // Full error for I
+    float d_error = c * setpoint - measurement;  // Weighted for D
+
+    float p_term = kp * p_error;
+    float i_term = ki * integral;  // integral of i_error
+    float d_term = kd * derivative_of(d_error);
+
+    return p_term + i_term + d_term;
+}</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>PID control combines proportional (current error), integral (accumulated error), and derivative (rate of change) terms</li>
+                <li>Proportional gain determines response speed; integral eliminates steady-state error; derivative provides damping</li>
+                <li>Discrete implementation requires attention to sample time, anti-windup, and derivative filtering</li>
+                <li>Ziegler-Nichols and Cohen-Coon provide systematic tuning methods</li>
+                <li>Anti-windup techniques prevent integral term from growing excessively during saturation</li>
+                <li>Cascaded control (position → velocity → current) is the standard architecture for motor control</li>
+                <li>Feed-forward compensation improves tracking by anticipating required control effort</li>
+                <li>Advanced variants (PI-D, I-PD, 2-DOF) offer better performance for specific applications</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain why pure proportional control always has steady-state error for a step input.</li>
+                <li>What is integral windup and how does back-calculation anti-windup work?</li>
+                <li>Why is the derivative term often computed on measurement rather than error?</li>
+                <li>Describe the Ziegler-Nichols closed-loop tuning procedure step by step.</li>
+                <li>In cascaded motor control, why is the current loop the innermost loop?</li>
+                <li>What is the purpose of derivative filtering and how is it implemented?</li>
+                <li>How does feed-forward differ from feedback control? Why combine both?</li>
+                <li>Compare PI-D and I-PD controllers. When would you use each?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

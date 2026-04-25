@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: AI 향상 제어 방법 | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>6장: AI 향상 제어 방법</h1>
+
+        <h2>6.1 모터 제어에서의 AI 소개</h2>
+        <p>인공지능은 학습, 적응, 최적화를 통해 고전적 제어가 달성할 수 있는 것 이상의 모터 제어 성능을 제공합니다. PID와 캐스케이드 제어는 알려진 선형 시스템에서 잘 작동하지만, 실제 모터는 비선형성, 파라미터 변동, 외란에 직면하여 고전적 제어기의 성능을 제한합니다.</p>
+
+        <p>AI 향상 모터 제어가 이러한 문제를 해결하는 방법:</p>
+        <ul>
+            <li><strong>학습:</strong> 데이터로부터 최적의 제어 전략을 자동으로 발견</li>
+            <li><strong>적응:</strong> 변화하는 모터 파라미터와 운전 조건에 조정</li>
+            <li><strong>예측:</strong> 외란과 고장을 발생 전에 예측</li>
+            <li><strong>최적화:</strong> 복잡한 목표에 대해 전역 최적 솔루션 찾기</li>
+            <li><strong>일반화:</strong> 학습된 지식을 유사한 시스템에 전이</li>
+        </ul>
+
+        <h2>6.2 AI 모터 제어 아키텍처</h2>
+        <table>
+            <tr>
+                <th>AI 접근법</th>
+                <th>모터 제어에서의 역할</th>
+                <th>장점</th>
+                <th>과제</th>
+            </tr>
+            <tr>
+                <td><strong>신경망</strong></td>
+                <td>함수 근사, 역모델</td>
+                <td>보편적 근사기, 비선형 처리</td>
+                <td>학습 데이터, 실시간 계산</td>
+            </tr>
+            <tr>
+                <td><strong>강화학습</strong></td>
+                <td>최적 제어 정책 학습</td>
+                <td>시스템 모델 불필요, 불확실성 처리</td>
+                <td>샘플 효율, 학습 중 안전</td>
+            </tr>
+            <tr>
+                <td><strong>퍼지 로직</strong></td>
+                <td>규칙 기반 비선형 제어</td>
+                <td>전문가 지식 반영, 해석 가능</td>
+                <td>규칙 설계, 복잡성 제한</td>
+            </tr>
+            <tr>
+                <td><strong>유전 알고리즘</strong></td>
+                <td>파라미터 최적화, 튜닝</td>
+                <td>전역 최적화, 기울기 불필요</td>
+                <td>계산 비용, 수렴 시간</td>
+            </tr>
+            <tr>
+                <td><strong>베이지안 방법</strong></td>
+                <td>불확실성 정량화, 적응 제어</td>
+                <td>원칙적 불확실성 처리</td>
+                <td>계산 복잡도</td>
+            </tr>
+        </table>
+
+        <h2>6.3 신경망 제어기</h2>
+        <p>신경망은 비선형 모터 동역학을 포착하는 복잡한 제어 매핑을 학습할 수 있습니다:</p>
+
+        <pre><code>// 신경망 모터 제어기
+class NeuralController {
+private:
+    // 네트워크 구조
+    int input_size;
+    int hidden_size;
+    int output_size;
+
+    // 가중치 행렬
+    Matrix W1, b1;  // 입력 → 은닉
+    Matrix W2, b2;  // 은닉 → 출력
+
+    // 학습 파라미터
+    float learning_rate;
+    bool online_learning;
+
+public:
+    NeuralController(int inputs, int hidden, int outputs) {
+        input_size = inputs;
+        hidden_size = hidden;
+        output_size = outputs;
+
+        // 가중치 초기화 (Xavier 초기화)
+        W1 = Matrix::random(hidden, inputs) * sqrt(2.0f / inputs);
+        b1 = Matrix::zeros(hidden, 1);
+        W2 = Matrix::random(outputs, hidden) * sqrt(2.0f / hidden);
+        b2 = Matrix::zeros(outputs, 1);
+
+        learning_rate = 0.001f;
+        online_learning = false;
+    }
+
+    // 순방향 전파: 제어 출력 계산
+    float forward(vector<float>& inputs) {
+        Matrix x = Matrix::from_vector(inputs);
+
+        // 은닉층 (ReLU 활성화)
+        Matrix h = (W1 * x + b1).apply(relu);
+
+        // 출력층 (선형)
+        Matrix y = W2 * h + b2;
+
+        return y(0, 0);
+    }
+
+    // 온라인 학습
+    void learn(vector<float>& inputs, float target, float actual) {
+        if (!online_learning) return;
+
+        float error = target - actual;
+
+        // 순방향 전파
+        Matrix x = Matrix::from_vector(inputs);
+        Matrix h = (W1 * x + b1).apply(relu);
+
+        // 역전파
+        Matrix d_output(1, 1);
+        d_output(0, 0) = error;
+
+        Matrix d_W2 = d_output * h.transpose();
+        Matrix d_hidden = W2.transpose() * d_output;
+
+        // ReLU 미분
+        for (int i = 0; i < hidden_size; i++) {
+            if (h(i, 0) <= 0) d_hidden(i, 0) = 0;
+        }
+
+        Matrix d_W1 = d_hidden * x.transpose();
+
+        // 가중치 업데이트
+        W2 += learning_rate * d_W2;
+        b2 += learning_rate * d_output;
+        W1 += learning_rate * d_W1;
+        b1 += learning_rate * d_hidden;
+    }
+
+private:
+    static float relu(float x) { return (x > 0) ? x : 0; }
+};</code></pre>
+
+        <h3>PID + 신경망 보상기</h3>
+        <pre><code>// 신경망 보상이 적용된 PID
+class NeuralCompensatedPID {
+private:
+    PIDController pid;
+    NeuralController nn_compensator;
+    float alpha;  // 혼합 비율 (0: 순수 PID, 1: 순수 NN)
+
+public:
+    NeuralCompensatedPID(PIDParams& pid_params, NNParams& nn_params)
+        : pid(pid_params.kp, pid_params.ki, pid_params.kd, pid_params.dt),
+          nn_compensator(nn_params.inputs, nn_params.hidden, 1)
+    {
+        alpha = 0.3f;  // 대부분 PID로 시작
+    }
+
+    float compute(float setpoint, float feedback, vector<float>& state) {
+        // 고전적 PID 출력
+        float pid_output = pid.compute(setpoint, feedback);
+
+        // 신경망 보상
+        float nn_output = nn_compensator.forward(state);
+
+        // 혼합 출력
+        float output = (1.0f - alpha) * pid_output + alpha * nn_output;
+
+        // 온라인 학습: 초기에는 PID를 교사로 사용
+        if (nn_compensator.is_learning()) {
+            nn_compensator.learn(state, pid_output, nn_output);
+        }
+
+        return output;
+    }
+
+    // 성능에 따라 NN 기여도 점진적 증가
+    void update_blend(float performance_metric) {
+        if (performance_metric < 0.1f) {  // 좋은 성능
+            alpha = min(alpha + 0.01f, 0.9f);
+        }
+    }
+};</code></pre>
+
+        <h2>6.4 모터 제어를 위한 강화학습</h2>
+        <p>강화학습(RL)은 시행착오를 통해 최적의 제어 정책을 학습합니다:</p>
+
+        <pre><code>// 이산 제어를 위한 Deep Q-Network (DQN)
+class DQNMotorController {
+private:
+    NeuralController q_network;
+    NeuralController target_network;
+
+    // 재생 버퍼
+    deque<Experience> replay_buffer;
+    int buffer_size;
+    int batch_size;
+
+    // 학습 파라미터
+    float gamma;            // 할인 계수
+    float epsilon;          // 탐색 비율
+    float epsilon_decay;
+    float epsilon_min;
+    int update_target_freq;
+    int step_count;
+
+    int num_actions;
+
+public:
+    struct Experience {
+        vector<float> state;
+        int action;
+        float reward;
+        vector<float> next_state;
+        bool done;
+    };
+
+    DQNMotorController(int state_dim, int n_actions) :
+        q_network(state_dim, 64, n_actions),
+        target_network(state_dim, 64, n_actions)
+    {
+        num_actions = n_actions;
+        buffer_size = 10000;
+        batch_size = 32;
+        gamma = 0.99f;
+        epsilon = 1.0f;
+        epsilon_decay = 0.995f;
+        epsilon_min = 0.01f;
+        update_target_freq = 100;
+        step_count = 0;
+    }
+
+    int select_action(vector<float>& state) {
+        // 엡실론-그리디 탐색
+        if (random_float() < epsilon) {
+            return random_int(0, num_actions);
+        }
+
+        // Q-네트워크에서 탐욕적 행동
+        vector<float> q_values = q_network.forward_all(state);
+        return argmax(q_values);
+    }
+
+    void train() {
+        if (replay_buffer.size() < batch_size) return;
+
+        // 무작위 배치 샘플링
+        vector<Experience> batch = sample_batch(batch_size);
+
+        for (auto& exp : batch) {
+            float target;
+
+            if (exp.done) {
+                target = exp.reward;
+            } else {
+                // Q-학습 타겟: r + gamma * max Q(s', a')
+                vector<float> next_q = target_network.forward_all(exp.next_state);
+                target = exp.reward + gamma * max_element(next_q);
+            }
+
+            // Q-네트워크 업데이트
+            q_network.train_single(exp.state, exp.action, target);
+        }
+
+        // 탐색 감쇠
+        epsilon = max(epsilon * epsilon_decay, epsilon_min);
+
+        // 타겟 네트워크 주기적 업데이트
+        step_count++;
+        if (step_count % update_target_freq == 0) {
+            target_network.copy_weights_from(q_network);
+        }
+    }
+};</code></pre>
+
+        <h2>6.5 모터 제어를 위한 보상 함수 설계</h2>
+        <pre><code>// 모터 제어 보상 함수
+class MotorRewardFunction {
+public:
+    struct State {
+        float position;
+        float velocity;
+        float current;
+        float position_error;
+        float velocity_error;
+    };
+
+    // 위치 추종 보상
+    static float position_tracking(State& s, float action, float prev_action) {
+        // 기본: 위치 오차 최소화
+        float pos_reward = -fabs(s.position_error);
+
+        // 부가: 부드러운 제어 (저크 최소화)
+        float smoothness_reward = -fabs(action - prev_action) * 0.1f;
+
+        // 부가: 에너지 효율
+        float energy_reward = -s.current * s.current * 0.01f;
+
+        // 보너스: 목표 도달
+        float target_bonus = (fabs(s.position_error) < 0.01f) ? 1.0f : 0.0f;
+
+        return pos_reward + smoothness_reward + energy_reward + target_bonus;
+    }
+
+    // 속도 추종 보상
+    static float velocity_tracking(State& s, float action) {
+        float vel_reward = -fabs(s.velocity_error);
+        float current_penalty = -s.current * s.current * 0.01f;
+
+        return vel_reward + current_penalty;
+    }
+
+    // 에너지 최적 궤적 추종
+    static float energy_optimal(State& s, float action, float dt) {
+        float tracking_weight = 10.0f;
+        float energy_weight = 1.0f;
+
+        float tracking_cost = -tracking_weight * s.position_error * s.position_error;
+        float energy_cost = -energy_weight * s.current * s.current * dt;
+
+        return tracking_cost + energy_cost;
+    }
+
+    // 안전한 탐색 보상
+    static float safe_exploration(State& s, float action, SafetyLimits& limits) {
+        float reward = 0;
+
+        // 한계에 접근할 때 페널티
+        float pos_margin = min(limits.max_pos - s.position,
+                               s.position - limits.min_pos);
+        if (pos_margin < limits.safety_margin) {
+            reward -= (limits.safety_margin - pos_margin) * 10.0f;
+        }
+
+        float vel_margin = limits.max_vel - fabs(s.velocity);
+        if (vel_margin < limits.safety_margin) {
+            reward -= (limits.safety_margin - vel_margin) * 10.0f;
+        }
+
+        return reward;
+    }
+};</code></pre>
+
+        <h2>6.6 AI를 이용한 자동 튜닝</h2>
+        <pre><code>// PID 튜닝을 위한 베이지안 최적화
+class BayesianPIDTuner {
+private:
+    GaussianProcess gp;
+
+    // 탐색 공간 범위
+    float kp_min, kp_max;
+    float ki_min, ki_max;
+    float kd_min, kd_max;
+
+    // 이력
+    vector<vector<float>> evaluated_points;
+    vector<float> observed_performances;
+
+    float beta;  // 탐색-활용 균형
+
+public:
+    BayesianPIDTuner(TunerConfig config) {
+        kp_min = config.kp_range[0]; kp_max = config.kp_range[1];
+        ki_min = config.ki_range[0]; ki_max = config.ki_range[1];
+        kd_min = config.kd_range[0]; kd_max = config.kd_range[1];
+
+        beta = 2.0f;  // UCB 탐색 파라미터
+
+        gp = GaussianProcess(SquaredExponentialKernel(1.0f, 0.1f));
+    }
+
+    vector<float> suggest_next() {
+        // 획득 함수 최적화
+        float best_ucb = -INFINITY;
+        vector<float> best_point(3);
+
+        for (float kp = kp_min; kp <= kp_max; kp += (kp_max - kp_min) / 20) {
+            for (float ki = ki_min; ki <= ki_max; ki += (ki_max - ki_min) / 20) {
+                for (float kd = kd_min; kd <= kd_max; kd += (kd_max - kd_min) / 20) {
+                    vector<float> point = {kp, ki, kd};
+
+                    // Upper Confidence Bound (UCB)
+                    float mean, std;
+                    gp.predict(point, mean, std);
+                    float ucb = mean + beta * std;
+
+                    if (ucb > best_ucb) {
+                        best_ucb = ucb;
+                        best_point = point;
+                    }
+                }
+            }
+        }
+
+        return best_point;
+    }
+
+    void update(vector<float>& gains, float performance) {
+        evaluated_points.push_back(gains);
+        observed_performances.push_back(performance);
+        gp.fit(evaluated_points, observed_performances);
+    }
+
+    vector<float> get_best() {
+        int best_idx = 0;
+        float best_perf = observed_performances[0];
+        for (int i = 1; i < observed_performances.size(); i++) {
+            if (observed_performances[i] > best_perf) {
+                best_perf = observed_performances[i];
+                best_idx = i;
+            }
+        }
+        return evaluated_points[best_idx];
+    }
+};</code></pre>
+
+        <h2>6.7 AI를 이용한 예측 유지보수</h2>
+        <pre><code>// 기계 학습을 이용한 모터 상태 모니터링
+class MotorHealthMonitor {
+private:
+    struct Features {
+        float rms_current;
+        float current_thd;      // 전고조파 왜곡
+        float temperature;
+        float vibration_rms;
+        float position_error_std;
+        float torque_ripple;
+    };
+
+    // 이상 감지 모델
+    IsolationForest anomaly_detector;
+
+    // 잔여 수명 예측
+    NeuralController rul_predictor;
+
+    // 이력 데이터
+    deque<Features> feature_history;
+    int history_size;
+
+    float anomaly_threshold;
+    float rul_warning_hours;
+
+public:
+    MotorHealthMonitor(HealthMonitorConfig config) :
+        anomaly_detector(100, 256),
+        rul_predictor(10, 32, 1)
+    {
+        history_size = 1000;
+        anomaly_threshold = config.anomaly_threshold;
+        rul_warning_hours = config.rul_warning;
+
+        anomaly_detector.load(config.anomaly_model_path);
+        rul_predictor.load(config.rul_model_path);
+    }
+
+    Features extract_features(SensorData& data) {
+        Features f;
+
+        // 전류 분석
+        f.rms_current = compute_rms(data.current_samples);
+        f.current_thd = compute_thd(data.current_samples);
+
+        // 열
+        f.temperature = data.winding_temperature;
+
+        // 진동
+        f.vibration_rms = compute_rms(data.vibration_samples);
+
+        // 제어 성능
+        f.position_error_std = compute_std(data.position_errors);
+        f.torque_ripple = compute_ripple(data.torque_estimates);
+
+        return f;
+    }
+
+    struct HealthStatus {
+        bool is_anomaly;
+        float anomaly_score;
+        float remaining_life_hours;
+        bool needs_maintenance;
+        string fault_type;
+    };
+
+    HealthStatus assess(SensorData& data) {
+        Features features = extract_features(data);
+        feature_history.push_back(features);
+        if (feature_history.size() > history_size) {
+            feature_history.pop_front();
+        }
+
+        HealthStatus status;
+
+        // 이상 감지
+        vector<float> feature_vector = features_to_vector(features);
+        float anomaly_score = anomaly_detector.score(feature_vector);
+        status.is_anomaly = (anomaly_score > anomaly_threshold);
+        status.anomaly_score = anomaly_score;
+
+        // 잔여 수명 예측
+        vector<float> trend_features = compute_trend_features();
+        float rul_hours = rul_predictor.forward(trend_features);
+        status.remaining_life_hours = rul_hours;
+        status.needs_maintenance = (rul_hours < rul_warning_hours);
+
+        // 특정 결함 진단
+        status.fault_type = diagnose_fault(features);
+
+        return status;
+    }
+};</code></pre>
+
+        <h2>6.8 마찰 보상을 위한 신경망</h2>
+        <pre><code>// 학습된 마찰 모델
+class NeuralFrictionCompensator {
+private:
+    NeuralController friction_nn;
+
+    // 물리적 모델 기준선 (LuGre 마찰)
+    float sigma0, sigma1, sigma2;
+    float Fc, Fs;
+    float vs;
+
+public:
+    NeuralFrictionCompensator() :
+        friction_nn(3, 16, 1)  // 3 입력, 16 은닉, 1 출력
+    {
+        // 물리적 모델 파라미터 초기화
+        sigma0 = 1e5f;
+        sigma1 = 100.0f;
+        sigma2 = 0.1f;
+        Fc = 0.5f;
+        Fs = 1.0f;
+        vs = 0.01f;
+    }
+
+    // 물리 기반 신경망 출력
+    float predict(float velocity, float position, float temperature) {
+        // 물리적 모델 예측 (LuGre 단순화)
+        float g_v = Fc + (Fs - Fc) * exp(-pow(velocity / vs, 2));
+        float F_physical = g_v * tanh(velocity * 100) + sigma2 * velocity;
+
+        // 신경망 잔차
+        vector<float> inputs = {velocity, position, temperature};
+        float F_nn = friction_nn.forward(inputs);
+
+        // 결합된 예측
+        return F_physical + F_nn;
+    }
+
+    // 운전 중 학습 데이터 수집
+    void collect_data(float velocity, float position, float temperature,
+                      float current, float acceleration, float inertia) {
+        // 동역학으로부터 마찰 추정
+        float motor_torque = current * torque_constant;
+        float inertia_torque = inertia * acceleration;
+        float friction_estimate = motor_torque - inertia_torque;
+
+        // 학습 데이터에 추가
+        // ...
+    }
+
+private:
+    float torque_constant = 0.1f;
+};</code></pre>
+
+        <h2>6.9 안전한 강화학습</h2>
+        <pre><code>// 제약 만족이 있는 안전한 RL
+class SafeRLController {
+private:
+    TD3MotorController policy;
+    NeuralController safety_critic;
+
+    vector<SafetyConstraint> constraints;
+    PIDController safe_pid;
+
+    float safety_threshold;
+    bool use_shield;
+
+public:
+    SafeRLController(int state_dim, int action_dim,
+                     vector<SafetyConstraint>& safety_constraints) :
+        policy(state_dim, action_dim),
+        safety_critic(state_dim + action_dim, 64, safety_constraints.size()),
+        safe_pid(10.0f, 1.0f, 0.5f, 0.001f)
+    {
+        constraints = safety_constraints;
+        safety_threshold = 0.95f;
+        use_shield = true;
+    }
+
+    float select_safe_action(vector<float>& state) {
+        // RL 행동
+        float rl_action = policy.select_action(state);
+
+        if (!use_shield) {
+            return rl_action;
+        }
+
+        // 안전성 검사
+        vector<float> sa = concat(state, {rl_action});
+        vector<float> constraint_values = safety_critic.forward_all(sa);
+
+        bool is_safe = true;
+        for (int i = 0; i < constraints.size(); i++) {
+            if (constraint_values[i] > constraints[i].limit) {
+                is_safe = false;
+                break;
+            }
+        }
+
+        if (is_safe) {
+            return rl_action;
+        }
+
+        // 실드: 안전한 행동으로 투영
+        return find_safe_action(state, rl_action);
+    }
+
+    // RL 제안에 가장 가까운 안전한 행동 찾기
+    float find_safe_action(vector<float>& state, float unsafe_action) {
+        float safe_action = 0;
+        float search_action = unsafe_action;
+        float step = unsafe_action / 2.0f;
+
+        for (int i = 0; i < 10; i++) {
+            vector<float> sa = concat(state, {search_action});
+            vector<float> cv = safety_critic.forward_all(sa);
+
+            bool is_safe = true;
+            for (int j = 0; j < constraints.size(); j++) {
+                if (cv[j] > constraints[j].limit) {
+                    is_safe = false;
+                    break;
+                }
+            }
+
+            if (is_safe) {
+                safe_action = search_action;
+                search_action += step;
+            } else {
+                search_action -= step;
+            }
+            step /= 2.0f;
+        }
+
+        return safe_action;
+    }
+};</code></pre>
+
+        <h2>6.10 임베디드 AI 배포</h2>
+        <pre><code>// 임베디드 배포를 위한 최적화된 신경망
+class EmbeddedNeuralController {
+private:
+    // 양자화된 가중치 (8비트 고정 소수점)
+    int8_t* weights_q8;
+    int8_t* biases_q8;
+
+    // 스케일링 계수
+    float input_scale;
+    float output_scale;
+    float weight_scale;
+
+    // 네트워크 차원 (정적 할당)
+    static const int INPUT_SIZE = 6;
+    static const int HIDDEN_SIZE = 16;
+    static const int OUTPUT_SIZE = 1;
+
+    // 중간 버퍼 (동적 할당 회피)
+    int16_t hidden_buffer[HIDDEN_SIZE];
+
+public:
+    EmbeddedNeuralController() {
+        // SIMD를 위한 정렬된 메모리 할당
+        weights_q8 = (int8_t*)aligned_alloc(16,
+            INPUT_SIZE * HIDDEN_SIZE + HIDDEN_SIZE * OUTPUT_SIZE);
+        biases_q8 = (int8_t*)aligned_alloc(16, HIDDEN_SIZE + OUTPUT_SIZE);
+    }
+
+    // 양자화된 모델 로드
+    void load_quantized_model(const char* model_path) {
+        FILE* f = fopen(model_path, "rb");
+        fread(&input_scale, sizeof(float), 1, f);
+        fread(&weight_scale, sizeof(float), 1, f);
+        fread(&output_scale, sizeof(float), 1, f);
+        fread(weights_q8, 1,
+              INPUT_SIZE * HIDDEN_SIZE + HIDDEN_SIZE * OUTPUT_SIZE, f);
+        fread(biases_q8, 1, HIDDEN_SIZE + OUTPUT_SIZE, f);
+        fclose(f);
+    }
+
+    // 정수 연산을 사용한 빠른 추론
+    float forward(float* inputs) {
+        // 입력 양자화
+        int8_t inputs_q8[INPUT_SIZE];
+        for (int i = 0; i < INPUT_SIZE; i++) {
+            int32_t q = (int32_t)(inputs[i] * input_scale);
+            inputs_q8[i] = (int8_t)clamp(q, -127, 127);
+        }
+
+        // 은닉층
+        int8_t* w1 = weights_q8;
+        int8_t* b1 = biases_q8;
+
+        for (int h = 0; h < HIDDEN_SIZE; h++) {
+            int32_t acc = b1[h] << 8;
+
+            for (int i = 0; i < INPUT_SIZE; i++) {
+                acc += (int32_t)inputs_q8[i] * (int32_t)w1[h * INPUT_SIZE + i];
+            }
+
+            // ReLU 및 재양자화
+            hidden_buffer[h] = (acc > 0) ? (int16_t)(acc >> 8) : 0;
+        }
+
+        // 출력층
+        int8_t* w2 = weights_q8 + INPUT_SIZE * HIDDEN_SIZE;
+        int8_t* b2 = biases_q8 + HIDDEN_SIZE;
+
+        int32_t output_acc = b2[0] << 8;
+        for (int h = 0; h < HIDDEN_SIZE; h++) {
+            output_acc += (int32_t)hidden_buffer[h] * (int32_t)w2[h];
+        }
+
+        // 출력 역양자화
+        return (float)output_acc * output_scale / (input_scale * weight_scale * 256.0f);
+    }
+
+private:
+    int32_t clamp(int32_t x, int32_t min_val, int32_t max_val);
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>AI는 학습, 적응, 예측, 최적화를 통해 모터 제어를 향상시킵니다</li>
+                <li>신경망은 복잡한 비선형 제어 매핑을 학습하고 모델 오차를 보상합니다</li>
+                <li>강화학습은 시행착오를 통해 최적의 제어 정책을 발견합니다</li>
+                <li>보상 함수 설계는 모터 RL 성공에 매우 중요합니다</li>
+                <li>베이지안 최적화는 PID 및 기타 제어기 파라미터를 효율적으로 튜닝합니다</li>
+                <li>ML을 이용한 예측 유지보수는 이상을 감지하고 잔여 수명을 추정합니다</li>
+                <li>물리 기반 신경망은 도메인 지식과 학습을 결합합니다</li>
+                <li>안전한 RL 기법은 학습과 운전 중 제약을 만족시킵니다</li>
+                <li>양자화와 최적화는 임베디드 시스템에서 AI 배포를 가능하게 합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>모터 제어에서 AI가 고전적 제어 방법에 비해 어떤 장점을 제공합니까?</li>
+                <li>신경망을 사용하여 모터 비선형성을 보상하는 방법을 설명하시오.</li>
+                <li>모터 제어 강화학습에서 탐색-활용 균형을 설명하시오.</li>
+                <li>모터 RL을 위한 보상 함수 설계 시 고려사항은 무엇입니까?</li>
+                <li>베이지안 최적화가 PID 튜닝에서 그리드 탐색보다 개선되는 점을 설명하시오.</li>
+                <li>모터 상태 모니터링과 예측 유지보수에 유용한 특성은 무엇입니까?</li>
+                <li>모터 제어 응용에서 안전한 강화학습이 중요한 이유는 무엇입니까?</li>
+                <li>임베디드 모터 제어기에서 신경망 배포를 가능하게 하는 기술은 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:16px;margin-top:10px;">널리 인간을 이롭게 하라</p>
+        </div>
+
+        </div>
+</body>
+</html>

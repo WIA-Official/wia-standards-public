@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Hardware Safety Design | WIA-AI-SAFETY-PHYSICAL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .warning{background:#7f1d1d;border-left:4px solid #dc2626;padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+        .info{background:#1e3a5f;border-left:4px solid var(--ai-color);padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Hardware Safety Design</h1>
+
+        <h2>6.1 Inherent Safety Through Hardware</h2>
+        <p>Hardware safety design aims to eliminate or reduce hazards through the physical design of robot systems. Unlike software-based safety measures that can fail due to bugs or malfunctions, hardware safety features provide intrinsic protection that cannot be bypassed by software failures. The WIA-AI-SAFETY-PHYSICAL standard emphasizes hardware safety as the foundation of the defense-in-depth strategy.</p>
+
+        <div class="info">
+            <strong>Design Philosophy:</strong> The safest robot is one that physically cannot cause harm, regardless of what its software commands. Hardware safety measures should make dangerous operation mechanically impossible.
+        </div>
+
+        <h2>6.2 Power and Force Limiting</h2>
+        <p>Limiting the maximum power and force that a robot can exert is the most fundamental hardware safety measure:</p>
+
+        <h3>Power Density Limits</h3>
+        <table>
+            <tr>
+                <th>Application</th>
+                <th>Max Power Density</th>
+                <th>Typical Total Power</th>
+                <th>Rationale</th>
+            </tr>
+            <tr>
+                <td><strong>Collaborative Robot</strong></td>
+                <td>80 W/kg payload</td>
+                <td>80-150W total</td>
+                <td>Human contact expected</td>
+            </tr>
+            <tr>
+                <td><strong>Service Robot</strong></td>
+                <td>150 W/kg payload</td>
+                <td>200-500W total</td>
+                <td>Public environment</td>
+            </tr>
+            <tr>
+                <td><strong>Industrial Robot</strong></td>
+                <td>No intrinsic limit</td>
+                <td>1-10kW</td>
+                <td>Guarded workspace</td>
+            </tr>
+            <tr>
+                <td><strong>Mobile Platform</strong></td>
+                <td>50 W/kg</td>
+                <td>100-500W</td>
+                <td>Pedestrian environment</td>
+            </tr>
+        </table>
+
+        <pre><code>// Power Limiting Hardware Configuration
+interface PowerLimitingConfig {
+    // Motor-level limits
+    motors: {
+        maxContinuousPower: number;  // Watts per motor
+        maxPeakPower: number;        // Watts (short duration)
+        peakDuration: number;        // Milliseconds
+        thermalLimit: number;        // Celsius
+    };
+
+    // System-level limits
+    system: {
+        maxTotalPower: number;       // Watts total
+        powerBudgetAllocation: PowerBudget;
+    };
+
+    // Hardware enforcement
+    enforcement: {
+        currentLimitCircuit: boolean;    // Hardware current limiting
+        temperatureCutoff: boolean;      // Thermal protection
+        mechanicalCurrentBreaker: boolean;
+    };
+}
+
+// Example: Collaborative Robot Power Configuration
+const cobotPowerConfig: PowerLimitingConfig = {
+    motors: {
+        maxContinuousPower: 20,    // 20W per joint
+        maxPeakPower: 40,           // 40W peak
+        peakDuration: 500,          // 500ms max
+        thermalLimit: 80            // 80C cutoff
+    },
+    system: {
+        maxTotalPower: 80,          // 80W total (ISO/TS 15066)
+        powerBudgetAllocation: {
+            joints: 60,             // 60W for joints
+            endEffector: 10,        // 10W for gripper
+            electronics: 10         // 10W for control
+        }
+    },
+    enforcement: {
+        currentLimitCircuit: true,
+        temperatureCutoff: true,
+        mechanicalCurrentBreaker: true
+    }
+};</code></pre>
+
+        <h2>6.3 Mechanical Stops and Limits</h2>
+        <p>Mechanical stops provide hardware-enforced motion limits that cannot be exceeded regardless of software commands:</p>
+
+        <table>
+            <tr>
+                <th>Stop Type</th>
+                <th>Purpose</th>
+                <th>Implementation</th>
+                <th>Override</th>
+            </tr>
+            <tr>
+                <td><strong>Hard Stops</strong></td>
+                <td>Absolute motion limit</td>
+                <td>Physical blocks on joints</td>
+                <td>Not possible</td>
+            </tr>
+            <tr>
+                <td><strong>Soft Stops</strong></td>
+                <td>Normal operating range</td>
+                <td>Software + sensor limits</td>
+                <td>Special mode</td>
+            </tr>
+            <tr>
+                <td><strong>Adjustable Stops</strong></td>
+                <td>Application-specific limits</td>
+                <td>Mechanical adjusters + sensors</td>
+                <td>Tool required</td>
+            </tr>
+            <tr>
+                <td><strong>Virtual Walls</strong></td>
+                <td>Dynamic workspace limits</td>
+                <td>Safety controller + sensing</td>
+                <td>Authorization</td>
+            </tr>
+        </table>
+
+        <pre><code>// Mechanical Limit Enforcement
+class MechanicalLimits {
+    // Joint angle limits with hardware enforcement
+    jointLimits = {
+        joint1: { softMin: -170, softMax: 170, hardMin: -175, hardMax: 175 },
+        joint2: { softMin: -120, softMax: 120, hardMin: -125, hardMax: 125 },
+        joint3: { softMin: -170, softMax: 170, hardMin: -175, hardMax: 175 },
+        joint4: { softMin: -120, softMax: 120, hardMin: -125, hardMax: 125 },
+        joint5: { softMin: -170, softMax: 170, hardMin: -175, hardMax: 175 },
+        joint6: { softMin: -360, softMax: 360, hardMin: -365, hardMax: 365 }
+    };
+
+    // Velocity limits per joint
+    velocityLimits = {
+        joint1: { soft: 180, hard: 200 },  // deg/s
+        joint2: { soft: 180, hard: 200 },
+        joint3: { soft: 225, hard: 250 },
+        joint4: { soft: 225, hard: 250 },
+        joint5: { soft: 225, hard: 250 },
+        joint6: { soft: 360, hard: 400 }
+    };
+
+    // Hardware limit switches
+    limitSwitches = {
+        type: 'INDUCTIVE_PROXIMITY',
+        arrangement: 'DUAL_REDUNDANT',
+        failureMode: 'NORMALLY_CLOSED',
+        responseTime: 1  // ms
+    };
+
+    checkPosition(jointId: string, position: number): LimitStatus {
+        const limits = this.jointLimits[jointId];
+
+        if (position <= limits.hardMin || position >= limits.hardMax) {
+            return {
+                status: 'HARD_LIMIT',
+                action: 'EMERGENCY_STOP',
+                detail: `Joint ${jointId} at hard limit: ${position}`
+            };
+        }
+
+        if (position <= limits.softMin || position >= limits.softMax) {
+            return {
+                status: 'SOFT_LIMIT',
+                action: 'CONTROLLED_STOP',
+                detail: `Joint ${jointId} at soft limit: ${position}`
+            };
+        }
+
+        return { status: 'OK', action: 'CONTINUE' };
+    }
+}</code></pre>
+
+        <h2>6.4 Compliant and Backdrivable Actuators</h2>
+        <p>Compliant actuators reduce impact forces by allowing controlled deflection:</p>
+
+        <h3>Actuator Types for Safety</h3>
+        <table>
+            <tr>
+                <th>Type</th>
+                <th>Compliance</th>
+                <th>Backdrivability</th>
+                <th>Best For</th>
+            </tr>
+            <tr>
+                <td><strong>Series Elastic (SEA)</strong></td>
+                <td>High (spring element)</td>
+                <td>High</td>
+                <td>Cobots, impact absorption</td>
+            </tr>
+            <tr>
+                <td><strong>Variable Stiffness (VSA)</strong></td>
+                <td>Adjustable</td>
+                <td>Medium-High</td>
+                <td>Adaptive tasks</td>
+            </tr>
+            <tr>
+                <td><strong>Direct Drive</strong></td>
+                <td>Low</td>
+                <td>High</td>
+                <td>Fast, precise motion</td>
+            </tr>
+            <tr>
+                <td><strong>Geared Motor</strong></td>
+                <td>Very Low</td>
+                <td>Low</td>
+                <td>High torque (requires guarding)</td>
+            </tr>
+            <tr>
+                <td><strong>Cable/Tendon</strong></td>
+                <td>Medium</td>
+                <td>Medium</td>
+                <td>Remote actuation</td>
+            </tr>
+        </table>
+
+        <pre><code>// Series Elastic Actuator Modeling
+class SeriesElasticActuator {
+    private springStiffness: number;  // N*m/rad
+    private motorInertia: number;     // kg*m^2
+    private linkInertia: number;      // kg*m^2
+
+    constructor(config: SEAConfig) {
+        this.springStiffness = config.springStiffness;
+        this.motorInertia = config.motorInertia;
+        this.linkInertia = config.linkInertia;
+    }
+
+    // Calculate impact force with human
+    calculateImpactForce(
+        approachVelocity: number,  // m/s
+        humanStiffness: number,    // N/m (body region dependent)
+        effectiveMass: number      // kg
+    ): ImpactForce {
+        // Combined stiffness (springs in series)
+        const combinedStiffness = 1 / (
+            1 / this.springStiffness +
+            1 / humanStiffness
+        );
+
+        // Impact force using energy conservation
+        // F_max = v * sqrt(k * m)
+        const peakForce = approachVelocity * Math.sqrt(
+            combinedStiffness * effectiveMass
+        );
+
+        // Duration of impact
+        const impactDuration = Math.PI * Math.sqrt(
+            effectiveMass / combinedStiffness
+        );
+
+        return {
+            peakForce,
+            impactDuration,
+            impulse: peakForce * impactDuration / 2
+        };
+    }
+
+    // Torque sensing through spring deflection
+    measureJointTorque(): number {
+        const motorPosition = this.motorEncoder.getPosition();
+        const linkPosition = this.linkEncoder.getPosition();
+        const springDeflection = motorPosition - linkPosition;
+
+        return springDeflection * this.springStiffness;
+    }
+
+    // Backdrivability check
+    isBackdrivable(externalTorque: number): boolean {
+        const frictionTorque = this.staticFriction;
+        return Math.abs(externalTorque) > frictionTorque;
+    }
+}</code></pre>
+
+        <h2>6.5 Protective Enclosures and Covers</h2>
+        <p>Physical enclosures protect humans from hazards and protect the robot from environmental factors:</p>
+
+        <table>
+            <tr>
+                <th>Protection Type</th>
+                <th>Purpose</th>
+                <th>Requirements</th>
+            </tr>
+            <tr>
+                <td><strong>Pinch Point Guards</strong></td>
+                <td>Prevent finger entrapment</td>
+                <td>&lt;4mm gaps or &gt;25mm clearance</td>
+            </tr>
+            <tr>
+                <td><strong>Motor Covers</strong></td>
+                <td>Prevent burns, entanglement</td>
+                <td>Surface temp &lt;60C, smooth surface</td>
+            </tr>
+            <tr>
+                <td><strong>Cable Management</strong></td>
+                <td>Prevent entanglement</td>
+                <td>Internal routing, conduits</td>
+            </tr>
+            <tr>
+                <td><strong>Soft Padding</strong></td>
+                <td>Reduce impact severity</td>
+                <td>Energy-absorbing foam, 10-50mm</td>
+            </tr>
+            <tr>
+                <td><strong>Impact Shells</strong></td>
+                <td>Distribute contact forces</td>
+                <td>Large radius, smooth surfaces</td>
+            </tr>
+        </table>
+
+        <pre><code>// Enclosure Design Specifications
+interface EnclosureDesign {
+    geometry: {
+        minRadius: 10,         // mm - minimum edge radius
+        maxSurfaceTemp: 60,    // Celsius
+        maxGap: 4,             // mm - gap preventing finger insertion
+        minGap: 25,            // mm - gap allowing finger withdrawal
+    };
+
+    materials: {
+        outer: {
+            type: 'ABS_PLASTIC',
+            thickness: 2,      // mm
+            impactRating: 'IK08'
+        };
+        padding: {
+            type: 'CLOSED_CELL_FOAM',
+            thickness: 15,     // mm
+            density: 50,       // kg/m^3
+            energyAbsorption: 0.5  // J/cm^3
+        };
+    };
+
+    openings: {
+        ventilation: {
+            required: true,
+            maxHoleSize: 4,    // mm
+            pattern: 'HONEYCOMB'
+        };
+        access: {
+            type: 'HINGED_PANEL',
+            interlock: 'SAFETY_SWITCH',
+            tool: 'NONE'       // No tool required for maintenance
+        };
+    };
+}
+
+// Calculate padding requirements for impact protection
+function calculatePaddingRequirement(
+    maxVelocity: number,      // m/s
+    effectiveMass: number,    // kg
+    maxAllowedForce: number   // N
+): number {
+    // Kinetic energy to absorb
+    const energy = 0.5 * effectiveMass * maxVelocity * maxVelocity;
+
+    // Work done by padding: W = F * d
+    // Solve for d (padding compression distance)
+    const compressionDistance = energy / maxAllowedForce;
+
+    // Padding thickness = 2x compression distance (50% compression max)
+    return compressionDistance * 2 * 1000; // Convert to mm
+}</code></pre>
+
+        <h2>6.6 Brake Systems</h2>
+        <p>Reliable braking is essential for stopping and holding position during emergencies:</p>
+
+        <h3>Brake Types and Characteristics</h3>
+        <table>
+            <tr>
+                <th>Brake Type</th>
+                <th>Engagement</th>
+                <th>Response Time</th>
+                <th>Fail-Safe</th>
+            </tr>
+            <tr>
+                <td><strong>Spring-Applied Electric-Release</strong></td>
+                <td>Power off = braked</td>
+                <td>10-50ms</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td><strong>Electric-Applied</strong></td>
+                <td>Power on = braked</td>
+                <td>20-100ms</td>
+                <td>No</td>
+            </tr>
+            <tr>
+                <td><strong>Hydraulic</strong></td>
+                <td>Pressure applied</td>
+                <td>50-200ms</td>
+                <td>Configurable</td>
+            </tr>
+            <tr>
+                <td><strong>Dynamic Braking</strong></td>
+                <td>Motor shorting</td>
+                <td>&lt;10ms</td>
+                <td>Partial</td>
+            </tr>
+        </table>
+
+        <pre><code>// Brake System Design
+class BrakeSystem {
+    private brakes: JointBrake[];
+
+    // Brake sizing calculation
+    calculateBrakeRequirements(
+        joint: JointConfig,
+        maxLoadTorque: number,
+        safetyFactor: number = 2.0
+    ): BrakeRequirements {
+        // Static holding torque
+        const staticTorque = maxLoadTorque * safetyFactor;
+
+        // Dynamic braking torque (for stopping)
+        const angularMomentum = joint.inertia * joint.maxVelocity;
+        const stoppingTime = 0.5; // Target 500ms stop
+        const dynamicTorque = angularMomentum / stoppingTime;
+
+        return {
+            staticHoldingTorque: staticTorque,
+            dynamicBrakingTorque: dynamicTorque,
+            minTorque: Math.max(staticTorque, dynamicTorque),
+            engagementTime: 50,  // ms max
+            releaseTime: 100,    // ms max
+            wearIndicator: true,
+            temperatureRating: 120  // Celsius
+        };
+    }
+
+    // Emergency brake sequence
+    async engageEmergencyBrakes(): Promise&lt;BrakeResult&gt; {
+        const startTime = Date.now();
+
+        // Engage all brakes simultaneously
+        await Promise.all(
+            this.brakes.map(brake => brake.engage())
+        );
+
+        // Verify engagement
+        const engagementTime = Date.now() - startTime;
+
+        for (const brake of this.brakes) {
+            if (!brake.isEngaged()) {
+                return {
+                    success: false,
+                    error: `Brake ${brake.id} failed to engage`,
+                    engagementTime
+                };
+            }
+        }
+
+        return { success: true, engagementTime };
+    }
+
+    // Brake wear monitoring
+    monitorBrakeHealth(): BrakeHealthReport {
+        const reports: JointBrakeHealth[] = [];
+
+        for (const brake of this.brakes) {
+            const health = {
+                jointId: brake.jointId,
+                wearPercentage: brake.getWearLevel(),
+                engagementCycles: brake.getCycleCount(),
+                lastTestResult: brake.getLastTestResult(),
+                estimatedLifeRemaining: brake.estimateRemainingLife()
+            };
+
+            reports.push(health);
+
+            // Alert if wear exceeds threshold
+            if (health.wearPercentage > 80) {
+                this.alertMaintenanceRequired(brake.jointId, 'Brake wear >80%');
+            }
+        }
+
+        return { joints: reports, timestamp: Date.now() };
+    }
+}</code></pre>
+
+        <h2>6.7 Electrical Safety</h2>
+        <p>Electrical safety protects against shock, fire, and interference hazards:</p>
+
+        <table>
+            <tr>
+                <th>Hazard</th>
+                <th>Protection</th>
+                <th>Standard</th>
+            </tr>
+            <tr>
+                <td><strong>Electric Shock</strong></td>
+                <td>Class I grounding, double insulation</td>
+                <td>IEC 60204-1</td>
+            </tr>
+            <tr>
+                <td><strong>Overcurrent</strong></td>
+                <td>Fuses, circuit breakers</td>
+                <td>IEC 60204-1</td>
+            </tr>
+            <tr>
+                <td><strong>Earth Fault</strong></td>
+                <td>RCD/GFCI, insulation monitoring</td>
+                <td>IEC 60204-1</td>
+            </tr>
+            <tr>
+                <td><strong>EMC Interference</strong></td>
+                <td>Shielding, filtering</td>
+                <td>IEC 61000-6</td>
+            </tr>
+            <tr>
+                <td><strong>Static Discharge</strong></td>
+                <td>Grounding, ESD protection</td>
+                <td>IEC 61000-4-2</td>
+            </tr>
+            <tr>
+                <td><strong>Battery Hazards</strong></td>
+                <td>BMS, thermal management</td>
+                <td>IEC 62133</td>
+            </tr>
+        </table>
+
+        <pre><code>// Electrical Safety System
+class ElectricalSafety {
+    // Ground fault detection
+    monitorGroundFault(): GroundFaultStatus {
+        const leakageCurrent = this.measureLeakageCurrent();
+        const threshold = 30; // mA (personnel protection)
+
+        if (leakageCurrent > threshold) {
+            this.tripGroundFaultProtection();
+            return {
+                fault: true,
+                current: leakageCurrent,
+                action: 'CIRCUIT_TRIPPED'
+            };
+        }
+
+        return { fault: false, current: leakageCurrent };
+    }
+
+    // Battery management safety
+    batteryManagement: BatteryManagementSystem = {
+        monitoring: {
+            cellVoltageMin: 2.5,    // V
+            cellVoltageMax: 4.2,    // V
+            temperatureMin: 0,       // C
+            temperatureMax: 45,      // C
+            maxChargeCurrent: 1.0,   // C-rate
+            maxDischargeCurrent: 2.0 // C-rate
+        },
+
+        protection: {
+            overVoltageProtection: true,
+            underVoltageProtection: true,
+            overCurrentProtection: true,
+            overTemperatureProtection: true,
+            shortCircuitProtection: true,
+            cellBalancing: true
+        },
+
+        thermal: {
+            coolingMethod: 'ACTIVE_AIR',
+            fanTriggerTemp: 35,      // C
+            shutdownTemp: 50         // C
+        }
+    };
+
+    // Isolation testing
+    performIsolationTest(): IsolationTestResult {
+        // Test insulation resistance
+        const testVoltage = 500; // V DC
+        const minResistance = 1; // MOhm
+
+        const measuredResistance = this.measureInsulation(testVoltage);
+
+        return {
+            passed: measuredResistance >= minResistance,
+            testVoltage,
+            measuredResistance,
+            minRequired: minResistance
+        };
+    }
+}</code></pre>
+
+        <h2>6.8 Sensor Hardware Design</h2>
+        <p>Safety sensors require careful hardware design to ensure reliability:</p>
+
+        <pre><code>// Safety Sensor Hardware Requirements
+interface SafetySensorHardware {
+    // Redundancy requirements
+    redundancy: {
+        type: 'DUAL_CHANNEL' | 'TRIPLE_MODULAR',
+        diversity: boolean,  // Different sensor types
+        crossMonitoring: boolean
+    };
+
+    // Response time
+    timing: {
+        sampleRate: number,      // Hz
+        processingTime: number,  // ms
+        outputDelay: number,     // ms
+        totalResponseTime: number // ms max
+    };
+
+    // Environmental ratings
+    environment: {
+        ipRating: string,        // e.g., 'IP65'
+        temperatureRange: [number, number],  // Celsius
+        vibrationRating: string, // e.g., 'IEC 60068-2-6'
+        emcImmunity: string     // e.g., 'IEC 61000-6-2'
+    };
+
+    // Diagnostic capabilities
+    diagnostics: {
+        selfTest: boolean,
+        crossCheck: boolean,
+        degradationDetection: boolean,
+        communicationMonitoring: boolean
+    };
+}
+
+// Example: Safety-Rated Proximity Sensor
+const safetyProximitySensor: SafetySensorHardware = {
+    redundancy: {
+        type: 'DUAL_CHANNEL',
+        diversity: true,  // LiDAR + ToF
+        crossMonitoring: true
+    },
+    timing: {
+        sampleRate: 100,        // 100 Hz
+        processingTime: 5,       // 5ms
+        outputDelay: 2,          // 2ms
+        totalResponseTime: 12    // 12ms total
+    },
+    environment: {
+        ipRating: 'IP65',
+        temperatureRange: [-10, 50],
+        vibrationRating: '2G 10-500Hz',
+        emcImmunity: 'IEC 61000-6-2'
+    },
+    diagnostics: {
+        selfTest: true,
+        crossCheck: true,
+        degradationDetection: true,
+        communicationMonitoring: true
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Hardware safety provides intrinsic protection that cannot be bypassed by software</li>
+                <li>Power and force limiting through hardware constraints are fundamental safety measures</li>
+                <li>Mechanical stops provide absolute motion limits regardless of software commands</li>
+                <li>Compliant actuators (SEA, VSA) reduce impact forces through controlled deflection</li>
+                <li>Protective enclosures must prevent pinch points, burns, and entanglement</li>
+                <li>Spring-applied brakes provide fail-safe stopping on power loss</li>
+                <li>Electrical safety requires proper grounding, isolation, and protection circuits</li>
+                <li>Safety sensors need redundancy, fast response, and self-diagnostics</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Why is hardware safety preferred over software safety measures?</li>
+                <li>What power limits are typical for collaborative robots and why?</li>
+                <li>Explain the difference between hard stops and soft stops.</li>
+                <li>How do Series Elastic Actuators improve safety compared to geared motors?</li>
+                <li>What are the requirements for protective enclosure gap sizes?</li>
+                <li>Why are spring-applied brakes preferred for safety applications?</li>
+                <li>What electrical safety protections are required by IEC 60204-1?</li>
+                <li>What redundancy and diagnostic requirements apply to safety sensors?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+            <p style="font-size:14px;margin-top:10px;color:#94a3b8">"Build safety into the machine, not just the software"</p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 궤적 계획 및 모션 프로파일 | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>3장: 궤적 계획 및 모션 프로파일</h1>
+
+        <h2>3.1 궤적 계획 소개</h2>
+        <p>궤적 계획은 모터가 시작점에서 목표점까지 어떻게 이동할지를 결정하는 과정입니다. 단순히 목표 위치만 지정하는 것이 아니라, 위치, 속도, 가속도의 시간에 따른 변화를 정의합니다. 좋은 궤적 계획은 부드러운 동작, 기계적 스트레스 감소, 정밀한 위치 결정을 보장합니다.</p>
+
+        <p>궤적 계획의 주요 목표:</p>
+        <ul>
+            <li><strong>부드러운 운동:</strong> 급격한 가속도 변화(저크) 최소화</li>
+            <li><strong>제약 조건 준수:</strong> 속도, 가속도, 저크 제한 내에서 동작</li>
+            <li><strong>시간 최적화:</strong> 제약 조건 내에서 최단 시간에 목표 도달</li>
+            <li><strong>에너지 효율:</strong> 불필요한 에너지 소비 최소화</li>
+        </ul>
+
+        <h2>3.2 모션 프로파일 종류</h2>
+        <table>
+            <tr>
+                <th>프로파일 유형</th>
+                <th>특징</th>
+                <th>장점</th>
+                <th>단점</th>
+            </tr>
+            <tr>
+                <td><strong>사다리꼴 (Trapezoidal)</strong></td>
+                <td>일정 가속-정속-일정 감속</td>
+                <td>단순, 계산 쉬움</td>
+                <td>가속도 불연속, 진동 유발</td>
+            </tr>
+            <tr>
+                <td><strong>S-커브</strong></td>
+                <td>저크 제한 포함</td>
+                <td>부드러운 동작, 진동 감소</td>
+                <td>계산 복잡, 시간 증가</td>
+            </tr>
+            <tr>
+                <td><strong>다항식</strong></td>
+                <td>3차, 5차, 7차 다항식</td>
+                <td>경계 조건 유연, 연속성</td>
+                <td>계산량, 최적성 보장 안됨</td>
+            </tr>
+            <tr>
+                <td><strong>스플라인</strong></td>
+                <td>구간별 다항식 연결</td>
+                <td>여러 경유점 처리</td>
+                <td>복잡한 구현</td>
+            </tr>
+        </table>
+
+        <h2>3.3 사다리꼴 속도 프로파일</h2>
+        <p>가장 기본적인 모션 프로파일로, 일정한 가속도로 가속, 정속 운동, 일정한 감속도로 감속하는 세 구간으로 구성됩니다:</p>
+
+        <pre><code>// 사다리꼴 속도 프로파일 생성기
+class TrapezoidalProfile {
+private:
+    float max_velocity;
+    float max_acceleration;
+
+    // 프로파일 파라미터
+    float t_accel;      // 가속 시간
+    float t_cruise;     // 정속 시간
+    float t_decel;      // 감속 시간
+    float t_total;      // 전체 시간
+
+    float start_pos;
+    float end_pos;
+    float direction;
+
+    bool is_triangular;  // 삼각 프로파일 (정속 구간 없음)
+
+public:
+    TrapezoidalProfile(float v_max, float a_max) {
+        max_velocity = v_max;
+        max_acceleration = a_max;
+    }
+
+    void plan(float p_start, float p_end) {
+        start_pos = p_start;
+        end_pos = p_end;
+
+        float distance = fabs(p_end - p_start);
+        direction = (p_end >= p_start) ? 1.0f : -1.0f;
+
+        // 최대 속도에 도달하는데 필요한 거리
+        float dist_to_max_vel = max_velocity * max_velocity / max_acceleration;
+
+        if (distance >= dist_to_max_vel) {
+            // 사다리꼴 프로파일 (정속 구간 있음)
+            is_triangular = false;
+            t_accel = max_velocity / max_acceleration;
+            t_decel = t_accel;
+            float dist_accel = 0.5f * max_acceleration * t_accel * t_accel;
+            float dist_cruise = distance - 2 * dist_accel;
+            t_cruise = dist_cruise / max_velocity;
+            t_total = t_accel + t_cruise + t_decel;
+        } else {
+            // 삼각 프로파일 (정속 구간 없음)
+            is_triangular = true;
+            t_accel = sqrt(distance / max_acceleration);
+            t_decel = t_accel;
+            t_cruise = 0;
+            t_total = t_accel + t_decel;
+        }
+    }
+
+    struct ProfilePoint {
+        float position;
+        float velocity;
+        float acceleration;
+    };
+
+    ProfilePoint evaluate(float t) {
+        ProfilePoint p;
+
+        if (t < 0) {
+            p.position = start_pos;
+            p.velocity = 0;
+            p.acceleration = 0;
+        }
+        else if (t < t_accel) {
+            // 가속 구간
+            p.acceleration = direction * max_acceleration;
+            p.velocity = p.acceleration * t;
+            p.position = start_pos + 0.5f * p.acceleration * t * t;
+        }
+        else if (t < t_accel + t_cruise) {
+            // 정속 구간
+            float t_in_cruise = t - t_accel;
+            float v_cruise = direction * (is_triangular ?
+                sqrt(fabs(end_pos - start_pos) * max_acceleration) : max_velocity);
+
+            p.acceleration = 0;
+            p.velocity = v_cruise;
+            float pos_after_accel = start_pos + 0.5f * direction * max_acceleration * t_accel * t_accel;
+            p.position = pos_after_accel + v_cruise * t_in_cruise;
+        }
+        else if (t < t_total) {
+            // 감속 구간
+            float t_in_decel = t - t_accel - t_cruise;
+            float v_at_decel_start = direction * (is_triangular ?
+                sqrt(fabs(end_pos - start_pos) * max_acceleration) : max_velocity);
+
+            p.acceleration = -direction * max_acceleration;
+            p.velocity = v_at_decel_start + p.acceleration * t_in_decel;
+
+            float pos_at_decel_start = end_pos - 0.5f * fabs(v_at_decel_start * v_at_decel_start / max_acceleration) * direction;
+            p.position = pos_at_decel_start + v_at_decel_start * t_in_decel +
+                        0.5f * p.acceleration * t_in_decel * t_in_decel;
+        }
+        else {
+            // 완료
+            p.position = end_pos;
+            p.velocity = 0;
+            p.acceleration = 0;
+        }
+
+        return p;
+    }
+
+    float get_duration() { return t_total; }
+};</code></pre>
+
+        <h2>3.4 S-커브 프로파일</h2>
+        <p>S-커브 프로파일은 저크(가속도의 변화율)를 제한하여 더 부드러운 운동을 제공합니다. 7구간 S-커브가 가장 일반적입니다:</p>
+
+        <pre><code>// 7구간 S-커브 프로파일
+class SCurveProfile {
+private:
+    float max_velocity;
+    float max_acceleration;
+    float max_jerk;
+
+    // 7구간 시간
+    float t[7];  // 각 구간의 지속 시간
+    float T[8];  // 각 구간의 시작 시간 (T[0] = 0)
+
+    float start_pos, end_pos;
+    float direction;
+
+public:
+    SCurveProfile(float v_max, float a_max, float j_max) {
+        max_velocity = v_max;
+        max_acceleration = a_max;
+        max_jerk = j_max;
+    }
+
+    void plan(float p_start, float p_end) {
+        start_pos = p_start;
+        end_pos = p_end;
+
+        float distance = fabs(p_end - p_start);
+        direction = (p_end >= p_start) ? 1.0f : -1.0f;
+
+        // 저크 제한 시간 (가속도가 0에서 max까지 도달하는 시간)
+        float Tj = max_acceleration / max_jerk;
+
+        // 최대 속도 도달에 필요한 가속 시간
+        float Ta = max_velocity / max_acceleration + Tj;
+
+        // 최소 거리 계산 (전체 가속-감속 수행 시)
+        float dist_min = 2 * (max_velocity * Ta - 0.5f * max_acceleration * Tj * Tj);
+
+        if (distance >= dist_min) {
+            // 전체 S-커브 (정속 구간 있음)
+            t[0] = Tj;                          // 저크 증가
+            t[1] = Ta - 2 * Tj;                 // 일정 가속도
+            t[2] = Tj;                          // 저크 감소
+            float dist_accel = max_velocity * Ta - 0.5f * max_acceleration * Tj * Tj;
+            t[3] = (distance - 2 * dist_accel) / max_velocity;  // 정속
+            t[4] = Tj;                          // 저크 감소 (감속 시작)
+            t[5] = Ta - 2 * Tj;                 // 일정 감속도
+            t[6] = Tj;                          // 저크 증가 (감속 완료)
+        } else {
+            // 축소된 S-커브 (정속 구간 없음)
+            // 더 복잡한 계산 필요 - 단순화된 버전
+            float scale = sqrt(distance / dist_min);
+            t[0] = Tj * scale;
+            t[1] = (Ta - 2 * Tj) * scale;
+            t[2] = Tj * scale;
+            t[3] = 0;
+            t[4] = Tj * scale;
+            t[5] = (Ta - 2 * Tj) * scale;
+            t[6] = Tj * scale;
+        }
+
+        // 누적 시간 계산
+        T[0] = 0;
+        for (int i = 0; i < 7; i++) {
+            T[i + 1] = T[i] + t[i];
+        }
+    }
+
+    struct ProfilePoint {
+        float position;
+        float velocity;
+        float acceleration;
+        float jerk;
+    };
+
+    ProfilePoint evaluate(float time) {
+        ProfilePoint p = {start_pos, 0, 0, 0};
+
+        if (time <= 0) return p;
+        if (time >= T[7]) {
+            p.position = end_pos;
+            return p;
+        }
+
+        // 현재 구간 찾기
+        int segment = 0;
+        for (int i = 0; i < 7; i++) {
+            if (time >= T[i] && time < T[i + 1]) {
+                segment = i;
+                break;
+            }
+        }
+
+        float tau = time - T[segment];
+
+        // 구간별 저크 값
+        float jerks[7] = {
+            max_jerk,    // 구간 0: 저크 +
+            0,           // 구간 1: 일정 가속도
+            -max_jerk,   // 구간 2: 저크 -
+            0,           // 구간 3: 정속
+            -max_jerk,   // 구간 4: 저크 - (감속 시작)
+            0,           // 구간 5: 일정 감속도
+            max_jerk     // 구간 6: 저크 + (감속 완료)
+        };
+
+        p.jerk = direction * jerks[segment];
+
+        // 적분하여 가속도, 속도, 위치 계산
+        // (실제 구현에서는 각 구간 시작점의 값을 저장하여 사용)
+        // 여기서는 개념적 구현
+
+        return integrate_to_time(time);
+    }
+
+    float get_duration() { return T[7]; }
+
+private:
+    ProfilePoint integrate_to_time(float time);
+};</code></pre>
+
+        <h2>3.5 다항식 궤적</h2>
+        <p>경계 조건(시작/끝 위치, 속도, 가속도)을 만족하는 다항식으로 궤적을 정의합니다:</p>
+
+        <pre><code>// 3차 다항식 궤적 (위치, 속도 경계 조건)
+class CubicPolynomialTrajectory {
+private:
+    float a0, a1, a2, a3;  // 계수
+    float duration;
+
+public:
+    void plan(float p0, float v0, float pf, float vf, float T) {
+        // p(t) = a0 + a1*t + a2*t^2 + a3*t^3
+        // 경계 조건:
+        // p(0) = p0, v(0) = v0
+        // p(T) = pf, v(T) = vf
+
+        duration = T;
+
+        a0 = p0;
+        a1 = v0;
+        a2 = (3 * (pf - p0) / (T * T)) - (2 * v0 / T) - (vf / T);
+        a3 = (-2 * (pf - p0) / (T * T * T)) + ((vf + v0) / (T * T));
+    }
+
+    struct TrajectoryPoint {
+        float position;
+        float velocity;
+        float acceleration;
+    };
+
+    TrajectoryPoint evaluate(float t) {
+        TrajectoryPoint point;
+
+        if (t < 0) t = 0;
+        if (t > duration) t = duration;
+
+        point.position = a0 + a1 * t + a2 * t * t + a3 * t * t * t;
+        point.velocity = a1 + 2 * a2 * t + 3 * a3 * t * t;
+        point.acceleration = 2 * a2 + 6 * a3 * t;
+
+        return point;
+    }
+};
+
+// 5차 다항식 궤적 (위치, 속도, 가속도 경계 조건)
+class QuinticPolynomialTrajectory {
+private:
+    float a[6];  // 계수 a0 ~ a5
+    float duration;
+
+public:
+    void plan(float p0, float v0, float acc0,
+              float pf, float vf, float accf, float T) {
+        // p(t) = a0 + a1*t + a2*t^2 + a3*t^3 + a4*t^4 + a5*t^5
+        // 6개 경계 조건으로 6개 계수 결정
+
+        duration = T;
+        float T2 = T * T;
+        float T3 = T2 * T;
+        float T4 = T3 * T;
+        float T5 = T4 * T;
+
+        a[0] = p0;
+        a[1] = v0;
+        a[2] = acc0 / 2.0f;
+
+        // 행렬 방정식 풀이
+        // [T3   T4   T5 ] [a3]   [pf - p0 - v0*T - acc0*T2/2]
+        // [3T2  4T3  5T4] [a4] = [vf - v0 - acc0*T          ]
+        // [6T   12T2 20T3] [a5]   [accf - acc0               ]
+
+        float dp = pf - p0 - v0 * T - acc0 * T2 / 2.0f;
+        float dv = vf - v0 - acc0 * T;
+        float da = accf - acc0;
+
+        // Cramer's rule로 계산 (실제로는 행렬 역함수 사용)
+        float det = T3 * (4 * T3 * 20 * T3 - 5 * T4 * 12 * T2)
+                  - T4 * (3 * T2 * 20 * T3 - 5 * T4 * 6 * T)
+                  + T5 * (3 * T2 * 12 * T2 - 4 * T3 * 6 * T);
+
+        // 단순화된 공식 (표준 5차 다항식)
+        a[3] = (20 * (pf - p0) - (8 * vf + 12 * v0) * T - (3 * acc0 - accf) * T2) / (2 * T3);
+        a[4] = (-30 * (pf - p0) + (14 * vf + 16 * v0) * T + (3 * acc0 - 2 * accf) * T2) / (2 * T4);
+        a[5] = (12 * (pf - p0) - 6 * (vf + v0) * T + (accf - acc0) * T2) / (2 * T5);
+    }
+
+    struct TrajectoryPoint {
+        float position;
+        float velocity;
+        float acceleration;
+        float jerk;
+    };
+
+    TrajectoryPoint evaluate(float t) {
+        TrajectoryPoint point;
+
+        if (t < 0) t = 0;
+        if (t > duration) t = duration;
+
+        float t2 = t * t;
+        float t3 = t2 * t;
+        float t4 = t3 * t;
+        float t5 = t4 * t;
+
+        point.position = a[0] + a[1]*t + a[2]*t2 + a[3]*t3 + a[4]*t4 + a[5]*t5;
+        point.velocity = a[1] + 2*a[2]*t + 3*a[3]*t2 + 4*a[4]*t3 + 5*a[5]*t4;
+        point.acceleration = 2*a[2] + 6*a[3]*t + 12*a[4]*t2 + 20*a[5]*t3;
+        point.jerk = 6*a[3] + 24*a[4]*t + 60*a[5]*t2;
+
+        return point;
+    }
+
+    float get_duration() { return duration; }
+};</code></pre>
+
+        <h2>3.6 경유점 궤적 계획</h2>
+        <p>여러 점을 지나는 궤적을 계획할 때는 각 구간을 연결하고 연속성을 보장해야 합니다:</p>
+
+        <pre><code>// 다중 경유점 궤적 계획기
+class WaypointTrajectoryPlanner {
+private:
+    vector<float> waypoints;      // 경유점 위치
+    vector<float> via_velocities; // 경유점 속도 (0이면 정지)
+    vector<float> segment_times;  // 각 구간 시간
+
+    vector<QuinticPolynomialTrajectory> segments;
+
+public:
+    void add_waypoint(float position, float velocity = 0) {
+        waypoints.push_back(position);
+        via_velocities.push_back(velocity);
+    }
+
+    void plan_with_times(vector<float>& times) {
+        segment_times = times;
+
+        if (waypoints.size() < 2) return;
+
+        segments.clear();
+
+        for (size_t i = 0; i < waypoints.size() - 1; i++) {
+            QuinticPolynomialTrajectory seg;
+
+            float p0 = waypoints[i];
+            float pf = waypoints[i + 1];
+            float v0 = via_velocities[i];
+            float vf = via_velocities[i + 1];
+            float T = segment_times[i];
+
+            // 가속도는 경유점에서 0으로 설정 (또는 연속성 위해 계산)
+            seg.plan(p0, v0, 0, pf, vf, 0, T);
+            segments.push_back(seg);
+        }
+    }
+
+    // 시간 자동 할당 (거리 비례)
+    void plan_auto_time(float total_time) {
+        if (waypoints.size() < 2) return;
+
+        // 총 거리 계산
+        float total_distance = 0;
+        for (size_t i = 0; i < waypoints.size() - 1; i++) {
+            total_distance += fabs(waypoints[i + 1] - waypoints[i]);
+        }
+
+        // 거리 비례로 시간 할당
+        segment_times.clear();
+        for (size_t i = 0; i < waypoints.size() - 1; i++) {
+            float dist = fabs(waypoints[i + 1] - waypoints[i]);
+            float t = total_time * dist / total_distance;
+            segment_times.push_back(t);
+        }
+
+        plan_with_times(segment_times);
+    }
+
+    struct TrajectoryPoint {
+        float position;
+        float velocity;
+        float acceleration;
+    };
+
+    TrajectoryPoint evaluate(float t) {
+        // 현재 구간 찾기
+        float t_accum = 0;
+        for (size_t i = 0; i < segments.size(); i++) {
+            float seg_duration = segment_times[i];
+
+            if (t < t_accum + seg_duration) {
+                float t_local = t - t_accum;
+                auto pt = segments[i].evaluate(t_local);
+                return {pt.position, pt.velocity, pt.acceleration};
+            }
+
+            t_accum += seg_duration;
+        }
+
+        // 궤적 종료 후
+        auto pt = segments.back().evaluate(segment_times.back());
+        return {pt.position, 0, 0};
+    }
+
+    float get_total_duration() {
+        float total = 0;
+        for (float t : segment_times) total += t;
+        return total;
+    }
+};</code></pre>
+
+        <h2>3.7 온라인 궤적 수정</h2>
+        <p>실시간으로 궤적을 수정해야 할 때 사용하는 기법입니다:</p>
+
+        <pre><code>// 온라인 궤적 수정기
+class OnlineTrajectoryModifier {
+private:
+    float max_velocity;
+    float max_acceleration;
+    float max_jerk;
+
+    // 현재 상태
+    float current_pos;
+    float current_vel;
+    float current_acc;
+
+    // 목표
+    float target_pos;
+
+public:
+    OnlineTrajectoryModifier(float v_max, float a_max, float j_max) {
+        max_velocity = v_max;
+        max_acceleration = a_max;
+        max_jerk = j_max;
+    }
+
+    void set_state(float pos, float vel, float acc) {
+        current_pos = pos;
+        current_vel = vel;
+        current_acc = acc;
+    }
+
+    void set_target(float new_target) {
+        target_pos = new_target;
+    }
+
+    struct Command {
+        float position;
+        float velocity;
+        float acceleration;
+    };
+
+    // 매 제어 주기마다 호출
+    Command step(float dt) {
+        Command cmd;
+
+        float error = target_pos - current_pos;
+        float direction = (error >= 0) ? 1.0f : -1.0f;
+
+        // 정지 거리 계산
+        float stopping_dist = calculate_stopping_distance(current_vel, current_acc);
+
+        // 감속이 필요한지 확인
+        bool need_decel = (direction * current_vel > 0) &&
+                          (fabs(error) <= stopping_dist * 1.1f);
+
+        float target_acc;
+
+        if (need_decel) {
+            // 감속 단계
+            target_acc = -direction * max_acceleration;
+        } else {
+            // 가속 또는 정속 단계
+            float target_vel = direction * max_velocity;
+
+            if (fabs(current_vel - target_vel) > 0.01f) {
+                // 가속 필요
+                target_acc = direction * max_acceleration;
+            } else {
+                // 정속 유지
+                target_acc = 0;
+            }
+        }
+
+        // 저크 제한 적용
+        float acc_change = target_acc - current_acc;
+        float max_acc_change = max_jerk * dt;
+
+        if (fabs(acc_change) > max_acc_change) {
+            acc_change = copysign(max_acc_change, acc_change);
+        }
+
+        current_acc += acc_change;
+
+        // 가속도 제한
+        current_acc = clamp(current_acc, -max_acceleration, max_acceleration);
+
+        // 속도 업데이트
+        current_vel += current_acc * dt;
+        current_vel = clamp(current_vel, -max_velocity, max_velocity);
+
+        // 위치 업데이트
+        current_pos += current_vel * dt;
+
+        // 목표 도달 체크
+        if (fabs(error) < 0.001f && fabs(current_vel) < 0.001f) {
+            current_pos = target_pos;
+            current_vel = 0;
+            current_acc = 0;
+        }
+
+        cmd.position = current_pos;
+        cmd.velocity = current_vel;
+        cmd.acceleration = current_acc;
+
+        return cmd;
+    }
+
+private:
+    float calculate_stopping_distance(float vel, float acc) {
+        // S-커브 정지 거리 근사 계산
+        float v = fabs(vel);
+        float a = max_acceleration;
+        float j = max_jerk;
+
+        float t_jerk = a / j;  // 저크 시간
+        float v_during_jerk = 0.5f * a * t_jerk;
+
+        if (v <= 2 * v_during_jerk) {
+            // 짧은 거리 - 저크만으로 정지
+            float t = pow(v / j, 1.0f/3.0f);
+            return v * t / 2.0f;
+        } else {
+            // 일반적인 경우
+            float d_jerk = 2 * v_during_jerk * t_jerk / 2.0f;
+            float v_const = v - 2 * v_during_jerk;
+            float t_const = v_const / a;
+            float d_const = v_const * t_const / 2.0f + v_during_jerk * t_const;
+
+            return d_jerk + d_const;
+        }
+    }
+
+    float clamp(float value, float min_val, float max_val) {
+        if (value > max_val) return max_val;
+        if (value < min_val) return min_val;
+        return value;
+    }
+};</code></pre>
+
+        <h2>3.8 시간 최적 궤적</h2>
+        <p>속도, 가속도, 저크 제한 내에서 최소 시간에 목표에 도달하는 궤적입니다:</p>
+
+        <pre><code>// 시간 최적 궤적 계산
+class TimeOptimalTrajectory {
+private:
+    float v_max, a_max, j_max;
+
+public:
+    TimeOptimalTrajectory(float vel, float acc, float jerk) {
+        v_max = vel;
+        a_max = acc;
+        j_max = jerk;
+    }
+
+    // 최소 시간 계산 (S-커브 기준)
+    float calculate_minimum_time(float distance) {
+        float d = fabs(distance);
+
+        // 저크 시간
+        float Tj = a_max / j_max;
+
+        // 최대 속도 도달 가속 시간
+        float Ta = v_max / a_max + Tj;
+
+        // 최대 속도 도달에 필요한 거리
+        float d_accel = v_max * Ta - 0.5f * a_max * Tj * Tj;
+
+        if (d >= 2 * d_accel) {
+            // 전체 S-커브 + 정속 구간
+            float d_cruise = d - 2 * d_accel;
+            float t_cruise = d_cruise / v_max;
+            return 2 * Ta + t_cruise;
+        } else if (d >= 2 * a_max * Tj * Tj) {
+            // 정속 없이 최대 가속도 도달
+            // 반복적 계산 또는 해석적 해
+            float v_peak = sqrt(d * a_max + a_max * a_max * Tj * Tj) - a_max * Tj;
+            float Ta_new = v_peak / a_max + Tj;
+            return 2 * Ta_new;
+        } else {
+            // 최대 가속도에도 도달 못함
+            float Tj_new = pow(d / (2 * j_max), 1.0f / 3.0f);
+            return 4 * Tj_new;
+        }
+    }
+
+    // 주어진 제약 조건 내에서 달성 가능한 최대 속도
+    float calculate_achievable_velocity(float distance, float time) {
+        // 이진 탐색으로 속도 찾기
+        float v_low = 0;
+        float v_high = v_max;
+
+        while (v_high - v_low > 0.001f) {
+            float v_mid = (v_low + v_high) / 2.0f;
+
+            // 이 속도로 거리 이동에 필요한 시간
+            float t_needed = estimate_time_for_velocity(distance, v_mid);
+
+            if (t_needed > time) {
+                v_high = v_mid;  // 속도 낮춰야 함
+            } else {
+                v_low = v_mid;   // 속도 높일 수 있음
+            }
+        }
+
+        return v_low;
+    }
+
+private:
+    float estimate_time_for_velocity(float distance, float velocity);
+};</code></pre>
+
+        <h2>3.9 다축 동기화 궤적</h2>
+        <p>여러 축이 동시에 목표에 도달하도록 궤적을 조정합니다:</p>
+
+        <pre><code>// 다축 동기화 궤적 계획기
+class MultiAxisSyncPlanner {
+private:
+    int num_axes;
+    vector<TrapezoidalProfile> profiles;
+    vector<float> axis_v_max;
+    vector<float> axis_a_max;
+
+public:
+    MultiAxisSyncPlanner(int axes) {
+        num_axes = axes;
+        profiles.resize(axes);
+    }
+
+    void set_axis_limits(int axis, float v_max, float a_max) {
+        if (axis >= num_axes) return;
+        axis_v_max[axis] = v_max;
+        axis_a_max[axis] = a_max;
+    }
+
+    void plan_synchronized(vector<float>& start_positions,
+                           vector<float>& end_positions) {
+        // 1. 각 축의 최소 시간 계산
+        float max_time = 0;
+
+        for (int i = 0; i < num_axes; i++) {
+            profiles[i] = TrapezoidalProfile(axis_v_max[i], axis_a_max[i]);
+            profiles[i].plan(start_positions[i], end_positions[i]);
+
+            float t = profiles[i].get_duration();
+            if (t > max_time) max_time = t;
+        }
+
+        // 2. 모든 축을 최대 시간에 맞춰 재계획
+        for (int i = 0; i < num_axes; i++) {
+            float distance = fabs(end_positions[i] - start_positions[i]);
+
+            if (distance < 0.001f) continue;
+
+            // 시간에 맞춰 속도/가속도 조정
+            float required_time = max_time;
+            float axis_time = profiles[i].get_duration();
+
+            if (axis_time < required_time) {
+                // 속도를 낮춰서 시간 맞춤
+                float scale = axis_time / required_time;
+                float new_v_max = axis_v_max[i] * scale;
+                float new_a_max = axis_a_max[i] * scale * scale;
+
+                profiles[i] = TrapezoidalProfile(new_v_max, new_a_max);
+                profiles[i].plan(start_positions[i], end_positions[i]);
+            }
+        }
+    }
+
+    struct MultiAxisPoint {
+        vector<float> positions;
+        vector<float> velocities;
+        vector<float> accelerations;
+    };
+
+    MultiAxisPoint evaluate(float t) {
+        MultiAxisPoint point;
+        point.positions.resize(num_axes);
+        point.velocities.resize(num_axes);
+        point.accelerations.resize(num_axes);
+
+        for (int i = 0; i < num_axes; i++) {
+            auto p = profiles[i].evaluate(t);
+            point.positions[i] = p.position;
+            point.velocities[i] = p.velocity;
+            point.accelerations[i] = p.acceleration;
+        }
+
+        return point;
+    }
+
+    float get_duration() {
+        float max_t = 0;
+        for (auto& p : profiles) {
+            if (p.get_duration() > max_t) max_t = p.get_duration();
+        }
+        return max_t;
+    }
+};</code></pre>
+
+        <h2>3.10 궤적 계획과 AI</h2>
+        <p>AI를 활용하여 최적의 궤적을 학습하거나 적응적으로 조정할 수 있습니다:</p>
+
+        <pre><code>// AI 기반 적응형 궤적 계획
+class AITrajectoryPlanner {
+private:
+    // 신경망 기반 시간 예측기
+    NeuralNetwork time_predictor;
+
+    // 강화학습 기반 파라미터 최적화
+    RLAgent rl_optimizer;
+
+    // 기본 궤적 생성기
+    SCurveProfile base_profile;
+
+public:
+    AITrajectoryPlanner() :
+        time_predictor(10, 32, 1),  // 입력: 거리, 부하, 온도 등
+        rl_optimizer(4, 3)           // 상태 4차원, 액션 3차원 (v, a, j)
+    {}
+
+    // 학습된 모델로 최적 시간 예측
+    float predict_optimal_time(float distance, float load,
+                               float temperature, float wear_level) {
+        vector<float> features = {
+            distance, load, temperature, wear_level,
+            base_profile.max_velocity,
+            base_profile.max_acceleration,
+            base_profile.max_jerk,
+            // ... 추가 특성
+        };
+
+        return time_predictor.predict(features);
+    }
+
+    // 강화학습으로 프로파일 파라미터 최적화
+    struct ProfileParams {
+        float velocity;
+        float acceleration;
+        float jerk;
+    };
+
+    ProfileParams optimize_parameters(float distance, float* current_state) {
+        // 상태: [거리, 현재속도, 현재가속도, 부하]
+        // 보상: -시간 - 에너지*alpha - 진동*beta
+
+        vector<float> state = {
+            distance, current_state[0], current_state[1], current_state[2]
+        };
+
+        // RL 에이전트가 액션 선택 (속도, 가속도, 저크 스케일)
+        vector<float> action = rl_optimizer.select_action(state);
+
+        ProfileParams params;
+        params.velocity = base_profile.max_velocity * (0.5f + 0.5f * action[0]);
+        params.acceleration = base_profile.max_acceleration * (0.5f + 0.5f * action[1]);
+        params.jerk = base_profile.max_jerk * (0.5f + 0.5f * action[2]);
+
+        return params;
+    }
+
+    // 온라인 학습: 실제 성능으로 모델 업데이트
+    void update_from_execution(float predicted_time, float actual_time,
+                               float energy_used, float vibration_level) {
+        // 시간 예측기 업데이트
+        float time_error = actual_time - predicted_time;
+        time_predictor.online_update(time_error);
+
+        // RL 보상 계산 및 업데이트
+        float reward = -actual_time - 0.1f * energy_used - 0.5f * vibration_level;
+        rl_optimizer.update_reward(reward);
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>궤적 계획은 위치, 속도, 가속도의 시간에 따른 변화를 정의합니다</li>
+                <li>사다리꼴 프로파일은 단순하지만 가속도 불연속으로 진동을 유발할 수 있습니다</li>
+                <li>S-커브 프로파일은 저크를 제한하여 부드러운 운동을 제공합니다</li>
+                <li>다항식 궤적은 경계 조건을 유연하게 설정할 수 있습니다</li>
+                <li>경유점 궤적은 여러 점을 연속적으로 연결합니다</li>
+                <li>온라인 궤적 수정은 실시간으로 목표를 변경할 수 있게 합니다</li>
+                <li>시간 최적 궤적은 제약 조건 내에서 최소 시간을 달성합니다</li>
+                <li>다축 동기화는 모든 축이 동시에 목표에 도달하도록 합니다</li>
+                <li>AI는 궤적 파라미터 최적화와 적응적 계획에 활용될 수 있습니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>사다리꼴 프로파일과 S-커브 프로파일의 차이점을 설명하시오.</li>
+                <li>저크(jerk)가 중요한 이유와 저크 제한의 효과를 설명하시오.</li>
+                <li>3차 다항식과 5차 다항식 궤적의 경계 조건 차이를 설명하시오.</li>
+                <li>온라인 궤적 수정이 필요한 상황의 예를 드시오.</li>
+                <li>다축 동기화에서 시간을 맞추기 위해 어떤 파라미터를 조정합니까?</li>
+                <li>시간 최적 궤적 계산에서 고려해야 할 제약 조건을 나열하시오.</li>
+                <li>경유점 궤적에서 연속성을 보장하는 방법을 설명하시오.</li>
+                <li>AI가 궤적 계획을 어떻게 개선할 수 있는지 설명하시오.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:16px;margin-top:10px;">널리 인간을 이롭게 하라</p>
+        </div>
+
+        </div>
+</body>
+</html>

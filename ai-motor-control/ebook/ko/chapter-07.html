@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 고급 제어 기법 | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>7장: 고급 제어 기법</h1>
+
+        <h2>7.1 고급 제어 소개</h2>
+        <p>PID 제어와 캐스케이드 루프가 모터 제어의 기초를 형성하지만, 고급 기법은 까다로운 응용에서 우수한 성능을 제공합니다. 이러한 방법은 비선형성, 모델 불확실성, 다중 입출력, 복잡한 성능 목표를 다룰 때 고전적 제어의 한계를 극복합니다.</p>
+
+        <p>이 장에서는 상태공간 제어, 모델 예측 제어(MPC), 슬라이딩 모드 제어, 적응 제어, 관측기 설계를 다룹니다.</p>
+
+        <h2>7.2 상태공간 제어</h2>
+        <p>상태공간 표현은 다변수 및 고차 시스템의 분석과 설계에 강력한 프레임워크를 제공합니다:</p>
+
+        <h3>DC 모터의 상태공간 모델</h3>
+        <pre><code>// DC 모터 상태공간 모델
+// 상태 벡터: x = [theta, omega, i]^T (위치, 속도, 전류)
+// 입력: u = V (전압)
+// 출력: y = theta (위치)
+
+상태 방정식:
+dx/dt = A*x + B*u
+y = C*x
+
+행렬:
+A = [  0       1        0    ]
+    [  0    -B/J     Kt/J   ]
+    [  0   -Ke/L    -R/L    ]
+
+B = [  0  ]
+    [  0  ]
+    [ 1/L ]
+
+C = [ 1  0  0 ]
+
+파라미터:
+- J: 관성 모멘트
+- B: 점성 마찰 계수
+- Kt: 토크 상수
+- Ke: 역기전력 상수
+- R: 전기자 저항
+- L: 전기자 인덕턴스</code></pre>
+
+        <h3>상태 피드백 제어</h3>
+        <pre><code>// 전상태 피드백 제어기
+class StateSpaceController {
+private:
+    Matrix A, B, C;
+    Matrix K;           // 피드백 이득 행렬
+    float N_bar;        // 기준 스케일링
+    Vector x;
+    StateObserver* observer;
+
+public:
+    StateSpaceController(Matrix& A_sys, Matrix& B_sys, Matrix& C_sys) {
+        A = A_sys;
+        B = B_sys;
+        C = C_sys;
+
+        K = design_lqr_gains();
+        N_bar = compute_reference_scaling();
+    }
+
+    float compute_control(float reference, Vector& measured_state) {
+        if (observer != nullptr) {
+            x = observer->estimate(measured_state);
+        } else {
+            x = measured_state;
+        }
+
+        // 상태 피드백 제어 법칙: u = N_bar*r - K*x
+        float u = N_bar * reference - K.dot(x);
+
+        return u;
+    }
+
+    Matrix design_lqr_gains() {
+        // 선형 2차 조절기 설계
+        // 최소화: J = integral(x'Qx + u'Ru) dt
+
+        Matrix Q = Matrix::identity(3) * 100;
+        Q(0,0) = 1000;  // 위치 오차에 큰 페널티
+
+        Matrix R = Matrix::identity(1) * 1;
+
+        // 대수 리카티 방정식 풀이
+        Matrix P = solve_are(A, B, Q, R);
+
+        // 최적 이득: K = R^-1 * B' * P
+        K = R.inverse() * B.transpose() * P;
+
+        return K;
+    }
+};</code></pre>
+
+        <h2>7.3 선형 2차 조절기 (LQR)</h2>
+        <p>LQR은 2차 비용 함수를 최소화하여 최적의 상태 피드백 이득을 제공합니다:</p>
+
+        <div class="formula">J = ∫₀^∞ (x'Qx + u'Ru) dt</div>
+
+        <pre><code>// 모터 위치 제어를 위한 LQR
+class LQRMotorController {
+private:
+    float k_theta;   // 위치 이득
+    float k_omega;   // 속도 이득
+    float k_integral;
+    float integral_error;
+
+    MotorParams params;
+
+public:
+    LQRMotorController(MotorParams& p) : params(p) {
+        design_gains();
+        integral_error = 0;
+    }
+
+    void design_gains() {
+        // Q: 위치 오차에 큰 가중치
+        float q11 = 10000.0f;
+        float q22 = 100.0f;
+
+        // R: 제어 노력 가중치
+        float r = 1.0f;
+
+        // 2차 시스템에 대한 근사적 이득
+        float omega_n = sqrt(params.Kt / (params.J * params.R));
+        float zeta = 0.7f;
+
+        k_theta = q11 / r;
+        k_omega = 2 * zeta * sqrt(k_theta * params.J / params.Kt);
+        k_integral = k_theta * 0.1f;
+    }
+
+    float compute(float theta_ref, float theta, float omega) {
+        float error = theta_ref - theta;
+
+        integral_error += error * dt;
+        integral_error = clamp(integral_error, -max_integral, max_integral);
+
+        float voltage = k_theta * error - k_omega * omega + k_integral * integral_error;
+
+        return clamp(voltage, -max_voltage, max_voltage);
+    }
+
+private:
+    float dt = 0.0001f;
+    float max_integral = 10.0f;
+    float max_voltage = 48.0f;
+};</code></pre>
+
+        <h2>7.4 모델 예측 제어 (MPC)</h2>
+        <p>MPC는 미래 호라이즌에서 제어를 최적화하며 제약 조건을 명시적으로 처리합니다:</p>
+
+        <pre><code>// 모터 제어를 위한 MPC
+class MPCMotorController {
+private:
+    int N_horizon;
+    Matrix A_d, B_d, C_d;  // 이산화된 상태공간
+    Matrix Q, R, P;
+
+    float u_min, u_max;
+    float x_min[3], x_max[3];
+    float du_max;
+
+    QPSolver qp;
+    float u_prev;
+
+public:
+    MPCMotorController(MotorParams& params, MPCConfig& config) {
+        N_horizon = config.horizon;
+
+        discretize_model(params, config.dt);
+
+        Q = config.Q;
+        R = config.R;
+        P = compute_terminal_cost();
+
+        u_min = -params.max_voltage;
+        u_max = params.max_voltage;
+        du_max = config.max_control_rate;
+        u_prev = 0;
+    }
+
+    float solve(Vector& x_current, Vector& x_reference) {
+        // QP 문제 구성
+        // 최소화: sum_{k=0}^{N-1} (x_k - x_ref)'Q(x_k - x_ref) + u_k'R*u_k
+        // 제약: x_{k+1} = A_d*x_k + B_d*u_k
+        //       u_min <= u_k <= u_max
+
+        Matrix Phi, Gamma;
+        build_prediction_matrices(Phi, Gamma);
+
+        Matrix H = Gamma.transpose() * Q_bar * Gamma + R_bar;
+        Vector f = Gamma.transpose() * Q_bar * (Phi * x_current - X_ref);
+
+        Matrix A_ineq;
+        Vector b_ineq;
+        build_constraint_matrices(A_ineq, b_ineq, x_current);
+
+        Vector U_optimal = qp.solve(H, f, A_ineq, b_ineq);
+
+        float u = U_optimal(0);
+        u_prev = u;
+
+        return u;
+    }
+};</code></pre>
+
+        <h2>7.5 슬라이딩 모드 제어 (SMC)</h2>
+        <p>슬라이딩 모드 제어는 고주파 스위칭을 통해 파라미터 변동과 외란에 대한 로버스트성을 제공합니다:</p>
+
+        <pre><code>// 모터 위치를 위한 슬라이딩 모드 제어기
+class SlidingModeController {
+private:
+    float lambda;  // 슬라이딩 표면 기울기
+    float eta;     // 도달 이득
+    float phi;     // 경계층 두께 (채터링 감소용)
+
+    float J_nom, B_nom, Kt_nom;
+    float d_max;   // 최대 외란 크기
+
+public:
+    SlidingModeController(MotorParams& params, SMCConfig& config) {
+        J_nom = params.J;
+        B_nom = params.B;
+        Kt_nom = params.Kt;
+
+        lambda = config.lambda;
+        eta = config.eta;
+        phi = config.phi;
+        d_max = config.disturbance_bound;
+    }
+
+    float compute(float theta_ref, float theta, float omega,
+                  float theta_ref_dot, float theta_ref_ddot) {
+        float e = theta - theta_ref;
+        float e_dot = omega - theta_ref_dot;
+
+        // 슬라이딩 표면: s = e_dot + lambda * e
+        float s = e_dot + lambda * e;
+
+        // 등가 제어 (슬라이딩 표면 유지)
+        float u_eq = (J_nom / Kt_nom) * (theta_ref_ddot - lambda * e_dot)
+                   + (B_nom / Kt_nom) * omega;
+
+        // 스위칭 제어 (슬라이딩 표면으로 유도)
+        float u_sw = (J_nom / Kt_nom) * (eta + d_max) * sat(s / phi);
+
+        return u_eq + u_sw;
+    }
+
+    // 채터링 감소를 위한 포화 함수
+    float sat(float x) {
+        if (x > 1.0f) return 1.0f;
+        if (x < -1.0f) return -1.0f;
+        return x;
+    }
+};
+
+// 슈퍼 트위스팅 알고리즘 (채터링 추가 감소)
+class SuperTwistingController {
+private:
+    float alpha, beta;
+    float z;
+
+public:
+    SuperTwistingController(float bound) {
+        alpha = 1.5f * sqrt(bound);
+        beta = 1.1f * bound;
+        z = 0;
+    }
+
+    float compute(float s, float dt) {
+        float s_sqrt = sqrt(fabs(s));
+        float u = -alpha * s_sqrt * sign(s) + z;
+        z += -beta * sign(s) * dt;
+
+        return u;
+    }
+
+    float sign(float x) {
+        return (x > 0) ? 1.0f : ((x < 0) ? -1.0f : 0.0f);
+    }
+};</code></pre>
+
+        <h2>7.6 적응 제어</h2>
+        <p>적응 제어는 알 수 없거나 변화하는 시스템 파라미터를 보상하기 위해 제어기 파라미터를 온라인으로 조정합니다:</p>
+
+        <pre><code>// 모델 기준 적응 제어 (MRAC)
+class MRACController {
+private:
+    // 기준 모델 파라미터 (원하는 폐루프 동작)
+    float omega_m;
+    float zeta_m;
+
+    // 적응 이득
+    float theta_hat[4];
+    float gamma[4];
+
+    float x_m, x_m_dot;
+
+public:
+    MRACController(MRACConfig& config) {
+        omega_m = config.reference_omega;
+        zeta_m = config.reference_zeta;
+
+        for (int i = 0; i < 4; i++) {
+            theta_hat[i] = config.initial_estimates[i];
+            gamma[i] = config.adaptation_rates[i];
+        }
+
+        x_m = 0;
+        x_m_dot = 0;
+    }
+
+    float compute(float r, float y, float y_dot, float dt) {
+        // 기준 모델
+        float x_m_ddot = omega_m * omega_m * (r - x_m) - 2 * zeta_m * omega_m * x_m_dot;
+        x_m_dot += x_m_ddot * dt;
+        x_m += x_m_dot * dt;
+
+        // 추적 오차
+        float e = y - x_m;
+        float s = (y_dot - x_m_dot) + lambda * e;
+
+        // 회귀 벡터
+        float phi[4] = {r, y, y_dot, sign(y_dot)};
+
+        // 적응 제어 법칙
+        float u = 0;
+        for (int i = 0; i < 4; i++) {
+            u += theta_hat[i] * phi[i];
+        }
+
+        // 파라미터 적응 (경사 하강)
+        for (int i = 0; i < 4; i++) {
+            float theta_dot = -gamma[i] * s * phi[i];
+            theta_hat[i] += theta_dot * dt;
+            theta_hat[i] = clamp(theta_hat[i], theta_min[i], theta_max[i]);
+        }
+
+        return u;
+    }
+
+private:
+    float lambda = 10.0f;
+    float theta_min[4] = {0.1f, -10.0f, -1.0f, -5.0f};
+    float theta_max[4] = {10.0f, 10.0f, 1.0f, 5.0f};
+};</code></pre>
+
+        <h2>7.7 상태 관측기</h2>
+        <p>관측기는 사용 가능한 측정으로부터 측정되지 않은 상태를 추정합니다:</p>
+
+        <pre><code>// 루엔버거 관측기
+class LuenbergerObserver {
+private:
+    Vector x_hat;
+    Matrix A, B, C;
+    Matrix L;
+    float dt;
+
+public:
+    LuenbergerObserver(MotorParams& params, float sample_time) {
+        dt = sample_time;
+        setup_system_matrices(params);
+        design_observer_gains(5.0f);
+        x_hat = Vector::zeros(3);
+    }
+
+    Vector estimate(float u, float y_measured) {
+        // 예측: x_hat_pred = A*x_hat + B*u
+        Vector x_pred = A * x_hat + B * u;
+
+        // 보정: x_hat = x_pred + L*(y - C*x_pred)
+        float y_pred = C.dot(x_pred);
+        float innovation = y_measured - y_pred;
+
+        x_hat = x_pred + L * innovation;
+
+        return x_hat;
+    }
+
+    void design_observer_gains(float speed_factor) {
+        // 관측기 극을 제어기 극보다 빠르게 배치
+        float p1 = -500.0f * speed_factor;
+        float p2 = -600.0f * speed_factor;
+        float p3 = -700.0f * speed_factor;
+
+        L = ackermann_formula(A, C, p1, p2, p3);
+    }
+};
+
+// 확장 칼만 필터 (비선형 시스템용)
+class ExtendedKalmanFilter {
+private:
+    Vector x_hat;
+    Matrix P, Q, R;
+    float dt;
+
+public:
+    ExtendedKalmanFilter(EKFConfig& config) {
+        dt = config.sample_time;
+        x_hat = Vector::zeros(3);
+        P = Matrix::identity(3) * config.initial_covariance;
+        Q = config.Q;
+        R = config.R;
+    }
+
+    Vector estimate(float u, float y_measured) {
+        // 예측
+        Vector x_pred = predict_state(x_hat, u);
+        Matrix F = compute_jacobian_F(x_hat, u);
+        Matrix P_pred = F * P * F.transpose() + Q;
+
+        // 측정 업데이트
+        Matrix H = compute_jacobian_H(x_pred);
+        float y_pred = h(x_pred);
+        float innovation = y_measured - y_pred;
+
+        // 칼만 이득
+        float S = H * P_pred * H.transpose() + R(0,0);
+        Vector K = P_pred * H.transpose() / S;
+
+        // 업데이트
+        x_hat = x_pred + K * innovation;
+        P = (Matrix::identity(3) - K * H) * P_pred;
+
+        return x_hat;
+    }
+};
+
+// 외란 관측기 (DOB)
+class DisturbanceObserver {
+private:
+    float Q_filter;
+    float d_hat;
+    float J_nom, B_nom;
+
+public:
+    DisturbanceObserver(MotorParams& params, float bandwidth) {
+        J_nom = params.J;
+        B_nom = params.B;
+        Q_filter = bandwidth;
+        d_hat = 0;
+    }
+
+    float estimate(float u, float omega, float omega_dot, float dt) {
+        float d_raw = J_nom * omega_dot + B_nom * omega - u;
+
+        float alpha = Q_filter * dt / (1 + Q_filter * dt);
+        d_hat = alpha * d_raw + (1 - alpha) * d_hat;
+
+        return d_hat;
+    }
+
+    float compensate(float u_nominal) {
+        return u_nominal + d_hat;
+    }
+};</code></pre>
+
+        <h2>7.8 센서리스 제어 기법</h2>
+        <p>전기적 측정으로부터 상태를 추정하여 위치/속도 센서를 제거합니다:</p>
+
+        <pre><code>// 역기전력 기반 센서리스 제어 (BLDC)
+class SensorlessController {
+private:
+    float bemf_alpha, bemf_beta;
+    float theta_est;
+    float omega_est;
+
+    float pll_kp, pll_ki;
+    float pll_integral;
+
+public:
+    SensorlessController(MotorParams& params, SensorlessConfig& config) {
+        pll_kp = config.pll_bandwidth * 2;
+        pll_ki = config.pll_bandwidth * config.pll_bandwidth;
+
+        theta_est = 0;
+        omega_est = 0;
+        pll_integral = 0;
+    }
+
+    void estimate_position(float v_alpha, float v_beta,
+                           float i_alpha, float i_beta, float dt) {
+        static float i_alpha_prev = 0, i_beta_prev = 0;
+
+        float di_alpha = (i_alpha - i_alpha_prev) / dt;
+        float di_beta = (i_beta - i_beta_prev) / dt;
+
+        // 역기전력 추정: e = v - R*i - L*di/dt
+        bemf_alpha = v_alpha - R * i_alpha - L * di_alpha;
+        bemf_beta = v_beta - R * i_beta - L * di_beta;
+
+        i_alpha_prev = i_alpha;
+        i_beta_prev = i_beta;
+
+        // PLL 기반 위치 추정
+        float sin_theta = sin(theta_est);
+        float cos_theta = cos(theta_est);
+
+        float error = bemf_alpha * cos_theta + bemf_beta * sin_theta;
+
+        pll_integral += pll_ki * error * dt;
+        omega_est = pll_kp * error + pll_integral;
+
+        theta_est += omega_est * dt;
+
+        while (theta_est > 2 * M_PI) theta_est -= 2 * M_PI;
+        while (theta_est < 0) theta_est += 2 * M_PI;
+    }
+
+    float get_position() { return theta_est; }
+    float get_velocity() { return omega_est; }
+
+private:
+    float R, L;
+};</code></pre>
+
+        <h2>7.9 다축 협조 제어</h2>
+        <p>동기화된 동작을 위해 여러 모터를 조정합니다:</p>
+
+        <pre><code>// 다축 동기화 제어기
+class MultiAxisController {
+private:
+    int num_axes;
+    vector<SingleAxisController*> axis_controllers;
+    Matrix Kc;  // 교차 결합 이득
+
+    enum SyncMode { MASTER_SLAVE, PEER_TO_PEER, VIRTUAL_MASTER };
+    SyncMode sync_mode;
+
+    float virtual_position;
+    float virtual_velocity;
+
+public:
+    MultiAxisController(int axes, MultiAxisConfig& config) {
+        num_axes = axes;
+        sync_mode = config.sync_mode;
+
+        for (int i = 0; i < axes; i++) {
+            axis_controllers.push_back(
+                new SingleAxisController(config.axis_params[i])
+            );
+        }
+
+        Kc = config.cross_coupling_gains;
+    }
+
+    void compute(Vector& refs, Vector& positions, Vector& velocities,
+                 Vector& outputs) {
+        // 동기화 오차 계산
+        Vector sync_errors(num_axes);
+
+        if (sync_mode == VIRTUAL_MASTER) {
+            for (int i = 0; i < num_axes; i++) {
+                sync_errors(i) = positions(i) - virtual_position;
+            }
+        } else if (sync_mode == PEER_TO_PEER) {
+            float avg_pos = positions.mean();
+            for (int i = 0; i < num_axes; i++) {
+                sync_errors(i) = positions(i) - avg_pos;
+            }
+        }
+
+        // 교차 결합 보상이 있는 개별 축 제어
+        for (int i = 0; i < num_axes; i++) {
+            float u_individual = axis_controllers[i]->compute(
+                refs(i), positions(i), velocities(i)
+            );
+
+            float u_coupling = 0;
+            for (int j = 0; j < num_axes; j++) {
+                if (i != j) {
+                    u_coupling -= Kc(i, j) * (positions(i) - positions(j));
+                }
+            }
+
+            outputs(i) = u_individual + u_coupling;
+        }
+    }
+};</code></pre>
+
+        <h2>7.10 AI와 고급 제어의 결합</h2>
+        <pre><code>// AI 향상 MPC
+class AIEnhancedMPC {
+private:
+    MPCMotorController mpc;
+    NeuralNetwork model_corrector;
+
+public:
+    AIEnhancedMPC(MotorParams& params, MPCConfig& config) :
+        mpc(params, config),
+        model_corrector(6, 32, 3)  // 상태 + 입력 → 모델 보정
+    {}
+
+    float compute(Vector& x_current, Vector& x_reference) {
+        // AI가 모델 오차 보정
+        vector<float> features = state_to_features(x_current);
+        vector<float> correction = model_corrector.predict(features);
+
+        // 보정된 상태로 MPC 실행
+        Vector x_corrected = x_current + Vector(correction);
+
+        return mpc.solve(x_corrected, x_reference);
+    }
+
+    // 온라인 모델 학습
+    void update_model(Vector& predicted_next, Vector& actual_next) {
+        Vector error = actual_next - predicted_next;
+        model_corrector.train_online(error);
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>상태공간 방법은 다변수 모터 제어 시스템을 위한 통합 프레임워크를 제공합니다</li>
+                <li>LQR은 2차 비용 함수를 최소화하여 최적의 상태 피드백 이득을 제공합니다</li>
+                <li>MPC는 예측 호라이즌에서 제약 조건을 명시적으로 처리하며 제어를 최적화합니다</li>
+                <li>슬라이딩 모드 제어는 파라미터 변동과 외란에 대해 로버스트성을 제공합니다</li>
+                <li>적응 제어는 알 수 없는 동역학을 보상하기 위해 파라미터를 온라인으로 조정합니다</li>
+                <li>상태 관측기(루엔버거, EKF)는 가용 측정으로부터 상태를 추정합니다</li>
+                <li>외란 관측기는 외란을 추정하고 보상하여 제어를 개선합니다</li>
+                <li>센서리스 제어는 역기전력 추정이나 HF 주입을 사용하여 위치 센서를 제거합니다</li>
+                <li>다축 협조는 여러 모터의 동기화된 동작을 보장합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>상태공간 표현이 전달함수 모델에 비해 제공하는 장점은 무엇입니까?</li>
+                <li>LQR 설계에서 Q와 R 행렬의 의미를 설명하시오. 값이 폐루프 동작에 어떤 영향을 미칩니까?</li>
+                <li>MPC가 제약이 있는 모터 제어 시스템에 특히 적합한 이유는 무엇입니까?</li>
+                <li>슬라이딩 모드 제어에서 채터링이란 무엇이며, 이를 줄이는 기법은 무엇입니까?</li>
+                <li>직접 적응 제어와 간접 적응 제어의 차이를 설명하시오.</li>
+                <li>관측기 극이 제어기 극보다 빨라야 하는 이유는 무엇입니까?</li>
+                <li>확장 칼만 필터가 비선형 모터 동역학을 어떻게 처리하는지 설명하시오.</li>
+                <li>역기전력 기반 센서리스 제어의 원리와 저속에서의 한계를 설명하시오.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:16px;margin-top:10px;">널리 인간을 이롭게 하라</p>
+        </div>
+
+        </div>
+</body>
+</html>

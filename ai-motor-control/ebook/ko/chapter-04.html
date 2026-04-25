@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 토크 및 힘 제어 | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>4장: 토크 및 힘 제어</h1>
+
+        <h2>4.1 토크 제어 개요</h2>
+        <p>토크 제어는 모터가 출력하는 회전력(토크)을 직접 제어하는 방식입니다. 위치나 속도 제어와 달리, 토크 제어는 로봇 팔의 힘 제어, 협동 로봇, 임피던스 제어 등 외부 환경과의 상호작용이 중요한 응용에서 필수적입니다.</p>
+
+        <p>모터에서 토크는 전류에 비례합니다:</p>
+        <div class="formula">T = K<sub>t</sub> × I</div>
+        <p>여기서 K<sub>t</sub>는 토크 상수(Nm/A), I는 전류(A)입니다. 따라서 토크 제어는 본질적으로 전류 제어입니다.</p>
+
+        <h2>4.2 전류 루프 제어</h2>
+        <p>토크 제어의 핵심인 전류 루프는 가장 내부 제어 루프로, 가장 빠른 응답 속도가 요구됩니다:</p>
+
+        <pre><code>// DC 모터 전류 제어기
+class CurrentController {
+private:
+    // PI 제어기 (전류 루프에서 미분항은 노이즈 증폭으로 잘 안 씀)
+    float Kp_i, Ki_i;
+    float integral;
+
+    // 모터 파라미터
+    float R;       // 전기자 저항
+    float L;       // 전기자 인덕턴스
+    float Ke;      // 역기전력 상수
+
+    // 전압 제한
+    float voltage_limit;
+
+    float dt;
+
+public:
+    CurrentController(float r, float l, float ke, float sample_time) {
+        R = r;
+        L = l;
+        Ke = ke;
+        dt = sample_time;
+
+        // 대역폭 기반 PI 이득 설계
+        // 전류 루프 대역폭: 일반적으로 1-5 kHz
+        float bandwidth = 2000.0f;  // Hz
+        float omega = 2.0f * M_PI * bandwidth;
+
+        Kp_i = L * omega;
+        Ki_i = R * omega;
+
+        integral = 0;
+        voltage_limit = 48.0f;  // 전원 전압
+    }
+
+    float compute(float current_ref, float current_actual, float velocity) {
+        // 전류 오차
+        float error = current_ref - current_actual;
+
+        // PI 제어
+        float P_term = Kp_i * error;
+
+        integral += error * dt;
+        float I_term = Ki_i * integral;
+
+        // 피드포워드: 역기전력 보상
+        float feedforward = Ke * velocity;
+
+        // 피드포워드: 저항 전압 강하 보상
+        feedforward += R * current_ref;
+
+        // 전체 전압 명령
+        float voltage = P_term + I_term + feedforward;
+
+        // 와인드업 방지
+        if (fabs(voltage) > voltage_limit) {
+            voltage = copysign(voltage_limit, voltage);
+            // 적분 역추적
+            integral -= error * dt;
+        }
+
+        return voltage;
+    }
+
+    void reset() {
+        integral = 0;
+    }
+};</code></pre>
+
+        <h2>4.3 BLDC/PMSM 토크 제어 (FOC)</h2>
+        <p>3상 모터의 토크 제어는 계자 배향 제어(FOC, Field-Oriented Control)를 사용합니다. d-q 변환을 통해 DC 모터처럼 제어할 수 있습니다:</p>
+
+        <pre><code>// 계자 배향 제어 (FOC)
+class FieldOrientedController {
+private:
+    // d축, q축 전류 제어기
+    CurrentController id_controller;
+    CurrentController iq_controller;
+
+    // 모터 파라미터
+    float Ld, Lq;      // d축, q축 인덕턴스
+    float Rs;          // 고정자 저항
+    float flux_pm;     // 영구자석 쇄교자속
+    float pole_pairs;
+
+    // 변환 관련
+    float theta_e;     // 전기 각도
+
+public:
+    FieldOrientedController(PMSMParams& params, float sample_time) :
+        id_controller(params.Rs, params.Ld, 0, sample_time),
+        iq_controller(params.Rs, params.Lq, 0, sample_time)
+    {
+        Ld = params.Ld;
+        Lq = params.Lq;
+        Rs = params.Rs;
+        flux_pm = params.flux_pm;
+        pole_pairs = params.pole_pairs;
+    }
+
+    struct FOCOutput {
+        float v_alpha;
+        float v_beta;
+        float v_a;
+        float v_b;
+        float v_c;
+    };
+
+    FOCOutput compute(float torque_ref, float i_a, float i_b, float i_c,
+                      float theta_m, float omega_m) {
+        // 전기 각도 계산
+        theta_e = theta_m * pole_pairs;
+        float omega_e = omega_m * pole_pairs;
+
+        // Clarke 변환: abc → αβ
+        float i_alpha = i_a;
+        float i_beta = (i_a + 2 * i_b) / sqrt(3.0f);
+
+        // Park 변환: αβ → dq
+        float cos_theta = cos(theta_e);
+        float sin_theta = sin(theta_e);
+
+        float i_d = i_alpha * cos_theta + i_beta * sin_theta;
+        float i_q = -i_alpha * sin_theta + i_beta * cos_theta;
+
+        // 토크 기준에서 전류 기준 계산
+        // 토크: T = (3/2) * p * (flux_pm * i_q + (Ld - Lq) * i_d * i_q)
+        // SPMSM (Ld = Lq): T = (3/2) * p * flux_pm * i_q
+        float iq_ref = torque_ref / (1.5f * pole_pairs * flux_pm);
+        float id_ref = 0;  // MTPA: 최대 토크/전류를 위해 최적화 가능
+
+        // d축 전류 제어 (약자속 또는 0)
+        float v_d = id_controller.compute(id_ref, i_d, 0);
+
+        // q축 전류 제어
+        float v_q = iq_controller.compute(iq_ref, i_q, 0);
+
+        // 교차 결합 보상 (디커플링)
+        v_d -= omega_e * Lq * i_q;
+        v_q += omega_e * (Ld * i_d + flux_pm);
+
+        // 역 Park 변환: dq → αβ
+        float v_alpha = v_d * cos_theta - v_q * sin_theta;
+        float v_beta = v_d * sin_theta + v_q * cos_theta;
+
+        // 역 Clarke 변환: αβ → abc (또는 SVPWM 사용)
+        FOCOutput output;
+        output.v_alpha = v_alpha;
+        output.v_beta = v_beta;
+
+        output.v_a = v_alpha;
+        output.v_b = (-v_alpha + sqrt(3.0f) * v_beta) / 2.0f;
+        output.v_c = (-v_alpha - sqrt(3.0f) * v_beta) / 2.0f;
+
+        return output;
+    }
+};</code></pre>
+
+        <h2>4.4 공간 벡터 PWM (SVPWM)</h2>
+        <p>3상 인버터의 효율적인 PWM 변조 방법입니다:</p>
+
+        <pre><code>// 공간 벡터 PWM
+class SpaceVectorPWM {
+private:
+    float Vdc;         // DC 링크 전압
+    float Ts;          // PWM 주기
+
+public:
+    SpaceVectorPWM(float dc_voltage, float pwm_period) {
+        Vdc = dc_voltage;
+        Ts = pwm_period;
+    }
+
+    struct PWMDuties {
+        float duty_a;
+        float duty_b;
+        float duty_c;
+    };
+
+    PWMDuties compute(float v_alpha, float v_beta) {
+        PWMDuties duties;
+
+        // 섹터 결정
+        int sector = determine_sector(v_alpha, v_beta);
+
+        // 기본 벡터 시간 계산
+        float Vref = sqrt(v_alpha * v_alpha + v_beta * v_beta);
+        float angle = atan2(v_beta, v_alpha);
+
+        // 섹터 내 각도
+        float theta = angle - (sector - 1) * M_PI / 3.0f;
+
+        // 인접 벡터 시간
+        float T1 = sqrt(3.0f) * Ts * Vref * sin(M_PI / 3.0f - theta) / Vdc;
+        float T2 = sqrt(3.0f) * Ts * Vref * sin(theta) / Vdc;
+        float T0 = Ts - T1 - T2;  // 영벡터 시간
+
+        // 과변조 방지
+        if (T1 + T2 > Ts) {
+            float scale = Ts / (T1 + T2);
+            T1 *= scale;
+            T2 *= scale;
+            T0 = 0;
+        }
+
+        // 듀티 계산 (7-세그먼트 SVPWM)
+        calculate_duties_7segment(sector, T0, T1, T2, duties);
+
+        return duties;
+    }
+
+private:
+    int determine_sector(float v_alpha, float v_beta) {
+        // α-β 평면에서 섹터 결정
+        float Vref1 = v_beta;
+        float Vref2 = (sqrt(3.0f) * v_alpha - v_beta) / 2.0f;
+        float Vref3 = (-sqrt(3.0f) * v_alpha - v_beta) / 2.0f;
+
+        int a = (Vref1 > 0) ? 1 : 0;
+        int b = (Vref2 > 0) ? 1 : 0;
+        int c = (Vref3 > 0) ? 1 : 0;
+
+        int sector_table[8] = {0, 2, 6, 1, 4, 3, 5, 0};
+        return sector_table[a + 2*b + 4*c];
+    }
+
+    void calculate_duties_7segment(int sector, float T0, float T1, float T2,
+                                    PWMDuties& duties) {
+        float Ta, Tb, Tc;
+
+        // 7-세그먼트 스위칭 시퀀스
+        // T0/4 - T1/2 - T2/2 - T0/2 - T2/2 - T1/2 - T0/4
+
+        switch (sector) {
+            case 1:
+                Ta = T1 + T2 + T0/2;
+                Tb = T2 + T0/2;
+                Tc = T0/2;
+                break;
+            case 2:
+                Ta = T1 + T0/2;
+                Tb = T1 + T2 + T0/2;
+                Tc = T0/2;
+                break;
+            case 3:
+                Ta = T0/2;
+                Tb = T1 + T2 + T0/2;
+                Tc = T2 + T0/2;
+                break;
+            case 4:
+                Ta = T0/2;
+                Tb = T1 + T0/2;
+                Tc = T1 + T2 + T0/2;
+                break;
+            case 5:
+                Ta = T2 + T0/2;
+                Tb = T0/2;
+                Tc = T1 + T2 + T0/2;
+                break;
+            case 6:
+                Ta = T1 + T2 + T0/2;
+                Tb = T0/2;
+                Tc = T1 + T0/2;
+                break;
+            default:
+                Ta = Tb = Tc = T0/2;
+        }
+
+        duties.duty_a = Ta / Ts;
+        duties.duty_b = Tb / Ts;
+        duties.duty_c = Tc / Ts;
+    }
+};</code></pre>
+
+        <h2>4.5 토크 리플 저감</h2>
+        <p>모터 토크의 리플(맥동)을 줄이는 방법입니다:</p>
+
+        <pre><code>// 토크 리플 보상기
+class TorqueRippleCompensator {
+private:
+    // 고조파 보상 (역기전력 고조파로 인한 리플)
+    int num_harmonics;
+    vector<float> harmonic_amplitudes;
+    vector<float> harmonic_phases;
+
+    // 코깅 토크 보상 테이블
+    vector<float> cogging_table;
+    int cogging_table_size;
+
+    float pole_pairs;
+
+public:
+    TorqueRippleCompensator(int poles, int table_size = 360) {
+        pole_pairs = poles;
+        cogging_table_size = table_size;
+        cogging_table.resize(table_size, 0);
+
+        // 주요 고조파: 5차, 7차, 11차, 13차 등
+        num_harmonics = 4;
+        harmonic_amplitudes = {0, 0, 0, 0};  // 캘리브레이션 필요
+        harmonic_phases = {0, 0, 0, 0};
+    }
+
+    // 코깅 토크 캘리브레이션 (오프라인)
+    void calibrate_cogging(vector<float>& measured_cogging) {
+        // 측정된 코깅 토크를 테이블에 저장
+        for (int i = 0; i < cogging_table_size && i < measured_cogging.size(); i++) {
+            cogging_table[i] = measured_cogging[i];
+        }
+    }
+
+    // 고조파 캘리브레이션
+    void calibrate_harmonics(vector<float>& amplitudes, vector<float>& phases) {
+        harmonic_amplitudes = amplitudes;
+        harmonic_phases = phases;
+    }
+
+    float compute_compensation(float theta_e) {
+        float compensation = 0;
+
+        // 코깅 토크 보상
+        int index = (int)(theta_e / (2 * M_PI) * cogging_table_size) % cogging_table_size;
+        compensation += cogging_table[index];
+
+        // 고조파 보상 (6n ± 1차 고조파)
+        int harmonics[] = {5, 7, 11, 13};
+        for (int i = 0; i < num_harmonics; i++) {
+            compensation += harmonic_amplitudes[i] *
+                           sin(harmonics[i] * theta_e + harmonic_phases[i]);
+        }
+
+        return compensation;
+    }
+};
+
+// 토크 리플이 보상된 전류 제어기
+class RippleCompensatedCurrentController {
+private:
+    FieldOrientedController foc;
+    TorqueRippleCompensator ripple_comp;
+
+public:
+    RippleCompensatedCurrentController(PMSMParams& params, float sample_time) :
+        foc(params, sample_time),
+        ripple_comp(params.pole_pairs)
+    {}
+
+    auto compute(float torque_ref, float i_a, float i_b, float i_c,
+                 float theta_m, float omega_m) {
+        float theta_e = theta_m * pole_pairs;
+
+        // 토크 리플 보상값 계산
+        float compensation = ripple_comp.compute_compensation(theta_e);
+
+        // 보상된 토크 기준
+        float torque_ref_compensated = torque_ref + compensation;
+
+        return foc.compute(torque_ref_compensated, i_a, i_b, i_c, theta_m, omega_m);
+    }
+
+private:
+    float pole_pairs;
+};</code></pre>
+
+        <h2>4.6 힘 제어 기초</h2>
+        <p>로봇 응용에서 엔드이펙터의 힘을 제어하는 방법입니다:</p>
+
+        <pre><code>// 기본 힘 제어기
+class ForceController {
+private:
+    // 힘 제어 PI 게인
+    float Kp_f, Ki_f;
+    float force_integral;
+
+    // 힘 센서 필터
+    LowPassFilter force_filter;
+
+    // 제한값
+    float max_torque;
+
+    float dt;
+
+public:
+    ForceController(float kp, float ki, float filter_freq, float sample_time) :
+        force_filter(filter_freq, sample_time)
+    {
+        Kp_f = kp;
+        Ki_f = ki;
+        dt = sample_time;
+        force_integral = 0;
+        max_torque = 10.0f;  // Nm
+    }
+
+    float compute(float force_ref, float force_measured) {
+        // 힘 센서 필터링
+        float force_filtered = force_filter.filter(force_measured);
+
+        // 힘 오차
+        float error = force_ref - force_filtered;
+
+        // PI 제어
+        float P_term = Kp_f * error;
+
+        force_integral += error * dt;
+        float I_term = Ki_f * force_integral;
+
+        // 토크 명령 (힘 × 레버암 또는 기어비 고려)
+        float torque_cmd = P_term + I_term;
+
+        // 제한
+        torque_cmd = clamp(torque_cmd, -max_torque, max_torque);
+
+        return torque_cmd;
+    }
+
+    void reset() {
+        force_integral = 0;
+    }
+
+private:
+    float clamp(float value, float min_val, float max_val);
+};</code></pre>
+
+        <h2>4.7 임피던스 제어</h2>
+        <p>임피던스 제어는 위치와 힘 사이의 관계(강성, 감쇠, 관성)를 제어합니다:</p>
+
+        <pre><code>// 임피던스 제어기
+class ImpedanceController {
+private:
+    // 원하는 임피던스 파라미터
+    float M_d;   // 원하는 관성 (kg 또는 kg·m²)
+    float B_d;   // 원하는 감쇠 (Ns/m 또는 Nms/rad)
+    float K_d;   // 원하는 강성 (N/m 또는 Nm/rad)
+
+    // 위치 제어기 (내부)
+    PIDController position_controller;
+
+    // 상태
+    float x_d;   // 목표 위치
+    float v_d;   // 목표 속도
+
+    float dt;
+
+public:
+    ImpedanceController(float M, float B, float K, float sample_time) :
+        position_controller(K, 0, B, sample_time)
+    {
+        M_d = M;
+        B_d = B;
+        K_d = K;
+        dt = sample_time;
+        x_d = 0;
+        v_d = 0;
+    }
+
+    void set_target(float position, float velocity = 0) {
+        x_d = position;
+        v_d = velocity;
+    }
+
+    void set_impedance(float M, float B, float K) {
+        M_d = M;
+        B_d = B;
+        K_d = K;
+    }
+
+    // 외력 기반 임피던스 제어
+    // F_ext = M_d * a + B_d * v + K_d * (x - x_d)
+    // 원하는 가속도: a_d = (F_ext - B_d * v - K_d * (x - x_d)) / M_d
+    float compute(float x_actual, float v_actual, float F_external) {
+        // 위치 오차
+        float x_error = x_actual - x_d;
+
+        // 속도 오차
+        float v_error = v_actual - v_d;
+
+        // 원하는 가속도 (임피던스 관계)
+        float a_desired = (F_external - B_d * v_error - K_d * x_error) / M_d;
+
+        // 필요한 토크/힘 (F = M * a)
+        float force_cmd = M_d * a_desired;
+
+        return force_cmd;
+    }
+
+    // 위치 기반 임피던스 제어 (힘 센서 없이)
+    float compute_position_based(float x_ref, float x_actual, float v_actual) {
+        // 가상의 외력: F = K_d * (x_ref - x_actual)
+        float virtual_force = K_d * (x_ref - x_actual);
+
+        // 원하는 가속도
+        float a_desired = (virtual_force - B_d * v_actual) / M_d;
+
+        return M_d * a_desired;
+    }
+};
+
+// 가변 임피던스 제어기 (상황에 따라 강성 변경)
+class VariableImpedanceController {
+private:
+    ImpedanceController base_controller;
+
+    // 임피던스 범위
+    float K_min, K_max;
+    float B_min, B_max;
+
+public:
+    VariableImpedanceController(float sample_time) :
+        base_controller(1.0f, 10.0f, 100.0f, sample_time)
+    {
+        K_min = 10.0f;    // 유연 모드
+        K_max = 1000.0f;  // 강성 모드
+        B_min = 1.0f;
+        B_max = 100.0f;
+    }
+
+    // 접촉 힘에 따른 임피던스 조정
+    void adapt_impedance(float contact_force, float velocity) {
+        // 접촉 시: 강성 감소, 감쇠 증가
+        float force_threshold = 5.0f;
+
+        if (fabs(contact_force) > force_threshold) {
+            // 접촉 중 - 컴플라이언트 모드
+            float force_ratio = fabs(contact_force) / 50.0f;  // 50N에서 최대
+            force_ratio = fmin(force_ratio, 1.0f);
+
+            float K = K_max - force_ratio * (K_max - K_min);
+            float B = B_min + force_ratio * (B_max - B_min);
+
+            base_controller.set_impedance(1.0f, B, K);
+        } else {
+            // 자유 공간 - 스티프 모드
+            base_controller.set_impedance(1.0f, B_min, K_max);
+        }
+    }
+
+    float compute(float x_actual, float v_actual, float F_external) {
+        adapt_impedance(F_external, v_actual);
+        return base_controller.compute(x_actual, v_actual, F_external);
+    }
+};</code></pre>
+
+        <h2>4.8 하이브리드 힘/위치 제어</h2>
+        <p>특정 방향은 힘 제어, 다른 방향은 위치 제어를 수행합니다:</p>
+
+        <pre><code>// 하이브리드 힘/위치 제어기
+class HybridForcePositionController {
+private:
+    // 위치 제어기 (자유 방향)
+    PIDController position_controller;
+
+    // 힘 제어기 (구속 방향)
+    ForceController force_controller;
+
+    // 선택 행렬 (1: 힘 제어, 0: 위치 제어)
+    bool force_control_active;
+
+    float dt;
+
+public:
+    HybridForcePositionController(float sample_time) :
+        position_controller(100.0f, 10.0f, 5.0f, sample_time),
+        force_controller(0.1f, 0.01f, 100.0f, sample_time)
+    {
+        dt = sample_time;
+        force_control_active = false;
+    }
+
+    void set_mode(bool use_force_control) {
+        force_control_active = use_force_control;
+    }
+
+    struct ControlOutput {
+        float torque;
+        bool in_force_mode;
+    };
+
+    ControlOutput compute(float position_ref, float position_actual,
+                          float velocity_actual,
+                          float force_ref, float force_actual) {
+        ControlOutput output;
+
+        if (force_control_active) {
+            // 힘 제어 모드
+            output.torque = force_controller.compute(force_ref, force_actual);
+            output.in_force_mode = true;
+        } else {
+            // 위치 제어 모드
+            output.torque = position_controller.compute(position_ref, position_actual);
+            output.in_force_mode = false;
+        }
+
+        return output;
+    }
+
+    // 자동 모드 전환 (접촉 감지 기반)
+    ControlOutput compute_auto_switch(float position_ref, float position_actual,
+                                       float velocity_actual,
+                                       float force_ref, float force_actual,
+                                       float contact_threshold) {
+        // 접촉 감지
+        if (fabs(force_actual) > contact_threshold) {
+            force_control_active = true;
+        }
+
+        // 힘이 작아지면 위치 제어로 복귀
+        if (force_control_active && fabs(force_actual) < contact_threshold * 0.5f) {
+            force_control_active = false;
+            position_controller.reset();
+        }
+
+        return compute(position_ref, position_actual, velocity_actual,
+                       force_ref, force_actual);
+    }
+};</code></pre>
+
+        <h2>4.9 토크 관측기</h2>
+        <p>외부 토크(부하 토크, 외란)를 추정합니다:</p>
+
+        <pre><code>// 외란 토크 관측기
+class TorqueObserver {
+private:
+    // 모터 파라미터
+    float J;    // 관성
+    float B;    // 점성 마찰
+    float Kt;   // 토크 상수
+
+    // 관측기 상태
+    float estimated_torque;
+    float estimated_velocity;
+
+    // 관측기 이득
+    float L1, L2;  // 관측기 극 결정
+
+    float dt;
+
+public:
+    TorqueObserver(float inertia, float friction, float torque_const,
+                   float bandwidth, float sample_time) {
+        J = inertia;
+        B = friction;
+        Kt = torque_const;
+        dt = sample_time;
+
+        // 관측기 이득 설계 (폴 배치)
+        float omega = 2.0f * M_PI * bandwidth;
+        L1 = 2 * omega;
+        L2 = omega * omega;
+
+        estimated_torque = 0;
+        estimated_velocity = 0;
+    }
+
+    struct ObserverOutput {
+        float velocity;
+        float external_torque;
+    };
+
+    ObserverOutput estimate(float motor_torque, float measured_velocity) {
+        // 시스템: J * dw/dt = T_motor - B*w - T_external
+        // 관측기: 확장 상태 관측기
+
+        // 예측 단계
+        float velocity_pred = estimated_velocity +
+            dt * (motor_torque - B * estimated_velocity - estimated_torque) / J;
+
+        // 보정 단계
+        float velocity_error = measured_velocity - velocity_pred;
+
+        estimated_velocity += L1 * velocity_error * dt;
+        estimated_torque += L2 * velocity_error * dt;
+
+        ObserverOutput output;
+        output.velocity = estimated_velocity;
+        output.external_torque = estimated_torque;
+
+        return output;
+    }
+
+    float get_external_torque() {
+        return estimated_torque;
+    }
+
+    void reset() {
+        estimated_torque = 0;
+        estimated_velocity = 0;
+    }
+};
+
+// 외란 관측기 기반 힘 제어 (센서리스)
+class SensorlessForceController {
+private:
+    TorqueObserver observer;
+    ForceController force_ctrl;
+
+    float gear_ratio;
+    float lever_arm;
+
+public:
+    SensorlessForceController(MotorParams& params, float sample_time) :
+        observer(params.J, params.B, params.Kt, 100.0f, sample_time),
+        force_ctrl(0.5f, 0.1f, 50.0f, sample_time)
+    {
+        gear_ratio = params.gear_ratio;
+        lever_arm = params.lever_arm;
+    }
+
+    float compute(float force_ref, float motor_torque, float velocity) {
+        // 외부 토크 추정
+        auto obs = observer.estimate(motor_torque, velocity);
+
+        // 추정된 외력 계산
+        float estimated_force = obs.external_torque / (gear_ratio * lever_arm);
+
+        // 힘 제어
+        float torque_cmd = force_ctrl.compute(force_ref, estimated_force);
+
+        return torque_cmd;
+    }
+};</code></pre>
+
+        <h2>4.10 토크 제어와 AI</h2>
+        <p>AI를 활용하여 토크 제어 성능을 향상시킬 수 있습니다:</p>
+
+        <pre><code>// AI 기반 토크 리플 학습 보상
+class AITorqueRippleCompensator {
+private:
+    // 신경망: 각도 → 보상 토크
+    NeuralNetwork compensator_nn;
+
+    // 온라인 학습 데이터
+    CircularBuffer<float> angle_buffer;
+    CircularBuffer<float> ripple_buffer;
+
+    bool learning_enabled;
+
+public:
+    AITorqueRippleCompensator() :
+        compensator_nn(2, 32, 1),  // 입력: [sin(theta), cos(theta)]
+        angle_buffer(1000),
+        ripple_buffer(1000)
+    {
+        learning_enabled = true;
+    }
+
+    float compensate(float theta_e, float measured_ripple = 0) {
+        // 입력 특성
+        float sin_theta = sin(theta_e);
+        float cos_theta = cos(theta_e);
+        vector<float> input = {sin_theta, cos_theta};
+
+        // 보상값 예측
+        float compensation = compensator_nn.predict(input);
+
+        // 온라인 학습
+        if (learning_enabled && measured_ripple != 0) {
+            angle_buffer.push(theta_e);
+            ripple_buffer.push(measured_ripple);
+
+            // 배치 학습
+            if (angle_buffer.size() >= 100) {
+                train_batch();
+            }
+        }
+
+        return compensation;
+    }
+
+    void train_batch() {
+        // 수집된 데이터로 신경망 업데이트
+        vector<vector<float>> inputs;
+        vector<float> targets;
+
+        for (int i = 0; i < angle_buffer.size(); i++) {
+            float theta = angle_buffer[i];
+            inputs.push_back({sin(theta), cos(theta)});
+            targets.push_back(ripple_buffer[i]);
+        }
+
+        compensator_nn.train(inputs, targets, 10);  // 10 에포크
+
+        // 버퍼 클리어
+        angle_buffer.clear();
+        ripple_buffer.clear();
+    }
+};
+
+// 강화학습 기반 임피던스 파라미터 조정
+class RLImpedanceController {
+private:
+    ImpedanceController base_controller;
+    RLAgent rl_agent;
+
+    // 상태 정규화
+    float max_force;
+    float max_position_error;
+
+public:
+    RLImpedanceController(float sample_time) :
+        base_controller(1.0f, 10.0f, 100.0f, sample_time),
+        rl_agent(4, 3)  // 상태 4차원, 액션 3차원 (M, B, K)
+    {
+        max_force = 50.0f;
+        max_position_error = 0.1f;
+    }
+
+    float compute(float x_ref, float x_actual, float v_actual,
+                  float force_actual) {
+        // 상태 구성
+        vector<float> state = {
+            (x_actual - x_ref) / max_position_error,
+            v_actual / 1.0f,
+            force_actual / max_force,
+            (force_actual - last_force) / max_force  // 힘 변화율
+        };
+
+        // RL 에이전트가 임피던스 파라미터 결정
+        vector<float> action = rl_agent.select_action(state);
+
+        // 액션을 파라미터로 변환
+        float M = 0.5f + 2.0f * (action[0] + 1) / 2;  // 0.5 ~ 2.5 kg
+        float B = 5.0f + 45.0f * (action[1] + 1) / 2; // 5 ~ 50 Ns/m
+        float K = 50.0f + 450.0f * (action[2] + 1) / 2; // 50 ~ 500 N/m
+
+        base_controller.set_impedance(M, B, K);
+
+        // 제어 계산
+        float output = base_controller.compute(x_actual, v_actual, force_actual);
+
+        // 보상 계산 및 학습
+        float reward = compute_reward(x_ref, x_actual, force_actual);
+        rl_agent.store_experience(state, action, reward);
+
+        last_force = force_actual;
+        return output;
+    }
+
+private:
+    float last_force = 0;
+
+    float compute_reward(float x_ref, float x_actual, float force) {
+        float pos_error = fabs(x_actual - x_ref);
+        float force_penalty = fabs(force) > 10.0f ? (fabs(force) - 10.0f) : 0;
+
+        return -pos_error - 0.1f * force_penalty;
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>토크 제어는 전류 제어로 구현되며, T = K<sub>t</sub> × I 관계를 활용합니다</li>
+                <li>전류 루프는 가장 빠른 응답이 필요하며, 일반적으로 PI 제어를 사용합니다</li>
+                <li>FOC(계자 배향 제어)는 3상 모터를 DC 모터처럼 제어할 수 있게 합니다</li>
+                <li>SVPWM은 3상 인버터의 효율적인 PWM 변조 방법입니다</li>
+                <li>토크 리플은 코깅 토크와 역기전력 고조파로 발생하며 보상이 필요합니다</li>
+                <li>임피던스 제어는 위치와 힘 사이의 관계(강성, 감쇠)를 제어합니다</li>
+                <li>하이브리드 제어는 방향에 따라 힘/위치 제어를 선택합니다</li>
+                <li>토크 관측기로 힘 센서 없이 외부 힘을 추정할 수 있습니다</li>
+                <li>AI는 토크 리플 보상과 임피던스 파라미터 최적화에 활용됩니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>토크 제어가 전류 제어로 구현되는 이유를 설명하시오.</li>
+                <li>FOC에서 d-q 변환의 목적과 장점을 설명하시오.</li>
+                <li>SVPWM이 일반 정현파 PWM보다 좋은 이유를 설명하시오.</li>
+                <li>토크 리플의 원인 두 가지와 각각의 보상 방법을 설명하시오.</li>
+                <li>임피던스 제어에서 M, B, K 파라미터의 의미를 설명하시오.</li>
+                <li>하이브리드 힘/위치 제어가 필요한 응용 예를 드시오.</li>
+                <li>토크 관측기의 원리와 센서리스 힘 제어 구현 방법을 설명하시오.</li>
+                <li>AI가 토크 제어 성능을 향상시킬 수 있는 방법을 두 가지 설명하시오.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:16px;margin-top:10px;">널리 인간을 이롭게 하라</p>
+        </div>
+
+        </div>
+</body>
+</html>

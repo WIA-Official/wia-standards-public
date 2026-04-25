@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 인식 알고리즘 및 AI | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>5장: 인식 알고리즘 및 AI</h1>
+
+        <h2>5.1 AI 기반 센서 융합</h2>
+        <p>딥러닝과 센서 융합의 융합은 인식을 위한 강력한 새로운 패러다임을 만들어냈습니다. 칼만 필터와 같은 전통적인 융합 알고리즘은 센서와 역학의 명시적인 수학적 모델에 의존합니다. AI 기반 접근 방식은 이러한 모델을 데이터에서 직접 학습하여 분석적으로 모델링하기 어려운 복잡한 관계를 포착할 수 있습니다.</p>
+
+        <p>이 장에서는 인공 지능, 특히 딥러닝이 센서 융합을 어떻게 변화시키고 있는지 살펴봅니다. 다중 모달 융합을 위한 신경망 아키텍처, 엔드투엔드 학습 접근 방식, 고전적 방법과 AI 기반 방법의 강점을 결합하는 하이브리드 시스템을 검토합니다.</p>
+
+        <h2>5.2 딥러닝 융합 아키텍처</h2>
+        <p>신경망은 다중 센서 데이터를 결합하는 방법을 학습하기 위한 유연한 아키텍처를 제공합니다:</p>
+
+        <h3>초기 융합 (Early Fusion)</h3>
+        <pre><code>import torch
+import torch.nn as nn
+
+class EarlyFusionNetwork(nn.Module):
+    """
+    초기 융합: 다중 모달 입력을 연결하고 공동으로 처리
+
+    장점: 원시 데이터에서 교차 모달 상관관계 학습 가능
+    단점: 정렬된 입력 필요, 계산 비용 높음
+    """
+    def __init__(self, camera_channels, lidar_points, radar_features, output_dim):
+        super().__init__()
+
+        # 카메라 인코더
+        self.camera_encoder = nn.Sequential(
+            nn.Conv2d(camera_channels, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Flatten(),
+            nn.Linear(128 * 64 * 64, 512)
+        )
+
+        # LiDAR 인코더 (PointNet 스타일)
+        self.lidar_encoder = nn.Sequential(
+            nn.Linear(3, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 256)
+        )
+
+        # 레이더 인코더
+        self.radar_encoder = nn.Sequential(
+            nn.Linear(radar_features, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128)
+        )
+
+        # 융합 레이어 (연결 후)
+        self.fusion_layers = nn.Sequential(
+            nn.Linear(512 + 256 + 128, 512),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, output_dim)
+        )
+
+    def forward(self, camera_img, lidar_points, radar_data):
+        # 각 모달리티 인코딩
+        camera_features = self.camera_encoder(camera_img)
+
+        # PointNet: 각 점 인코딩 후 최대 풀링
+        lidar_point_features = self.lidar_encoder(lidar_points)
+        lidar_features = torch.max(lidar_point_features, dim=1)[0]
+
+        radar_features = self.radar_encoder(radar_data)
+
+        # 초기 융합: 모든 특징 연결
+        fused = torch.cat([camera_features, lidar_features, radar_features], dim=1)
+
+        # 출력 예측
+        return self.fusion_layers(fused)</code></pre>
+
+        <h3>후기 융합 (Late Fusion)</h3>
+        <pre><code>class LateFusionNetwork(nn.Module):
+    """
+    후기 융합: 모달리티를 독립적으로 처리한 후 결정 수준에서 융합
+
+    장점: 모달리티별 학습, 누락된 모달리티 처리 가능
+    단점: 제한된 교차 모달 학습
+    """
+    def __init__(self, num_classes):
+        super().__init__()
+
+        # 독립적인 모달리티 네트워크
+        self.camera_net = CameraDetector(num_classes)
+        self.lidar_net = LiDARDetector(num_classes)
+        self.radar_net = RadarDetector(num_classes)
+
+        # 융합 네트워크
+        self.fusion_net = nn.Sequential(
+            nn.Linear(num_classes * 3, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes),
+            nn.Softmax(dim=1)
+        )
+
+        # 학습된 신뢰도 가중치
+        self.modality_weights = nn.Parameter(torch.ones(3) / 3)
+
+    def forward(self, camera_img, lidar_points, radar_data, modality_mask=None):
+        # 각 모달리티에서 예측 얻기
+        camera_logits = self.camera_net(camera_img)
+        lidar_logits = self.lidar_net(lidar_points)
+        radar_logits = self.radar_net(radar_data)
+
+        if modality_mask is None:
+            modality_mask = torch.ones(3, device=camera_logits.device)
+
+        # 가중 융합
+        weights = torch.softmax(self.modality_weights * modality_mask, dim=0)
+
+        # 가중 평균
+        fused_logits = (weights[0] * camera_logits +
+                       weights[1] * lidar_logits +
+                       weights[2] * radar_logits)
+
+        return fused_logits, weights</code></pre>
+
+        <h3>어텐션 기반 융합</h3>
+        <pre><code>class AttentionFusionNetwork(nn.Module):
+    """
+    어텐션 기반 융합: 컨텍스트에 따라 동적으로 모달리티 가중치 부여
+
+    트랜스포머 스타일 어텐션을 사용하여 각 센서를 언제 신뢰할지 학습
+    """
+    def __init__(self, feature_dim=256, num_modalities=3, num_heads=8):
+        super().__init__()
+
+        self.feature_dim = feature_dim
+        self.num_modalities = num_modalities
+
+        # 모달리티 인코더 (공통 차원으로 투영)
+        self.camera_encoder = CameraEncoder(output_dim=feature_dim)
+        self.lidar_encoder = LiDAREncoder(output_dim=feature_dim)
+        self.radar_encoder = RadarEncoder(output_dim=feature_dim)
+
+        # 학습 가능한 모달리티 임베딩
+        self.modality_embeddings = nn.Parameter(
+            torch.randn(num_modalities, feature_dim)
+        )
+
+        # 교차 모달 어텐션
+        self.cross_attention = nn.MultiheadAttention(
+            embed_dim=feature_dim,
+            num_heads=num_heads,
+            batch_first=True
+        )
+
+        # 자기 어텐션
+        self.self_attention = nn.MultiheadAttention(
+            embed_dim=feature_dim,
+            num_heads=num_heads,
+            batch_first=True
+        )
+
+        # 출력 투영
+        self.output_projection = nn.Linear(feature_dim, feature_dim)
+
+    def forward(self, camera_img, lidar_points, radar_data):
+        batch_size = camera_img.shape[0]
+
+        # 각 모달리티 인코딩
+        camera_features = self.camera_encoder(camera_img)
+        lidar_features = self.lidar_encoder(lidar_points)
+        radar_features = self.radar_encoder(radar_data)
+
+        # 모달리티 특징 스택
+        modality_features = torch.stack(
+            [camera_features, lidar_features, radar_features], dim=1
+        )
+
+        # 모달리티 임베딩 추가
+        modality_features = modality_features + self.modality_embeddings
+
+        # 교차 모달 어텐션
+        attended_features, attention_weights = self.cross_attention(
+            modality_features,
+            modality_features,
+            modality_features
+        )
+
+        # 자기 어텐션으로 최종 융합
+        fused_features, _ = self.self_attention(
+            attended_features,
+            attended_features,
+            attended_features
+        )
+
+        # 모달리티에 걸쳐 풀링
+        fused = torch.mean(fused_features, dim=1)
+
+        return self.output_projection(fused), attention_weights</code></pre>
+
+        <h2>5.3 신경망에서의 불확실성 추정</h2>
+        <p>신뢰할 수 있는 센서 융합은 시스템이 언제 불확실한지 알아야 합니다:</p>
+
+        <pre><code>class UncertaintyAwareFusion(nn.Module):
+    """
+    불확실성 추정이 내장된 신경망
+
+    예측 불확실성을 정량화하는 여러 접근 방식 사용
+    """
+    def __init__(self, input_dim, output_dim, num_mc_samples=10):
+        super().__init__()
+
+        self.num_mc_samples = num_mc_samples
+
+        # MC 드롭아웃 불확실성을 위한 드롭아웃이 있는 인코더
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2)
+        )
+
+        # 평균 예측 헤드
+        self.mean_head = nn.Linear(128, output_dim)
+
+        # 분산 예측 헤드 (이분산 불확실성)
+        self.var_head = nn.Sequential(
+            nn.Linear(128, output_dim),
+            nn.Softplus()  # 양의 분산 보장
+        )
+
+    def forward(self, x, return_uncertainty=True):
+        features = self.encoder(x)
+
+        # 평균 및 분산 예측
+        mean = self.mean_head(features)
+        variance = self.var_head(features)  # 우연적 불확실성
+
+        if not return_uncertainty:
+            return mean
+
+        return mean, variance
+
+    def predict_with_uncertainty(self, x):
+        """
+        MC 드롭아웃 + 학습된 분산을 사용한 전체 불확실성 추정
+        """
+        self.train()  # 드롭아웃 활성화
+
+        # MC 드롭아웃 샘플
+        mc_means = []
+        mc_vars = []
+
+        for _ in range(self.num_mc_samples):
+            mean, var = self.forward(x)
+            mc_means.append(mean)
+            mc_vars.append(var)
+
+        mc_means = torch.stack(mc_means, dim=0)
+        mc_vars = torch.stack(mc_vars, dim=0)
+
+        # 최종 예측
+        predictive_mean = mc_means.mean(dim=0)
+
+        # 인식론적 불확실성 (모델 불확실성)
+        epistemic_uncertainty = mc_means.var(dim=0)
+
+        # 우연적 불확실성 (데이터 불확실성)
+        aleatoric_uncertainty = mc_vars.mean(dim=0)
+
+        # 총 불확실성
+        total_uncertainty = epistemic_uncertainty + aleatoric_uncertainty
+
+        self.eval()
+
+        return {
+            'mean': predictive_mean,
+            'epistemic_uncertainty': epistemic_uncertainty,
+            'aleatoric_uncertainty': aleatoric_uncertainty,
+            'total_uncertainty': total_uncertainty
+        }</code></pre>
+
+        <h2>5.4 신경 칼만 필터</h2>
+        <p>칼만 필터링의 구조와 학습된 구성 요소를 결합:</p>
+
+        <pre><code>class NeuralKalmanFilter(nn.Module):
+    """
+    신경망 구성 요소가 있는 칼만 필터
+
+    해석 가능한 필터 구조를 유지하면서 학습:
+    - 관측 모델
+    - 프로세스 모델
+    - 노이즈 공분산
+    """
+    def __init__(self, state_dim, observation_dim, hidden_dim=128):
+        super().__init__()
+
+        self.state_dim = state_dim
+        self.obs_dim = observation_dim
+
+        # 학습된 관측 인코더
+        self.observation_encoder = nn.Sequential(
+            nn.Linear(observation_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, observation_dim)
+        )
+
+        # 학습된 프로세스 모델
+        self.process_model = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, state_dim)
+        )
+
+        # EKF를 위한 학습된 야코비안
+        self.F_net = nn.Linear(state_dim, state_dim * state_dim)
+        self.H_net = nn.Linear(state_dim, observation_dim * state_dim)
+
+        # 학습된 노이즈 공분산
+        self.Q_net = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, state_dim * state_dim)
+        )
+
+        self.R_net = nn.Sequential(
+            nn.Linear(observation_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, observation_dim * observation_dim)
+        )
+
+    def predict(self, x, P):
+        """
+        학습된 예측 단계
+        """
+        batch_size = x.shape[0]
+
+        # 학습된 상태 전이
+        x_pred = self.process_model(x)
+
+        # 학습된 야코비안
+        F = self.F_net(x).reshape(batch_size, self.state_dim, self.state_dim)
+
+        # 학습된 프로세스 노이즈
+        Q_vec = self.Q_net(x)
+        Q = self._make_positive_definite(Q_vec, self.state_dim)
+
+        # 공분산 예측
+        P_pred = torch.bmm(torch.bmm(F, P), F.transpose(1, 2)) + Q
+
+        return x_pred, P_pred, F
+
+    def update(self, x_pred, P_pred, z):
+        """
+        학습된 업데이트 단계
+        """
+        batch_size = x_pred.shape[0]
+
+        # 관측 인코딩
+        z_encoded = self.observation_encoder(z)
+
+        # 학습된 관측 야코비안
+        H = self.H_net(x_pred).reshape(batch_size, self.obs_dim, self.state_dim)
+
+        # 예측된 관측
+        z_pred = torch.bmm(H, x_pred.unsqueeze(2)).squeeze(2)
+
+        # 학습된 관측 노이즈
+        R_vec = self.R_net(z)
+        R = self._make_positive_definite(R_vec, self.obs_dim)
+
+        # 혁신
+        y = z_encoded - z_pred
+
+        # 혁신 공분산
+        S = torch.bmm(torch.bmm(H, P_pred), H.transpose(1, 2)) + R
+
+        # 칼만 이득
+        K = torch.bmm(torch.bmm(P_pred, H.transpose(1, 2)), torch.linalg.inv(S))
+
+        # 상태 업데이트
+        x_updated = x_pred + torch.bmm(K, y.unsqueeze(2)).squeeze(2)
+
+        # 공분산 업데이트
+        I_KH = torch.eye(self.state_dim).unsqueeze(0) - torch.bmm(K, H)
+        P_updated = torch.bmm(I_KH, P_pred)
+
+        return x_updated, P_updated, y, S</code></pre>
+
+        <h2>5.5 융합 네트워크 학습 전략</h2>
+        <table>
+            <tr>
+                <th>전략</th>
+                <th>설명</th>
+                <th>사용 사례</th>
+            </tr>
+            <tr>
+                <td><strong>공동 학습</strong></td>
+                <td>모든 모달리티를 엔드투엔드로 함께 학습</td>
+                <td>모든 모달리티에 충분한 데이터</td>
+            </tr>
+            <tr>
+                <td><strong>사전 학습 + 미세 조정</strong></td>
+                <td>모달리티 네트워크 사전 학습 후 융합 미세 조정</td>
+                <td>제한된 다중 모달 데이터</td>
+            </tr>
+            <tr>
+                <td><strong>지식 증류</strong></td>
+                <td>다중 모달에서 단일 모달로 전이</td>
+                <td>센서 서브셋으로 배포</td>
+            </tr>
+            <tr>
+                <td><strong>모달리티 드롭아웃</strong></td>
+                <td>학습 중 무작위로 모달리티 제거</td>
+                <td>센서 장애에 대한 강건성</td>
+            </tr>
+        </table>
+
+        <pre><code>class RobustFusionTrainer:
+    """
+    강건한 다중 모달 융합을 위한 학습 전략
+    """
+    def __init__(self, model, modalities, modality_dropout_prob=0.2):
+        self.model = model
+        self.modalities = modalities
+        self.modality_dropout_prob = modality_dropout_prob
+
+    def train_step(self, batch):
+        # 강건성을 위해 모달리티 드롭아웃 적용
+        available_modalities = self.apply_modality_dropout(batch)
+
+        # 모달리티 마스크 생성
+        modality_mask = {m: m in available_modalities for m in self.modalities}
+
+        # 사용 가능한 모달리티로 순전파
+        output = self.model(batch, modality_mask)
+
+        # 다중 작업 손실
+        loss = self.compute_loss(output, batch['labels'])
+
+        return loss
+
+    def apply_modality_dropout(self, batch):
+        """
+        학습 중 무작위로 모달리티 제거
+
+        최소 하나의 모달리티는 유지
+        """
+        available = list(self.modalities)
+
+        for modality in self.modalities:
+            if len(available) > 1 and np.random.random() < self.modality_dropout_prob:
+                available.remove(modality)
+                batch[modality] = None
+
+        return available</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>딥러닝은 복잡한 교차 모달 관계를 포착하는 강력한 학습 융합 전략을 가능하게 합니다</li>
+                <li>초기 융합은 원시 데이터를 결합하고, 후기 융합은 고수준 특징을 결합합니다</li>
+                <li>어텐션 기반 융합은 동적 가중치를 학습합니다</li>
+                <li>MC 드롭아웃, 앙상블 또는 학습된 분산을 통한 불확실성 추정이 필수적입니다</li>
+                <li>신경 칼만 필터는 해석 가능한 필터 구조와 학습된 구성 요소를 결합합니다</li>
+                <li>모달리티 드롭아웃과 같은 학습 전략은 센서 장애에 대한 강건성을 향상시킵니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>초기, 후기, 어텐션 기반 융합 아키텍처를 비교하세요. 각각의 트레이드오프는 무엇입니까?</li>
+                <li>학습 중 모달리티 드롭아웃이 융합 네트워크의 강건성을 어떻게 향상시킵니까?</li>
+                <li>우연적 불확실성과 인식론적 불확실성의 차이를 설명하세요. 각각 어떻게 추정할 수 있습니까?</li>
+                <li>신경 칼만 필터가 고전적 필터링과 딥러닝을 어떻게 결합하는지 설명하세요.</li>
+                <li>다중 모달 융합에 Bird's Eye View 표현을 사용하는 장점은 무엇입니까?</li>
+                <li>트랜스포머 어텐션 메커니즘이 센서 입력의 적응적 가중치 부여를 어떻게 가능하게 합니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+        </div>
+
+        </div>
+</body>
+</html>

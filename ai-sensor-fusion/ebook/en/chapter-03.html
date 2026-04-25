@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Kalman Filtering & State Estimation | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .formula{background:var(--bg-tertiary);padding:15px;border-radius:5px;margin:15px 0;font-family:monospace;text-align:center;font-size:16px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 3: Kalman Filtering & State Estimation</h1>
+
+        <h2>3.1 Introduction to State Estimation</h2>
+        <p>State estimation is the process of inferring the internal state of a dynamic system from noisy, incomplete observations. In sensor fusion, state estimation combines multiple sensor measurements to produce an optimal estimate of the system state along with its uncertainty.</p>
+
+        <p>The Kalman filter, developed by Rudolf E. Kalman in 1960, remains the foundational algorithm for optimal linear state estimation. Its elegance lies in providing the minimum variance estimate for linear systems with Gaussian noise. Extensions like the Extended Kalman Filter (EKF) and Unscented Kalman Filter (UKF) extend these principles to nonlinear systems.</p>
+
+        <p>Understanding Kalman filtering deeply is essential for any sensor fusion practitioner. This chapter provides comprehensive coverage of the theory, mathematics, and implementation of Kalman filter variants for multi-sensor fusion.</p>
+
+        <h2>3.2 Linear Kalman Filter Theory</h2>
+        <p>The Kalman filter operates on linear dynamic systems described by state-space equations:</p>
+
+        <h3>System Model</h3>
+        <div class="formula">
+            State Transition: x_k = F_k * x_{k-1} + B_k * u_k + w_k
+        </div>
+        <div class="formula">
+            Measurement Model: z_k = H_k * x_k + v_k
+        </div>
+
+        <p>Where:</p>
+        <ul>
+            <li><strong>x_k</strong>: State vector at time k</li>
+            <li><strong>F_k</strong>: State transition matrix</li>
+            <li><strong>B_k</strong>: Control input matrix</li>
+            <li><strong>u_k</strong>: Control input vector</li>
+            <li><strong>w_k</strong>: Process noise, w ~ N(0, Q)</li>
+            <li><strong>z_k</strong>: Measurement vector</li>
+            <li><strong>H_k</strong>: Measurement matrix</li>
+            <li><strong>v_k</strong>: Measurement noise, v ~ N(0, R)</li>
+        </ul>
+
+        <h3>The Kalman Filter Algorithm</h3>
+        <p>The filter operates in two phases: Prediction (time update) and Correction (measurement update).</p>
+
+        <pre><code>class KalmanFilter:
+    """
+    Linear Kalman Filter Implementation
+
+    Optimal state estimation for linear systems with Gaussian noise
+    """
+    def __init__(self, state_dim, measurement_dim):
+        self.n = state_dim
+        self.m = measurement_dim
+
+        # State estimate and covariance
+        self.x = np.zeros(self.n)           # State estimate
+        self.P = np.eye(self.n)             # State covariance
+
+        # System matrices
+        self.F = np.eye(self.n)             # State transition
+        self.H = np.zeros((self.m, self.n)) # Measurement matrix
+        self.Q = np.eye(self.n) * 0.01      # Process noise covariance
+        self.R = np.eye(self.m) * 0.1       # Measurement noise covariance
+        self.B = np.zeros((self.n, 1))      # Control input matrix
+
+    def predict(self, u=None, dt=None):
+        """
+        Prediction Step (Time Update)
+
+        Propagate state and covariance forward in time
+        """
+        # Update transition matrix if time-varying
+        if dt is not None:
+            self.update_transition_matrix(dt)
+
+        # State prediction: x_pred = F * x + B * u
+        if u is not None:
+            self.x = self.F @ self.x + self.B @ u
+        else:
+            self.x = self.F @ self.x
+
+        # Covariance prediction: P_pred = F * P * F^T + Q
+        self.P = self.F @ self.P @ self.F.T + self.Q
+
+        return self.x, self.P
+
+    def update(self, z):
+        """
+        Correction Step (Measurement Update)
+
+        Incorporate new measurement to refine state estimate
+        """
+        # Innovation (measurement residual): y = z - H * x
+        y = z - self.H @ self.x
+
+        # Innovation covariance: S = H * P * H^T + R
+        S = self.H @ self.P @ self.H.T + self.R
+
+        # Kalman gain: K = P * H^T * S^{-1}
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+
+        # State update: x = x + K * y
+        self.x = self.x + K @ y
+
+        # Covariance update: P = (I - K * H) * P
+        # Using Joseph form for numerical stability
+        I_KH = np.eye(self.n) - K @ self.H
+        self.P = I_KH @ self.P @ I_KH.T + K @ self.R @ K.T
+
+        return self.x, self.P, y, S
+
+    def update_transition_matrix(self, dt):
+        """
+        Update state transition matrix for given time step
+        Example: Constant velocity model
+        """
+        # Position-velocity model
+        # x = [px, py, vx, vy]
+        self.F = np.array([
+            [1, 0, dt, 0],
+            [0, 1, 0, dt],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ])
+
+        # Process noise (continuous white noise acceleration model)
+        q = self.process_noise_intensity
+        self.Q = np.array([
+            [dt**4/4, 0, dt**3/2, 0],
+            [0, dt**4/4, 0, dt**3/2],
+            [dt**3/2, 0, dt**2, 0],
+            [0, dt**3/2, 0, dt**2]
+        ]) * q</code></pre>
+
+        <h2>3.3 Understanding the Kalman Gain</h2>
+        <p>The Kalman gain K is the key to optimal fusion. It balances trust between the prediction and measurement based on their respective uncertainties:</p>
+
+        <div class="formula">
+            K = P * H^T * (H * P * H^T + R)^{-1}
+        </div>
+
+        <table>
+            <tr>
+                <th>Scenario</th>
+                <th>Kalman Gain Behavior</th>
+                <th>Interpretation</th>
+            </tr>
+            <tr>
+                <td><strong>R >> P</strong> (noisy sensor)</td>
+                <td>K approaches 0</td>
+                <td>Trust prediction more than measurement</td>
+            </tr>
+            <tr>
+                <td><strong>R << P</strong> (accurate sensor)</td>
+                <td>K approaches H^{-1}</td>
+                <td>Trust measurement more than prediction</td>
+            </tr>
+            <tr>
+                <td><strong>R = P</strong></td>
+                <td>K = 0.5 (for scalar)</td>
+                <td>Equal weight to prediction and measurement</td>
+            </tr>
+        </table>
+
+        <pre><code># Visualization of Kalman Gain Effect
+def demonstrate_kalman_gain():
+    """
+    Demonstrate how Kalman gain balances prediction and measurement
+    """
+    # Prior estimate
+    x_prior = 10.0
+    P_prior = 4.0    # Variance of prior
+
+    # Measurement
+    z = 12.0
+    R = 1.0          # Measurement variance
+
+    H = 1.0          # Direct measurement
+
+    # Compute Kalman gain
+    S = H * P_prior * H + R
+    K = P_prior * H / S
+
+    print(f"Kalman Gain K = {K:.3f}")
+    print(f"Interpretation: {K*100:.1f}% weight to measurement, {(1-K)*100:.1f}% to prior")
+
+    # Update
+    x_post = x_prior + K * (z - H * x_prior)
+    P_post = (1 - K * H) * P_prior
+
+    print(f"\nPrior: {x_prior:.2f} +/- {np.sqrt(P_prior):.2f}")
+    print(f"Measurement: {z:.2f} +/- {np.sqrt(R):.2f}")
+    print(f"Posterior: {x_post:.2f} +/- {np.sqrt(P_post):.2f}")
+
+    # Posterior is always between prior and measurement
+    # Posterior variance is always less than both
+
+# Output:
+# Kalman Gain K = 0.800
+# Interpretation: 80.0% weight to measurement, 20.0% to prior
+# Prior: 10.00 +/- 2.00
+# Measurement: 12.00 +/- 1.00
+# Posterior: 11.60 +/- 0.89</code></pre>
+
+        <h2>3.4 Multi-Sensor Kalman Fusion</h2>
+        <p>The Kalman filter naturally handles multiple sensors through sequential or parallel updates:</p>
+
+        <h3>Sequential Update</h3>
+        <pre><code>class MultiSensorKalmanFilter(KalmanFilter):
+    """
+    Kalman filter with multiple sensor support
+    """
+    def __init__(self, state_dim, sensors):
+        super().__init__(state_dim, measurement_dim=None)
+        self.sensors = {}
+        for sensor_id, config in sensors.items():
+            self.sensors[sensor_id] = {
+                'H': config['measurement_matrix'],
+                'R': config['noise_covariance']
+            }
+
+    def update_sequential(self, measurements):
+        """
+        Sequential update: Process one sensor at a time
+
+        Order doesn't affect final result (for linear Gaussian case)
+        """
+        for sensor_id, z in measurements.items():
+            if sensor_id not in self.sensors:
+                continue
+
+            H = self.sensors[sensor_id]['H']
+            R = self.sensors[sensor_id]['R']
+
+            # Standard Kalman update
+            y = z - H @ self.x
+            S = H @ self.P @ H.T + R
+            K = self.P @ H.T @ np.linalg.inv(S)
+
+            self.x = self.x + K @ y
+            I_KH = np.eye(self.n) - K @ H
+            self.P = I_KH @ self.P @ I_KH.T + K @ R @ K.T
+
+        return self.x, self.P
+
+    def update_batch(self, measurements):
+        """
+        Batch update: Stack all measurements and update once
+
+        More efficient for many sensors, mathematically equivalent
+        """
+        # Stack measurements, H matrices, and R matrices
+        z_stacked = []
+        H_stacked = []
+        R_blocks = []
+
+        for sensor_id, z in measurements.items():
+            if sensor_id not in self.sensors:
+                continue
+            z_stacked.append(z)
+            H_stacked.append(self.sensors[sensor_id]['H'])
+            R_blocks.append(self.sensors[sensor_id]['R'])
+
+        z_combined = np.concatenate(z_stacked)
+        H_combined = np.vstack(H_stacked)
+        R_combined = scipy.linalg.block_diag(*R_blocks)
+
+        # Single update with combined measurement
+        y = z_combined - H_combined @ self.x
+        S = H_combined @ self.P @ H_combined.T + R_combined
+        K = self.P @ H_combined.T @ np.linalg.inv(S)
+
+        self.x = self.x + K @ y
+        I_KH = np.eye(self.n) - K @ H_combined
+        self.P = I_KH @ self.P @ I_KH.T + K @ R_combined @ K.T
+
+        return self.x, self.P</code></pre>
+
+        <h2>3.5 Extended Kalman Filter (EKF)</h2>
+        <p>The Extended Kalman Filter handles nonlinear systems by linearizing about the current estimate. This is essential for most real-world sensor fusion applications:</p>
+
+        <div class="formula">
+            Nonlinear State Transition: x_k = f(x_{k-1}, u_k) + w_k
+        </div>
+        <div class="formula">
+            Nonlinear Measurement Model: z_k = h(x_k) + v_k
+        </div>
+
+        <pre><code>class ExtendedKalmanFilter:
+    """
+    Extended Kalman Filter for nonlinear systems
+
+    Linearizes about current estimate using Jacobians
+    """
+    def __init__(self, state_dim):
+        self.n = state_dim
+        self.x = np.zeros(self.n)
+        self.P = np.eye(self.n)
+        self.Q = np.eye(self.n) * 0.01
+
+    def predict(self, u, dt):
+        """
+        EKF Prediction with nonlinear state transition
+        """
+        # Nonlinear state prediction
+        self.x = self.f(self.x, u, dt)
+
+        # Compute Jacobian of f with respect to x
+        F = self.compute_F_jacobian(self.x, u, dt)
+
+        # Covariance prediction (same form as linear KF)
+        self.P = F @ self.P @ F.T + self.Q
+
+        return self.x, self.P
+
+    def update(self, z, sensor_id):
+        """
+        EKF Update with nonlinear measurement model
+        """
+        # Predicted measurement
+        z_pred = self.h(self.x, sensor_id)
+
+        # Compute Jacobian of h with respect to x
+        H = self.compute_H_jacobian(self.x, sensor_id)
+
+        # Get measurement noise for this sensor
+        R = self.get_R(sensor_id)
+
+        # Innovation
+        y = z - z_pred
+
+        # Handle angle wraparound if necessary
+        y = self.normalize_innovation(y, sensor_id)
+
+        # Innovation covariance
+        S = H @ self.P @ H.T + R
+
+        # Kalman gain
+        K = self.P @ H.T @ np.linalg.inv(S)
+
+        # State update
+        self.x = self.x + K @ y
+
+        # Covariance update (Joseph form)
+        I_KH = np.eye(self.n) - K @ H
+        self.P = I_KH @ self.P @ I_KH.T + K @ R @ K.T
+
+        return self.x, self.P
+
+    def f(self, x, u, dt):
+        """
+        Nonlinear state transition function
+        Example: 2D robot motion model
+        """
+        # State: [x, y, theta, v, omega]
+        px, py, theta, v, omega = x
+
+        # Velocity motion model
+        if abs(omega) > 1e-6:
+            px_new = px + v/omega * (np.sin(theta + omega*dt) - np.sin(theta))
+            py_new = py + v/omega * (-np.cos(theta + omega*dt) + np.cos(theta))
+        else:
+            px_new = px + v * dt * np.cos(theta)
+            py_new = py + v * dt * np.sin(theta)
+
+        theta_new = theta + omega * dt
+
+        return np.array([px_new, py_new, theta_new, v, omega])
+
+    def compute_F_jacobian(self, x, u, dt):
+        """
+        Compute Jacobian of state transition analytically or numerically
+        """
+        px, py, theta, v, omega = x
+
+        F = np.eye(5)
+
+        if abs(omega) > 1e-6:
+            F[0, 2] = v/omega * (np.cos(theta + omega*dt) - np.cos(theta))
+            F[0, 3] = 1/omega * (np.sin(theta + omega*dt) - np.sin(theta))
+            F[0, 4] = v/(omega**2) * (np.sin(theta) - np.sin(theta + omega*dt)) + \
+                      v/omega * np.cos(theta + omega*dt) * dt
+
+            F[1, 2] = v/omega * (np.sin(theta + omega*dt) - np.sin(theta))
+            F[1, 3] = 1/omega * (-np.cos(theta + omega*dt) + np.cos(theta))
+            F[1, 4] = v/(omega**2) * (-np.cos(theta) + np.cos(theta + omega*dt)) + \
+                      v/omega * np.sin(theta + omega*dt) * dt
+        else:
+            F[0, 2] = -v * dt * np.sin(theta)
+            F[0, 3] = dt * np.cos(theta)
+            F[1, 2] = v * dt * np.cos(theta)
+            F[1, 3] = dt * np.sin(theta)
+
+        F[2, 4] = dt
+
+        return F
+
+    def h(self, x, sensor_id):
+        """
+        Nonlinear measurement function
+        """
+        if sensor_id == 'gps':
+            # GPS measures position
+            return x[:2]
+        elif sensor_id == 'compass':
+            # Compass measures heading
+            return np.array([x[2]])
+        elif sensor_id == 'range_bearing':
+            # Range-bearing to landmark
+            px, py = x[:2]
+            lx, ly = self.landmark_position
+            dx, dy = lx - px, ly - py
+            r = np.sqrt(dx**2 + dy**2)
+            phi = np.arctan2(dy, dx) - x[2]
+            return np.array([r, phi])
+
+    def compute_H_jacobian(self, x, sensor_id):
+        """
+        Compute measurement Jacobian
+        """
+        if sensor_id == 'gps':
+            H = np.zeros((2, 5))
+            H[0, 0] = 1  # dx/dpx
+            H[1, 1] = 1  # dy/dpy
+            return H
+        elif sensor_id == 'compass':
+            H = np.zeros((1, 5))
+            H[0, 2] = 1  # dtheta/dtheta
+            return H
+        elif sensor_id == 'range_bearing':
+            px, py, theta = x[:3]
+            lx, ly = self.landmark_position
+            dx, dy = lx - px, ly - py
+            r = np.sqrt(dx**2 + dy**2)
+
+            H = np.zeros((2, 5))
+            H[0, 0] = -dx / r
+            H[0, 1] = -dy / r
+            H[1, 0] = dy / r**2
+            H[1, 1] = -dx / r**2
+            H[1, 2] = -1
+            return H</code></pre>
+
+        <h2>3.6 Unscented Kalman Filter (UKF)</h2>
+        <p>The Unscented Kalman Filter provides better handling of nonlinearities without requiring Jacobian computation. It uses sigma points to propagate the distribution through nonlinear functions:</p>
+
+        <table>
+            <tr>
+                <th>Aspect</th>
+                <th>EKF</th>
+                <th>UKF</th>
+            </tr>
+            <tr>
+                <td><strong>Linearization</strong></td>
+                <td>First-order Taylor expansion</td>
+                <td>Sigma point propagation</td>
+            </tr>
+            <tr>
+                <td><strong>Jacobian Required</strong></td>
+                <td>Yes, analytical or numerical</td>
+                <td>No</td>
+            </tr>
+            <tr>
+                <td><strong>Accuracy</strong></td>
+                <td>Second-order mean, first-order cov</td>
+                <td>Third-order mean, second-order cov</td>
+            </tr>
+            <tr>
+                <td><strong>Computational Cost</strong></td>
+                <td>Lower for small state</td>
+                <td>Higher (2n+1 sigma points)</td>
+            </tr>
+            <tr>
+                <td><strong>Robustness</strong></td>
+                <td>Can diverge for high nonlinearity</td>
+                <td>More robust to nonlinearity</td>
+            </tr>
+        </table>
+
+        <pre><code>class UnscentedKalmanFilter:
+    """
+    Unscented Kalman Filter implementation
+
+    Uses sigma points to capture mean and covariance through nonlinear transforms
+    """
+    def __init__(self, state_dim, alpha=1e-3, beta=2.0, kappa=0):
+        self.n = state_dim
+        self.x = np.zeros(self.n)
+        self.P = np.eye(self.n)
+
+        # UKF parameters
+        self.alpha = alpha  # Spread of sigma points
+        self.beta = beta    # Prior distribution (2 = Gaussian)
+        self.kappa = kappa  # Secondary scaling parameter
+
+        # Compute weights
+        self.lambda_ = alpha**2 * (self.n + kappa) - self.n
+        self._compute_weights()
+
+    def _compute_weights(self):
+        """
+        Compute sigma point weights for mean and covariance
+        """
+        n = self.n
+        lambda_ = self.lambda_
+
+        # Weights for mean
+        self.Wm = np.zeros(2*n + 1)
+        self.Wm[0] = lambda_ / (n + lambda_)
+        self.Wm[1:] = 1 / (2 * (n + lambda_))
+
+        # Weights for covariance
+        self.Wc = np.zeros(2*n + 1)
+        self.Wc[0] = lambda_ / (n + lambda_) + (1 - self.alpha**2 + self.beta)
+        self.Wc[1:] = 1 / (2 * (n + lambda_))
+
+    def _generate_sigma_points(self, x, P):
+        """
+        Generate sigma points around mean x with covariance P
+        """
+        n = self.n
+        sigma_points = np.zeros((2*n + 1, n))
+
+        # Central point
+        sigma_points[0] = x
+
+        # Square root of (n + lambda) * P
+        try:
+            sqrt_matrix = np.linalg.cholesky((n + self.lambda_) * P)
+        except np.linalg.LinAlgError:
+            # Fallback if not positive definite
+            sqrt_matrix = scipy.linalg.sqrtm((n + self.lambda_) * P)
+
+        # Sigma points
+        for i in range(n):
+            sigma_points[i + 1] = x + sqrt_matrix[i]
+            sigma_points[n + i + 1] = x - sqrt_matrix[i]
+
+        return sigma_points
+
+    def predict(self, u, dt):
+        """
+        UKF Prediction step
+        """
+        # Generate sigma points
+        sigma_points = self._generate_sigma_points(self.x, self.P)
+
+        # Propagate sigma points through nonlinear function
+        sigma_points_pred = np.zeros_like(sigma_points)
+        for i, sp in enumerate(sigma_points):
+            sigma_points_pred[i] = self.f(sp, u, dt)
+
+        # Compute predicted mean
+        self.x = np.sum(self.Wm[:, np.newaxis] * sigma_points_pred, axis=0)
+
+        # Compute predicted covariance
+        self.P = np.zeros((self.n, self.n))
+        for i, sp in enumerate(sigma_points_pred):
+            diff = sp - self.x
+            self.P += self.Wc[i] * np.outer(diff, diff)
+
+        # Add process noise
+        self.P += self.Q
+
+        return self.x, self.P
+
+    def update(self, z, sensor_id):
+        """
+        UKF Update step
+        """
+        # Generate sigma points from predicted state
+        sigma_points = self._generate_sigma_points(self.x, self.P)
+
+        # Transform sigma points through measurement function
+        m = len(z)
+        sigma_z = np.zeros((2*self.n + 1, m))
+        for i, sp in enumerate(sigma_points):
+            sigma_z[i] = self.h(sp, sensor_id)
+
+        # Predicted measurement mean
+        z_pred = np.sum(self.Wm[:, np.newaxis] * sigma_z, axis=0)
+
+        # Innovation covariance
+        R = self.get_R(sensor_id)
+        S = R.copy()
+        for i in range(2*self.n + 1):
+            diff = sigma_z[i] - z_pred
+            S += self.Wc[i] * np.outer(diff, diff)
+
+        # Cross-covariance
+        Pxz = np.zeros((self.n, m))
+        for i in range(2*self.n + 1):
+            diff_x = sigma_points[i] - self.x
+            diff_z = sigma_z[i] - z_pred
+            Pxz += self.Wc[i] * np.outer(diff_x, diff_z)
+
+        # Kalman gain
+        K = Pxz @ np.linalg.inv(S)
+
+        # Update
+        y = z - z_pred
+        self.x = self.x + K @ y
+        self.P = self.P - K @ S @ K.T
+
+        return self.x, self.P</code></pre>
+
+        <h2>3.7 Information Filter Form</h2>
+        <p>The Information Filter is an alternative parameterization of the Kalman filter that is often more natural for multi-sensor fusion and distributed systems:</p>
+
+        <div class="formula">
+            Information Matrix: Y = P^{-1}
+        </div>
+        <div class="formula">
+            Information Vector: y = P^{-1} * x
+        </div>
+
+        <pre><code>class InformationFilter:
+    """
+    Information Form of Kalman Filter
+
+    Advantages:
+    - Natural representation for sensor fusion
+    - Easy initialization with no prior (Y = 0)
+    - Supports distributed fusion with simple addition
+    """
+    def __init__(self, state_dim):
+        self.n = state_dim
+        self.Y = np.zeros((self.n, self.n))  # Information matrix
+        self.y = np.zeros(self.n)             # Information vector
+
+    @property
+    def x(self):
+        """Recover state estimate from information form"""
+        return np.linalg.solve(self.Y, self.y)
+
+    @property
+    def P(self):
+        """Recover covariance from information form"""
+        return np.linalg.inv(self.Y)
+
+    def predict(self, dt):
+        """
+        Information filter prediction
+        """
+        F = self.get_transition_matrix(dt)
+        Q = self.get_process_noise(dt)
+
+        # Convert to covariance form for prediction
+        P = np.linalg.inv(self.Y)
+        x = P @ self.y
+
+        # Standard prediction
+        x_pred = F @ x
+        P_pred = F @ P @ F.T + Q
+
+        # Convert back to information form
+        self.Y = np.linalg.inv(P_pred)
+        self.y = self.Y @ x_pred
+
+        return self.x, self.P
+
+    def update(self, z, H, R):
+        """
+        Information filter update - naturally additive!
+
+        This is why information filter is ideal for multi-sensor fusion
+        """
+        R_inv = np.linalg.inv(R)
+
+        # Information contribution from this measurement
+        info_matrix_contribution = H.T @ R_inv @ H
+        info_vector_contribution = H.T @ R_inv @ z
+
+        # Simply add to existing information!
+        self.Y += info_matrix_contribution
+        self.y += info_vector_contribution
+
+        return self.x, self.P
+
+    def fuse_with(self, other_info_filter):
+        """
+        Fuse information from another filter
+
+        In distributed systems, each node computes local information,
+        then fusion is just addition
+        """
+        self.Y += other_info_filter.Y
+        self.y += other_info_filter.y</code></pre>
+
+        <h2>3.8 Practical Implementation Considerations</h2>
+
+        <h3>Numerical Stability</h3>
+        <table>
+            <tr>
+                <th>Issue</th>
+                <th>Cause</th>
+                <th>Solution</th>
+            </tr>
+            <tr>
+                <td><strong>Covariance not positive definite</strong></td>
+                <td>Numerical errors accumulate</td>
+                <td>Use Joseph form update, symmetry enforcement</td>
+            </tr>
+            <tr>
+                <td><strong>Matrix inversion failure</strong></td>
+                <td>Singular or ill-conditioned matrices</td>
+                <td>Use pseudoinverse, add regularization</td>
+            </tr>
+            <tr>
+                <td><strong>State divergence</strong></td>
+                <td>Poor initialization or model mismatch</td>
+                <td>Monitor innovation, adaptive noise estimation</td>
+            </tr>
+            <tr>
+                <td><strong>Underflow/overflow</strong></td>
+                <td>Very small/large covariance values</td>
+                <td>Square-root filter, scaled representations</td>
+            </tr>
+        </table>
+
+        <pre><code>def ensure_positive_definite(P, epsilon=1e-6):
+    """
+    Ensure covariance matrix remains positive definite
+    """
+    # Enforce symmetry
+    P = (P + P.T) / 2
+
+    # Eigendecomposition
+    eigenvalues, eigenvectors = np.linalg.eigh(P)
+
+    # Clamp negative eigenvalues
+    eigenvalues = np.maximum(eigenvalues, epsilon)
+
+    # Reconstruct
+    P_fixed = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+
+    return P_fixed
+
+def joseph_form_update(P, K, H, R):
+    """
+    Joseph form covariance update - numerically stable
+    Guarantees symmetry and positive semi-definiteness
+    """
+    I = np.eye(P.shape[0])
+    I_KH = I - K @ H
+
+    P_new = I_KH @ P @ I_KH.T + K @ R @ K.T
+
+    # Enforce symmetry
+    P_new = (P_new + P_new.T) / 2
+
+    return P_new</code></pre>
+
+        <h2>3.9 Square-Root Filters</h2>
+        <p>Square-root filters maintain the Cholesky factor of the covariance rather than the covariance itself, providing enhanced numerical stability:</p>
+
+        <pre><code>class SquareRootKalmanFilter:
+    """
+    Square-Root Kalman Filter (Potter form)
+
+    Maintains Cholesky factor S where P = S @ S.T
+    Provides better numerical stability for ill-conditioned problems
+    """
+    def __init__(self, state_dim):
+        self.n = state_dim
+        self.x = np.zeros(self.n)
+        self.S = np.eye(self.n)  # Cholesky factor of covariance
+
+    @property
+    def P(self):
+        """Recover full covariance"""
+        return self.S @ self.S.T
+
+    def predict(self, F, Q_sqrt):
+        """
+        Square-root prediction using QR decomposition
+        """
+        # Propagate state
+        self.x = F @ self.x
+
+        # Propagate covariance factor
+        # [F @ S, Q_sqrt] -> QR decomposition -> new S
+        A = np.hstack([F @ self.S, Q_sqrt])
+        _, R = np.linalg.qr(A.T)
+        self.S = R[:self.n, :self.n].T
+
+        return self.x, self.P
+
+    def update(self, z, H, R_sqrt):
+        """
+        Square-root update using Cholesky downdate
+        """
+        # Innovation
+        y = z - H @ self.x
+
+        # Innovation covariance factor
+        B = np.vstack([R_sqrt, H @ self.S])
+        _, S_y = np.linalg.qr(B)
+        S_y = S_y[:len(z), :len(z)]
+
+        # Kalman gain
+        K = np.linalg.solve(S_y.T, np.linalg.solve(S_y, H @ self.S.T @ self.S)).T
+
+        # Update state
+        self.x = self.x + K @ y
+
+        # Update covariance factor using Cholesky downdate
+        U = K @ S_y
+        for j in range(U.shape[1]):
+            self.S = cholupdate(self.S, U[:, j], '-')
+
+        return self.x, self.P</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>The Kalman filter provides optimal state estimation for linear Gaussian systems</li>
+                <li>Prediction propagates state forward; Update incorporates measurements</li>
+                <li>Kalman gain optimally balances prediction and measurement based on their uncertainties</li>
+                <li>Multi-sensor fusion is natural: sequential updates or batch processing</li>
+                <li>EKF extends to nonlinear systems via linearization using Jacobians</li>
+                <li>UKF uses sigma points for better nonlinear handling without requiring Jacobians</li>
+                <li>Information filter form enables natural sensor fusion through addition</li>
+                <li>Numerical stability requires careful implementation (Joseph form, square-root filters)</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Derive the Kalman gain equation starting from the Bayesian fusion of two Gaussian distributions.</li>
+                <li>Explain what happens to the Kalman gain when measurement noise R approaches zero or infinity.</li>
+                <li>Why is the order of sensor updates irrelevant for the linear Kalman filter?</li>
+                <li>Compare EKF and UKF: when would you choose one over the other?</li>
+                <li>What are the advantages of the information filter form for multi-sensor fusion?</li>
+                <li>Explain why the Joseph form update is more numerically stable than the standard form.</li>
+                <li>Design an EKF for fusing GPS and IMU data for vehicle localization. Define state, transition, and measurement models.</li>
+                <li>What is the computational complexity of the UKF vs EKF for a state dimension of n?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

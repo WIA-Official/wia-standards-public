@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Protocol | WIA-AI-ROBOT</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .warning{background:#dc2626;color:#fff;padding:15px;border-radius:5px;margin:20px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Phase 3 - Communication Protocol</h1>
+
+        <h2>6.1 AIRI Protocol Overview</h2>
+        <p>The AI-Robot Interface (AIRI) Protocol is the core communication protocol of the WIA-AI-ROBOT standard, designed for real-time, safety-critical AI-robot communication. It provides low-latency message exchange, reliability guarantees, and built-in safety mechanisms.</p>
+
+        <h3>Protocol Stack</h3>
+        <pre><code>┌─────────────────────────────────────┐
+│   Application Layer (Commands/Data) │
+├─────────────────────────────────────┤
+│   AIRI Protocol (Message Format)    │
+├─────────────────────────────────────┤
+│   Transport (WebSocket/MQTT/UDP)    │
+├─────────────────────────────────────┤
+│   Network (TCP/IP or UDP/IP)        │
+├─────────────────────────────────────┤
+│   Physical (Ethernet/WiFi/5G)       │
+└─────────────────────────────────────┘</code></pre>
+
+        <h2>6.2 Message Format Specification</h2>
+        <p>AIRI messages use an efficient binary format with optional JSON encoding:</p>
+
+        <h3>Binary Message Structure</h3>
+        <pre><code>AIRI Message Format (Binary):
+┌──────────┬──────────┬──────────┬────────────┬─────────┬────────┐
+│  Magic   │ Version  │  Type    │  Length    │ Payload │   CRC  │
+│ (4 bytes)│ (2 bytes)│ (2 bytes)│  (4 bytes) │ (N bytes│(4 bytes│
+└──────────┴──────────┴──────────┴────────────┴─────────┴────────┘
+
+Magic: 0x41495249 ('AIRI' in ASCII)
+Version: Protocol version (e.g., 0x0100 for v1.0)
+Type: Message type identifier
+Length: Payload length in bytes
+Payload: Message data (varies by type)
+CRC: CRC32 checksum for error detection</code></pre>
+
+        <h3>Message Types</h3>
+        <table>
+            <tr>
+                <th>Type Code</th>
+                <th>Message Type</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td><strong>0x0001</strong></td>
+                <td>HANDSHAKE</td>
+                <td>Connection establishment</td>
+            </tr>
+            <tr>
+                <td><strong>0x0002</strong></td>
+                <td>HEARTBEAT</td>
+                <td>Keep-alive and health check</td>
+            </tr>
+            <tr>
+                <td><strong>0x0010</strong></td>
+                <td>COMMAND</td>
+                <td>Robot command execution</td>
+            </tr>
+            <tr>
+                <td><strong>0x0011</strong></td>
+                <td>COMMAND_ACK</td>
+                <td>Command acknowledgment</td>
+            </tr>
+            <tr>
+                <td><strong>0x0012</strong></td>
+                <td>STATUS</td>
+                <td>Robot status update</td>
+            </tr>
+            <tr>
+                <td><strong>0x0020</strong></td>
+                <td>TELEMETRY</td>
+                <td>Sensor data streaming</td>
+            </tr>
+            <tr>
+                <td><strong>0x0030</strong></td>
+                <td>AI_REQUEST</td>
+                <td>AI inference request</td>
+            </tr>
+            <tr>
+                <td><strong>0x0031</strong></td>
+                <td>AI_RESPONSE</td>
+                <td>AI inference result</td>
+            </tr>
+            <tr>
+                <td><strong>0x0040</strong></td>
+                <td>SAFETY_STOP</td>
+                <td>Emergency stop signal</td>
+            </tr>
+            <tr>
+                <td><strong>0x00FF</strong></td>
+                <td>ERROR</td>
+                <td>Error notification</td>
+            </tr>
+        </table>
+
+        <h2>6.3 Connection Establishment</h2>
+        <p>AIRI protocol uses a handshake process to establish secure connections:</p>
+
+        <h3>Handshake Sequence</h3>
+        <pre><code>Client                                    Server
+  │                                           │
+  │─────── HANDSHAKE Request ────────────────>│
+  │  (capabilities, auth token, version)      │
+  │                                           │
+  │<──────── HANDSHAKE Response ──────────────│
+  │  (accepted, session_id, config)           │
+  │                                           │
+  │─────── HEARTBEAT ──────────────────────>  │
+  │                                           │
+  │<──────── HEARTBEAT ACK ───────────────────│
+  │                                           │
+  │           [Connection Active]             │
+</code></pre>
+
+        <h3>Handshake Message</h3>
+        <pre><code>{
+  "type": "handshake",
+  "version": "1.0",
+  "client": {
+    "type": "robot|ai_service|controller",
+    "id": "rb_001",
+    "capabilities": [...]
+  },
+  "auth": {
+    "method": "jwt|api_key|certificate",
+    "token": "..."
+  },
+  "requested_features": [
+    "telemetry_streaming",
+    "ai_inference",
+    "fleet_coordination"
+  ]
+}
+
+Response:
+{
+  "type": "handshake_response",
+  "status": "accepted",
+  "session_id": "sess_abc123",
+  "server_version": "1.0",
+  "enabled_features": [
+    "telemetry_streaming",
+    "ai_inference"
+  ],
+  "heartbeat_interval_ms": 1000,
+  "timeout_ms": 5000
+}</code></pre>
+
+        <h2>6.4 Real-Time Communication</h2>
+        <p>AIRI supports multiple transport mechanisms for different latency requirements:</p>
+
+        <table>
+            <tr>
+                <th>Transport</th>
+                <th>Latency</th>
+                <th>Reliability</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td><strong>WebSocket</strong></td>
+                <td>10-50ms</td>
+                <td>High (TCP)</td>
+                <td>Commands, status, general data</td>
+            </tr>
+            <tr>
+                <td><strong>UDP</strong></td>
+                <td>1-10ms</td>
+                <td>Best-effort</td>
+                <td>High-frequency telemetry</td>
+            </tr>
+            <tr>
+                <td><strong>MQTT</strong></td>
+                <td>50-200ms</td>
+                <td>Configurable QoS</td>
+                <td>Fleet coordination, events</td>
+            </tr>
+            <tr>
+                <td><strong>gRPC</strong></td>
+                <td>5-30ms</td>
+                <td>High (HTTP/2)</td>
+                <td>AI inference, RPC calls</td>
+            </tr>
+        </table>
+
+        <h2>6.5 Safety Interlocks</h2>
+        <p>Multi-layer safety mechanisms prevent dangerous operations:</p>
+
+        <h3>Safety Architecture</h3>
+        <pre><code>Layer 1: Command Validation
+├── Syntax check
+├── Parameter range validation
+├── Capability verification
+└── Workspace boundary check
+
+Layer 2: Conflict Detection
+├── Resource conflict check
+├── Concurrent command validation
+└── Priority resolution
+
+Layer 3: Safety Rules
+├── Speed limit enforcement
+├── Force limit verification
+├── Safety zone compliance
+└── Collision prediction
+
+Layer 4: Real-Time Monitoring
+├── Sensor-based obstacle detection
+├── Emergency stop monitoring
+└── Watchdog timer
+
+Layer 5: Fail-Safe
+├── Connection loss handling
+├── Heartbeat timeout
+└── Safe state guarantee</code></pre>
+
+        <h3>Safety Stop Protocol</h3>
+        <pre><code>// Emergency stop message (highest priority)
+{
+  "type": "safety_stop",
+  "priority": "critical",
+  "timestamp": "2025-01-15T10:30:45.123Z",
+  "reason": "obstacle_detected|emergency_button|connection_loss",
+  "source": "sensor|operator|system",
+  "stop_type": "immediate|controlled",
+  "affected_robots": ["rb_001", "rb_002"]
+}
+
+// Robot must:
+1. Stop all motion within 100ms
+2. Hold position safely
+3. Send acknowledgment
+4. Wait for resume command</code></pre>
+
+        <div class="warning">
+            <strong>Safety Critical:</strong> Safety stop commands bypass all queues and must be processed within 100ms. They cannot be overridden without explicit operator authorization.
+        </div>
+
+        <h2>6.6 Error Handling and Recovery</h2>
+        <p>Robust error handling ensures system reliability:</p>
+
+        <h3>Error Classification</h3>
+        <table>
+            <tr>
+                <th>Error Level</th>
+                <th>Action</th>
+                <th>Recovery</th>
+            </tr>
+            <tr>
+                <td><strong>Critical</strong></td>
+                <td>Immediate stop</td>
+                <td>Manual intervention required</td>
+            </tr>
+            <tr>
+                <td><strong>Error</strong></td>
+                <td>Abort current command</td>
+                <td>Automatic retry or fallback</td>
+            </tr>
+            <tr>
+                <td><strong>Warning</strong></td>
+                <td>Log and continue</td>
+                <td>Monitor for escalation</td>
+            </tr>
+            <tr>
+                <td><strong>Info</strong></td>
+                <td>Log only</td>
+                <td>No action needed</td>
+            </tr>
+        </table>
+
+        <h3>Retry Strategy</h3>
+        <pre><code>// Exponential backoff with jitter
+function retryCommand(command, attempt = 0) {
+  const maxAttempts = 3;
+  const baseDelay = 1000; // 1 second
+
+  if (attempt >= maxAttempts) {
+    return {status: "failed", reason: "max_retries_exceeded"};
+  }
+
+  try {
+    return executeCommand(command);
+  } catch (error) {
+    if (isRetriable(error)) {
+      const delay = baseDelay * Math.pow(2, attempt) +
+                    random(0, 1000); // jitter
+      sleep(delay);
+      return retryCommand(command, attempt + 1);
+    } else {
+      throw error; // Non-retriable error
+    }
+  }
+}</code></pre>
+
+        <h2>6.7 State Synchronization</h2>
+        <p>Maintaining consistent state across distributed systems:</p>
+
+        <h3>State Update Protocol</h3>
+        <pre><code>// State update with version control
+{
+  "type": "state_update",
+  "robot_id": "rb_001",
+  "timestamp": "2025-01-15T10:30:45.123Z",
+  "version": 1234, // Monotonically increasing
+  "state": {
+    "position": {"x": 4.2, "y": 3.0, "z": 0.0},
+    "mode": "executing",
+    "current_command": "cmd_123",
+    "battery": 85
+  },
+  "checksum": "sha256_hash_of_state"
+}
+
+// Conflict resolution: last-write-wins with version
+if (incoming.version > local.version) {
+  local.state = incoming.state;
+  local.version = incoming.version;
+}</code></pre>
+
+        <h2>6.8 Quality of Service (QoS)</h2>
+        <p>Different message types require different delivery guarantees:</p>
+
+        <table>
+            <tr>
+                <th>Message Type</th>
+                <th>QoS Level</th>
+                <th>Guarantee</th>
+            </tr>
+            <tr>
+                <td><strong>Commands</strong></td>
+                <td>QoS 2</td>
+                <td>Exactly once delivery</td>
+            </tr>
+            <tr>
+                <td><strong>Status</strong></td>
+                <td>QoS 1</td>
+                <td>At least once delivery</td>
+            </tr>
+            <tr>
+                <td><strong>Telemetry</strong></td>
+                <td>QoS 0</td>
+                <td>Best effort (latest value)</td>
+            </tr>
+            <tr>
+                <td><strong>Safety Stop</strong></td>
+                <td>QoS 2</td>
+                <td>Exactly once, high priority</td>
+            </tr>
+        </table>
+
+        <h2>6.9 Bandwidth Optimization</h2>
+        <p>Efficient use of network resources:</p>
+
+        <h3>Compression Strategies</h3>
+        <pre><code>// Adaptive compression based on payload size
+function selectCompression(payload) {
+  if (payload.size < 1KB) {
+    return "none"; // Overhead not worth it
+  } else if (payload.type === "image") {
+    return "jpeg"; // Lossy for images
+  } else if (payload.type === "point_cloud") {
+    return "lz4"; // Fast compression
+  } else {
+    return "gzip"; // General purpose
+  }
+}
+
+// Delta encoding for telemetry
+{
+  "type": "telemetry_delta",
+  "base_version": 1000,
+  "changes": {
+    "position.x": 4.2, // Only changed fields
+    "battery": 84
+  }
+}</code></pre>
+
+        <h2>6.10 Protocol Security</h2>
+        <p>Security measures to protect communication:</p>
+
+        <h3>Security Layers</h3>
+        <ul>
+            <li><strong>Transport Security:</strong> TLS 1.3 encryption for all connections</li>
+            <li><strong>Authentication:</strong> Mutual authentication using certificates or tokens</li>
+            <li><strong>Message Integrity:</strong> CRC32 checksums and optional HMAC signatures</li>
+            <li><strong>Replay Protection:</strong> Timestamp validation and nonce tracking</li>
+            <li><strong>Command Authorization:</strong> Permission checks before execution</li>
+        </ul>
+
+        <h3>Message Signing</h3>
+        <pre><code>{
+  "type": "command",
+  "command_id": "cmd_123",
+  "payload": {...},
+  "security": {
+    "timestamp": "2025-01-15T10:30:45.123Z",
+    "nonce": "random_value_12345",
+    "signature": "HMAC-SHA256(payload + timestamp + nonce)",
+    "signer": "ai_service_001"
+  }
+}
+
+// Verification steps:
+1. Check timestamp (must be within 5 minutes)
+2. Verify nonce not seen before
+3. Validate signature
+4. Check signer authorization</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>AIRI Protocol provides real-time, safety-critical communication for AI-robot systems</li>
+                <li>Binary message format with Magic, Version, Type, Length, Payload, and CRC fields</li>
+                <li>Ten standard message types from handshake to safety stop</li>
+                <li>Handshake process establishes secure connections with capability negotiation</li>
+                <li>Multiple transport options (WebSocket, UDP, MQTT, gRPC) for different latency needs</li>
+                <li>Five-layer safety architecture from command validation to fail-safe mechanisms</li>
+                <li>Safety stop commands must be processed within 100ms and cannot be overridden</li>
+                <li>Error handling includes classification, retry strategies, and recovery procedures</li>
+                <li>QoS levels ensure appropriate delivery guarantees for different message types</li>
+                <li>Security through TLS encryption, authentication, message signing, and replay protection</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the six fields in the AIRI binary message format?</li>
+                <li>List five message types in the AIRI protocol and explain their purposes.</li>
+                <li>Describe the handshake sequence for establishing an AIRI connection.</li>
+                <li>Compare the four transport mechanisms (WebSocket, UDP, MQTT, gRPC) in terms of latency and reliability.</li>
+                <li>Explain the five layers of the safety architecture.</li>
+                <li>What must happen when a safety stop command is received?</li>
+                <li>How does the protocol classify errors and what recovery actions are taken for each level?</li>
+                <li>Describe the exponential backoff retry strategy with jitter.</li>
+                <li>What QoS levels are used for commands, status, telemetry, and safety stop messages?</li>
+                <li>What are the five security layers that protect AIRI protocol communication?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

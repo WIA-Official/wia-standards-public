@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Trajectory Planning & Motion Profiles | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 3: Trajectory Planning & Motion Profiles</h1>
+
+        <h2>3.1 Introduction to Motion Profiles</h2>
+        <p>Motion profiles define how a motor moves from one position to another over time. A well-designed motion profile ensures smooth, efficient movement while respecting the physical limitations of the motor and mechanical system. The profile specifies position, velocity, and acceleration as functions of time.</p>
+
+        <p>The primary goals of motion profile generation are:</p>
+        <ul>
+            <li><strong>Smooth motion:</strong> Minimize vibration and mechanical stress</li>
+            <li><strong>Respect limits:</strong> Stay within velocity, acceleration, and jerk constraints</li>
+            <li><strong>Time optimization:</strong> Achieve the movement in minimum time when required</li>
+            <li><strong>Energy efficiency:</strong> Minimize power consumption for the movement</li>
+            <li><strong>Precision:</strong> Accurate positioning at the endpoint</li>
+        </ul>
+
+        <h2>3.2 Motion Profile Types Comparison</h2>
+        <table>
+            <tr>
+                <th>Profile Type</th>
+                <th>Continuity</th>
+                <th>Jerk</th>
+                <th>Smoothness</th>
+                <th>Complexity</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td><strong>Trapezoidal</strong></td>
+                <td>Velocity continuous</td>
+                <td>Infinite at corners</td>
+                <td>Low</td>
+                <td>Simple</td>
+                <td>Basic positioning</td>
+            </tr>
+            <tr>
+                <td><strong>S-Curve</strong></td>
+                <td>Acceleration continuous</td>
+                <td>Finite, constant</td>
+                <td>Medium</td>
+                <td>Moderate</td>
+                <td>Industrial automation</td>
+            </tr>
+            <tr>
+                <td><strong>Polynomial (5th order)</strong></td>
+                <td>Jerk continuous</td>
+                <td>Varies smoothly</td>
+                <td>High</td>
+                <td>Moderate</td>
+                <td>Robotics</td>
+            </tr>
+            <tr>
+                <td><strong>Polynomial (7th order)</strong></td>
+                <td>Snap continuous</td>
+                <td>Smooth jerk</td>
+                <td>Very High</td>
+                <td>Complex</td>
+                <td>Precision motion</td>
+            </tr>
+            <tr>
+                <td><strong>Spline</strong></td>
+                <td>Configurable</td>
+                <td>Smooth</td>
+                <td>High</td>
+                <td>Complex</td>
+                <td>Multi-point paths</td>
+            </tr>
+        </table>
+
+        <h2>3.3 Trapezoidal Velocity Profile</h2>
+        <p>The trapezoidal profile is the simplest motion profile, consisting of constant acceleration, constant velocity (cruise), and constant deceleration phases:</p>
+
+        <pre><code>Trapezoidal Velocity Profile:
+
+Velocity
+   ^
+   |      ___________
+   |     /           \
+   |    /             \
+   |   /               \
+   |  /                 \
+   |_/___________________\____> Time
+   0  t1        t2      t3
+
+Phase 1 (0 to t1): Acceleration
+   v(t) = a_max * t
+   x(t) = 0.5 * a_max * t²
+
+Phase 2 (t1 to t2): Cruise (constant velocity)
+   v(t) = v_max
+   x(t) = x1 + v_max * (t - t1)
+
+Phase 3 (t2 to t3): Deceleration
+   v(t) = v_max - a_max * (t - t2)
+   x(t) = x2 + v_max * (t - t2) - 0.5 * a_max * (t - t2)²</code></pre>
+
+        <pre><code>// Trapezoidal Profile Generator
+class TrapezoidalProfile {
+private:
+    float pos_start, pos_end;
+    float v_max, a_max;
+    float t1, t2, t3;           // Phase transition times
+    float x1, x2;               // Position at phase transitions
+    float direction;            // +1 or -1
+
+public:
+    void plan(float start, float end, float max_vel, float max_accel) {
+        pos_start = start;
+        pos_end = end;
+        v_max = max_vel;
+        a_max = max_accel;
+
+        float distance = fabs(end - start);
+        direction = (end >= start) ? 1.0f : -1.0f;
+
+        // Time to reach max velocity
+        float t_accel = v_max / a_max;
+
+        // Distance during acceleration/deceleration
+        float d_accel = 0.5f * a_max * t_accel * t_accel;
+
+        if (2 * d_accel >= distance) {
+            // Triangular profile (can't reach max velocity)
+            t_accel = sqrt(distance / a_max);
+            t1 = t_accel;
+            t2 = t_accel;  // No cruise phase
+            t3 = 2 * t_accel;
+            x1 = 0.5f * distance;
+            x2 = x1;
+        } else {
+            // Full trapezoidal profile
+            float d_cruise = distance - 2 * d_accel;
+            float t_cruise = d_cruise / v_max;
+
+            t1 = t_accel;
+            t2 = t_accel + t_cruise;
+            t3 = 2 * t_accel + t_cruise;
+            x1 = d_accel;
+            x2 = d_accel + d_cruise;
+        }
+    }
+
+    void evaluate(float t, float* pos, float* vel, float* accel) {
+        float t_local = t;
+
+        if (t < 0) {
+            *pos = pos_start;
+            *vel = 0;
+            *accel = 0;
+        } else if (t < t1) {
+            // Acceleration phase
+            *accel = direction * a_max;
+            *vel = direction * a_max * t;
+            *pos = pos_start + direction * 0.5f * a_max * t * t;
+        } else if (t < t2) {
+            // Cruise phase
+            float v_cruise = a_max * t1;
+            *accel = 0;
+            *vel = direction * v_cruise;
+            *pos = pos_start + direction * (x1 + v_cruise * (t - t1));
+        } else if (t < t3) {
+            // Deceleration phase
+            float dt = t - t2;
+            float v_cruise = a_max * t1;
+            *accel = -direction * a_max;
+            *vel = direction * (v_cruise - a_max * dt);
+            *pos = pos_start + direction * (x2 + v_cruise * dt - 0.5f * a_max * dt * dt);
+        } else {
+            *pos = pos_end;
+            *vel = 0;
+            *accel = 0;
+        }
+    }
+
+    float get_duration() { return t3; }
+};</code></pre>
+
+        <h2>3.4 S-Curve (Jerk-Limited) Profile</h2>
+        <p>S-curve profiles limit jerk (rate of change of acceleration) for smoother motion with reduced vibration:</p>
+
+        <pre><code>S-Curve Profile (7 Phases):
+
+Acceleration
+   ^
+   |   ___
+   |  /   \
+   | /     \
+   |/       \_______________
+   |                        \
+   |                         \___
+   |_____________________________\____> Time
+   0  t1  t2  t3    t4    t5  t6  t7
+
+Phase 1: Jerk-limited acceleration increase
+Phase 2: Constant max acceleration
+Phase 3: Jerk-limited acceleration decrease
+Phase 4: Constant velocity (cruise)
+Phase 5: Jerk-limited deceleration start
+Phase 6: Constant max deceleration
+Phase 7: Jerk-limited deceleration end</code></pre>
+
+        <pre><code>// S-Curve Profile Generator
+class SCurveProfile {
+private:
+    float j_max;    // Maximum jerk
+    float a_max;    // Maximum acceleration
+    float v_max;    // Maximum velocity
+    float pos_start, pos_end;
+
+    // Phase times
+    float t[8];     // t[0]=0, t[1] through t[7] are phase end times
+
+public:
+    void plan(float start, float end, float max_jerk,
+              float max_accel, float max_vel) {
+        pos_start = start;
+        pos_end = end;
+        j_max = max_jerk;
+        a_max = max_accel;
+        v_max = max_vel;
+
+        float distance = fabs(end - start);
+
+        // Time to reach max acceleration with max jerk
+        float t_jerk = a_max / j_max;
+
+        // Velocity gained during jerk-limited acceleration
+        float v_jerk_phase = 0.5f * j_max * t_jerk * t_jerk;
+
+        // Calculate phase durations...
+        // (Complex calculations for all 7 phases)
+        calculate_phase_times(distance);
+    }
+
+    void evaluate(float t_in, float* pos, float* vel,
+                  float* accel, float* jerk) {
+        // Determine current phase and compute outputs
+        int phase = get_phase(t_in);
+        float t_phase = t_in - t[phase - 1];
+
+        // Initial conditions for this phase
+        float p0, v0, a0;
+        get_phase_initial_conditions(phase, &p0, &v0, &a0);
+
+        // Jerk for this phase
+        float j = get_phase_jerk(phase);
+
+        // Kinematic equations with constant jerk
+        *jerk = j;
+        *accel = a0 + j * t_phase;
+        *vel = v0 + a0 * t_phase + 0.5f * j * t_phase * t_phase;
+        *pos = p0 + v0 * t_phase + 0.5f * a0 * t_phase * t_phase
+               + (1.0f/6.0f) * j * t_phase * t_phase * t_phase;
+    }
+
+private:
+    void calculate_phase_times(float distance) {
+        // Phase 1: Jerk = +j_max (acceleration increasing)
+        // Phase 2: Jerk = 0 (constant acceleration = a_max)
+        // Phase 3: Jerk = -j_max (acceleration decreasing to 0)
+        // Phase 4: Jerk = 0 (cruise at v_max)
+        // Phase 5: Jerk = -j_max (deceleration starting)
+        // Phase 6: Jerk = 0 (constant deceleration = -a_max)
+        // Phase 7: Jerk = +j_max (deceleration ending)
+
+        float tj = a_max / j_max;  // Jerk phase duration
+
+        // Velocity at end of phase 1 (and start of phase 3)
+        float v_at_tj = 0.5f * j_max * tj * tj;
+
+        // Velocity gained during phases 1, 2, 3 combined
+        float v_accel = v_max;  // Assuming we reach v_max
+
+        // Time at constant acceleration (phase 2)
+        float ta = (v_max - 2 * v_at_tj) / a_max;
+
+        if (ta < 0) {
+            // Cannot reach max acceleration, recalculate
+            ta = 0;
+            // Solve for actual jerk phase duration
+        }
+
+        // Distance during acceleration phases (1,2,3)
+        float d_accel = calculate_accel_distance(tj, ta);
+
+        // Cruise distance and time
+        float d_cruise = distance - 2 * d_accel;
+        float t_cruise = d_cruise / v_max;
+
+        if (t_cruise < 0) {
+            // Cannot reach max velocity, need to reduce profile
+            t_cruise = 0;
+            // Recalculate for triangular velocity profile
+        }
+
+        // Fill in phase times
+        t[0] = 0;
+        t[1] = tj;
+        t[2] = tj + ta;
+        t[3] = 2 * tj + ta;
+        t[4] = 2 * tj + ta + t_cruise;
+        t[5] = 3 * tj + ta + t_cruise;
+        t[6] = 3 * tj + 2 * ta + t_cruise;
+        t[7] = 4 * tj + 2 * ta + t_cruise;
+    }
+
+    float calculate_accel_distance(float tj, float ta);
+    int get_phase(float t);
+    void get_phase_initial_conditions(int phase, float* p, float* v, float* a);
+    float get_phase_jerk(int phase);
+};</code></pre>
+
+        <h2>3.5 Polynomial Trajectories</h2>
+        <p>Polynomial trajectories provide smooth motion by ensuring continuity of position, velocity, acceleration, and higher derivatives at waypoints.</p>
+
+        <h3>Fifth-Order (Quintic) Polynomial</h3>
+        <p>A quintic polynomial can satisfy 6 boundary conditions (position, velocity, and acceleration at start and end):</p>
+
+        <div class="formula">x(t) = a<sub>0</sub> + a<sub>1</sub>t + a<sub>2</sub>t² + a<sub>3</sub>t³ + a<sub>4</sub>t⁴ + a<sub>5</sub>t⁵</div>
+
+        <pre><code>// Quintic Polynomial Trajectory
+class QuinticTrajectory {
+private:
+    float a[6];  // Polynomial coefficients
+    float T;     // Duration
+
+public:
+    void plan(float x0, float v0, float a0,    // Start conditions
+              float xf, float vf, float af,    // End conditions
+              float duration) {
+        T = duration;
+        float T2 = T * T;
+        float T3 = T2 * T;
+        float T4 = T3 * T;
+        float T5 = T4 * T;
+
+        // Solve for coefficients from boundary conditions
+        a[0] = x0;
+        a[1] = v0;
+        a[2] = a0 / 2.0f;
+
+        // Matrix solution for a3, a4, a5
+        // [x(T) ]   [T³    T⁴    T⁵  ] [a3]   [xf - x0 - v0*T - 0.5*a0*T²]
+        // [v(T) ] = [3T²   4T³   5T⁴ ] [a4] + [vf - v0 - a0*T            ]
+        // [a(T) ]   [6T    12T²  20T³] [a5]   [af - a0                   ]
+
+        float dx = xf - x0 - v0 * T - 0.5f * a0 * T2;
+        float dv = vf - v0 - a0 * T;
+        float da = af - a0;
+
+        // Solve using matrix inverse (or Cramer's rule)
+        float det = 2 * T3 * T3;  // Determinant
+
+        a[3] = (20 * dx - (8 * dv + da * T) * T) / (2 * T3);
+        a[4] = (-30 * dx + (14 * dv + 2 * da * T) * T) / (2 * T4);
+        a[5] = (12 * dx - (6 * dv + da * T) * T) / (2 * T5);
+    }
+
+    void evaluate(float t, float* pos, float* vel,
+                  float* accel, float* jerk) {
+        float t2 = t * t;
+        float t3 = t2 * t;
+        float t4 = t3 * t;
+        float t5 = t4 * t;
+
+        *pos = a[0] + a[1]*t + a[2]*t2 + a[3]*t3 + a[4]*t4 + a[5]*t5;
+        *vel = a[1] + 2*a[2]*t + 3*a[3]*t2 + 4*a[4]*t3 + 5*a[5]*t4;
+        *accel = 2*a[2] + 6*a[3]*t + 12*a[4]*t2 + 20*a[5]*t3;
+        *jerk = 6*a[3] + 24*a[4]*t + 60*a[5]*t2;
+    }
+};</code></pre>
+
+        <h2>3.6 Multi-Point Trajectory with Cubic Splines</h2>
+        <p>For paths through multiple waypoints, cubic splines provide smooth interpolation:</p>
+
+        <pre><code>// Cubic Spline Trajectory for Multiple Waypoints
+class CubicSplineTrajectory {
+private:
+    vector<float> waypoints;    // Position waypoints
+    vector<float> times;        // Time at each waypoint
+    vector<float> a, b, c, d;   // Spline coefficients for each segment
+
+public:
+    void plan(vector<float> positions, vector<float> timestamps) {
+        waypoints = positions;
+        times = timestamps;
+        int n = positions.size() - 1;  // Number of segments
+
+        // Allocate coefficient arrays
+        a.resize(n); b.resize(n); c.resize(n); d.resize(n);
+
+        // Natural cubic spline (second derivative = 0 at endpoints)
+        vector<float> h(n);  // Segment durations
+        for (int i = 0; i < n; i++) {
+            h[i] = times[i + 1] - times[i];
+        }
+
+        // Solve tridiagonal system for second derivatives
+        vector<float> alpha(n), l(n + 1), mu(n + 1), z(n + 1);
+
+        for (int i = 1; i < n; i++) {
+            alpha[i] = 3.0f / h[i] * (positions[i + 1] - positions[i])
+                     - 3.0f / h[i - 1] * (positions[i] - positions[i - 1]);
+        }
+
+        l[0] = 1; mu[0] = 0; z[0] = 0;
+
+        for (int i = 1; i < n; i++) {
+            l[i] = 2 * (times[i + 1] - times[i - 1]) - h[i - 1] * mu[i - 1];
+            mu[i] = h[i] / l[i];
+            z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+        }
+
+        l[n] = 1; z[n] = 0;
+        vector<float> c_temp(n + 1);
+        c_temp[n] = 0;
+
+        for (int j = n - 1; j >= 0; j--) {
+            c_temp[j] = z[j] - mu[j] * c_temp[j + 1];
+            b[j] = (positions[j + 1] - positions[j]) / h[j]
+                 - h[j] * (c_temp[j + 1] + 2 * c_temp[j]) / 3.0f;
+            d[j] = (c_temp[j + 1] - c_temp[j]) / (3.0f * h[j]);
+            a[j] = positions[j];
+            c[j] = c_temp[j];
+        }
+    }
+
+    void evaluate(float t, float* pos, float* vel, float* accel) {
+        // Find segment
+        int seg = 0;
+        for (int i = 0; i < times.size() - 1; i++) {
+            if (t >= times[i] && t < times[i + 1]) {
+                seg = i;
+                break;
+            }
+            if (i == times.size() - 2) seg = i;
+        }
+
+        float dt = t - times[seg];
+        float dt2 = dt * dt;
+        float dt3 = dt2 * dt;
+
+        *pos = a[seg] + b[seg] * dt + c[seg] * dt2 + d[seg] * dt3;
+        *vel = b[seg] + 2 * c[seg] * dt + 3 * d[seg] * dt2;
+        *accel = 2 * c[seg] + 6 * d[seg] * dt;
+    }
+};</code></pre>
+
+        <h2>3.7 Time-Optimal Trajectory Planning</h2>
+        <p>Time-optimal trajectories achieve movement in minimum time while respecting constraints:</p>
+
+        <pre><code>// Time-Optimal Point-to-Point Motion
+class TimeOptimalPlanner {
+public:
+    struct Limits {
+        float v_max;     // Maximum velocity
+        float a_max;     // Maximum acceleration
+        float j_max;     // Maximum jerk (optional)
+    };
+
+    static float compute_minimum_time(float distance, Limits limits) {
+        if (limits.j_max > 0) {
+            // Jerk-limited (S-curve) minimum time
+            return compute_scurve_min_time(distance, limits);
+        } else {
+            // Acceleration-limited (trapezoidal) minimum time
+            return compute_trap_min_time(distance, limits);
+        }
+    }
+
+private:
+    static float compute_trap_min_time(float d, Limits L) {
+        // Check if triangular or trapezoidal
+        float t_acc = L.v_max / L.a_max;
+        float d_acc = 0.5f * L.a_max * t_acc * t_acc;
+
+        if (2 * d_acc >= d) {
+            // Triangular: T = 2 * sqrt(d / a_max)
+            return 2.0f * sqrt(d / L.a_max);
+        } else {
+            // Trapezoidal: T = 2*t_acc + d_cruise/v_max
+            float d_cruise = d - 2 * d_acc;
+            return 2.0f * t_acc + d_cruise / L.v_max;
+        }
+    }
+
+    static float compute_scurve_min_time(float d, Limits L) {
+        float tj = L.a_max / L.j_max;
+        float ta = L.v_max / L.a_max - tj;
+
+        if (ta < 0) {
+            // Cannot reach max acceleration
+            ta = 0;
+            tj = sqrt(L.v_max / L.j_max);
+        }
+
+        // Distance during acceleration phases
+        float d_acc = L.v_max * (tj + ta);
+
+        if (2 * d_acc >= d) {
+            // Need to reduce velocity, iterative solution
+            return solve_reduced_velocity(d, L);
+        } else {
+            float d_cruise = d - 2 * d_acc;
+            float t_cruise = d_cruise / L.v_max;
+            return 2 * (2 * tj + ta) + t_cruise;
+        }
+    }
+
+    static float solve_reduced_velocity(float d, Limits L);
+};</code></pre>
+
+        <h2>3.8 Blending and Continuous Motion</h2>
+        <p>For multi-segment motion without stopping at waypoints, trajectory blending creates continuous paths:</p>
+
+        <pre><code>// Trajectory Blending at Waypoints
+class TrajectoryBlender {
+public:
+    struct Segment {
+        float start_pos;
+        float end_pos;
+        float velocity;     // Target velocity at waypoint
+        float blend_radius; // Radius for circular blending
+    };
+
+    // Circular blend at corner
+    static void circular_blend(Segment seg1, Segment seg2,
+                               float blend_time, TrajectorySegment* output) {
+        // Calculate blend arc parameters
+        float v1_dir = (seg1.end_pos > seg1.start_pos) ? 1 : -1;
+        float v2_dir = (seg2.end_pos > seg2.start_pos) ? 1 : -1;
+
+        float v_blend = min(seg1.velocity, seg2.velocity);
+        float r_blend = v_blend * blend_time / 2;  // Blend radius
+
+        // Centripetal acceleration during blend
+        float a_centripetal = v_blend * v_blend / r_blend;
+
+        // Generate circular arc trajectory
+        output->type = CIRCULAR_BLEND;
+        output->radius = r_blend;
+        output->velocity = v_blend;
+        output->duration = blend_time;
+    }
+
+    // Polynomial blend (ensure velocity continuity)
+    static void polynomial_blend(float t_blend,
+                                 float v_in, float v_out,
+                                 float pos_in, float pos_out,
+                                 PolySegment* output) {
+        // Use cubic polynomial to smoothly transition
+        float a0 = pos_in;
+        float a1 = v_in;
+        float a2 = (3 * (pos_out - pos_in) - (2 * v_in + v_out) * t_blend)
+                   / (t_blend * t_blend);
+        float a3 = (-2 * (pos_out - pos_in) + (v_in + v_out) * t_blend)
+                   / (t_blend * t_blend * t_blend);
+
+        output->coeffs[0] = a0;
+        output->coeffs[1] = a1;
+        output->coeffs[2] = a2;
+        output->coeffs[3] = a3;
+        output->duration = t_blend;
+    }
+};</code></pre>
+
+        <h2>3.9 Online Trajectory Generation</h2>
+        <p>Real-time trajectory generation adapts to changing targets while maintaining smoothness:</p>
+
+        <pre><code>// Online Trajectory Generator (Third-Order Filter)
+class OnlineTrajectoryGenerator {
+private:
+    // Current state
+    float position;
+    float velocity;
+    float acceleration;
+
+    // Limits
+    float v_max, a_max, j_max;
+
+    // Target
+    float target_position;
+
+    float dt;
+
+public:
+    OnlineTrajectoryGenerator(float sample_time) {
+        dt = sample_time;
+        position = 0;
+        velocity = 0;
+        acceleration = 0;
+    }
+
+    void set_limits(float max_vel, float max_accel, float max_jerk) {
+        v_max = max_vel;
+        a_max = max_accel;
+        j_max = max_jerk;
+    }
+
+    void set_target(float new_target) {
+        target_position = new_target;
+    }
+
+    void update(float* pos_out, float* vel_out, float* acc_out) {
+        // Calculate position error
+        float pos_error = target_position - position;
+
+        // Calculate required deceleration distance
+        float stopping_distance = calculate_stopping_distance();
+
+        // Determine desired acceleration
+        float desired_accel;
+
+        if (fabs(pos_error) <= stopping_distance) {
+            // Need to decelerate
+            desired_accel = calculate_decel_accel(pos_error);
+        } else {
+            // Can accelerate toward target
+            desired_accel = (pos_error > 0) ? a_max : -a_max;
+        }
+
+        // Limit velocity
+        float next_vel = velocity + acceleration * dt;
+        if (fabs(next_vel) > v_max) {
+            desired_accel = 0;
+        }
+
+        // Apply jerk limit
+        float accel_error = desired_accel - acceleration;
+        float jerk = clamp(accel_error / dt, -j_max, j_max);
+
+        // Integrate
+        acceleration += jerk * dt;
+        acceleration = clamp(acceleration, -a_max, a_max);
+
+        velocity += acceleration * dt;
+        velocity = clamp(velocity, -v_max, v_max);
+
+        position += velocity * dt;
+
+        *pos_out = position;
+        *vel_out = velocity;
+        *acc_out = acceleration;
+    }
+
+private:
+    float calculate_stopping_distance() {
+        // Distance to stop from current velocity with max deceleration
+        return velocity * velocity / (2.0f * a_max)
+             + fabs(velocity) * a_max / (2.0f * j_max);
+    }
+
+    float calculate_decel_accel(float error);
+};</code></pre>
+
+        <h2>3.10 Multi-Axis Coordination</h2>
+        <p>For multi-axis systems, coordinated motion ensures all axes reach endpoints simultaneously:</p>
+
+        <pre><code>// Multi-Axis Coordinated Motion
+class CoordinatedMotion {
+public:
+    struct AxisConfig {
+        float start, end;
+        float v_max, a_max, j_max;
+    };
+
+    static void plan_synchronized(vector<AxisConfig>& axes,
+                                   vector<TrajectoryProfile>& profiles) {
+        // Find the axis that requires the longest time
+        float max_time = 0;
+        int slowest_axis = 0;
+
+        for (int i = 0; i < axes.size(); i++) {
+            float distance = fabs(axes[i].end - axes[i].start);
+            float time = compute_minimum_time(distance, axes[i]);
+            if (time > max_time) {
+                max_time = time;
+                slowest_axis = i;
+            }
+        }
+
+        // Scale other axes to match slowest axis time
+        for (int i = 0; i < axes.size(); i++) {
+            if (i == slowest_axis) {
+                // Use full limits for slowest axis
+                profiles[i] = plan_trajectory(axes[i], max_time);
+            } else {
+                // Scale down limits to match duration
+                float distance = fabs(axes[i].end - axes[i].start);
+                AxisConfig scaled = scale_limits(axes[i], distance, max_time);
+                profiles[i] = plan_trajectory(scaled, max_time);
+            }
+        }
+    }
+
+private:
+    static AxisConfig scale_limits(AxisConfig orig,
+                                   float distance, float target_time) {
+        // Reduce velocity/acceleration to achieve target_time
+        AxisConfig scaled = orig;
+
+        // Binary search for velocity that gives target_time
+        float v_low = 0, v_high = orig.v_max;
+        while (v_high - v_low > 0.001f) {
+            float v_mid = (v_low + v_high) / 2;
+            scaled.v_max = v_mid;
+            float time = compute_minimum_time(distance, scaled);
+            if (time < target_time) {
+                v_high = v_mid;
+            } else {
+                v_low = v_mid;
+            }
+        }
+
+        scaled.v_max = v_low;
+        return scaled;
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Motion profiles define position, velocity, and acceleration as functions of time</li>
+                <li>Trapezoidal profiles are simple but have infinite jerk at transitions</li>
+                <li>S-curve profiles limit jerk for smoother motion and reduced vibration</li>
+                <li>Polynomial trajectories (quintic, septic) provide configurable smoothness at boundaries</li>
+                <li>Cubic splines enable smooth interpolation through multiple waypoints</li>
+                <li>Time-optimal planning minimizes movement time within physical constraints</li>
+                <li>Trajectory blending allows continuous motion through waypoints without stopping</li>
+                <li>Online trajectory generation enables real-time adaptation to changing targets</li>
+                <li>Multi-axis coordination synchronizes multiple motors to complete motion simultaneously</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the advantages and disadvantages of trapezoidal vs. S-curve motion profiles?</li>
+                <li>Why is jerk limiting important in precision motion systems?</li>
+                <li>How many boundary conditions can a quintic polynomial satisfy? What are they?</li>
+                <li>Explain how a triangular velocity profile arises in trapezoidal trajectory planning.</li>
+                <li>What is the purpose of trajectory blending and when would you use it?</li>
+                <li>Describe the trade-off between smoothness and time in trajectory planning.</li>
+                <li>How does online trajectory generation differ from pre-planned trajectories?</li>
+                <li>In multi-axis coordination, why must all axes complete motion at the same time?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

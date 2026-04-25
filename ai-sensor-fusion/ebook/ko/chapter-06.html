@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 불확실성 관리 및 신뢰성 | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>6장: 불확실성 관리 및 신뢰성</h1>
+
+        <h2>6.1 불확실성의 중요성</h2>
+        <p>불확실성 관리는 신뢰할 수 있는 센서 융합의 초석입니다. 모든 측정, 모델 및 예측은 어느 정도의 불확실성을 가지고 있습니다. 이 불확실성을 적절히 정량화하고 전파하지 못하면 안전에 중요한 응용 프로그램에서 잠재적으로 치명적인 결과를 초래할 수 있는 과신 결정으로 이어질 수 있습니다.</p>
+
+        <p>센서 융합 시스템은 "상태가 무엇인가?"뿐만 아니라 "이 추정에 얼마나 확신하는가?"라는 질문에도 답해야 합니다. 추정이 신뢰할 수 없을 때를 인식하는 능력은 추가 센서 데이터 요청, 속도 감소 또는 인간 운영자에게 제어 이양과 같은 적절한 대응을 가능하게 합니다.</p>
+
+        <h2>6.2 불확실성 원천</h2>
+        <table>
+            <tr>
+                <th>원천</th>
+                <th>유형</th>
+                <th>특성</th>
+                <th>완화</th>
+            </tr>
+            <tr>
+                <td><strong>센서 노이즈</strong></td>
+                <td>우연적</td>
+                <td>고유한 측정 무작위성</td>
+                <td>필터링, 평균화, 더 나은 센서</td>
+            </tr>
+            <tr>
+                <td><strong>모델 오류</strong></td>
+                <td>인식론적</td>
+                <td>불완전한 시스템 모델</td>
+                <td>더 나은 모델, 적응 추정</td>
+            </tr>
+            <tr>
+                <td><strong>캘리브레이션 오류</strong></td>
+                <td>체계적</td>
+                <td>불완전한 캘리브레이션으로 인한 바이어스</td>
+                <td>온라인 캘리브레이션, 바이어스 추정</td>
+            </tr>
+            <tr>
+                <td><strong>환경적</strong></td>
+                <td>컨텍스트 의존</td>
+                <td>날씨, 조명, 간섭</td>
+                <td>다중 센서 융합, 적응</td>
+            </tr>
+            <tr>
+                <td><strong>연관</strong></td>
+                <td>이산적</td>
+                <td>잘못된 데이터 대응</td>
+                <td>확률적 연관, MHT</td>
+            </tr>
+        </table>
+
+        <h2>6.3 공분산 표현 및 전파</h2>
+        <p>공분산 행렬은 가우시안 기반 융합 시스템에서 불확실성의 주요 표현입니다:</p>
+
+        <pre><code>class CovarianceManager:
+    """
+    센서 융합에서 불확실성 표현 및 전파 관리
+    """
+    def __init__(self, state_dim):
+        self.state_dim = state_dim
+
+    def propagate_linear(self, P, F, Q):
+        """
+        선형 변환을 통한 공분산 전파
+
+        P_new = F @ P @ F.T + Q
+        """
+        return F @ P @ F.T + Q
+
+    def propagate_unscented(self, P, f, Q, alpha=1e-3, beta=2, kappa=0):
+        """
+        무향 변환을 사용한 공분산 전파
+
+        비선형 함수에 대해 더 정확
+        """
+        n = self.state_dim
+        lambda_ = alpha**2 * (n + kappa) - n
+
+        # 시그마 포인트 생성
+        sqrt_P = np.linalg.cholesky((n + lambda_) * P)
+        sigma_points = np.zeros((2*n + 1, n))
+        sigma_points[0] = self.x
+
+        for i in range(n):
+            sigma_points[i + 1] = self.x + sqrt_P[i]
+            sigma_points[n + i + 1] = self.x - sqrt_P[i]
+
+        # 시그마 포인트 변환
+        transformed = np.array([f(sp) for sp in sigma_points])
+
+        # 가중치 계산
+        Wm = np.zeros(2*n + 1)
+        Wc = np.zeros(2*n + 1)
+        Wm[0] = lambda_ / (n + lambda_)
+        Wc[0] = Wm[0] + (1 - alpha**2 + beta)
+        Wm[1:] = Wc[1:] = 1 / (2 * (n + lambda_))
+
+        # 평균 및 공분산 계산
+        mean = np.sum(Wm[:, np.newaxis] * transformed, axis=0)
+        P_new = Q.copy()
+
+        for i, sp in enumerate(transformed):
+            diff = sp - mean
+            P_new += Wc[i] * np.outer(diff, diff)
+
+        return mean, P_new
+
+    def ensure_positive_definite(self, P, min_eigenvalue=1e-6):
+        """
+        공분산 행렬이 양정치임을 보장
+
+        수치 안정성에 필수
+        """
+        # 대칭화
+        P = (P + P.T) / 2
+
+        # 고유분해
+        eigenvalues, eigenvectors = np.linalg.eigh(P)
+
+        # 고유값 클램핑
+        eigenvalues = np.maximum(eigenvalues, min_eigenvalue)
+
+        # 재구성
+        P_fixed = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+
+        return P_fixed</code></pre>
+
+        <h2>6.4 결함 감지 및 분리</h2>
+        <p>신뢰할 수 있는 센서 융합은 센서 결함을 감지하고 처리해야 합니다:</p>
+
+        <pre><code>class FaultDetector:
+    """
+    융합 시스템에서 센서 결함 감지 및 분리
+    """
+    def __init__(self, sensors, chi2_threshold=0.99):
+        self.sensors = sensors
+        self.chi2_threshold = chi2_threshold
+        self.fault_history = {s: [] for s in sensors}
+        self.sensor_status = {s: 'healthy' for s in sensors}
+
+    def detect_innovation_fault(self, sensor_id, innovation, innovation_cov):
+        """
+        혁신 (측정 잔차)에 대한 카이제곱 테스트
+
+        큰 혁신은 센서 결함 또는 모델 불일치를 나타냄
+        """
+        dim = len(innovation)
+        threshold = scipy.stats.chi2.ppf(self.chi2_threshold, dim)
+
+        # 정규화된 혁신 제곱 (NIS)
+        try:
+            nis = innovation @ np.linalg.solve(innovation_cov, innovation)
+        except np.linalg.LinAlgError:
+            nis = float('inf')
+
+        fault_detected = nis > threshold
+
+        self.fault_history[sensor_id].append({
+            'timestamp': time.time(),
+            'nis': nis,
+            'threshold': threshold,
+            'fault': fault_detected
+        })
+
+        return fault_detected, nis, threshold
+
+    def update_sensor_status(self, sensor_id, fault_detected):
+        """
+        결함 기록을 기반으로 센서 상태 업데이트
+        """
+        history = self.fault_history[sensor_id][-10:]
+
+        if len(history) < 5:
+            return
+
+        fault_rate = sum(1 for h in history if h['fault']) / len(history)
+
+        if fault_rate > 0.8:
+            self.sensor_status[sensor_id] = 'failed'
+        elif fault_rate > 0.5:
+            self.sensor_status[sensor_id] = 'degraded'
+        elif fault_rate > 0.2:
+            self.sensor_status[sensor_id] = 'suspicious'
+        else:
+            self.sensor_status[sensor_id] = 'healthy'
+
+
+class FaultTolerantFusion:
+    """
+    내장된 결함 허용 기능이 있는 센서 융합
+    """
+    def __init__(self, sensors, estimator):
+        self.sensors = sensors
+        self.estimator = estimator
+        self.fault_detector = FaultDetector(list(sensors.keys()))
+
+    def fuse_with_fault_handling(self, measurements, dt):
+        """
+        자동 결함 감지 및 복구로 융합 수행
+        """
+        # 예측 단계
+        self.estimator.predict(dt)
+
+        # 업데이트 전 결함 감지
+        faults = self.fault_detector.detect_consistency_fault(
+            measurements,
+            self.estimator.x,
+            self.estimator.P
+        )
+
+        # 결함 측정 필터링
+        valid_measurements = {}
+        for sensor_id, meas in measurements.items():
+            if not faults.get(sensor_id, {}).get('fault', False):
+                valid_measurements[sensor_id] = meas
+            else:
+                logging.warning(f"결함 센서 제외: {sensor_id}")
+                self.fault_detector.update_sensor_status(sensor_id, True)
+
+        # 유효한 센서가 너무 적으면 불확실성 증가
+        if len(valid_measurements) < 2:
+            self.estimator.P *= 1.5
+
+        # 유효한 측정으로만 업데이트
+        for sensor_id, meas in valid_measurements.items():
+            H = self.sensors[sensor_id]['H']
+            R = self.sensors[sensor_id]['R']
+            self.estimator.update(meas, H, R)
+            self.fault_detector.update_sensor_status(sensor_id, False)
+
+        return self.estimator.x, self.estimator.P, faults</code></pre>
+
+        <h2>6.5 우아한 성능 저하</h2>
+        <p>센서가 실패하거나 성능이 저하될 때 시스템은 완전히 실패하기보다 능력을 점진적으로 줄여야 합니다:</p>
+
+        <pre><code>class GracefulDegradationManager:
+    """
+    센서 실패 또는 성능 저하에 따른 시스템 능력 관리
+    """
+    def __init__(self, sensor_configs, capability_requirements):
+        self.sensor_configs = sensor_configs
+        self.requirements = capability_requirements
+        self.current_capability = 'full'
+
+    def assess_capability(self, sensor_status):
+        """
+        사용 가능한 센서를 기반으로 현재 시스템 능력 결정
+        """
+        healthy_sensors = [s for s, status in sensor_status.items()
+                         if status == 'healthy']
+        degraded_sensors = [s for s, status in sensor_status.items()
+                          if status == 'degraded']
+
+        # 능력 요구 사항 확인
+        capabilities = {
+            'full_autonomous': self._check_full_autonomous(healthy_sensors),
+            'limited_autonomous': self._check_limited_autonomous(healthy_sensors + degraded_sensors),
+            'assisted': self._check_assisted(healthy_sensors + degraded_sensors),
+            'manual_only': True  # 대체 기능으로 항상 사용 가능
+        }
+
+        # 가장 높은 가용 능력 결정
+        for cap in ['full_autonomous', 'limited_autonomous', 'assisted', 'manual_only']:
+            if capabilities[cap]:
+                return cap
+
+        return 'emergency_stop'
+
+    def get_operating_envelope(self, capability_level):
+        """
+        능력 수준에 대한 안전 작동 범위 반환
+        """
+        envelopes = {
+            'full_autonomous': {
+                'max_speed': 130,  # km/h
+                'environments': ['highway', 'urban', 'rural'],
+                'weather': ['clear', 'light_rain', 'cloudy'],
+                'lighting': ['day', 'night', 'tunnel']
+            },
+            'limited_autonomous': {
+                'max_speed': 80,
+                'environments': ['highway', 'urban'],
+                'weather': ['clear', 'cloudy'],
+                'lighting': ['day', 'tunnel']
+            },
+            'assisted': {
+                'max_speed': 50,
+                'environments': ['urban'],
+                'weather': ['clear'],
+                'lighting': ['day']
+            },
+            'manual_only': {
+                'max_speed': 30,
+                'environments': ['all'],
+                'weather': ['all'],
+                'lighting': ['all'],
+                'requires_human': True
+            }
+        }
+        return envelopes.get(capability_level, envelopes['manual_only'])</code></pre>
+
+        <h2>6.6 무결성 모니터링</h2>
+        <p>안전에 중요한 응용 프로그램의 경우 무결성 모니터링은 융합 출력이 필요한 보호 수준을 충족하는지 확인합니다:</p>
+
+        <table>
+            <tr>
+                <th>메트릭</th>
+                <th>정의</th>
+                <th>일반적인 요구 사항</th>
+            </tr>
+            <tr>
+                <td><strong>보호 수준 (PL)</strong></td>
+                <td>보장할 수 있는 위치 오류 경계</td>
+                <td>경보 한계 초과해야 함</td>
+            </tr>
+            <tr>
+                <td><strong>경보 한계 (AL)</strong></td>
+                <td>안전한 작동을 위한 최대 허용 오류</td>
+                <td>응용 프로그램에 따라 다름</td>
+            </tr>
+            <tr>
+                <td><strong>경보 시간 (TTA)</strong></td>
+                <td>무결성 실패 감지 및 경보 시간</td>
+                <td>초에서 분</td>
+            </tr>
+            <tr>
+                <td><strong>무결성 위험</strong></td>
+                <td>경보 없이 오류가 AL을 초과할 확률</td>
+                <td>시간당 10^-7 ~ 10^-9</td>
+            </tr>
+        </table>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>불확실성 정량화는 신뢰할 수 있는 센서 융합과 안전한 의사 결정에 필수적입니다</li>
+                <li>불확실성 원천에는 센서 노이즈, 모델 오류, 캘리브레이션 오류 및 환경적 요인이 포함됩니다</li>
+                <li>선형 및 비선형 변환을 통한 공분산 전파에는 적절한 기법이 필요합니다</li>
+                <li>신뢰도 보정은 예측된 불확실성이 실제 오류 분포와 일치하도록 보장합니다</li>
+                <li>혁신 테스트를 사용한 결함 감지는 센서 고장 또는 모델 불일치를 식별할 수 있습니다</li>
+                <li>우아한 성능 저하는 센서가 실패해도 안전한 작동을 유지합니다</li>
+                <li>무결성 모니터링은 안전에 중요한 응용 프로그램에 보호 수준을 제공합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>우연적 불확실성과 인식론적 불확실성을 구별하세요. 각각 어떻게 표현되고 줄일 수 있습니까?</li>
+                <li>NEES (정규화된 추정 오류 제곱) 메트릭을 설명하세요. NEES > 1은 무엇을 나타냅니까?</li>
+                <li>혁신에 대한 카이제곱 테스트가 센서 결함을 어떻게 감지할 수 있는지 설명하세요.</li>
+                <li>결함 감지와 결함 분리의 차이점은 무엇입니까? 분리가 왜 더 어렵습니까?</li>
+                <li>LiDAR 센서를 잃은 자율 주행차에 대한 우아한 성능 저하 전략을 설계하세요.</li>
+                <li>적응 노이즈 추정의 작동 방식을 설명하세요. 이점과 위험은 무엇입니까?</li>
+                <li>무결성 모니터링에서 보호 수준과 경보 한계를 정의하세요. 어떻게 관련됩니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+        </div>
+
+        </div>
+</body>
+</html>

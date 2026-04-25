@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Multi-Sensor Processing Architecture | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .formula{background:var(--bg-tertiary);padding:15px;border-radius:5px;margin:15px 0;font-family:monospace;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Multi-Sensor Processing Architecture</h1>
+
+        <h2>4.1 Architecture Design Principles</h2>
+        <p>The architecture of a multi-sensor fusion system fundamentally determines its performance, reliability, scalability, and maintainability. Choosing the right architecture requires careful consideration of system requirements, computational resources, communication constraints, and operational context.</p>
+
+        <p>This chapter explores the major architectural paradigms for sensor fusion: centralized, decentralized, and hybrid approaches. Each has distinct advantages and trade-offs that make it suitable for different application domains. Understanding these architectures deeply enables engineers to design robust fusion systems that meet demanding real-world requirements.</p>
+
+        <p>The WIA-AI-SENSOR-FUSION standard supports all architectural paradigms through its modular, interface-driven design, allowing implementers to choose the most appropriate architecture for their specific needs.</p>
+
+        <h2>4.2 Centralized Fusion Architecture</h2>
+        <p>In centralized fusion, all sensor data is transmitted to a single processing node that performs the complete fusion computation. This is the most straightforward architecture and often provides optimal fusion quality.</p>
+
+        <pre><code>CENTRALIZED FUSION ARCHITECTURE
+================================
+
+[Camera 1] ────┐
+[Camera 2] ────┤
+[LiDAR] ───────┼───────→ [Central Fusion Node] ───→ [Fused Output]
+[Radar] ───────┤                   │
+[IMU] ─────────┤                   ▼
+[GPS] ─────────┘         ┌─────────────────────┐
+                         │  • Raw data fusion   │
+                         │  • Global optimization│
+                         │  • Complete state    │
+                         │  • Consistent output │
+                         └─────────────────────┘</code></pre>
+
+        <table>
+            <tr>
+                <th>Advantages</th>
+                <th>Disadvantages</th>
+            </tr>
+            <tr>
+                <td><strong>Optimal Fusion Quality</strong><br>Access to all raw data enables globally optimal estimation</td>
+                <td><strong>Communication Bottleneck</strong><br>High bandwidth required for raw data transmission</td>
+            </tr>
+            <tr>
+                <td><strong>Consistent Output</strong><br>Single source of truth, no fusion conflicts</td>
+                <td><strong>Single Point of Failure</strong><br>Central node failure disables entire system</td>
+            </tr>
+            <tr>
+                <td><strong>Simpler Implementation</strong><br>All algorithms in one place</td>
+                <td><strong>Scalability Limits</strong><br>Computation grows with sensor count</td>
+            </tr>
+            <tr>
+                <td><strong>Global Context</strong><br>Can exploit cross-sensor correlations</td>
+                <td><strong>Latency</strong><br>Data transmission adds delay</td>
+            </tr>
+        </table>
+
+        <pre><code>class CentralizedFusionNode:
+    """
+    Central fusion node that receives and processes all sensor data
+    """
+    def __init__(self, config):
+        self.sensors = {}
+        self.synchronizer = DataSynchronizer(config.sync_params)
+        self.state_estimator = self._create_estimator(config.estimator_type)
+        self.output_publisher = OutputPublisher(config.output_topic)
+
+        # Register all sensors
+        for sensor_config in config.sensors:
+            self.register_sensor(sensor_config)
+
+    def register_sensor(self, sensor_config):
+        """
+        Register a sensor with the central node
+        """
+        sensor_id = sensor_config['id']
+        self.sensors[sensor_id] = {
+            'type': sensor_config['type'],
+            'rate': sensor_config['rate'],
+            'H': sensor_config['measurement_matrix'],
+            'R': sensor_config['noise_covariance'],
+            'transform': sensor_config['extrinsic_transform'],
+            'buffer': SensorBuffer(max_age=2.0)
+        }
+
+    def receive_sensor_data(self, sensor_id, timestamp, data, uncertainty):
+        """
+        Callback for receiving sensor data
+        """
+        if sensor_id not in self.sensors:
+            logging.warning(f"Unknown sensor: {sensor_id}")
+            return
+
+        # Store in buffer
+        self.sensors[sensor_id]['buffer'].push(timestamp, data, uncertainty)
+
+        # Check if we should run fusion
+        self.check_fusion_trigger(timestamp)
+
+    def check_fusion_trigger(self, current_time):
+        """
+        Determine when to run fusion based on policy
+        """
+        if self.trigger_policy == 'any_sensor':
+            # Fuse immediately when any sensor data arrives
+            self.run_fusion(current_time)
+
+        elif self.trigger_policy == 'primary_sensor':
+            # Fuse only when primary sensor (e.g., LiDAR) data arrives
+            if self.primary_sensor_updated:
+                self.run_fusion(current_time)
+
+        elif self.trigger_policy == 'fixed_rate':
+            # Fuse at fixed intervals
+            if current_time - self.last_fusion_time >= self.fusion_period:
+                self.run_fusion(current_time)
+
+    def run_fusion(self, fusion_time):
+        """
+        Execute centralized fusion
+        """
+        # Synchronize all sensor data to fusion time
+        synchronized_data = self.synchronizer.synchronize(
+            self.sensors,
+            fusion_time
+        )
+
+        # Prediction step
+        dt = fusion_time - self.last_fusion_time
+        self.state_estimator.predict(dt)
+
+        # Update with each sensor
+        for sensor_id, sensor_data in synchronized_data.items():
+            sensor_config = self.sensors[sensor_id]
+
+            # Transform to fusion frame
+            data_transformed = self.transform_to_fusion_frame(
+                sensor_data['data'],
+                sensor_config['transform']
+            )
+
+            # Apply measurement update
+            self.state_estimator.update(
+                data_transformed,
+                sensor_config['H'],
+                sensor_data['uncertainty']
+            )
+
+        # Publish fused output
+        fused_state = self.state_estimator.get_state()
+        fused_covariance = self.state_estimator.get_covariance()
+
+        self.output_publisher.publish(
+            timestamp=fusion_time,
+            state=fused_state,
+            covariance=fused_covariance,
+            sensors_used=list(synchronized_data.keys())
+        )
+
+        self.last_fusion_time = fusion_time</code></pre>
+
+        <h2>4.3 Decentralized Fusion Architecture</h2>
+        <p>In decentralized fusion, each sensor or sensor group has local processing capability. Local estimates are shared and combined, rather than raw data. This architecture provides resilience and scalability at the cost of theoretical optimality.</p>
+
+        <pre><code>DECENTRALIZED FUSION ARCHITECTURE
+==================================
+
+[Camera 1] ──→ [Local Node 1] ──┐
+[Camera 2] ──→ [Local Node 1] ──┤
+                                │
+[LiDAR] ─────→ [Local Node 2] ──┼───→ [Fusion Network] ───→ [Each Node Has
+[IMU] ───────→ [Local Node 2] ──┤         ▲                  Fused Estimate]
+                                │         │
+[Radar] ─────→ [Local Node 3] ──┤    Communication
+[GPS] ───────→ [Local Node 3] ──┘    of Estimates
+
+Each local node:
+• Processes raw sensor data
+• Generates local estimate with uncertainty
+• Shares estimate (not raw data) with network
+• Receives and fuses estimates from other nodes</code></pre>
+
+        <h3>Covariance Intersection Algorithm</h3>
+        <p>Covariance Intersection (CI) is a key algorithm for decentralized fusion that avoids double-counting of correlated information:</p>
+
+        <pre><code>class CovarianceIntersection:
+    """
+    Covariance Intersection for fusing estimates with unknown correlations
+
+    Guarantees consistent (non-overconfident) fusion without knowing
+    the correlation between estimates
+    """
+    def fuse(self, estimates, covariances):
+        """
+        Fuse multiple estimates using Covariance Intersection
+
+        Parameters:
+        - estimates: List of state estimates [x1, x2, ...]
+        - covariances: List of covariances [P1, P2, ...]
+
+        Returns:
+        - x_fused: Fused estimate
+        - P_fused: Fused covariance (guaranteed consistent)
+        """
+        n_estimates = len(estimates)
+
+        if n_estimates == 0:
+            return None, None
+
+        if n_estimates == 1:
+            return estimates[0], covariances[0]
+
+        # For two estimates, use optimal omega
+        if n_estimates == 2:
+            return self._fuse_two(estimates[0], covariances[0],
+                                  estimates[1], covariances[1])
+
+        # For more estimates, use iterative pairwise fusion
+        x_current = estimates[0]
+        P_current = covariances[0]
+
+        for i in range(1, n_estimates):
+            x_current, P_current = self._fuse_two(
+                x_current, P_current,
+                estimates[i], covariances[i]
+            )
+
+        return x_current, P_current
+
+    def _fuse_two(self, x1, P1, x2, P2):
+        """
+        Fuse two estimates using Covariance Intersection
+        """
+        # Find optimal omega by minimizing trace or determinant of P_fused
+        omega = self._find_optimal_omega(P1, P2)
+
+        # Fused covariance
+        P1_inv = np.linalg.inv(P1)
+        P2_inv = np.linalg.inv(P2)
+
+        P_fused_inv = omega * P1_inv + (1 - omega) * P2_inv
+        P_fused = np.linalg.inv(P_fused_inv)
+
+        # Fused estimate
+        x_fused = P_fused @ (omega * P1_inv @ x1 + (1 - omega) * P2_inv @ x2)
+
+        return x_fused, P_fused
+
+    def _find_optimal_omega(self, P1, P2, criterion='trace'):
+        """
+        Find omega that minimizes fusion covariance
+
+        Uses golden section search for efficiency
+        """
+        def objective(omega):
+            P1_inv = np.linalg.inv(P1)
+            P2_inv = np.linalg.inv(P2)
+            P_fused = np.linalg.inv(omega * P1_inv + (1 - omega) * P2_inv)
+
+            if criterion == 'trace':
+                return np.trace(P_fused)
+            elif criterion == 'det':
+                return np.linalg.det(P_fused)
+
+        # Golden section search
+        result = scipy.optimize.minimize_scalar(
+            objective,
+            bounds=(0.001, 0.999),
+            method='bounded'
+        )
+
+        return result.x
+
+
+class DecentralizedNode:
+    """
+    A node in a decentralized fusion network
+    """
+    def __init__(self, node_id, local_sensors, network):
+        self.node_id = node_id
+        self.local_sensors = local_sensors
+        self.network = network
+
+        self.local_estimator = KalmanFilter(state_dim=6)
+        self.ci_fuser = CovarianceIntersection()
+
+        self.local_estimate = None
+        self.local_covariance = None
+        self.fused_estimate = None
+        self.fused_covariance = None
+
+    def process_local_sensors(self, sensor_data):
+        """
+        Process local sensor data and generate local estimate
+        """
+        # Run local Kalman filter
+        self.local_estimator.predict(dt=self.dt)
+
+        for sensor_id, data in sensor_data.items():
+            if sensor_id in self.local_sensors:
+                self.local_estimator.update(data)
+
+        self.local_estimate = self.local_estimator.x.copy()
+        self.local_covariance = self.local_estimator.P.copy()
+
+        # Broadcast to network
+        self.network.broadcast(
+            source=self.node_id,
+            estimate=self.local_estimate,
+            covariance=self.local_covariance
+        )
+
+    def receive_network_estimates(self, remote_estimates):
+        """
+        Receive and fuse estimates from other nodes
+        """
+        # Collect all estimates including local
+        all_estimates = [self.local_estimate]
+        all_covariances = [self.local_covariance]
+
+        for node_id, data in remote_estimates.items():
+            all_estimates.append(data['estimate'])
+            all_covariances.append(data['covariance'])
+
+        # Fuse using Covariance Intersection
+        self.fused_estimate, self.fused_covariance = self.ci_fuser.fuse(
+            all_estimates, all_covariances
+        )
+
+        return self.fused_estimate, self.fused_covariance</code></pre>
+
+        <h2>4.4 Hierarchical and Hybrid Architectures</h2>
+        <p>Hybrid architectures combine centralized and decentralized elements to achieve the best of both worlds. Common patterns include hierarchical fusion and federated architectures:</p>
+
+        <pre><code>HIERARCHICAL FUSION ARCHITECTURE
+================================
+
+Level 0 (Sensors):
+[Cam1] [Cam2] [Cam3]  [LiDAR1] [LiDAR2]  [Radar] [IMU] [GPS]
+   │      │      │        │        │         │     │     │
+   └──────┴──────┘        └────────┘         └─────┴─────┘
+          │                   │                    │
+Level 1 (Local Fusion):      │                    │
+   [Vision Fusion]    [LiDAR Fusion]      [Navigation Fusion]
+          │                   │                    │
+          └───────────────────┴────────────────────┘
+                              │
+Level 2 (Global Fusion):     │
+                    [Central Fusion Node]
+                              │
+                              ▼
+                      [Final Output]</code></pre>
+
+        <pre><code>class HierarchicalFusionSystem:
+    """
+    Multi-level hierarchical fusion architecture
+    """
+    def __init__(self, config):
+        self.levels = []
+        self._build_hierarchy(config)
+
+    def _build_hierarchy(self, config):
+        """
+        Build fusion hierarchy from configuration
+        """
+        # Level 0: Raw sensors (no processing, just data collection)
+        self.levels.append({
+            'name': 'sensors',
+            'nodes': {},
+            'outputs': {}
+        })
+
+        # Level 1: Domain-specific fusion
+        level1 = {'name': 'domain_fusion', 'nodes': {}, 'outputs': {}}
+
+        # Vision fusion node
+        level1['nodes']['vision'] = DomainFusionNode(
+            name='vision',
+            sensor_types=['camera'],
+            fusion_algorithm='visual_odometry'
+        )
+
+        # LiDAR fusion node
+        level1['nodes']['lidar'] = DomainFusionNode(
+            name='lidar',
+            sensor_types=['lidar'],
+            fusion_algorithm='point_cloud_registration'
+        )
+
+        # Navigation fusion node
+        level1['nodes']['navigation'] = DomainFusionNode(
+            name='navigation',
+            sensor_types=['imu', 'gps', 'wheel_encoder'],
+            fusion_algorithm='ekf_navigation'
+        )
+
+        self.levels.append(level1)
+
+        # Level 2: Global fusion
+        level2 = {'name': 'global_fusion', 'nodes': {}, 'outputs': {}}
+        level2['nodes']['global'] = GlobalFusionNode(
+            input_nodes=['vision', 'lidar', 'navigation'],
+            fusion_algorithm='multi_modal_ekf'
+        )
+        self.levels.append(level2)
+
+    def process(self, sensor_data, timestamp):
+        """
+        Process data through fusion hierarchy
+        """
+        # Level 0: Distribute raw data
+        level0_outputs = self._distribute_to_domains(sensor_data)
+
+        # Level 1: Domain-specific fusion
+        level1_outputs = {}
+        for node_name, node in self.levels[1]['nodes'].items():
+            domain_data = level0_outputs.get(node_name, {})
+            level1_outputs[node_name] = node.process(domain_data, timestamp)
+
+        # Level 2: Global fusion
+        global_node = self.levels[2]['nodes']['global']
+        global_output = global_node.process(level1_outputs, timestamp)
+
+        return global_output
+
+
+class FederatedKalmanFilter:
+    """
+    Federated Kalman Filter architecture
+
+    Local filters operate independently, master filter fuses their outputs
+    """
+    def __init__(self, n_local_filters, state_dim):
+        self.n_filters = n_local_filters
+        self.state_dim = state_dim
+
+        # Information sharing factor (sum across all filters = 1)
+        self.beta = np.ones(n_local_filters) / n_local_filters
+
+        # Local filters
+        self.local_filters = [
+            InformationFilter(state_dim) for _ in range(n_local_filters)
+        ]
+
+        # Master filter
+        self.master_filter = InformationFilter(state_dim)
+
+    def distribute_information(self, master_Y, master_y):
+        """
+        Distribute master information to local filters based on beta
+        """
+        for i, local_filter in enumerate(self.local_filters):
+            local_filter.Y = self.beta[i] * master_Y
+            local_filter.y = self.beta[i] * master_y
+
+    def fuse_local_outputs(self):
+        """
+        Fuse local filter outputs in master filter
+        """
+        # Reset master
+        self.master_filter.Y = np.zeros((self.state_dim, self.state_dim))
+        self.master_filter.y = np.zeros(self.state_dim)
+
+        # Sum information from all local filters
+        for local_filter in self.local_filters:
+            self.master_filter.Y += local_filter.Y
+            self.master_filter.y += local_filter.y
+
+        return self.master_filter.x, self.master_filter.P
+
+    def reset_with_master(self):
+        """
+        Reset local filters with fused master estimate
+        """
+        self.distribute_information(
+            self.master_filter.Y,
+            self.master_filter.y
+        )</code></pre>
+
+        <h2>4.5 Real-Time Processing Pipelines</h2>
+        <p>Real-time sensor fusion requires careful pipeline design to meet latency constraints while maintaining fusion quality:</p>
+
+        <table>
+            <tr>
+                <th>Pipeline Stage</th>
+                <th>Typical Latency</th>
+                <th>Optimization Strategy</th>
+            </tr>
+            <tr>
+                <td><strong>Sensor Acquisition</strong></td>
+                <td>1-10 ms</td>
+                <td>DMA, ring buffers, interrupt handling</td>
+            </tr>
+            <tr>
+                <td><strong>Preprocessing</strong></td>
+                <td>5-20 ms</td>
+                <td>GPU acceleration, SIMD, parallel processing</td>
+            </tr>
+            <tr>
+                <td><strong>Synchronization</strong></td>
+                <td>0-50 ms</td>
+                <td>Minimal buffering, predictive alignment</td>
+            </tr>
+            <tr>
+                <td><strong>Fusion Algorithm</strong></td>
+                <td>1-20 ms</td>
+                <td>Efficient implementations, approximations</td>
+            </tr>
+            <tr>
+                <td><strong>Output Publication</strong></td>
+                <td>1-5 ms</td>
+                <td>Zero-copy, shared memory</td>
+            </tr>
+        </table>
+
+        <pre><code>class RealTimeFusionPipeline:
+    """
+    High-performance real-time fusion pipeline
+    """
+    def __init__(self, config):
+        # Multi-threaded architecture
+        self.sensor_threads = {}
+        self.fusion_thread = None
+        self.output_thread = None
+
+        # Lock-free queues for inter-thread communication
+        self.sensor_queues = {
+            sensor_id: LockFreeQueue(max_size=100)
+            for sensor_id in config.sensor_ids
+        }
+        self.output_queue = LockFreeQueue(max_size=50)
+
+        # Fusion components
+        self.synchronizer = RealTimeSynchronizer(config.sync_params)
+        self.estimator = EKFEstimator(config.state_dim)
+
+        # Timing statistics
+        self.timing_stats = TimingStatistics()
+
+    def start(self):
+        """
+        Start all pipeline threads
+        """
+        # Start sensor acquisition threads
+        for sensor_id in self.sensor_queues:
+            thread = threading.Thread(
+                target=self._sensor_acquisition_loop,
+                args=(sensor_id,),
+                daemon=True
+            )
+            thread.start()
+            self.sensor_threads[sensor_id] = thread
+
+        # Start fusion thread (high priority)
+        self.fusion_thread = threading.Thread(
+            target=self._fusion_loop,
+            daemon=True
+        )
+        set_thread_priority(self.fusion_thread, priority='realtime')
+        self.fusion_thread.start()
+
+        # Start output thread
+        self.output_thread = threading.Thread(
+            target=self._output_loop,
+            daemon=True
+        )
+        self.output_thread.start()
+
+    def _sensor_acquisition_loop(self, sensor_id):
+        """
+        Continuously acquire data from a single sensor
+        """
+        sensor = self.sensors[sensor_id]
+
+        while not self.shutdown_flag:
+            # Non-blocking read with timeout
+            data = sensor.read(timeout_ms=10)
+
+            if data is not None:
+                # Timestamp at reception
+                receive_time = time.perf_counter_ns()
+
+                # Push to queue (lock-free, non-blocking)
+                self.sensor_queues[sensor_id].push({
+                    'data': data,
+                    'receive_time': receive_time
+                })
+
+    def _fusion_loop(self):
+        """
+        Main fusion processing loop
+        """
+        target_period = 1.0 / self.fusion_rate  # e.g., 100 Hz
+
+        while not self.shutdown_flag:
+            loop_start = time.perf_counter()
+
+            # Collect available sensor data
+            sensor_data = {}
+            for sensor_id, queue in self.sensor_queues.items():
+                while not queue.empty():
+                    item = queue.pop()
+                    sensor_data.setdefault(sensor_id, []).append(item)
+
+            # Run fusion if we have data
+            if sensor_data:
+                fusion_start = time.perf_counter()
+
+                result = self._run_fusion(sensor_data)
+
+                fusion_time = time.perf_counter() - fusion_start
+                self.timing_stats.record('fusion', fusion_time)
+
+                # Push to output queue
+                if result is not None:
+                    self.output_queue.push(result)
+
+            # Sleep for remaining time in period
+            elapsed = time.perf_counter() - loop_start
+            sleep_time = target_period - elapsed
+
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            else:
+                self.timing_stats.record('overrun', -sleep_time)
+
+    def _run_fusion(self, sensor_data):
+        """
+        Execute fusion algorithm
+        """
+        # Get fusion timestamp
+        fusion_time = time.perf_counter()
+
+        # Synchronize sensor data
+        synchronized = self.synchronizer.synchronize(sensor_data, fusion_time)
+
+        # Prediction
+        dt = fusion_time - self.last_fusion_time
+        self.estimator.predict(dt)
+
+        # Update with each sensor
+        for sensor_id, data in synchronized.items():
+            self.estimator.update(sensor_id, data)
+
+        self.last_fusion_time = fusion_time
+
+        return {
+            'timestamp': fusion_time,
+            'state': self.estimator.get_state(),
+            'covariance': self.estimator.get_covariance()
+        }</code></pre>
+
+        <h2>4.6 GPU-Accelerated Fusion</h2>
+        <p>For high-dimensional state spaces and computationally intensive operations, GPU acceleration provides significant performance improvements:</p>
+
+        <pre><code>import cupy as cp  # NumPy-compatible GPU computing
+
+class GPUAcceleratedFusion:
+    """
+    GPU-accelerated sensor fusion for high-performance applications
+    """
+    def __init__(self, state_dim, use_gpu=True):
+        self.use_gpu = use_gpu and cp.cuda.is_available()
+        self.xp = cp if self.use_gpu else np  # Array library
+
+        self.state_dim = state_dim
+        self.x = self.xp.zeros(state_dim)
+        self.P = self.xp.eye(state_dim)
+
+    def batch_predict(self, states, covariances, F, Q):
+        """
+        Parallel prediction for multiple tracks/particles
+
+        states: (N, state_dim) array of state vectors
+        covariances: (N, state_dim, state_dim) array of covariances
+        """
+        N = states.shape[0]
+
+        # Batch matrix multiplication on GPU
+        # states_pred[i] = F @ states[i] for all i in parallel
+        states_pred = self.xp.einsum('ij,nj->ni', F, states)
+
+        # Batch covariance prediction
+        # P_pred[i] = F @ P[i] @ F.T + Q for all i in parallel
+        FP = self.xp.einsum('ij,njk->nik', F, covariances)
+        covariances_pred = self.xp.einsum('nij,kj->nik', FP, F) + Q
+
+        return states_pred, covariances_pred
+
+    def batch_update(self, states, covariances, measurements, H, R):
+        """
+        Parallel Kalman update for multiple tracks
+
+        measurements: (N, meas_dim) array of measurements
+        """
+        N = states.shape[0]
+        meas_dim = measurements.shape[1]
+
+        # Innovation: y = z - H @ x for all tracks
+        predicted_meas = self.xp.einsum('ij,nj->ni', H, states)
+        innovations = measurements - predicted_meas
+
+        # Innovation covariance: S = H @ P @ H.T + R
+        HP = self.xp.einsum('ij,njk->nik', H, covariances)
+        S = self.xp.einsum('nij,kj->nik', HP, H) + R
+
+        # Kalman gain: K = P @ H.T @ S^{-1}
+        S_inv = self.xp.linalg.inv(S)
+        PH_T = self.xp.einsum('nij,kj->nik', covariances, H)
+        K = self.xp.einsum('nij,njk->nik', PH_T, S_inv)
+
+        # State update
+        states_updated = states + self.xp.einsum('nij,nj->ni', K, innovations)
+
+        # Covariance update (Joseph form)
+        I_KH = self.xp.eye(self.state_dim) - self.xp.einsum('nij,jk->nik', K, H)
+        P_temp = self.xp.einsum('nij,njk->nik', I_KH, covariances)
+        P_temp = self.xp.einsum('nij,nkj->nik', P_temp, I_KH)
+        KRK = self.xp.einsum('nij,jk->nik', K, R)
+        KRK = self.xp.einsum('nij,nkj->nik', KRK, K)
+        covariances_updated = P_temp + KRK
+
+        return states_updated, covariances_updated
+
+    def to_cpu(self, array):
+        """Transfer array from GPU to CPU"""
+        if self.use_gpu:
+            return cp.asnumpy(array)
+        return array
+
+    def to_gpu(self, array):
+        """Transfer array from CPU to GPU"""
+        if self.use_gpu:
+            return cp.asarray(array)
+        return array</code></pre>
+
+        <h2>4.7 Modular Pipeline Design</h2>
+        <p>The WIA-AI-SENSOR-FUSION standard promotes modular design through well-defined interfaces, enabling flexible pipeline configuration:</p>
+
+        <pre><code>// WIA-AI-SENSOR-FUSION Pipeline Configuration Schema
+interface FusionPipelineConfig {
+    name: string;
+    version: string;
+
+    // Sensor inputs
+    sensors: SensorConfig[];
+
+    // Processing stages
+    stages: PipelineStage[];
+
+    // Output configuration
+    outputs: OutputConfig[];
+
+    // Runtime parameters
+    runtime: {
+        fusion_rate_hz: number;
+        max_latency_ms: number;
+        enable_gpu: boolean;
+        thread_priority: 'normal' | 'high' | 'realtime';
+    };
+}
+
+interface PipelineStage {
+    name: string;
+    type: 'preprocessor' | 'synchronizer' | 'fuser' | 'postprocessor';
+    implementation: string;  // Class or function name
+    inputs: string[];        // Input stage names or 'sensor:{id}'
+    outputs: string[];       // Output names
+    config: Record<string, any>;
+}
+
+// Example configuration
+const examplePipeline: FusionPipelineConfig = {
+    name: "autonomous_vehicle_fusion",
+    version: "1.0.0",
+
+    sensors: [
+        { id: "front_camera", type: "camera", rate: 30 },
+        { id: "lidar_top", type: "lidar", rate: 10 },
+        { id: "radar_front", type: "radar", rate: 20 },
+        { id: "imu", type: "imu", rate: 200 },
+        { id: "gps", type: "gps", rate: 10 }
+    ],
+
+    stages: [
+        {
+            name: "camera_preprocess",
+            type: "preprocessor",
+            implementation: "ImageUndistort",
+            inputs: ["sensor:front_camera"],
+            outputs: ["undistorted_image"],
+            config: { calibration_file: "camera_calibration.yaml" }
+        },
+        {
+            name: "object_detector",
+            type: "preprocessor",
+            implementation: "YOLOv8Detector",
+            inputs: ["undistorted_image"],
+            outputs: ["camera_detections"],
+            config: { model_path: "yolov8.onnx", confidence_threshold: 0.5 }
+        },
+        {
+            name: "lidar_preprocess",
+            type: "preprocessor",
+            implementation: "PointCloudFilter",
+            inputs: ["sensor:lidar_top"],
+            outputs: ["filtered_pointcloud"],
+            config: { voxel_size: 0.1, range_min: 0.5, range_max: 100.0 }
+        },
+        {
+            name: "sync",
+            type: "synchronizer",
+            implementation: "ApproximateTimeSynchronizer",
+            inputs: ["camera_detections", "filtered_pointcloud", "sensor:radar_front"],
+            outputs: ["synchronized_detections"],
+            config: { slop: 0.05 }
+        },
+        {
+            name: "track_fusion",
+            type: "fuser",
+            implementation: "MultiObjectTracker",
+            inputs: ["synchronized_detections"],
+            outputs: ["tracked_objects"],
+            config: {
+                state_dim: 6,
+                association_method: "hungarian",
+                filter_type: "ekf"
+            }
+        },
+        {
+            name: "localization_fusion",
+            type: "fuser",
+            implementation: "EKFLocalization",
+            inputs: ["sensor:imu", "sensor:gps"],
+            outputs: ["vehicle_pose"],
+            config: { state_dim: 15, imu_rate: 200 }
+        }
+    ],
+
+    outputs: [
+        { name: "tracked_objects", format: "TrackedObjectList", rate: 10 },
+        { name: "vehicle_pose", format: "PoseWithCovariance", rate: 100 }
+    ],
+
+    runtime: {
+        fusion_rate_hz: 100,
+        max_latency_ms: 50,
+        enable_gpu: true,
+        thread_priority: 'high'
+    }
+};</code></pre>
+
+        <h2>4.8 Architecture Selection Guidelines</h2>
+        <table>
+            <tr>
+                <th>Requirement</th>
+                <th>Recommended Architecture</th>
+                <th>Rationale</th>
+            </tr>
+            <tr>
+                <td><strong>Optimal fusion quality</strong></td>
+                <td>Centralized</td>
+                <td>Access to all raw data enables global optimization</td>
+            </tr>
+            <tr>
+                <td><strong>High reliability / fault tolerance</strong></td>
+                <td>Decentralized</td>
+                <td>No single point of failure, graceful degradation</td>
+            </tr>
+            <tr>
+                <td><strong>Low bandwidth</strong></td>
+                <td>Decentralized/Hierarchical</td>
+                <td>Share estimates, not raw data</td>
+            </tr>
+            <tr>
+                <td><strong>Many diverse sensors</strong></td>
+                <td>Hierarchical</td>
+                <td>Domain-specific fusion before global fusion</td>
+            </tr>
+            <tr>
+                <td><strong>Real-time constraints</strong></td>
+                <td>Hierarchical/Parallel</td>
+                <td>Distribute computation, pipeline processing</td>
+            </tr>
+            <tr>
+                <td><strong>Scalability</strong></td>
+                <td>Decentralized</td>
+                <td>Linear scaling with added sensors/nodes</td>
+            </tr>
+        </table>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Centralized architecture provides optimal fusion but has single-point-of-failure risk</li>
+                <li>Decentralized architecture offers resilience and scalability through distributed processing</li>
+                <li>Covariance Intersection enables consistent fusion without knowing correlations</li>
+                <li>Hierarchical/hybrid architectures combine benefits of centralized and decentralized</li>
+                <li>Federated Kalman Filter provides principled information distribution across local filters</li>
+                <li>Real-time pipelines require careful threading, queuing, and timing management</li>
+                <li>GPU acceleration enables high-performance fusion for complex applications</li>
+                <li>Modular design through standard interfaces enables flexible pipeline configuration</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Compare centralized and decentralized fusion architectures. When would you choose each?</li>
+                <li>Explain why Covariance Intersection is necessary for decentralized fusion. What problem does it solve?</li>
+                <li>Describe a hierarchical fusion architecture for an autonomous vehicle with cameras, LiDAR, radar, and GPS/IMU.</li>
+                <li>How does the Federated Kalman Filter distribute and recombine information across local filters?</li>
+                <li>What are the key considerations for designing a real-time fusion pipeline with latency constraints?</li>
+                <li>How can GPU acceleration improve sensor fusion performance? What operations benefit most?</li>
+                <li>Design a modular pipeline configuration for a mobile robot with stereo cameras, 2D LiDAR, and wheel encoders.</li>
+                <li>What happens to fusion quality when a sensor fails in centralized vs. decentralized architectures?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (Benefit All Humanity)</p>
+        </div>
+
+        </div>
+</body>
+</html>

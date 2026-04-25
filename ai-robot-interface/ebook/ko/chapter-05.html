@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 2단계 - API 인터페이스 | WIA-AI-ROBOT</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>5장: 2단계 - API 인터페이스 정의</h1>
+
+        <h2>5.1 API 설계 원칙</h2>
+        <p>WIA-AI-ROBOT 표준의 2단계는 AI 시스템과 로봇을 연결하는 포괄적인 API 인터페이스를 정의합니다:</p>
+
+        <table>
+            <tr>
+                <th>원칙</th>
+                <th>설명</th>
+                <th>구현</th>
+            </tr>
+            <tr>
+                <td><strong>RESTful 설계</strong></td>
+                <td>표준 HTTP 메서드 및 상태 코드</td>
+                <td>GET, POST, PUT, DELETE 작업</td>
+            </tr>
+            <tr>
+                <td><strong>무상태성</strong></td>
+                <td>각 요청에 모든 필요한 정보 포함</td>
+                <td>JWT 토큰, 요청의 세션</td>
+            </tr>
+            <tr>
+                <td><strong>리소스 지향</strong></td>
+                <td>URL이 리소스를 나타냄</td>
+                <td>/robots/{id}/commands, /sensors/{id}</td>
+            </tr>
+            <tr>
+                <td><strong>버전 관리</strong></td>
+                <td>API가 여러 버전 지원</td>
+                <td>URL 경로에 /v1/, /v2/</td>
+            </tr>
+            <tr>
+                <td><strong>잘 문서화됨</strong></td>
+                <td>OpenAPI 사양</td>
+                <td>Swagger/OpenAPI 3.0</td>
+            </tr>
+        </table>
+
+        <h2>5.2 AI 추론 엔드포인트</h2>
+        <p>LLM 및 비전 AI 통합을 위한 표준 API:</p>
+
+        <h3>LLM 추론 API</h3>
+        <pre><code>POST /v1/ai/language/infer
+Content-Type: application/json
+
+요청:
+{
+  "model": "gpt-4",
+  "messages": [
+    {"role": "system", "content": "로봇 작업 계획자..."},
+    {"role": "user", "content": "빨간 상자를 집어 선반에 놓으세요"}
+  ],
+  "context": {
+    "robot_state": {...},
+    "environment": {...}
+  }
+}
+
+응답:
+{
+  "commands": [
+    {"type": "scan_area", "target": "red_box"},
+    {"type": "navigate_to", "object": "red_box"},
+    {"type": "grasp", "object": "red_box"}
+  ],
+  "confidence": 0.92
+}</code></pre>
+
+        <h3>비전 AI API</h3>
+        <pre><code>POST /v1/ai/vision/detect
+Content-Type: multipart/form-data
+
+요청:
+- image: [바이너리 이미지 데이터]
+- task: "object_detection"
+- classes: ["person", "box", "shelf"]
+
+응답:
+{
+  "detections": [
+    {
+      "class": "box",
+      "confidence": 0.95,
+      "bounding_box": {"x": 120, "y": 80},
+      "color": "red"
+    }
+  ]
+}</code></pre>
+
+        <h2>5.3 로봇 제어 API</h2>
+        <p>다양한 로봇 플랫폼을 제어하기 위한 통합 인터페이스:</p>
+
+        <h3>명령 실행 API</h3>
+        <pre><code>POST /v1/robots/{robot_id}/commands
+Content-Type: application/json
+
+요청:
+{
+  "type": "navigate_to",
+  "parameters": {
+    "target": {"x": 5.0, "y": 3.2, "z": 0.0}
+  }
+}
+
+응답: 202 Accepted
+{
+  "command_id": "cmd_123",
+  "status": "accepted",
+  "estimated_duration": 30000
+}</code></pre>
+
+        <h3>상태 조회 API</h3>
+        <pre><code>GET /v1/robots/{robot_id}/status
+
+응답:
+{
+  "robot_id": "rb_001",
+  "state": "executing",
+  "battery": 85,
+  "position": {"x": 4.2, "y": 3.0},
+  "health": "good"
+}</code></pre>
+
+        <h2>5.4 원격 측정 스트리밍 API</h2>
+        <p>실시간 센서 데이터 게시:</p>
+
+        <h3>WebSocket 원격 측정 스트림</h3>
+        <pre><code>WS /v1/robots/{robot_id}/telemetry/stream
+
+구독 메시지:
+{
+  "action": "subscribe",
+  "channels": ["camera", "position", "battery"],
+  "rate_hz": {
+    "camera": 10,
+    "position": 50,
+    "battery": 1
+  }
+}
+
+스트림 메시지:
+{
+  "channel": "position",
+  "data": {"x": 4.2, "y": 3.0}
+}</code></pre>
+
+        <h2>5.5 구성 관리 API</h2>
+        <p>로봇 기능 및 매개변수 관리를 위한 API:</p>
+
+        <h3>기능 발견</h3>
+        <pre><code>GET /v1/robots/{robot_id}/capabilities
+
+응답:
+{
+  "capabilities": {
+    "manipulation": {
+      "available": true,
+      "dof": 6,
+      "reach": 1.3
+    },
+    "navigation": {
+      "available": true,
+      "max_speed": 1.5
+    }
+  },
+  "supported_commands": [
+    "navigate_to", "grasp", "release"
+  ]
+}</code></pre>
+
+        <h2>5.6 플릿 관리 API</h2>
+        <p>여러 로봇 조정을 위한 API:</p>
+
+        <h3>플릿 상태</h3>
+        <pre><code>GET /v1/fleet/status
+
+응답:
+{
+  "fleet_id": "fleet_warehouse_01",
+  "total_robots": 10,
+  "active": 8,
+  "idle": 2,
+  "robots": [
+    {"robot_id": "rb_001", "state": "executing"},
+    {"robot_id": "rb_002", "state": "idle"}
+  ]
+}</code></pre>
+
+        <h2>5.7 인증 및 권한 부여</h2>
+        <p>API 액세스를 위한 보안 메커니즘:</p>
+
+        <table>
+            <tr>
+                <th>방법</th>
+                <th>사용 사례</th>
+                <th>구현</th>
+            </tr>
+            <tr>
+                <td><strong>API 키</strong></td>
+                <td>서비스 간</td>
+                <td>X-API-Key 헤더</td>
+            </tr>
+            <tr>
+                <td><strong>JWT 토큰</strong></td>
+                <td>사용자 인증</td>
+                <td>Bearer 토큰</td>
+            </tr>
+            <tr>
+                <td><strong>OAuth 2.0</strong></td>
+                <td>타사 액세스</td>
+                <td>권한 부여 흐름</td>
+            </tr>
+            <tr>
+                <td><strong>mTLS</strong></td>
+                <td>로봇-서버</td>
+                <td>인증서 기반</td>
+            </tr>
+        </table>
+
+        <h2>5.8 오류 처리</h2>
+        <p>표준 HTTP 상태 코드 및 오류 형식:</p>
+
+        <table>
+            <tr>
+                <th>상태 코드</th>
+                <th>의미</th>
+                <th>예</th>
+            </tr>
+            <tr>
+                <td><strong>200 OK</strong></td>
+                <td>성공적인 요청</td>
+                <td>GET 상태 성공</td>
+            </tr>
+            <tr>
+                <td><strong>202 Accepted</strong></td>
+                <td>처리를 위해 요청 수락됨</td>
+                <td>명령 대기 중</td>
+            </tr>
+            <tr>
+                <td><strong>400 Bad Request</strong></td>
+                <td>잘못된 요청 형식</td>
+                <td>필수 필드 누락</td>
+            </tr>
+            <tr>
+                <td><strong>401 Unauthorized</strong></td>
+                <td>인증 필요</td>
+                <td>토큰 누락</td>
+            </tr>
+            <tr>
+                <td><strong>404 Not Found</strong></td>
+                <td>리소스가 존재하지 않음</td>
+                <td>로봇 ID를 찾을 수 없음</td>
+            </tr>
+            <tr>
+                <td><strong>422 Unprocessable</strong></td>
+                <td>형식은 유효하지만 내용 무효</td>
+                <td>명령이 안전 규칙 위반</td>
+            </tr>
+        </table>
+
+        <h3>오류 응답 형식</h3>
+        <pre><code>HTTP 422 Unprocessable Entity
+{
+  "error": {
+    "code": "SAFETY_VIOLATION",
+    "message": "명령이 작업 공간 경계 위반",
+    "details": {
+      "command_id": "cmd_123",
+      "violation": "목표 위치가 허용 작업 공간 밖"
+    }
+  }
+}</code></pre>
+
+        <h2>5.9 속도 제한 및 조절</h2>
+        <p>과부하로부터 서비스 보호:</p>
+
+        <pre><code>HTTP/1.1 200 OK
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 950
+X-RateLimit-Reset: 1642251600
+
+// 제한 초과 시:
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "retry_after": 60
+  }
+}</code></pre>
+
+        <h2>5.10 API 문서 모범 사례</h2>
+        <p>OpenAPI를 사용한 포괄적인 API 문서:</p>
+
+        <pre><code>openapi: 3.0.0
+info:
+  title: WIA-AI-ROBOT API
+  version: 1.0.0
+paths:
+  /robots/{robot_id}/commands:
+    post:
+      summary: 로봇 명령 실행
+      parameters:
+        - name: robot_id
+          in: path
+          required: true
+      responses:
+        '202':
+          description: 명령 수락됨</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>WIA-AI-ROBOT API는 실시간 지원과 함께 RESTful 원칙을 따릅니다</li>
+                <li>AI 추론 엔드포인트는 LLM 및 비전 AI에 대한 표준화된 액세스를 제공합니다</li>
+                <li>로봇 제어 API는 다양한 로봇 플랫폼을 위한 통합 인터페이스를 제공합니다</li>
+                <li>원격 측정 스트리밍은 실시간 데이터 전달을 위해 WebSocket 및 SSE를 사용합니다</li>
+                <li>구성 API는 동적 기능 발견 및 매개변수 관리를 가능하게 합니다</li>
+                <li>플릿 관리 API는 여러 로봇을 효율적으로 조정합니다</li>
+                <li>여러 인증 방법이 다양한 사용 사례를 지원합니다 (API 키, JWT, OAuth, mTLS)</li>
+                <li>표준 HTTP 상태 코드 및 오류 형식은 일관된 오류 처리를 보장합니다</li>
+                <li>속도 제한은 과부하로부터 서비스를 보호합니다</li>
+                <li>OpenAPI 사양은 포괄적인 API 문서를 제공합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>WIA-AI-ROBOT API 설계의 다섯 가지 핵심 원칙은 무엇인가?</li>
+                <li>LLM 추론 API의 요청 및 응답 형식을 설명하시오.</li>
+                <li>비전 AI API는 객체 감지 요청을 어떻게 처리하는가?</li>
+                <li>원격 측정 스트리밍을 위한 WebSocket과 Server-Sent Events (SSE)의 차이는 무엇인가?</li>
+                <li>기능 발견 API의 목적을 설명하시오.</li>
+                <li>표준이 지원하는 네 가지 인증 방법과 사용 사례는 무엇인가?</li>
+                <li>API에서 사용되는 다섯 가지 HTTP 상태 코드를 나열하고 각각 언제 사용되는지 설명하시오.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (널리 인간을 이롭게 하라)</p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 데이터 통합 및 동기화 | WIA-AI-SENSOR-FUSION</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#14B8A6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .formula{background:var(--bg-tertiary);padding:15px;border-radius:5px;margin:15px 0;font-family:monospace;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>2장: 데이터 통합 및 동기화</h1>
+
+        <h2>2.1 시간 동기화의 중요성</h2>
+        <p>센서 융합에서 가장 중요한 과제 중 하나는 시간 동기화입니다. 서로 다른 센서는 다른 속도로 데이터를 생성하고, 다른 처리 지연을 가지며, 다른 시계를 사용할 수 있습니다. 정확한 시간 정렬 없이는 융합된 인식이 일관성이 없거나 완전히 잘못될 수 있습니다.</p>
+
+        <p>예를 들어, 자율 주행차가 시속 100km로 이동할 때 10ms의 시간 오차는 약 28cm의 위치 오차를 초래합니다. 이러한 오차는 객체 감지 및 추적에서 심각한 문제를 일으킬 수 있습니다.</p>
+
+        <h2>2.2 시간 동기화 방법</h2>
+        <table>
+            <tr>
+                <th>방법</th>
+                <th>정확도</th>
+                <th>복잡성</th>
+                <th>사용 사례</th>
+            </tr>
+            <tr>
+                <td><strong>소프트웨어 타임스탬프</strong></td>
+                <td>1-10 ms</td>
+                <td>낮음</td>
+                <td>저정밀 응용 프로그램</td>
+            </tr>
+            <tr>
+                <td><strong>NTP (Network Time Protocol)</strong></td>
+                <td>1-10 ms</td>
+                <td>중간</td>
+                <td>네트워크 연결 센서</td>
+            </tr>
+            <tr>
+                <td><strong>PTP (Precision Time Protocol)</strong></td>
+                <td>< 1 us</td>
+                <td>높음</td>
+                <td>산업용, 고정밀 시스템</td>
+            </tr>
+            <tr>
+                <td><strong>하드웨어 트리거</strong></td>
+                <td>< 1 us</td>
+                <td>높음</td>
+                <td>동기화된 센서 캡처</td>
+            </tr>
+            <tr>
+                <td><strong>GPS 시간</strong></td>
+                <td>< 100 ns</td>
+                <td>중간</td>
+                <td>분산 시스템</td>
+            </tr>
+        </table>
+
+        <pre><code>class TimeSynchronizer:
+    """
+    다중 센서 시간 동기화 관리자
+
+    다양한 속도의 센서 데이터를 공통 시간 기준으로 정렬
+    """
+    def __init__(self, reference_clock='system'):
+        self.reference_clock = reference_clock
+        self.sensor_offsets = {}  # 센서별 시간 오프셋
+        self.sensor_buffers = {}  # 센서별 데이터 버퍼
+
+    def register_sensor(self, sensor_id, expected_rate, max_delay):
+        """
+        새 센서 등록
+
+        매개변수:
+        - sensor_id: 센서 식별자
+        - expected_rate: 예상 데이터 속도 (Hz)
+        - max_delay: 최대 허용 지연 (초)
+        """
+        self.sensor_buffers[sensor_id] = SensorBuffer(
+            max_size=int(expected_rate * max_delay * 2),
+            expected_rate=expected_rate
+        )
+        self.sensor_offsets[sensor_id] = 0.0
+
+    def add_measurement(self, sensor_id, timestamp, data):
+        """
+        센서 측정 추가
+
+        타임스탬프를 참조 시간으로 변환하고 버퍼에 저장
+        """
+        # 센서별 오프셋 적용
+        corrected_timestamp = timestamp - self.sensor_offsets[sensor_id]
+
+        # 버퍼에 저장
+        self.sensor_buffers[sensor_id].add(corrected_timestamp, data)
+
+    def get_synchronized(self, query_time, tolerance=0.01):
+        """
+        지정된 시간에 대해 모든 센서의 동기화된 데이터 가져오기
+
+        매개변수:
+        - query_time: 쿼리 시간
+        - tolerance: 허용 시간 오차 (초)
+
+        반환:
+        - 동기화된 센서 데이터 딕셔너리
+        """
+        synchronized_data = {}
+
+        for sensor_id, buffer in self.sensor_buffers.items():
+            # 가장 가까운 측정 찾기
+            nearest = buffer.get_nearest(query_time, tolerance)
+
+            if nearest is not None:
+                synchronized_data[sensor_id] = nearest
+            else:
+                # 보간 시도
+                interpolated = buffer.interpolate(query_time)
+                if interpolated is not None:
+                    synchronized_data[sensor_id] = interpolated
+
+        return synchronized_data
+
+    def estimate_clock_offset(self, sensor_id, reference_measurements):
+        """
+        참조 측정을 사용하여 센서 시계 오프셋 추정
+
+        상호 상관을 사용하여 최적의 시간 정렬 찾기
+        """
+        sensor_data = self.sensor_buffers[sensor_id].get_recent(100)
+
+        # 상호 상관 계산
+        correlation = np.correlate(
+            sensor_data['values'],
+            reference_measurements['values'],
+            mode='full'
+        )
+
+        # 최대 상관 위치에서 오프셋 계산
+        lag = np.argmax(correlation) - len(reference_measurements['values']) + 1
+        offset = lag / sensor_data['rate']
+
+        self.sensor_offsets[sensor_id] = offset
+        return offset</code></pre>
+
+        <h2>2.3 데이터 보간 기법</h2>
+        <p>센서 데이터 속도가 다를 때 보간을 통해 공통 시간에서 값을 추정해야 합니다:</p>
+
+        <pre><code>class DataInterpolator:
+    """
+    다양한 보간 방법을 제공하는 센서 데이터 보간기
+    """
+    def __init__(self, method='linear'):
+        self.method = method
+
+    def interpolate_pose(self, poses, query_time):
+        """
+        자세 데이터 보간 (위치 + 방향)
+
+        위치: 선형 보간
+        방향: 구면 선형 보간 (SLERP)
+        """
+        # 쿼리 시간을 감싸는 두 자세 찾기
+        idx = np.searchsorted(poses['timestamps'], query_time)
+
+        if idx == 0 or idx >= len(poses['timestamps']):
+            return None  # 외삽 불가
+
+        t0 = poses['timestamps'][idx - 1]
+        t1 = poses['timestamps'][idx]
+
+        # 보간 비율
+        alpha = (query_time - t0) / (t1 - t0)
+
+        # 위치: 선형 보간
+        pos0 = poses['positions'][idx - 1]
+        pos1 = poses['positions'][idx]
+        interpolated_position = (1 - alpha) * pos0 + alpha * pos1
+
+        # 방향: SLERP
+        q0 = poses['orientations'][idx - 1]
+        q1 = poses['orientations'][idx]
+        interpolated_orientation = self.slerp(q0, q1, alpha)
+
+        return {
+            'position': interpolated_position,
+            'orientation': interpolated_orientation,
+            'timestamp': query_time
+        }
+
+    def slerp(self, q0, q1, t):
+        """
+        쿼터니언 구면 선형 보간 (SLERP)
+        """
+        # 쿼터니언 정규화
+        q0 = q0 / np.linalg.norm(q0)
+        q1 = q1 / np.linalg.norm(q1)
+
+        # 내적
+        dot = np.dot(q0, q1)
+
+        # 최단 경로 보장
+        if dot < 0:
+            q1 = -q1
+            dot = -dot
+
+        # 거의 동일한 경우 선형 보간
+        if dot > 0.9995:
+            result = (1 - t) * q0 + t * q1
+            return result / np.linalg.norm(result)
+
+        # 각도 계산
+        theta_0 = np.arccos(dot)
+        theta = theta_0 * t
+
+        # 직교 성분
+        q2 = q1 - q0 * dot
+        q2 = q2 / np.linalg.norm(q2)
+
+        # 보간
+        return q0 * np.cos(theta) + q2 * np.sin(theta)
+
+    def interpolate_imu(self, imu_data, query_time):
+        """
+        IMU 데이터 보간 (가속도, 자이로)
+
+        높은 속도 데이터의 경우 간단한 선형 보간 적합
+        """
+        idx = np.searchsorted(imu_data['timestamps'], query_time)
+
+        if idx == 0 or idx >= len(imu_data['timestamps']):
+            return None
+
+        t0 = imu_data['timestamps'][idx - 1]
+        t1 = imu_data['timestamps'][idx]
+        alpha = (query_time - t0) / (t1 - t0)
+
+        return {
+            'accel': (1 - alpha) * imu_data['accel'][idx-1] + alpha * imu_data['accel'][idx],
+            'gyro': (1 - alpha) * imu_data['gyro'][idx-1] + alpha * imu_data['gyro'][idx],
+            'timestamp': query_time
+        }</code></pre>
+
+        <h2>2.4 데이터 연관</h2>
+        <p>데이터 연관은 서로 다른 센서에서 온 측정이 동일한 물리적 객체를 참조하는지 결정하는 과정입니다:</p>
+
+        <pre><code>class DataAssociator:
+    """
+    다중 센서 데이터 연관
+
+    서로 다른 센서의 감지를 동일한 객체와 매칭
+    """
+    def __init__(self, distance_threshold=2.0, iou_threshold=0.3):
+        self.distance_threshold = distance_threshold
+        self.iou_threshold = iou_threshold
+
+    def associate_detections(self, detections_a, detections_b):
+        """
+        두 센서의 감지 연관
+
+        헝가리안 알고리즘을 사용한 최적 매칭
+        """
+        if len(detections_a) == 0 or len(detections_b) == 0:
+            return [], list(range(len(detections_a))), list(range(len(detections_b)))
+
+        # 비용 행렬 계산
+        cost_matrix = np.zeros((len(detections_a), len(detections_b)))
+
+        for i, det_a in enumerate(detections_a):
+            for j, det_b in enumerate(detections_b):
+                # 공간적 거리
+                spatial_cost = np.linalg.norm(
+                    det_a['position'] - det_b['position']
+                )
+
+                # 박스 IoU (가능한 경우)
+                if 'bbox' in det_a and 'bbox' in det_b:
+                    iou = self.compute_iou(det_a['bbox'], det_b['bbox'])
+                    iou_cost = 1 - iou
+                else:
+                    iou_cost = 0
+
+                # 결합된 비용
+                cost_matrix[i, j] = spatial_cost + 0.5 * iou_cost
+
+        # 헝가리안 알고리즘
+        row_indices, col_indices = linear_sum_assignment(cost_matrix)
+
+        # 임계값으로 필터링
+        matches = []
+        unmatched_a = list(range(len(detections_a)))
+        unmatched_b = list(range(len(detections_b)))
+
+        for i, j in zip(row_indices, col_indices):
+            if cost_matrix[i, j] < self.distance_threshold:
+                matches.append((i, j))
+                unmatched_a.remove(i)
+                unmatched_b.remove(j)
+
+        return matches, unmatched_a, unmatched_b
+
+    def compute_iou(self, bbox_a, bbox_b):
+        """
+        두 바운딩 박스의 IoU (Intersection over Union) 계산
+        """
+        # 교집합 영역
+        x1 = max(bbox_a[0], bbox_b[0])
+        y1 = max(bbox_a[1], bbox_b[1])
+        x2 = min(bbox_a[2], bbox_b[2])
+        y2 = min(bbox_a[3], bbox_b[3])
+
+        if x2 < x1 or y2 < y1:
+            return 0.0
+
+        intersection = (x2 - x1) * (y2 - y1)
+
+        # 합집합 영역
+        area_a = (bbox_a[2] - bbox_a[0]) * (bbox_a[3] - bbox_a[1])
+        area_b = (bbox_b[2] - bbox_b[0]) * (bbox_b[3] - bbox_b[1])
+        union = area_a + area_b - intersection
+
+        return intersection / union if union > 0 else 0.0</code></pre>
+
+        <h2>2.5 좌표 프레임 변환</h2>
+        <p>다중 센서 시스템에서 각 센서는 자체 좌표계를 가집니다. 융합을 위해서는 모든 데이터를 공통 참조 프레임으로 변환해야 합니다:</p>
+
+        <pre><code>class CoordinateTransformer:
+    """
+    센서 좌표계 간 변환 관리
+    """
+    def __init__(self):
+        self.transforms = {}  # {(from_frame, to_frame): transformation}
+
+    def set_transform(self, from_frame, to_frame, rotation, translation):
+        """
+        두 프레임 간의 변환 설정
+
+        매개변수:
+        - rotation: 3x3 회전 행렬 또는 쿼터니언
+        - translation: 3D 변환 벡터
+        """
+        T = np.eye(4)
+
+        if rotation.shape == (4,):  # 쿼터니언
+            R = self.quaternion_to_rotation_matrix(rotation)
+        else:
+            R = rotation
+
+        T[:3, :3] = R
+        T[:3, 3] = translation
+
+        self.transforms[(from_frame, to_frame)] = T
+        self.transforms[(to_frame, from_frame)] = np.linalg.inv(T)
+
+    def transform_point(self, point, from_frame, to_frame):
+        """
+        단일 점을 소스 프레임에서 대상 프레임으로 변환
+        """
+        T = self.get_transform(from_frame, to_frame)
+
+        # 동차 좌표로 변환
+        point_h = np.append(point, 1)
+
+        # 변환 적용
+        transformed_h = T @ point_h
+
+        return transformed_h[:3]
+
+    def transform_point_cloud(self, points, from_frame, to_frame):
+        """
+        포인트 클라우드 변환
+        """
+        T = self.get_transform(from_frame, to_frame)
+
+        # 동차 좌표
+        n_points = points.shape[0]
+        points_h = np.hstack([points, np.ones((n_points, 1))])
+
+        # 변환
+        transformed_h = (T @ points_h.T).T
+
+        return transformed_h[:, :3]
+
+    def transform_pose(self, pose, from_frame, to_frame):
+        """
+        자세 (위치 + 방향) 변환
+        """
+        T = self.get_transform(from_frame, to_frame)
+
+        # 위치 변환
+        position_h = np.append(pose['position'], 1)
+        new_position = (T @ position_h)[:3]
+
+        # 방향 변환
+        R_transform = T[:3, :3]
+        R_pose = self.quaternion_to_rotation_matrix(pose['orientation'])
+        R_new = R_transform @ R_pose
+        new_orientation = self.rotation_matrix_to_quaternion(R_new)
+
+        return {
+            'position': new_position,
+            'orientation': new_orientation
+        }
+
+    def get_transform(self, from_frame, to_frame):
+        """
+        두 프레임 간의 변환 가져오기 (연쇄 지원)
+        """
+        if (from_frame, to_frame) in self.transforms:
+            return self.transforms[(from_frame, to_frame)]
+
+        # 경로 탐색 (간단한 구현)
+        path = self.find_path(from_frame, to_frame)
+        if path is None:
+            raise ValueError(f"변환 경로 없음: {from_frame} -> {to_frame}")
+
+        # 변환 연쇄
+        T = np.eye(4)
+        for i in range(len(path) - 1):
+            T = self.transforms[(path[i], path[i+1])] @ T
+
+        return T</code></pre>
+
+        <h2>2.6 센서 버퍼 관리</h2>
+        <p>실시간 시스템에서 효율적인 버퍼 관리는 필수적입니다:</p>
+
+        <pre><code>class SensorBuffer:
+    """
+    시간 기반 센서 데이터 버퍼
+
+    효율적인 시간 쿼리 및 보간 지원
+    """
+    def __init__(self, max_size, expected_rate):
+        self.max_size = max_size
+        self.expected_rate = expected_rate
+
+        # 순환 버퍼
+        self.timestamps = np.zeros(max_size)
+        self.data = [None] * max_size
+
+        self.head = 0
+        self.count = 0
+
+    def add(self, timestamp, data):
+        """
+        새 데이터 추가
+        """
+        self.timestamps[self.head] = timestamp
+        self.data[self.head] = data
+
+        self.head = (self.head + 1) % self.max_size
+        self.count = min(self.count + 1, self.max_size)
+
+    def get_nearest(self, query_time, tolerance):
+        """
+        쿼리 시간에 가장 가까운 데이터 가져오기
+        """
+        if self.count == 0:
+            return None
+
+        # 유효한 타임스탬프 가져오기
+        valid_timestamps = self.get_valid_timestamps()
+
+        # 가장 가까운 인덱스 찾기
+        diffs = np.abs(valid_timestamps - query_time)
+        min_idx = np.argmin(diffs)
+
+        if diffs[min_idx] > tolerance:
+            return None
+
+        buffer_idx = self.get_buffer_index(min_idx)
+        return self.data[buffer_idx]
+
+    def get_range(self, start_time, end_time):
+        """
+        시간 범위 내의 모든 데이터 가져오기
+        """
+        result = []
+
+        for i in range(self.count):
+            buffer_idx = (self.head - self.count + i) % self.max_size
+            ts = self.timestamps[buffer_idx]
+
+            if start_time <= ts <= end_time:
+                result.append({
+                    'timestamp': ts,
+                    'data': self.data[buffer_idx]
+                })
+
+        return result</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>시간 동기화는 정확한 센서 융합의 기본 요구 사항입니다</li>
+                <li>다양한 동기화 방법이 있으며, 정확도와 복잡성이 다릅니다 (NTP, PTP, 하드웨어 트리거)</li>
+                <li>서로 다른 샘플링 속도의 센서를 위해 데이터 보간이 필요합니다</li>
+                <li>자세 보간 시 위치는 선형 보간, 방향은 SLERP를 사용합니다</li>
+                <li>데이터 연관은 서로 다른 센서의 측정을 동일한 객체에 매칭합니다</li>
+                <li>좌표 프레임 변환은 모든 센서 데이터를 공통 참조 프레임으로 정렬합니다</li>
+                <li>효율적인 버퍼 관리는 실시간 시스템 성능에 중요합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>시간 동기화가 센서 융합에서 왜 중요합니까? 구체적인 예를 들어 설명하세요.</li>
+                <li>NTP와 PTP의 차이점은 무엇이며, 각각 어떤 상황에서 사용됩니까?</li>
+                <li>SLERP가 무엇이며, 왜 방향 보간에 사용됩니까?</li>
+                <li>데이터 연관에서 헝가리안 알고리즘의 역할은 무엇입니까?</li>
+                <li>외부 캘리브레이션 매개변수가 좌표 변환에 어떻게 사용됩니까?</li>
+                <li>순환 버퍼의 장점은 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+        </div>
+
+        </div>
+</body>
+</html>

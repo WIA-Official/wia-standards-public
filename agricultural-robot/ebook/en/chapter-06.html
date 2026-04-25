@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Protocol | WIA-ROB-007</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--agri-color:#22C55E;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--agri-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--agri-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--agri-color);margin:40px 0 20px;border-bottom:2px solid var(--agri-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--agri-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--agri-color);margin:20px 0;font-size:18px;letter-spacing:2px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--agri-color);text-decoration:none;font-size:16px;padding:10px 20px;border:2px solid var(--agri-color);border-radius:5px}
+        ul,ol{margin:15px 0 15px 30px}
+        li{margin:10px 0}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;text-align:left;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--agri-color)}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--agri-color);padding:20px;margin:25px 0;border-radius:5px}
+        .key-takeaways{background:rgba(34,197,94,0.1);border:2px solid var(--agri-color);border-radius:8px;padding:25px;margin:30px 0}
+        .review-questions{background:var(--bg);border:2px solid var(--border);border-radius:8px;padding:25px;margin:30px 0}
+        strong{color:var(--agri-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:monospace;color:#22C55E}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+        <h1>Chapter 6: Phase 3 - Protocol</h1>
+
+        <h2>6.1 Real-Time Communication Requirements</h2>
+        <p>Agricultural robots require real-time communication protocols for time-critical operations such as obstacle detection, emergency stops, swarm coordination, and sensor data streaming. While the RESTful API described in Chapter 5 handles most management operations, real-time protocols enable the sub-second latency and high-frequency data exchange necessary for safe and efficient robot operation.</p>
+
+        <p>The WIA-ROB-007 standard defines multiple protocol layers to address different communication needs. Low-latency command-and-control requires protocols like WebSocket and MQTT with QoS guarantees. Sensor streaming benefits from UDP-based protocols that prioritize throughput over reliability. Safety-critical systems use redundant communication channels with hardware failsafes.</p>
+
+        <h3>Communication Hierarchy</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Layer</th>
+                    <th>Protocol</th>
+                    <th>Latency Target</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Emergency Safety</td>
+                    <td>Hardware E-Stop</td>
+                    <td>&lt; 50ms</td>
+                    <td>Emergency shutdown</td>
+                </tr>
+                <tr>
+                    <td>Real-Time Control</td>
+                    <td>WebSocket/DDS</td>
+                    <td>&lt; 100ms</td>
+                    <td>Collision avoidance, coordination</td>
+                </tr>
+                <tr>
+                    <td>Telemetry Streaming</td>
+                    <td>MQTT/UDP</td>
+                    <td>&lt; 500ms</td>
+                    <td>Sensor data, position updates</td>
+                </tr>
+                <tr>
+                    <td>Task Management</td>
+                    <td>REST API/HTTPS</td>
+                    <td>&lt; 2s</td>
+                    <td>Task assignment, status updates</td>
+                </tr>
+                <tr>
+                    <td>Bulk Data Transfer</td>
+                    <td>HTTP/FTP</td>
+                    <td>Best effort</td>
+                    <td>Maps, firmware, logs</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.2 MQTT for Agricultural IoT</h2>
+        <p>MQTT (Message Queuing Telemetry Transport) serves as the primary protocol for telemetry streaming and event distribution in agricultural robot systems. MQTT's publish-subscribe model enables efficient one-to-many communication, making it ideal for broadcasting robot status to multiple monitoring clients and aggregating sensor data from large robot fleets.</p>
+
+        <p>The standard defines a hierarchical MQTT topic structure that organizes messages by farm, field, robot, and data type. This structure enables selective subscription—clients interested only in specific robots or data types subscribe to relevant topics without receiving unnecessary data.</p>
+
+        <h3>MQTT Topic Hierarchy</h3>
+        <pre><code>wia-rob-007/{farm_id}/{robot_id}/{message_type}
+
+Examples:
+wia-rob-007/farm-12345/robot-001/telemetry
+wia-rob-007/farm-12345/robot-001/status
+wia-rob-007/farm-12345/robot-001/alerts
+wia-rob-007/farm-12345/fleet/coordination
+wia-rob-007/farm-12345/field-north-40/coverage
+
+// Telemetry Message Example
+Topic: wia-rob-007/farm-12345/robot-001/telemetry
+Payload:
+{
+  "timestamp": "2025-12-29T14:35:22.145Z",
+  "robot_id": "robot-001",
+  "position": {
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "altitude": 120.5,
+    "heading": 87.3,
+    "accuracy": 0.02
+  },
+  "velocity": {
+    "speed_ms": 1.8,
+    "direction": 85
+  },
+  "battery": {
+    "percentage": 87,
+    "voltage": 48.2,
+    "current": -15.3,
+    "time_remaining_minutes": 145
+  },
+  "sensors": {
+    "gps_satellites": 18,
+    "rtk_fix": true,
+    "obstacle_distance_m": null,
+    "soil_moisture": 0.32
+  }
+}</code></pre>
+
+        <h3>MQTT Quality of Service Levels</h3>
+        <p>MQTT defines three QoS levels balancing reliability and performance:</p>
+        <ul>
+            <li><strong>QoS 0 (At most once):</strong> Fire-and-forget, no acknowledgment. Used for high-frequency telemetry where occasional loss is acceptable.</li>
+            <li><strong>QoS 1 (At least once):</strong> Guaranteed delivery with possible duplicates. Used for alerts and status changes.</li>
+            <li><strong>QoS 2 (Exactly once):</strong> Guaranteed single delivery. Used for commands and configuration updates.</li>
+        </ul>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Message Type</th>
+                    <th>QoS Level</th>
+                    <th>Retained</th>
+                    <th>Frequency</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Telemetry</td>
+                    <td>0</td>
+                    <td>No</td>
+                    <td>1-10 Hz</td>
+                </tr>
+                <tr>
+                    <td>Status Changes</td>
+                    <td>1</td>
+                    <td>Yes</td>
+                    <td>On change</td>
+                </tr>
+                <tr>
+                    <td>Alerts/Warnings</td>
+                    <td>1</td>
+                    <td>Yes</td>
+                    <td>On event</td>
+                </tr>
+                <tr>
+                    <td>Commands</td>
+                    <td>2</td>
+                    <td>No</td>
+                    <td>On demand</td>
+                </tr>
+                <tr>
+                    <td>Configuration</td>
+                    <td>2</td>
+                    <td>Yes</td>
+                    <td>Infrequent</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 ROS2 Integration</h2>
+        <p>Robot Operating System 2 (ROS2) has emerged as the standard middleware for robot software development. Many agricultural robots use ROS2 internally for sensor processing, path planning, and control. The WIA-ROB-007 standard provides a bridge between ROS2's internal communication (DDS) and external APIs, enabling seamless integration with farm management systems.</p>
+
+        <p>ROS2 uses a distributed publish-subscribe architecture based on DDS (Data Distribution Service). The standard defines custom ROS2 message types for agricultural operations, ensuring consistent data representation across different robot platforms.</p>
+
+        <h3>Custom ROS2 Messages</h3>
+        <pre><code># FieldBoundary.msg
+std_msgs/Header header
+string field_id
+geometry_msgs/PolygonStamped boundary
+float64 area_hectares
+string crop_type
+sensor_msgs/NavSatFix[] waypoints
+
+---
+
+# SprayCommand.msg
+std_msgs/Header header
+string task_id
+string chemical_name
+float32 rate_l_ha
+float32 ground_speed_kmh
+float32 boom_height_cm
+bool[] nozzle_states
+geometry_msgs/Polygon target_area
+
+---
+
+# RobotStatus.msg
+std_msgs/Header header
+string robot_id
+uint8 operational_state
+# States: 0=IDLE, 1=ACTIVE, 2=ERROR, 3=MAINTENANCE
+geometry_msgs/PoseStamped pose
+geometry_msgs/Twist velocity
+sensor_msgs/BatteryState battery
+diagnostic_msgs/DiagnosticArray diagnostics
+</code></pre>
+
+        <h3>ROS2-MQTT Bridge</h3>
+        <p>The standard includes a bidirectional bridge component that translates between ROS2 topics and MQTT messages, enabling external applications to monitor and control ROS2-based robots without running ROS2 themselves.</p>
+
+        <pre><code># Bridge Configuration (YAML)
+bridges:
+  - ros_topic: /robot_001/telemetry
+    mqtt_topic: wia-rob-007/farm-12345/robot-001/telemetry
+    direction: ros_to_mqtt
+    qos: 0
+    rate_limit_hz: 5
+
+  - ros_topic: /robot_001/cmd_vel
+    mqtt_topic: wia-rob-007/farm-12345/robot-001/command/velocity
+    direction: mqtt_to_ros
+    qos: 2
+    message_type: geometry_msgs/Twist
+</code></pre>
+
+        <h2>6.4 Swarm Coordination Protocols</h2>
+        <p>When multiple robots work in proximity—such as a fleet of weeding robots covering a large field—coordination protocols prevent collisions, optimize coverage, and balance workload. The WIA-ROB-007 standard supports both centralized and decentralized coordination approaches.</p>
+
+        <h3>Centralized Coordination</h3>
+        <p>A central coordinator service assigns work areas to each robot and monitors their progress. Robots regularly report position and status; the coordinator detects potential conflicts and issues path adjustments. This approach works well for smaller fleets (2-10 robots) with reliable network connectivity.</p>
+
+        <pre><code>// Centralized Coordination Message
+{
+  "coordination_id": "coord-9876",
+  "timestamp": "2025-12-29T14:35:22Z",
+  "coordinator": "fleet-manager-01",
+  "assignments": [
+    {
+      "robot_id": "robot-001",
+      "work_area": {
+        "type": "Polygon",
+        "coordinates": [[[...area 1...]]]
+      },
+      "priority": 1,
+      "estimated_duration_minutes": 45
+    },
+    {
+      "robot_id": "robot-002",
+      "work_area": {
+        "type": "Polygon",
+        "coordinates": [[[...area 2...]]]
+      },
+      "priority": 1,
+      "estimated_duration_minutes": 42
+    }
+  ],
+  "separation_distance_m": 10,
+  "replan_trigger": "progress_deviation"
+}</code></pre>
+
+        <h3>Decentralized Coordination</h3>
+        <p>Robots communicate peer-to-peer to negotiate work areas and avoid collisions without a central coordinator. Each robot broadcasts its position, intended path, and work area. Robots use conflict resolution algorithms (e.g., priority-based, auction-based) to resolve overlaps. This approach scales better and remains functional during network partitions.</p>
+
+        <div class="highlight-box">
+            <h3>Swarm Coordination Algorithm</h3>
+            <ol>
+                <li><strong>Broadcast Intent:</strong> Each robot publishes its planned path and work area</li>
+                <li><strong>Conflict Detection:</strong> Robots detect potential path conflicts or work area overlaps</li>
+                <li><strong>Priority Resolution:</strong> Conflicts resolved based on priority (task urgency, battery level, proximity to target)</li>
+                <li><strong>Path Adjustment:</strong> Lower-priority robot modifies path or yields work area</li>
+                <li><strong>Confirmation:</strong> Updated plans broadcast to ensure no new conflicts</li>
+                <li><strong>Continuous Monitoring:</strong> Process repeats as conditions change</li>
+            </ol>
+        </div>
+
+        <h2>6.5 Safety Communication Protocols</h2>
+        <p>Safety is paramount in agricultural robotics. Robots operate in environments with workers, animals, and expensive crops. The WIA-ROB-007 standard mandates multiple layers of safety communication, from software protocols to hardware interlocks.</p>
+
+        <h3>Safety Architecture</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Safety Layer</th>
+                    <th>Implementation</th>
+                    <th>Response Time</th>
+                    <th>Failure Mode</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Hardware E-Stop</td>
+                    <td>Physical button, relay cutoff</td>
+                    <td>&lt; 50ms</td>
+                    <td>Immediate power cut</td>
+                </tr>
+                <tr>
+                    <td>Safety Controller</td>
+                    <td>Dedicated safety PLC</td>
+                    <td>&lt; 100ms</td>
+                    <td>Safe stop sequence</td>
+                </tr>
+                <tr>
+                    <td>Software E-Stop</td>
+                    <td>High-priority message</td>
+                    <td>&lt; 200ms</td>
+                    <td>Controlled deceleration</td>
+                </tr>
+                <tr>
+                    <td>Geofencing</td>
+                    <td>GPS boundary checking</td>
+                    <td>&lt; 500ms</td>
+                    <td>Stop at boundary</td>
+                </tr>
+                <tr>
+                    <td>Watchdog Timer</td>
+                    <td>Communication heartbeat</td>
+                    <td>5s timeout</td>
+                    <td>Safe mode entry</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Safety Message Protocol</h3>
+        <pre><code>// Emergency Stop Command
+Topic: wia-rob-007/farm-12345/emergency/stop
+QoS: 2 (Exactly once)
+{
+  "command": "EMERGENCY_STOP",
+  "scope": "all_robots",
+  "reason": "person_detected",
+  "location": {
+    "latitude": 40.7128,
+    "longitude": -74.0060
+  },
+  "timestamp": "2025-12-29T14:35:22.145Z",
+  "signature": "SHA256:abc123...",
+  "authorized_by": "safety-system-01"
+}
+
+// Safety Heartbeat
+Topic: wia-rob-007/farm-12345/robot-001/safety/heartbeat
+QoS: 1
+Frequency: 1 Hz
+{
+  "robot_id": "robot-001",
+  "timestamp": "2025-12-29T14:35:22.145Z",
+  "safety_status": "nominal",
+  "e_stop_engaged": false,
+  "obstacle_detected": false,
+  "system_health": "ok",
+  "sequence_number": 98765
+}</code></pre>
+
+        <h3>Fail-Safe Behaviors</h3>
+        <p>When communication fails or safety violations are detected, robots must enter fail-safe modes:</p>
+        <ul>
+            <li><strong>Communication Loss:</strong> Robot stops moving and waits for reconnection (timeout: 30 seconds)</li>
+            <li><strong>Geofence Violation:</strong> Robot stops immediately and alerts operators</li>
+            <li><strong>Obstacle Detection:</strong> Robot stops and attempts to route around (max 3 attempts)</li>
+            <li><strong>Low Battery Critical:</strong> Robot returns to charging station via shortest safe path</li>
+            <li><strong>System Error:</strong> Robot enters safe mode—non-moving state with diagnostic mode active</li>
+        </ul>
+
+        <h2>6.6 Telemetry Streaming</h2>
+        <p>Agricultural robots generate continuous streams of sensor data—position, speed, battery status, soil conditions, crop health observations. Efficient telemetry streaming requires protocols optimized for high-frequency data with variable quality of service requirements.</p>
+
+        <h3>Telemetry Data Types</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Frequency</th>
+                    <th>Protocol</th>
+                    <th>Bandwidth</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>GPS Position</td>
+                    <td>1-10 Hz</td>
+                    <td>MQTT QoS 0</td>
+                    <td>~1 KB/s</td>
+                </tr>
+                <tr>
+                    <td>IMU Data</td>
+                    <td>50-100 Hz</td>
+                    <td>UDP (local)</td>
+                    <td>~10 KB/s</td>
+                </tr>
+                <tr>
+                    <td>Camera Streams</td>
+                    <td>15-30 FPS</td>
+                    <td>WebRTC/RTSP</td>
+                    <td>500 KB/s - 2 MB/s</td>
+                </tr>
+                <tr>
+                    <td>LiDAR Scans</td>
+                    <td>10-20 Hz</td>
+                    <td>UDP (local)</td>
+                    <td>~100 KB/s</td>
+                </tr>
+                <tr>
+                    <td>Soil Sensors</td>
+                    <td>0.1-1 Hz</td>
+                    <td>MQTT QoS 1</td>
+                    <td>~100 B/s</td>
+                </tr>
+                <tr>
+                    <td>System Status</td>
+                    <td>1 Hz</td>
+                    <td>MQTT QoS 1</td>
+                    <td>~500 B/s</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Adaptive Streaming</h3>
+        <p>Network conditions in agricultural environments vary dramatically—from high-bandwidth WiFi near farm buildings to constrained cellular connections in remote fields. The protocol supports adaptive streaming that adjusts data rates and quality based on available bandwidth.</p>
+
+        <pre><code>// Telemetry Configuration
+{
+  "robot_id": "robot-001",
+  "streaming_config": {
+    "mode": "adaptive",
+    "network_conditions": {
+      "connection_type": "cellular_4g",
+      "signal_strength": -85,
+      "available_bandwidth_kbps": 512,
+      "latency_ms": 120
+    },
+    "streams": {
+      "gps_position": {
+        "enabled": true,
+        "frequency_hz": 1,
+        "priority": "high"
+      },
+      "camera_front": {
+        "enabled": true,
+        "resolution": "640x480",
+        "fps": 10,
+        "compression": "h264",
+        "bitrate_kbps": 256,
+        "priority": "medium"
+      },
+      "lidar": {
+        "enabled": false,
+        "reason": "insufficient_bandwidth"
+      }
+    }
+  }
+}</code></pre>
+
+        <h2>6.7 Time Synchronization</h2>
+        <p>Accurate time synchronization across distributed robot systems is critical for sensor fusion, task coordination, and data analysis. The WIA-ROB-007 standard mandates Network Time Protocol (NTP) or Precision Time Protocol (PTP) for time synchronization with accuracy requirements varying by application.</p>
+
+        <h3>Time Synchronization Requirements</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Application</th>
+                    <th>Accuracy Required</th>
+                    <th>Protocol</th>
+                    <th>Update Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Data Logging</td>
+                    <td>± 1 second</td>
+                    <td>NTP</td>
+                    <td>Hourly</td>
+                </tr>
+                <tr>
+                    <td>Swarm Coordination</td>
+                    <td>± 100 ms</td>
+                    <td>NTP</td>
+                    <td>Every 5 minutes</td>
+                </tr>
+                <tr>
+                    <td>Sensor Fusion</td>
+                    <td>± 10 ms</td>
+                    <td>PTP</td>
+                    <td>Continuous</td>
+                </tr>
+                <tr>
+                    <td>Multi-Robot SLAM</td>
+                    <td>± 1 ms</td>
+                    <td>PTP Hardware</td>
+                    <td>Continuous</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>GPS Time Integration</h3>
+        <p>Most agricultural robots include GPS receivers that provide highly accurate time from GPS satellites. The standard supports GPS time as the primary time source with NTP/PTP for systems without GPS or during GPS signal loss.</p>
+
+        <pre><code>// Time Synchronization Status
+{
+  "robot_id": "robot-001",
+  "time_sync": {
+    "current_time": "2025-12-29T14:35:22.145Z",
+    "primary_source": "gps",
+    "gps_time_accuracy_ns": 40,
+    "ntp_servers": ["pool.ntp.org", "time.farm.local"],
+    "ntp_offset_ms": 12,
+    "ntp_jitter_ms": 3,
+    "last_sync": "2025-12-29T14:35:15Z",
+    "sync_status": "synchronized"
+  }
+}</code></pre>
+
+        <h2>6.8 Bandwidth Optimization</h2>
+        <p>Agricultural operations often occur in areas with limited network infrastructure. Cellular coverage may be sparse, and available bandwidth expensive. The protocol includes several optimization techniques to minimize data transmission while maintaining operational effectiveness.</p>
+
+        <h3>Compression and Delta Encoding</h3>
+        <p>Telemetry data exhibits significant temporal correlation—consecutive position readings differ by small amounts. Delta encoding transmits only changes from previous values, dramatically reducing bandwidth.</p>
+
+        <pre><code>// Standard Position Update (95 bytes JSON)
+{
+  "timestamp": "2025-12-29T14:35:22.145Z",
+  "latitude": 40.712800,
+  "longitude": -74.006000,
+  "altitude": 120.5,
+  "heading": 87.3
+}
+
+// Delta-Encoded Update (42 bytes JSON)
+{
+  "t": 1000,        // +1000ms from previous
+  "lat": 0.00001,   // +0.00001 degrees
+  "lon": -0.00002,  // -0.00002 degrees
+  "alt": -0.1,      // -0.1 meters
+  "hdg": 0.5        // +0.5 degrees
+}
+
+// Binary Protocol (16 bytes)
+// Even more compact using Protocol Buffers or MessagePack
+</code></pre>
+
+        <h3>Edge Processing and Aggregation</h3>
+        <p>Rather than streaming raw sensor data, edge processing on the robot extracts meaningful information. For example, instead of transmitting full camera frames, the robot runs plant detection and transmits only detection results.</p>
+
+        <div class="highlight-box">
+            <h3>Bandwidth Reduction Techniques</h3>
+            <ul>
+                <li><strong>Delta Encoding:</strong> 60-80% reduction for telemetry streams</li>
+                <li><strong>Binary Protocols:</strong> 50-70% reduction compared to JSON</li>
+                <li><strong>Data Compression:</strong> 40-60% reduction using gzip/brotli</li>
+                <li><strong>Edge Processing:</strong> 90-99% reduction by transmitting results instead of raw data</li>
+                <li><strong>Adaptive Sampling:</strong> 50-80% reduction by varying frequency based on activity</li>
+                <li><strong>Deduplication:</strong> 30-50% reduction for repeated status messages</li>
+            </ul>
+        </div>
+
+        <h2>6.9 Protocol Security</h2>
+        <p>Communication security protects against unauthorized access, command injection, data tampering, and eavesdropping. The WIA-ROB-007 standard mandates end-to-end encryption and message authentication for all robot communications.</p>
+
+        <h3>Security Measures</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Threat</th>
+                    <th>Protection</th>
+                    <th>Implementation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Eavesdropping</td>
+                    <td>Encryption</td>
+                    <td>TLS 1.3 for all connections</td>
+                </tr>
+                <tr>
+                    <td>Unauthorized Control</td>
+                    <td>Authentication</td>
+                    <td>X.509 certificates, JWT tokens</td>
+                </tr>
+                <tr>
+                    <td>Command Injection</td>
+                    <td>Message Signing</td>
+                    <td>HMAC-SHA256 signatures</td>
+                </tr>
+                <tr>
+                    <td>Replay Attacks</td>
+                    <td>Timestamps + Nonces</td>
+                    <td>5-minute message validity window</td>
+                </tr>
+                <tr>
+                    <td>Man-in-the-Middle</td>
+                    <td>Certificate Pinning</td>
+                    <td>Pin farm server certificates</td>
+                </tr>
+                <tr>
+                    <td>Data Tampering</td>
+                    <td>Integrity Checks</td>
+                    <td>SHA256 checksums</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Secure Communication Example</h3>
+        <pre><code>// Signed and Encrypted Command
+{
+  "header": {
+    "version": "1.0",
+    "message_id": "msg-12345",
+    "timestamp": "2025-12-29T14:35:22.145Z",
+    "sender": "farm-controller-01",
+    "recipient": "robot-001",
+    "nonce": "a1b2c3d4e5f6"
+  },
+  "payload": {
+    "command": "start_task",
+    "task_id": "task-9876",
+    "encrypted": true
+  },
+  "signature": "SHA256:abc123def456...",
+  "encryption": {
+    "algorithm": "AES-256-GCM",
+    "key_id": "key-farm-2025"
+  }
+}
+
+// Signature Verification Process
+1. Extract header + payload
+2. Verify timestamp within validity window
+3. Check nonce not previously used (replay prevention)
+4. Compute HMAC-SHA256(header + payload, shared_secret)
+5. Compare computed signature with message signature
+6. Decrypt payload using symmetric key
+7. Execute command if signature valid
+</code></pre>
+
+        <h2>6.10 Protocol Testing and Validation</h2>
+        <p>The WIA-ROB-007 standard includes comprehensive testing requirements for protocol implementations. Conformance testing ensures interoperability between different robot manufacturers and software platforms.</p>
+
+        <h3>Test Scenarios</h3>
+        <ul>
+            <li><strong>Latency Testing:</strong> Measure round-trip time for various message types under different network conditions</li>
+            <li><strong>Throughput Testing:</strong> Verify sustained data rates for telemetry streaming</li>
+            <li><strong>Reliability Testing:</strong> Validate message delivery guarantees for different QoS levels</li>
+            <li><strong>Failover Testing:</strong> Ensure proper behavior during network interruptions</li>
+            <li><strong>Security Testing:</strong> Verify encryption, authentication, and resistance to attacks</li>
+            <li><strong>Interoperability Testing:</strong> Cross-vendor communication verification</li>
+        </ul>
+
+        <h3>Protocol Validation Tool</h3>
+        <pre><code>$ wia-rob-007 protocol test --profile field-robot
+
+Running WIA-ROB-007 Protocol Conformance Tests...
+
+[✓] MQTT Connection (QoS 0, 1, 2)
+[✓] Topic Hierarchy Compliance
+[✓] Message Format Validation
+[✓] TLS 1.3 Encryption
+[✓] Certificate Validation
+[✓] Heartbeat Timing (1 Hz ± 50ms)
+[✓] Emergency Stop Latency (&lt; 200ms)
+[✓] Telemetry Frequency (1 Hz achieved)
+[✓] Bandwidth Under Limit (512 kbps)
+[!] ROS2 Bridge (Warning: Latency 150ms, target &lt;100ms)
+
+Overall: 9/10 tests passed, 1 warning
+Conformance Level: Level 2 (Production Ready)
+Certificate: WIA-ROB-007-PROTO-12345
+</code></pre>
+
+        <div class="key-takeaways">
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li><strong>Real-Time Communication:</strong> Agricultural robots require multiple protocol layers from hardware E-stop (&lt;50ms) to bulk data transfer (best effort).</li>
+                <li><strong>MQTT for IoT:</strong> MQTT's publish-subscribe model efficiently distributes telemetry and events across robot fleets with configurable QoS levels.</li>
+                <li><strong>ROS2 Integration:</strong> Custom ROS2 message types and MQTT bridges enable seamless integration with ROS2-based robots.</li>
+                <li><strong>Swarm Coordination:</strong> Both centralized and decentralized coordination protocols support multi-robot operations with collision avoidance.</li>
+                <li><strong>Safety Critical:</strong> Multiple safety layers with redundant communication ensure fail-safe behavior during emergencies.</li>
+                <li><strong>Adaptive Streaming:</strong> Telemetry protocols adjust to variable network conditions common in agricultural environments.</li>
+                <li><strong>Time Synchronization:</strong> NTP/PTP with GPS integration provides accurate timing for sensor fusion and coordination.</li>
+                <li><strong>Security First:</strong> End-to-end encryption, message signing, and authentication protect against cyber threats.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li><strong>Protocol Hierarchy:</strong> Explain the different protocol layers in agricultural robot communication. Why are multiple layers necessary?</li>
+                <li><strong>MQTT QoS:</strong> Compare MQTT QoS levels 0, 1, and 2. When should each be used for agricultural robot telemetry?</li>
+                <li><strong>ROS2 Bridge:</strong> What is the purpose of the ROS2-MQTT bridge? How does it enable external system integration?</li>
+                <li><strong>Swarm Coordination:</strong> Compare centralized versus decentralized swarm coordination. What are the advantages and disadvantages of each approach?</li>
+                <li><strong>Safety Architecture:</strong> Describe the multiple layers of safety communication. What happens when each layer detects a problem?</li>
+                <li><strong>Bandwidth Optimization:</strong> What techniques reduce bandwidth consumption for robot telemetry? How much reduction can each achieve?</li>
+                <li><strong>Time Sync Importance:</strong> Why is accurate time synchronization critical for multi-robot systems? What accuracy levels are needed for different applications?</li>
+                <li><strong>Protocol Security:</strong> How does the protocol protect against command injection and replay attacks? Describe the message signing process.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

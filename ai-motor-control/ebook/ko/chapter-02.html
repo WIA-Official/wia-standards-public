@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: PID 제어 및 고전적 방법 | WIA-AI-MOTOR-CONTROL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#F97316;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:'Courier New',monospace;font-size:14px}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        .formula{background:#000;padding:15px;border-radius:5px;text-align:center;margin:20px 0;font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>2장: PID 제어 및 고전적 방법</h1>
+
+        <h2>2.1 PID 제어 소개</h2>
+        <p>비례-적분-미분(PID) 제어는 산업용 모터 제어에서 가장 널리 사용되는 피드백 제어 알고리즘입니다. 단순하면서도 효과적인 특성으로 인해 90% 이상의 산업용 제어 루프에서 PID 제어기가 사용됩니다. PID 제어기는 현재 오차(P), 과거 오차의 누적(I), 오차의 변화율(D)을 조합하여 제어 출력을 생성합니다.</p>
+
+        <h3>PID 제어 공식</h3>
+        <div class="formula">u(t) = K<sub>p</sub>·e(t) + K<sub>i</sub>·∫e(τ)dτ + K<sub>d</sub>·(de/dt)</div>
+        <p>여기서:</p>
+        <ul>
+            <li><strong>e(t)</strong>: 시간 t에서의 오차 (설정값 - 실제값)</li>
+            <li><strong>K<sub>p</sub></strong>: 비례 이득</li>
+            <li><strong>K<sub>i</sub></strong>: 적분 이득</li>
+            <li><strong>K<sub>d</sub></strong>: 미분 이득</li>
+            <li><strong>u(t)</strong>: 제어 출력</li>
+        </ul>
+
+        <h2>2.2 PID 각 항의 역할</h2>
+        <table>
+            <tr>
+                <th>제어 항</th>
+                <th>역할</th>
+                <th>장점</th>
+                <th>단점</th>
+            </tr>
+            <tr>
+                <td><strong>비례 (P)</strong></td>
+                <td>현재 오차에 비례하여 제어</td>
+                <td>빠른 응답, 직관적</td>
+                <td>정상상태 오차 발생</td>
+            </tr>
+            <tr>
+                <td><strong>적분 (I)</strong></td>
+                <td>과거 오차 누적에 비례하여 제어</td>
+                <td>정상상태 오차 제거</td>
+                <td>오버슈트, 와인드업</td>
+            </tr>
+            <tr>
+                <td><strong>미분 (D)</strong></td>
+                <td>오차 변화율에 비례하여 제어</td>
+                <td>오버슈트 감소, 안정화</td>
+                <td>노이즈 증폭</td>
+            </tr>
+        </table>
+
+        <h2>2.3 디지털 PID 구현</h2>
+        <pre><code>// 기본 디지털 PID 제어기
+class PIDController {
+private:
+    // PID 이득
+    float Kp, Ki, Kd;
+
+    // 상태 변수
+    float integral;
+    float prev_error;
+
+    // 제한값
+    float integral_max;
+    float output_max;
+
+    // 샘플링 시간
+    float dt;
+
+public:
+    PIDController(float kp, float ki, float kd, float sample_time) {
+        Kp = kp;
+        Ki = ki;
+        Kd = kd;
+        dt = sample_time;
+
+        integral = 0;
+        prev_error = 0;
+
+        integral_max = 100.0f;   // 적분 와인드업 방지
+        output_max = 1000.0f;    // 출력 제한
+    }
+
+    float compute(float setpoint, float feedback) {
+        // 오차 계산
+        float error = setpoint - feedback;
+
+        // 비례 항
+        float P_term = Kp * error;
+
+        // 적분 항 (와인드업 방지 포함)
+        integral += error * dt;
+        integral = clamp(integral, -integral_max, integral_max);
+        float I_term = Ki * integral;
+
+        // 미분 항 (미분 킥 방지: 오차 대신 피드백 미분)
+        float derivative = (error - prev_error) / dt;
+        float D_term = Kd * derivative;
+        prev_error = error;
+
+        // 전체 출력
+        float output = P_term + I_term + D_term;
+        output = clamp(output, -output_max, output_max);
+
+        return output;
+    }
+
+    float clamp(float value, float min_val, float max_val) {
+        if (value > max_val) return max_val;
+        if (value < min_val) return min_val;
+        return value;
+    }
+
+    void reset() {
+        integral = 0;
+        prev_error = 0;
+    }
+
+    void set_gains(float kp, float ki, float kd) {
+        Kp = kp;
+        Ki = ki;
+        Kd = kd;
+    }
+};</code></pre>
+
+        <h2>2.4 적분 와인드업 방지</h2>
+        <p>적분 와인드업은 제어 출력이 포화되었을 때 적분 항이 계속 누적되어 발생하는 문제입니다. 이로 인해 오버슈트가 증가하고 응답이 느려집니다.</p>
+
+        <h3>와인드업 방지 기법</h3>
+        <pre><code>// 고급 와인드업 방지 PID
+class AntiWindupPID {
+private:
+    float Kp, Ki, Kd;
+    float integral;
+    float prev_error;
+    float dt;
+    float output_min, output_max;
+
+    // 역추적 이득
+    float Kb;
+
+public:
+    AntiWindupPID(float kp, float ki, float kd, float sample_time,
+                  float out_min, float out_max) {
+        Kp = kp;
+        Ki = ki;
+        Kd = kd;
+        dt = sample_time;
+        output_min = out_min;
+        output_max = out_max;
+
+        // 역추적 이득 (일반적으로 1/Ti 또는 sqrt(Ki*Kd))
+        Kb = sqrt(Ki);
+
+        integral = 0;
+        prev_error = 0;
+    }
+
+    float compute(float setpoint, float feedback) {
+        float error = setpoint - feedback;
+
+        // 비례 항
+        float P_term = Kp * error;
+
+        // 적분 항
+        float I_term = Ki * integral;
+
+        // 미분 항
+        float derivative = (error - prev_error) / dt;
+        float D_term = Kd * derivative;
+        prev_error = error;
+
+        // 포화 전 출력
+        float output_unsat = P_term + I_term + D_term;
+
+        // 포화 후 출력
+        float output = clamp(output_unsat, output_min, output_max);
+
+        // 역추적: 포화 오차를 적분에서 차감
+        float saturation_error = output - output_unsat;
+        integral += (error + Kb * saturation_error) * dt;
+
+        return output;
+    }
+
+    // 조건부 적분 방법
+    float compute_conditional(float setpoint, float feedback) {
+        float error = setpoint - feedback;
+
+        float P_term = Kp * error;
+        float D_term = Kd * (error - prev_error) / dt;
+        prev_error = error;
+
+        // 예상 출력 계산
+        float output_preview = P_term + Ki * integral + D_term;
+
+        // 포화되지 않을 때만 적분
+        if (output_preview > output_min && output_preview < output_max) {
+            integral += error * dt;
+        }
+        // 또는: 오차 부호가 포화 방향과 다를 때만 적분
+        else if ((output_preview >= output_max && error < 0) ||
+                 (output_preview <= output_min && error > 0)) {
+            integral += error * dt;
+        }
+
+        float output = P_term + Ki * integral + D_term;
+        return clamp(output, output_min, output_max);
+    }
+
+private:
+    float clamp(float value, float min_val, float max_val);
+};</code></pre>
+
+        <h2>2.5 미분 킥 방지</h2>
+        <p>설정값의 급격한 변화(스텝 입력)는 미분 항에서 큰 스파이크(킥)를 유발합니다. 이를 방지하기 위해 오차 대신 피드백의 미분을 사용합니다:</p>
+
+        <pre><code>// 미분 킥 방지 PID
+class DerivativeOnMeasurementPID {
+private:
+    float Kp, Ki, Kd;
+    float integral;
+    float prev_feedback;  // 오차 대신 피드백 저장
+    float dt;
+
+public:
+    float compute(float setpoint, float feedback) {
+        float error = setpoint - feedback;
+
+        // 비례 항
+        float P_term = Kp * error;
+
+        // 적분 항
+        integral += error * dt;
+        float I_term = Ki * integral;
+
+        // 미분 항: 피드백의 미분 (부호 반전)
+        // d(error)/dt = d(setpoint)/dt - d(feedback)/dt
+        // setpoint이 상수이면 d(setpoint)/dt = 0
+        // 따라서 -d(feedback)/dt 사용
+        float derivative = -(feedback - prev_feedback) / dt;
+        float D_term = Kd * derivative;
+        prev_feedback = feedback;
+
+        return P_term + I_term + D_term;
+    }
+};</code></pre>
+
+        <h2>2.6 PID 튜닝 방법</h2>
+        <h3>지글러-니콜스 방법</h3>
+        <p>가장 유명한 PID 튜닝 방법으로, 시스템을 한계 진동 상태로 만들어 파라미터를 결정합니다:</p>
+
+        <table>
+            <tr>
+                <th>제어기 유형</th>
+                <th>K<sub>p</sub></th>
+                <th>T<sub>i</sub></th>
+                <th>T<sub>d</sub></th>
+            </tr>
+            <tr>
+                <td><strong>P</strong></td>
+                <td>0.5 × K<sub>u</sub></td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><strong>PI</strong></td>
+                <td>0.45 × K<sub>u</sub></td>
+                <td>T<sub>u</sub> / 1.2</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><strong>PID</strong></td>
+                <td>0.6 × K<sub>u</sub></td>
+                <td>T<sub>u</sub> / 2</td>
+                <td>T<sub>u</sub> / 8</td>
+            </tr>
+        </table>
+        <p>여기서 K<sub>u</sub>는 한계 이득, T<sub>u</sub>는 한계 주기입니다.</p>
+
+        <h3>자동 튜닝 알고리즘</h3>
+        <pre><code>// 릴레이 피드백 자동 튜닝
+class RelayAutoTuner {
+private:
+    float relay_amplitude;    // 릴레이 출력 진폭
+    float hysteresis;         // 히스테리시스
+    float setpoint;
+
+    // 진동 측정
+    float peak_positive;
+    float peak_negative;
+    vector<float> zero_crossings;  // 영점 교차 시간
+
+    bool tuning_active;
+    float start_time;
+
+public:
+    RelayAutoTuner(float amplitude, float hyst) {
+        relay_amplitude = amplitude;
+        hysteresis = hyst;
+        tuning_active = false;
+    }
+
+    void start_tuning(float sp) {
+        setpoint = sp;
+        tuning_active = true;
+        zero_crossings.clear();
+        peak_positive = 0;
+        peak_negative = 0;
+        start_time = get_time();
+    }
+
+    float compute_relay_output(float feedback) {
+        if (!tuning_active) return 0;
+
+        float error = setpoint - feedback;
+
+        // 릴레이 출력 (히스테리시스 포함)
+        static float last_output = relay_amplitude;
+
+        if (error > hysteresis) {
+            last_output = relay_amplitude;
+        } else if (error < -hysteresis) {
+            last_output = -relay_amplitude;
+        }
+
+        // 피크값 추적
+        if (feedback > peak_positive) peak_positive = feedback;
+        if (feedback < peak_negative) peak_negative = feedback;
+
+        // 영점 교차 감지
+        static float last_error = 0;
+        if ((last_error < 0 && error >= 0) || (last_error > 0 && error <= 0)) {
+            zero_crossings.push_back(get_time());
+        }
+        last_error = error;
+
+        return last_output;
+    }
+
+    PIDGains calculate_pid_gains() {
+        // 진동 진폭 계산
+        float amplitude = (peak_positive - peak_negative) / 2.0f;
+
+        // 한계 이득: Ku = 4d / (π * a)
+        // d: 릴레이 진폭, a: 진동 진폭
+        float Ku = (4.0f * relay_amplitude) / (M_PI * amplitude);
+
+        // 한계 주기: 두 연속 영점 교차 사이의 평균 시간
+        float Tu = 0;
+        if (zero_crossings.size() >= 4) {
+            for (int i = 2; i < zero_crossings.size(); i += 2) {
+                Tu += zero_crossings[i] - zero_crossings[i-2];
+            }
+            Tu /= (zero_crossings.size() / 2 - 1);
+        }
+
+        // 지글러-니콜스 공식 적용
+        PIDGains gains;
+        gains.Kp = 0.6f * Ku;
+        gains.Ki = gains.Kp / (Tu / 2.0f);  // Ki = Kp / Ti
+        gains.Kd = gains.Kp * (Tu / 8.0f);  // Kd = Kp * Td
+
+        tuning_active = false;
+        return gains;
+    }
+
+    struct PIDGains {
+        float Kp, Ki, Kd;
+    };
+
+private:
+    float get_time();
+};</code></pre>
+
+        <h2>2.7 PI 제어기 설계</h2>
+        <p>많은 모터 제어 응용에서 PI 제어기만으로 충분합니다. 특히 전류 루프와 속도 루프에서 널리 사용됩니다:</p>
+
+        <pre><code>// 전류 루프용 PI 제어기 설계
+class CurrentLoopPIDesigner {
+public:
+    struct PIGains {
+        float Kp;
+        float Ki;
+    };
+
+    // 대역폭 기반 설계
+    static PIGains design_by_bandwidth(float L, float R, float bandwidth_hz) {
+        // 전류 루프 전달 함수: I(s)/V(s) = 1/(Ls + R)
+        // 원하는 폐루프 대역폭: omega_bw = 2*pi*bandwidth_hz
+
+        float omega_bw = 2.0f * M_PI * bandwidth_hz;
+
+        PIGains gains;
+        // 극점 상쇄 설계: Ki/Kp = R/L
+        // 폐루프 대역폭: Kp/L = omega_bw
+        gains.Kp = omega_bw * L;
+        gains.Ki = gains.Kp * R / L;
+
+        return gains;
+    }
+
+    // IMC (내부 모델 제어) 기반 설계
+    static PIGains design_by_imc(float L, float R, float lambda) {
+        // lambda: 폐루프 시정수 (작을수록 빠름)
+
+        PIGains gains;
+        gains.Kp = L / lambda;
+        gains.Ki = R / lambda;
+
+        return gains;
+    }
+};
+
+// 속도 루프용 PI 제어기 설계
+class VelocityLoopPIDesigner {
+public:
+    struct PIGains {
+        float Kp;
+        float Ki;
+    };
+
+    // 대역폭 기반 설계
+    static PIGains design_by_bandwidth(float J, float B, float Kt,
+                                        float current_loop_bw,
+                                        float velocity_loop_bw) {
+        // 속도 루프는 전류 루프보다 느려야 함 (일반적으로 5-10배)
+        if (velocity_loop_bw > current_loop_bw / 5) {
+            velocity_loop_bw = current_loop_bw / 5;
+        }
+
+        float omega_bw = 2.0f * M_PI * velocity_loop_bw;
+
+        PIGains gains;
+        // 전류 루프를 이득 1로 근사
+        // 속도 전달 함수: omega(s)/I(s) = Kt/(Js + B)
+        gains.Kp = omega_bw * J / Kt;
+        gains.Ki = gains.Kp * B / J;
+
+        return gains;
+    }
+
+    // 감쇠비 기반 설계
+    static PIGains design_by_damping(float J, float B, float Kt,
+                                      float omega_n, float zeta) {
+        // 원하는 2차 응답: omega_n (고유 진동수), zeta (감쇠비)
+
+        PIGains gains;
+        gains.Kp = (2 * zeta * omega_n * J - B) / Kt;
+        gains.Ki = omega_n * omega_n * J / Kt;
+
+        return gains;
+    }
+};</code></pre>
+
+        <h2>2.8 캐스케이드 PID 제어</h2>
+        <p>모터 제어에서는 여러 PID 루프를 중첩하여 사용하는 캐스케이드 구조가 일반적입니다:</p>
+
+        <pre><code>// 캐스케이드 위치-속도-전류 제어기
+class CascadeController {
+private:
+    // 외부 루프 (위치)
+    PIDController position_loop;
+    float position_loop_freq;
+
+    // 중간 루프 (속도)
+    PIDController velocity_loop;
+    float velocity_loop_freq;
+
+    // 내부 루프 (전류)
+    PIDController current_loop;
+    float current_loop_freq;
+
+    // 제한값
+    float max_velocity;
+    float max_current;
+
+public:
+    CascadeController(CascadeConfig& config) :
+        position_loop(config.pos_kp, config.pos_ki, config.pos_kd, 1.0f/config.pos_freq),
+        velocity_loop(config.vel_kp, config.vel_ki, config.vel_kd, 1.0f/config.vel_freq),
+        current_loop(config.cur_kp, config.cur_ki, config.cur_kd, 1.0f/config.cur_freq)
+    {
+        position_loop_freq = config.pos_freq;
+        velocity_loop_freq = config.vel_freq;
+        current_loop_freq = config.cur_freq;
+
+        max_velocity = config.max_velocity;
+        max_current = config.max_current;
+    }
+
+    // 전류 루프 (가장 빠름, 10-50 kHz)
+    float compute_current_loop(float current_ref, float current_actual) {
+        float voltage = current_loop.compute(current_ref, current_actual);
+        return voltage;
+    }
+
+    // 속도 루프 (중간, 1-10 kHz)
+    float compute_velocity_loop(float velocity_ref, float velocity_actual) {
+        float current_ref = velocity_loop.compute(velocity_ref, velocity_actual);
+        current_ref = clamp(current_ref, -max_current, max_current);
+        return current_ref;
+    }
+
+    // 위치 루프 (가장 느림, 100 Hz - 1 kHz)
+    float compute_position_loop(float position_ref, float position_actual) {
+        float velocity_ref = position_loop.compute(position_ref, position_actual);
+        velocity_ref = clamp(velocity_ref, -max_velocity, max_velocity);
+        return velocity_ref;
+    }
+
+    // 전체 캐스케이드 (각 루프를 적절한 주파수로 호출)
+    struct ControlOutput {
+        float velocity_ref;
+        float current_ref;
+        float voltage;
+    };
+
+    ControlOutput compute_all(float position_ref, float position_actual,
+                               float velocity_actual, float current_actual) {
+        ControlOutput output;
+
+        output.velocity_ref = compute_position_loop(position_ref, position_actual);
+        output.current_ref = compute_velocity_loop(output.velocity_ref, velocity_actual);
+        output.voltage = compute_current_loop(output.current_ref, current_actual);
+
+        return output;
+    }
+
+private:
+    float clamp(float value, float min_val, float max_val) {
+        if (value > max_val) return max_val;
+        if (value < min_val) return min_val;
+        return value;
+    }
+};</code></pre>
+
+        <h2>2.9 필터링 기법</h2>
+        <p>노이즈가 있는 피드백 신호에 대해 필터링이 필요합니다. 특히 미분 항에서 중요합니다:</p>
+
+        <pre><code>// 저역통과 필터가 있는 미분
+class FilteredDerivative {
+private:
+    float tau;          // 필터 시정수
+    float dt;           // 샘플링 시간
+    float prev_output;  // 이전 필터 출력
+    float prev_input;   // 이전 입력
+
+public:
+    FilteredDerivative(float filter_freq, float sample_time) {
+        tau = 1.0f / (2.0f * M_PI * filter_freq);
+        dt = sample_time;
+        prev_output = 0;
+        prev_input = 0;
+    }
+
+    float compute(float input) {
+        // 1차 필터링된 미분
+        // H(s) = s / (tau*s + 1)
+
+        float alpha = tau / (tau + dt);
+        float derivative = (input - prev_input) / dt;
+        float filtered = alpha * prev_output + (1 - alpha) * derivative;
+
+        prev_output = filtered;
+        prev_input = input;
+
+        return filtered;
+    }
+};
+
+// 필터링된 PID 제어기
+class FilteredPID {
+private:
+    float Kp, Ki, Kd;
+    float integral;
+    FilteredDerivative derivative_filter;
+    float output_min, output_max;
+    float integral_max;
+
+public:
+    FilteredPID(float kp, float ki, float kd, float deriv_filter_freq,
+                float sample_time, float out_min, float out_max) :
+        derivative_filter(deriv_filter_freq, sample_time)
+    {
+        Kp = kp;
+        Ki = ki;
+        Kd = kd;
+        integral = 0;
+        output_min = out_min;
+        output_max = out_max;
+        integral_max = (out_max - out_min) / ki;  // 적분 제한
+    }
+
+    float compute(float setpoint, float feedback) {
+        float error = setpoint - feedback;
+
+        // 비례 항
+        float P_term = Kp * error;
+
+        // 적분 항
+        integral += error;
+        integral = clamp(integral, -integral_max, integral_max);
+        float I_term = Ki * integral;
+
+        // 필터링된 미분 항 (피드백 기준)
+        float D_term = -Kd * derivative_filter.compute(feedback);
+
+        float output = P_term + I_term + D_term;
+        return clamp(output, output_min, output_max);
+    }
+
+private:
+    float clamp(float value, float min_val, float max_val);
+};</code></pre>
+
+        <h2>2.10 PID 성능 평가 지표</h2>
+        <table>
+            <tr>
+                <th>성능 지표</th>
+                <th>정의</th>
+                <th>목표값</th>
+            </tr>
+            <tr>
+                <td><strong>상승 시간 (Rise Time)</strong></td>
+                <td>최종값의 10%에서 90%까지 도달 시간</td>
+                <td>응용에 따라 다름</td>
+            </tr>
+            <tr>
+                <td><strong>정착 시간 (Settling Time)</strong></td>
+                <td>최종값의 ±2% 또는 ±5% 내에 도달 시간</td>
+                <td>가능한 짧게</td>
+            </tr>
+            <tr>
+                <td><strong>오버슈트 (%)</strong></td>
+                <td>(최대값 - 최종값) / 최종값 × 100</td>
+                <td>일반적으로 5-15%</td>
+            </tr>
+            <tr>
+                <td><strong>정상상태 오차</strong></td>
+                <td>최종 출력과 설정값의 차이</td>
+                <td>0에 가깝게</td>
+            </tr>
+            <tr>
+                <td><strong>ISE (적분 제곱 오차)</strong></td>
+                <td>∫e²(t)dt</td>
+                <td>최소화</td>
+            </tr>
+            <tr>
+                <td><strong>ITAE (적분 시간 절대 오차)</strong></td>
+                <td>∫t|e(t)|dt</td>
+                <td>최소화</td>
+            </tr>
+        </table>
+
+        <div class="key-takeaways">
+            <h2>핵심 내용</h2>
+            <ul>
+                <li>PID 제어기는 비례, 적분, 미분 세 가지 항을 조합하여 피드백 제어를 수행합니다</li>
+                <li>비례 항(P)은 빠른 응답을 제공하지만 정상상태 오차를 남깁니다</li>
+                <li>적분 항(I)은 정상상태 오차를 제거하지만 와인드업 문제에 주의해야 합니다</li>
+                <li>미분 항(D)은 오버슈트를 줄이지만 노이즈에 민감합니다</li>
+                <li>와인드업 방지 기법(역추적, 조건부 적분)은 포화 상황에서 필수적입니다</li>
+                <li>미분 킥 방지를 위해 오차 대신 피드백의 미분을 사용합니다</li>
+                <li>지글러-니콜스 방법과 릴레이 피드백은 대표적인 튜닝 방법입니다</li>
+                <li>캐스케이드 제어는 위치-속도-전류 루프를 중첩하여 사용합니다</li>
+                <li>노이즈 제거를 위해 미분 항에 필터링이 필요합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>PID 제어기의 세 가지 항(P, I, D)의 역할을 각각 설명하시오.</li>
+                <li>적분 와인드업이란 무엇이며, 이를 방지하는 방법을 두 가지 설명하시오.</li>
+                <li>미분 킥이 발생하는 이유와 이를 방지하는 방법을 설명하시오.</li>
+                <li>지글러-니콜스 튜닝 방법의 절차를 설명하시오.</li>
+                <li>캐스케이드 제어에서 내부 루프가 외부 루프보다 빨라야 하는 이유를 설명하시오.</li>
+                <li>전류 루프에 PI 제어기가 적합한 이유를 설명하시오.</li>
+                <li>미분 항에 저역통과 필터를 사용하는 이유를 설명하시오.</li>
+                <li>상승 시간, 정착 시간, 오버슈트의 의미와 상호 관계를 설명하시오.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:16px;margin-top:10px;">널리 인간을 이롭게 하라</p>
+        </div>
+
+        </div>
+</body>
+</html>

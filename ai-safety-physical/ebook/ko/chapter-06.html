@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 하드웨어 안전 설계 | WIA-AI-SAFETY-PHYSICAL</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--ai-color:#3B82F6;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--ai-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--ai-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--ai-color);margin:40px 0 20px;border-bottom:2px solid var(--ai-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--ai-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--ai-color);text-decoration:none;padding:10px 20px;border:2px solid var(--ai-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--ai-color)}
+        strong{color:var(--ai-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        .key-takeaways,.review-questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .philosophy{text-align:center;margin-top:40px;font-size:20px;color:var(--ai-color)}
+        ul,ol{margin-left:25px;margin-top:10px}
+        li{margin:8px 0}
+        code{background:#000;padding:2px 6px;border-radius:3px;font-family:monospace}
+        .warning{background:#7f1d1d;border-left:4px solid #dc2626;padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+        .info{background:#1e3a5f;border-left:4px solid var(--ai-color);padding:15px;margin:20px 0;border-radius:0 8px 8px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>6장: 하드웨어 안전 설계</h1>
+
+        <h2>6.1 하드웨어를 통한 본질적 안전</h2>
+        <p>하드웨어 안전 설계는 로봇 시스템의 물리적 설계를 통해 위험을 제거하거나 감소시키는 것을 목표로 합니다. 버그나 오작동으로 인해 실패할 수 있는 소프트웨어 기반 안전 조치와 달리, 하드웨어 안전 기능은 소프트웨어 고장에 의해 우회될 수 없는 본질적인 보호를 제공합니다. WIA-AI-SAFETY-PHYSICAL 표준은 하드웨어 안전을 심층 방어 전략의 기초로 강조합니다.</p>
+
+        <div class="info">
+            <strong>설계 철학:</strong> 가장 안전한 로봇은 소프트웨어가 무엇을 명령하든 물리적으로 피해를 입힐 수 없는 로봇입니다. 하드웨어 안전 조치는 위험한 작동을 기계적으로 불가능하게 만들어야 합니다.
+        </div>
+
+        <h2>6.2 전력 및 힘 제한</h2>
+        <p>로봇이 발휘할 수 있는 최대 전력과 힘을 제한하는 것은 가장 기본적인 하드웨어 안전 조치입니다:</p>
+
+        <h3>전력 밀도 한계</h3>
+        <table>
+            <tr>
+                <th>응용</th>
+                <th>최대 전력 밀도</th>
+                <th>일반적 총 전력</th>
+                <th>근거</th>
+            </tr>
+            <tr>
+                <td><strong>협동 로봇</strong></td>
+                <td>80 W/kg 페이로드</td>
+                <td>80-150W 총합</td>
+                <td>인간 접촉 예상</td>
+            </tr>
+            <tr>
+                <td><strong>서비스 로봇</strong></td>
+                <td>150 W/kg 페이로드</td>
+                <td>200-500W 총합</td>
+                <td>공공 환경</td>
+            </tr>
+            <tr>
+                <td><strong>산업용 로봇</strong></td>
+                <td>본질적 한계 없음</td>
+                <td>1-10kW</td>
+                <td>보호된 작업 공간</td>
+            </tr>
+            <tr>
+                <td><strong>이동 플랫폼</strong></td>
+                <td>50 W/kg</td>
+                <td>100-500W</td>
+                <td>보행자 환경</td>
+            </tr>
+        </table>
+
+        <pre><code>// 전력 제한 하드웨어 구성
+interface PowerLimitingConfig {
+    // 모터 수준 한계
+    motors: {
+        maxContinuousPower: number;  // 모터당 와트
+        maxPeakPower: number;        // 와트 (짧은 기간)
+        peakDuration: number;        // 밀리초
+        thermalLimit: number;        // 섭씨
+    };
+
+    // 시스템 수준 한계
+    system: {
+        maxTotalPower: number;       // 총 와트
+        powerBudgetAllocation: PowerBudget;
+    };
+
+    // 하드웨어 시행
+    enforcement: {
+        currentLimitCircuit: boolean;    // 하드웨어 전류 제한
+        temperatureCutoff: boolean;      // 열 보호
+        mechanicalCurrentBreaker: boolean;
+    };
+}
+
+// 예시: 협동 로봇 전력 구성
+const cobotPowerConfig: PowerLimitingConfig = {
+    motors: {
+        maxContinuousPower: 20,    // 조인트당 20W
+        maxPeakPower: 40,           // 40W 피크
+        peakDuration: 500,          // 최대 500ms
+        thermalLimit: 80            // 80C 차단
+    },
+    system: {
+        maxTotalPower: 80,          // 80W 총합 (ISO/TS 15066)
+        powerBudgetAllocation: {
+            joints: 60,             // 조인트에 60W
+            endEffector: 10,        // 그리퍼에 10W
+            electronics: 10         // 제어에 10W
+        }
+    },
+    enforcement: {
+        currentLimitCircuit: true,
+        temperatureCutoff: true,
+        mechanicalCurrentBreaker: true
+    }
+};</code></pre>
+
+        <h2>6.3 기계적 정지 및 한계</h2>
+        <p>기계적 정지는 소프트웨어 명령에 관계없이 초과할 수 없는 하드웨어 강제 동작 한계를 제공합니다:</p>
+
+        <table>
+            <tr>
+                <th>정지 유형</th>
+                <th>목적</th>
+                <th>구현</th>
+                <th>우회</th>
+            </tr>
+            <tr>
+                <td><strong>하드 스톱</strong></td>
+                <td>절대 동작 한계</td>
+                <td>조인트의 물리적 블록</td>
+                <td>불가능</td>
+            </tr>
+            <tr>
+                <td><strong>소프트 스톱</strong></td>
+                <td>정상 작동 범위</td>
+                <td>소프트웨어 + 센서 한계</td>
+                <td>특수 모드</td>
+            </tr>
+            <tr>
+                <td><strong>조정 가능 스톱</strong></td>
+                <td>응용 특정 한계</td>
+                <td>기계적 조정기 + 센서</td>
+                <td>도구 필요</td>
+            </tr>
+            <tr>
+                <td><strong>가상 벽</strong></td>
+                <td>동적 작업 공간 한계</td>
+                <td>안전 컨트롤러 + 감지</td>
+                <td>권한 필요</td>
+            </tr>
+        </table>
+
+        <pre><code>// 기계적 한계 시행
+class MechanicalLimits {
+    // 하드웨어 시행이 있는 조인트 각도 한계
+    jointLimits = {
+        joint1: { softMin: -170, softMax: 170, hardMin: -175, hardMax: 175 },
+        joint2: { softMin: -120, softMax: 120, hardMin: -125, hardMax: 125 },
+        joint3: { softMin: -170, softMax: 170, hardMin: -175, hardMax: 175 },
+        joint4: { softMin: -120, softMax: 120, hardMin: -125, hardMax: 125 },
+        joint5: { softMin: -170, softMax: 170, hardMin: -175, hardMax: 175 },
+        joint6: { softMin: -360, softMax: 360, hardMin: -365, hardMax: 365 }
+    };
+
+    // 조인트별 속도 한계
+    velocityLimits = {
+        joint1: { soft: 180, hard: 200 },  // deg/s
+        joint2: { soft: 180, hard: 200 },
+        joint3: { soft: 225, hard: 250 },
+        joint4: { soft: 225, hard: 250 },
+        joint5: { soft: 225, hard: 250 },
+        joint6: { soft: 360, hard: 400 }
+    };
+
+    // 하드웨어 리밋 스위치
+    limitSwitches = {
+        type: 'INDUCTIVE_PROXIMITY',
+        arrangement: 'DUAL_REDUNDANT',
+        failureMode: 'NORMALLY_CLOSED',
+        responseTime: 1  // ms
+    };
+
+    checkPosition(jointId: string, position: number): LimitStatus {
+        const limits = this.jointLimits[jointId];
+
+        if (position <= limits.hardMin || position >= limits.hardMax) {
+            return {
+                status: 'HARD_LIMIT',
+                action: 'EMERGENCY_STOP',
+                detail: `조인트 ${jointId}이 하드 한계에 도달: ${position}`
+            };
+        }
+
+        if (position <= limits.softMin || position >= limits.softMax) {
+            return {
+                status: 'SOFT_LIMIT',
+                action: 'CONTROLLED_STOP',
+                detail: `조인트 ${jointId}이 소프트 한계에 도달: ${position}`
+            };
+        }
+
+        return { status: 'OK', action: 'CONTINUE' };
+    }
+}</code></pre>
+
+        <h2>6.4 유연 및 역구동 가능 액추에이터</h2>
+        <p>유연 액추에이터는 제어된 변형을 허용하여 충격력을 감소시킵니다:</p>
+
+        <h3>안전을 위한 액추에이터 유형</h3>
+        <table>
+            <tr>
+                <th>유형</th>
+                <th>유연성</th>
+                <th>역구동성</th>
+                <th>최적 용도</th>
+            </tr>
+            <tr>
+                <td><strong>직렬 탄성 (SEA)</strong></td>
+                <td>높음 (스프링 요소)</td>
+                <td>높음</td>
+                <td>코봇, 충격 흡수</td>
+            </tr>
+            <tr>
+                <td><strong>가변 강성 (VSA)</strong></td>
+                <td>조정 가능</td>
+                <td>중간-높음</td>
+                <td>적응형 작업</td>
+            </tr>
+            <tr>
+                <td><strong>직접 구동</strong></td>
+                <td>낮음</td>
+                <td>높음</td>
+                <td>빠르고 정밀한 동작</td>
+            </tr>
+            <tr>
+                <td><strong>기어드 모터</strong></td>
+                <td>매우 낮음</td>
+                <td>낮음</td>
+                <td>높은 토크 (보호 필요)</td>
+            </tr>
+            <tr>
+                <td><strong>케이블/텐던</strong></td>
+                <td>중간</td>
+                <td>중간</td>
+                <td>원격 구동</td>
+            </tr>
+        </table>
+
+        <pre><code>// 직렬 탄성 액추에이터 모델링
+class SeriesElasticActuator {
+    private springStiffness: number;  // N*m/rad
+    private motorInertia: number;     // kg*m^2
+    private linkInertia: number;      // kg*m^2
+
+    constructor(config: SEAConfig) {
+        this.springStiffness = config.springStiffness;
+        this.motorInertia = config.motorInertia;
+        this.linkInertia = config.linkInertia;
+    }
+
+    // 인간과의 충격력 계산
+    calculateImpactForce(
+        approachVelocity: number,  // m/s
+        humanStiffness: number,    // N/m (신체 부위에 따라 다름)
+        effectiveMass: number      // kg
+    ): ImpactForce {
+        // 결합 강성 (직렬 스프링)
+        const combinedStiffness = 1 / (
+            1 / this.springStiffness +
+            1 / humanStiffness
+        );
+
+        // 에너지 보존을 사용한 충격력
+        // F_max = v * sqrt(k * m)
+        const peakForce = approachVelocity * Math.sqrt(
+            combinedStiffness * effectiveMass
+        );
+
+        // 충격 지속 시간
+        const impactDuration = Math.PI * Math.sqrt(
+            effectiveMass / combinedStiffness
+        );
+
+        return {
+            peakForce,
+            impactDuration,
+            impulse: peakForce * impactDuration / 2
+        };
+    }
+
+    // 스프링 변형을 통한 토크 감지
+    measureJointTorque(): number {
+        const motorPosition = this.motorEncoder.getPosition();
+        const linkPosition = this.linkEncoder.getPosition();
+        const springDeflection = motorPosition - linkPosition;
+
+        return springDeflection * this.springStiffness;
+    }
+
+    // 역구동성 확인
+    isBackdrivable(externalTorque: number): boolean {
+        const frictionTorque = this.staticFriction;
+        return Math.abs(externalTorque) > frictionTorque;
+    }
+}</code></pre>
+
+        <h2>6.5 보호 외함 및 커버</h2>
+        <p>물리적 외함은 인간을 위험으로부터 보호하고 로봇을 환경 요인으로부터 보호합니다:</p>
+
+        <table>
+            <tr>
+                <th>보호 유형</th>
+                <th>목적</th>
+                <th>요구사항</th>
+            </tr>
+            <tr>
+                <td><strong>끼임 방지 가드</strong></td>
+                <td>손가락 끼임 방지</td>
+                <td>4mm 미만 간격 또는 25mm 이상 여유</td>
+            </tr>
+            <tr>
+                <td><strong>모터 커버</strong></td>
+                <td>화상, 얽힘 방지</td>
+                <td>표면 온도 60C 미만, 매끄러운 표면</td>
+            </tr>
+            <tr>
+                <td><strong>케이블 관리</strong></td>
+                <td>얽힘 방지</td>
+                <td>내부 배선, 도관</td>
+            </tr>
+            <tr>
+                <td><strong>소프트 패딩</strong></td>
+                <td>충격 심각도 감소</td>
+                <td>에너지 흡수 폼, 10-50mm</td>
+            </tr>
+            <tr>
+                <td><strong>충격 쉘</strong></td>
+                <td>접촉력 분산</td>
+                <td>큰 반경, 매끄러운 표면</td>
+            </tr>
+        </table>
+
+        <pre><code>// 외함 설계 사양
+interface EnclosureDesign {
+    geometry: {
+        minRadius: 10,         // mm - 최소 모서리 반경
+        maxSurfaceTemp: 60,    // 섭씨
+        maxGap: 4,             // mm - 손가락 삽입 방지 간격
+        minGap: 25,            // mm - 손가락 빼기 허용 간격
+    };
+
+    materials: {
+        outer: {
+            type: 'ABS_PLASTIC',
+            thickness: 2,      // mm
+            impactRating: 'IK08'
+        };
+        padding: {
+            type: 'CLOSED_CELL_FOAM',
+            thickness: 15,     // mm
+            density: 50,       // kg/m^3
+            energyAbsorption: 0.5  // J/cm^3
+        };
+    };
+
+    openings: {
+        ventilation: {
+            required: true,
+            maxHoleSize: 4,    // mm
+            pattern: 'HONEYCOMB'
+        };
+        access: {
+            type: 'HINGED_PANEL',
+            interlock: 'SAFETY_SWITCH',
+            tool: 'NONE'       // 유지보수에 도구 불필요
+        };
+    };
+}
+
+// 충격 보호를 위한 패딩 요구사항 계산
+function calculatePaddingRequirement(
+    maxVelocity: number,      // m/s
+    effectiveMass: number,    // kg
+    maxAllowedForce: number   // N
+): number {
+    // 흡수해야 할 운동 에너지
+    const energy = 0.5 * effectiveMass * maxVelocity * maxVelocity;
+
+    // 패딩이 하는 일: W = F * d
+    // d(패딩 압축 거리) 계산
+    const compressionDistance = energy / maxAllowedForce;
+
+    // 패딩 두께 = 압축 거리의 2배 (최대 50% 압축)
+    return compressionDistance * 2 * 1000; // mm로 변환
+}</code></pre>
+
+        <h2>6.6 브레이크 시스템</h2>
+        <p>신뢰할 수 있는 제동은 비상 시 정지 및 위치 유지에 필수적입니다:</p>
+
+        <h3>브레이크 유형 및 특성</h3>
+        <table>
+            <tr>
+                <th>브레이크 유형</th>
+                <th>작동</th>
+                <th>응답 시간</th>
+                <th>안전 장치</th>
+            </tr>
+            <tr>
+                <td><strong>스프링 적용 전기 해제</strong></td>
+                <td>전원 차단 = 제동</td>
+                <td>10-50ms</td>
+                <td>예</td>
+            </tr>
+            <tr>
+                <td><strong>전기 적용</strong></td>
+                <td>전원 인가 = 제동</td>
+                <td>20-100ms</td>
+                <td>아니오</td>
+            </tr>
+            <tr>
+                <td><strong>유압</strong></td>
+                <td>압력 인가</td>
+                <td>50-200ms</td>
+                <td>구성 가능</td>
+            </tr>
+            <tr>
+                <td><strong>동적 제동</strong></td>
+                <td>모터 단락</td>
+                <td>&lt;10ms</td>
+                <td>부분적</td>
+            </tr>
+        </table>
+
+        <pre><code>// 브레이크 시스템 설계
+class BrakeSystem {
+    private brakes: JointBrake[];
+
+    // 브레이크 사이징 계산
+    calculateBrakeRequirements(
+        joint: JointConfig,
+        maxLoadTorque: number,
+        safetyFactor: number = 2.0
+    ): BrakeRequirements {
+        // 정적 유지 토크
+        const staticTorque = maxLoadTorque * safetyFactor;
+
+        // 동적 제동 토크 (정지용)
+        const angularMomentum = joint.inertia * joint.maxVelocity;
+        const stoppingTime = 0.5; // 목표 500ms 정지
+        const dynamicTorque = angularMomentum / stoppingTime;
+
+        return {
+            staticHoldingTorque: staticTorque,
+            dynamicBrakingTorque: dynamicTorque,
+            minTorque: Math.max(staticTorque, dynamicTorque),
+            engagementTime: 50,  // 최대 ms
+            releaseTime: 100,    // 최대 ms
+            wearIndicator: true,
+            temperatureRating: 120  // 섭씨
+        };
+    }
+
+    // 비상 브레이크 시퀀스
+    async engageEmergencyBrakes(): Promise&lt;BrakeResult&gt; {
+        const startTime = Date.now();
+
+        // 모든 브레이크 동시 작동
+        await Promise.all(
+            this.brakes.map(brake => brake.engage())
+        );
+
+        // 작동 확인
+        const engagementTime = Date.now() - startTime;
+
+        for (const brake of this.brakes) {
+            if (!brake.isEngaged()) {
+                return {
+                    success: false,
+                    error: `브레이크 ${brake.id} 작동 실패`,
+                    engagementTime
+                };
+            }
+        }
+
+        return { success: true, engagementTime };
+    }
+
+    // 브레이크 마모 모니터링
+    monitorBrakeHealth(): BrakeHealthReport {
+        const reports: JointBrakeHealth[] = [];
+
+        for (const brake of this.brakes) {
+            const health = {
+                jointId: brake.jointId,
+                wearPercentage: brake.getWearLevel(),
+                engagementCycles: brake.getCycleCount(),
+                lastTestResult: brake.getLastTestResult(),
+                estimatedLifeRemaining: brake.estimateRemainingLife()
+            };
+
+            reports.push(health);
+
+            // 마모가 임계값 초과 시 경고
+            if (health.wearPercentage > 80) {
+                this.alertMaintenanceRequired(brake.jointId, '브레이크 마모 >80%');
+            }
+        }
+
+        return { joints: reports, timestamp: Date.now() };
+    }
+}</code></pre>
+
+        <h2>6.7 전기 안전</h2>
+        <p>전기 안전은 감전, 화재 및 간섭 위험으로부터 보호합니다:</p>
+
+        <table>
+            <tr>
+                <th>위험</th>
+                <th>보호</th>
+                <th>표준</th>
+            </tr>
+            <tr>
+                <td><strong>감전</strong></td>
+                <td>클래스 I 접지, 이중 절연</td>
+                <td>IEC 60204-1</td>
+            </tr>
+            <tr>
+                <td><strong>과전류</strong></td>
+                <td>퓨즈, 회로 차단기</td>
+                <td>IEC 60204-1</td>
+            </tr>
+            <tr>
+                <td><strong>지락 고장</strong></td>
+                <td>RCD/GFCI, 절연 모니터링</td>
+                <td>IEC 60204-1</td>
+            </tr>
+            <tr>
+                <td><strong>EMC 간섭</strong></td>
+                <td>차폐, 필터링</td>
+                <td>IEC 61000-6</td>
+            </tr>
+            <tr>
+                <td><strong>정전기 방전</strong></td>
+                <td>접지, ESD 보호</td>
+                <td>IEC 61000-4-2</td>
+            </tr>
+            <tr>
+                <td><strong>배터리 위험</strong></td>
+                <td>BMS, 열 관리</td>
+                <td>IEC 62133</td>
+            </tr>
+        </table>
+
+        <pre><code>// 전기 안전 시스템
+class ElectricalSafety {
+    // 지락 고장 감지
+    monitorGroundFault(): GroundFaultStatus {
+        const leakageCurrent = this.measureLeakageCurrent();
+        const threshold = 30; // mA (인체 보호)
+
+        if (leakageCurrent > threshold) {
+            this.tripGroundFaultProtection();
+            return {
+                fault: true,
+                current: leakageCurrent,
+                action: 'CIRCUIT_TRIPPED'
+            };
+        }
+
+        return { fault: false, current: leakageCurrent };
+    }
+
+    // 배터리 관리 안전
+    batteryManagement: BatteryManagementSystem = {
+        monitoring: {
+            cellVoltageMin: 2.5,    // V
+            cellVoltageMax: 4.2,    // V
+            temperatureMin: 0,       // C
+            temperatureMax: 45,      // C
+            maxChargeCurrent: 1.0,   // C-레이트
+            maxDischargeCurrent: 2.0 // C-레이트
+        },
+
+        protection: {
+            overVoltageProtection: true,
+            underVoltageProtection: true,
+            overCurrentProtection: true,
+            overTemperatureProtection: true,
+            shortCircuitProtection: true,
+            cellBalancing: true
+        },
+
+        thermal: {
+            coolingMethod: 'ACTIVE_AIR',
+            fanTriggerTemp: 35,      // C
+            shutdownTemp: 50         // C
+        }
+    };
+
+    // 절연 테스트
+    performIsolationTest(): IsolationTestResult {
+        // 절연 저항 테스트
+        const testVoltage = 500; // V DC
+        const minResistance = 1; // MOhm
+
+        const measuredResistance = this.measureInsulation(testVoltage);
+
+        return {
+            passed: measuredResistance >= minResistance,
+            testVoltage,
+            measuredResistance,
+            minRequired: minResistance
+        };
+    }
+}</code></pre>
+
+        <h2>6.8 센서 하드웨어 설계</h2>
+        <p>안전 센서는 신뢰성을 보장하기 위해 신중한 하드웨어 설계가 필요합니다:</p>
+
+        <pre><code>// 안전 센서 하드웨어 요구사항
+interface SafetySensorHardware {
+    // 중복성 요구사항
+    redundancy: {
+        type: 'DUAL_CHANNEL' | 'TRIPLE_MODULAR',
+        diversity: boolean,  // 다른 센서 유형
+        crossMonitoring: boolean
+    };
+
+    // 응답 시간
+    timing: {
+        sampleRate: number,      // Hz
+        processingTime: number,  // ms
+        outputDelay: number,     // ms
+        totalResponseTime: number // 최대 ms
+    };
+
+    // 환경 등급
+    environment: {
+        ipRating: string,        // 예: 'IP65'
+        temperatureRange: [number, number],  // 섭씨
+        vibrationRating: string, // 예: 'IEC 60068-2-6'
+        emcImmunity: string     // 예: 'IEC 61000-6-2'
+    };
+
+    // 진단 기능
+    diagnostics: {
+        selfTest: boolean,
+        crossCheck: boolean,
+        degradationDetection: boolean,
+        communicationMonitoring: boolean
+    };
+}
+
+// 예시: 안전 등급 근접 센서
+const safetyProximitySensor: SafetySensorHardware = {
+    redundancy: {
+        type: 'DUAL_CHANNEL',
+        diversity: true,  // LiDAR + ToF
+        crossMonitoring: true
+    },
+    timing: {
+        sampleRate: 100,        // 100 Hz
+        processingTime: 5,       // 5ms
+        outputDelay: 2,          // 2ms
+        totalResponseTime: 12    // 총 12ms
+    },
+    environment: {
+        ipRating: 'IP65',
+        temperatureRange: [-10, 50],
+        vibrationRating: '2G 10-500Hz',
+        emcImmunity: 'IEC 61000-6-2'
+    },
+    diagnostics: {
+        selfTest: true,
+        crossCheck: true,
+        degradationDetection: true,
+        communicationMonitoring: true
+    }
+};</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 요점</h2>
+            <ul>
+                <li>하드웨어 안전은 소프트웨어로 우회할 수 없는 본질적 보호를 제공합니다</li>
+                <li>하드웨어 제약을 통한 전력 및 힘 제한은 기본적인 안전 조치입니다</li>
+                <li>기계적 정지는 소프트웨어 명령에 관계없이 절대적인 동작 한계를 제공합니다</li>
+                <li>유연 액추에이터(SEA, VSA)는 제어된 변형을 통해 충격력을 감소시킵니다</li>
+                <li>보호 외함은 끼임 지점, 화상 및 얽힘을 방지해야 합니다</li>
+                <li>스프링 적용 브레이크는 전원 손실 시 안전한 정지를 제공합니다</li>
+                <li>전기 안전은 적절한 접지, 절연 및 보호 회로가 필요합니다</li>
+                <li>안전 센서는 중복성, 빠른 응답 및 자가 진단이 필요합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>하드웨어 안전이 소프트웨어 안전 조치보다 선호되는 이유는 무엇입니까?</li>
+                <li>협동 로봇에 일반적인 전력 한계는 무엇이며 그 이유는 무엇입니까?</li>
+                <li>하드 스톱과 소프트 스톱의 차이점을 설명하세요.</li>
+                <li>직렬 탄성 액추에이터가 기어드 모터에 비해 안전성을 어떻게 향상시킵니까?</li>
+                <li>보호 외함 간격 크기에 대한 요구사항은 무엇입니까?</li>
+                <li>스프링 적용 브레이크가 안전 응용에서 선호되는 이유는 무엇입니까?</li>
+                <li>IEC 60204-1에서 요구하는 전기 안전 보호에는 무엇이 있습니까?</li>
+                <li>안전 센서에 적용되는 중복성 및 진단 요구사항은 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            <p>弘益人間 (홍익인간)</p>
+            <p style="font-size:14px;margin-top:10px;color:#94a3b8">"소프트웨어가 아닌 기계에 안전을 구축하라"</p>
+        </div>
+
+        </div>
+</body>
+</html>
