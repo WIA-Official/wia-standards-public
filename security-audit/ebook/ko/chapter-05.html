@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 2단계 - API 인터페이스 | WIA-SEC-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #8B5CF6; --primary-dark: #7C3AED; --bg-dark: #0f172a; --text-light: #e2e8f0; --text-muted: #94a3b8; --accent: #a78bfa; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; background: linear-gradient(135deg, #020617 0%, var(--bg-dark) 100%); color: var(--text-light); line-height: 1.8; min-height: 100vh; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .nav-header { display: flex; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid rgba(139, 92, 246, 0.3); margin-bottom: 2rem; }
+        .nav-header a { color: var(--accent); text-decoration: none; }
+        .chapter-header { text-align: center; padding: 3rem 0; margin-bottom: 3rem; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); border-radius: 20px; }
+        .chapter-header h1 { font-size: 2.5rem; color: white; margin-bottom: 0.5rem; }
+        .chapter-header .subtitle { color: #e9d5ff; font-size: 1.2rem; }
+        section { background: rgba(30, 41, 59, 0.5); padding: 2.5rem; border-radius: 15px; margin-bottom: 2rem; border-left: 4px solid var(--primary); }
+        h2 { color: var(--accent); font-size: 1.8rem; margin-bottom: 1.5rem; border-bottom: 2px solid rgba(139, 92, 246, 0.3); padding-bottom: 0.5rem; }
+        h3 { color: var(--accent); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin-bottom: 1.25rem; color: #cbd5e1; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        .highlight-box { background: rgba(139, 92, 246, 0.15); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 8px; }
+        .code-block { background: #020617; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border: 1px solid rgba(139, 92, 246, 0.3); overflow-x: auto; }
+        .code-block pre { color: #e9d5ff; font-family: 'Monaco', monospace; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: rgba(30, 41, 59, 0.3); }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid rgba(139, 92, 246, 0.2); }
+        th { background: rgba(139, 92, 246, 0.3); color: var(--accent); }
+        .nav-footer { display: flex; justify-content: space-between; padding: 2rem 0; margin-top: 3rem; border-top: 2px solid rgba(139, 92, 246, 0.3); }
+        .nav-btn { background: var(--primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .nav-btn.secondary { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        footer { text-align: center; padding: 2rem 0; color: var(--text-muted); }
+        .philosophy { color: var(--accent); font-size: 1.2rem; margin-bottom: 0.5rem; }
+        .method-get { color: #10b981; font-weight: bold; }
+        .method-post { color: #f59e0b; font-weight: bold; }
+        .method-delete { color: #ef4444; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <h1>제5장: 2단계 - API 인터페이스</h1>
+            <p class="subtitle">RESTful API 설계 및 구현</p>
+        </div>
+
+        <section>
+            <h2>5.1 API 개요</h2>
+            <p>WIA-SEC-017은 감사 이벤트 관리를 위한 RESTful API를 정의합니다:</p>
+
+            <table>
+                <thead><tr><th>카테고리</th><th>엔드포인트</th><th>목적</th></tr></thead>
+                <tbody>
+                    <tr><td>이벤트</td><td>/events</td><td>이벤트 제출 및 조회</td></tr>
+                    <tr><td>체인</td><td>/chain</td><td>체인 검증 및 상태</td></tr>
+                    <tr><td>검색</td><td>/search</td><td>고급 검색</td></tr>
+                    <tr><td>규정 준수</td><td>/compliance</td><td>규정 준수 보고</td></tr>
+                    <tr><td>알림</td><td>/alerts</td><td>보안 알림</td></tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h4>기본 URL</h4>
+                <p><code>https://audit.example.com/wia-audit/v1</code></p>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.2 이벤트 API</h2>
+
+            <h3><span class="method-post">POST</span> /events - 이벤트 제출</h3>
+            <div class="code-block">
+                <pre>
+POST /wia-audit/v1/events
+Content-Type: application/json
+Authorization: Bearer &lt;token&gt;
+
+{
+  "events": [
+    {
+      "timestamp": "2025-01-15T09:30:45.123Z",
+      "actor": {
+        "type": "user",
+        "id": "user_123",
+        "email": "user@example.com"
+      },
+      "action": {
+        "type": "DATA_ACCESS",
+        "operation": "READ",
+        "resource": "/api/customers/456"
+      },
+      "outcome": {
+        "status": "SUCCESS"
+      }
+    }
+  ]
+}
+
+// 응답
+{
+  "accepted": 1,
+  "rejected": 0,
+  "events": [
+    {
+      "eventId": "evt_01HQMXK9J2N4P5R6S7T8V9W0",
+      "sequence": 12345,
+      "status": "accepted"
+    }
+  ]
+}</pre>
+            </div>
+
+            <h3><span class="method-get">GET</span> /events/{eventId} - 단일 이벤트 조회</h3>
+            <div class="code-block">
+                <pre>
+GET /wia-audit/v1/events/evt_01HQMXK9J2N4P5R6S7T8V9W0
+
+// 응답
+{
+  "eventId": "evt_01HQMXK9J2N4P5R6S7T8V9W0",
+  "timestamp": "2025-01-15T09:30:45.123Z",
+  "actor": {...},
+  "action": {...},
+  "outcome": {...},
+  "chain": {
+    "sequence": 12345,
+    "hash": "sha256:abc123...",
+    "signature": "sig:xyz789..."
+  }
+}</pre>
+            </div>
+
+            <h3><span class="method-get">GET</span> /events - 이벤트 목록</h3>
+            <div class="code-block">
+                <pre>
+GET /wia-audit/v1/events?from=2025-01-01&to=2025-01-31&limit=100
+
+// 응답
+{
+  "events": [...],
+  "pagination": {
+    "total": 5000,
+    "limit": 100,
+    "offset": 0,
+    "hasMore": true,
+    "nextCursor": "cursor_abc123"
+  }
+}</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.3 체인 API</h2>
+
+            <h3><span class="method-get">GET</span> /chain/head - 체인 헤드</h3>
+            <div class="code-block">
+                <pre>
+GET /wia-audit/v1/chain/head
+
+// 응답
+{
+  "sequence": 12345,
+  "hash": "sha256:latest_hash...",
+  "timestamp": "2025-01-15T09:30:45.123Z",
+  "status": "healthy"
+}</pre>
+            </div>
+
+            <h3><span class="method-get">GET</span> /chain/verify - 체인 검증</h3>
+            <div class="code-block">
+                <pre>
+GET /wia-audit/v1/chain/verify?from=1&to=12345
+
+// 응답
+{
+  "valid": true,
+  "verified": 12345,
+  "startSequence": 1,
+  "endSequence": 12345,
+  "duration": "2.5s"
+}</pre>
+            </div>
+
+            <h3><span class="method-post">POST</span> /chain/audit - 스팟 체크</h3>
+            <div class="code-block">
+                <pre>
+POST /wia-audit/v1/chain/audit
+{
+  "sampleSize": 100,
+  "method": "random"
+}
+
+// 응답
+{
+  "verified": true,
+  "samplesChecked": 100,
+  "failures": [],
+  "confidence": "99.9%"
+}</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.4 검색 API</h2>
+
+            <h3><span class="method-post">POST</span> /search - 고급 검색</h3>
+            <div class="code-block">
+                <pre>
+POST /wia-audit/v1/search
+{
+  "query": {
+    "timeRange": {
+      "from": "2025-01-01T00:00:00Z",
+      "to": "2025-01-31T23:59:59Z"
+    },
+    "filters": [
+      {"field": "actor.email", "operator": "equals", "value": "admin@example.com"},
+      {"field": "action.type", "operator": "in", "value": ["DATA_ACCESS", "AUTHENTICATION"]},
+      {"field": "outcome.status", "operator": "equals", "value": "FAILURE"}
+    ],
+    "sort": [
+      {"field": "timestamp", "order": "desc"}
+    ]
+  },
+  "pagination": {
+    "limit": 50,
+    "offset": 0
+  }
+}
+
+// 응답
+{
+  "results": [...],
+  "total": 150,
+  "aggregations": {
+    "byActionType": {
+      "DATA_ACCESS": 120,
+      "AUTHENTICATION": 30
+    }
+  }
+}</pre>
+            </div>
+
+            <h3>검색 연산자</h3>
+            <table>
+                <thead><tr><th>연산자</th><th>설명</th><th>예시</th></tr></thead>
+                <tbody>
+                    <tr><td>equals</td><td>정확히 일치</td><td>status = "SUCCESS"</td></tr>
+                    <tr><td>not_equals</td><td>불일치</td><td>status != "SUCCESS"</td></tr>
+                    <tr><td>in</td><td>목록에 포함</td><td>type in ["A", "B"]</td></tr>
+                    <tr><td>contains</td><td>포함</td><td>email contains "@example"</td></tr>
+                    <tr><td>starts_with</td><td>시작</td><td>ip starts_with "192.168"</td></tr>
+                    <tr><td>range</td><td>범위</td><td>statusCode range [400, 499]</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.5 규정 준수 API</h2>
+
+            <h3><span class="method-get">GET</span> /compliance/status</h3>
+            <div class="code-block">
+                <pre>
+GET /wia-audit/v1/compliance/status
+
+// 응답
+{
+  "frameworks": {
+    "SOC2": {
+      "status": "COMPLIANT",
+      "lastCheck": "2025-01-15T00:00:00Z",
+      "controls": {
+        "CC6.1": "PASS",
+        "CC6.2": "PASS",
+        "CC7.1": "PASS"
+      }
+    },
+    "GDPR": {
+      "status": "COMPLIANT",
+      "lastCheck": "2025-01-15T00:00:00Z"
+    }
+  }
+}</pre>
+            </div>
+
+            <h3><span class="method-get">GET</span> /compliance/report</h3>
+            <div class="code-block">
+                <pre>
+GET /wia-audit/v1/compliance/report?framework=SOC2&period=2025-01
+
+// 응답: PDF 또는 JSON 보고서</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.6 알림 API</h2>
+
+            <h3><span class="method-get">GET</span> /alerts</h3>
+            <div class="code-block">
+                <pre>
+GET /wia-audit/v1/alerts?status=open&severity=critical
+
+// 응답
+{
+  "alerts": [
+    {
+      "alertId": "alert_001",
+      "severity": "CRITICAL",
+      "title": "다중 인증 실패 탐지",
+      "description": "192.168.1.100에서 50회 연속 로그인 실패",
+      "triggeredAt": "2025-01-15T09:30:00Z",
+      "status": "OPEN",
+      "relatedEvents": ["evt_001", "evt_002"]
+    }
+  ]
+}</pre>
+            </div>
+
+            <h3><span class="method-post">POST</span> /alerts/{alertId}/acknowledge</h3>
+            <div class="code-block">
+                <pre>
+POST /wia-audit/v1/alerts/alert_001/acknowledge
+{
+  "acknowledgedBy": "security-team@example.com",
+  "notes": "조사 시작"
+}</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.7 인증 및 권한</h2>
+
+            <h3>인증 방법</h3>
+            <table>
+                <thead><tr><th>방법</th><th>사용 사례</th><th>헤더</th></tr></thead>
+                <tbody>
+                    <tr><td>Bearer Token</td><td>사용자 세션</td><td>Authorization: Bearer &lt;jwt&gt;</td></tr>
+                    <tr><td>API Key</td><td>서비스 통합</td><td>X-API-Key: &lt;key&gt;</td></tr>
+                    <tr><td>mTLS</td><td>서비스 간 통신</td><td>클라이언트 인증서</td></tr>
+                </tbody>
+            </table>
+
+            <h3>권한 범위</h3>
+            <ul>
+                <li><strong>audit:write</strong> - 이벤트 제출</li>
+                <li><strong>audit:read</strong> - 이벤트 조회</li>
+                <li><strong>audit:search</strong> - 고급 검색</li>
+                <li><strong>audit:verify</strong> - 체인 검증</li>
+                <li><strong>audit:admin</strong> - 관리 작업</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>5.8 장 요약</h2>
+            <div class="highlight-box">
+                <h4>핵심 내용</h4>
+                <ul>
+                    <li>RESTful API로 감사 이벤트 관리</li>
+                    <li>이벤트 API: 제출, 조회, 목록</li>
+                    <li>체인 API: 헤드, 검증, 스팟 체크</li>
+                    <li>검색 API: 다양한 연산자 지원</li>
+                    <li>규정 준수 API: 상태 및 보고서</li>
+                    <li>알림 API: 보안 이벤트 관리</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.9 복습 문제</h2>
+            <ol>
+                <li>5가지 API 카테고리를 나열하세요.</li>
+                <li>이벤트 제출 API의 응답 형식을 설명하세요.</li>
+                <li>체인 검증 API의 목적은 무엇입니까?</li>
+                <li>검색 API에서 사용 가능한 연산자는?</li>
+                <li>3가지 인증 방법을 설명하세요.</li>
+            </ol>
+        </section>
+
+        </div>
+</body>
+</html>

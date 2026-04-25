@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: API Interfaces | WIA-SEC-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #8B5CF6; --primary-dark: #7C3AED; --bg-dark: #0f172a; --text-light: #e2e8f0; --text-muted: #94a3b8; --accent: #a78bfa; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #020617 0%, var(--bg-dark) 100%); color: var(--text-light); line-height: 1.8; min-height: 100vh; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .nav-header { display: flex; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid rgba(139, 92, 246, 0.3); margin-bottom: 2rem; }
+        .nav-header a { color: var(--accent); text-decoration: none; }
+        .chapter-header { text-align: center; padding: 3rem 0; margin-bottom: 3rem; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); border-radius: 20px; }
+        .chapter-header h1 { font-size: 2.5rem; color: white; margin-bottom: 0.5rem; }
+        .chapter-header .subtitle { color: #e9d5ff; font-size: 1.2rem; }
+        section { background: rgba(30, 41, 59, 0.5); padding: 2.5rem; border-radius: 15px; margin-bottom: 2rem; border-left: 4px solid var(--primary); }
+        h2 { color: var(--accent); font-size: 1.8rem; margin-bottom: 1.5rem; border-bottom: 2px solid rgba(139, 92, 246, 0.3); padding-bottom: 0.5rem; }
+        h3 { color: var(--accent); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin-bottom: 1.25rem; color: #cbd5e1; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        .highlight-box { background: rgba(139, 92, 246, 0.15); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: rgba(30, 41, 59, 0.3); }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid rgba(139, 92, 246, 0.2); }
+        th { background: rgba(139, 92, 246, 0.3); color: var(--accent); }
+        .code-block { background: #020617; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border: 1px solid rgba(139, 92, 246, 0.3); overflow-x: auto; }
+        .code-block pre { color: #e9d5ff; font-family: 'Monaco', monospace; font-size: 0.9rem; }
+        .nav-footer { display: flex; justify-content: space-between; padding: 2rem 0; margin-top: 3rem; border-top: 2px solid rgba(139, 92, 246, 0.3); }
+        .nav-btn { background: var(--primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .nav-btn.secondary { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        footer { text-align: center; padding: 2rem 0; color: var(--text-muted); }
+        .philosophy { color: var(--accent); font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <h1>Chapter 5: Phase 2 - API Interfaces</h1>
+            <p class="subtitle">RESTful APIs for Audit Operations</p>
+        </div>
+
+        <section>
+            <h2>5.1 API Design Philosophy</h2>
+            <p>WIA-SEC-017 APIs follow RESTful principles with security and performance as primary concerns:</p>
+            <ul>
+                <li><strong>Resource-oriented:</strong> URLs represent audit resources</li>
+                <li><strong>JSON-first:</strong> All payloads use JSON format</li>
+                <li><strong>Secure by default:</strong> TLS required, authentication mandatory</li>
+                <li><strong>Idempotent:</strong> Safe retry of failed requests</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>5.2 Event Submission API</h2>
+
+            <h3>Submit Single Event</h3>
+            <div class="code-block">
+                <pre>
+POST /wia-audit/v1/events
+Authorization: Bearer {api_key}
+Content-Type: application/json
+
+{
+  "type": "AUTHENTICATION",
+  "actor": {
+    "id": "urn:wia:identity:user:john.doe",
+    "type": "USER"
+  },
+  "action": "LOGIN",
+  "outcome": "SUCCESS",
+  "metadata": { "ip": "192.168.1.100", "mfa": true }
+}
+
+Response: 201 Created
+{
+  "id": "urn:wia:audit:evt:550e8400-e29b-41d4",
+  "sequence": 12345,
+  "hash": "d4e5f6a7b8c9d0..."
+}</pre>
+            </div>
+
+            <h3>Batch Submission</h3>
+            <div class="code-block">
+                <pre>
+POST /wia-audit/v1/events/batch
+Authorization: Bearer {api_key}
+Content-Type: application/json
+
+{
+  "events": [
+    { "type": "DATA_ACCESS", "action": "READ", ... },
+    { "type": "DATA_ACCESS", "action": "READ", ... }
+  ]
+}
+
+Response: 201 Created
+{
+  "accepted": 2,
+  "rejected": 0,
+  "events": [...]
+}</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.3 Query API</h2>
+            <table>
+                <thead><tr><th>Endpoint</th><th>Method</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>/events</td><td>GET</td><td>List events with filters</td></tr>
+                    <tr><td>/events/{id}</td><td>GET</td><td>Get single event</td></tr>
+                    <tr><td>/events/search</td><td>POST</td><td>Advanced search</td></tr>
+                    <tr><td>/events/export</td><td>POST</td><td>Export to file</td></tr>
+                    <tr><td>/chain/verify</td><td>POST</td><td>Verify chain integrity</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Query Examples</h3>
+            <div class="code-block">
+                <pre>
+# List recent authentication failures
+GET /wia-audit/v1/events?type=AUTHENTICATION&outcome=FAILURE&limit=100
+
+# Search by actor
+POST /wia-audit/v1/events/search
+{
+  "query": {
+    "actor.id": "urn:wia:identity:user:john.doe",
+    "timestamp": { "$gte": "2025-01-01T00:00:00Z" }
+  },
+  "sort": { "timestamp": "desc" },
+  "limit": 50
+}</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.4 Real-Time Streaming</h2>
+            <div class="code-block">
+                <pre>
+# WebSocket connection for real-time events
+ws://audit.company.com/wia-audit/v1/stream
+
+# Subscribe to specific event types
+{
+  "action": "subscribe",
+  "filters": {
+    "types": ["AUTHENTICATION", "SECURITY"],
+    "outcome": "FAILURE"
+  }
+}
+
+# Incoming events
+{
+  "type": "event",
+  "data": {
+    "id": "urn:wia:audit:evt:...",
+    "type": "AUTHENTICATION",
+    "action": "LOGIN",
+    "outcome": "FAILURE",
+    ...
+  }
+}</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.5 Compliance Reports API</h2>
+            <div class="code-block">
+                <pre>
+# Generate SOC 2 compliance report
+POST /wia-audit/v1/reports
+{
+  "type": "SOC2",
+  "period": {
+    "start": "2025-01-01",
+    "end": "2025-03-31"
+  },
+  "format": "PDF"
+}
+
+Response:
+{
+  "reportId": "rpt-12345",
+  "status": "GENERATING",
+  "estimatedCompletion": "2025-01-07T11:00:00Z"
+}</pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.6 Error Handling</h2>
+            <table>
+                <thead><tr><th>HTTP Status</th><th>Error Code</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>400</td><td>INVALID_REQUEST</td><td>Malformed request body</td></tr>
+                    <tr><td>401</td><td>UNAUTHORIZED</td><td>Missing or invalid credentials</td></tr>
+                    <tr><td>403</td><td>FORBIDDEN</td><td>Insufficient permissions</td></tr>
+                    <tr><td>404</td><td>NOT_FOUND</td><td>Resource not found</td></tr>
+                    <tr><td>429</td><td>RATE_LIMITED</td><td>Too many requests</td></tr>
+                    <tr><td>500</td><td>INTERNAL_ERROR</td><td>Server error</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.7 Chapter Summary</h2>
+            <div class="highlight-box">
+                <h4>Key Takeaways</h4>
+                <ul>
+                    <li>RESTful API design with JSON payloads</li>
+                    <li>Single and batch event submission endpoints</li>
+                    <li>Flexible query API with search and export</li>
+                    <li>WebSocket streaming for real-time alerts</li>
+                    <li>Automated compliance report generation</li>
+                    <li>Standardized error handling and rate limiting</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.8 Review Questions</h2>
+            <ol>
+                <li>What HTTP method is used for event submission?</li>
+                <li>How do you subscribe to real-time events?</li>
+                <li>What query parameters can filter the events list?</li>
+                <li>How are compliance reports generated via API?</li>
+                <li>What HTTP status code indicates rate limiting?</li>
+            </ol>
+        </section>
+
+        </div>
+</body>
+</html>
