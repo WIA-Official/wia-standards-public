@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 3: AI-to-AI Messaging - WIA LLM Standard</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] Table of Contents</a></p>
+<hr>
+
+<h1>Chapter 3: AI-to-AI Messaging (WIA-LLM-MESSAGE)</h1>
+<blockquote>"For AI models to collaborate, they must speak a common language."</blockquote>
+<hr>
+
+<h2>3.1 The Need for AI Messaging</h2>
+<p>Once AI models know each other's capabilities, they need a way to communicate. The WIA-LLM-MESSAGE standard defines how AI models exchange information:</p>
+<ul>
+<li>Send queries to other AI models</li>
+<li>Delegate subtasks</li>
+<li>Request verification of results</li>
+<li>Stream responses in real-time</li>
+<li>Handle errors gracefully</li>
+</ul>
+<hr>
+
+<h2>3.2 Message Envelope Structure</h2>
+<p>Every message is wrapped in a standardized envelope:</p>
+
+<pre>
+MessageEnvelope
+├── @context           # JSON-LD context
+├── id                 # Unique message ID
+├── type               # "MessageEnvelope"
+├── version            # Protocol version
+├── header             # Routing and metadata
+├── payload            # Message content
+├── routing            # Delivery instructions
+└── security           # Encryption and signing
+</pre>
+<hr>
+
+<h2>3.3 Message Header</h2>
+<p>The header contains essential routing information:</p>
+
+<pre>
+header: {
+    from: "did:wia:llm:anthropic:claude-3-opus",
+    to: "did:wia:llm:openai:gpt-4",
+    timestamp: "2024-01-15T10:30:00Z",
+    messageType: "QUERY",
+    correlationId: "corr-abc123",
+    replyTo: "did:wia:llm:anthropic:claude-3-opus",
+    ttl: 300,
+    priority: "NORMAL"
+}
+</pre>
+
+<h3>Header Fields</h3>
+<table border="1" cellpadding="5">
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td>from</td><td>DID</td><td>Sender's identifier</td></tr>
+<tr><td>to</td><td>DID</td><td>Recipient's identifier</td></tr>
+<tr><td>timestamp</td><td>ISO 8601</td><td>When message was created</td></tr>
+<tr><td>messageType</td><td>enum</td><td>Type of message</td></tr>
+<tr><td>correlationId</td><td>string</td><td>Links related messages</td></tr>
+<tr><td>replyTo</td><td>DID</td><td>Where to send response</td></tr>
+<tr><td>ttl</td><td>number</td><td>Time-to-live in seconds</td></tr>
+<tr><td>priority</td><td>enum</td><td>Message priority level</td></tr>
+</table>
+<hr>
+
+<h2>3.4 Message Types</h2>
+<p>The standard defines several message types:</p>
+
+<table border="1" cellpadding="10">
+<tr>
+<th>Type</th>
+<th>Purpose</th>
+<th>Expected Response</th>
+</tr>
+<tr>
+<td>QUERY</td>
+<td>Ask a question or request information</td>
+<td>RESPONSE</td>
+</tr>
+<tr>
+<td>DELEGATE</td>
+<td>Assign a subtask to another AI</td>
+<td>RESPONSE or STREAM</td>
+</tr>
+<tr>
+<td>COLLABORATE</td>
+<td>Request collaboration on a task</td>
+<td>ACCEPT/REJECT</td>
+</tr>
+<tr>
+<td>VERIFY</td>
+<td>Request verification of results</td>
+<td>VERIFICATION</td>
+</tr>
+<tr>
+<td>RESPONSE</td>
+<td>Reply to a query or delegation</td>
+<td>None (final)</td>
+</tr>
+<tr>
+<td>STREAM</td>
+<td>Streaming response chunks</td>
+<td>More STREAM or END</td>
+</tr>
+<tr>
+<td>ERROR</td>
+<td>Report an error condition</td>
+<td>None (final)</td>
+</tr>
+</table>
+<hr>
+
+<h2>3.5 Query Payload</h2>
+<p>A query message requests information or processing:</p>
+
+<pre>
+{
+    "header": {
+        "from": "did:wia:llm:anthropic:claude-3-opus",
+        "to": "did:wia:llm:local:codellama-34b",
+        "messageType": "QUERY"
+    },
+    "payload": {
+        "type": "query_payload",
+        "content": "Analyze this code for security vulnerabilities",
+        "context": {
+            "code": "function login(user, pass) { ... }",
+            "language": "javascript"
+        },
+        "parameters": {
+            "maxTokens": 2048,
+            "temperature": 0.3,
+            "responseFormat": "structured"
+        },
+        "constraints": {
+            "timeout": 30000,
+            "requiredFields": ["vulnerabilities", "severity"]
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>3.6 Response Payload</h2>
+<p>A response message contains the result:</p>
+
+<pre>
+{
+    "header": {
+        "from": "did:wia:llm:local:codellama-34b",
+        "to": "did:wia:llm:anthropic:claude-3-opus",
+        "messageType": "RESPONSE",
+        "correlationId": "corr-abc123"
+    },
+    "payload": {
+        "type": "response_payload",
+        "status": "SUCCESS",
+        "content": {
+            "vulnerabilities": [
+                {
+                    "type": "SQL_INJECTION",
+                    "severity": "HIGH",
+                    "line": 15,
+                    "description": "User input not sanitized"
+                }
+            ],
+            "summary": "Found 1 high-severity vulnerability"
+        },
+        "metadata": {
+            "processingTime": 1250,
+            "tokensUsed": 856,
+            "confidence": 0.92
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>3.7 Delegation Workflow</h2>
+<p>When an AI delegates a subtask to another:</p>
+
+<pre>
+Step 1: Delegating AI sends DELEGATE message
++------------------+                    +------------------+
+|   Claude 3       |  --- DELEGATE -->  |   Code Llama     |
+|   (Orchestrator) |                    |   (Specialist)   |
++------------------+                    +------------------+
+
+Step 2: Specialist processes and responds
++------------------+                    +------------------+
+|   Claude 3       |  <-- RESPONSE ---  |   Code Llama     |
+|                  |                    |                  |
++------------------+                    +------------------+
+
+Step 3: Orchestrator continues with result
+</pre>
+
+<h3>Delegation Message Example</h3>
+<pre>
+{
+    "header": {
+        "messageType": "DELEGATE"
+    },
+    "payload": {
+        "type": "delegate_payload",
+        "task": "Analyze Python code for type errors",
+        "input": {
+            "code": "...",
+            "requirements": ["mypy", "strict"]
+        },
+        "expectedOutput": {
+            "format": "json",
+            "schema": "TypeErrorReport"
+        },
+        "deadline": "2024-01-15T10:35:00Z"
+    }
+}
+</pre>
+<hr>
+
+<h2>3.8 Streaming Responses</h2>
+<p>For long responses, streaming delivers content incrementally:</p>
+
+<pre>
+Stream Message 1:
+{
+    "header": { "messageType": "STREAM" },
+    "payload": {
+        "sequenceNumber": 1,
+        "chunk": "The analysis reveals ",
+        "done": false
+    }
+}
+
+Stream Message 2:
+{
+    "header": { "messageType": "STREAM" },
+    "payload": {
+        "sequenceNumber": 2,
+        "chunk": "several security concerns...",
+        "done": false
+    }
+}
+
+Stream Message 3 (Final):
+{
+    "header": { "messageType": "STREAM" },
+    "payload": {
+        "sequenceNumber": 3,
+        "chunk": "",
+        "done": true,
+        "totalTokens": 1523
+    }
+}
+</pre>
+<hr>
+
+<h2>3.9 Error Handling</h2>
+<p>When errors occur, the ERROR message type is used:</p>
+
+<pre>
+{
+    "header": {
+        "messageType": "ERROR",
+        "correlationId": "corr-abc123"
+    },
+    "payload": {
+        "type": "error_payload",
+        "code": "CAPABILITY_MISMATCH",
+        "message": "Task requires MEDICAL domain expertise",
+        "details": {
+            "required": ["MEDICAL"],
+            "available": ["CODE", "MATH"]
+        },
+        "recoverable": true,
+        "suggestion": "Route to a model with MEDICAL capability"
+    }
+}
+</pre>
+
+<h3>Standard Error Codes</h3>
+<table border="1" cellpadding="5">
+<tr><th>Code</th><th>Description</th><th>Recoverable</th></tr>
+<tr><td>CAPABILITY_MISMATCH</td><td>Model lacks required capability</td><td>Yes</td></tr>
+<tr><td>RATE_LIMITED</td><td>Too many requests</td><td>Yes</td></tr>
+<tr><td>CONTEXT_OVERFLOW</td><td>Input exceeds context window</td><td>Yes</td></tr>
+<tr><td>TIMEOUT</td><td>Processing took too long</td><td>Yes</td></tr>
+<tr><td>CONTENT_POLICY</td><td>Request violates content policy</td><td>No</td></tr>
+<tr><td>AUTHENTICATION_FAILED</td><td>Invalid credentials</td><td>Yes</td></tr>
+<tr><td>INTERNAL_ERROR</td><td>Unexpected error</td><td>Maybe</td></tr>
+</table>
+<hr>
+
+<h2>3.10 Message Routing</h2>
+<p>Messages include routing instructions:</p>
+
+<pre>
+routing: {
+    strategy: "CAPABILITY_BASED",
+    hops: [],
+    maxHops: 3,
+    fallback: {
+        strategy: "BROADCAST",
+        scope: "FEDERATION"
+    }
+}
+</pre>
+
+<h3>Routing Strategies</h3>
+<table border="1" cellpadding="5">
+<tr><th>Strategy</th><th>Description</th></tr>
+<tr><td>DIRECT</td><td>Send directly to specified recipient</td></tr>
+<tr><td>CAPABILITY_BASED</td><td>Route based on capability match</td></tr>
+<tr><td>LOAD_BALANCED</td><td>Distribute across available models</td></tr>
+<tr><td>BROADCAST</td><td>Send to all federation members</td></tr>
+</table>
+<hr>
+
+<h2>3.11 Security</h2>
+<p>All messages include security information:</p>
+
+<pre>
+security: {
+    encrypted: true,
+    algorithm: "AES-256-GCM",
+    keyId: "key-2024-01",
+    signature: {
+        algorithm: "Ed25519",
+        value: "wia-sig:abc123...",
+        publicKey: "did:wia:llm:anthropic:claude-3-opus#key-1"
+    },
+    nonce: "unique-nonce-value"
+}
+</pre>
+<hr>
+
+<h2>3.12 Complete Message Example</h2>
+<pre>
+{
+    "@context": "https://wia.org/contexts/llm-message/v1",
+    "id": "msg:2024-01-15:abc123",
+    "type": "MessageEnvelope",
+    "version": "1.0.0",
+
+    "header": {
+        "from": "did:wia:llm:anthropic:claude-3-opus",
+        "to": "did:wia:llm:openai:gpt-4",
+        "timestamp": "2024-01-15T10:30:00Z",
+        "messageType": "QUERY",
+        "correlationId": "corr-xyz789",
+        "ttl": 300,
+        "priority": "NORMAL"
+    },
+
+    "payload": {
+        "type": "query_payload",
+        "content": "What are the latest developments in quantum computing?",
+        "parameters": {
+            "maxTokens": 2048,
+            "temperature": 0.7
+        }
+    },
+
+    "routing": {
+        "strategy": "DIRECT",
+        "maxHops": 1
+    },
+
+    "security": {
+        "encrypted": true,
+        "algorithm": "AES-256-GCM",
+        "signature": "wia-sig:abc123..."
+    }
+}
+</pre>
+<hr>
+
+<h2>3.13 Chapter Summary</h2>
+<ul>
+<li>[OK] Message Envelope standardizes AI-to-AI communication</li>
+<li>[OK] Multiple message types for different purposes</li>
+<li>[OK] Streaming support for long responses</li>
+<li>[OK] Robust error handling with recovery suggestions</li>
+<li>[OK] Flexible routing strategies</li>
+<li>[OK] Built-in security with encryption and signing</li>
+</ul>
+<hr>
+
+<p><a href="chapter-02.html">&lt;&lt; Previous: Chapter 2 - Capability Declaration</a></p>
+<p><a href="chapter-04.html">Next: Chapter 4 - Federation Framework (WIA-LLM-FEDERATION) &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] Table of Contents</a> | Chapter 3 of 8</p>
+</body>
+</html>

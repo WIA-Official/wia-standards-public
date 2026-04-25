@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제7장: 통합 및 배포 - WIA LLM 표준</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] 목차</a></p>
+<hr>
+
+<h1>제7장: 통합 및 배포</h1>
+<blockquote>"표준은 기존 시스템에 쉽게 통합될 수 있을 때만 의미가 있습니다."</blockquote>
+<hr>
+
+<h2>7.1 통합 개요</h2>
+<p>이 장에서는 WIA LLM 상호운용 표준의 실제 통합을 다룹니다:</p>
+<ul>
+<li>AI 제공자 통합 (OpenAI, Anthropic, Google, Local)</li>
+<li>클라우드 플랫폼 배포 (AWS, Azure, GCP)</li>
+<li>프레임워크 통합 (LangChain, LlamaIndex, AutoGen)</li>
+<li>SDK 구현</li>
+</ul>
+<hr>
+
+<h2>7.2 OpenAI 통합</h2>
+
+<h3>어댑터 구성</h3>
+<pre>
+{
+    "provider": "openai",
+    "adapter": {
+        "type": "WIA_OPENAI_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "apiKey": "${OPENAI_API_KEY}",
+            "organization": "${OPENAI_ORG_ID}",
+            "baseUrl": "https://api.openai.com/v1",
+            "defaultModel": "gpt-4",
+            "timeout": 30000
+        }
+    },
+    "capabilities": {
+        "models": {
+            "gpt-4": {
+                "did": "did:wia:llm:openai:gpt-4",
+                "level": 4,
+                "contextWindow": 128000
+            },
+            "gpt-4-turbo": {
+                "did": "did:wia:llm:openai:gpt-4-turbo",
+                "level": 4,
+                "contextWindow": 128000
+            },
+            "gpt-3.5-turbo": {
+                "did": "did:wia:llm:openai:gpt-3.5-turbo",
+                "level": 2,
+                "contextWindow": 16385
+            }
+        }
+    }
+}
+</pre>
+
+<h3>메시지 변환</h3>
+<pre>
+# WIA 메시지를 OpenAI 형식으로 변환
+def translate_to_openai(wia_message):
+    return {
+        "model": extract_model(wia_message.header.to),
+        "messages": [
+            {
+                "role": "user",
+                "content": wia_message.payload.content
+            }
+        ],
+        "max_tokens": wia_message.payload.parameters.maxTokens,
+        "temperature": wia_message.payload.parameters.temperature
+    }
+
+# OpenAI 응답을 WIA 형식으로 변환
+def translate_from_openai(openai_response, correlation_id):
+    return {
+        "header": {
+            "messageType": "RESPONSE",
+            "correlationId": correlation_id
+        },
+        "payload": {
+            "status": "SUCCESS",
+            "content": openai_response.choices[0].message.content,
+            "metadata": {
+                "tokensUsed": openai_response.usage.total_tokens,
+                "model": openai_response.model
+            }
+        }
+    }
+</pre>
+<hr>
+
+<h2>7.3 Anthropic 통합</h2>
+
+<h3>어댑터 구성</h3>
+<pre>
+{
+    "provider": "anthropic",
+    "adapter": {
+        "type": "WIA_ANTHROPIC_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "apiKey": "${ANTHROPIC_API_KEY}",
+            "baseUrl": "https://api.anthropic.com",
+            "defaultModel": "claude-3-opus-20240229",
+            "timeout": 60000
+        }
+    },
+    "capabilities": {
+        "models": {
+            "claude-3-opus": {
+                "did": "did:wia:llm:anthropic:claude-3-opus",
+                "level": 4,
+                "contextWindow": 200000
+            },
+            "claude-3-sonnet": {
+                "did": "did:wia:llm:anthropic:claude-3-sonnet",
+                "level": 3,
+                "contextWindow": 200000
+            },
+            "claude-3-haiku": {
+                "did": "did:wia:llm:anthropic:claude-3-haiku",
+                "level": 2,
+                "contextWindow": 200000
+            }
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>7.4 Google Gemini 통합</h2>
+
+<h3>어댑터 구성</h3>
+<pre>
+{
+    "provider": "google",
+    "adapter": {
+        "type": "WIA_GOOGLE_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "apiKey": "${GOOGLE_API_KEY}",
+            "project": "${GCP_PROJECT_ID}",
+            "location": "asia-northeast3",
+            "defaultModel": "gemini-pro"
+        }
+    },
+    "capabilities": {
+        "models": {
+            "gemini-pro": {
+                "did": "did:wia:llm:google:gemini-pro",
+                "level": 3,
+                "contextWindow": 32000,
+                "modalities": ["text", "image"]
+            },
+            "gemini-pro-vision": {
+                "did": "did:wia:llm:google:gemini-pro-vision",
+                "level": 3,
+                "modalities": ["text", "image", "video"]
+            }
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>7.5 로컬 모델 통합 (Ollama)</h2>
+
+<h3>어댑터 구성</h3>
+<pre>
+{
+    "provider": "local",
+    "adapter": {
+        "type": "WIA_OLLAMA_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "baseUrl": "http://localhost:11434",
+            "timeout": 120000
+        }
+    },
+    "capabilities": {
+        "models": {
+            "llama2": {
+                "did": "did:wia:llm:local:llama-2-70b",
+                "level": 2,
+                "contextWindow": 4096
+            },
+            "codellama": {
+                "did": "did:wia:llm:local:codellama-34b",
+                "level": 3,
+                "contextWindow": 16000,
+                "domains": ["CODE"]
+            },
+            "mistral": {
+                "did": "did:wia:llm:local:mistral-7b",
+                "level": 2,
+                "contextWindow": 8192
+            }
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>7.6 AWS Lambda 배포</h2>
+
+<h3>Lambda 함수 구성</h3>
+<pre>
+# serverless.yml
+service: wia-llm-interop
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: ap-northeast-2
+  memorySize: 1024
+  timeout: 30
+  environment:
+    WIA_CONFIG_PATH: /opt/config/wia-config.json
+
+functions:
+  capability:
+    handler: handlers/capability.handler
+    events:
+      - http:
+          path: /capability
+          method: post
+      - http:
+          path: /capability/query
+          method: post
+
+  message:
+    handler: handlers/message.handler
+    events:
+      - http:
+          path: /message
+          method: post
+
+  federation:
+    handler: handlers/federation.handler
+    events:
+      - http:
+          path: /federation
+          method: post
+      - http:
+          path: /federation/{id}/task
+          method: post
+</pre>
+
+<h3>Lambda 핸들러 예시</h3>
+<pre>
+# handlers/capability.py
+import json
+from wia_llm import CapabilityService
+
+service = CapabilityService()
+
+def handler(event, context):
+    path = event['path']
+    method = event['httpMethod']
+    body = json.loads(event.get('body', '{}'))
+
+    if path == '/capability' and method == 'POST':
+        result = service.register(body)
+        return {
+            'statusCode': 201,
+            'body': json.dumps(result)
+        }
+
+    elif path == '/capability/query' and method == 'POST':
+        result = service.query(body)
+        return {
+            'statusCode': 200,
+            'body': json.dumps(result)
+        }
+
+    return {'statusCode': 404}
+</pre>
+<hr>
+
+<h2>7.7 Azure Container Apps 배포</h2>
+
+<h3>컨테이너 구성</h3>
+<pre>
+# azure-container-app.yaml
+apiVersion: apps/v1
+kind: ContainerApp
+metadata:
+  name: wia-llm-interop
+spec:
+  configuration:
+    ingress:
+      external: true
+      targetPort: 8080
+    secrets:
+      - name: openai-key
+        value: ${OPENAI_API_KEY}
+      - name: anthropic-key
+        value: ${ANTHROPIC_API_KEY}
+
+  template:
+    containers:
+      - image: wia/llm-interop:latest
+        name: wia-llm-service
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+        env:
+          - name: OPENAI_API_KEY
+            secretRef: openai-key
+          - name: ANTHROPIC_API_KEY
+            secretRef: anthropic-key
+          - name: WIA_LOG_LEVEL
+            value: "info"
+    scale:
+      minReplicas: 1
+      maxReplicas: 10
+      rules:
+        - name: http-scaling
+          http:
+            metadata:
+              concurrentRequests: "50"
+</pre>
+<hr>
+
+<h2>7.8 Kubernetes 배포</h2>
+
+<h3>배포 구성</h3>
+<pre>
+# kubernetes/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wia-llm-interop
+  labels:
+    app: wia-llm
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: wia-llm
+  template:
+    metadata:
+      labels:
+        app: wia-llm
+    spec:
+      containers:
+      - name: wia-llm-service
+        image: wia/llm-interop:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-secrets
+              key: openai-key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wia-llm-service
+spec:
+  selector:
+    app: wia-llm
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: LoadBalancer
+</pre>
+<hr>
+
+<h2>7.9 LangChain 통합</h2>
+
+<h3>LangChain용 WIA LLM 제공자</h3>
+<pre>
+from langchain.llms.base import LLM
+from wia_llm import WIAClient
+
+class WIALLM(LLM):
+    """LangChain용 WIA LLM 상호운용 제공자"""
+
+    client: WIAClient
+    target_did: str
+
+    def __init__(self, wia_endpoint: str, target_did: str):
+        self.client = WIAClient(wia_endpoint)
+        self.target_did = target_did
+
+    def _call(self, prompt: str, stop=None) -> str:
+        message = {
+            "header": {
+                "to": self.target_did,
+                "messageType": "QUERY"
+            },
+            "payload": {
+                "content": prompt
+            }
+        }
+
+        response = self.client.send_message(message)
+        return response.payload.content
+
+    @property
+    def _llm_type(self) -> str:
+        return "wia-llm"
+
+# 사용 예시
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+
+llm = WIALLM(
+    wia_endpoint="https://api.wia.org/v1/llm",
+    target_did="did:wia:llm:anthropic:claude-3-opus"
+)
+
+chain = LLMChain(
+    llm=llm,
+    prompt=PromptTemplate.from_template("분석: {text}")
+)
+
+result = chain.run(text="여기에 샘플 코드...")
+</pre>
+<hr>
+
+<h2>7.10 LlamaIndex 통합</h2>
+
+<h3>LlamaIndex용 WIA LLM</h3>
+<pre>
+from llama_index.llms import CustomLLM
+from wia_llm import WIAClient
+
+class WIALlamaIndex(CustomLLM):
+    """LlamaIndex용 WIA LLM 제공자"""
+
+    def __init__(self, wia_endpoint: str, did: str):
+        self.client = WIAClient(wia_endpoint)
+        self.did = did
+
+    def complete(self, prompt: str) -> str:
+        response = self.client.query(self.did, prompt)
+        return response.content
+
+    def stream_complete(self, prompt: str):
+        for chunk in self.client.stream_query(self.did, prompt):
+            yield chunk
+
+# RAG와 함께 사용
+from llama_index import VectorStoreIndex, SimpleDirectoryReader
+
+llm = WIALlamaIndex(
+    wia_endpoint="https://api.wia.org/v1/llm",
+    did="did:wia:llm:openai:gpt-4"
+)
+
+documents = SimpleDirectoryReader("./data").load_data()
+index = VectorStoreIndex.from_documents(documents, llm=llm)
+query_engine = index.as_query_engine()
+
+response = query_engine.query("이것은 무엇에 관한 것인가요?")
+</pre>
+<hr>
+
+<h2>7.11 SDK 예시</h2>
+
+<h3>TypeScript SDK</h3>
+<pre>
+import { WIAClient, Federation, Message } from '@wia/llm-sdk';
+
+// 클라이언트 초기화
+const client = new WIAClient({
+    endpoint: 'https://api.wia.org/v1/llm',
+    auth: { did: 'did:wia:llm:my-service', privateKey: '...' }
+});
+
+// 능력 등록
+await client.capability.register({
+    level: 3,
+    domains: [{ code: 'CODE', proficiency: 0.9 }]
+});
+
+// 능력 쿼리
+const matches = await client.capability.query({
+    domains: ['CODE', 'ANALYSIS'],
+    minLevel: 2
+});
+
+// 메시지 전송
+const response = await client.message.send({
+    to: 'did:wia:llm:openai:gpt-4',
+    content: '이 코드를 분석해주세요...'
+});
+
+// 연합 생성
+const federation = await client.federation.create({
+    name: '보안 팀',
+    topology: 'STAR',
+    consensus: { algorithm: 'WEIGHTED' }
+});
+
+// 작업 제출
+const task = await federation.submitTask({
+    description: '보안 감사',
+    decomposition: { strategy: 'HIERARCHICAL' }
+});
+</pre>
+
+<h3>Python SDK</h3>
+<pre>
+from wia_llm import WIAClient, Federation
+
+# 클라이언트 초기화
+client = WIAClient(
+    endpoint="https://api.wia.org/v1/llm",
+    did="did:wia:llm:my-service",
+    private_key="..."
+)
+
+# 능력 쿼리
+matches = client.capability.query(
+    domains=["CODE", "ANALYSIS"],
+    min_level=3
+)
+
+# 스트리밍으로 메시지 전송
+async for chunk in client.message.stream(
+    to="did:wia:llm:anthropic:claude-3-opus",
+    content="양자 컴퓨팅을 설명해주세요"
+):
+    print(chunk, end="")
+
+# 연합 생성 및 사용
+federation = client.federation.create(
+    name="연구 팀",
+    topology="MESH",
+    members=["did:wia:llm:openai:gpt-4", "did:wia:llm:anthropic:claude-3-opus"]
+)
+
+result = await federation.submit_task(
+    description="최근 AI 연구 요약",
+    consensus="DEBATE"
+)
+</pre>
+<hr>
+
+<h2>7.12 장 요약</h2>
+<ul>
+<li>[OK] OpenAI, Anthropic, Google, 로컬 모델용 제공자 어댑터</li>
+<li>[OK] 클라우드 배포 옵션: AWS Lambda, Azure, GCP, Kubernetes</li>
+<li>[OK] 프레임워크 통합: LangChain, LlamaIndex</li>
+<li>[OK] 다중 언어 SDK: TypeScript, Python, Rust</li>
+<li>[OK] 바로 사용 가능한 구성 템플릿</li>
+</ul>
+<hr>
+
+<p><a href="chapter-06.html">&lt;&lt; 이전: 제6장 - 프로토콜 명세</a></p>
+<p><a href="chapter-08.html">다음: 제8장 - 활용 사례와 모범 사례 &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] 목차</a> | 제7장 / 8장</p>
+</body>
+</html>

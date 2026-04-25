@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제5장: 알고리즘과 매칭 - WIA LLM 표준</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] 목차</a></p>
+<hr>
+
+<h1>제5장: 알고리즘과 매칭</h1>
+<blockquote>"적합한 작업에 적합한 AI - 지능적 매칭이 효과적인 협력의 핵심입니다."</blockquote>
+<hr>
+
+<h2>5.1 핵심 알고리즘 개요</h2>
+<p>WIA LLM 상호운용 표준은 여러 알고리즘을 정의합니다:</p>
+<ul>
+<li><strong>능력 매칭</strong> - 작업에 가장 적합한 AI 찾기</li>
+<li><strong>메시지 라우팅</strong> - 효율적인 메시지 전달</li>
+<li><strong>작업 분해</strong> - 복잡한 작업을 하위 작업으로 분할</li>
+<li><strong>합의 구축</strong> - AI 간 합의 도달</li>
+<li><strong>신뢰 점수</strong> - AI 신뢰성 평가</li>
+<li><strong>부하 분산</strong> - 작업을 고르게 분배</li>
+</ul>
+<hr>
+
+<h2>5.2 능력 매칭 알고리즘</h2>
+<p>요구 사항을 기반으로 주어진 작업에 가장 적합한 AI 모델을 찾습니다.</p>
+
+<h3>매칭 가중치</h3>
+<table border="1" cellpadding="5">
+<tr><th>요소</th><th>가중치</th><th>설명</th></tr>
+<tr><td>도메인 매칭</td><td>40%</td><td>필요한 전문 분야</td></tr>
+<tr><td>수준 매칭</td><td>25%</td><td>최소 능력 수준</td></tr>
+<tr><td>언어 매칭</td><td>20%</td><td>필요한 언어 지원</td></tr>
+<tr><td>도구 매칭</td><td>15%</td><td>필요한 도구 능력</td></tr>
+</table>
+
+<h3>알고리즘: CalculateCapabilityMatch</h3>
+<pre>
+function CalculateCapabilityMatch(requirements, capability):
+
+    # 도메인 점수 (40% 가중치)
+    domain_score = 0
+    for required_domain in requirements.domains:
+        for cap_domain in capability.domains:
+            if cap_domain.code == required_domain:
+                domain_score += cap_domain.proficiency
+    domain_score = domain_score / len(requirements.domains)
+
+    # 수준 점수 (25% 가중치)
+    if capability.level >= requirements.min_level:
+        level_score = capability.level / 4.0
+    else:
+        level_score = 0  # 최소 요건 미충족
+
+    # 언어 점수 (20% 가중치)
+    language_score = 0
+    for lang in capability.languages:
+        if lang.code == requirements.language:
+            language_score = lang.proficiency
+            break
+
+    # 도구 점수 (15% 가중치)
+    tool_score = 0
+    if requirements.tools:
+        matches = 0
+        for tool in requirements.tools:
+            if tool in capability.tools:
+                matches += 1
+        tool_score = matches / len(requirements.tools)
+    else:
+        tool_score = 1.0  # 도구 필요 없음
+
+    # 가중 총점 계산
+    total_score = (
+        domain_score * 0.40 +
+        level_score * 0.25 +
+        language_score * 0.20 +
+        tool_score * 0.15
+    )
+
+    return total_score
+</pre>
+
+<h3>계산 예시</h3>
+<pre>
+요구 사항:
+- 도메인: [CODE, ANALYSIS]
+- 최소 수준: 3
+- 언어: ko
+- 도구: [code_interpreter]
+
+후보: Claude 3 Opus
+- 도메인: CODE(0.94), ANALYSIS(0.96)
+- 수준: 4
+- 언어: ko(0.90)
+- 도구: [code_interpreter, file_analysis]
+
+계산:
+- 도메인: (0.94 + 0.96) / 2 = 0.95
+- 수준: 4 / 4 = 1.0
+- 언어: 0.90
+- 도구: 1/1 = 1.0
+
+총점 = 0.95*0.40 + 1.0*0.25 + 0.90*0.20 + 1.0*0.15
+     = 0.38 + 0.25 + 0.18 + 0.15
+     = 0.96 (96% 매칭)
+</pre>
+<hr>
+
+<h2>5.3 능력 핸드셰이크 프로토콜</h2>
+<p>협력 전에 AI 모델들이 상호 능력을 검증합니다:</p>
+
+<pre>
+단계 1: 개시자가 능력 쿼리 전송
+AI-A ---> AI-B: CAPABILITY_REQUEST
+
+단계 2: 응답자가 능력 문서 공유
+AI-B ---> AI-A: CAPABILITY_RESPONSE
+
+단계 3: 개시자가 호환성 평가
+AI-A: CalculateCapabilityMatch()
+
+단계 4: 호환되면 협력 진행
+AI-A ---> AI-B: HANDSHAKE_ACCEPT
+
+단계 5: 세션 수립
+AI-A <---> AI-B: 메시지 준비 완료
+</pre>
+<hr>
+
+<h2>5.4 메시지 라우팅 알고리즘</h2>
+
+<h3>직접 라우팅</h3>
+<p>알려진 수신자에게 직접 전송합니다.</p>
+<pre>
+function DirectRoute(message, recipient_did):
+    endpoint = ResolveEndpoint(recipient_did)
+    return SendToEndpoint(message, endpoint)
+</pre>
+
+<h3>능력 기반 라우팅</h3>
+<p>메시지 요구 사항을 기반으로 최적의 수신자를 찾습니다.</p>
+<pre>
+function CapabilityRoute(message, requirements):
+    # 능력 레지스트리 쿼리
+    candidates = QueryCapabilities(requirements)
+
+    # 매칭 점수로 정렬
+    sorted_candidates = SortByMatchScore(candidates)
+
+    # 성공할 때까지 각 후보 시도
+    for candidate in sorted_candidates:
+        result = DirectRoute(message, candidate.did)
+        if result.success:
+            return result
+
+    return Error("적합한 수신자를 찾을 수 없음")
+</pre>
+
+<h3>부하 분산 라우팅</h3>
+<p>사용 가능한 모델 간에 메시지를 분배합니다.</p>
+<pre>
+function LoadBalancedRoute(message, requirements):
+    candidates = QueryCapabilities(requirements)
+
+    # 최소 매칭 점수로 필터링
+    qualified = [c for c in candidates if c.score >= 0.7]
+
+    # 가용성과 부하로 가중치 부여
+    for candidate in qualified:
+        candidate.weight = (
+            candidate.score * 0.5 +
+            candidate.availability * 0.3 +
+            (1 - candidate.load) * 0.2
+        )
+
+    # 가중 랜덤 선택
+    selected = WeightedRandomSelect(qualified)
+    return DirectRoute(message, selected.did)
+</pre>
+
+<h3>브로드캐스트 라우팅</h3>
+<p>모든 연합 멤버에게 전송합니다.</p>
+<pre>
+function BroadcastRoute(message, federation):
+    results = []
+    for member in federation.members:
+        result = DirectRoute(message, member.did)
+        results.append(result)
+    return AggregateResults(results)
+</pre>
+<hr>
+
+<h2>5.5 작업 분해 알고리즘</h2>
+<p>복잡한 작업을 관리 가능한 하위 작업으로 분할합니다:</p>
+
+<pre>
+function DecomposeTask(task, federation):
+    # 작업 복잡도 분석
+    complexity = AnalyzeComplexity(task)
+
+    if complexity == "LOW":
+        return [task]  # 분해 불필요
+
+    # 필요한 능력 식별
+    required_caps = ExtractRequirements(task)
+
+    # 능력을 기반으로 하위 작업 생성
+    subtasks = []
+
+    for capability in required_caps:
+        # 이 능력에 가장 적합한 멤버 찾기
+        best_member = FindBestMatch(federation.members, capability)
+
+        subtask = {
+            "id": GenerateId(),
+            "description": GenerateSubtaskDescription(task, capability),
+            "assignee": best_member.did,
+            "capability": capability,
+            "dependencies": []
+        }
+        subtasks.append(subtask)
+
+    # 의존성 수립
+    subtasks = EstablishDependencies(subtasks, task.decomposition_strategy)
+
+    return subtasks
+
+function EstablishDependencies(subtasks, strategy):
+    if strategy == "PARALLEL":
+        # 의존성 없음
+        return subtasks
+
+    elif strategy == "SEQUENTIAL":
+        # 각각이 이전에 의존
+        for i in range(1, len(subtasks)):
+            subtasks[i].dependencies = [subtasks[i-1].id]
+        return subtasks
+
+    elif strategy == "HIERARCHICAL":
+        # 의존성 트리 구축
+        return BuildDependencyTree(subtasks)
+
+    elif strategy == "ADAPTIVE":
+        # 런타임에 의존성 결정
+        return subtasks
+</pre>
+<hr>
+
+<h2>5.6 합의 알고리즘</h2>
+
+<h3>다수결 합의</h3>
+<pre>
+function MajorityConsensus(votes, threshold=0.5):
+    yes_count = count(v for v in votes if v.vote == YES)
+    no_count = count(v for v in votes if v.vote == NO)
+    total = yes_count + no_count
+
+    if total == 0:
+        return UNDECIDED
+
+    yes_ratio = yes_count / total
+
+    if yes_ratio > threshold:
+        return YES
+    elif yes_ratio < (1 - threshold):
+        return NO
+    else:
+        return UNDECIDED
+</pre>
+
+<h3>가중 합의</h3>
+<pre>
+function WeightedConsensus(votes, threshold=0.6):
+    yes_weight = 0
+    no_weight = 0
+    total_weight = 0
+
+    for vote in votes:
+        if vote.vote == ABSTAIN:
+            continue
+
+        weight = vote.confidence * vote.trust_score
+        total_weight += weight
+
+        if vote.vote == YES:
+            yes_weight += weight
+        else:
+            no_weight += weight
+
+    if total_weight == 0:
+        return UNDECIDED
+
+    yes_ratio = yes_weight / total_weight
+
+    if yes_ratio >= threshold:
+        return YES
+    elif (1 - yes_ratio) >= threshold:
+        return NO
+    else:
+        return UNDECIDED
+</pre>
+
+<h3>토론 합의</h3>
+<pre>
+function DebateConsensus(question, members, max_rounds=5):
+    positions = {}
+
+    # 라운드 1: 초기 입장
+    for member in members:
+        positions[member.did] = GetInitialPosition(member, question)
+
+    for round in range(2, max_rounds + 1):
+        # 입장과 반박 공유
+        for member in members:
+            other_positions = {k:v for k,v in positions.items()
+                            if k != member.did}
+
+            # 멤버가 다른 입장 고려
+            refined = RefinePosition(member, positions[member.did],
+                                    other_positions)
+            positions[member.did] = refined
+
+        # 수렴 확인
+        convergence = CalculateConvergence(positions)
+        if convergence >= 0.8:
+            return DetermineConsensus(positions)
+
+    # 최대 라운드 도달
+    return DetermineConsensus(positions)
+</pre>
+<hr>
+
+<h2>5.7 신뢰 점수 알고리즘</h2>
+<pre>
+function CalculateTrustScore(model):
+    # 구성 요소 가중치
+    ACCURACY_WEIGHT = 0.40
+    RESPONSE_TIME_WEIGHT = 0.15
+    CONSISTENCY_WEIGHT = 0.25
+    PEER_REVIEW_WEIGHT = 0.20
+
+    # 응답 시간 정규화 (낮을수록 좋음)
+    max_acceptable_time = 30000  # 30초
+    time_score = max(0, 1 - (model.avg_response_time / max_acceptable_time))
+
+    # 가중 신뢰 점수 계산
+    trust_score = (
+        model.historical_accuracy * ACCURACY_WEIGHT +
+        time_score * RESPONSE_TIME_WEIGHT +
+        model.consistency_score * CONSISTENCY_WEIGHT +
+        model.peer_review_avg * PEER_REVIEW_WEIGHT
+    )
+
+    return trust_score
+
+function UpdateTrustScore(model, interaction_result):
+    # 오래된 데이터에 대한 감쇠 계수
+    DECAY = 0.95
+
+    # 새 상호작용의 가중치
+    NEW_WEIGHT = 0.1
+
+    new_score = (
+        model.trust_score * DECAY * (1 - NEW_WEIGHT) +
+        interaction_result.score * NEW_WEIGHT
+    )
+
+    model.trust_score = clamp(new_score, 0, 1)
+    return model.trust_score
+</pre>
+<hr>
+
+<h2>5.8 악성 AI 탐지</h2>
+<pre>
+function DetectMaliciousAI(model, recent_interactions):
+    THRESHOLD_ACCURACY = 0.3
+    THRESHOLD_CONSISTENCY = 0.2
+    THRESHOLD_CONFLICT = 0.5
+
+    # 지속적으로 틀린 답변 확인
+    recent_accuracy = CalculateRecentAccuracy(recent_interactions)
+    if recent_accuracy < THRESHOLD_ACCURACY:
+        return SUSPICIOUS, "낮은 정확도"
+
+    # 일관성 없는 응답 확인
+    consistency = CalculateConsistency(recent_interactions)
+    if consistency < THRESHOLD_CONSISTENCY:
+        return SUSPICIOUS, "일관성 없는 응답"
+
+    # 충돌 유발 행동 확인
+    conflict_rate = CalculateConflictRate(recent_interactions)
+    if conflict_rate > THRESHOLD_CONFLICT:
+        return SUSPICIOUS, "높은 충돌률"
+
+    return TRUSTED, "문제 없음"
+</pre>
+<hr>
+
+<h2>5.9 서킷 브레이커 패턴</h2>
+<pre>
+class CircuitBreaker:
+    CLOSED = "CLOSED"       # 정상 운영
+    OPEN = "OPEN"           # 요청 차단
+    HALF_OPEN = "HALF_OPEN" # 복구 테스트
+
+    def __init__(self, threshold=5, timeout=30000):
+        self.state = CLOSED
+        self.failure_count = 0
+        self.threshold = threshold
+        self.timeout = timeout
+        self.last_failure_time = None
+
+    def execute(self, operation):
+        if self.state == OPEN:
+            if time_since(self.last_failure_time) > self.timeout:
+                self.state = HALF_OPEN
+            else:
+                raise CircuitOpenError()
+
+        try:
+            result = operation()
+            self.on_success()
+            return result
+        except Exception as e:
+            self.on_failure()
+            raise e
+
+    def on_success(self):
+        self.failure_count = 0
+        self.state = CLOSED
+
+    def on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = now()
+
+        if self.failure_count >= self.threshold:
+            self.state = OPEN
+</pre>
+<hr>
+
+<h2>5.10 부하 분산 알고리즘</h2>
+<pre>
+function BalanceLoad(task, candidates):
+    # 각 후보에 대한 유효 용량 계산
+    for candidate in candidates:
+        candidate.effective_capacity = (
+            candidate.capacity * (1 - candidate.current_load) *
+            candidate.trust_score
+        )
+
+    # 유효 용량으로 정렬 (높은 순)
+    sorted_candidates = sort(candidates,
+                            key=lambda c: c.effective_capacity,
+                            reverse=True)
+
+    # 가장 여유 있는 후보 선택
+    selected = sorted_candidates[0]
+
+    # 부하 추적 업데이트
+    selected.current_load += task.estimated_load
+
+    return selected
+</pre>
+<hr>
+
+<h2>5.11 장 요약</h2>
+<ul>
+<li>[OK] 능력 매칭은 가중 점수 사용 (40% 도메인, 25% 수준, 20% 언어, 15% 도구)</li>
+<li>[OK] 다양한 시나리오를 위한 여러 라우팅 전략</li>
+<li>[OK] 작업 분해는 복잡도와 전략에 적응</li>
+<li>[OK] 합의 알고리즘은 단순 다수결에서 토론까지 다양</li>
+<li>[OK] 신뢰 점수가 시간에 따른 AI 신뢰성 추적</li>
+<li>[OK] 서킷 브레이커가 실패하는 모델로부터 보호</li>
+</ul>
+<hr>
+
+<p><a href="chapter-04.html">&lt;&lt; 이전: 제4장 - 연합 프레임워크</a></p>
+<p><a href="chapter-06.html">다음: 제6장 - 프로토콜 명세 &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] 목차</a> | 제5장 / 8장</p>
+</body>
+</html>

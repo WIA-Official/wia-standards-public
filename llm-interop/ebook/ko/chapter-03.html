@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제3장: AI간 메시징 - WIA LLM 표준</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] 목차</a></p>
+<hr>
+
+<h1>제3장: AI간 메시징 (WIA-LLM-MESSAGE)</h1>
+<blockquote>"AI 모델들이 협력하려면, 공통의 언어로 말해야 합니다."</blockquote>
+<hr>
+
+<h2>3.1 AI 메시징의 필요성</h2>
+<p>AI 모델들이 서로의 능력을 알게 되면, 통신하는 방법이 필요합니다. WIA-LLM-MESSAGE 표준은 AI 모델들이 정보를 교환하는 방법을 정의합니다:</p>
+<ul>
+<li>다른 AI 모델에 질의 전송</li>
+<li>하위 작업 위임</li>
+<li>결과 검증 요청</li>
+<li>실시간 응답 스트리밍</li>
+<li>오류 우아하게 처리</li>
+</ul>
+<hr>
+
+<h2>3.2 메시지 봉투 구조</h2>
+<p>모든 메시지는 표준화된 봉투로 감싸집니다:</p>
+
+<pre>
+MessageEnvelope
+├── @context           # JSON-LD 컨텍스트
+├── id                 # 고유 메시지 ID
+├── type               # "MessageEnvelope"
+├── version            # 프로토콜 버전
+├── header             # 라우팅 및 메타데이터
+├── payload            # 메시지 내용
+├── routing            # 전달 지시
+└── security           # 암호화 및 서명
+</pre>
+<hr>
+
+<h2>3.3 메시지 헤더</h2>
+<p>헤더는 필수 라우팅 정보를 포함합니다:</p>
+
+<pre>
+header: {
+    from: "did:wia:llm:anthropic:claude-3-opus",
+    to: "did:wia:llm:openai:gpt-4",
+    timestamp: "2024-01-15T10:30:00Z",
+    messageType: "QUERY",
+    correlationId: "corr-abc123",
+    replyTo: "did:wia:llm:anthropic:claude-3-opus",
+    ttl: 300,
+    priority: "NORMAL"
+}
+</pre>
+
+<h3>헤더 필드</h3>
+<table border="1" cellpadding="5">
+<tr><th>필드</th><th>타입</th><th>설명</th></tr>
+<tr><td>from</td><td>DID</td><td>발신자 식별자</td></tr>
+<tr><td>to</td><td>DID</td><td>수신자 식별자</td></tr>
+<tr><td>timestamp</td><td>ISO 8601</td><td>메시지 생성 시간</td></tr>
+<tr><td>messageType</td><td>enum</td><td>메시지 유형</td></tr>
+<tr><td>correlationId</td><td>string</td><td>관련 메시지 연결</td></tr>
+<tr><td>replyTo</td><td>DID</td><td>응답 보낼 곳</td></tr>
+<tr><td>ttl</td><td>number</td><td>유효 시간(초)</td></tr>
+<tr><td>priority</td><td>enum</td><td>메시지 우선순위</td></tr>
+</table>
+<hr>
+
+<h2>3.4 메시지 유형</h2>
+<p>표준은 여러 메시지 유형을 정의합니다:</p>
+
+<table border="1" cellpadding="10">
+<tr>
+<th>유형</th>
+<th>목적</th>
+<th>예상 응답</th>
+</tr>
+<tr>
+<td>QUERY</td>
+<td>질문하거나 정보 요청</td>
+<td>RESPONSE</td>
+</tr>
+<tr>
+<td>DELEGATE</td>
+<td>다른 AI에 하위 작업 할당</td>
+<td>RESPONSE 또는 STREAM</td>
+</tr>
+<tr>
+<td>COLLABORATE</td>
+<td>작업 협력 요청</td>
+<td>ACCEPT/REJECT</td>
+</tr>
+<tr>
+<td>VERIFY</td>
+<td>결과 검증 요청</td>
+<td>VERIFICATION</td>
+</tr>
+<tr>
+<td>RESPONSE</td>
+<td>질의나 위임에 대한 응답</td>
+<td>없음 (최종)</td>
+</tr>
+<tr>
+<td>STREAM</td>
+<td>스트리밍 응답 청크</td>
+<td>더 많은 STREAM 또는 END</td>
+</tr>
+<tr>
+<td>ERROR</td>
+<td>오류 상태 보고</td>
+<td>없음 (최종)</td>
+</tr>
+</table>
+<hr>
+
+<h2>3.5 질의 페이로드</h2>
+<p>질의 메시지는 정보나 처리를 요청합니다:</p>
+
+<pre>
+{
+    "header": {
+        "from": "did:wia:llm:anthropic:claude-3-opus",
+        "to": "did:wia:llm:local:codellama-34b",
+        "messageType": "QUERY"
+    },
+    "payload": {
+        "type": "query_payload",
+        "content": "이 코드의 보안 취약점을 분석해주세요",
+        "context": {
+            "code": "function login(user, pass) { ... }",
+            "language": "javascript"
+        },
+        "parameters": {
+            "maxTokens": 2048,
+            "temperature": 0.3,
+            "responseFormat": "structured"
+        },
+        "constraints": {
+            "timeout": 30000,
+            "requiredFields": ["vulnerabilities", "severity"]
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>3.6 응답 페이로드</h2>
+<p>응답 메시지는 결과를 포함합니다:</p>
+
+<pre>
+{
+    "header": {
+        "from": "did:wia:llm:local:codellama-34b",
+        "to": "did:wia:llm:anthropic:claude-3-opus",
+        "messageType": "RESPONSE",
+        "correlationId": "corr-abc123"
+    },
+    "payload": {
+        "type": "response_payload",
+        "status": "SUCCESS",
+        "content": {
+            "vulnerabilities": [
+                {
+                    "type": "SQL_INJECTION",
+                    "severity": "HIGH",
+                    "line": 15,
+                    "description": "사용자 입력이 살균되지 않음"
+                }
+            ],
+            "summary": "1개의 고위험 취약점 발견"
+        },
+        "metadata": {
+            "processingTime": 1250,
+            "tokensUsed": 856,
+            "confidence": 0.92
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>3.7 위임 워크플로우</h2>
+<p>AI가 다른 AI에 하위 작업을 위임할 때:</p>
+
+<pre>
+단계 1: 위임하는 AI가 DELEGATE 메시지 전송
++------------------+                    +------------------+
+|   Claude 3       |  --- DELEGATE -->  |   Code Llama     |
+|   (조정자)       |                    |   (전문가)       |
++------------------+                    +------------------+
+
+단계 2: 전문가가 처리하고 응답
++------------------+                    +------------------+
+|   Claude 3       |  <-- RESPONSE ---  |   Code Llama     |
+|                  |                    |                  |
++------------------+                    +------------------+
+
+단계 3: 조정자가 결과로 계속 진행
+</pre>
+
+<h3>위임 메시지 예시</h3>
+<pre>
+{
+    "header": {
+        "messageType": "DELEGATE"
+    },
+    "payload": {
+        "type": "delegate_payload",
+        "task": "Python 코드의 타입 오류 분석",
+        "input": {
+            "code": "...",
+            "requirements": ["mypy", "strict"]
+        },
+        "expectedOutput": {
+            "format": "json",
+            "schema": "TypeErrorReport"
+        },
+        "deadline": "2024-01-15T10:35:00Z"
+    }
+}
+</pre>
+<hr>
+
+<h2>3.8 스트리밍 응답</h2>
+<p>긴 응답의 경우, 스트리밍이 콘텐츠를 점진적으로 전달합니다:</p>
+
+<pre>
+스트림 메시지 1:
+{
+    "header": { "messageType": "STREAM" },
+    "payload": {
+        "sequenceNumber": 1,
+        "chunk": "분석 결과 ",
+        "done": false
+    }
+}
+
+스트림 메시지 2:
+{
+    "header": { "messageType": "STREAM" },
+    "payload": {
+        "sequenceNumber": 2,
+        "chunk": "여러 보안 문제가 발견되었습니다...",
+        "done": false
+    }
+}
+
+스트림 메시지 3 (최종):
+{
+    "header": { "messageType": "STREAM" },
+    "payload": {
+        "sequenceNumber": 3,
+        "chunk": "",
+        "done": true,
+        "totalTokens": 1523
+    }
+}
+</pre>
+<hr>
+
+<h2>3.9 오류 처리</h2>
+<p>오류 발생 시, ERROR 메시지 유형을 사용합니다:</p>
+
+<pre>
+{
+    "header": {
+        "messageType": "ERROR",
+        "correlationId": "corr-abc123"
+    },
+    "payload": {
+        "type": "error_payload",
+        "code": "CAPABILITY_MISMATCH",
+        "message": "작업에 MEDICAL 도메인 전문성이 필요합니다",
+        "details": {
+            "required": ["MEDICAL"],
+            "available": ["CODE", "MATH"]
+        },
+        "recoverable": true,
+        "suggestion": "MEDICAL 능력이 있는 모델로 라우팅"
+    }
+}
+</pre>
+
+<h3>표준 오류 코드</h3>
+<table border="1" cellpadding="5">
+<tr><th>코드</th><th>설명</th><th>복구 가능</th></tr>
+<tr><td>CAPABILITY_MISMATCH</td><td>모델에 필요한 능력 없음</td><td>예</td></tr>
+<tr><td>RATE_LIMITED</td><td>너무 많은 요청</td><td>예</td></tr>
+<tr><td>CONTEXT_OVERFLOW</td><td>입력이 컨텍스트 윈도우 초과</td><td>예</td></tr>
+<tr><td>TIMEOUT</td><td>처리 시간 초과</td><td>예</td></tr>
+<tr><td>CONTENT_POLICY</td><td>요청이 콘텐츠 정책 위반</td><td>아니오</td></tr>
+<tr><td>AUTHENTICATION_FAILED</td><td>잘못된 자격 증명</td><td>예</td></tr>
+<tr><td>INTERNAL_ERROR</td><td>예기치 않은 오류</td><td>아마도</td></tr>
+</table>
+<hr>
+
+<h2>3.10 메시지 라우팅</h2>
+<p>메시지는 라우팅 지시를 포함합니다:</p>
+
+<pre>
+routing: {
+    strategy: "CAPABILITY_BASED",
+    hops: [],
+    maxHops: 3,
+    fallback: {
+        strategy: "BROADCAST",
+        scope: "FEDERATION"
+    }
+}
+</pre>
+
+<h3>라우팅 전략</h3>
+<table border="1" cellpadding="5">
+<tr><th>전략</th><th>설명</th></tr>
+<tr><td>DIRECT</td><td>지정된 수신자에게 직접 전송</td></tr>
+<tr><td>CAPABILITY_BASED</td><td>능력 매칭 기반 라우팅</td></tr>
+<tr><td>LOAD_BALANCED</td><td>사용 가능한 모델에 분배</td></tr>
+<tr><td>BROADCAST</td><td>모든 연합 멤버에게 전송</td></tr>
+</table>
+<hr>
+
+<h2>3.11 보안</h2>
+<p>모든 메시지는 보안 정보를 포함합니다:</p>
+
+<pre>
+security: {
+    encrypted: true,
+    algorithm: "AES-256-GCM",
+    keyId: "key-2024-01",
+    signature: {
+        algorithm: "Ed25519",
+        value: "wia-sig:abc123...",
+        publicKey: "did:wia:llm:anthropic:claude-3-opus#key-1"
+    },
+    nonce: "unique-nonce-value"
+}
+</pre>
+<hr>
+
+<h2>3.12 완전한 메시지 예시</h2>
+<pre>
+{
+    "@context": "https://wia.org/contexts/llm-message/v1",
+    "id": "msg:2024-01-15:abc123",
+    "type": "MessageEnvelope",
+    "version": "1.0.0",
+
+    "header": {
+        "from": "did:wia:llm:anthropic:claude-3-opus",
+        "to": "did:wia:llm:openai:gpt-4",
+        "timestamp": "2024-01-15T10:30:00Z",
+        "messageType": "QUERY",
+        "correlationId": "corr-xyz789",
+        "ttl": 300,
+        "priority": "NORMAL"
+    },
+
+    "payload": {
+        "type": "query_payload",
+        "content": "양자 컴퓨팅의 최신 발전은 무엇인가요?",
+        "parameters": {
+            "maxTokens": 2048,
+            "temperature": 0.7
+        }
+    },
+
+    "routing": {
+        "strategy": "DIRECT",
+        "maxHops": 1
+    },
+
+    "security": {
+        "encrypted": true,
+        "algorithm": "AES-256-GCM",
+        "signature": "wia-sig:abc123..."
+    }
+}
+</pre>
+<hr>
+
+<h2>3.13 장 요약</h2>
+<ul>
+<li>[OK] 메시지 봉투가 AI간 통신 표준화</li>
+<li>[OK] 다양한 목적을 위한 여러 메시지 유형</li>
+<li>[OK] 긴 응답을 위한 스트리밍 지원</li>
+<li>[OK] 복구 제안이 있는 강력한 오류 처리</li>
+<li>[OK] 유연한 라우팅 전략</li>
+<li>[OK] 암호화와 서명을 포함한 내장 보안</li>
+</ul>
+<hr>
+
+<p><a href="chapter-02.html">&lt;&lt; 이전: 제2장 - 능력 선언</a></p>
+<p><a href="chapter-04.html">다음: 제4장 - 연합 프레임워크 (WIA-LLM-FEDERATION) &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] 목차</a> | 제3장 / 8장</p>
+</body>
+</html>

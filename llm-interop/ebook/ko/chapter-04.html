@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제4장: 연합 프레임워크 - WIA LLM 표준</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] 목차</a></p>
+<hr>
+
+<h1>제4장: 연합 프레임워크 (WIA-LLM-FEDERATION)</h1>
+<blockquote>"전체는 부분의 합보다 크다 - 이것이 AI 연합의 힘입니다."</blockquote>
+<hr>
+
+<h2>4.1 AI 연합이란?</h2>
+<p>연합은 복잡한 작업을 해결하기 위해 협력하는 AI 모델 그룹입니다. WIA-LLM-FEDERATION 표준은 다음 방법을 정의합니다:</p>
+<ul>
+<li>다양한 토폴로지로 연합 생성</li>
+<li>동적으로 멤버 추가 및 제거</li>
+<li>복잡한 작업 제출 및 분해</li>
+<li>결과에 대한 합의 도달</li>
+<li>신뢰와 거버넌스 관리</li>
+</ul>
+<hr>
+
+<h2>4.2 연합 문서 구조</h2>
+<pre>
+FederationDocument
+├── @context           # JSON-LD 컨텍스트
+├── id                 # 연합 식별자
+├── type               # "FederationDocument"
+├── name               # 사람이 읽을 수 있는 이름
+├── description        # 목적 설명
+├── topology           # 협력 구조
+├── consensus          # 의사결정 규칙
+├── members            # 참여 AI 모델
+├── governance         # 관리 규칙
+└── status             # 현재 상태
+</pre>
+<hr>
+
+<h2>4.3 연합 토폴로지</h2>
+<p>네 가지 토폴로지가 멤버들의 상호작용 방식을 정의합니다:</p>
+
+<h3>STAR 토폴로지</h3>
+<pre>
+         +--------+
+         |  GPT-4 |  (조정자)
+         +--------+
+        /    |    \
+       /     |     \
++-------+ +-------+ +-------+
+|Claude | |Gemini | |CodeLM |
++-------+ +-------+ +-------+
+</pre>
+<p><strong>사용 사례:</strong> 작업 위임, 중앙 집중식 조정</p>
+<p>한 명의 조정자가 다른 모든 멤버를 조정합니다.</p>
+
+<h3>MESH 토폴로지</h3>
+<pre>
++-------+----+-------+
+|Claude |<-->| GPT-4 |
++-------+    +-------+
+   ^  \      /  ^
+   |   \    /   |
+   v    v  v    v
++-------+    +-------+
+|Gemini |<-->|CodeLM |
++-------+    +-------+
+</pre>
+<p><strong>사용 사례:</strong> 협력적 분석, 피어 리뷰</p>
+<p>모든 멤버가 서로 직접 통신할 수 있습니다.</p>
+
+<h3>HIERARCHICAL 토폴로지</h3>
+<pre>
+           +--------+
+           |  GPT-4 |  (루트)
+           +--------+
+          /          \
+    +-------+    +-------+
+    |Claude |    |Gemini |  (관리자)
+    +-------+    +-------+
+    /      \          |
++----+  +----+    +------+
+|CM-1|  |CM-2|    |GM-1  |  (작업자)
++----+  +----+    +------+
+</pre>
+<p><strong>사용 사례:</strong> 복잡한 분해, 대규모 작업</p>
+<p>여러 수준의 조정이 있는 트리 구조.</p>
+
+<h3>RING 토폴로지</h3>
+<pre>
++-------+     +-------+
+|Claude | --> | GPT-4 |
++-------+     +-------+
+    ^             |
+    |             v
++-------+     +-------+
+|CodeLM | <-- |Gemini |
++-------+     +-------+
+</pre>
+<p><strong>사용 사례:</strong> 순차적 처리, 파이프라인 워크플로우</p>
+<p>각 멤버가 처리하고 다음으로 전달합니다.</p>
+<hr>
+
+<h2>4.4 연합 토폴로지 비교</h2>
+<table border="1" cellpadding="10">
+<tr>
+<th>토폴로지</th>
+<th>조정</th>
+<th>지연 시간</th>
+<th>장애 허용</th>
+<th>적합한 용도</th>
+</tr>
+<tr>
+<td>STAR</td>
+<td>중앙 집중</td>
+<td>낮음</td>
+<td>낮음</td>
+<td>작업 위임</td>
+</tr>
+<tr>
+<td>MESH</td>
+<td>분산</td>
+<td>중간</td>
+<td>높음</td>
+<td>협력</td>
+</tr>
+<tr>
+<td>HIERARCHICAL</td>
+<td>다중 레벨</td>
+<td>중간</td>
+<td>중간</td>
+<td>복잡한 작업</td>
+</tr>
+<tr>
+<td>RING</td>
+<td>순차적</td>
+<td>높음</td>
+<td>낮음</td>
+<td>파이프라인</td>
+</tr>
+</table>
+<hr>
+
+<h2>4.5 연합 멤버</h2>
+<p>각 멤버는 정의된 역할과 속성을 가집니다:</p>
+
+<pre>
+members: [
+    {
+        did: "did:wia:llm:openai:gpt-4",
+        name: "GPT-4",
+        role: "ORCHESTRATOR",
+        joinedAt: "2024-01-15T10:00:00Z",
+        trustScore: 0.95,
+        status: "ACTIVE",
+        capabilities: ["reasoning", "analysis"]
+    },
+    {
+        did: "did:wia:llm:anthropic:claude-3-opus",
+        name: "Claude 3 Opus",
+        role: "PARTICIPANT",
+        joinedAt: "2024-01-15T10:01:00Z",
+        trustScore: 0.93,
+        status: "ACTIVE",
+        capabilities: ["analysis", "creative"]
+    },
+    {
+        did: "did:wia:llm:local:codellama-34b",
+        name: "Code Llama",
+        role: "SPECIALIST",
+        joinedAt: "2024-01-15T10:02:00Z",
+        trustScore: 0.90,
+        status: "ACTIVE",
+        capabilities: ["code"]
+    }
+]
+</pre>
+
+<h3>멤버 역할</h3>
+<table border="1" cellpadding="5">
+<tr><th>역할</th><th>설명</th><th>책임</th></tr>
+<tr><td>ORCHESTRATOR</td><td>중앙 조정자</td><td>작업 분배, 결과 집계</td></tr>
+<tr><td>PARTICIPANT</td><td>일반 멤버</td><td>할당된 작업 처리</td></tr>
+<tr><td>SPECIALIST</td><td>도메인 전문가</td><td>특화된 하위 작업 처리</td></tr>
+<tr><td>OBSERVER</td><td>읽기 전용 멤버</td><td>참여 없이 모니터링</td></tr>
+</table>
+<hr>
+
+<h2>4.6 합의 메커니즘</h2>
+<p>연합은 합의를 사용하여 결정에 도달합니다:</p>
+
+<h3>다수결 합의</h3>
+<p>다수가 이기는 단순 투표.</p>
+<pre>
+consensus: {
+    algorithm: "MAJORITY",
+    threshold: 0.5,
+    timeout: 30000
+}
+
+예시:
+- GPT-4: 예
+- Claude: 예
+- Code Llama: 아니오
+결과: 예 (2/3 = 66.7% > 50%)
+</pre>
+
+<h3>가중 합의</h3>
+<p>신뢰 점수와 신뢰도로 가중된 투표.</p>
+<pre>
+consensus: {
+    algorithm: "WEIGHTED",
+    threshold: 0.6,
+    weights: {
+        trustScore: 0.5,
+        confidence: 0.5
+    }
+}
+
+예시:
+- GPT-4: 예 (신뢰: 0.95, 확신: 0.90) = 0.855
+- Claude: 예 (신뢰: 0.93, 확신: 0.85) = 0.790
+- Code Llama: 아니오 (신뢰: 0.90, 확신: 0.95) = 0.855
+가중 예: 1.645, 가중 아니오: 0.855
+결과: 예 (65.8% > 60%)
+</pre>
+
+<h3>토론 합의</h3>
+<p>모델들이 합의에 도달할 때까지 토론하고 개선합니다.</p>
+<pre>
+consensus: {
+    algorithm: "DEBATE",
+    maxRounds: 5,
+    convergenceThreshold: 0.8
+}
+
+라운드 1: 초기 입장 진술
+라운드 2: 반박 제시
+라운드 3: 입장 개선
+라운드 4: 합의 도달 (85% 수렴)
+</pre>
+
+<h3>RAFT 합의</h3>
+<p>선거를 통한 리더 기반 합의.</p>
+<pre>
+consensus: {
+    algorithm: "RAFT",
+    electionTimeout: 5000,
+    heartbeatInterval: 1000
+}
+
+1. 멤버 간 리더 선출
+2. 리더가 결정 제안
+3. 팔로워가 확인
+4. 다수 확인 시 결정 확정
+</pre>
+<hr>
+
+<h2>4.7 작업 문서</h2>
+<p>연합에 제출되는 작업은 구조화됩니다:</p>
+
+<pre>
+{
+    "@context": "https://wia.org/contexts/llm-task/v1",
+    "id": "task:2024-01-15:xyz789",
+    "type": "TaskDocument",
+    "version": "1.0.0",
+
+    "federationId": "fed:security-audit-team",
+    "submitter": "did:wia:user:alice",
+
+    "description": "웹 애플리케이션 종합 보안 감사",
+    "priority": "HIGH",
+
+    "decomposition": {
+        "strategy": "HIERARCHICAL",
+        "complexity": "HIGH"
+    },
+
+    "subtasks": [
+        {
+            "id": "subtask-1",
+            "description": "정적 코드 분석",
+            "assignee": "did:wia:llm:local:codellama-34b",
+            "status": "PENDING",
+            "dependencies": []
+        },
+        {
+            "id": "subtask-2",
+            "description": "취약점 분류",
+            "assignee": "did:wia:llm:openai:gpt-4",
+            "status": "PENDING",
+            "dependencies": ["subtask-1"]
+        },
+        {
+            "id": "subtask-3",
+            "description": "수정 권장사항",
+            "assignee": "did:wia:llm:anthropic:claude-3-opus",
+            "status": "PENDING",
+            "dependencies": ["subtask-2"]
+        }
+    ],
+
+    "workflow": {
+        "currentPhase": "DECOMPOSITION",
+        "phases": ["DECOMPOSITION", "ASSIGNMENT", "EXECUTION", "AGGREGATION", "COMPLETION"]
+    }
+}
+</pre>
+<hr>
+
+<h2>4.8 작업 분해 전략</h2>
+<table border="1" cellpadding="10">
+<tr>
+<th>전략</th>
+<th>설명</th>
+<th>사용 사례</th>
+</tr>
+<tr>
+<td>PARALLEL</td>
+<td>모든 하위 작업이 동시에 실행</td>
+<td>독립적인 분석</td>
+</tr>
+<tr>
+<td>SEQUENTIAL</td>
+<td>하위 작업이 순차적으로 실행</td>
+<td>의존적인 처리</td>
+</tr>
+<tr>
+<td>HIERARCHICAL</td>
+<td>트리 구조 분해</td>
+<td>복잡한 다중 레벨 작업</td>
+</tr>
+<tr>
+<td>ADAPTIVE</td>
+<td>결과에 따라 동적으로 결정</td>
+<td>탐색적 작업</td>
+</tr>
+</table>
+<hr>
+
+<h2>4.9 연합 거버넌스</h2>
+<p>연합 관리 규칙:</p>
+
+<pre>
+governance: {
+    creator: "did:wia:llm:openai:gpt-4",
+    createdAt: "2024-01-15T10:00:00Z",
+
+    membership: {
+        minMembers: 2,
+        maxMembers: 10,
+        allowDynamicJoin: true,
+        approvalRequired: false,
+        minTrustScore: 0.7
+    },
+
+    voting: {
+        quorum: 0.6,
+        abstainAllowed: true
+    },
+
+    termination: {
+        autoDissolve: true,
+        inactivityTimeout: 86400
+    }
+}
+</pre>
+<hr>
+
+<h2>4.10 연합 수명 주기</h2>
+<pre>
+1. 생성
+   +---> 연합 문서 생성
+   +---> 초기 멤버 참여
+
+2. 활성
+   +---> 작업 제출 및 처리
+   +---> 멤버들이 협력
+   +---> 결과에 대한 합의 도달
+
+3. 일시 중지 (선택)
+   +---> 일시적으로 비활성
+   +---> 재개 가능
+
+4. 해산
+   +---> 연합 종료
+   +---> 리소스 해제
+</pre>
+<hr>
+
+<h2>4.11 완전한 연합 예시</h2>
+<pre>
+{
+    "@context": "https://wia.org/contexts/llm-federation/v1",
+    "id": "fed:security-audit-2024",
+    "type": "FederationDocument",
+    "version": "1.0.0",
+
+    "name": "보안 감사 팀",
+    "description": "종합 보안 분석을 위한 AI 연합",
+
+    "topology": "STAR",
+
+    "consensus": {
+        "algorithm": "WEIGHTED",
+        "threshold": 0.6,
+        "timeout": 30000
+    },
+
+    "members": [
+        {
+            "did": "did:wia:llm:anthropic:claude-3-opus",
+            "name": "Claude 3 Opus",
+            "role": "ORCHESTRATOR",
+            "trustScore": 0.95,
+            "status": "ACTIVE"
+        },
+        {
+            "did": "did:wia:llm:openai:gpt-4",
+            "name": "GPT-4",
+            "role": "PARTICIPANT",
+            "trustScore": 0.94,
+            "status": "ACTIVE"
+        },
+        {
+            "did": "did:wia:llm:local:codellama-34b",
+            "name": "Code Llama",
+            "role": "SPECIALIST",
+            "trustScore": 0.90,
+            "status": "ACTIVE"
+        }
+    ],
+
+    "governance": {
+        "creator": "did:wia:llm:anthropic:claude-3-opus",
+        "minMembers": 2,
+        "maxMembers": 10,
+        "allowDynamicJoin": true
+    },
+
+    "status": "ACTIVE",
+    "createdAt": "2024-01-15T10:00:00Z"
+}
+</pre>
+<hr>
+
+<h2>4.12 장 요약</h2>
+<ul>
+<li>[OK] 연합이 다중 AI 협력 가능하게 함</li>
+<li>[OK] 네 가지 토폴로지: Star, Mesh, Hierarchical, Ring</li>
+<li>[OK] 멤버들은 정의된 역할과 신뢰 점수를 가짐</li>
+<li>[OK] 여러 합의 알고리즘 사용 가능</li>
+<li>[OK] 작업은 관리 가능한 하위 작업으로 분해됨</li>
+<li>[OK] 거버넌스 규칙이 연합 수명 주기 관리</li>
+</ul>
+<hr>
+
+<p><a href="chapter-03.html">&lt;&lt; 이전: 제3장 - AI간 메시징</a></p>
+<p><a href="chapter-05.html">다음: 제5장 - 알고리즘과 매칭 &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] 목차</a> | 제4장 / 8장</p>
+</body>
+</html>

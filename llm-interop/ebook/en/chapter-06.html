@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 6: Protocol Specifications - WIA LLM Standard</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] Table of Contents</a></p>
+<hr>
+
+<h1>Chapter 6: Protocol Specifications</h1>
+<blockquote>"A protocol is a promise - the foundation of trust between systems."</blockquote>
+<hr>
+
+<h2>6.1 Protocol Overview</h2>
+<p>The WIA LLM Interoperability Standard supports three transport protocols:</p>
+
+<table border="1" cellpadding="10">
+<tr>
+<th>Protocol</th>
+<th>Use Case</th>
+<th>Characteristics</th>
+</tr>
+<tr>
+<td>REST API</td>
+<td>Standard operations</td>
+<td>Simple, stateless, widely supported</td>
+</tr>
+<tr>
+<td>WebSocket</td>
+<td>Real-time streaming</td>
+<td>Bidirectional, persistent connection</td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td>High-performance</td>
+<td>Binary, efficient, strongly typed</td>
+</tr>
+</table>
+<hr>
+
+<h2>6.2 REST API Specification</h2>
+
+<h3>Base URL</h3>
+<pre>https://api.wia.org/v1/llm</pre>
+
+<h3>Common Headers</h3>
+<pre>
+Content-Type: application/json
+Authorization: Bearer {did-auth-token}
+X-WIA-Version: 1.0
+X-WIA-Request-ID: {uuid}
+</pre>
+
+<h3>Capability Endpoints</h3>
+<table border="1" cellpadding="5">
+<tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+<tr><td>POST</td><td>/capability</td><td>Register capability</td></tr>
+<tr><td>GET</td><td>/capability/{id}</td><td>Get capability by ID</td></tr>
+<tr><td>PUT</td><td>/capability/{id}</td><td>Update capability</td></tr>
+<tr><td>DELETE</td><td>/capability/{id}</td><td>Remove capability</td></tr>
+<tr><td>POST</td><td>/capability/query</td><td>Query capabilities</td></tr>
+</table>
+
+<h4>POST /capability - Register Capability</h4>
+<pre>
+Request:
+POST /capability
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+    "identity": {
+        "did": "did:wia:llm:anthropic:claude-3-opus",
+        "name": "Claude 3 Opus",
+        "provider": "Anthropic"
+    },
+    "capability": {
+        "level": 4,
+        "domains": [{"code": "CODE", "proficiency": 0.94}],
+        "languages": [{"code": "en", "proficiency": 0.98}]
+    }
+}
+
+Response: 201 Created
+Location: /capability/cap-abc123
+{
+    "id": "cap-abc123",
+    "status": "registered",
+    "expiresAt": "2024-02-15T10:30:00Z"
+}
+</pre>
+
+<h4>POST /capability/query - Query Capabilities</h4>
+<pre>
+Request:
+POST /capability/query
+{
+    "domains": ["CODE", "ANALYSIS"],
+    "minLevel": 3,
+    "language": "en",
+    "limit": 10
+}
+
+Response: 200 OK
+{
+    "matches": [
+        {
+            "did": "did:wia:llm:anthropic:claude-3-opus",
+            "name": "Claude 3 Opus",
+            "matchScore": 0.976
+        },
+        {
+            "did": "did:wia:llm:openai:gpt-4",
+            "name": "GPT-4",
+            "matchScore": 0.951
+        }
+    ],
+    "totalMatches": 2
+}
+</pre>
+
+<h3>Message Endpoints</h3>
+<table border="1" cellpadding="5">
+<tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+<tr><td>POST</td><td>/message</td><td>Send message</td></tr>
+<tr><td>POST</td><td>/message/stream</td><td>Send with streaming response</td></tr>
+<tr><td>GET</td><td>/message/{id}</td><td>Get message status</td></tr>
+<tr><td>GET</td><td>/message/{id}/response</td><td>Get message response</td></tr>
+</table>
+
+<h4>POST /message - Send Message</h4>
+<pre>
+Request:
+POST /message
+{
+    "header": {
+        "to": "did:wia:llm:openai:gpt-4",
+        "messageType": "QUERY"
+    },
+    "payload": {
+        "content": "Analyze this code for security issues",
+        "context": {"code": "..."}
+    }
+}
+
+Response: 202 Accepted
+{
+    "messageId": "msg-xyz789",
+    "status": "accepted",
+    "estimatedCompletionTime": 5000
+}
+</pre>
+
+<h3>Federation Endpoints</h3>
+<table border="1" cellpadding="5">
+<tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+<tr><td>POST</td><td>/federation</td><td>Create federation</td></tr>
+<tr><td>GET</td><td>/federation/{id}</td><td>Get federation</td></tr>
+<tr><td>POST</td><td>/federation/{id}/join</td><td>Join federation</td></tr>
+<tr><td>POST</td><td>/federation/{id}/leave</td><td>Leave federation</td></tr>
+<tr><td>POST</td><td>/federation/{id}/task</td><td>Submit task</td></tr>
+<tr><td>POST</td><td>/federation/{id}/consensus</td><td>Initiate consensus</td></tr>
+</table>
+
+<h4>POST /federation/{id}/task - Submit Task</h4>
+<pre>
+Request:
+POST /federation/fed-123/task
+{
+    "description": "Security audit of web application",
+    "priority": "HIGH",
+    "decomposition": {
+        "strategy": "HIERARCHICAL"
+    }
+}
+
+Response: 202 Accepted
+{
+    "taskId": "task-abc123",
+    "status": "decomposing",
+    "subtaskCount": 4
+}
+</pre>
+<hr>
+
+<h2>6.3 WebSocket Protocol</h2>
+
+<h3>Connection</h3>
+<pre>
+WebSocket URL: wss://api.wia.org/ws/v1/llm
+
+Connection Request:
+GET /ws/v1/llm HTTP/1.1
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Protocol: wia-llm-v1
+</pre>
+
+<h3>Handshake Sequence</h3>
+<pre>
+1. Client connects to WebSocket endpoint
+   CLIENT ---> SERVER: WebSocket upgrade request
+
+2. Server accepts connection
+   CLIENT <--- SERVER: 101 Switching Protocols
+
+3. Client sends authentication
+   CLIENT ---> SERVER: {
+       "type": "AUTH",
+       "token": "{did-auth-token}",
+       "did": "did:wia:llm:anthropic:claude-3-opus"
+   }
+
+4. Server confirms authentication
+   CLIENT <--- SERVER: {
+       "type": "AUTH_ACK",
+       "sessionId": "sess-123",
+       "expiresIn": 3600
+   }
+
+5. Ready for messages
+</pre>
+
+<h3>Message Types</h3>
+<table border="1" cellpadding="5">
+<tr><th>Type</th><th>Direction</th><th>Description</th></tr>
+<tr><td>AUTH</td><td>Client -> Server</td><td>Authentication request</td></tr>
+<tr><td>AUTH_ACK</td><td>Server -> Client</td><td>Authentication accepted</td></tr>
+<tr><td>CAPABILITY_REGISTER</td><td>Client -> Server</td><td>Register capability</td></tr>
+<tr><td>CAPABILITY_QUERY</td><td>Client -> Server</td><td>Query capabilities</td></tr>
+<tr><td>MESSAGE_SEND</td><td>Client -> Server</td><td>Send message</td></tr>
+<tr><td>MESSAGE_RECEIVE</td><td>Server -> Client</td><td>Incoming message</td></tr>
+<tr><td>STREAM_START</td><td>Server -> Client</td><td>Stream beginning</td></tr>
+<tr><td>STREAM_CHUNK</td><td>Server -> Client</td><td>Stream data chunk</td></tr>
+<tr><td>STREAM_END</td><td>Server -> Client</td><td>Stream complete</td></tr>
+<tr><td>PING</td><td>Both</td><td>Keep-alive ping</td></tr>
+<tr><td>PONG</td><td>Both</td><td>Keep-alive response</td></tr>
+</table>
+
+<h3>Streaming Response Example</h3>
+<pre>
+Client sends query:
+{
+    "type": "MESSAGE_SEND",
+    "payload": {
+        "to": "did:wia:llm:openai:gpt-4",
+        "content": "Explain quantum computing"
+    }
+}
+
+Server sends stream:
+{
+    "type": "STREAM_START",
+    "messageId": "msg-123",
+    "from": "did:wia:llm:openai:gpt-4"
+}
+
+{
+    "type": "STREAM_CHUNK",
+    "messageId": "msg-123",
+    "sequence": 1,
+    "content": "Quantum computing is "
+}
+
+{
+    "type": "STREAM_CHUNK",
+    "messageId": "msg-123",
+    "sequence": 2,
+    "content": "a type of computation..."
+}
+
+{
+    "type": "STREAM_END",
+    "messageId": "msg-123",
+    "totalChunks": 15,
+    "totalTokens": 523
+}
+</pre>
+<hr>
+
+<h2>6.4 gRPC Protocol</h2>
+
+<h3>Service Definitions (Protocol Buffers)</h3>
+<pre>
+syntax = "proto3";
+package wia.llm.v1;
+
+// Capability Service
+service LLMCapabilityService {
+    rpc RegisterCapability(CapabilityRequest)
+        returns (CapabilityResponse);
+
+    rpc QueryCapabilities(QueryRequest)
+        returns (stream CapabilityMatch);
+
+    rpc GetCapability(GetCapabilityRequest)
+        returns (CapabilityDocument);
+}
+
+// Message Service
+service LLMMessageService {
+    rpc SendMessage(MessageRequest)
+        returns (MessageResponse);
+
+    rpc StreamMessage(MessageRequest)
+        returns (stream StreamChunk);
+
+    rpc BidirectionalStream(stream MessageRequest)
+        returns (stream MessageResponse);
+}
+
+// Federation Service
+service LLMFederationService {
+    rpc CreateFederation(FederationRequest)
+        returns (FederationResponse);
+
+    rpc JoinFederation(JoinRequest)
+        returns (JoinResponse);
+
+    rpc SubmitTask(TaskRequest)
+        returns (stream TaskProgress);
+
+    rpc InitiateConsensus(ConsensusRequest)
+        returns (ConsensusResult);
+}
+</pre>
+
+<h3>Message Definitions</h3>
+<pre>
+message CapabilityDocument {
+    string id = 1;
+    ModelIdentity identity = 2;
+    Capability capability = 3;
+    Constraints constraints = 4;
+    int64 timestamp = 5;
+    bytes signature = 6;
+}
+
+message ModelIdentity {
+    string did = 1;
+    string name = 2;
+    string provider = 3;
+    string version = 4;
+}
+
+message Capability {
+    int32 level = 1;
+    repeated DomainExpertise domains = 2;
+    repeated LanguageSupport languages = 3;
+    repeated string modalities = 4;
+    repeated ToolCapability tools = 5;
+}
+
+message MessageEnvelope {
+    string id = 1;
+    MessageHeader header = 2;
+    bytes payload = 3;
+    RoutingInfo routing = 4;
+    SecurityInfo security = 5;
+}
+
+message TaskDocument {
+    string id = 1;
+    string federation_id = 2;
+    string description = 3;
+    Priority priority = 4;
+    DecompositionConfig decomposition = 5;
+    repeated Subtask subtasks = 6;
+}
+</pre>
+<hr>
+
+<h2>6.5 Security Specifications</h2>
+
+<h3>DID Authentication</h3>
+<pre>
+Authentication Header Format:
+Authorization: DID-Auth {signed-challenge}
+
+Challenge-Response Flow:
+1. Client requests challenge
+   GET /auth/challenge?did={did}
+
+2. Server returns challenge
+   { "challenge": "random-string", "expiresIn": 300 }
+
+3. Client signs challenge with DID private key
+   signature = Sign(challenge, privateKey)
+
+4. Client sends signed challenge
+   POST /auth/verify
+   { "did": "{did}", "challenge": "...", "signature": "..." }
+
+5. Server verifies and returns token
+   { "token": "{jwt}", "expiresIn": 3600 }
+</pre>
+
+<h3>Message Signing</h3>
+<pre>
+Signature Format:
+{
+    "algorithm": "Ed25519",
+    "publicKey": "did:wia:llm:...#key-1",
+    "value": "base64-encoded-signature"
+}
+
+Signing Process:
+1. Serialize message to canonical JSON
+2. Compute SHA-256 hash
+3. Sign hash with Ed25519 private key
+4. Encode signature as base64
+</pre>
+
+<h3>Encryption</h3>
+<pre>
+Encryption Format:
+{
+    "algorithm": "AES-256-GCM",
+    "keyAgreement": "X25519",
+    "recipientKey": "did:wia:llm:...#encryption-key-1",
+    "ephemeralKey": "base64-public-key",
+    "nonce": "base64-nonce",
+    "ciphertext": "base64-encrypted-payload"
+}
+
+Encryption Process:
+1. Generate ephemeral X25519 key pair
+2. Derive shared secret with recipient public key
+3. Derive AES key using HKDF
+4. Encrypt payload with AES-256-GCM
+5. Include ephemeral public key and nonce
+</pre>
+<hr>
+
+<h2>6.6 Error Response Format</h2>
+<pre>
+{
+    "error": {
+        "code": "CAPABILITY_MISMATCH",
+        "message": "No model matches the required capabilities",
+        "details": {
+            "required": {
+                "domains": ["MEDICAL"],
+                "minLevel": 4
+            },
+            "suggestion": "Lower minLevel to 3 or add more domain options"
+        },
+        "timestamp": "2024-01-15T10:30:00Z",
+        "requestId": "req-abc123"
+    }
+}
+</pre>
+
+<h3>HTTP Status Codes</h3>
+<table border="1" cellpadding="5">
+<tr><th>Code</th><th>Meaning</th><th>Use Case</th></tr>
+<tr><td>200</td><td>OK</td><td>Successful GET/PUT</td></tr>
+<tr><td>201</td><td>Created</td><td>Successful POST creating resource</td></tr>
+<tr><td>202</td><td>Accepted</td><td>Async operation started</td></tr>
+<tr><td>400</td><td>Bad Request</td><td>Invalid request format</td></tr>
+<tr><td>401</td><td>Unauthorized</td><td>Missing/invalid auth</td></tr>
+<tr><td>403</td><td>Forbidden</td><td>Insufficient permissions</td></tr>
+<tr><td>404</td><td>Not Found</td><td>Resource doesn't exist</td></tr>
+<tr><td>429</td><td>Too Many Requests</td><td>Rate limit exceeded</td></tr>
+<tr><td>500</td><td>Internal Error</td><td>Server error</td></tr>
+<tr><td>503</td><td>Service Unavailable</td><td>Temporary unavailability</td></tr>
+</table>
+<hr>
+
+<h2>6.7 Rate Limiting</h2>
+<pre>
+Rate Limit Headers:
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1705312200
+
+Default Limits:
+- Capability registration: 10/minute
+- Capability queries: 100/minute
+- Messages: 60/minute
+- Federation operations: 30/minute
+</pre>
+<hr>
+
+<h2>6.8 Chapter Summary</h2>
+<ul>
+<li>[OK] REST API for standard stateless operations</li>
+<li>[OK] WebSocket for real-time streaming</li>
+<li>[OK] gRPC for high-performance applications</li>
+<li>[OK] DID-based authentication and message signing</li>
+<li>[OK] AES-256-GCM encryption for security</li>
+<li>[OK] Standardized error responses and rate limiting</li>
+</ul>
+<hr>
+
+<p><a href="chapter-05.html">&lt;&lt; Previous: Chapter 5 - Algorithms and Matching</a></p>
+<p><a href="chapter-07.html">Next: Chapter 7 - Integration and Deployment &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] Table of Contents</a> | Chapter 6 of 8</p>
+</body>
+</html>

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 7: Integration and Deployment - WIA LLM Standard</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] Table of Contents</a></p>
+<hr>
+
+<h1>Chapter 7: Integration and Deployment</h1>
+<blockquote>"Standards only matter when they can be easily integrated into existing systems."</blockquote>
+<hr>
+
+<h2>7.1 Integration Overview</h2>
+<p>This chapter covers practical integration of the WIA LLM Interoperability Standard:</p>
+<ul>
+<li>AI Provider integrations (OpenAI, Anthropic, Google, Local)</li>
+<li>Cloud platform deployments (AWS, Azure, GCP)</li>
+<li>Framework integrations (LangChain, LlamaIndex, AutoGen)</li>
+<li>SDK implementations</li>
+</ul>
+<hr>
+
+<h2>7.2 OpenAI Integration</h2>
+
+<h3>Adapter Configuration</h3>
+<pre>
+{
+    "provider": "openai",
+    "adapter": {
+        "type": "WIA_OPENAI_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "apiKey": "${OPENAI_API_KEY}",
+            "organization": "${OPENAI_ORG_ID}",
+            "baseUrl": "https://api.openai.com/v1",
+            "defaultModel": "gpt-4",
+            "timeout": 30000
+        }
+    },
+    "capabilities": {
+        "models": {
+            "gpt-4": {
+                "did": "did:wia:llm:openai:gpt-4",
+                "level": 4,
+                "contextWindow": 128000
+            },
+            "gpt-4-turbo": {
+                "did": "did:wia:llm:openai:gpt-4-turbo",
+                "level": 4,
+                "contextWindow": 128000
+            },
+            "gpt-3.5-turbo": {
+                "did": "did:wia:llm:openai:gpt-3.5-turbo",
+                "level": 2,
+                "contextWindow": 16385
+            }
+        }
+    }
+}
+</pre>
+
+<h3>Message Translation</h3>
+<pre>
+# WIA Message to OpenAI format
+def translate_to_openai(wia_message):
+    return {
+        "model": extract_model(wia_message.header.to),
+        "messages": [
+            {
+                "role": "user",
+                "content": wia_message.payload.content
+            }
+        ],
+        "max_tokens": wia_message.payload.parameters.maxTokens,
+        "temperature": wia_message.payload.parameters.temperature
+    }
+
+# OpenAI response to WIA format
+def translate_from_openai(openai_response, correlation_id):
+    return {
+        "header": {
+            "messageType": "RESPONSE",
+            "correlationId": correlation_id
+        },
+        "payload": {
+            "status": "SUCCESS",
+            "content": openai_response.choices[0].message.content,
+            "metadata": {
+                "tokensUsed": openai_response.usage.total_tokens,
+                "model": openai_response.model
+            }
+        }
+    }
+</pre>
+<hr>
+
+<h2>7.3 Anthropic Integration</h2>
+
+<h3>Adapter Configuration</h3>
+<pre>
+{
+    "provider": "anthropic",
+    "adapter": {
+        "type": "WIA_ANTHROPIC_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "apiKey": "${ANTHROPIC_API_KEY}",
+            "baseUrl": "https://api.anthropic.com",
+            "defaultModel": "claude-3-opus-20240229",
+            "timeout": 60000
+        }
+    },
+    "capabilities": {
+        "models": {
+            "claude-3-opus": {
+                "did": "did:wia:llm:anthropic:claude-3-opus",
+                "level": 4,
+                "contextWindow": 200000
+            },
+            "claude-3-sonnet": {
+                "did": "did:wia:llm:anthropic:claude-3-sonnet",
+                "level": 3,
+                "contextWindow": 200000
+            },
+            "claude-3-haiku": {
+                "did": "did:wia:llm:anthropic:claude-3-haiku",
+                "level": 2,
+                "contextWindow": 200000
+            }
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>7.4 Google Gemini Integration</h2>
+
+<h3>Adapter Configuration</h3>
+<pre>
+{
+    "provider": "google",
+    "adapter": {
+        "type": "WIA_GOOGLE_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "apiKey": "${GOOGLE_API_KEY}",
+            "project": "${GCP_PROJECT_ID}",
+            "location": "us-central1",
+            "defaultModel": "gemini-pro"
+        }
+    },
+    "capabilities": {
+        "models": {
+            "gemini-pro": {
+                "did": "did:wia:llm:google:gemini-pro",
+                "level": 3,
+                "contextWindow": 32000,
+                "modalities": ["text", "image"]
+            },
+            "gemini-pro-vision": {
+                "did": "did:wia:llm:google:gemini-pro-vision",
+                "level": 3,
+                "modalities": ["text", "image", "video"]
+            }
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>7.5 Local Model Integration (Ollama)</h2>
+
+<h3>Adapter Configuration</h3>
+<pre>
+{
+    "provider": "local",
+    "adapter": {
+        "type": "WIA_OLLAMA_ADAPTER",
+        "version": "1.0",
+        "config": {
+            "baseUrl": "http://localhost:11434",
+            "timeout": 120000
+        }
+    },
+    "capabilities": {
+        "models": {
+            "llama2": {
+                "did": "did:wia:llm:local:llama-2-70b",
+                "level": 2,
+                "contextWindow": 4096
+            },
+            "codellama": {
+                "did": "did:wia:llm:local:codellama-34b",
+                "level": 3,
+                "contextWindow": 16000,
+                "domains": ["CODE"]
+            },
+            "mistral": {
+                "did": "did:wia:llm:local:mistral-7b",
+                "level": 2,
+                "contextWindow": 8192
+            }
+        }
+    }
+}
+</pre>
+<hr>
+
+<h2>7.6 AWS Lambda Deployment</h2>
+
+<h3>Lambda Function Configuration</h3>
+<pre>
+# serverless.yml
+service: wia-llm-interop
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  memorySize: 1024
+  timeout: 30
+  environment:
+    WIA_CONFIG_PATH: /opt/config/wia-config.json
+
+functions:
+  capability:
+    handler: handlers/capability.handler
+    events:
+      - http:
+          path: /capability
+          method: post
+      - http:
+          path: /capability/query
+          method: post
+
+  message:
+    handler: handlers/message.handler
+    events:
+      - http:
+          path: /message
+          method: post
+
+  federation:
+    handler: handlers/federation.handler
+    events:
+      - http:
+          path: /federation
+          method: post
+      - http:
+          path: /federation/{id}/task
+          method: post
+</pre>
+
+<h3>Lambda Handler Example</h3>
+<pre>
+# handlers/capability.py
+import json
+from wia_llm import CapabilityService
+
+service = CapabilityService()
+
+def handler(event, context):
+    path = event['path']
+    method = event['httpMethod']
+    body = json.loads(event.get('body', '{}'))
+
+    if path == '/capability' and method == 'POST':
+        result = service.register(body)
+        return {
+            'statusCode': 201,
+            'body': json.dumps(result)
+        }
+
+    elif path == '/capability/query' and method == 'POST':
+        result = service.query(body)
+        return {
+            'statusCode': 200,
+            'body': json.dumps(result)
+        }
+
+    return {'statusCode': 404}
+</pre>
+<hr>
+
+<h2>7.7 Azure Container Apps Deployment</h2>
+
+<h3>Container Configuration</h3>
+<pre>
+# azure-container-app.yaml
+apiVersion: apps/v1
+kind: ContainerApp
+metadata:
+  name: wia-llm-interop
+spec:
+  configuration:
+    ingress:
+      external: true
+      targetPort: 8080
+    secrets:
+      - name: openai-key
+        value: ${OPENAI_API_KEY}
+      - name: anthropic-key
+        value: ${ANTHROPIC_API_KEY}
+
+  template:
+    containers:
+      - image: wia/llm-interop:latest
+        name: wia-llm-service
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+        env:
+          - name: OPENAI_API_KEY
+            secretRef: openai-key
+          - name: ANTHROPIC_API_KEY
+            secretRef: anthropic-key
+          - name: WIA_LOG_LEVEL
+            value: "info"
+    scale:
+      minReplicas: 1
+      maxReplicas: 10
+      rules:
+        - name: http-scaling
+          http:
+            metadata:
+              concurrentRequests: "50"
+</pre>
+<hr>
+
+<h2>7.8 Kubernetes Deployment</h2>
+
+<h3>Deployment Configuration</h3>
+<pre>
+# kubernetes/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wia-llm-interop
+  labels:
+    app: wia-llm
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: wia-llm
+  template:
+    metadata:
+      labels:
+        app: wia-llm
+    spec:
+      containers:
+      - name: wia-llm-service
+        image: wia/llm-interop:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-secrets
+              key: openai-key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wia-llm-service
+spec:
+  selector:
+    app: wia-llm
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: LoadBalancer
+</pre>
+<hr>
+
+<h2>7.9 LangChain Integration</h2>
+
+<h3>WIA LLM Provider for LangChain</h3>
+<pre>
+from langchain.llms.base import LLM
+from wia_llm import WIAClient
+
+class WIALLM(LLM):
+    """WIA LLM Interoperability provider for LangChain"""
+
+    client: WIAClient
+    target_did: str
+
+    def __init__(self, wia_endpoint: str, target_did: str):
+        self.client = WIAClient(wia_endpoint)
+        self.target_did = target_did
+
+    def _call(self, prompt: str, stop=None) -> str:
+        message = {
+            "header": {
+                "to": self.target_did,
+                "messageType": "QUERY"
+            },
+            "payload": {
+                "content": prompt
+            }
+        }
+
+        response = self.client.send_message(message)
+        return response.payload.content
+
+    @property
+    def _llm_type(self) -> str:
+        return "wia-llm"
+
+# Usage
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+
+llm = WIALLM(
+    wia_endpoint="https://api.wia.org/v1/llm",
+    target_did="did:wia:llm:anthropic:claude-3-opus"
+)
+
+chain = LLMChain(
+    llm=llm,
+    prompt=PromptTemplate.from_template("Analyze: {text}")
+)
+
+result = chain.run(text="Sample code here...")
+</pre>
+<hr>
+
+<h2>7.10 LlamaIndex Integration</h2>
+
+<h3>WIA LLM for LlamaIndex</h3>
+<pre>
+from llama_index.llms import CustomLLM
+from wia_llm import WIAClient
+
+class WIALlamaIndex(CustomLLM):
+    """WIA LLM provider for LlamaIndex"""
+
+    def __init__(self, wia_endpoint: str, did: str):
+        self.client = WIAClient(wia_endpoint)
+        self.did = did
+
+    def complete(self, prompt: str) -> str:
+        response = self.client.query(self.did, prompt)
+        return response.content
+
+    def stream_complete(self, prompt: str):
+        for chunk in self.client.stream_query(self.did, prompt):
+            yield chunk
+
+# Usage with RAG
+from llama_index import VectorStoreIndex, SimpleDirectoryReader
+
+llm = WIALlamaIndex(
+    wia_endpoint="https://api.wia.org/v1/llm",
+    did="did:wia:llm:openai:gpt-4"
+)
+
+documents = SimpleDirectoryReader("./data").load_data()
+index = VectorStoreIndex.from_documents(documents, llm=llm)
+query_engine = index.as_query_engine()
+
+response = query_engine.query("What is this about?")
+</pre>
+<hr>
+
+<h2>7.11 SDK Examples</h2>
+
+<h3>TypeScript SDK</h3>
+<pre>
+import { WIAClient, Federation, Message } from '@wia/llm-sdk';
+
+// Initialize client
+const client = new WIAClient({
+    endpoint: 'https://api.wia.org/v1/llm',
+    auth: { did: 'did:wia:llm:my-service', privateKey: '...' }
+});
+
+// Register capability
+await client.capability.register({
+    level: 3,
+    domains: [{ code: 'CODE', proficiency: 0.9 }]
+});
+
+// Query capabilities
+const matches = await client.capability.query({
+    domains: ['CODE', 'ANALYSIS'],
+    minLevel: 2
+});
+
+// Send message
+const response = await client.message.send({
+    to: 'did:wia:llm:openai:gpt-4',
+    content: 'Analyze this code...'
+});
+
+// Create federation
+const federation = await client.federation.create({
+    name: 'Security Team',
+    topology: 'STAR',
+    consensus: { algorithm: 'WEIGHTED' }
+});
+
+// Submit task
+const task = await federation.submitTask({
+    description: 'Security audit',
+    decomposition: { strategy: 'HIERARCHICAL' }
+});
+</pre>
+
+<h3>Python SDK</h3>
+<pre>
+from wia_llm import WIAClient, Federation
+
+# Initialize client
+client = WIAClient(
+    endpoint="https://api.wia.org/v1/llm",
+    did="did:wia:llm:my-service",
+    private_key="..."
+)
+
+# Query capabilities
+matches = client.capability.query(
+    domains=["CODE", "ANALYSIS"],
+    min_level=3
+)
+
+# Send message with streaming
+async for chunk in client.message.stream(
+    to="did:wia:llm:anthropic:claude-3-opus",
+    content="Explain quantum computing"
+):
+    print(chunk, end="")
+
+# Create and use federation
+federation = client.federation.create(
+    name="Research Team",
+    topology="MESH",
+    members=["did:wia:llm:openai:gpt-4", "did:wia:llm:anthropic:claude-3-opus"]
+)
+
+result = await federation.submit_task(
+    description="Summarize recent AI research",
+    consensus="DEBATE"
+)
+</pre>
+<hr>
+
+<h2>7.12 Chapter Summary</h2>
+<ul>
+<li>[OK] Provider adapters for OpenAI, Anthropic, Google, Local models</li>
+<li>[OK] Cloud deployment options: AWS Lambda, Azure, GCP, Kubernetes</li>
+<li>[OK] Framework integrations: LangChain, LlamaIndex</li>
+<li>[OK] Multi-language SDKs: TypeScript, Python, Rust</li>
+<li>[OK] Ready-to-use configuration templates</li>
+</ul>
+<hr>
+
+<p><a href="chapter-06.html">&lt;&lt; Previous: Chapter 6 - Protocol Specifications</a></p>
+<p><a href="chapter-08.html">Next: Chapter 8 - Use Cases and Best Practices &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] Table of Contents</a> | Chapter 7 of 8</p>
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 5: Algorithms and Matching - WIA LLM Standard</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] Table of Contents</a></p>
+<hr>
+
+<h1>Chapter 5: Algorithms and Matching</h1>
+<blockquote>"The right AI for the right task - intelligent matching is the key to effective collaboration."</blockquote>
+<hr>
+
+<h2>5.1 Core Algorithms Overview</h2>
+<p>The WIA LLM Interoperability Standard defines several algorithms:</p>
+<ul>
+<li><strong>Capability Matching</strong> - Find the best AI for a task</li>
+<li><strong>Message Routing</strong> - Deliver messages efficiently</li>
+<li><strong>Task Decomposition</strong> - Break complex tasks into subtasks</li>
+<li><strong>Consensus Building</strong> - Reach agreement among AIs</li>
+<li><strong>Trust Scoring</strong> - Evaluate AI reliability</li>
+<li><strong>Load Balancing</strong> - Distribute work evenly</li>
+</ul>
+<hr>
+
+<h2>5.2 Capability Matching Algorithm</h2>
+<p>Finds the best AI model for a given task based on requirements.</p>
+
+<h3>Matching Weights</h3>
+<table border="1" cellpadding="5">
+<tr><th>Factor</th><th>Weight</th><th>Description</th></tr>
+<tr><td>Domain Match</td><td>40%</td><td>Required expertise areas</td></tr>
+<tr><td>Level Match</td><td>25%</td><td>Minimum capability level</td></tr>
+<tr><td>Language Match</td><td>20%</td><td>Required language support</td></tr>
+<tr><td>Tool Match</td><td>15%</td><td>Required tool capabilities</td></tr>
+</table>
+
+<h3>Algorithm: CalculateCapabilityMatch</h3>
+<pre>
+function CalculateCapabilityMatch(requirements, capability):
+
+    # Domain Score (40% weight)
+    domain_score = 0
+    for required_domain in requirements.domains:
+        for cap_domain in capability.domains:
+            if cap_domain.code == required_domain:
+                domain_score += cap_domain.proficiency
+    domain_score = domain_score / len(requirements.domains)
+
+    # Level Score (25% weight)
+    if capability.level >= requirements.min_level:
+        level_score = capability.level / 4.0
+    else:
+        level_score = 0  # Does not meet minimum
+
+    # Language Score (20% weight)
+    language_score = 0
+    for lang in capability.languages:
+        if lang.code == requirements.language:
+            language_score = lang.proficiency
+            break
+
+    # Tool Score (15% weight)
+    tool_score = 0
+    if requirements.tools:
+        matches = 0
+        for tool in requirements.tools:
+            if tool in capability.tools:
+                matches += 1
+        tool_score = matches / len(requirements.tools)
+    else:
+        tool_score = 1.0  # No tools required
+
+    # Calculate weighted total
+    total_score = (
+        domain_score * 0.40 +
+        level_score * 0.25 +
+        language_score * 0.20 +
+        tool_score * 0.15
+    )
+
+    return total_score
+</pre>
+
+<h3>Example Calculation</h3>
+<pre>
+Requirements:
+- Domains: [CODE, ANALYSIS]
+- Min Level: 3
+- Language: en
+- Tools: [code_interpreter]
+
+Candidate: Claude 3 Opus
+- Domains: CODE(0.94), ANALYSIS(0.96)
+- Level: 4
+- Languages: en(0.98)
+- Tools: [code_interpreter, file_analysis]
+
+Calculation:
+- Domain: (0.94 + 0.96) / 2 = 0.95
+- Level: 4 / 4 = 1.0
+- Language: 0.98
+- Tool: 1/1 = 1.0
+
+Total = 0.95*0.40 + 1.0*0.25 + 0.98*0.20 + 1.0*0.15
+     = 0.38 + 0.25 + 0.196 + 0.15
+     = 0.976 (97.6% match)
+</pre>
+<hr>
+
+<h2>5.3 Capability Handshake Protocol</h2>
+<p>Before collaboration, AI models verify mutual capabilities:</p>
+
+<pre>
+Step 1: Initiator sends capability query
+AI-A ---> AI-B: CAPABILITY_REQUEST
+
+Step 2: Responder shares capability document
+AI-B ---> AI-A: CAPABILITY_RESPONSE
+
+Step 3: Initiator evaluates compatibility
+AI-A: CalculateCapabilityMatch()
+
+Step 4: If compatible, collaboration proceeds
+AI-A ---> AI-B: HANDSHAKE_ACCEPT
+
+Step 5: Session established
+AI-A <---> AI-B: Ready for messages
+</pre>
+<hr>
+
+<h2>5.4 Message Routing Algorithms</h2>
+
+<h3>Direct Routing</h3>
+<p>Send directly to a known recipient.</p>
+<pre>
+function DirectRoute(message, recipient_did):
+    endpoint = ResolveEndpoint(recipient_did)
+    return SendToEndpoint(message, endpoint)
+</pre>
+
+<h3>Capability-Based Routing</h3>
+<p>Find the best recipient based on message requirements.</p>
+<pre>
+function CapabilityRoute(message, requirements):
+    # Query capability registry
+    candidates = QueryCapabilities(requirements)
+
+    # Sort by match score
+    sorted_candidates = SortByMatchScore(candidates)
+
+    # Try each candidate until success
+    for candidate in sorted_candidates:
+        result = DirectRoute(message, candidate.did)
+        if result.success:
+            return result
+
+    return Error("No capable recipient found")
+</pre>
+
+<h3>Load-Balanced Routing</h3>
+<p>Distribute messages across available models.</p>
+<pre>
+function LoadBalancedRoute(message, requirements):
+    candidates = QueryCapabilities(requirements)
+
+    # Filter by minimum match score
+    qualified = [c for c in candidates if c.score >= 0.7]
+
+    # Weight by availability and load
+    for candidate in qualified:
+        candidate.weight = (
+            candidate.score * 0.5 +
+            candidate.availability * 0.3 +
+            (1 - candidate.load) * 0.2
+        )
+
+    # Select using weighted random
+    selected = WeightedRandomSelect(qualified)
+    return DirectRoute(message, selected.did)
+</pre>
+
+<h3>Broadcast Routing</h3>
+<p>Send to all federation members.</p>
+<pre>
+function BroadcastRoute(message, federation):
+    results = []
+    for member in federation.members:
+        result = DirectRoute(message, member.did)
+        results.append(result)
+    return AggregateResults(results)
+</pre>
+<hr>
+
+<h2>5.5 Task Decomposition Algorithm</h2>
+<p>Break complex tasks into manageable subtasks:</p>
+
+<pre>
+function DecomposeTask(task, federation):
+    # Analyze task complexity
+    complexity = AnalyzeComplexity(task)
+
+    if complexity == "LOW":
+        return [task]  # No decomposition needed
+
+    # Identify required capabilities
+    required_caps = ExtractRequirements(task)
+
+    # Generate subtasks based on capabilities
+    subtasks = []
+
+    for capability in required_caps:
+        # Find best member for this capability
+        best_member = FindBestMatch(federation.members, capability)
+
+        subtask = {
+            "id": GenerateId(),
+            "description": GenerateSubtaskDescription(task, capability),
+            "assignee": best_member.did,
+            "capability": capability,
+            "dependencies": []
+        }
+        subtasks.append(subtask)
+
+    # Establish dependencies
+    subtasks = EstablishDependencies(subtasks, task.decomposition_strategy)
+
+    return subtasks
+
+function EstablishDependencies(subtasks, strategy):
+    if strategy == "PARALLEL":
+        # No dependencies
+        return subtasks
+
+    elif strategy == "SEQUENTIAL":
+        # Each depends on previous
+        for i in range(1, len(subtasks)):
+            subtasks[i].dependencies = [subtasks[i-1].id]
+        return subtasks
+
+    elif strategy == "HIERARCHICAL":
+        # Build dependency tree
+        return BuildDependencyTree(subtasks)
+
+    elif strategy == "ADAPTIVE":
+        # Dependencies determined at runtime
+        return subtasks
+</pre>
+<hr>
+
+<h2>5.6 Consensus Algorithms</h2>
+
+<h3>Majority Consensus</h3>
+<pre>
+function MajorityConsensus(votes, threshold=0.5):
+    yes_count = count(v for v in votes if v.vote == YES)
+    no_count = count(v for v in votes if v.vote == NO)
+    total = yes_count + no_count
+
+    if total == 0:
+        return UNDECIDED
+
+    yes_ratio = yes_count / total
+
+    if yes_ratio > threshold:
+        return YES
+    elif yes_ratio < (1 - threshold):
+        return NO
+    else:
+        return UNDECIDED
+</pre>
+
+<h3>Weighted Consensus</h3>
+<pre>
+function WeightedConsensus(votes, threshold=0.6):
+    yes_weight = 0
+    no_weight = 0
+    total_weight = 0
+
+    for vote in votes:
+        if vote.vote == ABSTAIN:
+            continue
+
+        weight = vote.confidence * vote.trust_score
+        total_weight += weight
+
+        if vote.vote == YES:
+            yes_weight += weight
+        else:
+            no_weight += weight
+
+    if total_weight == 0:
+        return UNDECIDED
+
+    yes_ratio = yes_weight / total_weight
+
+    if yes_ratio >= threshold:
+        return YES
+    elif (1 - yes_ratio) >= threshold:
+        return NO
+    else:
+        return UNDECIDED
+</pre>
+
+<h3>Debate Consensus</h3>
+<pre>
+function DebateConsensus(question, members, max_rounds=5):
+    positions = {}
+
+    # Round 1: Initial positions
+    for member in members:
+        positions[member.did] = GetInitialPosition(member, question)
+
+    for round in range(2, max_rounds + 1):
+        # Share positions and counter-arguments
+        for member in members:
+            other_positions = {k:v for k,v in positions.items()
+                            if k != member.did}
+
+            # Member considers other positions
+            refined = RefinePosition(member, positions[member.did],
+                                    other_positions)
+            positions[member.did] = refined
+
+        # Check for convergence
+        convergence = CalculateConvergence(positions)
+        if convergence >= 0.8:
+            return DetermineConsensus(positions)
+
+    # Max rounds reached
+    return DetermineConsensus(positions)
+</pre>
+<hr>
+
+<h2>5.7 Trust Score Algorithm</h2>
+<pre>
+function CalculateTrustScore(model):
+    # Component weights
+    ACCURACY_WEIGHT = 0.40
+    RESPONSE_TIME_WEIGHT = 0.15
+    CONSISTENCY_WEIGHT = 0.25
+    PEER_REVIEW_WEIGHT = 0.20
+
+    # Normalize response time (lower is better)
+    max_acceptable_time = 30000  # 30 seconds
+    time_score = max(0, 1 - (model.avg_response_time / max_acceptable_time))
+
+    # Calculate weighted trust score
+    trust_score = (
+        model.historical_accuracy * ACCURACY_WEIGHT +
+        time_score * RESPONSE_TIME_WEIGHT +
+        model.consistency_score * CONSISTENCY_WEIGHT +
+        model.peer_review_avg * PEER_REVIEW_WEIGHT
+    )
+
+    return trust_score
+
+function UpdateTrustScore(model, interaction_result):
+    # Decay factor for old data
+    DECAY = 0.95
+
+    # Weight of new interaction
+    NEW_WEIGHT = 0.1
+
+    new_score = (
+        model.trust_score * DECAY * (1 - NEW_WEIGHT) +
+        interaction_result.score * NEW_WEIGHT
+    )
+
+    model.trust_score = clamp(new_score, 0, 1)
+    return model.trust_score
+</pre>
+<hr>
+
+<h2>5.8 Malicious AI Detection</h2>
+<pre>
+function DetectMaliciousAI(model, recent_interactions):
+    THRESHOLD_ACCURACY = 0.3
+    THRESHOLD_CONSISTENCY = 0.2
+    THRESHOLD_CONFLICT = 0.5
+
+    # Check for consistently wrong answers
+    recent_accuracy = CalculateRecentAccuracy(recent_interactions)
+    if recent_accuracy < THRESHOLD_ACCURACY:
+        return SUSPICIOUS, "Low accuracy"
+
+    # Check for inconsistent responses
+    consistency = CalculateConsistency(recent_interactions)
+    if consistency < THRESHOLD_CONSISTENCY:
+        return SUSPICIOUS, "Inconsistent responses"
+
+    # Check for conflict-inducing behavior
+    conflict_rate = CalculateConflictRate(recent_interactions)
+    if conflict_rate > THRESHOLD_CONFLICT:
+        return SUSPICIOUS, "High conflict rate"
+
+    return TRUSTED, "No issues detected"
+</pre>
+<hr>
+
+<h2>5.9 Circuit Breaker Pattern</h2>
+<pre>
+class CircuitBreaker:
+    CLOSED = "CLOSED"       # Normal operation
+    OPEN = "OPEN"           # Blocking requests
+    HALF_OPEN = "HALF_OPEN" # Testing recovery
+
+    def __init__(self, threshold=5, timeout=30000):
+        self.state = CLOSED
+        self.failure_count = 0
+        self.threshold = threshold
+        self.timeout = timeout
+        self.last_failure_time = None
+
+    def execute(self, operation):
+        if self.state == OPEN:
+            if time_since(self.last_failure_time) > self.timeout:
+                self.state = HALF_OPEN
+            else:
+                raise CircuitOpenError()
+
+        try:
+            result = operation()
+            self.on_success()
+            return result
+        except Exception as e:
+            self.on_failure()
+            raise e
+
+    def on_success(self):
+        self.failure_count = 0
+        self.state = CLOSED
+
+    def on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = now()
+
+        if self.failure_count >= self.threshold:
+            self.state = OPEN
+</pre>
+<hr>
+
+<h2>5.10 Load Balancing Algorithm</h2>
+<pre>
+function BalanceLoad(task, candidates):
+    # Calculate effective capacity for each candidate
+    for candidate in candidates:
+        candidate.effective_capacity = (
+            candidate.capacity * (1 - candidate.current_load) *
+            candidate.trust_score
+        )
+
+    # Sort by effective capacity (highest first)
+    sorted_candidates = sort(candidates,
+                            key=lambda c: c.effective_capacity,
+                            reverse=True)
+
+    # Select candidate with most capacity
+    selected = sorted_candidates[0]
+
+    # Update load tracking
+    selected.current_load += task.estimated_load
+
+    return selected
+</pre>
+<hr>
+
+<h2>5.11 Chapter Summary</h2>
+<ul>
+<li>[OK] Capability matching uses weighted scoring (40% domain, 25% level, 20% language, 15% tools)</li>
+<li>[OK] Multiple routing strategies for different scenarios</li>
+<li>[OK] Task decomposition adapts to complexity and strategy</li>
+<li>[OK] Consensus algorithms range from simple majority to debate</li>
+<li>[OK] Trust scores track AI reliability over time</li>
+<li>[OK] Circuit breakers protect against failing models</li>
+</ul>
+<hr>
+
+<p><a href="chapter-04.html">&lt;&lt; Previous: Chapter 4 - Federation Framework</a></p>
+<p><a href="chapter-06.html">Next: Chapter 6 - Protocol Specifications &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] Table of Contents</a> | Chapter 5 of 8</p>
+</body>
+</html>

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제6장: 프로토콜 명세 - WIA LLM 표준</title>
+</head>
+<body>
+<p><a href="index.html">[LLM] 목차</a></p>
+<hr>
+
+<h1>제6장: 프로토콜 명세</h1>
+<blockquote>"프로토콜은 약속입니다 - 시스템 간 신뢰의 기반입니다."</blockquote>
+<hr>
+
+<h2>6.1 프로토콜 개요</h2>
+<p>WIA LLM 상호운용 표준은 세 가지 전송 프로토콜을 지원합니다:</p>
+
+<table border="1" cellpadding="10">
+<tr>
+<th>프로토콜</th>
+<th>사용 사례</th>
+<th>특성</th>
+</tr>
+<tr>
+<td>REST API</td>
+<td>표준 작업</td>
+<td>단순, 무상태, 널리 지원됨</td>
+</tr>
+<tr>
+<td>WebSocket</td>
+<td>실시간 스트리밍</td>
+<td>양방향, 지속 연결</td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td>고성능</td>
+<td>바이너리, 효율적, 강타입</td>
+</tr>
+</table>
+<hr>
+
+<h2>6.2 REST API 명세</h2>
+
+<h3>기본 URL</h3>
+<pre>https://api.wia.org/v1/llm</pre>
+
+<h3>공통 헤더</h3>
+<pre>
+Content-Type: application/json
+Authorization: Bearer {did-auth-token}
+X-WIA-Version: 1.0
+X-WIA-Request-ID: {uuid}
+</pre>
+
+<h3>능력 엔드포인트</h3>
+<table border="1" cellpadding="5">
+<tr><th>메서드</th><th>엔드포인트</th><th>설명</th></tr>
+<tr><td>POST</td><td>/capability</td><td>능력 등록</td></tr>
+<tr><td>GET</td><td>/capability/{id}</td><td>ID로 능력 조회</td></tr>
+<tr><td>PUT</td><td>/capability/{id}</td><td>능력 업데이트</td></tr>
+<tr><td>DELETE</td><td>/capability/{id}</td><td>능력 제거</td></tr>
+<tr><td>POST</td><td>/capability/query</td><td>능력 쿼리</td></tr>
+</table>
+
+<h4>POST /capability - 능력 등록</h4>
+<pre>
+요청:
+POST /capability
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+    "identity": {
+        "did": "did:wia:llm:anthropic:claude-3-opus",
+        "name": "Claude 3 Opus",
+        "provider": "Anthropic"
+    },
+    "capability": {
+        "level": 4,
+        "domains": [{"code": "CODE", "proficiency": 0.94}],
+        "languages": [{"code": "ko", "proficiency": 0.90}]
+    }
+}
+
+응답: 201 Created
+Location: /capability/cap-abc123
+{
+    "id": "cap-abc123",
+    "status": "registered",
+    "expiresAt": "2024-02-15T10:30:00Z"
+}
+</pre>
+
+<h4>POST /capability/query - 능력 쿼리</h4>
+<pre>
+요청:
+POST /capability/query
+{
+    "domains": ["CODE", "ANALYSIS"],
+    "minLevel": 3,
+    "language": "ko",
+    "limit": 10
+}
+
+응답: 200 OK
+{
+    "matches": [
+        {
+            "did": "did:wia:llm:anthropic:claude-3-opus",
+            "name": "Claude 3 Opus",
+            "matchScore": 0.976
+        },
+        {
+            "did": "did:wia:llm:openai:gpt-4",
+            "name": "GPT-4",
+            "matchScore": 0.951
+        }
+    ],
+    "totalMatches": 2
+}
+</pre>
+
+<h3>메시지 엔드포인트</h3>
+<table border="1" cellpadding="5">
+<tr><th>메서드</th><th>엔드포인트</th><th>설명</th></tr>
+<tr><td>POST</td><td>/message</td><td>메시지 전송</td></tr>
+<tr><td>POST</td><td>/message/stream</td><td>스트리밍 응답으로 전송</td></tr>
+<tr><td>GET</td><td>/message/{id}</td><td>메시지 상태 조회</td></tr>
+<tr><td>GET</td><td>/message/{id}/response</td><td>메시지 응답 조회</td></tr>
+</table>
+
+<h4>POST /message - 메시지 전송</h4>
+<pre>
+요청:
+POST /message
+{
+    "header": {
+        "to": "did:wia:llm:openai:gpt-4",
+        "messageType": "QUERY"
+    },
+    "payload": {
+        "content": "이 코드의 보안 문제를 분석해주세요",
+        "context": {"code": "..."}
+    }
+}
+
+응답: 202 Accepted
+{
+    "messageId": "msg-xyz789",
+    "status": "accepted",
+    "estimatedCompletionTime": 5000
+}
+</pre>
+
+<h3>연합 엔드포인트</h3>
+<table border="1" cellpadding="5">
+<tr><th>메서드</th><th>엔드포인트</th><th>설명</th></tr>
+<tr><td>POST</td><td>/federation</td><td>연합 생성</td></tr>
+<tr><td>GET</td><td>/federation/{id}</td><td>연합 조회</td></tr>
+<tr><td>POST</td><td>/federation/{id}/join</td><td>연합 참여</td></tr>
+<tr><td>POST</td><td>/federation/{id}/leave</td><td>연합 탈퇴</td></tr>
+<tr><td>POST</td><td>/federation/{id}/task</td><td>작업 제출</td></tr>
+<tr><td>POST</td><td>/federation/{id}/consensus</td><td>합의 시작</td></tr>
+</table>
+
+<h4>POST /federation/{id}/task - 작업 제출</h4>
+<pre>
+요청:
+POST /federation/fed-123/task
+{
+    "description": "웹 애플리케이션 보안 감사",
+    "priority": "HIGH",
+    "decomposition": {
+        "strategy": "HIERARCHICAL"
+    }
+}
+
+응답: 202 Accepted
+{
+    "taskId": "task-abc123",
+    "status": "decomposing",
+    "subtaskCount": 4
+}
+</pre>
+<hr>
+
+<h2>6.3 WebSocket 프로토콜</h2>
+
+<h3>연결</h3>
+<pre>
+WebSocket URL: wss://api.wia.org/ws/v1/llm
+
+연결 요청:
+GET /ws/v1/llm HTTP/1.1
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Protocol: wia-llm-v1
+</pre>
+
+<h3>핸드셰이크 순서</h3>
+<pre>
+1. 클라이언트가 WebSocket 엔드포인트에 연결
+   CLIENT ---> SERVER: WebSocket 업그레이드 요청
+
+2. 서버가 연결 수락
+   CLIENT <--- SERVER: 101 Switching Protocols
+
+3. 클라이언트가 인증 전송
+   CLIENT ---> SERVER: {
+       "type": "AUTH",
+       "token": "{did-auth-token}",
+       "did": "did:wia:llm:anthropic:claude-3-opus"
+   }
+
+4. 서버가 인증 확인
+   CLIENT <--- SERVER: {
+       "type": "AUTH_ACK",
+       "sessionId": "sess-123",
+       "expiresIn": 3600
+   }
+
+5. 메시지 준비 완료
+</pre>
+
+<h3>메시지 유형</h3>
+<table border="1" cellpadding="5">
+<tr><th>유형</th><th>방향</th><th>설명</th></tr>
+<tr><td>AUTH</td><td>클라이언트 -> 서버</td><td>인증 요청</td></tr>
+<tr><td>AUTH_ACK</td><td>서버 -> 클라이언트</td><td>인증 수락</td></tr>
+<tr><td>CAPABILITY_REGISTER</td><td>클라이언트 -> 서버</td><td>능력 등록</td></tr>
+<tr><td>CAPABILITY_QUERY</td><td>클라이언트 -> 서버</td><td>능력 쿼리</td></tr>
+<tr><td>MESSAGE_SEND</td><td>클라이언트 -> 서버</td><td>메시지 전송</td></tr>
+<tr><td>MESSAGE_RECEIVE</td><td>서버 -> 클라이언트</td><td>수신 메시지</td></tr>
+<tr><td>STREAM_START</td><td>서버 -> 클라이언트</td><td>스트림 시작</td></tr>
+<tr><td>STREAM_CHUNK</td><td>서버 -> 클라이언트</td><td>스트림 데이터 청크</td></tr>
+<tr><td>STREAM_END</td><td>서버 -> 클라이언트</td><td>스트림 완료</td></tr>
+<tr><td>PING</td><td>양방향</td><td>연결 유지 핑</td></tr>
+<tr><td>PONG</td><td>양방향</td><td>연결 유지 응답</td></tr>
+</table>
+
+<h3>스트리밍 응답 예시</h3>
+<pre>
+클라이언트가 쿼리 전송:
+{
+    "type": "MESSAGE_SEND",
+    "payload": {
+        "to": "did:wia:llm:openai:gpt-4",
+        "content": "양자 컴퓨팅을 설명해주세요"
+    }
+}
+
+서버가 스트림 전송:
+{
+    "type": "STREAM_START",
+    "messageId": "msg-123",
+    "from": "did:wia:llm:openai:gpt-4"
+}
+
+{
+    "type": "STREAM_CHUNK",
+    "messageId": "msg-123",
+    "sequence": 1,
+    "content": "양자 컴퓨팅은 "
+}
+
+{
+    "type": "STREAM_CHUNK",
+    "messageId": "msg-123",
+    "sequence": 2,
+    "content": "연산의 한 유형으로..."
+}
+
+{
+    "type": "STREAM_END",
+    "messageId": "msg-123",
+    "totalChunks": 15,
+    "totalTokens": 523
+}
+</pre>
+<hr>
+
+<h2>6.4 gRPC 프로토콜</h2>
+
+<h3>서비스 정의 (Protocol Buffers)</h3>
+<pre>
+syntax = "proto3";
+package wia.llm.v1;
+
+// 능력 서비스
+service LLMCapabilityService {
+    rpc RegisterCapability(CapabilityRequest)
+        returns (CapabilityResponse);
+
+    rpc QueryCapabilities(QueryRequest)
+        returns (stream CapabilityMatch);
+
+    rpc GetCapability(GetCapabilityRequest)
+        returns (CapabilityDocument);
+}
+
+// 메시지 서비스
+service LLMMessageService {
+    rpc SendMessage(MessageRequest)
+        returns (MessageResponse);
+
+    rpc StreamMessage(MessageRequest)
+        returns (stream StreamChunk);
+
+    rpc BidirectionalStream(stream MessageRequest)
+        returns (stream MessageResponse);
+}
+
+// 연합 서비스
+service LLMFederationService {
+    rpc CreateFederation(FederationRequest)
+        returns (FederationResponse);
+
+    rpc JoinFederation(JoinRequest)
+        returns (JoinResponse);
+
+    rpc SubmitTask(TaskRequest)
+        returns (stream TaskProgress);
+
+    rpc InitiateConsensus(ConsensusRequest)
+        returns (ConsensusResult);
+}
+</pre>
+
+<h3>메시지 정의</h3>
+<pre>
+message CapabilityDocument {
+    string id = 1;
+    ModelIdentity identity = 2;
+    Capability capability = 3;
+    Constraints constraints = 4;
+    int64 timestamp = 5;
+    bytes signature = 6;
+}
+
+message ModelIdentity {
+    string did = 1;
+    string name = 2;
+    string provider = 3;
+    string version = 4;
+}
+
+message Capability {
+    int32 level = 1;
+    repeated DomainExpertise domains = 2;
+    repeated LanguageSupport languages = 3;
+    repeated string modalities = 4;
+    repeated ToolCapability tools = 5;
+}
+
+message MessageEnvelope {
+    string id = 1;
+    MessageHeader header = 2;
+    bytes payload = 3;
+    RoutingInfo routing = 4;
+    SecurityInfo security = 5;
+}
+
+message TaskDocument {
+    string id = 1;
+    string federation_id = 2;
+    string description = 3;
+    Priority priority = 4;
+    DecompositionConfig decomposition = 5;
+    repeated Subtask subtasks = 6;
+}
+</pre>
+<hr>
+
+<h2>6.5 보안 명세</h2>
+
+<h3>DID 인증</h3>
+<pre>
+인증 헤더 형식:
+Authorization: DID-Auth {signed-challenge}
+
+챌린지-응답 흐름:
+1. 클라이언트가 챌린지 요청
+   GET /auth/challenge?did={did}
+
+2. 서버가 챌린지 반환
+   { "challenge": "random-string", "expiresIn": 300 }
+
+3. 클라이언트가 DID 개인키로 챌린지 서명
+   signature = Sign(challenge, privateKey)
+
+4. 클라이언트가 서명된 챌린지 전송
+   POST /auth/verify
+   { "did": "{did}", "challenge": "...", "signature": "..." }
+
+5. 서버가 검증하고 토큰 반환
+   { "token": "{jwt}", "expiresIn": 3600 }
+</pre>
+
+<h3>메시지 서명</h3>
+<pre>
+서명 형식:
+{
+    "algorithm": "Ed25519",
+    "publicKey": "did:wia:llm:...#key-1",
+    "value": "base64-encoded-signature"
+}
+
+서명 과정:
+1. 메시지를 정규 JSON으로 직렬화
+2. SHA-256 해시 계산
+3. Ed25519 개인키로 해시 서명
+4. 서명을 base64로 인코딩
+</pre>
+
+<h3>암호화</h3>
+<pre>
+암호화 형식:
+{
+    "algorithm": "AES-256-GCM",
+    "keyAgreement": "X25519",
+    "recipientKey": "did:wia:llm:...#encryption-key-1",
+    "ephemeralKey": "base64-public-key",
+    "nonce": "base64-nonce",
+    "ciphertext": "base64-encrypted-payload"
+}
+
+암호화 과정:
+1. 임시 X25519 키 쌍 생성
+2. 수신자 공개키로 공유 비밀 도출
+3. HKDF를 사용하여 AES 키 도출
+4. AES-256-GCM으로 페이로드 암호화
+5. 임시 공개키와 nonce 포함
+</pre>
+<hr>
+
+<h2>6.6 오류 응답 형식</h2>
+<pre>
+{
+    "error": {
+        "code": "CAPABILITY_MISMATCH",
+        "message": "필요한 능력과 일치하는 모델이 없습니다",
+        "details": {
+            "required": {
+                "domains": ["MEDICAL"],
+                "minLevel": 4
+            },
+            "suggestion": "minLevel을 3으로 낮추거나 더 많은 도메인 옵션 추가"
+        },
+        "timestamp": "2024-01-15T10:30:00Z",
+        "requestId": "req-abc123"
+    }
+}
+</pre>
+
+<h3>HTTP 상태 코드</h3>
+<table border="1" cellpadding="5">
+<tr><th>코드</th><th>의미</th><th>사용 사례</th></tr>
+<tr><td>200</td><td>OK</td><td>성공적인 GET/PUT</td></tr>
+<tr><td>201</td><td>Created</td><td>리소스 생성 성공</td></tr>
+<tr><td>202</td><td>Accepted</td><td>비동기 작업 시작</td></tr>
+<tr><td>400</td><td>Bad Request</td><td>잘못된 요청 형식</td></tr>
+<tr><td>401</td><td>Unauthorized</td><td>인증 없음/유효하지 않음</td></tr>
+<tr><td>403</td><td>Forbidden</td><td>권한 부족</td></tr>
+<tr><td>404</td><td>Not Found</td><td>리소스 없음</td></tr>
+<tr><td>429</td><td>Too Many Requests</td><td>속도 제한 초과</td></tr>
+<tr><td>500</td><td>Internal Error</td><td>서버 오류</td></tr>
+<tr><td>503</td><td>Service Unavailable</td><td>일시적 불가</td></tr>
+</table>
+<hr>
+
+<h2>6.7 속도 제한</h2>
+<pre>
+속도 제한 헤더:
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1705312200
+
+기본 제한:
+- 능력 등록: 10/분
+- 능력 쿼리: 100/분
+- 메시지: 60/분
+- 연합 작업: 30/분
+</pre>
+<hr>
+
+<h2>6.8 장 요약</h2>
+<ul>
+<li>[OK] 표준 무상태 작업을 위한 REST API</li>
+<li>[OK] 실시간 스트리밍을 위한 WebSocket</li>
+<li>[OK] 고성능 애플리케이션을 위한 gRPC</li>
+<li>[OK] DID 기반 인증 및 메시지 서명</li>
+<li>[OK] 보안을 위한 AES-256-GCM 암호화</li>
+<li>[OK] 표준화된 오류 응답 및 속도 제한</li>
+</ul>
+<hr>
+
+<p><a href="chapter-05.html">&lt;&lt; 이전: 제5장 - 알고리즘과 매칭</a></p>
+<p><a href="chapter-07.html">다음: 제7장 - 통합 및 배포 &gt;&gt;</a></p>
+<hr>
+<p><a href="index.html">[LLM] 목차</a> | 제6장 / 8장</p>
+</body>
+</html>

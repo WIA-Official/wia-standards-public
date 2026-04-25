@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - API Interface Layer - WIA AI-City</title>
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --purple: #8b5cf6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--primary); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--primary); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--secondary); }
+        h4 { font-size: 1.1rem; margin: 20px 0 10px; color: var(--purple); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--primary); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--warning); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--secondary); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+        pre { background: #1a1a2e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; border-left: 4px solid var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #e2e8f0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+        table { width: 100%; margin: 20px 0; border-collapse: collapse; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+        th { background: var(--primary); color: white; padding: 15px; text-align: left; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+        tr:last-child td { border-bottom: none; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .stat-card { background: var(--bg-card); padding: 20px; border-radius: 8px; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        .stat-label { color: var(--text-muted); font-size: 0.9rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .feature-item { background: var(--bg-card); padding: 15px; border-radius: 8px; border-left: 3px solid var(--secondary); }
+        .feature-item strong { color: var(--text); display: block; margin-bottom: 5px; }
+        .endpoint-card { background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a2e 100%); padding: 20px; border-radius: 12px; margin: 20px 0; border: 1px solid var(--border); }
+        .method { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; margin-right: 10px; }
+        .method-get { background: var(--secondary); color: white; }
+        .method-post { background: var(--primary); color: white; }
+        .method-put { background: var(--warning); color: black; }
+        .method-delete { background: var(--danger); color: white; }
+        .questions-box { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; }
+        .questions-box h3 { color: var(--primary); margin-top: 0; }
+        .questions-box ol { padding-left: 25px; }
+        .questions-box li { color: var(--text-muted); margin-bottom: 15px; padding-left: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--secondary); }
+        .summary-box h3 { color: var(--secondary); margin-top: 0; }
+        .summary-box ul { padding-left: 25px; }
+        .summary-box li { color: var(--text-muted); margin-bottom: 10px; }
+        .looking-ahead { background: linear-gradient(135deg, #2d1f3d 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--purple); }
+        .looking-ahead h3 { color: var(--purple); margin-top: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Phase 2 - API Interface Layer</h1>
+
+        <p>With data formats standardized in Phase 1, Phase 2 builds the API layer that exposes city services to applications, citizens, and third-party developers. This chapter covers REST API design, GraphQL implementation, authentication mechanisms, and the citizen portal APIs that make data sovereignty practical.</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">85+</div>
+                <div class="stat-label">Standard Endpoints</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">12-18</div>
+                <div class="stat-label">Months to Complete</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">OAuth 2.0</div>
+                <div class="stat-label">Authentication Standard</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">3</div>
+                <div class="stat-label">SDK Languages</div>
+            </div>
+        </div>
+
+        <h2>5.1 REST API Design Principles</h2>
+
+        <p>WIA AI-City APIs follow RESTful conventions with additional constraints to ensure consistency across all compliant implementations.</p>
+
+        <h3>Base URL Structure</h3>
+
+        <pre>https://api.{city-domain}/wia/v1/{resource}</pre>
+
+        <p>Examples:</p>
+        <ul style="padding-left: 25px; color: var(--text-muted);">
+            <li><code>https://api.seoul.ai-city.kr/wia/v1/traffic</code></li>
+            <li><code>https://api.barcelona.smart-city.es/wia/v1/environment</code></li>
+            <li><code>https://api.singapore.gov.sg/wia/v1/citizens</code></li>
+        </ul>
+
+        <h3>Standard Response Format</h3>
+
+        <pre>{
+  "@context": "https://schema.wia.org/ai-city/v1",
+  "success": true,
+  "data": { ... },
+  "meta": {
+    "requestId": "REQ-2024-ABC123",
+    "timestamp": "2024-12-24T10:30:00Z",
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "totalItems": 156,
+      "totalPages": 8
+    }
+  }
+}</pre>
+
+        <h3>Error Response Format</h3>
+
+        <pre>{
+  "@context": "https://schema.wia.org/ai-city/v1",
+  "success": false,
+  "error": {
+    "code": "CONSENT_REQUIRED",
+    "message": "Access to location data requires citizen consent",
+    "details": {
+      "dataType": "L2",
+      "requiredScope": "location:read"
+    },
+    "helpUrl": "https://docs.wia.org/errors/CONSENT_REQUIRED"
+  },
+  "meta": {
+    "requestId": "REQ-2024-XYZ789",
+    "timestamp": "2024-12-24T10:30:00Z"
+  }
+}</pre>
+
+        <h2>5.2 Core API Endpoints</h2>
+
+        <h3>Traffic Domain</h3>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/traffic/sensors</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">List all traffic sensors with optional filtering</p>
+            <p><strong>Query Parameters:</strong></p>
+            <ul style="padding-left: 20px; color: var(--text-muted); font-size: 0.9rem;">
+                <li><code>zone</code> - Filter by zone ID</li>
+                <li><code>status</code> - Filter by status (active, maintenance, offline)</li>
+                <li><code>type</code> - Filter by sensor type</li>
+            </ul>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/traffic/sensors/{sensorId}/readings</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Get historical readings from a specific sensor</p>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/traffic/congestion</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Real-time city-wide congestion status</p>
+        </div>
+
+        <h3>Environment Domain</h3>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/environment/air-quality</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Current air quality index across zones</p>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/environment/weather</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Current weather conditions and forecast</p>
+        </div>
+
+        <h3>Sharing Engine Domain</h3>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/sharing/stats</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Aggregate contribution statistics</p>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/sharing/allocations</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Fund allocation details by category</p>
+        </div>
+
+        <h2>5.3 Citizen Portal APIs</h2>
+
+        <p>The citizen portal APIs provide the technical foundation for data sovereignty rights. These endpoints enable citizens to view, manage, and control their personal data.</p>
+
+        <h3>Consent Management</h3>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/citizens/me/consents</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">List all active consent grants</p>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-post">POST</span><code>/citizens/me/consents</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Grant new consent for data usage</p>
+            <pre style="margin-top: 10px;">{
+  "dataType": "L2",
+  "purpose": "traffic_optimization",
+  "scope": ["location", "travel_patterns"],
+  "expiresAt": "2025-12-24T00:00:00Z"
+}</pre>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-delete">DELETE</span><code>/citizens/me/consents/{consentId}</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Revoke an existing consent</p>
+        </div>
+
+        <h3>Data Access</h3>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/citizens/me/data</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">View all data the city holds about you</p>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-get">GET</span><code>/citizens/me/access-log</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">See who accessed your data and when</p>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-post">POST</span><code>/citizens/me/data/export</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Request data export (portability right)</p>
+        </div>
+
+        <div class="endpoint-card">
+            <p><span class="method method-delete">DELETE</span><code>/citizens/me/data</code></p>
+            <p style="color: var(--text-muted); margin: 10px 0;">Request complete data deletion (erasure right)</p>
+        </div>
+
+        <h2>5.4 GraphQL Interface</h2>
+
+        <p>For complex queries and real-time subscriptions, WIA AI-City provides a GraphQL interface alongside REST.</p>
+
+        <h3>Schema Overview</h3>
+
+        <pre>type Query {
+  traffic(zone: ID, limit: Int): TrafficData
+  environment(type: EnvironmentType): EnvironmentData
+  sharing: SharingStats
+  citizen: CitizenProfile
+}
+
+type Mutation {
+  grantConsent(input: ConsentInput!): Consent
+  revokeConsent(consentId: ID!): Boolean
+  requestDataExport: ExportRequest
+  requestDataDeletion: DeletionRequest
+}
+
+type Subscription {
+  trafficUpdates(zone: ID): TrafficReading
+  alertsForZone(zone: ID!): Alert
+  congestionChanges: CongestionEvent
+}</pre>
+
+        <h3>Example Queries</h3>
+
+        <pre># Get traffic data with nested sensor information
+query {
+  traffic(zone: "gangnam") {
+    sensors {
+      id
+      status
+      lastReading {
+        vehicleCount
+        averageSpeed
+        timestamp
+      }
+    }
+    congestionLevel
+  }
+}</pre>
+
+        <pre># Subscribe to real-time traffic updates
+subscription {
+  trafficUpdates(zone: "gangnam") {
+    sensorId
+    vehicleCount
+    averageSpeed
+    congestionLevel
+    timestamp
+  }
+}</pre>
+
+        <h2>5.5 Authentication & Authorization</h2>
+
+        <p>WIA AI-City uses OAuth 2.0 with OpenID Connect for authentication, supporting multiple grant types for different use cases.</p>
+
+        <h3>Supported Grant Types</h3>
+
+        <table>
+            <tr>
+                <th>Grant Type</th>
+                <th>Use Case</th>
+                <th>Token Lifetime</th>
+            </tr>
+            <tr>
+                <td>Authorization Code + PKCE</td>
+                <td>Citizen-facing applications</td>
+                <td>1 hour (refresh: 30 days)</td>
+            </tr>
+            <tr>
+                <td>Client Credentials</td>
+                <td>Machine-to-machine (city systems)</td>
+                <td>1 hour</td>
+            </tr>
+            <tr>
+                <td>Device Authorization</td>
+                <td>IoT devices, kiosks</td>
+                <td>15 minutes (refresh: 90 days)</td>
+            </tr>
+        </table>
+
+        <h3>Scope Hierarchy</h3>
+
+        <pre># Data type scopes (classification levels)
+L1:*         # All L1 data (never granted externally)
+L2:read      # Read location data
+L2:write     # Update location preferences
+L3:read      # Read behavioral data
+L4:read      # Read public data (default)
+
+# Domain scopes
+traffic:read
+environment:read
+sharing:read
+citizen:profile:read
+citizen:consents:manage
+citizen:data:export
+citizen:data:delete</pre>
+
+        <h3>Token Request Example</h3>
+
+        <pre>POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&code=AUTH_CODE_HERE
+&redirect_uri=https://myapp.example.com/callback
+&client_id=APP_CLIENT_ID
+&code_verifier=PKCE_VERIFIER</pre>
+
+        <h2>5.6 Rate Limiting & Quotas</h2>
+
+        <table>
+            <tr>
+                <th>Tier</th>
+                <th>Requests/Hour</th>
+                <th>Burst Limit</th>
+                <th>Data Export/Day</th>
+            </tr>
+            <tr>
+                <td>Public (L4 only)</td>
+                <td>1,000</td>
+                <td>100/minute</td>
+                <td>N/A</td>
+            </tr>
+            <tr>
+                <td>Registered Developer</td>
+                <td>10,000</td>
+                <td>500/minute</td>
+                <td>10 GB</td>
+            </tr>
+            <tr>
+                <td>Certified Partner</td>
+                <td>100,000</td>
+                <td>2,000/minute</td>
+                <td>100 GB</td>
+            </tr>
+            <tr>
+                <td>City Systems</td>
+                <td>Unlimited</td>
+                <td>10,000/minute</td>
+                <td>Unlimited</td>
+            </tr>
+        </table>
+
+        <h3>Rate Limit Headers</h3>
+
+        <pre>X-RateLimit-Limit: 10000
+X-RateLimit-Remaining: 9876
+X-RateLimit-Reset: 1703412600
+X-RateLimit-RetryAfter: 3600</pre>
+
+        <h2>5.7 SDK Implementation</h2>
+
+        <h3>TypeScript SDK</h3>
+
+        <pre>npm install @wia/ai-city-sdk</pre>
+
+        <pre>import { AICityClient, TrafficAPI, CitizenAPI } from '@wia/ai-city-sdk';
+
+// Initialize client
+const client = new AICityClient({
+  baseUrl: 'https://api.seoul.ai-city.kr/wia/v1',
+  apiKey: process.env.WIA_API_KEY,
+  cityId: 'AIC-2024-SEOUL1'
+});
+
+// Traffic data
+const traffic = await client.traffic.getCongestion({ zone: 'gangnam' });
+console.log(`Congestion level: ${traffic.congestionLevel}`);
+
+// Citizen consent management
+const consents = await client.citizen.listConsents();
+await client.citizen.revokeConsent('CST-ABC123');</pre>
+
+        <h3>Python SDK</h3>
+
+        <pre>pip install wia-ai-city</pre>
+
+        <pre>from wia_ai_city import AICityClient
+
+client = AICityClient(
+    base_url='https://api.seoul.ai-city.kr/wia/v1',
+    api_key=os.environ['WIA_API_KEY'],
+    city_id='AIC-2024-SEOUL1'
+)
+
+# Get air quality
+air_quality = client.environment.get_air_quality(zone='gangnam')
+print(f"PM2.5: {air_quality.pm25}")
+
+# Export citizen data
+export_request = client.citizen.request_data_export(format='json-ld')
+print(f"Export ID: {export_request.id}")</pre>
+
+        <h3>Rust SDK</h3>
+
+        <pre>// Cargo.toml
+[dependencies]
+wia-ai-city = "1.0"</pre>
+
+        <pre>use wia_ai_city::{Client, Result};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let client = Client::from_env().await?;
+
+    // Get traffic sensors
+    let sensors = client.traffic().sensors()
+        .zone("gangnam")
+        .status("active")
+        .fetch().await?;
+
+    for sensor in sensors {
+        println!("{}: {} vehicles", sensor.id, sensor.reading.vehicle_count);
+    }
+
+    Ok(())
+}</pre>
+
+        <h2>5.8 Webhook Integration</h2>
+
+        <p>For event-driven architectures, WIA AI-City supports webhooks for real-time notifications.</p>
+
+        <h3>Registering a Webhook</h3>
+
+        <pre>POST /webhooks
+{
+  "url": "https://myapp.example.com/wia-webhook",
+  "events": [
+    "traffic.congestion.high",
+    "environment.alert.air_quality",
+    "sharing.contribution.milestone"
+  ],
+  "secret": "webhook_signing_secret"
+}</pre>
+
+        <h3>Webhook Payload</h3>
+
+        <pre>{
+  "@context": "https://schema.wia.org/ai-city/v1",
+  "@type": "WebhookEvent",
+  "event": "traffic.congestion.high",
+  "timestamp": "2024-12-24T10:30:00Z",
+  "data": {
+    "zone": "gangnam",
+    "congestionLevel": 0.85,
+    "affectedRoutes": ["route-a", "route-b"]
+  },
+  "signature": "sha256=abc123..."
+}</pre>
+
+        <h2>5.9 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>REST Design:</strong> APIs follow RESTful conventions with JSON-LD responses, standard error formats, and consistent pagination.</li>
+                <li><strong>Core Endpoints:</strong> 85+ standard endpoints across traffic, environment, sharing engine, and citizen domains.</li>
+                <li><strong>Citizen Portal:</strong> APIs for consent management, data access, export, and deletion implement the Data Sovereignty pillar technically.</li>
+                <li><strong>GraphQL:</strong> Flexible querying and real-time subscriptions complement REST for complex use cases.</li>
+                <li><strong>OAuth 2.0:</strong> Authentication uses OAuth 2.0 with OpenID Connect, supporting multiple grant types for different clients.</li>
+                <li><strong>Scopes:</strong> Fine-grained scopes map to data classification levels and domain permissions.</li>
+                <li><strong>Rate Limiting:</strong> Tiered rate limits protect the system while enabling legitimate high-volume access.</li>
+                <li><strong>SDKs:</strong> Official SDKs for TypeScript, Python, and Rust reduce integration friction.</li>
+                <li><strong>Webhooks:</strong> Event-driven integration enables real-time notifications for critical city events.</li>
+            </ul>
+        </div>
+
+        <h2>5.10 Review Questions</h2>
+
+        <div class="questions-box">
+            <h3>Test Your Understanding</h3>
+            <ol>
+                <li>A citizen wants to see all the data the city holds about them and who has accessed it. Which API endpoints would they use?</li>
+                <li>Design a GraphQL query that fetches air quality for multiple zones with sensor details and historical trends.</li>
+                <li>Why does WIA AI-City use OAuth 2.0 with PKCE for citizen-facing applications? What security benefits does this provide?</li>
+                <li>A third-party developer wants to build a traffic visualization app. What scopes would they need, and what rate limits would apply?</li>
+                <li>How do webhook signatures prevent tampering with event notifications?</li>
+                <li>Write code using the TypeScript SDK to list a citizen's active consents and revoke one that has expired.</li>
+            </ol>
+        </div>
+
+        <h2>5.11 Looking Ahead</h2>
+
+        <div class="looking-ahead">
+            <h3>What's Next: Chapter 6 - Phase 3: AIDC-Link Protocol</h3>
+            <p>With APIs providing application-level access, Phase 3 implements the complete AIDC-Link protocol stack:</p>
+            <ul style="margin-top: 15px; padding-left: 25px; color: var(--text-muted);">
+                <li><strong>Physical Layer:</strong> Network infrastructure specifications for fiber, 5G/6G, and quantum-ready links.</li>
+                <li><strong>Message Protocol:</strong> Binary and text message formats for efficient inter-node communication.</li>
+                <li><strong>Edge AI Deployment:</strong> Specifications for edge computing nodes and local AI processing.</li>
+                <li><strong>Security Hardening:</strong> End-to-end encryption, certificate management, and intrusion detection.</li>
+                <li><strong>Federation:</strong> Cross-city communication protocols for inter-city coordination.</li>
+            </ul>
+            <p style="margin-top: 20px; color: var(--primary);">The APIs speak to applications. Now let's build the protocol that makes the city speak to itself.</p>
+        </div>
+
+        </div>
+</body>
+</html>

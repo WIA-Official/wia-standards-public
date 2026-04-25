@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Refugee Credential - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #A78BFA); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .level-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .level-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .level-card:hover { border-color: var(--primary); }
+        .level-card.selected { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .level-num { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        .level-name { font-weight: 600; margin: 10px 0 5px; }
+        .level-conf { font-size: 0.9rem; color: var(--success); }
+
+        .credential-card { background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(167,139,250,0.1)); border: 2px solid var(--primary); border-radius: 12px; padding: 25px; margin: 20px 0; }
+        .credential-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border); padding-bottom: 15px; margin-bottom: 15px; }
+        .credential-id { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); }
+        .credential-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .credential-row:last-child { border-bottom: none; }
+        .credential-label { color: var(--text-muted); }
+        .credential-value { font-weight: 600; }
+
+        .peer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .peer-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .peer-match { color: var(--success); font-weight: 600; }
+
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .status-badge.level1 { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .status-badge.level2 { background: rgba(245,158,11,0.2); color: #f59e0b; }
+        .status-badge.level3 { background: rgba(16,185,129,0.2); color: #10b981; }
+        .status-badge.level4 { background: rgba(139,92,246,0.2); color: #8b5cf6; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .form-grid { grid-template-columns: 1fr; }
+            .level-grid { grid-template-columns: repeat(2, 1fr); }
+            .peer-grid { grid-template-columns: 1fr; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Refugee Credential</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🛂 WIA Refugee Credential</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Refugee Credential Standard" data-ko="난민 자격증명 표준">Refugee Credential Standard</h1>
+            <p data-en="Portable, verifiable credentials for displaced persons" data-ko="실향민을 위한 휴대 가능하고 검증 가능한 자격증명">Portable, verifiable credentials</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📝 Create" data-ko="📝 생성">📝 Create</div>
+            <div class="tab" onclick="showPanel(1)" data-en="👥 Verify" data-ko="👥 검증">👥 Verify</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📊 Levels" data-ko="📊 레벨">📊 Levels</div>
+            <div class="tab" onclick="showPanel(3)" data-en="✈️ Eligibility" data-ko="✈️ 자격">✈️ Eligibility</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔌 API" data-ko="🔌 API">🔌 API</div>
+        </div>
+
+        <!-- Panel 0: Create Credential -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📝 Create Credential" data-ko="📝 자격증명 생성">📝 Create Credential</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Self-declare your credentials (Level 1)" data-ko="자격증명 자기 선언 (레벨 1)">Self-declare credentials</p>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Display Name" data-ko="표시 이름">Display Name</label>
+                    <input type="text" id="displayName" placeholder="Ahmad Mohammad">
+                </div>
+                <div class="form-group">
+                    <label data-en="Birth Year" data-ko="출생연도">Birth Year</label>
+                    <input type="number" id="birthYear" value="1985" min="1940" max="2010">
+                </div>
+                <div class="form-group">
+                    <label data-en="Nationality Claimed" data-ko="주장 국적">Nationality Claimed</label>
+                    <select id="nationality">
+                        <option value="SY">Syria (SY)</option>
+                        <option value="UA">Ukraine (UA)</option>
+                        <option value="AF">Afghanistan (AF)</option>
+                        <option value="ER">Eritrea (ER)</option>
+                        <option value="SO">Somalia (SO)</option>
+                        <option value="SD">Sudan (SD)</option>
+                        <option value="VE">Venezuela (VE)</option>
+                        <option value="MM">Myanmar (MM)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Refugee Status" data-ko="난민 지위">Refugee Status</label>
+                    <select id="refugeeStatus">
+                        <option value="unhcr_recognized">UNHCR Recognized</option>
+                        <option value="asylum_seeker">Asylum Seeker</option>
+                        <option value="internally_displaced">Internally Displaced</option>
+                        <option value="stateless">Stateless</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Education Level" data-ko="학력">Education Level</label>
+                    <select id="eduLevel">
+                        <option value="professional">Professional (MD, JD)</option>
+                        <option value="doctorate">Doctorate (PhD)</option>
+                        <option value="masters">Master's Degree</option>
+                        <option value="bachelors">Bachelor's Degree</option>
+                        <option value="vocational">Vocational Training</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Field of Study" data-ko="전공">Field of Study</label>
+                    <input type="text" id="fieldOfStudy" placeholder="Medicine - Cardiology">
+                </div>
+                <div class="form-group">
+                    <label data-en="Institution" data-ko="교육기관">Institution</label>
+                    <input type="text" id="institution" placeholder="Damascus University">
+                </div>
+                <div class="form-group">
+                    <label data-en="Years of Practice" data-ko="경력 연수">Years of Practice</label>
+                    <input type="number" id="yearsPractice" value="12" min="0" max="50">
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="createCredential()" data-en="📝 Create Credential" data-ko="📝 자격증명 생성">📝 Create Credential</button>
+            </div>
+            <div class="output" id="createOutput"></div>
+        </div>
+
+        <!-- Panel 1: Peer Verification -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="👥 Peer Verification" data-ko="👥 동료 검증">👥 Peer Verification</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Find peers to verify your credentials" data-ko="자격증명을 검증할 동료 찾기">Find peers to verify</p>
+
+            <div class="peer-grid">
+                <div class="peer-card">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">👨‍⚕️</div>
+                    <div style="font-weight: 600;">Dr. Fatima Hassan</div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">Damascus University 2005-2011</div>
+                    <div class="peer-match">85% Match</div>
+                    <button class="btn btn-secondary" style="margin-top: 10px; padding: 8px 16px; font-size: 0.85rem;" onclick="requestVerify(1)">Request</button>
+                </div>
+                <div class="peer-card">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">👨‍🔬</div>
+                    <div style="font-weight: 600;">Prof. Omar Khalil</div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">Damascus University 2001-2012</div>
+                    <div class="peer-match">72% Match</div>
+                    <button class="btn btn-secondary" style="margin-top: 10px; padding: 8px 16px; font-size: 0.85rem;" onclick="requestVerify(2)">Request</button>
+                </div>
+                <div class="peer-card">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">👩‍⚕️</div>
+                    <div style="font-weight: 600;">Dr. Layla Mansour</div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">Medicine Professional</div>
+                    <div class="peer-match">65% Match</div>
+                    <button class="btn btn-secondary" style="margin-top: 10px; padding: 8px 16px; font-size: 0.85rem;" onclick="requestVerify(3)">Request</button>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulatePeerVerify()" data-en="👥 Simulate 2 Peers Verified" data-ko="👥 2명 동료 검증 시뮬레이션">👥 Simulate 2 Peers Verified</button>
+            </div>
+            <div class="output" id="verifyOutput"></div>
+        </div>
+
+        <!-- Panel 2: Verification Levels -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📊 Verification Levels" data-ko="📊 검증 레벨">📊 Verification Levels</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Four levels of credential verification" data-ko="4단계 자격증명 검증">Four verification levels</p>
+
+            <div class="level-grid">
+                <div class="level-card selected">
+                    <div class="level-num">1</div>
+                    <div class="level-name" data-en="Self-Declaration" data-ko="자기 선언">Self-Declaration</div>
+                    <div class="level-conf">30% Confidence</div>
+                </div>
+                <div class="level-card">
+                    <div class="level-num">2</div>
+                    <div class="level-name" data-en="Peer Verified" data-ko="동료 검증">Peer Verified</div>
+                    <div class="level-conf">60% Confidence</div>
+                </div>
+                <div class="level-card">
+                    <div class="level-num">3</div>
+                    <div class="level-name" data-en="Assessment" data-ko="평가 검증">Assessment</div>
+                    <div class="level-conf">80% Confidence</div>
+                </div>
+                <div class="level-card">
+                    <div class="level-num">4</div>
+                    <div class="level-name" data-en="Document Verified" data-ko="문서 검증">Document Verified</div>
+                    <div class="level-conf">95% Confidence</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="takeAssessment()" data-en="📝 Take Assessment (→ Level 3)" data-ko="📝 평가 응시 (→ 레벨 3)">📝 Take Assessment</button>
+            </div>
+            <div class="output" id="levelOutput"></div>
+        </div>
+
+        <!-- Panel 3: Eligibility Check -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="✈️ Travel/Work Eligibility" data-ko="✈️ 여행/취업 자격">✈️ Eligibility</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Check eligibility for different countries" data-ko="각 국가별 자격 확인">Check country eligibility</p>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Target Country" data-ko="대상 국가">Target Country</label>
+                    <select id="targetCountry">
+                        <option value="DE">Germany</option>
+                        <option value="CA">Canada</option>
+                        <option value="SE">Sweden</option>
+                        <option value="AU">Australia</option>
+                        <option value="US">United States</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Purpose" data-ko="목적">Purpose</label>
+                    <select id="purpose">
+                        <option value="work_medical">Work - Medical Practice</option>
+                        <option value="work_engineering">Work - Engineering</option>
+                        <option value="work_teaching">Work - Teaching</option>
+                        <option value="university">University Admission</option>
+                        <option value="license">Professional License</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="checkEligibility()" data-en="✈️ Check Eligibility" data-ko="✈️ 자격 확인">✈️ Check Eligibility</button>
+            </div>
+            <div class="output" id="eligibilityOutput"></div>
+        </div>
+
+        <!-- Panel 4: API -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔌 API Reference" data-ko="🔌 API 레퍼런스">🔌 API Reference</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Integration endpoints for refugee credentials" data-ko="난민 자격증명 연동 API">Integration endpoints</p>
+
+            <div class="form-group">
+                <label data-en="Endpoint" data-ko="엔드포인트">Endpoint</label>
+                <select id="apiEndpoint" onchange="showApiExample()">
+                    <option value="create">POST /api/v1/credentials - Create</option>
+                    <option value="verify">POST /api/v1/verify - Peer Verify</option>
+                    <option value="assess">POST /api/v1/assess - Assessment</option>
+                    <option value="check">GET /api/v1/eligibility - Check</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testApi()" data-en="🔌 Test API" data-ko="🔌 API 테스트">🔌 Test API</button>
+            </div>
+            <div class="output" id="apiOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="When nations fall, people's value does not fall with them" data-ko="나라가 무너져도 사람의 가치는 무너지지 않는다">When nations fall, people's value does not</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let currentCredential = null;
+        let verificationLevel = 1;
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = text;
+                else el.textContent = text;
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function generateDID() {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = 'did:wia:refugee:z6Mk';
+            for (let i = 0; i < 40; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+            return result;
+        }
+
+        function createCredential() {
+            currentCredential = {
+                did: generateDID(),
+                holder: {
+                    displayName: document.getElementById('displayName').value || 'Ahmad Mohammad',
+                    birthYear: document.getElementById('birthYear').value,
+                    nationality: document.getElementById('nationality').value,
+                    refugeeStatus: document.getElementById('refugeeStatus').value
+                },
+                education: {
+                    level: document.getElementById('eduLevel').value,
+                    field: document.getElementById('fieldOfStudy').value || 'Medicine - Cardiology',
+                    institution: document.getElementById('institution').value || 'Damascus University'
+                },
+                experience: { yearsPractice: document.getElementById('yearsPractice').value },
+                verification: { level: 1, confidence: 0.30 },
+                createdAt: new Date().toISOString()
+            };
+            verificationLevel = 1;
+
+            document.getElementById('createOutput').textContent = JSON.stringify({
+                status: 'success',
+                message: currentLang === 'ko' ? '자격증명이 생성되었습니다 (레벨 1)' : 'Credential created (Level 1)',
+                credential: currentCredential
+            }, null, 2);
+        }
+
+        function requestVerify(peerId) {
+            alert(currentLang === 'ko' ? `피어 ${peerId}에게 검증 요청을 보냈습니다.` : `Verification request sent to peer ${peerId}.`);
+        }
+
+        function simulatePeerVerify() {
+            if (!currentCredential) {
+                document.getElementById('verifyOutput').textContent = JSON.stringify({ error: currentLang === 'ko' ? '먼저 자격증명을 생성하세요' : 'Create credential first' }, null, 2);
+                return;
+            }
+            verificationLevel = 2;
+            currentCredential.verification = { level: 2, confidence: 0.60, peerCount: 2 };
+            document.getElementById('verifyOutput').textContent = JSON.stringify({
+                status: 'success',
+                message: currentLang === 'ko' ? '동료 검증 완료 (레벨 2)' : 'Peer verification complete (Level 2)',
+                newLevel: 2, newConfidence: '60%', peersVerified: 2
+            }, null, 2);
+        }
+
+        function takeAssessment() {
+            if (!currentCredential) {
+                document.getElementById('levelOutput').textContent = JSON.stringify({ error: currentLang === 'ko' ? '먼저 자격증명을 생성하세요' : 'Create credential first' }, null, 2);
+                return;
+            }
+            const score = 75 + Math.floor(Math.random() * 20);
+            verificationLevel = 3;
+            currentCredential.verification = { level: 3, confidence: 0.80, assessmentScore: score };
+            document.getElementById('levelOutput').textContent = JSON.stringify({
+                status: 'success',
+                message: currentLang === 'ko' ? '평가 완료 (레벨 3)' : 'Assessment complete (Level 3)',
+                score: score, passed: true, newLevel: 3, newConfidence: '80%'
+            }, null, 2);
+        }
+
+        function checkEligibility() {
+            const country = document.getElementById('targetCountry').value;
+            const purpose = document.getElementById('purpose').value;
+            const requirements = {
+                'work_medical': { minLevel: 3, minConfidence: 0.75 },
+                'work_engineering': { minLevel: 2, minConfidence: 0.60 },
+                'work_teaching': { minLevel: 2, minConfidence: 0.55 },
+                'university': { minLevel: 2, minConfidence: 0.50 },
+                'license': { minLevel: 3, minConfidence: 0.80 }
+            };
+            const req = requirements[purpose] || { minLevel: 2, minConfidence: 0.60 };
+            const eligible = verificationLevel >= req.minLevel;
+
+            document.getElementById('eligibilityOutput').textContent = JSON.stringify({
+                targetCountry: country,
+                purpose: purpose,
+                yourLevel: verificationLevel,
+                requiredLevel: req.minLevel,
+                eligible: eligible,
+                message: eligible ? (currentLang === 'ko' ? '자격 요건을 충족합니다' : 'You meet the requirements') : (currentLang === 'ko' ? '추가 검증이 필요합니다' : 'Additional verification needed')
+            }, null, 2);
+        }
+
+        function showApiExample() {
+            testApi();
+        }
+
+        function testApi() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const examples = {
+                create: { method: 'POST', path: '/api/v1/credentials', request: { holder: { displayName: 'Ahmad', nationality: 'SY' }, education: { level: 'professional' } }, response: { credentialId: 'cred_xxx', verificationLevel: 1 } },
+                verify: { method: 'POST', path: '/api/v1/verify', request: { credentialId: 'cred_xxx', peerId: 'peer_yyy' }, response: { verified: true, newLevel: 2 } },
+                assess: { method: 'POST', path: '/api/v1/assess', request: { credentialId: 'cred_xxx', domain: 'medicine' }, response: { score: 85, passed: true, newLevel: 3 } },
+                check: { method: 'GET', path: '/api/v1/eligibility?country=DE&purpose=work_medical', response: { eligible: true, requirements: { minLevel: 3 } } }
+            };
+            document.getElementById('apiOutput').textContent = JSON.stringify(examples[endpoint], null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('wiaLang') || 'en';
+            setLang(savedLang);
+            testApi();
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

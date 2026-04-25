@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Food Waste Reduction - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #84CC16;
+            --primary-dark: #65A30D;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Top Navigation */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Hero Section */
+        .hero { text-align: center; padding: 15px 0; margin-bottom: 15px; }
+        .hero h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero .subtitle { font-size: 0.95rem; color: var(--text-muted); }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+        .tab-btn {
+            padding: 12px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .tab-btn:hover { border-color: var(--primary); }
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Form Elements */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(132, 204, 22, 0.3); }
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--primary); }
+
+        /* Output Box */
+        .output-box {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            margin-top: 20px;
+        }
+        .output-box h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+        .output-box pre {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            border: 1px solid var(--border);
+        }
+
+        /* Info Cards */
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .info-card h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        .info-card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .info-card ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .info-card li {
+            color: var(--text-muted);
+            margin: 5px 0;
+            font-size: 0.9rem;
+        }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .stat {
+            background: var(--bg-card);
+            padding: 20px 30px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        /* Alert Messages */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid;
+        }
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--secondary);
+            color: var(--secondary);
+        }
+        .alert-info {
+            background: rgba(132, 204, 22, 0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 60px;
+            padding: 20px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        footer .philosophy {
+            color: #ffd700;
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+        footer p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin: 3px 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .tab-nav { gap: 5px; }
+            .tab-btn { padding: 10px 15px; font-size: 0.85rem; }
+            .form-grid { grid-template-columns: 1fr; }
+            .info-cards { grid-template-columns: 1fr; }
+            .breadcrumb { display: none; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="../">AGRI-032</a>
+                    <span class="sep">›</span>
+                    <span class="current">Simulator</span>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="../" data-en="← Back to Standard" data-ko="← 표준으로 돌아가기">← Back to Standard</a>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1 data-en="♻️ Food Waste Reduction Simulator" data-ko="♻️ 식량 폐기물 감소 시뮬레이터">♻️ Food Waste Reduction Simulator</h1>
+            <p class="subtitle" data-en="Track expiration, optimize inventory, and measure waste reduction impact" data-ko="유통기한 추적, 재고 최적화 및 폐기물 감소 효과 측정">Track expiration, optimize inventory, and measure waste reduction impact</p>
+        </section>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('overview')" data-en="📚 Overview" data-ko="📚 개요">📚 Overview</button>
+            <button class="tab-btn" onclick="switchTab('datainput')" data-en="📥 Data Input" data-ko="📥 데이터 입력">📥 Data Input</button>
+            <button class="tab-btn" onclick="switchTab('apitest')" data-en="🔌 API Test" data-ko="🔌 API 테스트">🔌 API Test</button>
+            <button class="tab-btn" onclick="switchTab('protocol')" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</button>
+            <button class="tab-btn" onclick="switchTab('integration')" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</button>
+        </div>
+
+        <!-- Tab 1: Overview -->
+        <div id="tab-overview" class="tab-content active">
+            <div class="info-cards">
+                <div class="info-card">
+                    <h3 data-en="🎯 Purpose" data-ko="🎯 목적">🎯 Purpose</h3>
+                    <p data-en="The WIA Food Waste Reduction standard enables tracking expiration dates, optimizing inventory management, facilitating food donations, and measuring waste reduction impact across the entire food supply chain." data-ko="WIA 식량 폐기물 감소 표준은 전체 식품 공급망에 걸쳐 유통기한 추적, 재고 관리 최적화, 식품 기부 촉진 및 폐기물 감소 효과 측정을 가능하게 합니다.">The WIA Food Waste Reduction standard enables tracking expiration dates, optimizing inventory management, facilitating food donations, and measuring waste reduction impact across the entire food supply chain.</p>
+                </div>
+                <div class="info-card">
+                    <h3 data-en="📊 Data Types" data-ko="📊 데이터 유형">📊 Data Types</h3>
+                    <ul>
+                        <li data-en="Product expiration tracking" data-ko="제품 유통기한 추적">Product expiration tracking</li>
+                        <li data-en="Inventory levels and turnover" data-ko="재고 수준 및 회전율">Inventory levels and turnover</li>
+                        <li data-en="Waste measurements (weight, cost)" data-ko="폐기물 측정 (중량, 비용)">Waste measurements (weight, cost)</li>
+                        <li data-en="Donation records and impact" data-ko="기부 기록 및 영향">Donation records and impact</li>
+                        <li data-en="Supply chain analytics" data-ko="공급망 분석">Supply chain analytics</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3 data-en="🔑 Key Features" data-ko="🔑 주요 기능">🔑 Key Features</h3>
+                    <ul>
+                        <li data-en="AI-powered expiration prediction" data-ko="AI 기반 유통기한 예측">AI-powered expiration prediction</li>
+                        <li data-en="Real-time inventory tracking" data-ko="실시간 재고 추적">Real-time inventory tracking</li>
+                        <li data-en="Donation network integration" data-ko="기부 네트워크 통합">Donation network integration</li>
+                        <li data-en="Waste reduction metrics" data-ko="폐기물 감소 지표">Waste reduction metrics</li>
+                        <li data-en="Supply chain optimization" data-ko="공급망 최적화">Supply chain optimization</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3 data-en="🌐 Use Cases" data-ko="🌐 사용 사례">🌐 Use Cases</h3>
+                    <ul>
+                        <li data-en="Restaurant inventory management" data-ko="레스토랑 재고 관리">Restaurant inventory management</li>
+                        <li data-en="Grocery store waste reduction" data-ko="식료품점 폐기물 감소">Grocery store waste reduction</li>
+                        <li data-en="Food bank coordination" data-ko="푸드뱅크 조정">Food bank coordination</li>
+                        <li data-en="Farm-to-table tracking" data-ko="농장에서 식탁까지 추적">Farm-to-table tracking</li>
+                        <li data-en="Regulatory compliance reporting" data-ko="규제 준수 보고">Regulatory compliance reporting</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">40%</div>
+                    <div class="stat-label" data-en="Waste Reduction" data-ko="폐기물 감소">Waste Reduction</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label" data-en="Monitoring" data-ko="모니터링">Monitoring</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">99%</div>
+                    <div class="stat-label" data-en="Accuracy" data-ko="정확도">Accuracy</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">API</div>
+                    <div class="stat-label" data-en="Integration" data-ko="통합">Integration</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Data Input -->
+        <div id="tab-datainput" class="tab-content">
+            <div class="alert alert-info" data-en="📝 Enter food waste data to generate standard-compliant JSON format" data-ko="📝 표준 호환 JSON 형식을 생성하려면 식량 폐기물 데이터를 입력하세요">📝 Enter food waste data to generate standard-compliant JSON format</div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Facility ID" data-ko="시설 ID">Facility ID</label>
+                    <input type="text" id="facilityId" placeholder="FACILITY-2025-001" value="FACILITY-2025-001">
+                </div>
+                <div class="form-group">
+                    <label data-en="Product Name" data-ko="제품명">Product Name</label>
+                    <input type="text" id="productName" placeholder="Fresh Milk" value="Fresh Milk">
+                </div>
+                <div class="form-group">
+                    <label data-en="Product Category" data-ko="제품 카테고리">Product Category</label>
+                    <select id="productCategory">
+                        <option value="dairy">Dairy Products</option>
+                        <option value="produce">Fresh Produce</option>
+                        <option value="meat">Meat & Seafood</option>
+                        <option value="bakery">Bakery</option>
+                        <option value="prepared">Prepared Foods</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Expiration Date" data-ko="유통기한">Expiration Date</label>
+                    <input type="date" id="expirationDate">
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Quantity" data-ko="수량">Quantity</label>
+                    <input type="number" id="quantity" placeholder="100" value="100" step="1">
+                </div>
+                <div class="form-group">
+                    <label data-en="Unit" data-ko="단위">Unit</label>
+                    <select id="unit">
+                        <option value="kg">Kilograms (kg)</option>
+                        <option value="lbs">Pounds (lbs)</option>
+                        <option value="items">Items</option>
+                        <option value="liters">Liters</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Status" data-ko="상태">Status</label>
+                    <select id="status">
+                        <option value="fresh">Fresh</option>
+                        <option value="near-expiry">Near Expiry</option>
+                        <option value="expired">Expired</option>
+                        <option value="donated">Donated</option>
+                        <option value="wasted">Wasted</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Cost per Unit ($)" data-ko="단위당 비용 ($)">Cost per Unit ($)</label>
+                    <input type="number" id="costPerUnit" placeholder="3.50" value="3.50" step="0.01">
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="generateDataFormat()" data-en="🔄 Generate JSON Format" data-ko="🔄 JSON 형식 생성">🔄 Generate JSON Format</button>
+
+            <div class="output-box">
+                <h3 data-en="Generated Data Format" data-ko="생성된 데이터 형식">Generated Data Format</h3>
+                <pre id="dataOutput">{
+  "standardVersion": "WIA-AGRI-032-v1.0",
+  "facilityId": "FACILITY-2025-001",
+  "timestamp": "2025-12-26T10:30:00Z",
+  "product": {
+    "name": "Fresh Milk",
+    "category": "dairy",
+    "quantity": 100,
+    "unit": "kg",
+    "expirationDate": "2025-12-31",
+    "status": "fresh"
+  },
+  "economics": {
+    "costPerUnit": 3.50,
+    "totalValue": 350.00,
+    "currency": "USD"
+  },
+  "metadata": {
+    "trackingId": "TRACK-001",
+    "validated": true
+  }
+}</pre>
+            </div>
+        </div>
+
+        <!-- Tab 3: API Test -->
+        <div id="tab-apitest" class="tab-content">
+            <div class="alert alert-info" data-en="🔌 Test API endpoints for waste tracking and donation coordination" data-ko="🔌 폐기물 추적 및 기부 조정을 위한 API 엔드포인트 테스트">🔌 Test API endpoints for waste tracking and donation coordination</div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="API Endpoint" data-ko="API 엔드포인트">API Endpoint</label>
+                    <select id="apiEndpoint" onchange="updateAPIDescription()">
+                        <option value="track">POST /api/v1/waste/track</option>
+                        <option value="query">GET /api/v1/inventory/query</option>
+                        <option value="donate">POST /api/v1/donations/create</option>
+                        <option value="metrics">GET /api/v1/metrics/waste</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Authentication Token" data-ko="인증 토큰">Authentication Token</label>
+                    <input type="text" id="authToken" placeholder="wia_xxxxxxxxxxxxx" value="wia_demo_token_2025">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Request Body (JSON)" data-ko="요청 본문 (JSON)">Request Body (JSON)</label>
+                <textarea id="apiRequestBody" rows="8">{
+  "facilityId": "FACILITY-2025-001",
+  "product": {
+    "name": "Fresh Milk",
+    "category": "dairy",
+    "quantity": 100,
+    "unit": "kg",
+    "status": "near-expiry"
+  }
+}</textarea>
+            </div>
+
+            <button class="btn btn-primary" onclick="testAPI()" data-en="🚀 Send API Request" data-ko="🚀 API 요청 보내기">🚀 Send API Request</button>
+            <button class="btn btn-secondary" onclick="clearAPIOutput()" data-en="🗑️ Clear" data-ko="🗑️ 지우기">🗑️ Clear</button>
+
+            <div class="output-box">
+                <h3 data-en="API Response" data-ko="API 응답">API Response</h3>
+                <pre id="apiOutput">{
+  "status": "success",
+  "message": "Waste tracking data recorded successfully",
+  "trackingId": "TRACK-20251226-001",
+  "timestamp": "2025-12-26T10:30:00Z",
+  "recommendations": [
+    "Consider donation to nearby food bank",
+    "Reduce next order quantity by 15%"
+  ],
+  "estimatedSavings": {
+    "amount": 350.00,
+    "currency": "USD"
+  }
+}</pre>
+            </div>
+
+            <div class="info-card" style="margin-top: 20px;">
+                <h3 data-en="📖 API Endpoint Descriptions" data-ko="📖 API 엔드포인트 설명">📖 API Endpoint Descriptions</h3>
+                <ul id="apiDescriptionList">
+                    <li><strong>POST /api/v1/waste/track:</strong> <span data-en="Track food waste events and measurements" data-ko="식량 폐기물 이벤트 및 측정 추적">Track food waste events and measurements</span></li>
+                    <li><strong>GET /api/v1/inventory/query:</strong> <span data-en="Query inventory with expiration filters" data-ko="유통기한 필터로 재고 조회">Query inventory with expiration filters</span></li>
+                    <li><strong>POST /api/v1/donations/create:</strong> <span data-en="Create food donation records" data-ko="식품 기부 기록 생성">Create food donation records</span></li>
+                    <li><strong>GET /api/v1/metrics/waste:</strong> <span data-en="Get waste reduction metrics and analytics" data-ko="폐기물 감소 지표 및 분석 가져오기">Get waste reduction metrics and analytics</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Tab 4: Protocol -->
+        <div id="tab-protocol" class="tab-content">
+            <div class="alert alert-info" data-en="📡 Configure communication protocols and notification settings" data-ko="📡 통신 프로토콜 및 알림 설정 구성">📡 Configure communication protocols and notification settings</div>
+
+            <div class="info-cards">
+                <div class="info-card">
+                    <h3 data-en="🔄 Supported Protocols" data-ko="🔄 지원 프로토콜">🔄 Supported Protocols</h3>
+                    <ul>
+                        <li><strong>HTTP/HTTPS:</strong> <span data-en="RESTful API communication" data-ko="RESTful API 통신">RESTful API communication</span></li>
+                        <li><strong>WebSocket:</strong> <span data-en="Real-time expiration alerts" data-ko="실시간 유통기한 알림">Real-time expiration alerts</span></li>
+                        <li><strong>Webhook:</strong> <span data-en="Event-driven notifications" data-ko="이벤트 기반 알림">Event-driven notifications</span></li>
+                        <li><strong>Email/SMS:</strong> <span data-en="Alert notifications" data-ko="알림 통지">Alert notifications</span></li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3 data-en="🔐 Security" data-ko="🔐 보안">🔐 Security</h3>
+                    <ul>
+                        <li data-en="TLS 1.3 encryption" data-ko="TLS 1.3 암호화">TLS 1.3 encryption</li>
+                        <li data-en="OAuth 2.0 authentication" data-ko="OAuth 2.0 인증">OAuth 2.0 authentication</li>
+                        <li data-en="API key management" data-ko="API 키 관리">API key management</li>
+                        <li data-en="Data privacy compliance (GDPR)" data-ko="데이터 개인정보 준수 (GDPR)">Data privacy compliance (GDPR)</li>
+                        <li data-en="Audit trail logging" data-ko="감사 추적 로깅">Audit trail logging</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Protocol Selection" data-ko="프로토콜 선택">Protocol Selection</label>
+                    <select id="protocolType">
+                        <option value="https">HTTPS (RESTful)</option>
+                        <option value="websocket">WebSocket (Real-time)</option>
+                        <option value="webhook">Webhook (Events)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Data Format" data-ko="데이터 형식">Data Format</label>
+                    <select id="protocolFormat">
+                        <option value="json">JSON</option>
+                        <option value="xml">XML</option>
+                        <option value="csv">CSV</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Alert Threshold (days)" data-ko="알림 임계값 (일)">Alert Threshold (days)</label>
+                    <input type="number" id="alertThreshold" value="3" min="1" max="30">
+                </div>
+                <div class="form-group">
+                    <label data-en="Notification Method" data-ko="알림 방법">Notification Method</label>
+                    <select id="notificationMethod">
+                        <option value="email">Email</option>
+                        <option value="sms">SMS</option>
+                        <option value="push">Push Notification</option>
+                        <option value="webhook">Webhook</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="generateProtocolConfig()" data-en="⚙️ Generate Configuration" data-ko="⚙️ 구성 생성">⚙️ Generate Configuration</button>
+
+            <div class="output-box">
+                <h3 data-en="Protocol Configuration" data-ko="프로토콜 구성">Protocol Configuration</h3>
+                <pre id="protocolOutput">{
+  "protocol": "https",
+  "endpoint": "https://api.wia-foodwaste.org/v1",
+  "format": "json",
+  "security": {
+    "tls": "1.3",
+    "auth": "oauth2"
+  },
+  "alerts": {
+    "expirationThreshold": 3,
+    "notificationMethod": "email",
+    "frequency": "daily"
+  },
+  "options": {
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "keepAlive": true
+  }
+}</pre>
+            </div>
+        </div>
+
+        <!-- Tab 5: Integration -->
+        <div id="tab-integration" class="tab-content">
+            <div class="alert alert-info" data-en="🔗 Test integration with inventory systems and donation networks" data-ko="🔗 재고 시스템 및 기부 네트워크와의 통합 테스트">🔗 Test integration with inventory systems and donation networks</div>
+
+            <div class="info-cards">
+                <div class="info-card">
+                    <h3 data-en="🏪 Retail Systems" data-ko="🏪 소매 시스템">🏪 Retail Systems</h3>
+                    <ul>
+                        <li>Square POS</li>
+                        <li>Shopify</li>
+                        <li>Toast (Restaurants)</li>
+                        <li>Oracle Retail</li>
+                        <li>SAP Retail</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3 data-en="📦 Inventory Management" data-ko="📦 재고 관리">📦 Inventory Management</h3>
+                    <ul>
+                        <li>Fishbowl Inventory</li>
+                        <li>NetSuite</li>
+                        <li>Zoho Inventory</li>
+                        <li>TradeGecko</li>
+                        <li>DEAR Systems</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3 data-en="🤝 Donation Networks" data-ko="🤝 기부 네트워크">🤝 Donation Networks</h3>
+                    <ul>
+                        <li>Feeding America</li>
+                        <li>Food Rescue US</li>
+                        <li>Too Good To Go</li>
+                        <li>Olio</li>
+                        <li>MealConnect</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3 data-en="📊 Analytics Platforms" data-ko="📊 분석 플랫폼">📊 Analytics Platforms</h3>
+                    <ul>
+                        <li>LeanPath</li>
+                        <li>Winnow Solutions</li>
+                        <li>Waste Analytics</li>
+                        <li>FoodMaven</li>
+                        <li>Spoiler Alert</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Integration Type" data-ko="통합 유형">Integration Type</label>
+                    <select id="integrationType">
+                        <option value="retail">Retail System</option>
+                        <option value="inventory">Inventory Management</option>
+                        <option value="donation">Donation Network</option>
+                        <option value="analytics">Analytics Platform</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Platform Name" data-ko="플랫폼 이름">Platform Name</label>
+                    <input type="text" id="platformName" placeholder="Square POS">
+                </div>
+                <div class="form-group">
+                    <label data-en="API Key" data-ko="API 키">API Key</label>
+                    <input type="text" id="integrationAPIKey" placeholder="platform_api_key_xxx">
+                </div>
+                <div class="form-group">
+                    <label data-en="Sync Frequency" data-ko="동기화 빈도">Sync Frequency</label>
+                    <select id="syncFrequency">
+                        <option value="realtime">Real-time</option>
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="testIntegration()" data-en="🔗 Test Connection" data-ko="🔗 연결 테스트">🔗 Test Connection</button>
+            <button class="btn btn-secondary" onclick="exportConfig()" data-en="💾 Export Config" data-ko="💾 구성 내보내기">💾 Export Config</button>
+
+            <div class="output-box">
+                <h3 data-en="Integration Status" data-ko="통합 상태">Integration Status</h3>
+                <pre id="integrationOutput">{
+  "status": "connected",
+  "platform": "Retail System - Square POS",
+  "lastSync": "2025-12-26T10:30:00Z",
+  "dataExchanged": {
+    "productsSynced": 1247,
+    "wasteTracked": 89,
+    "donationsCreated": 23
+  },
+  "impact": {
+    "wasteReduced": "450 kg",
+    "costSaved": "$1,575",
+    "mealsProvided": 1200
+  },
+  "health": {
+    "connectivity": "excellent",
+    "latency": "18ms",
+    "errorRate": "0.00%"
+  }
+}</pre>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>WIA-AGRI-032 Food Waste Reduction v1.0.0</p>
+            <p>© 2025 WIA Standards · MIT License</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function generateDataFormat() {
+            const facilityId = document.getElementById('facilityId').value;
+            const productName = document.getElementById('productName').value;
+            const productCategory = document.getElementById('productCategory').value;
+            const expirationDate = document.getElementById('expirationDate').value;
+            const quantity = parseFloat(document.getElementById('quantity').value);
+            const unit = document.getElementById('unit').value;
+            const status = document.getElementById('status').value;
+            const costPerUnit = parseFloat(document.getElementById('costPerUnit').value);
+
+            const data = {
+                standardVersion: "WIA-AGRI-032-v1.0",
+                facilityId: facilityId,
+                timestamp: new Date().toISOString(),
+                product: {
+                    name: productName,
+                    category: productCategory,
+                    quantity: quantity,
+                    unit: unit,
+                    expirationDate: expirationDate || new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
+                    status: status
+                },
+                economics: {
+                    costPerUnit: costPerUnit,
+                    totalValue: (quantity * costPerUnit).toFixed(2),
+                    currency: "USD"
+                },
+                metadata: {
+                    trackingId: "TRACK-" + Date.now(),
+                    validated: true
+                }
+            };
+
+            document.getElementById('dataOutput').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function testAPI() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const token = document.getElementById('authToken').value;
+
+            const responses = {
+                track: {
+                    status: "success",
+                    message: "Waste tracking data recorded successfully",
+                    trackingId: "TRACK-" + Date.now(),
+                    timestamp: new Date().toISOString(),
+                    recommendations: [
+                        "Consider donation to nearby food bank",
+                        "Reduce next order quantity by 15%"
+                    ],
+                    estimatedSavings: { amount: 350.00, currency: "USD" }
+                },
+                query: {
+                    status: "success",
+                    products: [
+                        { name: "Fresh Milk", expiresIn: "2 days", quantity: 100 },
+                        { name: "Bread", expiresIn: "1 day", quantity: 50 }
+                    ],
+                    totalProducts: 2
+                },
+                donate: {
+                    status: "success",
+                    donationId: "DONATE-" + Date.now(),
+                    recipient: "Local Food Bank",
+                    estimatedMeals: 120,
+                    pickupScheduled: new Date(Date.now() + 24*60*60*1000).toISOString()
+                },
+                metrics: {
+                    status: "success",
+                    period: "last 30 days",
+                    wasteReduced: "450 kg",
+                    costSaved: "$1,575",
+                    co2Prevented: "890 kg",
+                    mealsProvided: 1200
+                }
+            };
+
+            document.getElementById('apiOutput').textContent = JSON.stringify(responses[endpoint] || responses.track, null, 2);
+        }
+
+        function clearAPIOutput() {
+            document.getElementById('apiOutput').textContent = '// API response will appear here';
+        }
+
+        function generateProtocolConfig() {
+            const protocol = document.getElementById('protocolType').value;
+            const format = document.getElementById('protocolFormat').value;
+            const alertThreshold = document.getElementById('alertThreshold').value;
+            const notificationMethod = document.getElementById('notificationMethod').value;
+
+            const config = {
+                protocol: protocol,
+                endpoint: protocol === 'websocket' ? 'wss://api.wia-foodwaste.org/v1' : 'https://api.wia-foodwaste.org/v1',
+                format: format,
+                security: {
+                    tls: "1.3",
+                    auth: "oauth2"
+                },
+                alerts: {
+                    expirationThreshold: parseInt(alertThreshold),
+                    notificationMethod: notificationMethod,
+                    frequency: "daily"
+                },
+                options: {
+                    timeout: 30000,
+                    retryAttempts: 3,
+                    keepAlive: true
+                }
+            };
+
+            document.getElementById('protocolOutput').textContent = JSON.stringify(config, null, 2);
+        }
+
+        function testIntegration() {
+            const integrationType = document.getElementById('integrationType').value;
+            const platformName = document.getElementById('platformName').value;
+            const syncFrequency = document.getElementById('syncFrequency').value;
+
+            const typeMap = {
+                retail: "Retail System",
+                inventory: "Inventory Management",
+                donation: "Donation Network",
+                analytics: "Analytics Platform"
+            };
+
+            const result = {
+                status: "connected",
+                platform: typeMap[integrationType] + " - " + (platformName || "Demo Platform"),
+                lastSync: new Date().toISOString(),
+                syncFrequency: syncFrequency,
+                dataExchanged: {
+                    productsSynced: Math.floor(Math.random() * 2000) + 500,
+                    wasteTracked: Math.floor(Math.random() * 150) + 50,
+                    donationsCreated: Math.floor(Math.random() * 50) + 10
+                },
+                impact: {
+                    wasteReduced: Math.floor(Math.random() * 500) + 200 + " kg",
+                    costSaved: "$" + (Math.floor(Math.random() * 2000) + 500),
+                    mealsProvided: Math.floor(Math.random() * 1500) + 500
+                },
+                health: {
+                    connectivity: "excellent",
+                    latency: Math.floor(Math.random() * 30) + 10 + "ms",
+                    errorRate: (Math.random() * 0.1).toFixed(2) + "%"
+                }
+            };
+
+            document.getElementById('integrationOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function exportConfig() {
+            const config = {
+                standard: "WIA-AGRI-032-v1.0",
+                integrationType: document.getElementById('integrationType').value,
+                platform: document.getElementById('platformName').value,
+                apiKey: "***REDACTED***",
+                syncFrequency: document.getElementById('syncFrequency').value,
+                exportedAt: new Date().toISOString()
+            };
+
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'wia-agri-032-integration-config.json';
+            a.click();
+        }
+
+        // Set current date for expiration field
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+            const now = new Date();
+            const futureDate = new Date(now.getTime() + 7*24*60*60*1000); // 7 days from now
+            document.getElementById('expirationDate').value = futureDate.toISOString().split('T')[0];
+        });
+    </script>
+<!-- WIA AI Assistant -->
+<link rel="stylesheet" href="/ai-assistant/wia-ai-modal.css">
+<script src="/ai-assistant/wia-ai-modal.js"></script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>
