@@ -299,7 +299,7 @@ serialization MUST match the byte sequence below exactly:
 ```
 
 The SHA-256 of this byte sequence (no trailing newline) is:
-`64a8ed8a … 5b3f`. Implementations MUST emit the same digest when applied
+`a7d3490a62ae446074a226efc6857ba917fd40cec806497bd4ccf373664bf836`. Implementations MUST emit the same digest when applied
 to the same input.
 
 ### F.3 Negative Vector — Schema Violation
@@ -324,8 +324,11 @@ operative limit is published in the conformance report.
 
 ### F.5 Locale & Time-zone Vector
 
-The canonical example timestamp `2026-04-25T03:30:00Z` MUST render
-identically in every locale tested by the conformance suite:
+The canonical example timestamp `2026-04-25T03:30:00Z` is rendered in a
+locale-dependent manner. Implementations MUST delegate locale rendering
+to a CLDR-compliant library; representative stylistic targets for popular
+locales follow (the exact byte sequence depends on the CLDR profile in
+use):
 
 | Locale | Rendering |
 |--------|-----------|
