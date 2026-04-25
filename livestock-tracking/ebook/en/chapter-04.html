@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Chapter 4: Health Monitoring &amp; Veterinary Records</title>
+<style>body{font-family:-apple-system,sans-serif;background:#0f172a;color:#f8fafc;max-width:900px;margin:0 auto;padding:40px 20px}h1,h2,h3{color:#84CC16;margin-top:1.5em}h1{border-bottom:3px solid #84CC16;padding-bottom:10px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border:1px solid #334155;padding:12px}th{background:#1e293b;color:#84CC16}pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}code{color:#a3e635}.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center}</style>
+</head>
+<body>
+<h1>Chapter 4: Health Monitoring &amp; Veterinary Records</h1>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> Digital health records linked to RFID identity, IoT-driven early detection, disease prevention with vaccination schedules, antimicrobial-resistance reporting, animal welfare assessment, and veterinary system integration via HL7 FHIR R5 with SNOMED CT, LOINC, and ATC-vet code systems.
+</div>
+
+<h2>4.1 Digital health records — birth to slaughter</h2>
+
+<p>The animal record is the spine of every downstream decision: vet treatment, abattoir grading, withdrawal-period enforcement, regulator notification. WIA-AGRI-009 binds it to the ISO 11784/11785 RFID identifier so the same record is reachable whether the reader is a handheld in a race or a Snowflake query in a head office.</p>
+
+<table>
+<tr><th>Record type</th><th>Captured fields</th><th>Frequency</th></tr>
+<tr><td>Vaccinations</td><td>Vaccine LOINC, ATC-vet code, batch, route, dose, withdrawal days</td><td>Annual or per protocol</td></tr>
+<tr><td>Treatments</td><td>SNOMED CT diagnosis, drug, dose, duration, withdrawal</td><td>As needed</td></tr>
+<tr><td>Checkups</td><td>Weight, body condition score (1-5), rumen temp, gait score</td><td>Monthly to quarterly</td></tr>
+<tr><td>Reproduction</td><td>Heat detection (oestrus), AI/natural breeding, pregnancy diagnosis</td><td>Per cycle</td></tr>
+<tr><td>Calving / kidding / lambing</td><td>Ease score, neonate weight, colostrum intake</td><td>Per birth</td></tr>
+<tr><td>Welfare assessment</td><td>Five Domains scores, RSPCA welfare metrics</td><td>Quarterly</td></tr>
+</table>
+
+<h2>4.2 IoT health sensors</h2>
+
+<h3>4.2.1 Continuous body temperature</h3>
+<p>Cattle normal range 38.0–39.0 °C; sustained &gt; 39.5 °C is a fever flag. Three sensor classes:</p>
+<ul>
+<li><strong>Ear-tag thermistor</strong> — &lt; ±0.2 °C, BLE 5.4 ↔ farm gateway, 24-month coin cell.</li>
+<li><strong>Rumen bolus</strong> (e.g., Allflex SmartBolus, smaXtec) — most accurate core temperature, CoAP + OSCORE uplink, 5-year battery.</li>
+<li><strong>IR ear scanner</strong> — race-side, ±0.3 °C, no animal hardware needed.</li>
+</ul>
+
+<h3>4.2.2 Activity, gait, and rumination</h3>
+<p>3-axis IMU on the collar feeds an on-device classifier (TinyML / TFLite Micro). Output labels — resting / grazing / ruminating / walking / oestrus / lameness — uplink as a one-byte label rather than raw IMU. Rumination minutes/day &lt; 400 is an early disease warning regardless of cause.</p>
+
+<h2>4.3 Vaccination protocols</h2>
+
+<table>
+<tr><th>Disease</th><th>Notifiable</th><th>Korea protocol</th><th>Withdrawal</th></tr>
+<tr><td>Foot-and-mouth disease (FMD)</td><td>OIE notifiable</td><td>Twice yearly compulsory (MAFRA)</td><td>Meat 21 d, milk 0 d</td></tr>
+<tr><td>Brucellosis</td><td>OIE notifiable</td><td>Annual serology + RB51 calf vaccination</td><td>Variable — see ATC-vet</td></tr>
+<tr><td>Anthrax</td><td>OIE notifiable</td><td>Endemic-zone annual vaccination</td><td>Meat 21 d</td></tr>
+<tr><td>Black-leg / clostridial</td><td>—</td><td>Calves 4–6 mo</td><td>Meat 21 d</td></tr>
+<tr><td>BRD respiratory complex</td><td>—</td><td>Pre-feedlot 30 d</td><td>Per product</td></tr>
+<tr><td>Mastitis (dairy)</td><td>—</td><td>Dry-off intramammary</td><td>Milk 96 h after first calving</td></tr>
+</table>
+
+<h2>4.4 Veterinary system integration (HL7 FHIR R5 — animal-as-Patient)</h2>
+
+<p>Veterinary data exchange uses an HL7 FHIR R5 profile that maps Animal → Patient, with extension fields for species and identifier system. Every immunisation carries LOINC, SNOMED CT, and ATC-vet codes so cross-border consumers (USDA APHIS, EU TRACES NT) can decode without local mapping tables.</p>
+
+<pre><code>{
+  "resourceType":"Immunization",
+  "patient":{"reference":"Patient/KOR-01-123456789"},
+  "vaccineCode":{"coding":[
+    {"system":"http://loinc.org","code":"30958-7",
+     "display":"Foot and mouth disease vaccine"},
+    {"system":"http://www.whocc.no/atcvet","code":"QI02AA01"},
+    {"system":"http://snomed.info/sct","code":"419218000"}
+  ]},
+  "occurrenceDateTime":"2026-04-25T10:00:00+09:00",
+  "primarySource":true,
+  "performer":[{"actor":{"display":"이수의 KVMA-2026-0177"}}],
+  "doseQuantity":{"value":2.0,"unit":"mL","system":"http://unitsofmeasure.org","code":"mL"},
+  "lotNumber":"FMD-2026-Q1-A33",
+  "manufacturer":{"display":"Merial"},
+  "extension":[{"url":"https://wia.com/ext/withdrawal-meat-days","valueInteger":21},
+               {"url":"https://wia.com/ext/withdrawal-milk-days","valueInteger":0}]
+}</code></pre>
+
+<h2>4.5 Antimicrobial use and resistance reporting</h2>
+
+<p>OECD &amp; OIE require quantitative antimicrobial-use (AMU) reporting at species level. WIA-AGRI-009 emits AMU events as FHIR <code>MedicationAdministration</code> with ATC-vet codes; the platform aggregates to the OIE WAHIS template (mg/kg PCU per year). AMR results from sensitivity testing land as FHIR <code>Observation</code> records keyed to the herd ID.</p>
+
+<h2>4.6 Withdrawal-period enforcement</h2>
+
+<p>The platform refuses any slaughter or milk-collection event where the latest medication's withdrawal end-date is in the future. This is a compile-time check at ingest, not a downstream warning.</p>
+
+<pre><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":"https://errors.livestock.wia.com/withdrawal-violation",
+  "title":"Slaughter inside withdrawal period",
+  "detail":"FMD vaccine 2026-04-25 — meat withdrawal until 2026-05-16",
+  "violations":[{"check":"meatWithdrawalDays","required":21,"observed":3}]
+}</code></pre>
+
+<h2>4.7 Notifiable disease workflow (OIE WOAH WAHIS 2.0)</h2>
+
+<ol>
+<li>Field clinical sign or positive lab test triggers a <code>health.alert</code> event.</li>
+<li>The platform creates a draft WAHIS notification within 60 minutes.</li>
+<li>National Designated Authority (KR: APQA, EU: national CA, US: USDA APHIS) signs the payload.</li>
+<li>Submission to WAHIS 2.0 within 24 hours per OIE Terrestrial Animal Health Code Chapter 1.1.</li>
+<li>WAHIS reference id is appended to the animal record and to the next EPCIS event.</li>
+</ol>
+
+<h2>4.8 Welfare scoring (Five Domains framework)</h2>
+
+<p>Mellor's Five Domains model (2020 update) is the international welfare reference. The standard records each domain quarterly:</p>
+
+<ol>
+<li><strong>Nutrition</strong> — body condition score, hydration, feed access.</li>
+<li><strong>Environment</strong> — shelter, ventilation, climate stress index.</li>
+<li><strong>Health</strong> — disease prevalence, mortality, lameness.</li>
+<li><strong>Behaviour</strong> — natural behaviour expression, social grouping.</li>
+<li><strong>Mental state</strong> — composite from above four (welfare quality protocol).</li>
+</ol>
+
+<h2>4.9 Growth tracking and Average Daily Gain</h2>
+
+<p>Walk-over scales with integrated RFID readers capture weight every time the animal walks past, producing a 30+ data-point ADG curve per month with no human handling.</p>
+
+<pre><code>ADG_kg_per_day = (weight_today - weight_lookback_30d) / 30
+
+Targets (Hanwoo): 0.7-0.9 kg/d (growing), 0.9-1.2 kg/d (finishing)
+Flag for vet review if ADG &lt; 0.5 kg/d for 14+ days.</code></pre>
+
+<div class="info-box">
+<h3>Summary</h3>
+<ol>
+<li>Digital health records linked to ISO 11784 identity make every later decision traceable.</li>
+<li>IoT thermistors, rumen boluses, and IMU classifiers turn reactive disease care into proactive triage.</li>
+<li>HL7 FHIR R5 + LOINC + SNOMED CT + ATC-vet make veterinary data cross-border-readable.</li>
+<li>Withdrawal-period enforcement at API time blocks unsafe slaughter or milk collection.</li>
+<li>WAHIS 2.0 notification and Five Domains welfare scoring are first-class workflows.</li>
+</ol>
+</div>
+
+</body></html>
