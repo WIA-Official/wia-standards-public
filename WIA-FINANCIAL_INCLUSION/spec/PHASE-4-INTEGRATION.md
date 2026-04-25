@@ -182,9 +182,9 @@ disaster_recovery: cross-region
 - Cache operations
 
 ### 7.2 Performance Tests
-- Latency < 100ms (p99)
-- Throughput > 1000 req/sec
-- 99.9% availability
+- Latency: documented per the operating organisation's published SLO.
+- Throughput: documented per the operating organisation's published SLO and exercised under the reference load test.
+- Availability: documented per the operating organisation's published SLO; recovery objectives align with ISO/IEC 27031:2011.
 
 ### 7.3 Compatibility Tests
 - Cross-version compatibility

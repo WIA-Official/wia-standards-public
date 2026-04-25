@@ -115,14 +115,9 @@ The reference deployment uses an active-active multi-region topology with:
 
 ### 4.2 High Availability
 
-The reference high-availability targets are:
+The reference deployment publishes its high-availability targets as a service-level objective document, with separate targets for detection ingest, user-facing API, operator console, and reporting integrations. RTO and RPO match the deploying organisation's risk-management plan.
 
-- Detection ingest: continuous availability, RTO 5 minutes.
-- User-facing API: 99.95% monthly availability, RTO 15 minutes.
-- Operator console: 99.9% monthly availability.
-- Reporting integrations: 99.9% with retry queue for transient failures.
-
-These targets are exercised in quarterly disaster-recovery drills aligned with ISO/IEC 27031:2011.
+These targets are exercised in quarterly disaster-recovery drills aligned with ISO/IEC 27031:2011, and SLO-attainment metrics are reported in the platform's transparency report (§5.1).
 
 ### 4.3 Observability
 

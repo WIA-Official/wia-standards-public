@@ -39,7 +39,7 @@ interface AnalysisResult {
 - **Computer Vision**: Deep learning models for visual content
 - **Facial Recognition**: Age estimation and emotion detection
 - **Scene Analysis**: Context and environment assessment
-- **NSFW Detection**: 99.5% accuracy in blocking inappropriate imagery
+- **NSFW Detection**: high accuracy in blocking inappropriate imagery (operating-organisation benchmarks reported in the deployment's transparency report)
 
 #### Implementation
 ```typescript
@@ -213,15 +213,19 @@ interface Alert {
 - URL Lookup: <10ms
 
 ### 6.2 Accuracy Metrics
-- Content Classification: 95%+ accuracy
-- False Positive Rate: <5%
-- Threat Detection: 95%+ recall
-- Age Appropriateness: 92%+ accuracy
+- Content Classification: target accuracy declared in the deployment's transparency report.
+- False Positive Rate: target rate declared in the deployment's transparency report.
+- Threat Detection: target recall declared in the deployment's transparency report.
+- Age Appropriateness: target accuracy declared in the deployment's transparency report.
+
+Operating organisations report measured values per the calibration cadence of Phase 2 §2.2; specific operating points are policy decisions made by the deploying platform.
 
 ### 6.3 Availability
-- System Uptime: 99.9%
-- API Availability: 99.95%
-- Real-time Processing: 99.8%
+- System Uptime: documented per the operating organisation's published SLO.
+- API Availability: documented per the operating organisation's published SLO.
+- Real-time Processing: documented per the operating organisation's published SLO.
+
+Recovery objectives align with ISO/IEC 27031:2011 and are exercised on a quarterly cadence per Phase 4 §4.2.
 
 ## 7. Security Measures
 
@@ -259,13 +263,15 @@ interface Alert {
 
 ## 9. Success Criteria
 
-- [x] 95% threat detection accuracy achieved
-- [x] <50ms average response time
-- [x] Zero privacy violations
-- [x] 50,000+ protected children
-- [x] 99.9% system uptime
-- [x] Full COPPA compliance
-- [x] Positive parent feedback (4.5/5 avg)
+Phase 1 is considered complete when the deploying platform has:
+
+- Demonstrated detection performance against its declared targets in the published transparency report.
+- Met the response-time SLOs of §6.1 under the reference load test.
+- Recorded zero substantiated privacy violations during the Phase 1 window per the operating organisation's incident-response procedure.
+- Onboarded the cohort committed to in the Phase 1 plan.
+- Published the operating SLO and met it during the Phase 1 window.
+- Documented COPPA conformance against 16 CFR Part 312 (or the analogous rule of the deploying jurisdiction).
+- Captured user feedback through a structured channel and addressed actionable items per the deployment's product process.
 
 ## 10. Next Phase Preview
 

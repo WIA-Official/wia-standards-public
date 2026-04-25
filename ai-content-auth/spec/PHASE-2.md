@@ -46,9 +46,11 @@ Response:
 
 ### 1.3 Performance Requirements
 
-- **Latency:** < 5 seconds for images, < 30 seconds for 1-minute video
-- **Accuracy:** > 95% on standard benchmarks
-- **False Positive Rate:** < 5%
+- **Latency:** target latency declared in the deployment's published SLO.
+- **Accuracy:** target accuracy declared in the deployment's transparency report against the WIA reference benchmark suite (§7.1).
+- **False Positive Rate:** target rate declared in the deployment's transparency report.
+
+Operating points and calibration are addressed in §7.1 (operating points) and §7.3 (calibration). Specific operating-point selection is a policy decision made by the deploying platform.
 
 ---
 
