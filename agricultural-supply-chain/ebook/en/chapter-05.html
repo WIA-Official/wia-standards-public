@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 5: Phase 2 — API Interface</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+a:hover{text-decoration:underline}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;text-align:left;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>Chapter 5: Phase 2 — API Interface</h1>
+
+<div class="info-box">
+<strong>Overview:</strong> Phase 2 binds the Phase-1 records to two equally normative HTTP façades — REST/OpenAPI 3.1 and GS1 EPCIS 2.0 — and connects them to authority systems (FDA FSMA, EU EUDR, Korea MAFRA) without duplicating data.
+</div>
+
+<h2>5.1 Two façades, one truth</h2>
+
+<p>An implementation MUST surface the same shipment state through both:</p>
+
+<ol>
+<li><strong>REST + OpenAPI 3.1</strong> at <code>/v1/...</code> — synchronous CRUD over JSON resources. Suitable for retailer dashboards and operator apps.</li>
+<li><strong>EPCIS 2.0 REST</strong> at <code>/epcis/v2/...</code> — event-sourced wire protocol keyed by SGTIN/SSCC/GLN. Required for cross-organization interoperability.</li>
+</ol>
+
+<p>Conformance suite (<code>https://conformance.wia-supply-chain.org</code>) executes the same trace scenarios against both façades and compares result hashes.</p>
+
+<h2>5.2 Authentication menu</h2>
+
+<table>
+<tr><th>Mechanism</th><th>RFC</th><th>Use case</th></tr>
+<tr><td>OAuth 2.1 + PKCE</td><td>RFC 9700 BCP</td><td>Operator and retailer portals</td></tr>
+<tr><td>mTLS X.509</td><td>RFC 8446</td><td>Carrier IoT gateway, fleet routers</td></tr>
+<tr><td>HTTP Message Signatures</td><td>RFC 9421</td><td>Cross-org EPCIS event ingest</td></tr>
+</table>
+
+<pre><code>Authorization: Bearer eyJhbGciOiJFZERTQSIs...
+Signature-Input: epcis=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="farm-kr-jj-001";alg="ed25519"
+Signature: epcis=:NN5BFJ7H...:</code></pre>
+
+<h2>5.3 REST endpoints — the must-know set</h2>
+
+<h3>Create shipment</h3>
+<pre><code>curl -X POST https://api.wia-supply-chain.org/v1/shipments \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 4f1d3c0e-7b2c-4a98-9c7e-2c0e9b8a4a01" \
+  -d @shipment.json</code></pre>
+
+<p>The <code>Idempotency-Key</code> (draft-ietf-httpapi-idempotency-key) lets carriers retry POSTs after network blips. The server caches responses for 24 h. Successful responses include <code>Location</code> and a strong <code>ETag</code>.</p>
+
+<h3>Patch with optimistic concurrency</h3>
+<pre><code>PATCH /v1/shipments/SHIP-2026-0421
+Content-Type: application/merge-patch+json
+If-Match: "f3a2e1c"
+
+{ "status": "DELIVERED", "deliveredAt": "2026-04-23T17:42:11Z" }</code></pre>
+
+<p>RFC 7396 merge-patch keeps the wire small; <code>If-Match</code> guards against lost-update.</p>
+
+<h3>Conditional read</h3>
+<pre><code>GET /v1/shipments/SHIP-2026-0421
+If-None-Match: "W/\"f3a2e1c\""
+&rarr; HTTP/1.1 304 Not Modified</code></pre>
+
+<h2>5.4 EPCIS 2.0 capture and query</h2>
+
+<p>Capture an ObjectEvent at the harvest gate:</p>
+
+<pre><code>POST /epcis/v2/capture
+Content-Type: application/json+ld
+
+{
+  "@context":["https://gs1.github.io/EPCIS/epcis-context.jsonld"],
+  "type":"EPCISDocument","schemaVersion":"2.0",
+  "creationDate":"2026-04-22T08:00:00Z",
+  "epcisBody":{"eventList":[{
+    "type":"ObjectEvent","eventTime":"2026-04-22T08:00:00Z",
+    "eventTimeZoneOffset":"+09:00",
+    "epcList":["urn:epc:id:sgtin:880123.4567896.JJHBG2026W17"],
+    "action":"ADD",
+    "bizStep":"https://ref.gs1.org/cbv/BizStep-commissioning",
+    "disposition":"https://ref.gs1.org/cbv/Disp-active",
+    "readPoint":{"id":"urn:epc:id:sgln:880123.45000.0"}
+  }]}
+}</code></pre>
+
+<p>Query for shipment-stage events of one product family in April:</p>
+
+<pre><code>GET /epcis/v2/queries/SimpleEventQuery/events
+  ?MATCH_anyEPC=urn:epc:id:sgtin:880123.4567896.*
+  &amp;GE_eventTime=2026-04-01T00:00:00Z
+  &amp;EQ_bizStep=https://ref.gs1.org/cbv/BizStep-shipping</code></pre>
+
+<h2>5.5 Errors: RFC 9457 problem+json</h2>
+
+<pre><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":"https://errors.wia-supply-chain.org/cold-chain-violation",
+  "title":"Temperature out of target range",
+  "status":422,
+  "detail":"Target 2-8°C, observed 11.4°C at 2026-04-22T14:31:08Z",
+  "instance":"/v1/shipments/SHIP-2026-0421",
+  "violations":[{"field":"currentTemperature","code":"ABOVE_MAX","value":11.4,"max":8}]
+}</code></pre>
+
+<h2>5.6 Cold-chain ingest writes Iceberg snapshots</h2>
+
+<pre><code>POST /v1/cold-chain/data
+&rarr; HTTP/1.1 201 Created
+   X-Snapshot-Id: 7841029384712340987
+   ETag: "snap-7841029384712340987"</code></pre>
+
+<p>Downstream analytics jobs (Trino, Spark, DuckDB) can read the table at <code>X-Snapshot-Id</code> for snapshot-isolated scans, eliminating dirty reads on rolling ingests.</p>
+
+<h2>5.7 EUDR Due-Diligence Statement (EU 2023/1115)</h2>
+
+<pre><code>POST /eudr/v1/dds
+{
+  "operatorEori":"KR1234567890123",
+  "commodity":"0901.21",
+  "geolocations":[{"plot":"PLT-001",
+                   "polygon":"POLYGON((-79.51 -1.23, ...))",
+                   "plotAreaHa":3.2}],
+  "harvestPeriod":{"from":"2026-03-01","to":"2026-04-15"},
+  "deforestationRiskAssessment":{"basis":"GLAD-S2","risk":"NEGLIGIBLE"},
+  "supplierStatement":{"@id":"did:wia:farm:co-aoa-014",
+                       "signature":"eyJhbGciOiJFZERT..."}
+}</code></pre>
+
+<p>Returns a <strong>DDS reference number</strong> that EU operators reference downstream (cascade), satisfying EUDR Article 4(8). The same record is mirrored to <code>TRACES NT</code> for customs.</p>
+
+<h2>5.8 Korea MAFRA / 농산물이력추적관리</h2>
+
+<pre><code>POST /mafra/v1/traceability/register
+{ "이력번호":"080123456789012",
+  "생산자식별":"FARM-KR-JJ-001",
+  "품목":"한라봉","수확일":"2026-04-22",
+  "재배방법":"유기재배",
+  "친환경인증번호":"OG-9912-2026-0033" }</code></pre>
+
+<p>The MAFRA receipt id is appended to the next EPCIS event as <code>wia:mafraReceipt</code>, closing the regulator loop.</p>
+
+<h2>5.9 Webhooks: CloudEvents 1.0 + RFC 9421</h2>
+
+<pre><code>POST /webhooks/your-endpoint
+Content-Type: application/cloudevents+json
+Signature-Input: sig1=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="wia-supply-chain";alg="ed25519"
+
+{"specversion":"1.0","id":"evt-7b9","source":"https://api.wia-supply-chain.org/v1",
+ "type":"org.wia.supply-chain.cold_chain.violation","subject":"SHIP-2026-0421",
+ "time":"2026-04-22T14:33:00Z","datacontenttype":"application/json",
+ "data":{"oldStatus":"NORMAL","newStatus":"VIOLATION","temperatureC":11.4,"durationSec":420}}</code></pre>
+
+<h2>5.10 Rate limits and SLOs</h2>
+
+<table>
+<tr><th>Tier</th><th>Sustained TPS</th><th>EPCIS capture/s</th><th>P95 read</th><th>P95 write</th></tr>
+<tr><td>Standard</td><td>100</td><td>50</td><td>80 ms</td><td>250 ms</td></tr>
+<tr><td>Premium</td><td>1 000</td><td>500</td><td>50 ms</td><td>180 ms</td></tr>
+<tr><td>Enterprise</td><td>10 000</td><td>5 000</td><td>30 ms</td><td>120 ms</td></tr>
+</table>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>REST and EPCIS 2.0 are equally normative; both must surface identical state.</li>
+<li>Idempotency-Key + ETag/If-Match make retries and concurrent updates safe by design.</li>
+<li>Errors travel as RFC 9457 problem+json with a stable <code>type</code> URI for client handling.</li>
+<li>Cold-chain ingest commits to an Iceberg v2 table; the snapshot id is on every write response.</li>
+<li>EUDR DDS and MAFRA receipt endpoints turn the standard into a regulator-ready system out of the box.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>Why does WIA-AGRI-014 require both REST and EPCIS façades?</li>
+<li>What header makes shipment-creation retries safe under network failure?</li>
+<li>What HTTP status and content-type constitute a conformant validation error?</li>
+<li>Where does the EUDR DDS reference number come from, and who consumes it next?</li>
+<li>What does the X-Snapshot-Id header enable for downstream analytics?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 6 dives into Phase-3 protocols — MQTT 5 for fleet telemetry, CoAP + OSCORE for ultra-constrained loggers, LoRaWAN for cross-border last-mile, and the WIA Chain PoA ledger that anchors provenance signatures.</p>
+
+</body>
+</html>

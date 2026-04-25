@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>5장 — Phase 2 API 인터페이스</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>5장: Phase 2 — API 인터페이스</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> REST + OpenAPI 3.1 façade와 GS1 EPCIS 2.0 capture/query façade를 같은 상태에서 연결하고, EUDR DDS·MAFRA 어댑터·CloudEvents 1.0 웹훅·Iceberg 스냅샷 헤더까지 호출 단위로 보여준다.
+</div>
+
+<h2>5.1 두 façade, 같은 진실</h2>
+
+<p>구현은 다음 두 인터페이스를 동시에 노출해야 한다.</p>
+
+<ol>
+<li><strong>REST + OpenAPI 3.1</strong>(<code>/v1/...</code>) — 동기 CRUD. 매장 운영자 앱·도매 백오피스에 적합.</li>
+<li><strong>EPCIS 2.0 REST</strong>(<code>/epcis/v2/...</code>) — 이벤트 소싱. 농가↔도매↔소매 cross‑org 이력 교환에 표준.</li>
+</ol>
+
+<p><code>https://conformance.wia-supply-chain.org</code>에서 동일 시나리오를 두 façade로 동시 실행, 결과 해시 일치 여부로 인증한다.</p>
+
+<h2>5.2 인증 메뉴</h2>
+
+<table>
+<tr><th>방식</th><th>표준</th><th>활용</th></tr>
+<tr><td>OAuth 2.1 + PKCE</td><td>RFC 9700 BCP</td><td>매장·도매 포털, 농가용 앱</td></tr>
+<tr><td>mTLS X.509</td><td>RFC 8446</td><td>운송사 게이트웨이, 차량 텔레매틱스</td></tr>
+<tr><td>HTTP Message Signature</td><td>RFC 9421</td><td>cross‑org EPCIS 캡처</td></tr>
+</table>
+
+<pre><code>Authorization: Bearer eyJhbGciOiJFZERTQSIs...
+Signature-Input: sig=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="farm-kr-jj-001";alg="ed25519"
+Signature: sig=:NN5BFJ7H...:</code></pre>
+
+<h2>5.3 출하 생성 + 멱등성</h2>
+
+<pre><code>curl -X POST https://api.wia-supply-chain.org/v1/shipments \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 4f1d3c0e-7b2c-4a98-9c7e-2c0e9b8a4a01" \
+  -d @shipment.json</code></pre>
+
+<p><code>Idempotency-Key</code>(draft‑ietf‑httpapi‑idempotency‑key)는 산간 지역 통신 단절 후 자동 재시도 시에도 중복 출하 생성을 막는다. 서버는 24시간 동안 응답을 캐시한다.</p>
+
+<h2>5.4 동시성 제어 — ETag/If‑Match</h2>
+
+<pre><code>PATCH /v1/shipments/SHIP-2026-0421
+Content-Type: application/merge-patch+json
+If-Match: "f3a2e1c"
+
+{ "status": "DELIVERED", "deliveredAt": "2026-04-23T17:42:11+09:00" }</code></pre>
+
+<p>RFC 7396 merge‑patch는 wire 트래픽을 줄이고, <code>If-Match</code>는 lost‑update 사고를 차단한다.</p>
+
+<h2>5.5 EPCIS 2.0 capture</h2>
+
+<pre><code>POST /epcis/v2/capture
+Content-Type: application/json+ld
+
+{
+  "@context":["https://gs1.github.io/EPCIS/epcis-context.jsonld"],
+  "type":"EPCISDocument","schemaVersion":"2.0",
+  "creationDate":"2026-04-22T08:00:00+09:00",
+  "epcisBody":{"eventList":[{
+    "type":"ObjectEvent","eventTime":"2026-04-22T08:00:00+09:00",
+    "eventTimeZoneOffset":"+09:00",
+    "epcList":["urn:epc:id:sgtin:880123.4567896.JJHBG2026W17"],
+    "action":"ADD",
+    "bizStep":"https://ref.gs1.org/cbv/BizStep-commissioning",
+    "disposition":"https://ref.gs1.org/cbv/Disp-active",
+    "readPoint":{"id":"urn:epc:id:sgln:880123.45000.0"}
+  }]}
+}</code></pre>
+
+<h2>5.6 오류 응답 — RFC 9457 problem+json</h2>
+
+<pre><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":"https://errors.wia-supply-chain.org/cold-chain-violation",
+  "title":"목표 온도 범위 초과",
+  "status":422,
+  "detail":"목표 2-8°C, 실측 11.4°C @ 2026-04-22T14:31:08+09:00",
+  "instance":"/v1/shipments/SHIP-2026-0421",
+  "violations":[{"field":"currentTemperature","code":"ABOVE_MAX",
+                 "value":11.4,"max":8}]
+}</code></pre>
+
+<h2>5.7 콜드체인 ingest는 Iceberg 스냅샷을 만든다</h2>
+
+<pre><code>POST /v1/cold-chain/data
+&rarr; HTTP/1.1 201 Created
+   X-Snapshot-Id: 7841029384712340987
+   ETag: "snap-7841029384712340987"</code></pre>
+
+<p>다운스트림 분석 잡(Trino, DuckDB, Spark)은 <code>X-Snapshot-Id</code>로 스냅샷‑격리 스캔을 한다 — 롤링 ingest 도중에도 더티 리드 없이 일관된 결과.</p>
+
+<h2>5.8 EUDR Due‑Diligence Statement</h2>
+
+<pre><code>POST /eudr/v1/dds
+{
+  "operatorEori":"KR1234567890123",
+  "commodity":"0901.21",
+  "geolocations":[{"plot":"PLT-001",
+                   "polygon":"POLYGON((-79.51 -1.23, ...))",
+                   "plotAreaHa":3.2}],
+  "harvestPeriod":{"from":"2026-03-01","to":"2026-04-15"},
+  "deforestationRiskAssessment":{"basis":"GLAD-S2","risk":"NEGLIGIBLE"},
+  "supplierStatement":{"@id":"did:wia:farm:co-aoa-014",
+                       "signature":"eyJhbGciOiJFZERT..."}
+}</code></pre>
+
+<p>발급된 DDS reference number는 EU 통관 cascade에 그대로 인용되어 EUDR 4(8)을 충족한다.</p>
+
+<h2>5.9 한국 MAFRA / 농관원 어댑터</h2>
+
+<pre><code>POST /mafra/v1/traceability/register
+{ "이력번호":"080123456789012",
+  "생산자식별":"FARM-KR-JJ-001",
+  "품목":"한라봉","수확일":"2026-04-22",
+  "재배방법":"유기재배",
+  "친환경인증번호":"OG-9912-2026-0033" }</code></pre>
+
+<p>응답으로 돌아오는 MAFRA 영수증 ID는 다음 EPCIS 이벤트의 <code>wia:mafraReceipt</code>에 자동 첨부 — 규제 사이클이 닫힌다.</p>
+
+<h2>5.10 웹훅 — CloudEvents 1.0 + RFC 9421 서명</h2>
+
+<pre><code>POST /webhooks/your-endpoint
+Content-Type: application/cloudevents+json
+Signature-Input: sig1=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="wia-supply-chain";alg="ed25519"
+
+{"specversion":"1.0","id":"evt-7b9","source":"https://api.wia-supply-chain.org/v1",
+ "type":"org.wia.supply-chain.cold_chain.violation","subject":"SHIP-2026-0421",
+ "time":"2026-04-22T14:33:00+09:00","datacontenttype":"application/json",
+ "data":{"oldStatus":"NORMAL","newStatus":"VIOLATION",
+         "temperatureC":11.4,"durationSec":420}}</code></pre>
+
+<h2>5.11 SLO와 요청 한도</h2>
+
+<table>
+<tr><th>등급</th><th>지속 TPS</th><th>EPCIS 캡처/s</th><th>P95 read</th><th>P95 write</th></tr>
+<tr><td>Standard</td><td>100</td><td>50</td><td>80 ms</td><td>250 ms</td></tr>
+<tr><td>Premium</td><td>1 000</td><td>500</td><td>50 ms</td><td>180 ms</td></tr>
+<tr><td>Enterprise</td><td>10 000</td><td>5 000</td><td>30 ms</td><td>120 ms</td></tr>
+</table>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>REST와 EPCIS 두 façade는 동치성을 가져야 하며, 인증 시 결과 해시까지 비교된다.</li>
+<li>Idempotency‑Key + ETag/If‑Match는 산간·해상 환경의 재시도와 동시 갱신을 안전하게 만든다.</li>
+<li>오류는 RFC 9457 problem+json으로 일관, <code>type</code> URI는 클라이언트 처리의 안정 키다.</li>
+<li>콜드체인 ingest 응답마다 <code>X-Snapshot-Id</code>가 따라온다 — Iceberg 스냅샷 격리가 “옵션”이 아니다.</li>
+<li>EUDR DDS·MAFRA 어댑터는 표준의 1급 엔드포인트로, 규제 시스템이 그대로 소비한다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>두 façade의 동치성을 검증하는 방식은?</li>
+<li>출하 재시도 시 중복 생성을 막는 헤더와 그 표준 문서는?</li>
+<li>RFC 9457 problem+json의 stable한 식별 키는 무엇인가?</li>
+<li>X-Snapshot-Id가 분석 잡에 가져다주는 이점을 한 줄로 정리하라.</li>
+<li>MAFRA 영수증 ID는 표준 흐름의 어디로 회귀하는가?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>6장은 데이터 평면 — MQTT 5, CoAP+OSCORE, LoRaWAN 1.1, Hyperledger Fabric, WIA Chain 앵커링까지 — 의 와이어 형식과 보안 모델을 코드와 함께 설명한다.</p>
+
+</body>
+</html>

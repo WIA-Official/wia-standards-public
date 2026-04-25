@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>1장 — WIA 농산물 공급망 표준 입문</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>1장: WIA‑AGRI‑014 농산물 공급망 표준 입문</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> WIA‑AGRI‑014 표준이 무엇이며, 한국의 농산물 유통 현장이 어떤 구조적 한계를 안고 있고, 본 표준이 어떤 방식으로 그 한계를 푸는지 한 장 안에서 정렬한다.
+</div>
+
+<h2>1.1 표준의 한 줄 정의</h2>
+
+<p>WIA‑AGRI‑014는 <strong>농장에서 식탁까지(farm‑to‑fork)</strong> 이어지는 모든 단계 — 수확·집하·선별·가공·저온유통·도매·소매·소비자 검증 — 를 GS1 EPCIS 2.0, HL7 FHIR R5, OpenAPI 3.1, Apache Iceberg, MQTT 5/CoAP, OASIS CAP 1.2 같은 국제 표준의 조합으로 단단히 묶는 <em>실행 가능한 명세</em>다. "추적 시스템을 만들어 보자"가 아니라 "이 다섯 줄 spec을 통과하면 추적이 된다"라고 말할 수 있게 만드는 것이 목표다.</p>
+
+<h2>1.2 한국 농산물 유통의 다섯 가지 구조적 어려움</h2>
+
+<table>
+<tr><th>분야</th><th>현실</th><th>표준이 다루는 지점</th></tr>
+<tr><td>소규모 농가 비중</td><td>전체 농가의 90% 이상이 3 ha 미만</td><td>소형 IoT 로거 + LoRaWAN, 농가용 앱 한 화면 발급</td></tr>
+<tr><td>가락시장 집중</td><td>연 240만 톤이 한 거점에 쏠림</td><td>SSCC 단위 팔레트 자동 분기, 도매 경매 KDE 연동</td></tr>
+<tr><td>콜드체인 손실</td><td>운송 30%에서 온도 일탈, 연 1.5조 폐기</td><td>MQTT 5 + CAP 1.2 실시간 경보, FEFO 자동 putaway</td></tr>
+<tr><td>이력관리 단절</td><td>5–8개 시스템에 데이터 분산</td><td>EPCIS 이벤트 단일 진실원, ETag·Idempotency‑Key 동시성</td></tr>
+<tr><td>해외 수출 장벽</td><td>EU EUDR(2023/1115), FSMA Rule 204 등 새 규제</td><td>DDS·KDE 엔드포인트, GeoJSON 폴리곤 1차 시민</td></tr>
+</table>
+
+<h2>1.3 표준이 답하는 핵심 질문 5가지</h2>
+
+<ol>
+<li><strong>“이 한라봉 480 kg은 정확히 언제 어느 밭에서 수확됐나?”</strong> — 수확 시 발급되는 EPCIS ObjectEvent + GS1 SGTIN/Lot 조합이 답한다.</li>
+<li><strong>“운송 도중 4°C를 벗어난 적이 있는가?”</strong> — Iceberg v2 테이블 <code>agri.cold_chain.readings</code>가 5분 단위로 분기 가능한 시계열을 보존한다.</li>
+<li><strong>“가짜 친환경 인증이 끼어들 여지는?”</strong> — WIA‑VC 데이터 무결성 증명(EdDSA‑JCS‑2022)이 위조를 수학적으로 차단한다.</li>
+<li><strong>“회수 명령이 떨어지면 몇 분 안에 모든 매장에 닿는가?”</strong> — CAP 1.2 경보 + CloudEvents 1.0 웹훅이 SLA 5분 내 전파를 약속한다.</li>
+<li><strong>“소비자가 QR 한 번 찍으면 보이는가?”</strong> — Phase 4 통합 챕터의 verify URL이 종착점이다.</li>
+</ol>
+
+<h2>1.4 형(型)을 갖춘 4단계 구조</h2>
+
+<p>본 표준은 <strong>4단계(Phase)</strong>로 설계됐다. 각 단계는 직전 단계의 산출물을 입력으로 받는다.</p>
+
+<pre><code>Phase 1 — 데이터 형식 (JSON Schema, GS1 키, FHIR 프로파일, GeoJSON, Iceberg)
+Phase 2 — API 인터페이스 (REST + OpenAPI 3.1, EPCIS 2.0 capture/query)
+Phase 3 — 프로토콜 (MQTT 5, CoAP+OSCORE, LoRaWAN 1.1, Hyperledger/WIA Chain)
+Phase 4 — 통합 (ERP/WMS/POS, MFDS/MAFRA/EUDR/FSMA, WIA‑VC/CARBON)</code></pre>
+
+<h2>1.5 한국에서의 적용 거점</h2>
+
+<h3>1.5.1 농산물 이력추적관리시스템</h3>
+<p>국립농산물품질관리원(NAQS)이 운영하는 농산물 이력추적관리는 13자리 이력번호로 출하·유통·판매를 묶는다. WIA‑AGRI‑014는 이 시스템에 자동 등록하는 어댑터(<code>POST /mafra/v1/traceability/register</code>)를 1급 시민으로 포함한다.</p>
+
+<h3>1.5.2 식약처 식품안전나라</h3>
+<p>회수·반품·위해 정보는 식약처 식품안전나라(<a href="https://www.foodsafetykorea.go.kr" target="_blank">foodsafetykorea.go.kr</a>) 알림과 양방향 동기화한다. 회수 명령이 발령되면 SHIP 단위로 매장 POS까지 5분 안에 도달한다.</p>
+
+<h3>1.5.3 친환경농산물 인증 + GAP</h3>
+<p>친환경(유기·무농약), 우수관리(GAP) 인증번호는 EPCIS 이벤트의 <code>certifications</code> 슬라이스에 직접 들어간다. WIA‑VC 검증으로 인증서 위조가 원천 봉쇄된다.</p>
+
+<h2>1.6 표준이 “표준”인 이유</h2>
+
+<p>흔히 “우리 회사 시스템”과 “표준”의 차이를 묻는다. 답은 두 가지다.</p>
+
+<ul>
+<li><strong>외부 인용 가능성</strong> — 모든 식별자(GTIN, GLN, SGLN, SSCC, GIAI)와 의미 코드(CBV 1.2.2 BizStep/Disposition)가 GS1·HL7·LOINC 같은 공인 권위에서 비롯된다. 우리 회사가 사라져도 데이터는 살아남는다.</li>
+<li><strong>두 façade 동치성</strong> — 같은 화물의 상태가 REST와 EPCIS 양쪽에서 비트 단위로 같아야 한다. 단일 façade 시스템은 표준이 아니다.</li>
+</ul>
+
+<h2>1.7 본 책을 읽는 법</h2>
+
+<ol>
+<li>1·2장은 동기와 도전 과제를 다룬다 — 경영진과 공유.</li>
+<li>3장은 전체 구조도 — 아키텍트가 도구 선택의 기준으로 삼는다.</li>
+<li>4·5·6·7장은 Phase 1·2·3·4 — 개발자가 코드 옆에 두고 본다.</li>
+<li>8장은 구현 로드맵·인증 비용·ROI — 도입 결정자가 본다.</li>
+</ol>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>WIA‑AGRI‑014는 GS1 EPCIS 2.0·HL7 FHIR R5·OpenAPI 3.1·Iceberg·MQTT 5를 한 묶음으로 강제하는 실행 명세다.</li>
+<li>한국 농산물 유통의 다섯 가지 구조적 어려움(소규모 농가, 가락시장 집중, 콜드체인 손실, 이력 단절, 해외 규제) 각각에 대응한다.</li>
+<li>4단계(데이터·API·프로토콜·통합) 구조로, 다음 단계는 직전 단계의 산출물을 입력으로 받는다.</li>
+<li>NAQS 농산물 이력추적관리, 식약처 식품안전나라, 친환경/GAP 인증을 1급 시민으로 통합한다.</li>
+<li>표준의 본질은 외부 인용 가능성과 REST·EPCIS 두 façade 동치성에 있다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>WIA‑AGRI‑014가 묶는 4가지 국제 표준을 들어보라.</li>
+<li>한국 소규모 농가가 본 표준 도입 시 어떤 기술 선택이 핵심인가?</li>
+<li>NAQS 농산물 이력추적관리에 등록되는 식별자의 자릿수는?</li>
+<li>친환경·GAP 인증의 위조를 막기 위해 본 표준이 동원하는 암호 기술은?</li>
+<li>표준이 “표준”이 되기 위한 두 가지 조건은 무엇인가?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>2장에서는 식품 안전 사고, 콜드체인 실패, 원산지 사기, 규제 부담 등 지금 농산물 공급망이 안고 있는 구체적 통증을 데이터로 짚는다. 문제를 정확히 봐야 표준의 가치가 보인다.</p>
+
+</body>
+</html>

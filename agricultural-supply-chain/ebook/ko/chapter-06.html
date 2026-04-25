@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>6장 — Phase 3 프로토콜</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>6장: Phase 3 — 프로토콜</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> 데이터 평면을 정의한다. MQTT 5(OASIS, 2019)로 운송 차량 텔레메트리, CoAP + OSCORE로 배터리 제약 BLE 로거, LoRaWAN 1.1로 산간·도서 농가, Hyperledger Fabric / WIA Chain PoA로 변조 불가능 앵커링을 묶는다.
+</div>
+
+<h2>6.1 MQTT 5 — 운송 차량 텔레메트리 베이스라인</h2>
+
+<p>한국 도로 환경(터널·페리·산간 음영)이 MQTT 5의 세 가지 신규 속성을 사실상 필수화한다.</p>
+
+<ul>
+<li><strong>Session Expiry Interval</strong> — 차량이 음영 구간을 벗어나도 브로커 세션이 살아 있다.</li>
+<li><strong>Payload Format Indicator</strong> — CBOR 인코딩된 센서 프레임과 JSON 대시보드 트래픽을 라우팅 단계에서 분기.</li>
+<li><strong>AUTH 패킷 + Reason Codes</strong> — 게이트웨이 로그에 인증 실패 사유가 직접 남는다(RFC 7635 SCRAM 브리지).</li>
+</ul>
+
+<h3>토픽 구조</h3>
+<pre><code>wia/agri/{tenant}/shipment/{shipmentId}/temperature
+wia/agri/{tenant}/shipment/{shipmentId}/humidity
+wia/agri/{tenant}/shipment/{shipmentId}/gps
+wia/agri/{tenant}/shipment/{shipmentId}/shock
+wia/agri/{tenant}/shipment/{shipmentId}/alerts
+wia/agri/{tenant}/sensor/{deviceId}/state</code></pre>
+
+<h3>센서 프레임(CBOR로 인코딩되는 JSON 모양)</h3>
+<pre><code>{
+  "deviceId":"BLE-LOG-77AA",
+  "ts":"2026-04-22T14:31:08+09:00",
+  "data":{"temperatureC":4.2,"humidityPct":74,"shockG":0.18},
+  "meta":{"battMv":3015,"sigQual":-78,"firmware":"1.4.2"}
+}</code></pre>
+
+<h3>QoS 전략</h3>
+<table>
+<tr><th>QoS</th><th>활용</th><th>이유</th></tr>
+<tr><td>0</td><td>60초 하트비트</td><td>저렴, 손실 허용. 브로커가 last‑seen 추적.</td></tr>
+<tr><td>1</td><td>온도·습도·진동 표본</td><td>at‑least‑once, (deviceId, ts) 키로 dedup.</td></tr>
+<tr><td>2</td><td>콜드체인 위반·회수 신호</td><td>exactly‑once, 손실은 절대 불가.</td></tr>
+</table>
+
+<h2>6.2 CoAP + OSCORE — 배터리 제약 로거</h2>
+
+<p>BLE 코인셀(CR2032) 로거는 TLS 핸드셰이크 비용을 감당하지 못한다. CoAP(RFC 7252) over UDP + OSCORE(RFC 8613)는 200 byte 미만 오버헤드로 인증·암호화 요청을 보낸다.</p>
+
+<pre><code>CON POST /shipment/SHIP-2026-0421/temperature
+Content-Format: application/cbor
+OSCORE: kid=0x01,iv=0x...
+Payload (CBOR): {"t":4.2,"u":"C","ts":1714032668}</code></pre>
+
+<p>Block‑wise transfer(RFC 7959)로 1KB 초과 GPS 트레이스를 IP 단편화 없이 옮기고, Observe(RFC 7641)로 운영자 포털이 단일 센서를 폴링 없이 구독한다.</p>
+
+<h2>6.3 LoRaWAN 1.1 — 산간·도서 농가</h2>
+
+<p>제주 한라봉 농가, 강원 옥수수 산지, 전남 도서지역은 셀룰러 음영이 잦다. LoRaWAN 1.1은 KR920 대역에서 수 km 거리 업링크를 1mA 미만 평균 전류로 처리한다.</p>
+
+<pre><code>DevEUI:    0018B20000000001
+JoinEUI:   70B3D57ED0000000
+NwkSEncKey: 세션마다 회전 (LoRaWAN 1.1)
+DataRate:  SF7BW125 (도시) | SF12BW125 (산간 음영)
+Frequency: 920 900 000 Hz (KR920) | 868 100 000 Hz (EU868)</code></pre>
+
+<p>네트워크 서버(ChirpStack, KT MTN, SK 텔레콤 LoRa)는 디코드된 프레임을 §6.1과 같은 MQTT 토픽으로 재발행한다.</p>
+
+<h2>6.4 변조 불가능한 앵커링</h2>
+
+<h3>Hyperledger Fabric chaincode</h3>
+<pre><code>async function recordShipment(ctx, shipmentJson) {
+  const s = JSON.parse(shipmentJson);
+  const canon = require('canonicalize')(s);                      // RFC 8785
+  const key = ctx.stub.createCompositeKey('SHIP', [s.shipmentId]);
+  await ctx.stub.putState(key, Buffer.from(canon));
+  await ctx.stub.setEvent('AGRI_SHIPMENT', Buffer.from(s.shipmentId));
+  return s.shipmentId;
+}</code></pre>
+
+<p>endorsement 정책 <code>AND('Producers.member','Carriers.member','Retailers.member')</code> — 어느 한 조직도 단독으로 이력을 다시 쓸 수 없다.</p>
+
+<h3>WIA Chain PoA + BSC 앵커링</h3>
+<p>WIA Chain은 30초 단위로 모든 ingest의 머클 루트를 BSC 메인넷에 앵커링한다. 외부 감사자는 비공개 데이터에 접근하지 않고도 시점 무결성을 검증한다.</p>
+
+<h2>6.5 실시간 스트리밍</h2>
+
+<pre><code>const ws = new WebSocket('wss://stream.wia-supply-chain.org/v1?shipment=SHIP-2026-0421');
+ws.onmessage = (e) =&gt; {
+  const evt = JSON.parse(e.data);
+  if (evt.type === 'cold_chain.violation') alarm.fire(evt);
+};</code></pre>
+
+<h2>6.6 보안 베이스라인</h2>
+
+<table>
+<tr><th>계층</th><th>요구</th></tr>
+<tr><td>전송 (게이트웨이↔브로커)</td><td>TLS 1.3, TLS_AES_256_GCM_SHA384 또는 TLS_CHACHA20_POLY1305_SHA256</td></tr>
+<tr><td>엔드 디바이스 (로거↔게이트웨이)</td><td>OSCORE(RFC 8613) on CoAP, AES‑128‑CCM on LoRaWAN</td></tr>
+<tr><td>응용 서명</td><td>Ed25519(RFC 8032) over RFC 8785 정규화</td></tr>
+<tr><td>토큰</td><td>EdDSA JWT, 청자 제한, 30분 수명</td></tr>
+<tr><td>키 관리</td><td>HSM 보관, RFC 7517 JWKS 회전, 90일 최대</td></tr>
+</table>
+
+<h2>6.7 프로토콜 계층이 다뤄야 할 실패 모드</h2>
+
+<ul>
+<li><strong>브로커 다운</strong> — 게이트웨이는 24시간 로컬 버퍼링, 원본 ts로 리플레이.</li>
+<li><strong>시계 드리프트</strong> — 6시간마다 NTP 동기, <code>|now − ts| &gt; 300 s</code> 표본 거절.</li>
+<li><strong>리플레이</strong> — OSCORE 시퀀스 윈도, JWT JTI 캐시.</li>
+<li><strong>운송 중 센서 교체</strong> — EPCIS 2.0 <code>AssociationEvent</code>로 명시 — 감사가 왜‑언제를 추적 가능.</li>
+</ul>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>MQTT 5의 Session Expiry/Payload Format/AUTH 세 속성이 한국 도로 환경의 음영·터널 문제를 푼다.</li>
+<li>CoAP + OSCORE는 200 byte 미만으로 인증·암호화된 센서 프레임을 운반한다.</li>
+<li>LoRaWAN 1.1 KR920은 산간·도서 농가의 음영을 메우며, 같은 MQTT 토픽 트리에 흘려 보낸다.</li>
+<li>Fabric의 다중 조직 endorsement + WIA Chain PoA의 BSC 앵커링이 두 단위에서 무결성을 보장한다.</li>
+<li>TLS 1.3·OSCORE·Ed25519·HSM JWKS — 보안 베이스라인은 “옵션 X”가 없다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>운송 차량 음영 통과 시 MQTT 5의 어느 속성이 핵심인가?</li>
+<li>CoAP + OSCORE를 표준에서 채택한 이유를 한 줄로 정리하라.</li>
+<li>한국에서 LoRaWAN 적용 시 권장 주파수 대역과 두 데이터레이트 선택은?</li>
+<li>Fabric chaincode의 endorsement 정책을 정확히 옮겨 적어보라.</li>
+<li>시계 드리프트로 인한 리플레이를 어떻게 거르는가?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>7장은 통합 — ERP/WMS/POS와 FSMA·EUDR·MFDS·MAFRA·USDA APHIS — 를 한 호출 단위로 묶고, WIA‑VC, WIA‑CARBON과의 결합을 마무리한다.</p>
+
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 4: Phase 1 — Data Format</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+a:hover{text-decoration:underline}
+.nav{display:flex;justify-content:space-between;margin:20px 0;padding:20px 0;border-top:1px solid #334155;border-bottom:1px solid #334155}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;text-align:left;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>Chapter 4: Phase 1 — Data Format</h1>
+
+<div class="info-box">
+<strong>Overview:</strong> The Phase-1 data format binds JSON Schema 2020-12 records to GS1 EPCIS 2.0 identifiers, FHIR R5 ProductShelfLife profiles, GeoJSON-encoded EUDR plots, and Apache Iceberg storage so that a single record carries authority-grade meaning across producers, carriers, retailers, and regulators.
+</div>
+
+<h2>4.1 Identifier strategy: GS1 first, everything else next</h2>
+
+<p>Every traceable thing in WIA-AGRI-014 has at least one GS1 identifier:</p>
+
+<table>
+<tr><th>Thing</th><th>GS1 key</th><th>AI</th><th>Example</th></tr>
+<tr><td>Trade item (case)</td><td>GTIN-14</td><td>(01)</td><td>08801234567896</td></tr>
+<tr><td>Logistic unit (pallet)</td><td>SSCC-18</td><td>(00)</td><td>356123450000000017</td></tr>
+<tr><td>Location (farm gate, dock)</td><td>GLN-13</td><td>(414)</td><td>8801234500000</td></tr>
+<tr><td>Production lot</td><td>Batch/Lot</td><td>(10)</td><td>JJ-HBG-2026-W17</td></tr>
+<tr><td>Best-before</td><td>Date YYMMDD</td><td>(15)</td><td>260612</td></tr>
+<tr><td>Asset (sensor, reefer)</td><td>GIAI</td><td>(8004)</td><td>880123450042</td></tr>
+</table>
+
+<p>EPCIS 2.0 wraps these in <code>urn:epc:id:*</code> URIs (e.g., <code>urn:epc:id:sgtin:880123.4567896.JJHBG2026W17</code>). Internal systems MAY use surrogate keys, but WIA-AGRI-014 conformance requires the GS1 form on the wire.</p>
+
+<h2>4.2 Shipment record</h2>
+
+<p>A shipment is the smallest unit of accountability. Schema id <code>https://schemas.wia-supply-chain.org/Shipment.json</code>, JSON Schema draft 2020-12:</p>
+
+<pre><code>{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "shipmentId":"SHIP-2026-0421",
+  "sscc":"356123450000000017",
+  "productInfo":{
+    "gtin":"08801234567896","productName":"Jeju Organic Hallabong",
+    "quantity":480,"unit":"kg","harvestDate":"2026-04-22",
+    "lotNumber":"JJ-HBG-2026-W17","organic":true,
+    "certifications":["EU_ORGANIC","KOREA_FRIENDLY"]
+  },
+  "origin":{"gln":"8801234500000","farmId":"FARM-KR-JJ-001",
+            "latitude":33.4996,"longitude":126.5312},
+  "destination":{"gln":"8801234500113","facilityId":"RETAIL-SEL-021",
+                 "latitude":37.5665,"longitude":126.9780},
+  "coldChainRequired":true,
+  "targetTemperature":{"min":2,"max":8,"unit":"C"},
+  "status":"IN_TRANSIT"
+}</code></pre>
+
+<p>Status values follow CBV 1.2.2 dispositions: <code>PENDING</code>, <code>AT_ORIGIN</code>, <code>IN_TRANSIT</code>, <code>AT_HUB</code>, <code>OUT_FOR_DELIVERY</code>, <code>DELIVERED</code>, <code>REJECTED</code>, <code>RECALLED</code>.</p>
+
+<h2>4.3 Cold-chain telemetry record</h2>
+
+<p>Each sensor reading is an immutable row in the Iceberg v2 table <code>agri.cold_chain.readings</code>. The wire schema:</p>
+
+<pre><code>{
+  "shipmentId":"SHIP-2026-0421",
+  "deviceId":"BLE-LOG-77AA",
+  "deviceModel":"Sensitech TempTale Ultra",
+  "timestamp":"2026-04-22T14:31:08Z",
+  "temperatureC":4.2,"humidityPct":74,
+  "shockG":0.18,"tiltDeg":3.2,
+  "gps":{"lat":36.34,"lon":127.40,"hdop":1.2},
+  "battery":{"voltageMv":3015,"percent":78}
+}</code></pre>
+
+<p>The Iceberg table partitions by <code>hours(timestamp)</code> with an additional bucket transform on <code>shipmentId</code> (16 buckets) so that range scans for a single shipment never touch more than 16 manifest files even after years of accumulation.</p>
+
+<h2>4.4 Provenance record (FHIR R5 aligned)</h2>
+
+<p>Every state change that creates legal accountability — harvest, sort, pack, ship, receive, recall — is captured as an FHIR R5 <code>Provenance</code> resource with the WIA AgriProvenance profile (<code>https://wia-supply-chain.org/StructureDefinition/AgriProvenance</code>). Required slices:</p>
+
+<ul>
+<li><code>occurredDateTime</code> — when it happened, ISO 8601 with timezone offset.</li>
+<li><code>activity</code> — coded with <code>https://wia-supply-chain.org/cs/agri-stage</code> (harvest | wash | grade | pack | ship | receive | recall).</li>
+<li><code>agent.who</code> — the GLN-rooted identifier of the responsible operator.</li>
+<li><code>signature</code> — JOSE-format Ed25519 detached signature over canonical JSON (RFC 8785).</li>
+</ul>
+
+<h2>4.5 Shelf-life and product definition</h2>
+
+<p>FHIR R5 <code>ProductShelfLife</code> attached to a <code>SubstanceDefinition</code> communicates open-date, after-pack, and after-thaw durations:</p>
+
+<pre><code>{
+  "resourceType":"ProductShelfLife",
+  "type":{"coding":[{"system":"http://hl7.org/fhir/CodeSystem/product-shelf-life",
+                     "code":"shelfLifeAfterPacking"}]},
+  "periodDuration":{"value":18,"unit":"d","system":"http://unitsofmeasure.org","code":"d"},
+  "specialPrecautionsForStorage":[{"text":"Keep 2-8°C, 75-85% RH"}]
+}</code></pre>
+
+<h2>4.6 Geolocation: GeoJSON for EUDR plots</h2>
+
+<p>EU 2023/1115 (EUDR) requires geolocation of every plot of land where a regulated commodity originated. WIA-AGRI-014 carries plot polygons as GeoJSON <code>Feature</code>s (RFC 7946):</p>
+
+<pre><code>{
+  "type":"Feature",
+  "geometry":{"type":"Polygon","coordinates":[[
+    [-79.5101,-1.2301],[-79.5050,-1.2301],
+    [-79.5050,-1.2250],[-79.5101,-1.2250],[-79.5101,-1.2301]
+  ]]},
+  "properties":{"plotId":"PLT-001","areaHa":3.2,
+                "deforestationCheck":{"basis":"GLAD-S2","risk":"NEGLIGIBLE"}}
+}</code></pre>
+
+<h2>4.7 Quality and laboratory records</h2>
+
+<p>Lab payloads carry <a href="https://loinc.org" target="_blank">LOINC</a> codes so that residue panels, microbial counts, and Brix readings align with hospital EHR vocabularies during outbreak investigations.</p>
+
+<table>
+<tr><th>LOINC</th><th>Test</th><th>Used by</th></tr>
+<tr><td>5778-6</td><td>Pesticide residue panel (LC-MS/MS)</td><td>FDA, MFDS, Agroscope</td></tr>
+<tr><td>42832-7</td><td>Brix (refractometer)</td><td>Quality grading</td></tr>
+<tr><td>33262-1</td><td>Salmonella spp DNA</td><td>FSMA Rule 204 outbreak trace</td></tr>
+<tr><td>22633-9</td><td>Aerobic plate count</td><td>HACCP CCP-3 dairy</td></tr>
+</table>
+
+<h2>4.8 Validation rules</h2>
+
+<ul>
+<li>All timestamps MUST be ISO 8601-1 (<code>2026-04-22T14:31:08Z</code>) or 8601-2 with offset.</li>
+<li>Geographic coordinates use WGS-84 decimal degrees; precision ≤ 7 decimals.</li>
+<li>Temperature values MUST carry the <code>unit</code> field; mixing C and F in the same shipment is forbidden.</li>
+<li>GTIN MUST validate the GS1 mod-10 check digit; SSCC MUST be 18 digits including the check digit.</li>
+<li>Signed payloads MUST canonicalize per RFC 8785 (JCS) before signature verification.</li>
+</ul>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>GS1 identifiers (GTIN, SSCC, GLN) are mandatory on the wire — internal surrogates do not satisfy conformance.</li>
+<li>JSON Schema 2020-12 + GeoJSON RFC 7946 + FHIR R5 profiles compose the full record vocabulary.</li>
+<li>Cold-chain readings land in an Apache Iceberg v2 table partitioned for shipment-scoped fast scans.</li>
+<li>Provenance signatures are detached JOSE Ed25519 over RFC 8785 canonical JSON.</li>
+<li>EUDR-grade plot polygons travel inside the same record set, eliminating a parallel data pipeline.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>What is the wire form of a GS1 GTIN inside an EPCIS 2.0 event?</li>
+<li>Which Iceberg partition transforms keep cold-chain queries cheap at scale?</li>
+<li>What canonicalization is applied before signing a Provenance resource?</li>
+<li>What FHIR resource carries shelf-life information, and where is it attached?</li>
+<li>Why does WIA-AGRI-014 carry plot polygons as GeoJSON Feature rather than WKT?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 5 turns these records into HTTP traffic — REST + EPCIS façades, RFC 9457 problem details, idempotency keys, ETag concurrency, and the EUDR Due-Diligence Statement endpoint.</p>
+
+</body>
+</html>

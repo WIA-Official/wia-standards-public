@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>7장 — Phase 4 통합</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>7장: Phase 4 — 통합</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> ERP·WMS·POS, 그리고 식약처·MAFRA·EUDR·FSMA·USDA APHIS — 표준이 닿아야 하는 외부 시스템을 한 번에 연결한다. WIA‑BLOCKCHAIN·WIA‑VC·WIA‑CARBON 결합으로 ESG·인증·블록체인 가치까지 자연스럽게 흐르게 한다.
+</div>
+
+<h2>7.1 ERP 연동</h2>
+
+<table>
+<tr><th>ERP</th><th>와이어 포맷</th><th>흐름</th></tr>
+<tr><td>SAP S/4HANA</td><td>IDoc(DESADV.D11A, ORDERS05) over OData v4</td><td>출하장 ↔ 출하 상태, DELIVERED 시 매입 인보이스 자동 등록</td></tr>
+<tr><td>Oracle Fusion ERP</td><td>REST + FBDI 템플릿</td><td>Item Master ↔ GTIN, Supplier ↔ GLN 정합 점검</td></tr>
+<tr><td>NetSuite</td><td>SuiteTalk REST</td><td>Lot‑추적 항목 + WIA traceability 사용자 정의 필드</td></tr>
+<tr><td>국내 ERPiA / iCUBE</td><td>SOAP, KCCI EDI</td><td>전자세금계산서 ↔ 출하 로트 정합</td></tr>
+</table>
+
+<pre><code>// shipment.status_changed → DELIVERED 이벤트 시
+POST /sap/odata/sap/API_DESPATCH_ADVICE_SRV/A_DespatchAdvice
+{
+  "DespatchAdvice":"DA-2026-0421",
+  "DespatchAdviceItem":[{
+    "Material":"08801234567896",
+    "ActualDeliveredQuantity":"480.000",
+    "BatchIdentificationCode":"JJ-HBG-2026-W17",
+    "WIATraceabilityID":"SHIP-2026-0421"
+  }]
+}</code></pre>
+
+<h2>7.2 WMS 연동 — FEFO putaway</h2>
+
+<pre><code>POST /wms/inbound
+{
+  "shipmentId":"SHIP-2026-0421","sscc":"356123450000000017",
+  "expectedArrival":"2026-04-23T17:00:00+09:00",
+  "warehouseId":"WH-INC-002","storageZone":"REFRIGERATED_2_8C",
+  "putaway":{"strategy":"FEFO",
+             "shelfLifeAfterPackingDays":18,
+             "packedOn":"2026-04-22"}
+}</code></pre>
+
+<p>FEFO(First‑Expired‑First‑Out)는 4장 §4.5의 FHIR ProductShelfLife 값에서 흘러온다 — 매대 회전과 SAP 매입가 정확도가 함께 올라간다.</p>
+
+<h2>7.3 POS와 소비자 화면</h2>
+
+<p>NCR Commerce, Toshiba TCx, 이마트 자체 POS(EZ‑POS 4) 모두 받아들이는 receipt 첨부 QR:</p>
+
+<pre><code>const consumer = {
+  productName: shipment.productInfo.productName,
+  farm: shipment.origin.farmName,
+  harvestDate: shipment.productInfo.harvestDate,
+  verifyUrl: `https://verify.wia-supply-chain.org/p/${shipment.productInfo.gtin}/${shipment.productInfo.lotNumber}`,
+  blockchain: { verified:true, txId: shipment.blockchain.transactionId }
+};
+const qr = await QRCode.toDataURL(JSON.stringify(consumer));</code></pre>
+
+<p>소비자 스캔은 WIA‑VC 서명을 검증한 후 농장 페이지·검사 결과·콜드체인 그래프를 한 화면에 띄운다.</p>
+
+<h2>7.4 WIA 생태계 결합</h2>
+
+<h3>WIA‑BLOCKCHAIN</h3>
+<pre><code>const wia = require('@wia/blockchain');
+const tx = await wia.submit({
+  network:'WIA-AGRI',
+  payload:{ type:'AGRI_SHIPMENT',
+            gtin:s.productInfo.gtin, lot:s.productInfo.lotNumber,
+            hash:sha256(canonicalize(s)) }
+});
+return tx.transactionId;</code></pre>
+
+<h3>WIA‑VC — 친환경/GAP 인증서</h3>
+<pre><code>{
+  "@context":["https://www.w3.org/ns/credentials/v2",
+              "https://wia-supply-chain.org/credentials/v1"],
+  "type":["VerifiableCredential","AgriProvenanceCredential"],
+  "issuer":"did:wia:cert-authority:naqs",
+  "validFrom":"2026-04-22T00:00:00Z",
+  "credentialSubject":{
+    "id":"urn:gs1:gtin:08801234567896",
+    "productName":"제주 유기 한라봉",
+    "farmGLN":"8801234500000",
+    "certifications":["EU_ORGANIC","KOREA_FRIENDLY"],
+    "blockchainAttestation":"WIA-CHAIN:0xab12..."},
+  "proof":{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022",
+           "proofPurpose":"assertionMethod",
+           "verificationMethod":"did:wia:cert-authority:naqs#k1",
+           "proofValue":"z58D..."}
+}</code></pre>
+
+<h3>WIA‑CARBON</h3>
+<p>각 콜드체인 ingest는 ISO 14083:2023 Scope 3 카테고리 4 산정으로 <code>carbon.cold_chain</code> 테이블에 tCO2e를 첨부 — 이마트·롯데마트 ESG 대시보드에 그대로 흘러간다.</p>
+
+<h2>7.5 규제 보고</h2>
+
+<table>
+<tr><th>주체</th><th>의무</th><th>WIA 엔드포인트</th></tr>
+<tr><td>FDA FSMA Rule 204</td><td>고위험 식품 KDE/CTE 24시간 내 제출</td><td><code>POST /fda/v1/fsma-204/log</code></td></tr>
+<tr><td>EU EUDR(2023/1115)</td><td>플롯 폴리곤 + DDS</td><td><code>POST /eudr/v1/dds</code></td></tr>
+<tr><td>EU Farm to Fork(2030)</td><td>디지털 프로비넌스</td><td>EPCIS 2.0 query</td></tr>
+<tr><td>식약처 MFDS</td><td>위해 정보 + 회수 명령 전파</td><td><code>POST /mfds/v1/recall/notify</code></td></tr>
+<tr><td>농관원 MAFRA</td><td>농산물 생산이력 등록</td><td><code>POST /mafra/v1/traceability/register</code></td></tr>
+<tr><td>USDA APHIS</td><td>축산 EAD 보고</td><td><code>POST /usda/v1/aphis/event</code></td></tr>
+</table>
+
+<h2>7.6 22일이 22분이 되는 순간 — 회수 추적</h2>
+
+<p>2018 미국 로메인상추 사건 추적에 3주가 걸렸다. WIA‑AGRI‑014에서 동일 작업은 EPCIS 단일 쿼리 + Iceberg 시간‑여행 스캔이다.</p>
+
+<pre><code>-- 1단계 — 해당 로트가 입력으로 사용된 모든 출하
+SELECT shipment_id, customer_gln FROM agri.epcis.events
+WHERE event_type = 'TransformationEvent'
+  AND ARRAY_CONTAINS(input_epc_list,'urn:epc:id:sgtin:880123.4567896.JJHBG2026W17');
+
+-- 2단계 — 매장 도착까지 AggregationEvent 따라가기
+-- 3단계 — 같은 시점의 콜드체인 시계열 (Iceberg 시간‑여행)
+SELECT * FROM agri.cold_chain.readings
+FOR VERSION AS OF 7841029384712340987
+WHERE shipment_id IN (SELECT shipment_id FROM step1);</code></pre>
+
+<p>Iceberg 시간‑여행은 수개월 후 소송 단계에서도 같은 결과를 재현 가능하게 한다 — 법적 방어의 1차 자료.</p>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>ERP·WMS·POS는 새 데이터를 만드는 게 아니라 Phase 1 레코드를 그대로 인용한다.</li>
+<li>WIA‑BLOCKCHAIN, WIA‑VC, WIA‑CARBON이 추적성을 인증·ESG로 끌어올린다.</li>
+<li>FSMA·EUDR·MFDS·MAFRA 엔드포인트는 어댑터가 아니라 1급 시민이다.</li>
+<li>Iceberg 시간‑여행으로 회수 추적이 재현 가능해진다 — 법적 방어의 토대.</li>
+<li>소비자 QR은 WIA‑VC 서명 검증 후 “블록체인 검증됨” 마크와 함께 닫힌다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>SAP 출하장과 출하 상태를 묶는 IDoc 메시지는 무엇인가?</li>
+<li>WMS의 FEFO putaway는 표준의 어느 데이터를 따라가는가?</li>
+<li>친환경 인증을 발급할 때 사용되는 cryptosuite와 그 표준 이름은?</li>
+<li>ISO 14083:2023이 표준에서 다루는 영역은?</li>
+<li>22일 → 22분으로 단축되는 회수 추적의 두 가지 핵심 기술 요소는?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>마지막 8장은 구현 일정·인증 등급·ROI 모델 — 본 표준을 실제 도입 의사결정으로 만드는 장이다.</p>
+
+</body>
+</html>

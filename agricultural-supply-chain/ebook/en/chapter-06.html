@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 6: Phase 3 — Protocol</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+a:hover{text-decoration:underline}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;text-align:left;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>Chapter 6: Phase 3 — Protocol</h1>
+
+<div class="info-box">
+<strong>Overview:</strong> Phase 3 wires the data plane: MQTT 5 (OASIS, 2019) for reefer trucks and farm gateways, CoAP (RFC 7252) + OSCORE (RFC 8613) for battery-bound loggers, LoRaWAN 1.1 for cross-border last-mile, and Hyperledger Fabric / WIA Chain PoA for tamper-evident anchoring.
+</div>
+
+<h2>6.1 MQTT 5 for fleet telemetry</h2>
+
+<p>MQTT 5 is the baseline for reefer telemetry because it adds three properties a cold chain depends on:</p>
+
+<ul>
+<li><strong>Session Expiry Interval</strong> &mdash; carriers crossing dead zones (mountain tunnels, ferries) keep their session alive on the broker.</li>
+<li><strong>Payload Format Indicator</strong> &mdash; brokers route binary CBOR-encoded sensor frames separately from JSON dashboards.</li>
+<li><strong>Reason Codes &amp; AUTH packet</strong> &mdash; surface enhanced authentication failures to the gateway logs (RFC 7635 SCRAM bridges).</li>
+</ul>
+
+<h3>Topic structure</h3>
+<pre><code>wia/agri/{tenant}/shipment/{shipmentId}/temperature
+wia/agri/{tenant}/shipment/{shipmentId}/humidity
+wia/agri/{tenant}/shipment/{shipmentId}/gps
+wia/agri/{tenant}/shipment/{shipmentId}/shock
+wia/agri/{tenant}/shipment/{shipmentId}/alerts
+wia/agri/{tenant}/sensor/{deviceId}/state</code></pre>
+
+<h3>Sensor-frame payload (CBOR-encoded JSON shape)</h3>
+<pre><code>{
+  "deviceId":"BLE-LOG-77AA","ts":"2026-04-22T14:31:08Z",
+  "data":{"temperatureC":4.2,"humidityPct":74,"shockG":0.18},
+  "meta":{"battMv":3015,"sigQual":-78,"firmware":"1.4.2"}
+}</code></pre>
+
+<h3>QoS strategy</h3>
+<table>
+<tr><th>QoS</th><th>Use case</th><th>Why</th></tr>
+<tr><td>0</td><td>Heartbeat (every 60 s)</td><td>Cheap, loss tolerable; broker tracks last-seen.</td></tr>
+<tr><td>1</td><td>Temperature, humidity samples</td><td>At-least-once, dedup by (deviceId, ts).</td></tr>
+<tr><td>2</td><td>Cold-chain violations, recall flags</td><td>Exactly-once; loss is unacceptable.</td></tr>
+</table>
+
+<h2>6.2 CoAP + OSCORE for battery-bound loggers</h2>
+
+<p>BLE temperature loggers powered by a CR2032 cell cannot afford TLS handshakes. CoAP (RFC 7252) over UDP with OSCORE (RFC 8613) provides authenticated, encrypted requests at &lt;200 bytes overhead:</p>
+
+<pre><code>CON POST /shipment/SHIP-2026-0421/temperature
+Content-Format: application/cbor
+OSCORE: kid=0x01,iv=0x...
+Payload (CBOR): {"t":4.2,"u":"C","ts":1714032668}</code></pre>
+
+<p>Block-wise transfers (RFC 7959) carry GPS traces &gt; 1 KB without IP fragmentation. Observe (RFC 7641) lets the operator portal subscribe to a single sensor without polling.</p>
+
+<h2>6.3 LoRaWAN 1.1 for last-mile and remote farms</h2>
+
+<p>Smallholder farms on Jeju, the Andes coffee belt, and the Mekong delta cannot rely on cellular. LoRaWAN 1.1 (LoRa Alliance, 2017 + 2020 errata) provides 868/915 MHz long-range uplinks:</p>
+
+<pre><code>DevEUI:    0018B20000000001
+JoinEUI:   70B3D57ED0000000
+NwkSEncKey:rotated per session (LoRaWAN 1.1)
+DataRate:  SF7BW125 (urban) | SF12BW125 (mountain shadow)
+Frequency: 868 100 000 Hz (EU868) | 920 900 000 Hz (KR920)</code></pre>
+
+<p>Network servers (ChirpStack, The Things Network) forward decoded frames into the WIA broker as MQTT 5 messages, preserving the QoS choice from §6.1.</p>
+
+<h2>6.4 Tamper-evident anchoring</h2>
+
+<h3>Hyperledger Fabric chaincode</h3>
+<pre><code>async function recordShipment(ctx, shipmentJson) {
+  const s = JSON.parse(shipmentJson);
+  const canon = require('canonicalize')(s);                      // RFC 8785
+  const hash = ctx.stub.createCompositeKey('SHIP', [s.shipmentId]);
+  await ctx.stub.putState(hash, Buffer.from(canon));
+  await ctx.stub.setEvent('AGRI_SHIPMENT', Buffer.from(s.shipmentId));
+  return s.shipmentId;
+}</code></pre>
+
+<p>Endorsement policy: <code>AND('Producers.member','Carriers.member','Retailers.member')</code> &mdash; no single party can rewrite history.</p>
+
+<h3>WIA Chain PoA anchoring</h3>
+<p>WIA Chain (Phase-3 reference) anchors a Merkle root of every 30-second ingest window onto BSC mainnet, giving public auditors a one-click attestation without exposing private payloads.</p>
+
+<h2>6.5 Real-time streaming to the operator portal</h2>
+
+<p>WebSocket (RFC 6455) gateway re-publishes broker-side messages with backpressure-aware fan-out. The portal subscribes per-shipment:</p>
+
+<pre><code>const ws = new WebSocket('wss://stream.wia-supply-chain.org/v1?shipment=SHIP-2026-0421');
+ws.onmessage = (e) =&gt; {
+  const evt = JSON.parse(e.data);
+  if (evt.type === 'cold_chain.violation') alarm.fire(evt);
+};</code></pre>
+
+<h2>6.6 Security baseline</h2>
+
+<table>
+<tr><th>Layer</th><th>Required</th></tr>
+<tr><td>Transport (gateway ↔ broker)</td><td>TLS 1.3 with TLS_AES_256_GCM_SHA384 or TLS_CHACHA20_POLY1305_SHA256</td></tr>
+<tr><td>End-device (logger ↔ gateway)</td><td>OSCORE (RFC 8613) on CoAP, AES-128-CCM on LoRaWAN</td></tr>
+<tr><td>Application signing</td><td>Ed25519 (RFC 8032) over RFC 8785 canonical JSON</td></tr>
+<tr><td>Token format</td><td>JWT with EdDSA, audience-restricted, 30 min lifetime</td></tr>
+<tr><td>Key management</td><td>HSM-backed, RFC 7517 JWKS rotation, 90-day max</td></tr>
+</table>
+
+<h2>6.7 Failure modes the protocol layer must handle</h2>
+
+<ul>
+<li><strong>Broker outage</strong> &mdash; gateways MUST buffer up to 24 h locally; replay with original timestamps.</li>
+<li><strong>Clock drift</strong> &mdash; NTP every 6 h; server rejects readings with <code>|now - ts| &gt; 300 s</code>.</li>
+<li><strong>Replay attacks</strong> &mdash; OSCORE sequence number window + JTI cache for JWTs.</li>
+<li><strong>Sensor swap mid-shipment</strong> &mdash; emit <code>AssociationEvent</code> (EPCIS 2.0) so audit can reconcile.</li>
+</ul>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>MQTT 5 brings session expiry, payload-format indicator, and AUTH packet — all needed by reefer fleets.</li>
+<li>CoAP + OSCORE secures &lt; 200 byte sensor frames without a TLS handshake.</li>
+<li>LoRaWAN 1.1 carries telemetry from rural farms; gateways adapt frames into the same MQTT topic tree.</li>
+<li>Hyperledger Fabric multi-org endorsement + WIA Chain PoA anchoring give tamper evidence at two scales.</li>
+<li>TLS 1.3, OSCORE, Ed25519, and HSM-backed JWKS define the baseline; everything else is an exception.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>Which MQTT 5 property prevents reefer disconnects from losing the broker session?</li>
+<li>Why does WIA-AGRI-014 prefer CoAP + OSCORE over HTTPS for end-devices?</li>
+<li>What endorsement policy does the reference Fabric chaincode require, and why?</li>
+<li>What canonicalization is applied before signing on the application layer?</li>
+<li>How are clock-skew replay attempts rejected at ingest?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 7 closes the loop: ERP, WMS, POS, and authority systems. Once telemetry and provenance flow on the protocol layer, integration is what turns the network into a business outcome.</p>
+
+</body>
+</html>

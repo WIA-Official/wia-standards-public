@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>3장 — WIA‑AGRI‑014 전체 구조도</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>3장: WIA‑AGRI‑014 전체 구조도</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> 5계층 아키텍처, 4단계(Phase) 구현 흐름, 3가지 핵심 원칙, 그리고 WIA 생태계와의 결합 — 한 장 안에서 전체 그림을 보여준다.
+</div>
+
+<h2>3.1 5계층 아키텍처</h2>
+
+<pre><code>┌─────────────────────────────────────┐
+│  소비자 앱 (QR, 매대 라벨, 검증 페이지)│   ← Phase 4
+├─────────────────────────────────────┤
+│  업무 로직 (REST + EPCIS, 분석, ESG) │   ← Phase 2/4
+├─────────────────────────────────────┤
+│  프로토콜 (MQTT 5, CoAP, LoRaWAN)    │   ← Phase 3
+├─────────────────────────────────────┤
+│  데이터 (JSON Schema, Iceberg, 블록체인)│ ← Phase 1
+├─────────────────────────────────────┤
+│  디바이스 (BLE 로거, RFID, 냉장차 게이트웨이)│
+└─────────────────────────────────────┘</code></pre>
+
+<p>각 계층은 직상위 계층에 단일 책임 인터페이스만 노출한다. 디바이스 계층 교체(예: BLE 로거 → eSIM 셀룰러 로거)는 프로토콜 계층의 어댑터만 손보면 끝나야 한다.</p>
+
+<h2>3.2 세 가지 핵심 원칙</h2>
+
+<h3>3.2.1 상호운용성을 우선으로 (Interoperability First)</h3>
+<p>모든 식별자는 GS1, 모든 의미 코드는 CBV 1.2.2 / LOINC, 모든 메시지는 OpenAPI 3.1 / EPCIS 2.0. 자체 식별 체계는 표준 식별자에 매핑되는 한에서만 허용된다.</p>
+
+<h3>3.2.2 변조 불가능성 (Tamper Evidence)</h3>
+<p>핵심 이벤트(수확·가공·출하)는 Hyperledger Fabric 다중 조직 endorsement에 기록되고, 그 머클 루트가 WIA Chain PoA를 통해 BSC 메인넷에 30초 단위로 앵커링된다.</p>
+
+<h3>3.2.3 설계로서의 프라이버시 (Privacy by Design)</h3>
+<p>가격·계약 같은 영업 비밀은 사적(private) 채널, 원산지·인증 같은 공개 정보는 공적(public) 채널로 분리한다. zk‑SNARK 기반 selective disclosure로 “유기 인증된 한라봉이지만 공급가는 비공개” 같은 표현을 wire에서 그대로 다룬다.</p>
+
+<h2>3.3 4단계 구현 로드맵</h2>
+
+<table>
+<tr><th>단계</th><th>초점</th><th>산출물</th><th>전형 기간</th></tr>
+<tr><td>Phase 1</td><td>데이터 형식</td><td>JSON Schema, GS1 키 매핑, FHIR 프로파일, GeoJSON 폴리곤, Iceberg 테이블</td><td>1~2개월</td></tr>
+<tr><td>Phase 2</td><td>API 인터페이스</td><td>OpenAPI 3.1 + EPCIS 2.0 façade, EUDR DDS, MAFRA 어댑터</td><td>3~4개월</td></tr>
+<tr><td>Phase 3</td><td>프로토콜</td><td>MQTT 5 브로커, CoAP+OSCORE, LoRaWAN 게이트웨이, 블록체인 chaincode</td><td>5~6개월</td></tr>
+<tr><td>Phase 4</td><td>통합</td><td>SAP/Oracle/NetSuite, WMS, POS, FSMA/EUDR/MFDS 회수 자동화</td><td>7~8개월</td></tr>
+</table>
+
+<h2>3.4 핵심 컴포넌트 한눈에</h2>
+
+<ul>
+<li><strong>출하 추적</strong> — SHIP‑id를 키로 한 상태 기계, EPCIS 이벤트 시계열로 동치성 검증.</li>
+<li><strong>콜드체인 모니터링</strong> — Iceberg v2 테이블에 5분 partition, P95 200ms 응답.</li>
+<li><strong>블록체인 프로비넌스</strong> — Hyperledger Fabric + WIA Chain PoA 이중 앵커링.</li>
+<li><strong>품질·검사 기록</strong> — LOINC 코드 부여된 실험실 결과를 FHIR Observation으로 직접 매핑.</li>
+<li><strong>소비자 검증</strong> — verify URL + WIA‑VC 서명 검증 + 회수 시 즉시 차단 화면.</li>
+</ul>
+
+<h2>3.5 기술 스택 권장 매트릭스</h2>
+
+<table>
+<tr><th>계층</th><th>국내 환경 권장</th><th>해외 수출 시 권장</th></tr>
+<tr><td>프론트엔드</td><td>React + Tanstack Query, PWA</td><td>다국어 i18n (Phase 4 §7.3 verify URL)</td></tr>
+<tr><td>백엔드</td><td>Node.js (NestJS), 농가 백오피스 Python(Django)</td><td>Go(Fiber) — EPCIS 캡처 P95 30 ms 목표 시</td></tr>
+<tr><td>API</td><td>REST (OpenAPI 3.1)</td><td>EPCIS 2.0 JSON‑LD</td></tr>
+<tr><td>블록체인</td><td>WIA Chain PoA (BSC anchored)</td><td>Hyperledger Fabric (다중 조직)</td></tr>
+<tr><td>IoT</td><td>MQTT 5 + KR920 LoRaWAN</td><td>EU868 LoRaWAN, 셀룰러 LTE‑M</td></tr>
+<tr><td>데이터</td><td>PostgreSQL + TimescaleDB</td><td>Apache Iceberg v2 + Trino</td></tr>
+</table>
+
+<h2>3.6 WIA 생태계 결합</h2>
+
+<ul>
+<li><strong>WIA‑BLOCKCHAIN</strong> — 프로비넌스 기록과 검증의 베이스 레이어.</li>
+<li><strong>WIA‑VC</strong> — 친환경·GAP·할랄·코셔 인증을 W3C VC 2.0으로 발급.</li>
+<li><strong>WIA‑IoT</strong> — 디바이스 등록·키 회전·OTA 업데이트.</li>
+<li><strong>WIA‑CARBON</strong> — 콜드체인 운송 ISO 14083:2023 Scope 3 자동 계산.</li>
+<li><strong>WIA‑IDENTITY</strong> — 농가·검수원·운송기사 신원 관리(DID).</li>
+</ul>
+
+<h2>3.7 “시스템”이 “표준”이 되는 순간</h2>
+
+<p>한 회사의 시스템은 그 회사의 데이터로 끝난다. 본 표준은 EPCIS 2.0 capture 메시지가 식약처 회수 시스템으로, MAFRA 이력번호로, EU TRACES NT로, 미국 FDA 트레이서빌러티 로그로 같은 의미를 그대로 옮겨가는 동치성을 보장한다. <strong>외부 시스템이 비트 단위로 같은 의미를 받아들이게 되는 그 지점이 표준의 시작점이다.</strong></p>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>5계층(디바이스·데이터·프로토콜·업무·소비자)이 단일 책임 인터페이스로 수직 분리된다.</li>
+<li>상호운용성·변조 불가능성·프라이버시 — 세 원칙이 모든 설계 결정의 기준이다.</li>
+<li>4단계(Phase) 로드맵은 직전 단계 산출물을 입력으로 받는다 — 건너뛰지 말 것.</li>
+<li>WIA 생태계(블록체인·VC·IoT·CARBON·IDENTITY)와 결합해 단일 시스템보다 훨씬 큰 가치를 만든다.</li>
+<li>외부 시스템이 같은 비트를 같은 의미로 받아들일 때 비로소 “표준”이다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>5계층 중 디바이스 교체가 어느 계층에만 영향을 줘야 하는가?</li>
+<li>“변조 불가능성” 원칙을 보장하는 두 가지 메커니즘은?</li>
+<li>EUDR 수출 환경에서 권장되는 데이터 계층 조합은 무엇인가?</li>
+<li>WIA‑VC가 다루는 인증 종류 4가지를 들어보라.</li>
+<li>한 회사 시스템이 “표준”이 되는 결정적 조건은 무엇인가?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>4장은 Phase 1 데이터 형식 — GS1 키 부여 규칙, JSON Schema 2020‑12, FHIR 프로파일, GeoJSON 폴리곤, Iceberg 파티션 전략 — 의 첫 줄까지 코드로 보여준다.</p>
+
+</body>
+</html>

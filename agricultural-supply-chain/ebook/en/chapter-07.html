@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 7: Phase 4 — Integration</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#84CC16;margin-top:2em}
+h1{border-bottom:3px solid #84CC16;padding-bottom:10px}
+a{color:#60a5fa;text-decoration:none}
+a:hover{text-decoration:underline}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #84CC16}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#10b981}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;text-align:left;border:1px solid #334155}
+th{background:#1e293b;color:#84CC16}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>Chapter 7: Phase 4 — Integration</h1>
+
+<div class="info-box">
+<strong>Overview:</strong> Phase 4 connects WIA-AGRI-014 to the systems that turn traceability into outcomes — ERP for finance, WMS for warehouse flow, POS for the till, regulators for compliance, and the WIA ecosystem for blockchain attestation, verifiable credentials, and carbon accounting.
+</div>
+
+<h2>7.1 ERP integration</h2>
+
+<table>
+<tr><th>ERP</th><th>Wire format</th><th>Flow</th></tr>
+<tr><td>SAP S/4HANA</td><td>IDoc (DESADV.D11A, ORDERS05) over OData v4</td><td>Despatch advice ↔ shipment status sync, invoice posting on DELIVERED</td></tr>
+<tr><td>Oracle Fusion ERP</td><td>REST (FBDI templates)</td><td>Item master ↔ GTIN, supplier ↔ GLN reconciliation</td></tr>
+<tr><td>NetSuite</td><td>SuiteTalk REST</td><td>Lot-tracked item with WIA traceability extension fields</td></tr>
+<tr><td>Korean ERPiA / iCUBE</td><td>SOAP envelope, KCCI EDI</td><td>전자세금계산서 ↔ shipment lot reconciliation</td></tr>
+</table>
+
+<p>Reference SAP IDoc binding example:</p>
+
+<pre><code>// On shipment.status_changed → DELIVERED
+POST /sap/odata/sap/API_DESPATCH_ADVICE_SRV/A_DespatchAdvice
+{
+  "DespatchAdvice":"DA-2026-0421",
+  "DespatchAdviceItem":[{
+    "Material":"08801234567896",
+    "ActualDeliveredQuantity":"480.000",
+    "BatchIdentificationCode":"JJ-HBG-2026-W17",
+    "WIATraceabilityID":"SHIP-2026-0421"
+  }]
+}</code></pre>
+
+<h2>7.2 WMS integration</h2>
+
+<p>Manhattan Active Warehouse Management, Blue Yonder Luminate WM, and SAP EWM all accept inbound notices via REST or messaging. The WIA-AGRI-014 connector emits an <code>InboundShipment</code> when a carrier crosses the dock geofence:</p>
+
+<pre><code>POST /wms/inbound
+{
+  "shipmentId":"SHIP-2026-0421","sscc":"356123450000000017",
+  "expectedArrival":"2026-04-23T17:00:00+09:00",
+  "warehouseId":"WH-INC-002","storageZone":"REFRIGERATED_2_8C",
+  "putaway":{"strategy":"FEFO",
+             "shelfLifeAfterPackingDays":18,
+             "packedOn":"2026-04-22"}
+}</code></pre>
+
+<p>FEFO (First-Expired-First-Out) putaway is wired to the FHIR ProductShelfLife from §4.5; nothing is duplicated, the date flows straight through.</p>
+
+<h2>7.3 POS and consumer-facing integration</h2>
+
+<p>Retailer POS (NCR Commerce, Toshiba TCx, Walmart Retail Link) records receipt of WIA-traceable lots and surfaces a QR code on the receipt or shelf-edge label:</p>
+
+<pre><code>const consumer = {
+  productName: shipment.productInfo.productName,
+  farm: shipment.origin.farmName,
+  harvestDate: shipment.productInfo.harvestDate,
+  verifyUrl: `https://verify.wia-supply-chain.org/p/${shipment.productInfo.gtin}/${shipment.productInfo.lotNumber}`,
+  blockchain: { verified:true, txId: shipment.blockchain.transactionId }
+};
+const qr = await QRCode.toDataURL(JSON.stringify(consumer));</code></pre>
+
+<p>Consumer scan resolves to a verifiable provenance page powered by WIA-VC.</p>
+
+<h2>7.4 WIA ecosystem integration</h2>
+
+<h3>WIA-BLOCKCHAIN</h3>
+<pre><code>const wia = require('@wia/blockchain');
+const tx = await wia.submit({
+  network:'WIA-AGRI',
+  payload:{ type:'AGRI_SHIPMENT',
+            gtin: s.productInfo.gtin, lot: s.productInfo.lotNumber,
+            hash: sha256(canonicalize(s)) }
+});
+return tx.transactionId;</code></pre>
+
+<h3>WIA-VC: verifiable credentials for certifications</h3>
+<pre><code>{
+  "@context":["https://www.w3.org/ns/credentials/v2",
+              "https://wia-supply-chain.org/credentials/v1"],
+  "type":["VerifiableCredential","AgriProvenanceCredential"],
+  "issuer":"did:wia:cert-authority:kca",
+  "validFrom":"2026-04-22T00:00:00Z",
+  "credentialSubject":{
+    "id":"urn:gs1:gtin:08801234567896",
+    "productName":"Jeju Organic Hallabong",
+    "farmGLN":"8801234500000",
+    "certifications":["EU_ORGANIC","KOREA_FRIENDLY"],
+    "blockchainAttestation":"WIA-CHAIN:0xab12..."},
+  "proof":{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022",
+           "proofPurpose":"assertionMethod","verificationMethod":"did:wia:cert-authority:kca#k1",
+           "proofValue":"z58D..."}
+}</code></pre>
+
+<h3>WIA-CARBON</h3>
+<p>Each cold-chain ingest emits a side-record into <code>carbon.cold_chain</code> using GHG Protocol Scope 3 Category 4 factors. ISO 14083:2023 rules govern the calculation; the resulting <code>tCO2e</code> attaches to the shipment for retailer ESG dashboards.</p>
+
+<h2>7.5 Authority reporting</h2>
+
+<table>
+<tr><th>Authority</th><th>Mandate</th><th>WIA endpoint</th></tr>
+<tr><td>FDA FSMA Rule 204</td><td>Lot-level traceability, KDE/CTE log within 24 h on request</td><td><code>POST /fda/v1/fsma-204/log</code></td></tr>
+<tr><td>EU EUDR (2023/1115)</td><td>Plot polygons + DDS for forest-risk commodities</td><td><code>POST /eudr/v1/dds</code></td></tr>
+<tr><td>EU Farm-to-Fork</td><td>Digital provenance by 2030</td><td>EPCIS 2.0 query interface</td></tr>
+<tr><td>Korea MFDS</td><td>식품안전나라 위해정보, 회수 명령</td><td><code>POST /mfds/v1/recall/notify</code></td></tr>
+<tr><td>Korea MAFRA</td><td>농산물 생산이력</td><td><code>POST /mafra/v1/traceability/register</code></td></tr>
+<tr><td>USDA APHIS</td><td>EAD (Export Animal Disease) for livestock-adjacent</td><td><code>POST /usda/v1/aphis/event</code></td></tr>
+</table>
+
+<h2>7.6 Outbreak trace-back: 22 minutes, not 22 days</h2>
+
+<p>FDA's 2018 romaine outbreak took three weeks to trace. With WIA-AGRI-014 the trace runs as a single EPCIS query plus an Iceberg time-travel scan:</p>
+
+<pre><code>-- 1. Find every shipment where the lot was an input.
+SELECT shipment_id, customer_glnFROM agri.epcis.events
+WHERE event_type = 'TransformationEvent'
+  AND ARRAY_CONTAINS(input_epc_list, 'urn:epc:id:sgtin:880123.4567896.JJHBG2026W17');
+
+-- 2. Walk forward through AggregationEvents until retail.
+-- 3. Cold-chain temperature window.
+SELECT * FROM agri.cold_chain.readings
+FOR VERSION AS OF 7841029384712340987
+WHERE shipment_id IN (SELECT shipment_id FROM step1);</code></pre>
+
+<p>Iceberg time-travel guarantees the query is reproducible months later for litigation defense.</p>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>ERP, WMS, and POS connectors reuse the Phase-1 records — no parallel master data.</li>
+<li>WIA-BLOCKCHAIN, WIA-VC, and WIA-CARBON lift traceability into attestation and ESG.</li>
+<li>FDA FSMA, EU EUDR, and Korean MAFRA endpoints are first-class, not adapters.</li>
+<li>Iceberg time-travel makes outbreak trace-back queries reproducible and fast.</li>
+<li>Consumer QR scans terminate at a verifiable, blockchain-anchored provenance page.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>Which IDoc message couples shipment delivery to SAP invoicing?</li>
+<li>Why does FEFO putaway in the WMS connector use the FHIR ProductShelfLife date?</li>
+<li>What credential type proves a lot's organic certification, and what crypto suite signs it?</li>
+<li>Which standard governs the Scope 3 cold-chain emissions calculation?</li>
+<li>How does Iceberg time-travel improve outbreak trace-back compared to traditional event logs?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 8 turns this technical foundation into an implementation roadmap, certification levels, and ROI analysis &mdash; the bridge from spec to deployed system.</p>
+
+</body>
+</html>
