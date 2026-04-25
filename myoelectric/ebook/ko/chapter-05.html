@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 하지 동력 의지 — WIA 근전 표준</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제5장: 하지 동력 의지</h1>
+
+    <h2>5.1 하지 절단과 동력 의지 분류</h2>
+    <p>
+        하지 동력 의지는 보행 시 관절 토크를 능동적으로 생성하는 <strong>동력 의족(Powered Prosthetic Foot/Knee)</strong>으로, 수동(탄성 에너지 저장) 의지와 대비됩니다. ISO 22523 K-코드 체계로 절단 부위를 분류하며, 한국에서는 건강보험 급여 인정 코드와 연계됩니다.
+    </p>
+    <table>
+        <tr><th>ISO K 코드</th><th>절단 부위</th><th>한국 명칭</th><th>주요 제품</th><th>국내 급여 여부</th></tr>
+        <tr><td>K1</td><td>Syme (발목 이단)</td><td>족부 의지</td><td>Össur Proprio Foot</td><td>선별급여 50%</td></tr>
+        <tr><td>K2</td><td>경골 (하퇴)</td><td>하퇴 의지</td><td>Össur Pro-Flex LP</td><td>선별급여 50%</td></tr>
+        <tr><td>K3</td><td>대퇴</td><td>대퇴 의지</td><td>Ottobock Kenevo, Össur Rheo Knee 4</td><td>선별급여 50%</td></tr>
+        <tr><td>K4</td><td>슬관절 이단</td><td>무릎 이단 의지</td><td>Ottobock C-Leg 4</td><td>선별급여 50%</td></tr>
+        <tr><td>K5</td><td>고관절 이단</td><td>고관절 의지</td><td>Ottobock 7E10 Hip</td><td>비급여</td></tr>
+    </table>
+    <p>
+        국내 하퇴 동력 의지 신규 처방은 연간 약 1,200건(HIRA 2023), 이 중 전동 무릎 관절(Kenevo/C-Leg) 처방이 약 38%를 차지합니다.
+    </p>
+
+    <h2>5.2 Össur Proprio Foot — 발목 동력 제어</h2>
+    <p>
+        Össur <strong>Proprio Foot</strong>은 전기 모터 구동 발목 관절(±15° 족저굴/배굴)을 갖추고, IMU·힘 센서 융합으로 계단 오름/내림, 경사면을 자동 감지합니다. WIA-MYO 표준은 BLE GATT(Service UUID: <code>0x1830</code>)로 상태 모니터링 및 파라미터 설정을 지원합니다.
+    </p>
+    <pre><code>import asyncio
+from bleak import BleakClient
+
+PROPRIO_SERVICE = "00001830-0000-1000-8000-00805F9B34FB"
+PROPRIO_ANGLE   = "00002A67-0000-1000-8000-00805F9B34FB"  # Notify
+PROPRIO_MODE    = "00002A68-0000-1000-8000-00805F9B34FB"  # Write
+
+async def monitor_proprio(address: str):
+    async with BleakClient(address) as client:
+        def on_angle(sender, data):
+            import struct
+            angle_deg = struct.unpack("<f", data)[0]
+            print(f"발목 각도: {angle_deg:.1f}°")
+        await client.start_notify(PROPRIO_ANGLE, on_angle)
+        await asyncio.sleep(30.0)</code></pre>
+
+    <h2>5.3 Ottobock Kenevo — 노인·K2 사용자용 전동 무릎</h2>
+    <p>
+        <strong>Kenevo</strong>는 60세 이상, K2 활동 수준 사용자를 위한 처방 무릎 관절입니다. Bluetooth 5.0 기반 Cockpit 앱과 연동하여 댐핑 계수, 좌석 높이, 재활 모드를 원격 조정할 수 있습니다. 국내에서는 연세세브란스·서울성모병원 재활의학과가 공인 피팅 센터입니다.
+    </p>
+    <p>
+        WIA-MYO 통합 보행 위상 감지기: 힘 감지 족저(FSR 4점), 무릎 관절 각도 인코더, 대퇴 IMU 데이터를 결합하여 5단계 보행 위상(입각 전반/중간/후반, 유각 전반/후반)을 실시간 분류합니다.
+    </p>
+    <pre><code>import numpy as np
+from dataclasses import dataclass
+from enum import IntEnum
+
+class GaitPhase(IntEnum):
+    LOADING_RESPONSE = 0   # 입각 전반 (발뒤꿈치 착지)
+    MID_STANCE       = 1   # 중간 입각
+    TERMINAL_STANCE  = 2   # 입각 후반 (발가락 이지)
+    PRE_SWING        = 3   # 전기 유각
+    SWING            = 4   # 유각
+
+@dataclass
+class GaitSensorFrame:
+    fsr_heel: float     # N
+    fsr_toe: float      # N
+    knee_angle_deg: float
+    thigh_accel_z: float  # m/s²
+
+def classify_gait_phase(frame: GaitSensorFrame) -> GaitPhase:
+    loaded = (frame.fsr_heel + frame.fsr_toe) > 50.0  # N
+    knee_flex = frame.knee_angle_deg > 15.0
+    if loaded and not knee_flex:
+        if frame.fsr_heel > frame.fsr_toe * 1.5:
+            return GaitPhase.LOADING_RESPONSE
+        elif frame.fsr_toe > frame.fsr_heel * 1.2:
+            return GaitPhase.TERMINAL_STANCE
+        return GaitPhase.MID_STANCE
+    elif loaded and knee_flex:
+        return GaitPhase.PRE_SWING
+    return GaitPhase.SWING</code></pre>
+
+    <h2>5.4 지형 분류 CNN — 계단·경사·평지</h2>
+    <p>
+        서울대 기계공학부 생체역학 연구실(2024 Journal of Biomechanics)은 IMU 6축 × 50 ms 윈도우 데이터를 입력으로 받는 1D-CNN이 6가지 지형(평지/계단 오름/계단 내림/오르막/내리막/장애물)을 96.8% 정확도로 분류한다고 보고했습니다.
+    </p>
+    <pre><code>import torch
+import torch.nn as nn
+
+class TerrainCNN(nn.Module):
+    def __init__(self, in_channels=6, num_classes=6):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv1d(in_channels, 32, kernel_size=5, padding=2),
+            nn.ReLU(), nn.BatchNorm1d(32),
+            nn.Conv1d(32, 64, kernel_size=5, padding=2),
+            nn.ReLU(), nn.BatchNorm1d(64),
+            nn.AdaptiveAvgPool1d(8),
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(64 * 8, 128), nn.ReLU(),
+            nn.Linear(128, num_classes)
+        )
+
+    def forward(self, x):  # x: (배치, 6, 시퀀스_길이)
+        return self.fc(self.conv(x).flatten(1))</code></pre>
+
+    <h2>5.5 멀티모달 센서 융합</h2>
+    <table>
+        <tr><th>센서</th><th>신호 유형</th><th>갱신 주기</th><th>기여</th></tr>
+        <tr><td>FSR 4점 (발바닥)</td><td>아날로그 힘</td><td>100 Hz</td><td>보행 위상, 체중 이동</td></tr>
+        <tr><td>IMU (대퇴·경골)</td><td>6축 관성</td><td>200 Hz</td><td>지형 분류, 넘어짐 예측</td></tr>
+        <tr><td>관절 각도 인코더</td><td>디지털 펄스</td><td>500 Hz</td><td>관절 위치 피드백</td></tr>
+        <tr><td>sEMG (잔존 대퇴근)</td><td>sEMG</td><td>2000 Hz</td><td>의지 제어 의도 검출</td></tr>
+        <tr><td>모터 전류 센서</td><td>아날로그</td><td>1000 Hz</td><td>토크 추정, 모터 보호</td></tr>
+    </table>
+
+    <h2>5.6 FHIR R5 보행 세션 기록</h2>
+    <pre><code>{
+  "resourceType": "Observation",
+  "status": "final",
+  "code": {"coding": [{"system": "http://loinc.org",
+                        "code": "55411-3",
+                        "display": "Gait speed"}]},
+  "subject": {"reference": "Patient/patient-anon-001"},
+  "device": {"reference": "Device/kenevo-knee-001"},
+  "valueQuantity": {"value": 1.12, "unit": "m/s",
+                    "system": "http://unitsofmeasure.org"},
+  "component": [
+    {"code": {"coding": [{"display": "step count"}]},
+     "valueInteger": 3842},
+    {"code": {"coding": [{"display": "terrain classification accuracy"}]},
+     "valueQuantity": {"value": 96.8, "unit": "%"}}
+  ]
+}</code></pre>
+
+    <footer><p>WIA 근전 표준 · 제5장 · © 2026 WIA</p></footer>
+</body>
+</html>

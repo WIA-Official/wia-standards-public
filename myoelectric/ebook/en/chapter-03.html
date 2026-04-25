@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Feature Extraction and Pattern Recognition — WIA Myoelectric</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← Table of Contents</a></nav>
+
+    <h1>Chapter 3: Feature Extraction and Pattern Recognition</h1>
+
+    <h2>3.1 The Hudgins Time-Domain Feature Set</h2>
+    <p>
+        The foundational contribution of Hudgins, Parker, and Scott (1993) "A new strategy for multifunction myoelectric control" established four time-domain features — collectively the <strong>Hudgins TD4 set</strong> — computed over a 200–256 ms analysis window. This work demonstrated for the first time that reliable multi-class classification of hand gestures (up to 4 classes) was achievable from forearm sEMG in real-time.
+    </p>
+    <pre><code>import numpy as np
+
+def hudgins_td4(segment: np.ndarray) -> dict:
+    """Hudgins et al. 1993 four time-domain features."""
+    N = len(segment)
+    # MAV: mean absolute value
+    mav = np.mean(np.abs(segment))
+    # ZC: zero crossings (with threshold to suppress noise)
+    threshold = 0.01 * np.max(np.abs(segment))
+    zc = np.sum((np.sign(segment[:-1]) != np.sign(segment[1:])) &
+                (np.abs(segment[:-1] - segment[1:]) >= threshold))
+    # SSC: slope sign changes
+    diff = np.diff(segment)
+    ssc = np.sum((np.sign(diff[:-1]) != np.sign(diff[1:])) &
+                 ((np.abs(diff[:-1]) + np.abs(diff[1:])) >= threshold))
+    # WL: waveform length
+    wl = np.sum(np.abs(np.diff(segment)))
+    return {"mav": float(mav), "zc": int(zc), "ssc": int(ssc), "wl": float(wl)}</code></pre>
+
+    <h2>3.2 Extended Feature Sets</h2>
+    <p>Beyond Hudgins TD4, WIA-MYO supports advanced features for higher-DOF control:</p>
+    <table>
+        <tr><th>Feature</th><th>Abbreviation</th><th>Type</th><th>Advantage</th></tr>
+        <tr><td>Autoregressive (order 4)</td><td>AR4</td><td>Time-domain parametric</td><td>Better spectral representation than TD4</td></tr>
+        <tr><td>Root Mean Square</td><td>RMS</td><td>Time-domain</td><td>Direct amplitude encoding</td></tr>
+        <tr><td>Integrated EMG</td><td>IEMG</td><td>Time-domain</td><td>Proportional to force output</td></tr>
+        <tr><td>Median Frequency</td><td>MDF</td><td>Frequency-domain</td><td>Fatigue-sensitive; decreases with fatigue</td></tr>
+        <tr><td>Mean Power Frequency</td><td>MPF</td><td>Frequency-domain</td><td>Complements MDF; bandwidth indicator</td></tr>
+        <tr><td>V-Order (3rd)</td><td>VO3</td><td>Time-domain nonlinear</td><td>Better force estimation</td></tr>
+        <tr><td>Log Detector</td><td>LD</td><td>Time-domain nonlinear</td><td>Enhanced class separability</td></tr>
+    </table>
+    <pre><code>def ar4_burg(segment: np.ndarray) -> list:
+    """AR(4) coefficients via Burg's method — fast, numerically stable."""
+    # Uses spectrum.burg or manual implementation
+    from scipy.signal import lfilter
+    N = len(segment)
+    ar = np.zeros(4)
+    # Levinson-Durbin recursion (simplified)
+    r = np.correlate(segment, segment, mode='full')[N-1:N+4]
+    r = r / r[0]
+    # Yule-Walker equations (simplified)
+    R = np.array([[r[abs(i-j)] for j in range(4)] for i in range(4)])
+    ar = np.linalg.solve(R, -r[1:5])
+    return ar.tolist()</code></pre>
+
+    <h2>3.3 Analysis Window Parameters</h2>
+    <p>
+        The choice of analysis window duration and overlap significantly affects classifier performance and control responsiveness:
+    </p>
+    <table>
+        <tr><th>Parameter</th><th>Typical Value</th><th>Trade-off</th></tr>
+        <tr><td>Window size</td><td>200–256 ms</td><td>Longer = better features; shorter = faster response. ≥150 ms required for stable Hudgins TD4.</td></tr>
+        <tr><td>Window overlap</td><td>50% (100 ms overlap)</td><td>50% overlap at 200 ms → 10 Hz classification output. Higher overlap reduces delay.</td></tr>
+        <tr><td>Incremental processing</td><td>25–50 ms increment</td><td>25 ms increment at 200 ms window → 40 Hz output, ~25 ms additional delay.</td></tr>
+    </table>
+    <p>
+        System control loop delay = window_size/2 (inherent) + processing_time. For 200 ms window: minimum achievable delay ≈ 125–150 ms. Physiologically imperceptible delay threshold: ~300 ms (Parker & Scott 1986).
+    </p>
+
+    <h2>3.4 Linear Discriminant Analysis (LDA)</h2>
+    <p>
+        LDA is the clinical standard classifier for myoelectric pattern recognition. Despite its simplicity, LDA consistently achieves 90–98% offline accuracy for 4–8 gesture classes with Hudgins TD4 features, while meeting the real-time constraint (classifer latency &lt; 5 ms on embedded hardware).
+    </p>
+    <pre><code>from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+import numpy as np
+
+# Training phase (in prosthetist's office)
+clf = LinearDiscriminantAnalysis(solver='svd', shrinkage=None)
+clf.fit(X_train, y_train)  # X_train: (N_samples, 32) TD4 × 8 channels
+
+# Real-time classification
+def classify_window(window_32d: np.ndarray) -> dict:
+    proba = clf.predict_proba(window_32d.reshape(1, -1))[0]
+    pred_idx = np.argmax(proba)
+    return {
+        "predicted_class": gesture_classes[pred_idx],
+        "confidence": float(proba[pred_idx]),
+        "rejected": float(proba[pred_idx]) < 0.70,  # rejection threshold
+        "classifier_latency_ms": 2.1
+    }</code></pre>
+
+    <h2>3.5 LSTM Neural Networks for Sequential Gestures</h2>
+    <p>
+        Long Short-Term Memory (LSTM) networks capture temporal dependencies between successive EMG frames, enabling smoother, more natural transitions between gestures. WIA-MYO supports LSTM classifiers that process a sequence of feature vectors rather than a single window:
+    </p>
+    <pre><code>import torch
+import torch.nn as nn
+
+class MyoLSTM(nn.Module):
+    def __init__(self, input_size=32, hidden_size=128,
+                 num_layers=2, num_classes=8):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
+                            batch_first=True, dropout=0.2)
+        self.fc = nn.Linear(hidden_size, num_classes)
+
+    def forward(self, x):           # x: (batch, seq_len, 32)
+        out, _ = self.lstm(x)
+        return self.fc(out[:, -1, :])  # use last time step
+
+# Inference: feed 10-frame sequence (200 ms each = 2 s context)
+model = MyoLSTM()
+model.eval()
+with torch.no_grad():
+    logits = model(feature_sequence.unsqueeze(0))  # (1, 10, 32)
+    proba = torch.softmax(logits, dim=1).numpy()[0]</code></pre>
+
+    <h2>3.6 Gesture Class Definitions</h2>
+    <table>
+        <tr><th>WIA Class Index</th><th>Gesture Name</th><th>Primary Muscles</th></tr>
+        <tr><td>0</td><td>Rest</td><td>All low activity</td></tr>
+        <tr><td>1</td><td>Open Hand</td><td>EDC (extensor digitorum communis)</td></tr>
+        <tr><td>2</td><td>Close Hand (Power Grip)</td><td>FDS, FDP, FPL</td></tr>
+        <tr><td>3</td><td>Pronation</td><td>PT (pronator teres), PQ (pronator quadratus)</td></tr>
+        <tr><td>4</td><td>Supination</td><td>BB (biceps brachii), supinator</td></tr>
+        <tr><td>5</td><td>Wrist Flexion</td><td>FCR, FCU</td></tr>
+        <tr><td>6</td><td>Wrist Extension</td><td>ECR, ECU</td></tr>
+        <tr><td>7</td><td>Tripod Pinch</td><td>FDS (index/middle), lumbricales</td></tr>
+    </table>
+
+    <footer><p>WIA Myoelectric Standard · Chapter 3 · © 2026 WIA</p></footer>
+</body>
+</html>

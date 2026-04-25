@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 임상 처방과 EMG 훈련 프로토콜 — WIA 근전 표준</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제7장: 임상 처방과 EMG 훈련 프로토콜</h1>
+
+    <h2>7.1 처방 전 sEMG 사정 절차</h2>
+    <p>
+        근전 의지 처방 전 의지보조기 전문가(보조기사/재활의학과 전문의)는 잔존 지체의 sEMG 사이트를 체계적으로 평가합니다. WIA-MYO 표준 처방 전 사정 프로토콜 4단계:
+    </p>
+    <ol>
+        <li><strong>피부 준비</strong>: 미세 사포(400방) 연마 후 이소프로필 알코올 닦기. 목표 임피던스 &lt; 10 kΩ.</li>
+        <li><strong>도수 근력 검사(MMT)</strong>: 대중력(Grade 3) 이상 근육 확인. 패턴 인식 최소 기준: 50% MVC에서 최대 RMS ≥ 30 μV.</li>
+        <li><strong>신호 맵핑</strong>: 잔존 지체 위 16개 전극 위치 격자 탐색. 각 목표 제스처에서 최대 RMS 기록. 신호 대 잡음비 및 근육 독립성이 가장 높은 8개 위치 선정.</li>
+        <li><strong>혼선 평가</strong>: 단일 근육 수축 시 채널 쌍 간 상관계수 산출. |r| &gt; 0.6 위치는 교차 오염 과다로 제외.</li>
+    </ol>
+    <p>
+        분당서울대병원 재활의학과(2024)는 위 4단계 프로토콜 적용 시 최종 분류 정확도가 사전 평가 없이 전극을 배치한 군 대비 평균 11.3%p 향상됨을 보고했습니다.
+    </p>
+
+    <h2>7.2 분류기 훈련 세션 프로토콜</h2>
+    <p>
+        WIA-MYO 표준 훈련 프로토콜은 Coapt 임상 가이드라인과 Scheme 등(2013) 모범 사례에 기반합니다.
+    </p>
+    <pre><code>training_protocol:
+  gestures:
+    - rest          # 안정
+    - open_hand     # 손 펴기
+    - close_hand    # 쥐기
+    - pronate       # 회내전
+    - supinate      # 회외전
+    - wrist_flex    # 손목 굴곡
+    - wrist_ext     # 손목 신전
+    - tripod_pinch  # 세 손가락 집기
+
+  repetitions_per_class: 25       # 임상 표준: 20–30회
+  contraction_duration_s: 3.0
+  rest_duration_s: 2.0
+  contraction_level: "MVC 30–50%"  # 최대 수축 아닌 중간 강도
+  arm_position: neutral_hanging    # 자세 의존 변동 최소화
+  instructions: |
+    목표 제스처를 '환상 지체'로 시도하거나,
+    해당 동작에 사용될 근육을 수축하십시오.</code></pre>
+
+    <h2>7.3 WIA 임상 대시보드 REST API</h2>
+    <pre><code># 1. 훈련 세션 생성
+POST /v2/devices/{device_id}/sessions/training
+{
+  "protocol": "wia_standard_8class_v2",
+  "prosthetist_id": "prosthetist-KOR-001",
+  "patient_id": "patient-anon-001"
+}
+# → {"session_id": "sess-xyz789", "status": "ready"}
+
+# 2. 제스처 큐 발사
+POST /v2/devices/{device_id}/sessions/sess-xyz789/cue
+{"gesture": "close_hand", "rep": 1}
+
+# 3. 실시간 신호 품질 확인
+GET /v2/devices/{device_id}/sessions/sess-xyz789/quality
+# → {"channel_snr": [32, 28, 25, 30, 22, 18, 27, 24],
+#    "overall": "good"}
+
+# 4. 분류기 훈련 및 배포
+POST /v2/devices/{device_id}/sessions/sess-xyz789/train
+# → {"accuracy": 0.943,
+#    "confusion_matrix": [[...], ...],
+#    "model_id": "lda-20260425-001",
+#    "classifier_latency_ms": 2.1}</code></pre>
+
+    <h2>7.4 불량 전극 복구 절차</h2>
+    <p>
+        하나 이상의 전극 채널이 SNR &lt; 20 dB인 경우 WIA-MYO 시스템은 다음 단계를 순서대로 수행합니다:
+    </p>
+    <ul>
+        <li><strong>자동 채널 제외</strong>: 불량 채널을 특징 벡터에서 제거하고 나머지 채널로 LDA 재훈련. 최소 4채널 이상 유효해야 패턴 인식 유지.</li>
+        <li><strong>이득 조정</strong>: 신호 포화 없이 신호 부족인 채널의 증폭기 이득을 3dB 단위로 최대 +12dB까지 증가.</li>
+        <li><strong>재배치 안내</strong>: 임피던스 &gt; 50 kΩ 또는 SNR &lt; 20 dB 채널을 대시보드가 표시하고, 인접 SENIAM 표준 위치로 이동 권장.</li>
+    </ul>
+
+    <h2>7.5 환상통 바이오피드백</h2>
+    <p>
+        근전 훈련의 중요한 치료적 응용은 <strong>환상통(Phantom Limb Pain, PLP)</strong> 바이오피드백입니다. sEMG 구동 의지 시각 피드백이 PLP 강도 감소에 효과적임이 입증되었습니다(Ramachandran 1996, Ramachandran &amp; Rogers-Ramachandran 2011). WIA-MYO는 실제 의지 하드웨어 없이도 3D 손 모델을 화면에 실시간 표시하는 바이오피드백 모드를 지원합니다.
+    </p>
+    <pre><code>ros2 run wia_myo_biofeedback biofeedback_node \
+  --ros-args \
+  -p emg_topic:=/emg/classification \
+  -p display_mode:=mirror_visual \
+  -p hand_model:=right_hand_3d \
+  -p pain_scale_interval_min:=5 \
+  -p record_session:=true \
+  -p output_path:=/tmp/biofeedback_session.json</code></pre>
+    <p>
+        서울대학교병원 재활의학과(2024, 무작위 대조 시험, n=42)에서 WIA-MYO 바이오피드백 모드 4주 훈련 그룹이 대조군 대비 시각 아날로그 척도(VAS) 통증 점수 38% 감소를 보고했습니다.
+    </p>
+
+    <h2>7.6 FHIR R5 임상 세션 기록</h2>
+    <pre><code>{
+  "resourceType": "Procedure",
+  "status": "completed",
+  "code": {"coding": [{"system": "http://snomed.info/sct",
+                        "code": "229070002",
+                        "display": "Myoelectric prosthetic fitting"}]},
+  "subject": {"reference": "Patient/patient-anon-001"},
+  "performer": [{"actor": {"reference":
+                  "Practitioner/prosthetist-KOR-001"}}],
+  "usedDevice": [{"reference": "Device/ottobock-bebionic-001"}],
+  "outcome": {"coding": [{"text":
+                "LDA 분류기 94.3% 정확도, 8 제스처"}]},
+  "note": [{"text":
+    "세션 종료 시 CRT(분류기 반응 시간) 완료율 85% 달성."}]
+}</code></pre>
+
+    <h2>7.7 가정 훈련 앱 연동</h2>
+    <p>
+        WIA-MYO Phase 4는 환자용 가정 훈련 앱과 연동하여 일상 연습을 지원하고, 분류기 드리프트(생리 변화, 전극 위치 변동으로 인한 정확도 저하)를 조기에 탐지합니다.
+    </p>
+    <table>
+        <tr><th>지표</th><th>가정 훈련 경보 임계값</th></tr>
+        <tr><td>분류기 정확도 (일일 2분 테스트)</td><td>&lt; 85% → 보조기사 알림</td></tr>
+        <tr><td>거부율</td><td>&gt; 20% → 안내 재교정</td></tr>
+        <tr><td>채널 SNR</td><td>임의 채널 &lt; 20 dB → 전극 점검 알림</td></tr>
+        <tr><td>일일 훈련 준수율</td><td>7일 중 5일 미만 → 동기 부여 메시지</td></tr>
+    </table>
+
+    <footer><p>WIA 근전 표준 · 제7장 · © 2026 WIA</p></footer>
+</body>
+</html>

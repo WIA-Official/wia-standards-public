@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 비례 제어와 Coapt 연동 — WIA 근전 표준</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제4장: 비례 제어와 Coapt 연동</h1>
+
+    <h2>4.1 비례 제어 원리</h2>
+    <p>
+        <strong>비례 제어(Proportional Control)</strong>는 sEMG 신호의 진폭에 비례하여 의지 관절의 속도나 힘을 조절하는 방식입니다. 단순 온/오프 스위치 제어에서 한 단계 발전하여, 사용자가 근육 수축 강도를 조절함으로써 세밀한 동작이 가능합니다. WIA-MYO는 2-사이트(듀얼 채널) 비례 제어를 기본으로 정의합니다.
+    </p>
+    <p>
+        핵심 파라미터: 주동근 채널(예: 전완 굴근), 길항근 채널(예: 전완 신근), 불감대(dead-band) 임계값(일반적으로 MVC 5~8%), 포화 임계값(MVC 70~80%). 정규화 RMS가 포화 임계값을 초과하면 최대 속도로 구동합니다.
+    </p>
+    <pre><code>import numpy as np
+
+class DualSiteProportionalController:
+    """WIA-MYO 2-사이트 비례 제어기."""
+    def __init__(self, dead_band: float = 0.06,
+                 saturation: float = 0.75,
+                 mvc_flexor: float = 1.0,
+                 mvc_extensor: float = 1.0):
+        self.dead_band = dead_band
+        self.saturation = saturation
+        self.mvc = {"flexor": mvc_flexor, "extensor": mvc_extensor}
+
+    def normalize(self, rms: float, channel: str) -> float:
+        return np.clip(rms / self.mvc[channel], 0.0, 1.0)
+
+    def compute_velocity(self, rms_flex: float, rms_ext: float) -> float:
+        """양수: 굴곡(쥐기), 음수: 신전(펴기). [-1, +1]."""
+        n_flex = self.normalize(rms_flex, "flexor")
+        n_ext = self.normalize(rms_ext, "extensor")
+        # 더 강한 채널이 방향 결정
+        if n_flex > n_ext:
+            raw = n_flex
+            sign = +1.0
+        else:
+            raw = n_ext
+            sign = -1.0
+        # 불감대 · 선형 정규화
+        if raw < self.dead_band:
+            return 0.0
+        vel = (raw - self.dead_band) / (self.saturation - self.dead_band)
+        return float(np.clip(sign * vel, -1.0, 1.0))</code></pre>
+
+    <h2>4.2 코드수축(코-컨트랙션) 모드 스위치</h2>
+    <p>
+        <strong>코드수축 모드 스위치</strong>는 두 채널을 동시에 수축하여 제어 모드를 전환하는 기법입니다. 예를 들어 굴근·신근 채널이 동시에 MVC 15% 이상으로 0.3초 이상 지속되면, 손목 회전 모드↔손목 굴신 모드를 전환합니다. WIA-MYO 표준은 각 사용자별 조정 가능한 3단계 임계값(0.10/0.15/0.20 MVC)을 권장합니다.
+    </p>
+    <pre><code>class CoContractionModeSwitch:
+    def __init__(self, threshold: float = 0.15,
+                 duration_s: float = 0.3, fs: float = 2000):
+        self.threshold = threshold
+        self.min_samples = int(duration_s * fs)
+        self._buffer = []
+        self.mode = 0  # 0=손목 굴신, 1=회전, 2=손가락 개별
+
+    def update(self, n_flex: float, n_ext: float) -> int:
+        co = (n_flex >= self.threshold) and (n_ext >= self.threshold)
+        self._buffer.append(co)
+        if len(self._buffer) > self.min_samples:
+            self._buffer.pop(0)
+        if len(self._buffer) == self.min_samples and all(self._buffer):
+            self.mode = (self.mode + 1) % 3
+            self._buffer.clear()
+        return self.mode</code></pre>
+
+    <h2>4.3 Coapt RE-NET 패턴 인식 연동</h2>
+    <p>
+        <strong>Coapt Engineering</strong>의 COMPLETE CONTROL RE-NET은 가장 임상 보급이 넓은 상용 패턴 인식 모듈입니다. 소켓에 내장된 8~16채널 전극 배열, 실시간 LDA 분류기, Bluetooth LE/USB HID 양방향 출력을 통합합니다. WIA-MYO 시스템은 Coapt Python SDK(coapt-sdk ≥ 2.4)로 직접 연동 가능합니다.
+    </p>
+    <pre><code>from coapt_sdk import CoaptDevice, GestureClass
+
+device = CoaptDevice.find_first()
+device.connect()
+device.set_classifier_profile("wia_8class_lda_v2")
+
+@device.on_gesture
+def handle_gesture(evt):
+    print(f"제스처: {GestureClass(evt.class_id).name} "
+          f"신뢰도: {evt.confidence:.2f} "
+          f"거부: {evt.rejected}")
+
+device.start_stream()  # 25 ms 주기 (40 Hz)</code></pre>
+
+    <h2>4.4 오토복 OrthoConnect BLE 프로토콜</h2>
+    <p>
+        오토복 Axon-Bus 기반 BeBionic / Michelangelo 핸드는 <strong>OrthoConnect BLE</strong> 프로파일(Bluetooth 5.1, LE Secure Connections)로 모바일 앱 및 WIA-MYO 게이트웨이와 통신합니다. 핵심 특성:
+    </p>
+    <table>
+        <tr><th>특성 UUID</th><th>방향</th><th>기능</th></tr>
+        <tr><td>0xA001</td><td>Write</td><td>그립 패턴 선택 (0~24)</td></tr>
+        <tr><td>0xA002</td><td>Notify</td><td>현재 그립 상태, 파지력(N), 배터리(%)</td></tr>
+        <tr><td>0xA003</td><td>Write</td><td>그립 속도 비례값 (0.0–1.0)</td></tr>
+        <tr><td>0xA004</td><td>Indicate</td><td>오류/경보 이벤트</td></tr>
+    </table>
+    <pre><code>import asyncio
+from bleak import BleakClient
+
+ORTHO_GRIP_CMD   = "0000A001-0000-1000-8000-00805F9B34FB"
+ORTHO_STATUS_NTF = "0000A002-0000-1000-8000-00805F9B34FB"
+
+async def set_grip(client: BleakClient, grip_id: int, speed: float):
+    await client.write_gatt_char(ORTHO_GRIP_CMD,
+                                  bytes([grip_id & 0xFF]))
+    speed_byte = int(speed * 255) & 0xFF
+    import struct
+    await client.write_gatt_char(
+        "0000A003-0000-1000-8000-00805F9B34FB",
+        struct.pack("B", speed_byte)
+    )</code></pre>
+
+    <h2>4.5 WIA REST API 분류기 배포</h2>
+    <p>
+        훈련된 LDA 분류기는 WIA-MYO Phase 2 REST API를 통해 배포하고 버전을 관리합니다. 의지 교정사(prosthetist)가 임상 대시보드에서 훈련 세션을 완료하면, 자동으로 모델이 직렬화되어 디바이스에 배포됩니다.
+    </p>
+    <pre><code># 분류기 모델 배포 워크플로우
+# 1. 훈련 세션 시작
+POST /v2/devices/{device_id}/sessions/training
+{"protocol": "wia_standard_8class_v2",
+ "prosthetist_id": "prosthetist-KOR-001",
+ "patient_id": "patient-anon-001"}
+# → {"session_id": "sess-abc123", "status": "ready"}
+
+# 2. 훈련 완료 후 모델 배포
+POST /v2/devices/{device_id}/sessions/sess-abc123/train
+# → {"accuracy": 0.943,
+#    "model_id": "lda-20260425-001",
+#    "deployed": true,
+#    "classifier_latency_ms": 2.1}</code></pre>
+
+    <h2>4.6 임상 성능 지표</h2>
+    <table>
+        <tr><th>지표</th><th>WIA-MYO 최소 기준</th><th>임상 목표</th></tr>
+        <tr><td>오프라인 분류 정확도 (8-클래스)</td><td>≥ 85%</td><td>≥ 95%</td></tr>
+        <tr><td>분류기 지연</td><td>&lt; 30 ms</td><td>&lt; 10 ms</td></tr>
+        <tr><td>거부율 (안정 시)</td><td>&lt; 20%</td><td>&lt; 10%</td></tr>
+        <tr><td>제스처 완성 시간 (GCT)</td><td>&lt; 1.0 s</td><td>&lt; 0.5 s</td></tr>
+        <tr><td>경로 효율 (Fitts' 처리량)</td><td>≥ 1.0 bit/s</td><td>≥ 2.5 bit/s</td></tr>
+        <tr><td>Southampton 손 기능 검사 (SHAP)</td><td>≥ 55점</td><td>≥ 70점</td></tr>
+        <tr><td>프로스테틱 사용 검사 (PUF)</td><td>≥ 60점</td><td>≥ 75점</td></tr>
+    </table>
+    <p>
+        KAIST 바이오 및 뇌공학과(2024 IEEE TNSRE)에서 8채널 전완 패턴 인식 + Coapt RE-NET 연동 그룹이 4-사이트 진폭 제어 대조군 대비 GCT 42% 단축, SHAP 점수 18점 향상을 보고했습니다.
+    </p>
+
+    <footer><p>WIA 근전 표준 · 제4장 · © 2026 WIA</p></footer>
+</body>
+</html>

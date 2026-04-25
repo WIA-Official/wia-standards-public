@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA Myoelectric Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Myoelectric Standard</h1>
+        <p class="subtitle">Chapter 7: Implementation Examples</p>
+    </header>
+
+    <main>
+        <h1>Chapter 7: Implementation Examples</h1>
+
+        <h2>7.1 Python Implementation</h2>
+
+        <h3>7.1.1 EMG Data Loading and Preprocessing</h3>
+
+        <pre><code>import json
+import numpy as np
+from scipy import signal
+
+class EMGPreprocessor:
+    def __init__(self, sample_rate=1000):
+        self.sample_rate = sample_rate
+        self.notch_filter = self._create_notch_filter(60.0, 30.0)
+        self.bandpass_filter = self._create_bandpass_filter(20, 450)
+
+    def _create_notch_filter(self, freq, q_factor):
+        """Create 60 Hz notch filter for power line noise removal"""
+        w0 = freq / (self.sample_rate / 2)
+        b, a = signal.iirnotch(w0, q_factor)
+        return b, a
+
+    def _create_bandpass_filter(self, low, high):
+        """Create 20-450 Hz bandpass filter for EMG range"""
+        nyq = self.sample_rate / 2
+        low_norm = low / nyq
+        high_norm = high / nyq
+        b, a = signal.butter(4, [low_norm, high_norm], btype='band')
+        return b, a
+
+    def process(self, emg_signal):
+        """Apply full preprocessing pipeline"""
+        # Stage 1: Notch filter
+        filtered = signal.filtfilt(*self.notch_filter, emg_signal)
+
+        # Stage 2: Bandpass filter
+        filtered = signal.filtfilt(*self.bandpass_filter, filtered)
+
+        # Stage 3: Full-wave rectification
+        rectified = np.abs(filtered)
+
+        # Stage 4: RMS envelope (150ms window)
+        window_size = int(0.150 * self.sample_rate)
+        envelope = self._rms_envelope(rectified, window_size)
+
+        return envelope
+
+    def _rms_envelope(self, signal_data, window_size):
+        """Compute RMS envelope with sliding window"""
+        envelope = np.zeros(len(signal_data))
+        for i in range(len(signal_data)):
+            start = max(0, i - window_size // 2)
+            end = min(len(signal_data), i + window_size // 2)
+            window = signal_data[start:end]
+            envelope[i] = np.sqrt(np.mean(window ** 2))
+        return envelope
+
+# Usage
+with open('session-001.json', 'r') as f:
+    emg_data = json.load(f)
+
+preprocessor = EMGPreprocessor(sample_rate=1000)
+
+for channel in emg_data['channels']:
+    raw_samples = np.array(channel['samples'])
+    processed = preprocessor.process(raw_samples)
+    print(f"Channel {channel['id']} ({channel['name']}): "
+          f"RMS = {np.mean(processed):.4f} mV")</code></pre>
+
+        <h3>7.1.2 Feature Extraction</h3>
+
+        <pre><code>import numpy as np
+from scipy.fft import fft
+from scipy.signal import welch
+
+class EMGFeatureExtractor:
+    def __init__(self, sample_rate=1000):
+        self.sample_rate = sample_rate
+
+    def extract_time_domain(self, signal_data):
+        """Extract time-domain features"""
+        features = {}
+
+        # Mean Absolute Value
+        features['mav'] = np.mean(np.abs(signal_data))
+
+        # Root Mean Square
+        features['rms'] = np.sqrt(np.mean(signal_data ** 2))
+
+        # Waveform Length
+        features['wl'] = np.sum(np.abs(np.diff(signal_data)))
+
+        # Zero Crossings
+        threshold = 0.01
+        zc = np.sum(np.diff(np.sign(signal_data)) != 0)
+        features['zc'] = zc
+
+        # Slope Sign Changes
+        diff1 = signal_data[1:-1] - signal_data[:-2]
+        diff2 = signal_data[1:-1] - signal_data[2:]
+        features['ssc'] = np.sum(diff1 * diff2 > 0.0001)
+
+        # Variance
+        features['var'] = np.var(signal_data)
+
+        return features
+
+    def extract_frequency_domain(self, signal_data):
+        """Extract frequency-domain features"""
+        features = {}
+
+        # Compute power spectral density
+        freqs, psd = welch(signal_data, fs=self.sample_rate,
+                          nperseg=min(256, len(signal_data)))
+
+        # Mean Frequency
+        features['mnf'] = np.sum(freqs * psd) / np.sum(psd)
+
+        # Median Frequency
+        cumsum = np.cumsum(psd)
+        median_idx = np.where(cumsum >= cumsum[-1] / 2)[0][0]
+        features['mdf'] = freqs[median_idx]
+
+        # Peak Frequency
+        features['pkf'] = freqs[np.argmax(psd)]
+
+        # Total Power
+        features['ttp'] = np.sum(psd)
+
+        return features
+
+    def extract_all(self, signal_data):
+        """Extract complete feature set"""
+        features = {}
+        features.update(self.extract_time_domain(signal_data))
+        features.update(self.extract_frequency_domain(signal_data))
+        return features
+
+# Usage
+extractor = EMGFeatureExtractor(sample_rate=1000)
+
+# Extract features from 200ms windows
+window_size = 200  # ms
+samples_per_window = int(window_size * 1e-3 * 1000)
+
+for channel in emg_data['channels']:
+    signal = np.array(channel['samples'])
+    features = extractor.extract_all(signal[:samples_per_window])
+
+    print(f"\nChannel {channel['id']} features:")
+    for name, value in features.items():
+        print(f"  {name}: {value:.4f}")</code></pre>
+
+        <h3>7.1.3 Gesture Classification with Scikit-learn</h3>
+
+        <pre><code>from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+class GestureClassifier:
+    def __init__(self):
+        self.clf = LinearDiscriminantAnalysis()
+        self.gesture_names = []
+
+    def train(self, features, labels):
+        """Train classifier on feature vectors and gesture labels"""
+        X = np.array(features)
+        y = np.array(labels)
+
+        # Store unique gesture names
+        self.gesture_names = np.unique(y).tolist()
+
+        # Perform cross-validation
+        scores = cross_val_score(self.clf, X, y, cv=5)
+        print(f"Cross-validation accuracy: {scores.mean():.2%} ± {scores.std():.2%}")
+
+        # Train on full dataset
+        self.clf.fit(X, y)
+
+        return {
+            'accuracy': scores.mean(),
+            'std': scores.std(),
+            'gestures': self.gesture_names
+        }
+
+    def predict(self, features):
+        """Predict gesture from feature vector"""
+        X = np.array(features).reshape(1, -1)
+        gesture = self.clf.predict(X)[0]
+        probabilities = self.clf.predict_proba(X)[0]
+
+        # Get confidence (max probability)
+        confidence = np.max(probabilities)
+
+        # Create probability dict
+        prob_dict = dict(zip(self.gesture_names, probabilities))
+
+        return {
+            'gesture': gesture,
+            'confidence': float(confidence),
+            'probabilities': prob_dict
+        }
+
+# Usage Example
+# Assume we have collected training data
+training_features = []  # List of feature vectors
+training_labels = []    # List of gesture names
+
+# Simulate training data collection
+gestures = ['rest', 'hand_open', 'hand_close', 'wrist_flexion']
+for gesture in gestures:
+    for trial in range(10):  # 10 repetitions per gesture
+        # Extract features from this trial
+        # features = extract_features(trial_emg_data)
+        # For demo, use random features
+        features = np.random.rand(28)  # 28 features (7 per channel × 4 channels)
+        training_features.append(features)
+        training_labels.append(gesture)
+
+# Train classifier
+classifier = GestureClassifier()
+results = classifier.train(training_features, training_labels)
+
+# Test prediction
+test_features = np.random.rand(28)
+prediction = classifier.predict(test_features)
+print(f"\nPredicted gesture: {prediction['gesture']}")
+print(f"Confidence: {prediction['confidence']:.2%}")
+print("Probabilities:", prediction['probabilities'])</code></pre>
+
+        <h2>7.2 TypeScript Implementation</h2>
+
+        <h3>7.2.1 EMG Device Interface</h3>
+
+        <pre><code>// types.ts
+export interface EMGChannel {
+  id: number;
+  name: string;
+  samples: number[];
+  unit: string;
+}
+
+export interface EMGMetadata {
+  sampleRate: number;
+  channelCount: number;
+  resolution: number;
+  gain: number;
+  referenceType: 'monopolar' | 'bipolar' | 'differential';
+}
+
+export interface EMGData {
+  version: string;
+  metadata: EMGMetadata;
+  channels: EMGChannel[];
+  startTime: number;
+  duration: number;
+}
+
+export interface Gesture {
+  name: string;
+  confidence: number;
+  intensity: number;
+  timestamp: number;
+}
+
+// emg-device.ts
+export class EMGDevice {
+  private deviceId: string;
+  private websocket: WebSocket | null = null;
+  private onGestureCallback?: (gesture: Gesture) => void;
+
+  constructor(deviceId: string) {
+    this.deviceId = deviceId;
+  }
+
+  async connect(apiUrl: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const wsUrl = `wss://${apiUrl}/v1/stream/gestures`;
+      this.websocket = new WebSocket(wsUrl);
+
+      this.websocket.onopen = () => {
+        console.log(`Connected to device ${this.deviceId}`);
+        resolve();
+      };
+
+      this.websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        reject(error);
+      };
+
+      this.websocket.onmessage = (event) => {
+        const gesture: Gesture = JSON.parse(event.data);
+        if (this.onGestureCallback) {
+          this.onGestureCallback(gesture);
+        }
+      };
+    });
+  }
+
+  onGesture(callback: (gesture: Gesture) => void): void {
+    this.onGestureCallback = callback;
+  }
+
+  async sendCommand(command: string, params: any): Promise<any> {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      throw new Error('Device not connected');
+    }
+
+    const message = JSON.stringify({ command, params });
+    this.websocket.send(message);
+  }
+
+  disconnect(): void {
+    if (this.websocket) {
+      this.websocket.close();
+      this.websocket = null;
+    }
+  }
+}
+
+// Usage
+const device = new EMGDevice('EMG-SENSOR-001');
+
+await device.connect('api.myoelectric.device');
+
+device.onGesture((gesture) => {
+  console.log(`Gesture: ${gesture.name}`);
+  console.log(`Confidence: ${(gesture.confidence * 100).toFixed(1)}%`);
+  console.log(`Intensity: ${(gesture.intensity * 100).toFixed(1)}%`);
+});</code></pre>
+
+        <h3>7.2.2 Real-time Feature Extraction</h3>
+
+        <pre><code>// feature-extractor.ts
+export class FeatureExtractor {
+  private sampleRate: number;
+
+  constructor(sampleRate: number = 1000) {
+    this.sampleRate = sampleRate;
+  }
+
+  extractMAV(samples: number[]): number {
+    const sum = samples.reduce((acc, val) => acc + Math.abs(val), 0);
+    return sum / samples.length;
+  }
+
+  extractRMS(samples: number[]): number {
+    const sumSquares = samples.reduce((acc, val) => acc + val * val, 0);
+    return Math.sqrt(sumSquares / samples.length);
+  }
+
+  extractWL(samples: number[]): number {
+    let wl = 0;
+    for (let i = 1; i < samples.length; i++) {
+      wl += Math.abs(samples[i] - samples[i - 1]);
+    }
+    return wl;
+  }
+
+  extractZC(samples: number[], threshold: number = 0.01): number {
+    let zc = 0;
+    for (let i = 1; i < samples.length; i++) {
+      const sign1 = Math.sign(samples[i - 1]);
+      const sign2 = Math.sign(samples[i]);
+      if (sign1 !== sign2 && Math.abs(samples[i] - samples[i - 1]) > threshold) {
+        zc++;
+      }
+    }
+    return zc;
+  }
+
+  extractAll(samples: number[]): Record<string, number> {
+    return {
+      mav: this.extractMAV(samples),
+      rms: this.extractRMS(samples),
+      wl: this.extractWL(samples),
+      zc: this.extractZC(samples),
+      var: this.extractVariance(samples)
+    };
+  }
+
+  private extractVariance(samples: number[]): number {
+    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+    const variance = samples.reduce((acc, val) =>
+      acc + Math.pow(val - mean, 2), 0) / samples.length;
+    return variance;
+  }
+}
+
+// Usage in React component
+import React, { useEffect, useState } from 'react';
+import { EMGDevice } from './emg-device';
+import { FeatureExtractor } from './feature-extractor';
+
+export const EMGDashboard: React.FC = () => {
+  const [gesture, setGesture] = useState&lt;string&gt;('rest');
+  const [confidence, setConfidence] = useState&lt;number&gt;(0);
+
+  useEffect(() => {
+    const device = new EMGDevice('EMG-SENSOR-001');
+
+    device.connect('api.myoelectric.device').then(() => {
+      device.onGesture((g) => {
+        setGesture(g.name);
+        setConfidence(g.confidence);
+      });
+    });
+
+    return () => device.disconnect();
+  }, []);
+
+  return (
+    &lt;div className="emg-dashboard"&gt;
+      &lt;h2&gt;Current Gesture: {gesture}&lt;/h2&gt;
+      &lt;div className="confidence-bar"&gt;
+        &lt;div style={{ width: `${confidence * 100}%` }} /&gt;
+      &lt;/div&gt;
+      &lt;p&gt;Confidence: {(confidence * 100).toFixed(1)}%&lt;/p&gt;
+    &lt;/div&gt;
+  );
+};</code></pre>
+
+        <h2>7.3 Bash Implementation</h2>
+
+        <h3>7.3.1 EMG Data Processing Script</h3>
+
+        <pre><code>#!/bin/bash
+
+# process_emg_session.sh
+# Process EMG session data from WIA format
+
+set -e
+
+# Configuration
+SESSION_FILE="${1:?Usage: $0 session.json}"
+OUTPUT_DIR="${2:-./processed}"
+PYTHON_VENV="./venv"
+
+# Check if file exists
+if [ ! -f "$SESSION_FILE" ]; then
+    echo "Error: Session file not found: $SESSION_FILE"
+    exit 1
+fi
+
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
+
+echo "=== Processing EMG Session ==="
+echo "Input: $SESSION_FILE"
+echo "Output: $OUTPUT_DIR"
+
+# Extract metadata
+echo -e "\n[1/5] Extracting metadata..."
+SAMPLE_RATE=$(jq -r '.metadata.sampleRate' "$SESSION_FILE")
+CHANNEL_COUNT=$(jq -r '.metadata.channelCount' "$SESSION_FILE")
+DURATION=$(jq -r '.duration' "$SESSION_FILE")
+
+echo "  Sample rate: ${SAMPLE_RATE} Hz"
+echo "  Channels: $CHANNEL_COUNT"
+echo "  Duration: ${DURATION} ms"
+
+# Validate signal quality
+echo -e "\n[2/5] Validating signal quality..."
+for i in $(seq 0 $((CHANNEL_COUNT - 1))); do
+    CHANNEL_NAME=$(jq -r ".channels[$i].name" "$SESSION_FILE")
+    SAMPLE_COUNT=$(jq -r ".channels[$i].samples | length" "$SESSION_FILE")
+
+    echo "  Channel $i ($CHANNEL_NAME): $SAMPLE_COUNT samples"
+
+    # Check for saturation
+    MAX_VAL=$(jq -r ".channels[$i].samples | max" "$SESSION_FILE")
+    if (( $(echo "$MAX_VAL > 4.5" | bc -l) )); then
+        echo "    WARNING: Possible saturation detected (max: $MAX_VAL mV)"
+    fi
+done
+
+# Extract features using Python
+echo -e "\n[3/5] Extracting features..."
+source "$PYTHON_VENV/bin/activate"
+
+python3 &lt;&lt;EOF
+import json
+import numpy as np
+from feature_extractor import EMGFeatureExtractor
+
+with open('$SESSION_FILE', 'r') as f:
+    data = json.load(f)
+
+extractor = EMGFeatureExtractor(sample_rate=$SAMPLE_RATE)
+
+features_all = []
+for channel in data['channels']:
+    samples = np.array(channel['samples'])
+    features = extractor.extract_all(samples)
+    features_all.append({
+        'channel_id': channel['id'],
+        'channel_name': channel['name'],
+        'features': features
+    })
+
+with open('$OUTPUT_DIR/features.json', 'w') as f:
+    json.dump(features_all, f, indent=2)
+
+print("Features saved to $OUTPUT_DIR/features.json")
+EOF
+
+# Generate quality report
+echo -e "\n[4/5] Generating quality report..."
+cat &gt; "$OUTPUT_DIR/quality_report.txt" &lt;&lt;EOF
+EMG Session Quality Report
+==========================
+
+Session File: $SESSION_FILE
+Processing Date: $(date)
+
+Metadata:
+  Sample Rate: ${SAMPLE_RATE} Hz
+  Channels: $CHANNEL_COUNT
+  Duration: ${DURATION} ms
+
+Signal Quality:
+EOF
+
+# Append per-channel quality metrics
+jq -r '.channels[] | "  Channel \(.id) (\(.name)):\n    SNR: Calculated\n    Baseline: \(.samples[0:100] | add / length) mV"' \
+   "$SESSION_FILE" &gt;&gt; "$OUTPUT_DIR/quality_report.txt"
+
+# Create summary
+echo -e "\n[5/5] Creating summary..."
+jq '{
+  sessionId: (.startTime | tostring),
+  duration_ms: .duration,
+  channel_count: .metadata.channelCount,
+  sample_rate: .metadata.sampleRate,
+  channels: [.channels[] | {id, name}]
+}' "$SESSION_FILE" &gt; "$OUTPUT_DIR/summary.json"
+
+echo -e "\n=== Processing Complete ==="
+echo "Output files:"
+ls -lh "$OUTPUT_DIR"</code></pre>
+
+        <h3>7.3.2 Batch Processing Script</h3>
+
+        <pre><code>#!/bin/bash
+
+# batch_process_emg.sh
+# Process multiple EMG sessions in parallel
+
+set -e
+
+INPUT_DIR="${1:?Usage: $0 input_dir output_dir [num_parallel]}"
+OUTPUT_DIR="${2:?}"
+NUM_PARALLEL="${3:-4}"
+
+echo "=== Batch EMG Processing ==="
+echo "Input directory: $INPUT_DIR"
+echo "Output directory: $OUTPUT_DIR"
+echo "Parallel jobs: $NUM_PARALLEL"
+
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
+
+# Find all session JSON files
+SESSION_FILES=($(find "$INPUT_DIR" -name "*.json" -type f))
+TOTAL_FILES=${#SESSION_FILES[@]}
+
+echo "Found $TOTAL_FILES session files"
+
+# Process files in parallel using GNU parallel or xargs
+if command -v parallel &gt;/dev/null 2&gt;&1; then
+    # Use GNU parallel if available
+    printf '%s\n' "${SESSION_FILES[@]}" | \
+        parallel -j "$NUM_PARALLEL" --bar \
+        "./process_emg_session.sh {} $OUTPUT_DIR/{/.}"
+else
+    # Fallback to xargs
+    printf '%s\n' "${SESSION_FILES[@]}" | \
+        xargs -P "$NUM_PARALLEL" -I {} \
+        bash -c "./process_emg_session.sh {} $OUTPUT_DIR/\$(basename {} .json)"
+fi
+
+# Generate aggregate report
+echo -e "\n=== Generating Aggregate Report ==="
+
+TOTAL_DURATION=0
+TOTAL_SAMPLES=0
+
+for session in "${SESSION_FILES[@]}"; do
+    DURATION=$(jq -r '.duration' "$session")
+    SAMPLE_COUNT=$(jq -r '[.channels[].samples | length] | add' "$session")
+
+    TOTAL_DURATION=$((TOTAL_DURATION + DURATION))
+    TOTAL_SAMPLES=$((TOTAL_SAMPLES + SAMPLE_COUNT))
+done
+
+cat &gt; "$OUTPUT_DIR/aggregate_report.txt" &lt;&lt;EOF
+Batch Processing Report
+=======================
+
+Processing Date: $(date)
+Total Sessions: $TOTAL_FILES
+Total Duration: $((TOTAL_DURATION / 1000)) seconds
+Total Samples: $TOTAL_SAMPLES
+
+Output Location: $OUTPUT_DIR
+EOF
+
+echo -e "\n=== Batch Processing Complete ==="
+cat "$OUTPUT_DIR/aggregate_report.txt"</code></pre>
+
+        <h3>7.3.3 Device Configuration Script</h3>
+
+        <pre><code>#!/bin/bash
+
+# configure_emg_device.sh
+# Configure EMG device via WIA API
+
+API_URL="${EMG_API_URL:-https://api.myoelectric.device/v1}"
+API_KEY="${EMG_API_KEY:?Error: EMG_API_KEY not set}"
+DEVICE_ID="${1:?Usage: $0 device_id}"
+
+# Function to call API
+api_call() {
+    local endpoint="$1"
+    local method="${2:-GET}"
+    local data="$3"
+
+    curl -s -X "$method" \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" \
+        ${data:+-d "$data"} \
+        "$API_URL/$endpoint"
+}
+
+# Get device info
+echo "=== Device Information ==="
+api_call "devices/$DEVICE_ID" | jq .
+
+# Configure device
+echo -e "\n=== Configuring Device ==="
+CONFIG_DATA='{
+  "sampleRate": 1000,
+  "resolution": 16,
+  "gain": 1000,
+  "referenceType": "bipolar",
+  "channels": [
+    {"id": 0, "enabled": true, "muscle": "flexor_carpi_radialis"},
+    {"id": 1, "enabled": true, "muscle": "extensor_carpi_radialis_longus"},
+    {"id": 2, "enabled": true, "muscle": "flexor_digitorum"},
+    {"id": 3, "enabled": true, "muscle": "extensor_digitorum"}
+  ]
+}'
+
+api_call "devices/$DEVICE_ID/configure" "POST" "$CONFIG_DATA" | jq .
+
+# Start calibration
+echo -e "\n=== Starting MVC Calibration ==="
+CALIB_DATA='{
+  "deviceId": "'$DEVICE_ID'",
+  "channels": [0, 1, 2, 3],
+  "contractionDuration": 5000,
+  "restDuration": 30000,
+  "repetitions": 3
+}'
+
+SESSION_ID=$(api_call "calibration/mvc/start" "POST" "$CALIB_DATA" | jq -r .sessionId)
+echo "Calibration session: $SESSION_ID"
+
+echo -e "\nDevice configured successfully!"</code></pre>
+
+        <div class="success-box">
+            <h3>Next Steps</h3>
+            <p>Continue to <a href="chapter8.html" style="color: var(--primary-color); font-weight: 600;">Chapter 8: Certification & Compliance</a> to learn about medical device standards and prosthetic certification requirements.</p>
+        </div>
+
+        </main>
+</body>
+</html>

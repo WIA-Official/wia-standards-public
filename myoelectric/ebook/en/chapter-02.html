@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: sEMG Signal Acquisition — WIA Myoelectric</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← Table of Contents</a></nav>
+
+    <h1>Chapter 2: sEMG Signal Acquisition</h1>
+
+    <h2>2.1 Electrode Technologies</h2>
+    <p>
+        Surface EMG electrodes convert the electrochemical signal at the skin surface into a measurable voltage. Three electrode types are used in myoelectric prosthetics:
+    </p>
+    <table>
+        <tr><th>Type</th><th>Material</th><th>Impedance</th><th>Durability</th><th>Clinical Use</th></tr>
+        <tr><td>Ag/AgCl disposable</td><td>Silver/Silver Chloride gel</td><td>Low (2–10 kΩ)</td><td>Single use</td><td>Lab testing, clinical fitting</td></tr>
+        <tr><td>Stainless steel dry</td><td>Brushed 316L SS</td><td>Medium (10–100 kΩ)</td><td>Years</td><td>Long-term daily use (Ottobock 13E200)</td></tr>
+        <tr><td>Dry textile</td><td>Silver-coated fabric</td><td>High (50–500 kΩ)</td><td>Washable</td><td>Soft prosthetic liners, wearable research</td></tr>
+    </table>
+    <p>
+        WIA-MYO mandates electrode-skin impedance ≤ 50 kΩ at 20 Hz for acceptable signal quality; ≤ 10 kΩ is optimal. Abrasive gel and light skin preparation (fine sandpaper or alcohol wipe) typically achieves impedance below 10 kΩ.
+    </p>
+
+    <h2>2.2 Differential Amplification</h2>
+    <p>
+        All WIA-compliant sEMG acquisition systems use <strong>differential amplification</strong> with a dedicated ground (reference) electrode. The differential amplifier measures the potential difference between two active electrodes placed along the muscle belly, rejecting common-mode interference (power line noise, body potential shifts) with a Common Mode Rejection Ratio (CMRR) ≥ 80 dB.
+    </p>
+    <pre><code># Signal chain specification
+Input impedance:      ≥ 100 MΩ (to not load skin electrode impedance)
+CMRR:                 ≥ 80 dB at 50/60 Hz
+Gain:                 1000× (60 dB) — typical for ±5 mV input range
+Band-pass filter:     20–500 Hz (2nd order Butterworth or higher)
+Notch filter:         50 Hz (EU) or 60 Hz (US/KR) — optional if CMRR sufficient
+ADC resolution:       ≥ 12 bit (16-bit recommended for Delsys Trigno)
+Sample rate:          ≥ 2 kHz for pattern recognition (Nyquist for 1 kHz content)</code></pre>
+
+    <h2>2.3 SENIAM Electrode Placement</h2>
+    <p>
+        The <strong>SENIAM</strong> (Surface EMG for Non-Invasive Assessment of Muscles) project established standardised electrode placement guidelines for 27 muscles, ensuring reproducible recordings across sessions and laboratories. WIA-MYO-DATA-001 mandates SENIAM placement codes.
+    </p>
+    <p>Key forearm muscle placements for transradial prosthetics:</p>
+    <table>
+        <tr><th>Muscle</th><th>SENIAM Placement</th><th>Primary Action</th></tr>
+        <tr><td>FCR (Flexor Carpi Radialis)</td><td>1/3 of distance from medial epicondyle to radial styloid, on volar forearm</td><td>Wrist flexion, radial deviation</td></tr>
+        <tr><td>ECR (Extensor Carpi Radialis)</td><td>1/4 of distance from lateral epicondyle to radial styloid, dorsal forearm</td><td>Wrist extension, radial deviation</td></tr>
+        <tr><td>BB (Biceps Brachii)</td><td>Anterior upper arm, 1/3 from antecubital fossa</td><td>Elbow flexion, supination</td></tr>
+        <tr><td>TB (Triceps Brachii)</td><td>Posterior upper arm, midpoint</td><td>Elbow extension, pronation</td></tr>
+        <tr><td>FDS (Flexor Digitorum Superficialis)</td><td>Middle volar forearm, between FCR and ECU</td><td>Finger flexion (grip)</td></tr>
+    </table>
+
+    <h2>2.4 Hardware Systems</h2>
+
+    <h3>Delsys Trigno IM</h3>
+    <p>
+        The Delsys Trigno IM is the research gold standard for high-density sEMG acquisition, offering 16 wireless channels at 2 kHz with a 20 Hz lower cut-off and integrated IMU per sensor pod. The Delsys Trigno SDK exposes a Python/MATLAB API and is supported by the WIA <code>delsys_ros2_driver</code> package.
+    </p>
+    <pre><code># delsys_ros2_driver launch
+ros2 launch delsys_ros2_driver trigno_im.launch.py \
+  num_channels:=16 \
+  sample_rate_hz:=2000 \
+  bandwidth_low_hz:=20 \
+  bandwidth_high_hz:=450 \
+  publish_raw:=true \
+  publish_rms:=true</code></pre>
+
+    <h3>MyoWare 2.0 (SparkFun)</h3>
+    <p>
+        MyoWare 2.0 is an affordable, open-source single-channel sEMG module (3.3–5 V, I2C configurable gain) popular in academic prosthetics research and WIA developer kits. Chain up to 8 modules for an 8-channel array.
+    </p>
+    <pre><code># Arduino/Python read (MyoWare 2.0 analog output)
+# Output: 0–VCC mV envelope (rectified, low-pass filtered at ~60 Hz)
+# NOT suitable for pattern recognition (requires raw signal)
+# Use MyoWare with external ADC at ≥ 1 kHz for Hudgins features</code></pre>
+
+    <h3>Ottobock 13E200 Electrode</h3>
+    <p>
+        The stainless steel 13E200 is the clinical standard in transradial prosthetics worldwide. It integrates a differential amplifier with adjustable gain (3-position switch: low/medium/high sensitivity) and provides both an analog output for proportional control and a logic-level output for simple switch control.
+    </p>
+
+    <h2>2.5 Signal Quality Assessment</h2>
+    <pre><code># Python signal quality assessment
+import numpy as np
+
+def assess_emg_quality(raw_samples_uv: np.ndarray, fs: float = 2000) -> dict:
+    """Assess sEMG frame quality per WIA-MYO-DATA-001 §7."""
+    rms = np.sqrt(np.mean(raw_samples_uv ** 2))
+    saturation = np.any(np.abs(raw_samples_uv) > 4900)  # within 2% of ±5000 uV rail
+    motion_artifact = rms > 200  # high baseline during supposed rest
+
+    # SNR: compare signal RMS to noise floor (high-pass > 400 Hz)
+    from scipy.signal import butter, filtfilt
+    b, a = butter(4, 400 / (fs/2), btype='high')
+    noise = filtfilt(b, a, raw_samples_uv)
+    noise_rms = np.sqrt(np.mean(noise**2))
+    snr_db = 20 * np.log10(rms / noise_rms) if noise_rms > 0 else 0
+
+    quality = "good" if snr_db >= 28 else "fair" if snr_db >= 20 else "poor"
+    return {"rms_uv": rms, "snr_db": snr_db, "saturation": saturation,
+            "motion_artifact": motion_artifact, "overall_quality": quality}</code></pre>
+
+    <h2>2.6 Targeted Muscle Reinnervation (TMR)</h2>
+    <p>
+        For high-level amputees (transhumeral, shoulder disarticulation), Targeted Muscle Reinnervation (TMR) surgically reroutes residual nerves to denervated chest or shoulder muscles, creating additional sEMG sites that represent the phantom missing limb. TMR can provide 4+ independent control sites from a single-limb amputee, enabling pattern recognition with 8–16 electrodes over the reinnervated skin areas.
+    </p>
+    <p>
+        WIA-MYO session metadata includes a <code>tmr_performed</code> boolean and <code>tmr_target_muscles</code> array to enable stratified analysis of TMR vs. conventional transradial classifier performance.
+    </p>
+
+    <footer><p>WIA Myoelectric Standard · Chapter 2 · © 2026 WIA</p></footer>
+</body>
+</html>

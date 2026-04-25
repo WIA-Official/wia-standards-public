@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 통신 프로토콜 (BLE GATT, USB HID, ROS 2) — WIA 근전 표준</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.9; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← 목차로</a></nav>
+
+    <h1>제6장: 통신 프로토콜 (BLE GATT, USB HID, ROS 2)</h1>
+
+    <h2>6.1 BLE 5.4 GATT 프로파일</h2>
+    <p>
+        WIA-MYO는 Bluetooth Low Energy 5.4 (LE Audio/Extended Advertising 지원) 기반의 표준 GATT 프로파일을 정의합니다. 전극 모듈과 의지 프로세서 간 무선 sEMG 전송에 사용되며, 연결 간격 7.5 ms(최소)~20 ms(일반)로 분류 지연을 15 ms 이하로 유지합니다.
+    </p>
+    <table>
+        <tr><th>서비스/특성</th><th>UUID</th><th>속성</th><th>페이로드</th></tr>
+        <tr><td>WIA EMG Service</td><td>0xFEA0</td><td>—</td><td>서비스 선언</td></tr>
+        <tr><td>EMG Raw Stream</td><td>0xFEA1</td><td>Notify</td><td>8ch × 2B int16 + 2B 타임스탬프 (18B/패킷)</td></tr>
+        <tr><td>EMG RMS (처리됨)</td><td>0xFEA2</td><td>Notify</td><td>8ch × 1B uint8 (0–255 = 0–5mV RMS)</td></tr>
+        <tr><td>Classifier Output</td><td>0xFEA3</td><td>Notify</td><td>1B 클래스 ID + 1B 신뢰도 + 1B 플래그</td></tr>
+        <tr><td>Device Config</td><td>0xFEA4</td><td>Read/Write</td><td>이득, 샘플레이트, 필터 파라미터</td></tr>
+        <tr><td>Battery Level</td><td>0x2A19</td><td>Read/Notify</td><td>표준 BLE Battery Service</td></tr>
+    </table>
+    <p>
+        <strong>패킷 구조 (EMG Raw, 18B)</strong>:
+        <code>[ch0_hi][ch0_lo][ch1_hi][ch1_lo]…[ch7_hi][ch7_lo][ts_hi][ts_lo]</code>
+        — big-endian int16, μV 단위, 타임스탬프는 1/32768 s 틱 카운터.
+    </p>
+
+    <h2>6.2 BLE Python 클라이언트 (bleak)</h2>
+    <pre><code>import asyncio, struct
+from bleak import BleakClient, BleakScanner
+
+EMG_RAW_UUID  = "0000FEA1-0000-1000-8000-00805F9B34FB"
+CLASSIF_UUID  = "0000FEA3-0000-1000-8000-00805F9B34FB"
+
+GESTURE_NAMES = ["안정", "손 펴기", "쥐기", "회내전",
+                 "회외전", "손목 굴곡", "손목 신전", "세 손가락 집기"]
+
+async def run():
+    devices = await BleakScanner.discover(timeout=5.0)
+    target = next(d for d in devices if "WIA-EMG" in (d.name or ""))
+
+    async with BleakClient(target.address) as client:
+        def on_raw(_, data):
+            vals = struct.unpack(">8h", data[:16])
+            ts   = struct.unpack(">H", data[16:])[0]
+            print(f"[{ts}] 채널(μV): {vals}")
+
+        def on_class(_, data):
+            cls_id, conf, flags = data[0], data[1] / 255.0, data[2]
+            rejected = bool(flags & 0x01)
+            print(f"제스처: {GESTURE_NAMES[cls_id]}  "
+                  f"신뢰도: {conf:.2f}  거부: {rejected}")
+
+        await client.start_notify(EMG_RAW_UUID, on_raw)
+        await client.start_notify(CLASSIF_UUID, on_class)
+        await asyncio.sleep(60.0)
+
+asyncio.run(run())</code></pre>
+
+    <h2>6.3 USB HID 유선 인터페이스</h2>
+    <p>
+        USB HID(Human Interface Device) 클래스를 사용하면 드라이버 설치 없이 OS에서 즉시 인식됩니다. WIA-MYO USB HID 디스크립터는 <code>Usage Page: 0xFF00</code> (Vendor Defined), <code>Usage: 0x01</code>, 64B 인터럽트 IN 엔드포인트(인터벌 1 ms)를 정의합니다.
+    </p>
+    <pre><code>import hid  # pip install hidapi
+
+VENDOR_ID  = 0x2C7C  # WIA
+PRODUCT_ID = 0x0501  # WIA-EMG-8CH
+
+dev = hid.device()
+dev.open(VENDOR_ID, PRODUCT_ID)
+dev.set_nonblocking(False)
+
+while True:
+    report = dev.read(64, timeout_ms=100)
+    if report:
+        import struct
+        # 바이트 0: 리포트 ID (1 = EMG 원시, 2 = 분류 결과)
+        rid = report[0]
+        if rid == 1:
+            channels = struct.unpack_from("<8h", bytes(report), 1)
+            print("EMG(μV):", channels)
+        elif rid == 2:
+            cls_id = report[1]
+            conf   = report[2] / 255.0
+            print(f"분류: {cls_id}  신뢰도: {conf:.2f}")</code></pre>
+
+    <h2>6.4 ROS 2 토픽 맵</h2>
+    <table>
+        <tr><th>토픽</th><th>메시지 타입</th><th>주기</th><th>용도</th></tr>
+        <tr><td>/emg/raw</td><td>wia_myo_msgs/EmgFrame</td><td>2 kHz</td><td>원시 sEMG 샘플 스트림</td></tr>
+        <tr><td>/emg/rms</td><td>wia_myo_msgs/EmgRms</td><td>40 Hz</td><td>25 ms 윈도우 RMS (각 채널)</td></tr>
+        <tr><td>/emg/classification</td><td>wia_myo_msgs/EmgClassification</td><td>40 Hz</td><td>제스처 클래스, 신뢰도, 거부 플래그</td></tr>
+        <tr><td>/emg/quality</td><td>wia_myo_msgs/EmgQuality</td><td>1 Hz</td><td>채널별 SNR, 임피던스, 전체 품질 등급</td></tr>
+        <tr><td>/prosthesis/cmd</td><td>wia_myo_msgs/ProsthesisCommand</td><td>주문형</td><td>제스처 명령 + 비례 속도</td></tr>
+        <tr><td>/prosthesis/state</td><td>wia_myo_msgs/ProsthesisState</td><td>10 Hz</td><td>현재 그립, 파지력, 배터리</td></tr>
+    </table>
+    <pre><code>ros2 run wia_myo_driver emg_publisher_node \
+  --ros-args \
+  -p device_type:=ble \
+  -p ble_address:="AA:BB:CC:DD:EE:FF" \
+  -p sample_rate_hz:=2000 \
+  -p num_channels:=8 \
+  -p classifier_model:=lda-20260425-001</code></pre>
+
+    <h2>6.5 엔드-투-엔드 지연 예산</h2>
+    <table>
+        <tr><th>단계</th><th>지연 (ms)</th><th>비고</th></tr>
+        <tr><td>ADC 샘플링 (2 kHz)</td><td>0.5</td><td>Nyquist 기준</td></tr>
+        <tr><td>BLE 연결 간격</td><td>7.5–20</td><td>7.5 ms 최소 설정 권장</td></tr>
+        <tr><td>분석 윈도우 (200 ms, 50% 중첩)</td><td>100</td><td>새 출력 = 100 ms마다</td></tr>
+        <tr><td>특징 추출 + LDA 분류</td><td>2.1</td><td>8채널 TD4 + LDA</td></tr>
+        <tr><td>BLE 명령 송신 (의지 → 모터)</td><td>10</td><td>BLE 5.4 1M PHY</td></tr>
+        <tr><td>모터 제어 루프</td><td>5</td><td>의지 펌웨어 200 Hz</td></tr>
+        <tr><td><strong>합계 (최적)</strong></td><td><strong>~125 ms</strong></td><td>WIA-MYO 목표 ≤ 150 ms</td></tr>
+    </table>
+    <pre><code># 지연 측정 명령
+ros2 run wia_myo_tools latency_benchmark \
+  --ros-args \
+  -p emg_topic:=/emg/raw \
+  -p cmd_topic:=/prosthesis/cmd \
+  -p duration_s:=30 \
+  -p report_csv:=/tmp/wia_latency.csv</code></pre>
+
+    <footer><p>WIA 근전 표준 · 제6장 · © 2026 WIA</p></footer>
+</body>
+</html>

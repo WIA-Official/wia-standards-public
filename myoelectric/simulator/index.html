@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Myoelectric - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #F43F5E;
+            --primary-dark: #E11D48;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #FB7185); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        .emg-channels { display: grid; gap: 15px; }
+        .emg-channel { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; }
+        .emg-channel .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .emg-channel .name { font-weight: 600; color: var(--primary); }
+        .emg-channel .value { font-size: 1.2rem; font-weight: bold; }
+        .emg-waveform { height: 60px; background: var(--bg-card); border-radius: 4px; position: relative; overflow: hidden; }
+        .emg-waveform canvas { width: 100%; height: 100%; }
+
+        .muscle-map { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .muscle-group { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .muscle-group h5 { color: var(--primary); margin-bottom: 15px; }
+        .muscle-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .muscle-item:last-child { border-bottom: none; }
+        .muscle-bar { width: 100px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .muscle-bar-fill { height: 100%; background: var(--primary); transition: width 0.2s; }
+
+        .gesture-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin: 20px 0; }
+        .gesture-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .gesture-card:hover { border-color: var(--primary); }
+        .gesture-card.active { border-color: var(--primary); background: rgba(244, 63, 94, 0.1); }
+        .gesture-card .icon { font-size: 3rem; margin-bottom: 10px; }
+        .gesture-card .name { font-weight: 600; }
+        .gesture-card .confidence { font-size: 0.85rem; color: var(--text-muted); margin-top: 5px; }
+
+        .prosthetic-hand { display: flex; justify-content: center; gap: 30px; margin: 20px 0; align-items: flex-start; }
+        .hand-visual { width: 200px; height: 280px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; position: relative; display: flex; align-items: center; justify-content: center; }
+        .hand-emoji { font-size: 8rem; transition: transform 0.3s; }
+        .finger-controls { flex: 1; max-width: 300px; }
+        .finger-control { margin: 15px 0; }
+        .finger-control label { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .finger-control input[type="range"] { width: 100%; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .stat-item .value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .stat-item .label { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+
+        .calib-steps { display: flex; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
+        .calib-step { flex: 1; min-width: 150px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; }
+        .calib-step.active { border-color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+        .calib-step.done { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .calib-step .num { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        .calib-step .title { font-size: 0.9rem; margin-top: 10px; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .prosthetic-hand { flex-direction: column; align-items: center; }
+        }
+            .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Myoelectric</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">💪 WIA Myoelectric</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="EMG Prosthetic Control" data-ko="근전도 의수 제어">EMG Prosthetic Control</h1>
+            <p data-en="Control prosthetics with muscle electrical signals" data-ko="근육 전기 신호로 의수 제어">Control prosthetics with EMG</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 EMG Signal" data-ko="📊 EMG 신호">📊 EMG Signal</div>
+            <div class="tab" onclick="showPanel(1)" data-en="💪 Muscle" data-ko="💪 근육">💪 Muscle</div>
+            <div class="tab" onclick="showPanel(2)" data-en="✊ Gesture" data-ko="✊ 제스처">✊ Gesture</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🦾 Prosthetic" data-ko="🦾 의수">🦾 Prosthetic</div>
+            <div class="tab" onclick="showPanel(4)" data-en="⚙️ Calibration" data-ko="⚙️ 보정">⚙️ Calibration</div>
+        </div>
+
+        <!-- Panel 0: EMG Signal -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📊 Real-time EMG Signals" data-ko="📊 실시간 EMG 신호">📊 Real-time EMG Signals</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Electromyography signals from muscle sensors" data-ko="근육 센서의 근전도 신호">EMG signals from sensors</p>
+
+            <div class="emg-channels" id="emgChannels">
+                <div class="emg-channel">
+                    <div class="header">
+                        <span class="name" data-en="Ch1: Flexor (Wrist)" data-ko="Ch1: 굴근 (손목)">Ch1: Flexor (Wrist)</span>
+                        <span class="value" id="ch1Val">0.42 mV</span>
+                    </div>
+                    <div class="emg-waveform"><canvas id="wave1"></canvas></div>
+                </div>
+                <div class="emg-channel">
+                    <div class="header">
+                        <span class="name" data-en="Ch2: Extensor (Wrist)" data-ko="Ch2: 신근 (손목)">Ch2: Extensor (Wrist)</span>
+                        <span class="value" id="ch2Val">0.38 mV</span>
+                    </div>
+                    <div class="emg-waveform"><canvas id="wave2"></canvas></div>
+                </div>
+                <div class="emg-channel">
+                    <div class="header">
+                        <span class="name" data-en="Ch3: Flexor (Fingers)" data-ko="Ch3: 굴근 (손가락)">Ch3: Flexor (Fingers)</span>
+                        <span class="value" id="ch3Val">0.55 mV</span>
+                    </div>
+                    <div class="emg-waveform"><canvas id="wave3"></canvas></div>
+                </div>
+                <div class="emg-channel">
+                    <div class="header">
+                        <span class="name" data-en="Ch4: Extensor (Fingers)" data-ko="Ch4: 신근 (손가락)">Ch4: Extensor (Fingers)</span>
+                        <span class="value" id="ch4Val">0.31 mV</span>
+                    </div>
+                    <div class="emg-waveform"><canvas id="wave4"></canvas></div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value">1000</div>
+                    <div class="label">Hz Sample Rate</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">4</div>
+                    <div class="label" data-en="Channels" data-ko="채널">Channels</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">16</div>
+                    <div class="label">Bit Resolution</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">✅</div>
+                    <div class="label" data-en="Connected" data-ko="연결됨">Connected</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="toggleEMG()" id="emgBtn" data-en="▶️ Start Recording" data-ko="▶️ 녹음 시작">▶️ Start Recording</button>
+            </div>
+            <div class="output" id="emgOutput"></div>
+        </div>
+
+        <!-- Panel 1: Muscle -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="💪 Muscle Activation" data-ko="💪 근육 활성화">💪 Muscle Activation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Monitor muscle activation levels" data-ko="근육 활성화 수준 모니터링">Monitor muscle activation</p>
+
+            <div class="muscle-map">
+                <div class="muscle-group">
+                    <h5 data-en="🔽 Flexors (Grip)" data-ko="🔽 굴근 (쥐기)">🔽 Flexors (Grip)</h5>
+                    <div class="muscle-item">
+                        <span data-en="Flexor Carpi Radialis" data-ko="요측수근굴근">Flexor Carpi Radialis</span>
+                        <div class="muscle-bar"><div class="muscle-bar-fill" id="fcr" style="width: 65%;"></div></div>
+                    </div>
+                    <div class="muscle-item">
+                        <span data-en="Flexor Carpi Ulnaris" data-ko="척측수근굴근">Flexor Carpi Ulnaris</span>
+                        <div class="muscle-bar"><div class="muscle-bar-fill" id="fcu" style="width: 45%;"></div></div>
+                    </div>
+                    <div class="muscle-item">
+                        <span data-en="Flexor Digitorum" data-ko="지굴근">Flexor Digitorum</span>
+                        <div class="muscle-bar"><div class="muscle-bar-fill" id="fd" style="width: 70%;"></div></div>
+                    </div>
+                </div>
+                <div class="muscle-group">
+                    <h5 data-en="🔼 Extensors (Open)" data-ko="🔼 신근 (펴기)">🔼 Extensors (Open)</h5>
+                    <div class="muscle-item">
+                        <span data-en="Extensor Carpi Radialis" data-ko="요측수근신근">Extensor Carpi Radialis</span>
+                        <div class="muscle-bar"><div class="muscle-bar-fill" id="ecr" style="width: 30%;"></div></div>
+                    </div>
+                    <div class="muscle-item">
+                        <span data-en="Extensor Carpi Ulnaris" data-ko="척측수근신근">Extensor Carpi Ulnaris</span>
+                        <div class="muscle-bar"><div class="muscle-bar-fill" id="ecu" style="width: 25%;"></div></div>
+                    </div>
+                    <div class="muscle-item">
+                        <span data-en="Extensor Digitorum" data-ko="지신근">Extensor Digitorum</span>
+                        <div class="muscle-bar"><div class="muscle-bar-fill" id="ed" style="width: 20%;"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateMuscle()" data-en="🔄 Simulate Contraction" data-ko="🔄 수축 시뮬레이션">🔄 Simulate</button>
+            </div>
+            <div class="output" id="muscleOutput"></div>
+        </div>
+
+        <!-- Panel 2: Gesture -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="✊ Gesture Recognition" data-ko="✊ 제스처 인식">✊ Gesture Recognition</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Recognize hand gestures from EMG patterns" data-ko="EMG 패턴에서 손 제스처 인식">Recognize gestures from EMG</p>
+
+            <div class="gesture-grid">
+                <div class="gesture-card active" id="gesture-grasp" onclick="selectGesture('grasp')">
+                    <div class="icon">✊</div>
+                    <div class="name" data-en="Power Grasp" data-ko="파워 그립">Power Grasp</div>
+                    <div class="confidence">87%</div>
+                </div>
+                <div class="gesture-card" id="gesture-pinch" onclick="selectGesture('pinch')">
+                    <div class="icon">🤏</div>
+                    <div class="name" data-en="Pinch" data-ko="집기">Pinch</div>
+                    <div class="confidence">--</div>
+                </div>
+                <div class="gesture-card" id="gesture-point" onclick="selectGesture('point')">
+                    <div class="icon">👆</div>
+                    <div class="name" data-en="Point" data-ko="가리키기">Point</div>
+                    <div class="confidence">--</div>
+                </div>
+                <div class="gesture-card" id="gesture-open" onclick="selectGesture('open')">
+                    <div class="icon">✋</div>
+                    <div class="name" data-en="Open Hand" data-ko="손 펴기">Open Hand</div>
+                    <div class="confidence">--</div>
+                </div>
+                <div class="gesture-card" id="gesture-wrist-flex" onclick="selectGesture('wrist-flex')">
+                    <div class="icon">⬇️</div>
+                    <div class="name" data-en="Wrist Flex" data-ko="손목 굴곡">Wrist Flex</div>
+                    <div class="confidence">--</div>
+                </div>
+                <div class="gesture-card" id="gesture-wrist-ext" onclick="selectGesture('wrist-ext')">
+                    <div class="icon">⬆️</div>
+                    <div class="name" data-en="Wrist Extend" data-ko="손목 신전">Wrist Extend</div>
+                    <div class="confidence">--</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value" id="gestureAcc">92%</div>
+                    <div class="label" data-en="Accuracy" data-ko="정확도">Accuracy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">45ms</div>
+                    <div class="label" data-en="Latency" data-ko="지연시간">Latency</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">6</div>
+                    <div class="label" data-en="Gestures" data-ko="제스처 수">Gestures</div>
+                </div>
+            </div>
+            <div class="output" id="gestureOutput"></div>
+        </div>
+
+        <!-- Panel 3: Prosthetic -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🦾 Prosthetic Control" data-ko="🦾 의수 제어">🦾 Prosthetic Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Control prosthetic hand with EMG signals" data-ko="EMG 신호로 의수 제어">Control prosthetic with EMG</p>
+
+            <div class="prosthetic-hand">
+                <div class="hand-visual">
+                    <div class="hand-emoji" id="handEmoji">✊</div>
+                </div>
+                <div class="finger-controls">
+                    <div class="finger-control">
+                        <label><span data-en="👍 Thumb" data-ko="👍 엄지">👍 Thumb</span><span id="thumbVal">90°</span></label>
+                        <input type="range" id="thumb" min="0" max="90" value="90" oninput="updateFinger('thumb')">
+                    </div>
+                    <div class="finger-control">
+                        <label><span data-en="☝️ Index" data-ko="☝️ 검지">☝️ Index</span><span id="indexVal">90°</span></label>
+                        <input type="range" id="index" min="0" max="90" value="90" oninput="updateFinger('index')">
+                    </div>
+                    <div class="finger-control">
+                        <label><span data-en="🖕 Middle" data-ko="🖕 중지">🖕 Middle</span><span id="middleVal">90°</span></label>
+                        <input type="range" id="middle" min="0" max="90" value="90" oninput="updateFinger('middle')">
+                    </div>
+                    <div class="finger-control">
+                        <label><span data-en="💍 Ring" data-ko="💍 약지">💍 Ring</span><span id="ringVal">90°</span></label>
+                        <input type="range" id="ring" min="0" max="90" value="90" oninput="updateFinger('ring')">
+                    </div>
+                    <div class="finger-control">
+                        <label><span data-en="🤙 Pinky" data-ko="🤙 새끼">🤙 Pinky</span><span id="pinkyVal">90°</span></label>
+                        <input type="range" id="pinky" min="0" max="90" value="90" oninput="updateFinger('pinky')">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="setPose('fist')" data-en="✊ Fist" data-ko="✊ 주먹">✊ Fist</button>
+                <button class="btn btn-primary" onclick="setPose('open')" data-en="✋ Open" data-ko="✋ 펴기">✋ Open</button>
+                <button class="btn btn-primary" onclick="setPose('point')" data-en="👆 Point" data-ko="👆 가리키기">👆 Point</button>
+                <button class="btn btn-primary" onclick="setPose('pinch')" data-en="🤏 Pinch" data-ko="🤏 집기">🤏 Pinch</button>
+            </div>
+            <div class="output" id="prostheticOutput"></div>
+        </div>
+
+        <!-- Panel 4: Calibration -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="⚙️ EMG Calibration" data-ko="⚙️ EMG 보정">⚙️ EMG Calibration</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Calibrate EMG sensors for accurate control" data-ko="정확한 제어를 위한 EMG 센서 보정">Calibrate EMG sensors</p>
+
+            <div class="calib-steps">
+                <div class="calib-step done" id="calib1">
+                    <div class="num">1</div>
+                    <div class="title" data-en="Rest Position" data-ko="휴식 자세">Rest Position</div>
+                </div>
+                <div class="calib-step active" id="calib2">
+                    <div class="num">2</div>
+                    <div class="title" data-en="Max Grip" data-ko="최대 그립">Max Grip</div>
+                </div>
+                <div class="calib-step" id="calib3">
+                    <div class="num">3</div>
+                    <div class="title" data-en="Hand Open" data-ko="손 펴기">Hand Open</div>
+                </div>
+                <div class="calib-step" id="calib4">
+                    <div class="num">4</div>
+                    <div class="title" data-en="Wrist Flex" data-ko="손목 굴곡">Wrist Flex</div>
+                </div>
+                <div class="calib-step" id="calib5">
+                    <div class="num">5</div>
+                    <div class="title" data-en="Complete" data-ko="완료">Complete</div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Calibration Progress" data-ko="보정 진행률">Calibration Progress</h4>
+                <div style="background: var(--border); height: 20px; border-radius: 10px; overflow: hidden;">
+                    <div id="calibProgress" style="width: 40%; height: 100%; background: linear-gradient(90deg, var(--primary), #FB7185); transition: width 0.3s;"></div>
+                </div>
+                <p style="text-align: center; margin-top: 10px; color: var(--text-muted);" id="calibPercent">40%</p>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="nextCalibStep()" data-en="▶️ Next Step" data-ko="▶️ 다음 단계">▶️ Next Step</button>
+                <button class="btn btn-secondary" onclick="resetCalib()" data-en="🔄 Reset" data-ko="🔄 초기화">🔄 Reset</button>
+            </div>
+            <div class="output" id="calibOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Myoelectric: Restoring movement, restoring life" data-ko="WIA Myoelectric: 움직임을 되찾고, 삶을 되찾다">WIA Myoelectric: Restoring movement</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let emgRunning = false;
+        let emgInterval = null;
+        let calibStep = 2;
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        // EMG Signals
+        function toggleEMG() {
+            const btn = document.getElementById('emgBtn');
+            if (emgRunning) {
+                emgRunning = false;
+                clearInterval(emgInterval);
+                btn.textContent = currentLang === 'ko' ? '▶️ 녹음 시작' : '▶️ Start Recording';
+            } else {
+                emgRunning = true;
+                btn.textContent = currentLang === 'ko' ? '⏹️ 녹음 중지' : '⏹️ Stop Recording';
+                emgInterval = setInterval(updateEMG, 100);
+            }
+        }
+
+        function updateEMG() {
+            const vals = [
+                (Math.random() * 0.5 + 0.2).toFixed(2),
+                (Math.random() * 0.4 + 0.2).toFixed(2),
+                (Math.random() * 0.6 + 0.3).toFixed(2),
+                (Math.random() * 0.3 + 0.1).toFixed(2)
+            ];
+            document.getElementById('ch1Val').textContent = vals[0] + ' mV';
+            document.getElementById('ch2Val').textContent = vals[1] + ' mV';
+            document.getElementById('ch3Val').textContent = vals[2] + ' mV';
+            document.getElementById('ch4Val').textContent = vals[3] + ' mV';
+
+            document.getElementById('emgOutput').textContent = JSON.stringify({
+                timestamp: Date.now(),
+                channels: [
+                    { id: 1, muscle: 'flexor_carpi', value: parseFloat(vals[0]), unit: 'mV' },
+                    { id: 2, muscle: 'extensor_carpi', value: parseFloat(vals[1]), unit: 'mV' },
+                    { id: 3, muscle: 'flexor_digitorum', value: parseFloat(vals[2]), unit: 'mV' },
+                    { id: 4, muscle: 'extensor_digitorum', value: parseFloat(vals[3]), unit: 'mV' }
+                ],
+                sampleRate: 1000,
+                status: 'recording'
+            }, null, 2);
+        }
+
+        // Muscle
+        function simulateMuscle() {
+            const muscles = ['fcr', 'fcu', 'fd', 'ecr', 'ecu', 'ed'];
+            muscles.forEach(m => {
+                const val = Math.random() * 100;
+                document.getElementById(m).style.width = val + '%';
+            });
+            document.getElementById('muscleOutput').textContent = JSON.stringify({
+                action: 'muscle_contraction',
+                flexors: { fcr: Math.random().toFixed(2), fcu: Math.random().toFixed(2), fd: Math.random().toFixed(2) },
+                extensors: { ecr: Math.random().toFixed(2), ecu: Math.random().toFixed(2), ed: Math.random().toFixed(2) },
+                message: currentLang === 'ko' ? '근육 수축 시뮬레이션' : 'Muscle contraction simulated'
+            }, null, 2);
+        }
+
+        // Gesture
+        function selectGesture(gesture) {
+            document.querySelectorAll('.gesture-card').forEach(c => c.classList.remove('active'));
+            document.getElementById('gesture-' + gesture).classList.add('active');
+            document.getElementById('gesture-' + gesture).querySelector('.confidence').textContent = (Math.random() * 20 + 80).toFixed(0) + '%';
+            
+            const gestures = { grasp: '✊', pinch: '🤏', point: '👆', open: '✋', 'wrist-flex': '⬇️', 'wrist-ext': '⬆️' };
+            document.getElementById('gestureOutput').textContent = JSON.stringify({
+                gesture: gesture,
+                confidence: (Math.random() * 0.2 + 0.8).toFixed(2),
+                latency_ms: 45,
+                message: currentLang === 'ko' ? '제스처 인식됨' : 'Gesture recognized'
+            }, null, 2);
+        }
+
+        // Prosthetic
+        function updateFinger(finger) {
+            const val = document.getElementById(finger).value;
+            document.getElementById(finger + 'Val').textContent = val + '°';
+            updateHandEmoji();
+        }
+
+        function updateHandEmoji() {
+            const thumb = parseInt(document.getElementById('thumb').value);
+            const index = parseInt(document.getElementById('index').value);
+            const avg = (thumb + index + parseInt(document.getElementById('middle').value)) / 3;
+            
+            let emoji = '✊';
+            if (avg < 30) emoji = '✋';
+            else if (index < 30 && thumb > 60) emoji = '👆';
+            else if (thumb < 30 && index < 30) emoji = '🤏';
+            
+            document.getElementById('handEmoji').textContent = emoji;
+        }
+
+        function setPose(pose) {
+            const poses = {
+                fist: { thumb: 90, index: 90, middle: 90, ring: 90, pinky: 90 },
+                open: { thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0 },
+                point: { thumb: 60, index: 0, middle: 90, ring: 90, pinky: 90 },
+                pinch: { thumb: 45, index: 45, middle: 0, ring: 0, pinky: 0 }
+            };
+            const p = poses[pose];
+            ['thumb', 'index', 'middle', 'ring', 'pinky'].forEach(f => {
+                document.getElementById(f).value = p[f];
+                document.getElementById(f + 'Val').textContent = p[f] + '°';
+            });
+            updateHandEmoji();
+            
+            document.getElementById('prostheticOutput').textContent = JSON.stringify({
+                pose: pose,
+                fingers: p,
+                message: currentLang === 'ko' ? '의수 포즈 설정됨' : 'Prosthetic pose set'
+            }, null, 2);
+        }
+
+        // Calibration
+        function nextCalibStep() {
+            if (calibStep < 5) {
+                document.getElementById('calib' + calibStep).classList.remove('active');
+                document.getElementById('calib' + calibStep).classList.add('done');
+                calibStep++;
+                if (calibStep <= 5) {
+                    document.getElementById('calib' + calibStep).classList.add('active');
+                }
+                const progress = (calibStep - 1) * 25;
+                document.getElementById('calibProgress').style.width = progress + '%';
+                document.getElementById('calibPercent').textContent = progress + '%';
+                
+                document.getElementById('calibOutput').textContent = JSON.stringify({
+                    step: calibStep - 1,
+                    progress: progress + '%',
+                    status: calibStep > 5 ? 'complete' : 'in_progress',
+                    message: currentLang === 'ko' ? '보정 단계 완료' : 'Calibration step complete'
+                }, null, 2);
+            }
+        }
+
+        function resetCalib() {
+            calibStep = 1;
+            for (let i = 1; i <= 5; i++) {
+                document.getElementById('calib' + i).classList.remove('active', 'done');
+            }
+            document.getElementById('calib1').classList.add('active');
+            document.getElementById('calibProgress').style.width = '0%';
+            document.getElementById('calibPercent').textContent = '0%';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang('en');
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

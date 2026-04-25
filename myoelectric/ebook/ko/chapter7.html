@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 구현 예제 - WIA 근전 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA 근전 표준</h1>
+        <p class="subtitle">7장: 구현 예제</p>
+    </header>
+
+    <main>
+        <h1>7장: 구현 예제</h1>
+
+        <h2>7.1 Python 구현</h2>
+
+        <h3>7.1.1 EMG 데이터 로딩 및 전처리</h3>
+
+        <pre><code>import numpy as np
+from scipy.signal import butter, filtfilt, iirnotch
+
+class EMGProcessor:
+    def __init__(self, sample_rate=1000):
+        self.sample_rate = sample_rate
+
+    def notch_filter(self, data, freq=60, quality=30):
+        """전력선 간섭 제거"""
+        b, a = iirnotch(freq, quality, self.sample_rate)
+        return filtfilt(b, a, data)
+
+    def bandpass_filter(self, data, lowcut=20, highcut=450):
+        """EMG 주파수 대역 추출"""
+        nyquist = self.sample_rate / 2
+        low = lowcut / nyquist
+        high = highcut / nyquist
+        b, a = butter(4, [low, high], btype='band')
+        return filtfilt(b, a, data)
+
+    def rectify_and_envelope(self, data, cutoff=5):
+        """정류 및 엔벨로프 추출"""
+        # 정류
+        rectified = np.abs(data)
+
+        # 저역통과 필터 (엔벨로프)
+        nyquist = self.sample_rate / 2
+        b, a = butter(4, cutoff / nyquist, btype='low')
+        envelope = filtfilt(b, a, rectified)
+
+        return envelope
+
+    def process(self, emg_data):
+        """전체 전처리 파이프라인"""
+        # 노치 필터 적용
+        filtered = self.notch_filter(emg_data)
+
+        # 대역통과 필터
+        filtered = self.bandpass_filter(filtered)
+
+        # 엔벨로프 추출
+        envelope = self.rectify_and_envelope(filtered)
+
+        return envelope
+
+# 사용 예제
+processor = EMGProcessor(sample_rate=1000)
+emg_raw = np.loadtxt('emg_data.csv')
+emg_processed = processor.process(emg_raw)</code></pre>
+
+        <h3>7.1.2 특징 추출</h3>
+
+        <pre><code>class EMGFeatureExtractor:
+    def __init__(self, window_size=256):
+        self.window_size = window_size
+
+    def mean_absolute_value(self, signal):
+        """평균 절대값 (MAV)"""
+        return np.mean(np.abs(signal))
+
+    def root_mean_square(self, signal):
+        """제곱 평균 제곱근 (RMS)"""
+        return np.sqrt(np.mean(signal ** 2))
+
+    def waveform_length(self, signal):
+        """파형 길이 (WL)"""
+        return np.sum(np.abs(np.diff(signal)))
+
+    def zero_crossing(self, signal, threshold=0.01):
+        """영교차 (ZC)"""
+        signs = np.sign(signal)
+        zc = np.sum(np.abs(np.diff(signs)) > 0)
+        # 노이즈 임계값 적용
+        return zc
+
+    def extract_features(self, signal):
+        """모든 특징 추출"""
+        features = {
+            'mav': self.mean_absolute_value(signal),
+            'rms': self.root_mean_square(signal),
+            'wl': self.waveform_length(signal),
+            'zc': self.zero_crossing(signal)
+        }
+        return features
+
+# 사용 예제
+extractor = EMGFeatureExtractor(window_size=256)
+features = extractor.extract_features(emg_processed)</code></pre>
+
+        <h3>7.1.3 제스처 분류</h3>
+
+        <pre><code>from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.model_selection import cross_val_score
+import joblib
+
+class GestureClassifier:
+    def __init__(self):
+        self.model = LinearDiscriminantAnalysis()
+        self.gesture_labels = ['rest', 'hand_open', 'hand_close',
+                               'wrist_flexion', 'wrist_extension']
+
+    def train(self, features, labels):
+        """제스처 인식 모델 학습"""
+        # 교차 검증
+        scores = cross_val_score(self.model, features, labels, cv=5)
+        print(f"교차 검증 정확도: {scores.mean():.3f} ± {scores.std():.3f}")
+
+        # 전체 데이터로 학습
+        self.model.fit(features, labels)
+
+    def predict(self, features):
+        """제스처 예측"""
+        prediction = self.model.predict([features])[0]
+        confidence = self.model.predict_proba([features])[0]
+
+        return {
+            'gesture': self.gesture_labels[prediction],
+            'confidence': confidence[prediction]
+        }
+
+    def save(self, filename):
+        """모델 저장"""
+        joblib.dump(self.model, filename)
+
+    def load(self, filename):
+        """모델 로드"""
+        self.model = joblib.load(filename)
+
+# 사용 예제
+classifier = GestureClassifier()
+classifier.train(training_features, training_labels)
+result = classifier.predict(new_features)
+print(f"예측된 제스처: {result['gesture']} (신뢰도: {result['confidence']:.2f})")</code></pre>
+
+        <h2>7.2 TypeScript 구현</h2>
+
+        <h3>7.2.1 WebSocket EMG 스트리밍</h3>
+
+        <pre><code>interface EMGSample {
+  timestamp: number;
+  deviceId: string;
+  channels: { id: number; samples: number[] }[];
+}
+
+class EMGStreamClient {
+  private ws: WebSocket | null = null;
+  private onDataCallback: ((data: EMGSample) => void) | null = null;
+
+  connect(url: string): Promise&lt;void&gt; {
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(url);
+
+      this.ws.onopen = () => {
+        console.log('EMG 스트림 연결됨');
+        resolve();
+      };
+
+      this.ws.onerror = (error) => {
+        console.error('WebSocket 오류:', error);
+        reject(error);
+      };
+
+      this.ws.onmessage = (event) => {
+        const data: EMGSample = JSON.parse(event.data);
+        if (this.onDataCallback) {
+          this.onDataCallback(data);
+        }
+      };
+    });
+  }
+
+  onData(callback: (data: EMGSample) => void): void {
+    this.onDataCallback = callback;
+  }
+
+  disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+}
+
+// 사용 예제
+const client = new EMGStreamClient();
+await client.connect('wss://api.myoelectric.device/v1/stream/raw');
+
+client.onData((data) => {
+  console.log(`수신한 샘플: ${data.channels.length}개 채널`);
+  // 실시간 처리 수행
+  processEMGData(data);
+});</code></pre>
+
+        <h3>7.2.2 API 클라이언트</h3>
+
+        <pre><code>class MyoelectricAPIClient {
+  private baseURL: string;
+  private apiKey: string;
+
+  constructor(baseURL: string, apiKey: string) {
+    this.baseURL = baseURL;
+    this.apiKey = apiKey;
+  }
+
+  private async request(endpoint: string, options: RequestInit = {}) {
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `ApiKey ${this.apiKey}`,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`API 오류: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async listDevices() {
+    return this.request('/devices');
+  }
+
+  async startCalibration(deviceId: string, config: CalibrationConfig) {
+    return this.request('/calibration/mvc/start', {
+      method: 'POST',
+      body: JSON.stringify({ deviceId, ...config }),
+    });
+  }
+
+  async recognizeGesture(features: number[]) {
+    return this.request('/recognition/predict', {
+      method: 'POST',
+      body: JSON.stringify({ features }),
+    });
+  }
+}
+
+// 사용 예제
+const api = new MyoelectricAPIClient(
+  'https://api.myoelectric.device/v1',
+  'your-api-key'
+);
+
+const devices = await api.listDevices();
+console.log('사용 가능한 장치:', devices);</code></pre>
+
+        <h2>7.3 Bash 스크립트 구현</h2>
+
+        <h3>7.3.1 EMG 데이터 백업 스크립트</h3>
+
+        <pre><code>#!/bin/bash
+# EMG 데이터 백업 및 암호화
+
+set -e
+
+# 설정
+EMG_DATA_DIR="/var/lib/emg/sessions"
+BACKUP_DIR="/backup/emg"
+ENCRYPTION_KEY="/etc/emg/backup.key"
+DATE=$(date +%Y%m%d)
+
+# 백업 디렉토리 생성
+mkdir -p "$BACKUP_DIR"
+
+# 압축 및 암호화
+tar czf - "$EMG_DATA_DIR" | \
+  openssl enc -aes-256-cbc -salt -pbkdf2 \
+  -pass file:"$ENCRYPTION_KEY" \
+  -out "$BACKUP_DIR/emg_backup_$DATE.tar.gz.enc"
+
+# 체크섬 생성
+sha256sum "$BACKUP_DIR/emg_backup_$DATE.tar.gz.enc" \
+  > "$BACKUP_DIR/emg_backup_$DATE.sha256"
+
+# 오래된 백업 삭제 (30일 이상)
+find "$BACKUP_DIR" -name "emg_backup_*.tar.gz.enc" \
+  -mtime +30 -delete
+
+echo "백업 완료: emg_backup_$DATE.tar.gz.enc"</code></pre>
+
+        <h3>7.3.2 장치 모니터링 스크립트</h3>
+
+        <pre><code>#!/bin/bash
+# EMG 장치 상태 모니터링
+
+API_URL="https://api.myoelectric.device/v1"
+API_KEY="your-api-key"
+
+# 장치 목록 조회
+devices=$(curl -s -H "Authorization: ApiKey $API_KEY" \
+  "$API_URL/devices")
+
+# 각 장치 상태 확인
+echo "$devices" | jq -r '.devices[] | @json' | while read device; do
+  device_id=$(echo "$device" | jq -r '.id')
+  battery=$(echo "$device" | jq -r '.batteryLevel')
+  status=$(echo "$device" | jq -r '.status')
+
+  echo "장치: $device_id"
+  echo "  상태: $status"
+  echo "  배터리: $battery%"
+
+  # 배터리 부족 경고
+  if [ "$battery" -lt 20 ]; then
+    echo "  ⚠️  배터리 부족!"
+    # 알림 전송 (선택사항)
+    # send_notification "장치 $device_id 배터리 부족: $battery%"
+  fi
+
+  echo ""
+done</code></pre>
+
+        <div class="success-box">
+            <h3>다음 단계</h3>
+            <p><a href="chapter8.html" style="color: var(--primary-color); font-weight: 600;">8장: 인증 및 규정 준수</a>로 계속하여 의료 기기 표준 및 인증 요구사항에 대해 알아보세요.</p>
+        </div>
+
+        </main>
+</body>
+</html>

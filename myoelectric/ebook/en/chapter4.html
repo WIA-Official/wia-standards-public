@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Myoelectric Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Myoelectric Standard</h1>
+        <p class="subtitle">Chapter 4: Protocol Specification</p>
+    </header>
+
+    <main>
+        <h1>Chapter 4: Protocol Specification</h1>
+
+        <h2>4.1 EMG Preprocessing Pipeline</h2>
+
+        <p>The WIA standard defines a comprehensive signal processing pipeline that transforms raw EMG signals into clean, normalized data suitable for gesture recognition and prosthetic control.</p>
+
+        <div class="info-box">
+            <h3>Pipeline Architecture</h3>
+            <p><strong>Raw EMG → Notch Filter → Bandpass Filter → Rectification → Envelope → Normalization → Output</strong></p>
+            <p>Total latency budget: &lt; 50 ms for real-time control</p>
+        </div>
+
+        <h2>4.2 Stage 1: Notch Filter</h2>
+
+        <p>Removes 50 Hz (Europe/Asia) or 60 Hz (Americas) power line interference and harmonics.</p>
+
+        <h3>Algorithm: Second-Order IIR Notch Filter</h3>
+
+        <pre><code>// Transfer function
+H(z) = (b0 + b1*z^-1 + b2*z^-2) / (1 + a1*z^-1 + a2*z^-2)
+
+// Coefficients calculation
+w0 = 2 * PI * f0 / fs
+alpha = sin(w0) / (2 * Q)
+
+b0 = 1
+b1 = -2 * cos(w0)
+b2 = 1
+a1 = -2 * cos(w0)
+a2 = 1 - alpha
+
+// Normalize by (1 + alpha)</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Value</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Center frequency (f0)</td>
+                    <td>50 or 60 Hz</td>
+                    <td>Based on regional power system</td>
+                </tr>
+                <tr>
+                    <td>Quality factor (Q)</td>
+                    <td>30.0</td>
+                    <td>Higher = narrower notch</td>
+                </tr>
+                <tr>
+                    <td>Attenuation</td>
+                    <td>&gt; 40 dB</td>
+                    <td>At center frequency</td>
+                </tr>
+                <tr>
+                    <td>Bandwidth (-3dB)</td>
+                    <td>&lt; 2 Hz</td>
+                    <td>Narrow to preserve EMG</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.3 Stage 2: Bandpass Filter</h2>
+
+        <p>Removes motion artifacts (low frequency) and high-frequency noise while preserving EMG signal content.</p>
+
+        <h3>Algorithm: 4th-Order Butterworth Bandpass</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Application</th>
+                    <th>Low Cutoff</th>
+                    <th>High Cutoff</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>General purpose</td>
+                    <td>20 Hz</td>
+                    <td>450 Hz</td>
+                    <td>Standard EMG range (recommended)</td>
+                </tr>
+                <tr>
+                    <td>Fine control</td>
+                    <td>20 Hz</td>
+                    <td>500 Hz</td>
+                    <td>Higher bandwidth for detailed signals</td>
+                </tr>
+                <tr>
+                    <td>Motion rejection</td>
+                    <td>30 Hz</td>
+                    <td>450 Hz</td>
+                    <td>More aggressive low-frequency cut</td>
+                </tr>
+                <tr>
+                    <td>Limited bandwidth</td>
+                    <td>20 Hz</td>
+                    <td>350 Hz</td>
+                    <td>For lower sample rates</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Requirements</h3>
+        <ul>
+            <li>Passband ripple: &lt; 0.5 dB</li>
+            <li>Stopband attenuation: &gt; 40 dB</li>
+            <li>Phase response: Linear phase preferred</li>
+            <li>Group delay: &lt; 10 ms</li>
+        </ul>
+
+        <h2>4.4 Stage 3: Rectification</h2>
+
+        <p>Converts bipolar EMG signal to unipolar signal representing muscle activation intensity.</p>
+
+        <h3>Methods</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Formula</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Full-Wave (Recommended)</strong></td>
+                    <td><code>y = |x|</code></td>
+                    <td>Preserves all signal energy, standard approach</td>
+                </tr>
+                <tr>
+                    <td>Half-Wave</td>
+                    <td><code>y = max(x, 0)</code></td>
+                    <td>Simple but loses half the information</td>
+                </tr>
+                <tr>
+                    <td>Squaring</td>
+                    <td><code>y = x²</code></td>
+                    <td>Emphasizes large amplitudes</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.5 Stage 4: Envelope Extraction</h2>
+
+        <p>Extracts smooth envelope representing muscle activation level over time.</p>
+
+        <h3>Moving Average (MAV)</h3>
+        <pre><code>MAV = (1/N) * Σ|xi|
+
+Window size: 100-300 ms
+Overlap: 50-90%
+Output rate: 20-50 Hz</code></pre>
+
+        <h3>Root Mean Square (RMS) - Recommended</h3>
+        <pre><code>RMS = √((1/N) * Σxi²)
+
+Window size: 150 ms (default)
+Overlap: 75% (default)
+Output rate: 27 Hz</code></pre>
+
+        <h3>Low-Pass Filter Alternative</h3>
+        <pre><code>Cutoff frequency: 2-6 Hz
+Filter type: 4th-order Butterworth
+Minimal phase distortion</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Typical Value</th>
+                    <th>Trade-off</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Window size</td>
+                    <td>100-300 ms</td>
+                    <td>Shorter = faster response, more noise</td>
+                </tr>
+                <tr>
+                    <td>Overlap</td>
+                    <td>50-90%</td>
+                    <td>Higher = smoother output, more computation</td>
+                </tr>
+                <tr>
+                    <td>Update rate</td>
+                    <td>20-50 Hz</td>
+                    <td>Higher = more responsive, higher CPU load</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.6 Stage 5: Normalization</h2>
+
+        <p>Scales EMG values to standard range for consistent interpretation across users and sessions.</p>
+
+        <h3>MVC Normalization (Recommended)</h3>
+
+        <pre><code>normalized_value = (current_value / mvc_value) * 100
+
+Output: Percentage of Maximum Voluntary Contraction (%MVC)
+Range: 0-150% (clamped)
+Requires: Prior MVC calibration session</code></pre>
+
+        <h3>MVC Calibration Protocol</h3>
+
+        <ol>
+            <li><strong>Rest baseline (5 seconds):</strong> Record resting EMG level</li>
+            <li><strong>Submaximal contraction (3 reps):</strong> 50% effort warm-up, 10 sec rest</li>
+            <li><strong>Maximum contraction (3 reps):</strong> 3-5 seconds each, 30 second rest between</li>
+            <li><strong>Calculate MVC:</strong> Use peak value or mean of top 3 peaks</li>
+            <li><strong>Validation:</strong> Verify consistency across repetitions (CV &lt; 10%)</li>
+        </ol>
+
+        <h2>4.7 Feature Extraction</h2>
+
+        <p>Computes numerical descriptors from EMG windows for pattern recognition.</p>
+
+        <h3>Time-Domain Features</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Formula</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>MAV</td>
+                    <td>(1/N) * Σ|xi|</td>
+                    <td>Average signal amplitude</td>
+                </tr>
+                <tr>
+                    <td>RMS</td>
+                    <td>√((1/N) * Σxi²)</td>
+                    <td>Signal power</td>
+                </tr>
+                <tr>
+                    <td>WL</td>
+                    <td>Σ|xi - xi-1|</td>
+                    <td>Signal complexity</td>
+                </tr>
+                <tr>
+                    <td>ZC</td>
+                    <td>Count(sign changes)</td>
+                    <td>Frequency estimate</td>
+                </tr>
+                <tr>
+                    <td>SSC</td>
+                    <td>Count(slope changes)</td>
+                    <td>Motor unit complexity</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Frequency-Domain Features</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Description</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Mean Frequency (MNF)</td>
+                    <td>Center of mass of power spectrum</td>
+                    <td>Fatigue indicator, shifts lower with fatigue</td>
+                </tr>
+                <tr>
+                    <td>Median Frequency (MDF)</td>
+                    <td>Frequency dividing spectrum in half</td>
+                    <td>Robust fatigue measure</td>
+                </tr>
+                <tr>
+                    <td>Peak Frequency</td>
+                    <td>Frequency with maximum power</td>
+                    <td>Dominant motor unit firing rate</td>
+                </tr>
+                <tr>
+                    <td>Total Power</td>
+                    <td>Sum of all spectral power</td>
+                    <td>Overall muscle activation</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Standard Feature Set (4 channels)</h3>
+
+        <pre><code>Time domain: MAV, RMS, WL, ZC, SSC (5 features × 4 channels = 20)
+Frequency domain: MNF, MDF (2 features × 4 channels = 8)
+Total: 28 features</code></pre>
+
+        <h2>4.8 Real-Time Processing Requirements</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Stage</th>
+                    <th>Maximum Latency</th>
+                    <th>Throughput</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Notch + Bandpass Filtering</td>
+                    <td>5 ms</td>
+                    <td>1000-2000 samples/sec</td>
+                </tr>
+                <tr>
+                    <td>Rectification</td>
+                    <td>0.1 ms</td>
+                    <td>Trivial computation</td>
+                </tr>
+                <tr>
+                    <td>Envelope Extraction</td>
+                    <td>10 ms</td>
+                    <td>Window-dependent</td>
+                </tr>
+                <tr>
+                    <td>Feature Extraction</td>
+                    <td>5 ms</td>
+                    <td>Per window (~200 ms)</td>
+                </tr>
+                <tr>
+                    <td>Classification</td>
+                    <td>10 ms</td>
+                    <td>Linear algebra operations</td>
+                </tr>
+                <tr>
+                    <td><strong>Total Pipeline</strong></td>
+                    <td><strong>&lt; 50 ms</strong></td>
+                    <td><strong>Target for responsive control</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.9 Signal Quality Monitoring</h2>
+
+        <div class="warning-box">
+            <h3>Quality Metrics</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Good</th>
+                        <th>Acceptable</th>
+                        <th>Poor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>SNR</td>
+                        <td>&gt; 25 dB</td>
+                        <td>15-25 dB</td>
+                        <td>&lt; 15 dB</td>
+                    </tr>
+                    <tr>
+                        <td>Baseline drift</td>
+                        <td>&lt; 0.05 mV/s</td>
+                        <td>0.05-0.1 mV/s</td>
+                        <td>&gt; 0.1 mV/s</td>
+                    </tr>
+                    <tr>
+                        <td>Saturation</td>
+                        <td>&lt; 0.1%</td>
+                        <td>0.1-1%</td>
+                        <td>&gt; 1%</td>
+                    </tr>
+                    <tr>
+                        <td>Contact impedance</td>
+                        <td>&lt; 5 kΩ</td>
+                        <td>5-10 kΩ</td>
+                        <td>&gt; 10 kΩ</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>4.10 Streaming Protocol</h2>
+
+        <h3>WebSocket Packet Structure</h3>
+
+        <pre><code>{
+  "type": "emg_data",
+  "sequenceNumber": 12345,
+  "timestamp": 1705312800123,
+  "deviceId": "EMG-SENSOR-001",
+  "data": {
+    "raw": {
+      "ch0": [0.012, -0.008, 0.015, ...],
+      "ch1": [-0.005, 0.003, -0.002, ...],
+      "ch2": [0.018, 0.021, 0.017, ...],
+      "ch3": [-0.012, -0.009, -0.015, ...]
+    },
+    "processed": {
+      "ch0_rms": 0.156,
+      "ch1_rms": 0.089,
+      "ch2_rms": 0.234,
+      "ch3_rms": 0.112
+    }
+  },
+  "quality": {
+    "snr": [28.3, 26.1, 31.2, 24.8],
+    "impedance": [4.2, 5.1, 3.8, 6.3]
+  }
+}</code></pre>
+
+        <h3>Binary Packet Format (Efficient)</h3>
+
+        <pre><code>Header (8 bytes):
+  [0-1]   Sequence number: uint16
+  [2-5]   Timestamp delta (μs): uint32
+  [6-7]   Sample count: uint16
+
+Data:
+  [8-N]   Interleaved samples: float32[channels × samples]</code></pre>
+
+        <h2>4.11 Configuration Profiles</h2>
+
+        <h3>Default Profile (Balanced)</h3>
+        <pre><code>{
+  "notch": { "frequency": 50, "q_factor": 30 },
+  "bandpass": { "low": 20, "high": 450, "order": 4 },
+  "envelope": { "method": "rms", "window_ms": 150, "overlap": 75 },
+  "normalization": { "method": "mvc" }
+}</code></pre>
+
+        <h3>Low-Latency Profile</h3>
+        <pre><code>{
+  "notch": { "frequency": 50, "q_factor": 30 },
+  "bandpass": { "low": 20, "high": 450, "order": 2 },
+  "envelope": { "method": "rms", "window_ms": 50, "overlap": 50 },
+  "normalization": { "method": "mvc" }
+}</code></pre>
+
+        <h3>High-Quality Profile</h3>
+        <pre><code>{
+  "notch": { "frequency": 50, "q_factor": 50, "harmonics": [100, 150] },
+  "bandpass": { "low": 20, "high": 500, "order": 6 },
+  "envelope": { "method": "rms", "window_ms": 200, "overlap": 90 },
+  "normalization": { "method": "mvc" }
+}</code></pre>
+
+        <div class="success-box">
+            <h3>Next Steps</h3>
+            <p>Continue to <a href="chapter5.html" style="color: var(--primary-color); font-weight: 600;">Chapter 5: Integration Guide</a> to learn about prosthetic device integration, rehabilitation systems, and VR control applications.</p>
+        </div>
+
+        </main>
+</body>
+</html>

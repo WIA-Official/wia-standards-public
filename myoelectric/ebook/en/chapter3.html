@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Endpoints - WIA Myoelectric Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Myoelectric Standard</h1>
+        <p class="subtitle">Chapter 3: API Endpoints</p>
+    </header>
+
+    <main>
+        <h1>Chapter 3: API Endpoints</h1>
+
+        <h2>3.1 API Overview</h2>
+
+        <p>The WIA Myoelectric Standard defines a RESTful API for controlling EMG devices, managing calibration sessions, and performing gesture recognition. All endpoints use JSON for request/response bodies and follow HTTP conventions.</p>
+
+        <div class="info-box">
+            <h3>Base URL Structure</h3>
+            <p><code>https://api.myoelectric.device/v1/{resource}</code></p>
+            <p>All API requests require authentication via API key or OAuth 2.0 token.</p>
+        </div>
+
+        <h2>3.2 Device Management Endpoints</h2>
+
+        <h3>3.2.1 List Devices</h3>
+
+        <pre><code>GET /devices</code></pre>
+
+        <p>Returns all connected EMG devices and their current status.</p>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "devices": [
+    {
+      "id": "EMG-SENSOR-001",
+      "name": "Myoelectric Sensor Array",
+      "status": "connected",
+      "firmwareVersion": "2.3.1",
+      "batteryLevel": 85,
+      "channelCount": 8,
+      "sampleRate": 1000
+    }
+  ]
+}</code></pre>
+
+        <h3>3.2.2 Get Device Details</h3>
+
+        <pre><code>GET /devices/{deviceId}</code></pre>
+
+        <p>Returns detailed information about a specific device including configuration and capabilities.</p>
+
+        <h3>3.2.3 Configure Device</h3>
+
+        <pre><code>POST /devices/{deviceId}/configure</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "sampleRate": 1000,
+  "resolution": 16,
+  "gain": 1000,
+  "referenceType": "bipolar",
+  "channels": [
+    {
+      "id": 0,
+      "enabled": true,
+      "muscle": "flexor_carpi_radialis"
+    }
+  ]
+}</code></pre>
+
+        <h2>3.3 Calibration Endpoints</h2>
+
+        <h3>3.3.1 Start MVC Calibration</h3>
+
+        <pre><code>POST /calibration/mvc/start</code></pre>
+
+        <p>Initiates a Maximum Voluntary Contraction (MVC) calibration session.</p>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "deviceId": "EMG-SENSOR-001",
+  "channels": [0, 1, 2, 3],
+  "contractionDuration": 5000,
+  "restDuration": 30000,
+  "repetitions": 3
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "sessionId": "cal-session-12345",
+  "status": "in_progress",
+  "currentPhase": "rest_baseline",
+  "instructions": "Relax all muscles for 5 seconds"
+}</code></pre>
+
+        <h3>3.3.2 Get Calibration Status</h3>
+
+        <pre><code>GET /calibration/mvc/{sessionId}</code></pre>
+
+        <p>Returns current status of calibration session with real-time feedback.</p>
+
+        <h3>3.3.3 Complete Calibration</h3>
+
+        <pre><code>POST /calibration/mvc/{sessionId}/complete</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "sessionId": "cal-session-12345",
+  "status": "completed",
+  "results": [
+    {
+      "channel": 0,
+      "muscle": "flexor_carpi_radialis",
+      "mvcValue": 0.85,
+      "restBaseline": 0.015,
+      "confidence": 0.95,
+      "quality": "excellent"
+    }
+  ]
+}</code></pre>
+
+        <h2>3.4 Signal Processing Endpoints</h2>
+
+        <h3>3.4.1 Stream Raw EMG Data</h3>
+
+        <pre><code>WebSocket: wss://api.myoelectric.device/v1/stream/raw</code></pre>
+
+        <p>Establishes real-time WebSocket connection for streaming raw EMG samples.</p>
+
+        <p><strong>Message Format:</strong></p>
+        <pre><code>{
+  "timestamp": 1705312800123,
+  "deviceId": "EMG-SENSOR-001",
+  "samples": {
+    "ch0": [0.012, -0.008, 0.015],
+    "ch1": [-0.005, 0.003, -0.002],
+    "ch2": [0.018, 0.021, 0.017],
+    "ch3": [-0.012, -0.009, -0.015]
+  }
+}</code></pre>
+
+        <h3>3.4.2 Extract Features</h3>
+
+        <pre><code>POST /processing/features</code></pre>
+
+        <p>Computes time-domain and frequency-domain features from EMG window.</p>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "channels": [
+    {
+      "id": 0,
+      "samples": [0.012, -0.008, 0.015, ...]
+    }
+  ],
+  "sampleRate": 1000,
+  "features": ["mav", "rms", "wl", "zc", "ssc", "mnf", "mdf"]
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "featureVector": [0.123, 0.156, 45.2, 18, 22, 87.5, 95.2, ...],
+  "featureNames": ["ch0_mav", "ch0_rms", "ch0_wl", "ch0_zc", ...],
+  "timestamp": 1705312800000
+}</code></pre>
+
+        <h2>3.5 Gesture Recognition Endpoints</h2>
+
+        <h3>3.5.1 Train Classifier</h3>
+
+        <pre><code>POST /recognition/train</code></pre>
+
+        <p>Trains a gesture classifier using collected EMG patterns.</p>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "trainingData": [
+    {
+      "gesture": "hand_open",
+      "features": [[0.12, 0.15, 42.1, ...], [0.11, 0.14, 43.5, ...]]
+    },
+    {
+      "gesture": "hand_close",
+      "features": [[0.45, 0.52, 89.3, ...], [0.43, 0.51, 87.1, ...]]
+    }
+  ],
+  "algorithm": "lda",
+  "crossValidation": true
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "modelId": "classifier-78901",
+  "accuracy": 0.96,
+  "confusionMatrix": [[95, 5], [3, 97]],
+  "classes": ["hand_open", "hand_close"],
+  "trainingTime": 245
+}</code></pre>
+
+        <h3>3.5.2 Recognize Gesture (Real-time)</h3>
+
+        <pre><code>POST /recognition/predict</code></pre>
+
+        <p>Classifies current EMG pattern into gesture class.</p>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "modelId": "classifier-78901",
+  "features": [0.123, 0.156, 45.2, 18, 22, 87.5, 95.2, ...]
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "gesture": "hand_close",
+  "confidence": 0.94,
+  "probabilities": {
+    "rest": 0.01,
+    "hand_open": 0.03,
+    "hand_close": 0.94,
+    "wrist_flexion": 0.02
+  },
+  "latency": 12
+}</code></pre>
+
+        <h3>3.5.3 Stream Gesture Recognition</h3>
+
+        <pre><code>WebSocket: wss://api.myoelectric.device/v1/stream/gestures</code></pre>
+
+        <p>Continuous gesture recognition stream with sub-200ms latency.</p>
+
+        <p><strong>Message Format:</strong></p>
+        <pre><code>{
+  "timestamp": 1705312800456,
+  "gesture": "precision_pinch",
+  "confidence": 0.92,
+  "intensity": 0.67,
+  "holdDuration": 1250
+}</code></pre>
+
+        <h2>3.6 Prosthetic Control Endpoints</h2>
+
+        <h3>3.6.1 Send Motor Command</h3>
+
+        <pre><code>POST /prosthetic/command</code></pre>
+
+        <p>Sends control command to prosthetic actuators based on recognized gesture.</p>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "deviceId": "PROSTHETIC-HAND-001",
+  "command": {
+    "type": "grip",
+    "gesture": "power_grasp",
+    "force": 0.65,
+    "speed": 0.80
+  }
+}</code></pre>
+
+        <h3>3.6.2 Get Prosthetic Status</h3>
+
+        <pre><code>GET /prosthetic/{deviceId}/status</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "deviceId": "PROSTHETIC-HAND-001",
+  "currentGrip": "power_grasp",
+  "position": [0.0, 45.0, 90.0, 120.0, 150.0],
+  "force": 0.65,
+  "batteryLevel": 72,
+  "status": "active"
+}</code></pre>
+
+        <h2>3.7 Session Management</h2>
+
+        <h3>3.7.1 Create Training Session</h3>
+
+        <pre><code>POST /sessions/training</code></pre>
+
+        <p>Creates a new training session for gesture data collection.</p>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "patientId": "patient-001",
+  "gestures": ["rest", "hand_open", "hand_close", "wrist_flexion", "wrist_extension"],
+  "repetitionsPerGesture": 10,
+  "contractionDuration": 3000,
+  "restDuration": 2000
+}</code></pre>
+
+        <h3>3.7.2 Log Session Data</h3>
+
+        <pre><code>POST /sessions/{sessionId}/data</code></pre>
+
+        <p>Uploads EMG data collected during session for analysis and storage.</p>
+
+        <h2>3.8 Error Responses</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Status Code</th>
+                    <th>Error Type</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>400</td>
+                    <td>Bad Request</td>
+                    <td>Invalid request parameters or malformed JSON</td>
+                </tr>
+                <tr>
+                    <td>401</td>
+                    <td>Unauthorized</td>
+                    <td>Missing or invalid authentication credentials</td>
+                </tr>
+                <tr>
+                    <td>404</td>
+                    <td>Not Found</td>
+                    <td>Requested resource does not exist</td>
+                </tr>
+                <tr>
+                    <td>409</td>
+                    <td>Conflict</td>
+                    <td>Resource state conflict (e.g., device already in use)</td>
+                </tr>
+                <tr>
+                    <td>422</td>
+                    <td>Unprocessable Entity</td>
+                    <td>Valid request but semantic errors (e.g., poor signal quality)</td>
+                </tr>
+                <tr>
+                    <td>429</td>
+                    <td>Rate Limit Exceeded</td>
+                    <td>Too many requests in time window</td>
+                </tr>
+                <tr>
+                    <td>500</td>
+                    <td>Internal Server Error</td>
+                    <td>Server-side processing failure</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p><strong>Example Error Response:</strong></p>
+        <pre><code>{
+  "error": {
+    "code": "SIGNAL_QUALITY_LOW",
+    "message": "EMG signal quality below acceptable threshold",
+    "details": {
+      "channels": [0, 2],
+      "snr": [12.3, 15.8],
+      "threshold": 20.0
+    }
+  }
+}</code></pre>
+
+        <h2>3.9 Rate Limits</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint Type</th>
+                    <th>Rate Limit</th>
+                    <th>Burst Allowance</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Real-time streaming</td>
+                    <td>Continuous</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td>Gesture recognition</td>
+                    <td>100 req/sec</td>
+                    <td>150 req/sec for 5s</td>
+                </tr>
+                <tr>
+                    <td>Calibration</td>
+                    <td>10 sessions/hour</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td>Device configuration</td>
+                    <td>30 req/min</td>
+                    <td>50 req/min for 1min</td>
+                </tr>
+                <tr>
+                    <td>Data export</td>
+                    <td>100 MB/hour</td>
+                    <td>N/A</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="success-box">
+            <h3>Next Steps</h3>
+            <p>Continue to <a href="chapter4.html" style="color: var(--primary-color); font-weight: 600;">Chapter 4: Protocol Specification</a> to learn about real-time EMG streaming and signal processing protocols.</p>
+        </div>
+
+        </main>
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA Myoelectric Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Myoelectric Standard</h1>
+        <p class="subtitle">Chapter 6: Security & Privacy</p>
+    </header>
+
+    <main>
+        <h1>Chapter 6: Security & Privacy</h1>
+
+        <h2>6.1 EMG as Biometric Data</h2>
+
+        <p>Electromyography signals are unique biometric identifiers that can reveal sensitive information about an individual. The WIA Myoelectric Standard treats EMG data as Protected Health Information (PHI) requiring strict security measures.</p>
+
+        <div class="warning-box">
+            <h3>Privacy Risks</h3>
+            <p>EMG signals can potentially reveal:</p>
+            <ul>
+                <li><strong>User Identity:</strong> EMG patterns are individual-specific and can be used for authentication</li>
+                <li><strong>Medical Conditions:</strong> Signal characteristics may indicate neuromuscular diseases</li>
+                <li><strong>Behavioral Patterns:</strong> Daily activities and routines can be inferred from prosthetic usage</li>
+                <li><strong>Emotional State:</strong> Muscle tension patterns correlate with stress and emotions</li>
+                <li><strong>Physical Capability:</strong> Strength and fatigue levels are evident in signal amplitude</li>
+            </ul>
+        </div>
+
+        <h2>6.2 Data Protection Requirements</h2>
+
+        <h3>6.2.1 Encryption Standards</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Data State</th>
+                    <th>Encryption Method</th>
+                    <th>Key Requirements</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Data at Rest</td>
+                    <td>AES-256-GCM</td>
+                    <td>Unique keys per patient, hardware-backed key storage</td>
+                </tr>
+                <tr>
+                    <td>Data in Transit</td>
+                    <td>TLS 1.3</td>
+                    <td>Certificate pinning, perfect forward secrecy</td>
+                </tr>
+                <tr>
+                    <td>Backup Data</td>
+                    <td>AES-256-CBC</td>
+                    <td>Encrypted before cloud upload, customer-managed keys</td>
+                </tr>
+                <tr>
+                    <td>Database</td>
+                    <td>Transparent Data Encryption (TDE)</td>
+                    <td>Column-level encryption for PHI fields</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.2.2 Access Control</h3>
+
+        <pre><code>{
+  "accessPolicy": {
+    "patient": {
+      "permissions": ["read_own_data", "export_own_data", "delete_own_data"],
+      "mfa_required": true
+    },
+    "clinician": {
+      "permissions": ["read_patient_data", "create_session", "view_reports"],
+      "patient_consent_required": true,
+      "mfa_required": true,
+      "audit_all_access": true
+    },
+    "researcher": {
+      "permissions": ["read_anonymized_data", "aggregate_statistics"],
+      "patient_consent_required": true,
+      "irb_approval_required": true,
+      "data_anonymization": "level_3"
+    },
+    "administrator": {
+      "permissions": ["system_config", "user_management"],
+      "cannot_access": ["patient_emg_data"],
+      "mfa_required": true,
+      "privileged_access_management": true
+    }
+  }
+}</code></pre>
+
+        <h2>6.3 Device Security</h2>
+
+        <h3>6.3.1 Secure Boot and Firmware</h3>
+
+        <ul>
+            <li><strong>Secure Boot:</strong> Cryptographically signed firmware verified at startup</li>
+            <li><strong>Firmware Updates:</strong> Over-the-air (OTA) updates with digital signatures</li>
+            <li><strong>Rollback Protection:</strong> Prevent downgrade to vulnerable firmware versions</li>
+            <li><strong>Debug Lockdown:</strong> Disable debug interfaces in production devices</li>
+        </ul>
+
+        <h3>6.3.2 Wireless Security</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Protocol</th>
+                    <th>Security Measures</th>
+                    <th>Vulnerabilities Addressed</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Bluetooth LE</td>
+                    <td>BLE 5.2+ with LE Secure Connections, pairing with PIN/passkey</td>
+                    <td>Eavesdropping, MITM attacks</td>
+                </tr>
+                <tr>
+                    <td>Wi-Fi</td>
+                    <td>WPA3-Enterprise, 802.1X authentication</td>
+                    <td>Unauthorized access, packet sniffing</td>
+                </tr>
+                <tr>
+                    <td>USB</td>
+                    <td>USB authentication, host verification</td>
+                    <td>Malicious hosts, data exfiltration</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.3.3 Hardware Security Features</h3>
+
+        <ul>
+            <li><strong>Secure Element:</strong> Dedicated crypto chip for key storage (e.g., ATECC608)</li>
+            <li><strong>True Random Number Generator:</strong> Hardware TRNG for cryptographic operations</li>
+            <li><strong>Tamper Detection:</strong> Detect physical intrusion attempts</li>
+            <li><strong>Memory Protection:</strong> MPU/MMU to isolate sensitive data regions</li>
+        </ul>
+
+        <h2>6.4 Authentication & Authorization</h2>
+
+        <h3>6.4.1 Multi-Factor Authentication</h3>
+
+        <pre><code>{
+  "authenticationFlow": {
+    "factor1": {
+      "type": "password",
+      "requirements": {
+        "minLength": 12,
+        "complexity": "high",
+        "rotation": "90_days",
+        "passwordHistory": 10
+      }
+    },
+    "factor2": {
+      "type": "totp",
+      "alternatives": ["webauthn", "biometric"],
+      "timeout": 30
+    },
+    "riskBasedAuth": {
+      "enabled": true,
+      "factors": ["location", "device", "time_of_day", "behavior_profile"],
+      "stepUpAuth": "require_additional_factor_on_anomaly"
+    }
+  }
+}</code></pre>
+
+        <h3>6.4.2 OAuth 2.0 / OIDC Integration</h3>
+
+        <pre><code>POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&
+code=AUTHORIZATION_CODE&
+redirect_uri=https://myapp.example.com/callback&
+client_id=CLIENT_ID&
+code_verifier=CODE_VERIFIER
+
+Response:
+{
+  "access_token": "eyJhbGci...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "eyJhbGci...",
+  "id_token": "eyJhbGci...",
+  "scope": "openid profile emg:read emg:write"
+}</code></pre>
+
+        <h2>6.5 Data Anonymization</h2>
+
+        <h3>6.5.1 Anonymization Levels</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Level</th>
+                    <th>Technique</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Level 1: Pseudonymization</td>
+                    <td>Replace identifiers with tokens, reversible with key</td>
+                    <td>Internal analytics, re-identification possible</td>
+                </tr>
+                <tr>
+                    <td>Level 2: De-identification</td>
+                    <td>Remove direct identifiers, generalize quasi-identifiers</td>
+                    <td>Clinical research within institution</td>
+                </tr>
+                <tr>
+                    <td>Level 3: Anonymization</td>
+                    <td>Irreversible removal of all identifying information</td>
+                    <td>Public datasets, multi-site research</td>
+                </tr>
+                <tr>
+                    <td>Level 4: Differential Privacy</td>
+                    <td>Add calibrated noise, k-anonymity, l-diversity</td>
+                    <td>Privacy-preserving machine learning</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.5.2 Anonymization Example</h3>
+
+        <pre><code>// Original data
+{
+  "patientId": "patient-001",
+  "name": "John Doe",
+  "dateOfBirth": "1985-03-15",
+  "sessionDate": "2025-01-15T14:30:00Z",
+  "emgData": { ... }
+}
+
+// Level 3 Anonymized
+{
+  "recordId": "anon-7f8a2b3c",
+  "ageGroup": "35-40",
+  "sessionMonth": "2025-01",
+  "locationRegion": "Northeast_US",
+  "emgData": { ... }  // Raw EMG preserved
+}</code></pre>
+
+        <h2>6.6 Audit Logging</h2>
+
+        <h3>6.6.1 Required Audit Events</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Event Category</th>
+                    <th>Events to Log</th>
+                    <th>Retention</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Authentication</td>
+                    <td>Login, logout, failed attempts, MFA challenges, password resets</td>
+                    <td>7 years</td>
+                </tr>
+                <tr>
+                    <td>Data Access</td>
+                    <td>View, export, print EMG data; patient record access</td>
+                    <td>7 years</td>
+                </tr>
+                <tr>
+                    <td>Data Modification</td>
+                    <td>Create, update, delete sessions; calibration changes</td>
+                    <td>Permanent</td>
+                </tr>
+                <tr>
+                    <td>Administrative</td>
+                    <td>User creation, permission changes, config updates</td>
+                    <td>Permanent</td>
+                </tr>
+                <tr>
+                    <td>Security Events</td>
+                    <td>Failed auth, privilege escalation, intrusion attempts</td>
+                    <td>7 years</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.6.2 Audit Log Format</h3>
+
+        <pre><code>{
+  "timestamp": "2025-01-15T14:30:45.123Z",
+  "eventId": "evt-a1b2c3d4",
+  "eventType": "DATA_ACCESS",
+  "actor": {
+    "userId": "clinician-042",
+    "role": "prosthetist",
+    "ipAddress": "192.168.1.50",
+    "userAgent": "WIA-Myoelectric-App/2.3.1"
+  },
+  "resource": {
+    "type": "emg_session",
+    "id": "session-20250115-001",
+    "patientId": "patient-001"
+  },
+  "action": "VIEW",
+  "outcome": "SUCCESS",
+  "patientConsent": {
+    "consentId": "consent-789",
+    "validUntil": "2025-12-31T23:59:59Z"
+  },
+  "metadata": {
+    "accessReason": "routine_followup",
+    "dataExported": false
+  }
+}</code></pre>
+
+        <h2>6.7 Compliance Requirements</h2>
+
+        <h3>6.7.1 HIPAA Compliance (United States)</h3>
+
+        <ul>
+            <li><strong>Privacy Rule:</strong> EMG data is PHI, requires patient authorization for use/disclosure</li>
+            <li><strong>Security Rule:</strong> Administrative, physical, technical safeguards required</li>
+            <li><strong>Breach Notification:</strong> Report unauthorized access within 60 days</li>
+            <li><strong>Business Associate Agreements:</strong> Required for third-party service providers</li>
+            <li><strong>Patient Rights:</strong> Access, amendment, accounting of disclosures, restriction requests</li>
+        </ul>
+
+        <h3>6.7.2 GDPR Compliance (European Union)</h3>
+
+        <ul>
+            <li><strong>Lawful Basis:</strong> Explicit consent or medical necessity for EMG processing</li>
+            <li><strong>Data Minimization:</strong> Collect only necessary data for specified purpose</li>
+            <li><strong>Right to Erasure:</strong> Delete patient EMG data upon request ("right to be forgotten")</li>
+            <li><strong>Data Portability:</strong> Export patient data in machine-readable format</li>
+            <li><strong>Privacy by Design:</strong> Embed privacy controls into system architecture</li>
+            <li><strong>DPIA Required:</strong> Data Protection Impact Assessment for high-risk processing</li>
+        </ul>
+
+        <h3>6.7.3 Medical Device Regulations</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Region</th>
+                    <th>Regulation</th>
+                    <th>Cybersecurity Requirements</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>USA</td>
+                    <td>FDA Premarket Cybersecurity Guidance</td>
+                    <td>SBOM, threat modeling, vulnerability management</td>
+                </tr>
+                <tr>
+                    <td>EU</td>
+                    <td>MDR 2017/745, IEC 81001-5-1</td>
+                    <td>Security lifecycle, risk management, incident response</td>
+                </tr>
+                <tr>
+                    <td>International</td>
+                    <td>IEC 62443-4-2</td>
+                    <td>Security development lifecycle for medical devices</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.8 Incident Response</h2>
+
+        <h3>6.8.1 Security Incident Types</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Examples</th>
+                    <th>Response Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Critical</td>
+                    <td>Patient data breach, ransomware, device compromise affecting safety</td>
+                    <td>Immediate (&lt; 1 hour)</td>
+                </tr>
+                <tr>
+                    <td>High</td>
+                    <td>Unauthorized access attempt, DDoS, malware detection</td>
+                    <td>&lt; 4 hours</td>
+                </tr>
+                <tr>
+                    <td>Medium</td>
+                    <td>Failed authentication spike, suspicious activity, config changes</td>
+                    <td>&lt; 24 hours</td>
+                </tr>
+                <tr>
+                    <td>Low</td>
+                    <td>Policy violations, unusual usage patterns</td>
+                    <td>&lt; 72 hours</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.8.2 Response Procedure</h3>
+
+        <div class="info-box">
+            <ol>
+                <li><strong>Detection:</strong> Automated monitoring alerts on suspicious activity</li>
+                <li><strong>Containment:</strong> Isolate affected systems, revoke compromised credentials</li>
+                <li><strong>Investigation:</strong> Forensic analysis to determine scope and root cause</li>
+                <li><strong>Eradication:</strong> Remove malware, patch vulnerabilities, reset credentials</li>
+                <li><strong>Recovery:</strong> Restore systems from secure backups, verify integrity</li>
+                <li><strong>Notification:</strong> Inform affected patients, regulators per legal requirements</li>
+                <li><strong>Post-Incident:</strong> Document lessons learned, update security controls</li>
+            </ol>
+        </div>
+
+        <h2>6.9 Secure Development Practices</h2>
+
+        <ul>
+            <li><strong>Threat Modeling:</strong> STRIDE analysis during design phase</li>
+            <li><strong>Secure Coding:</strong> Follow OWASP/CWE guidelines, automated SAST/DAST scanning</li>
+            <li><strong>Code Review:</strong> Security-focused peer review for all changes</li>
+            <li><strong>Penetration Testing:</strong> Annual third-party security assessment</li>
+            <li><strong>Vulnerability Management:</strong> CVE monitoring, 30-day patch SLA</li>
+            <li><strong>Supply Chain Security:</strong> SBOM generation, dependency scanning</li>
+        </ul>
+
+        <div class="success-box">
+            <h3>Next Steps</h3>
+            <p>Continue to <a href="chapter7.html" style="color: var(--primary-color); font-weight: 600;">Chapter 7: Implementation Examples</a> to see practical code examples in Python, TypeScript, and Bash for EMG systems.</p>
+        </div>
+
+        </main>
+</body>
+</html>

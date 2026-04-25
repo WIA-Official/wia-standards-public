@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Clinical Fitting and EMG Training Protocols — WIA Myoelectric</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← Table of Contents</a></nav>
+
+    <h1>Chapter 7: Clinical Fitting and EMG Training Protocols</h1>
+
+    <h2>7.1 Pre-Fitting Assessment</h2>
+    <p>
+        Before myoelectric fitting, a prosthetic prosthetist performs a systematic sEMG site assessment to identify the best electrode locations on the residual limb. WIA-MYO defines a standardised pre-fitting assessment protocol:
+    </p>
+    <ol>
+        <li><strong>Skin preparation</strong>: Light abrasion with fine grit pad + isopropyl alcohol wipe. Target impedance &lt; 10 kΩ.</li>
+        <li><strong>Manual muscle testing (MMT)</strong>: Identify muscles with ≥ Grade 3 strength (against gravity). Minimum viable signal for pattern recognition: peak RMS ≥ 30 μV at 50% MVC.</li>
+        <li><strong>Signal mapping</strong>: Grid of 16 electrode positions over residual limb; record peak RMS for each target gesture at each position. Select 8 positions with highest signal-to-noise ratio and muscle independence.</li>
+        <li><strong>Crosstalk assessment</strong>: Correlation coefficient between channel pairs during single-muscle contractions. Reject positions with |r| &gt; 0.6 indicating excessive crosstalk.</li>
+    </ol>
+
+    <h2>7.2 Classifier Training Session Protocol</h2>
+    <p>
+        Pattern recognition classifier training follows a standardised WIA protocol (based on Coapt clinical guidelines and Scheme et al. 2013 best practices):
+    </p>
+    <pre><code>training_protocol:
+  gestures: ["rest", "open_hand", "close_hand", "pronate",
+             "supinate", "wrist_flex", "wrist_ext", "tripod_pinch"]
+  repetitions_per_class: 25          # clinical standard: 20–30
+  contraction_duration_s: 3.0
+  rest_duration_s: 2.0
+  contraction_level: 30-50% MVC      # moderate effort, not maximal
+  arm_position: neutral_hanging       # reduce posture-dependent variation
+  instructions: "Attempt the gesture with your phantom limb
+                 OR contract the muscles you would use for that motion"</code></pre>
+
+    <h2>7.3 WIA Clinical Fitting Dashboard (REST API)</h2>
+    <pre><code># Clinical dashboard API workflow
+# 1. Create training session
+POST /v2/devices/{device_id}/sessions/training
+{
+  "protocol": "wia_standard_8class_v2",
+  "prosthetist_id": "prosthetist-KOR-001",
+  "patient_id": "patient-anonymised-001"
+}
+# → {"session_id": "...", "status": "ready"}
+
+# 2. Trigger gesture cue
+POST /v2/devices/{device_id}/sessions/{session_id}/cue
+{"gesture": "close_hand", "rep": 1}
+
+# 3. Monitor quality in real-time
+GET /v2/devices/{device_id}/sessions/{session_id}/quality
+# → {"channel_snr": [32, 28, 25, 30, 22, 18, 27, 24], "overall": "good"}
+
+# 4. Train and deploy classifier
+POST /v2/devices/{device_id}/sessions/{session_id}/train
+# → {"accuracy": 0.943, "confusion_matrix": [[...]], "model_id": "lda-v..."}</code></pre>
+
+    <h2>7.4 Electrode Rejection / Poor SNR Recovery</h2>
+    <p>
+        When one or more electrode channels produce poor SNR (below 20 dB), the WIA-MYO system can:
+    </p>
+    <ul>
+        <li><strong>Automatic rejection</strong>: Exclude the channel from the feature vector; retrain LDA on remaining channels.</li>
+        <li><strong>Gain adjustment</strong>: Increase amplifier gain on low-signal channels (only if saturation not occurring).</li>
+        <li><strong>Re-placement guidance</strong>: Dashboard flags channels with impedance &gt; 50 kΩ or SNR &lt; 20 dB and guides prosthetist to alternative SENIAM sites.</li>
+    </ul>
+
+    <h2>7.5 Phantom Limb Pain and sEMG Biofeedback</h2>
+    <p>
+        An important therapeutic application of myoelectric training is biofeedback for phantom limb pain (PLP) management. Mirror visual feedback (Ramachandran 1996) combined with sEMG-driven prosthetic visual feedback has shown efficacy in reducing PLP intensity (Ramachandran & Rogers-Ramachandran 2011). WIA-MYO supports a biofeedback mode where prosthetic motion is displayed in real-time on a screen without requiring actual hardware:
+    </p>
+    <pre><code># WIA-MYO biofeedback mode (prosthetic visualisation without hardware)
+ros2 run wia_myo_biofeedback biofeedback_node \
+  --ros-args \
+  -p emg_topic:=/emg/classification \
+  -p display_mode:=mirror_visual \
+  -p hand_model:=right_hand_3d \
+  -p pain_scale_interval_min:=5</code></pre>
+
+    <h2>7.6 FHIR R5 Session Documentation</h2>
+    <pre><code>{
+  "resourceType": "Procedure",
+  "status": "completed",
+  "code": {"coding": [{"system": "http://snomed.info/sct",
+                        "code": "229070002",
+                        "display": "Myoelectric prosthetic fitting"}]},
+  "subject": {"reference": "Patient/patient-anonymised-001"},
+  "performer": [{"actor": {"reference": "Practitioner/prosthetist-KOR-001"}}],
+  "usedDevice": [{"reference": "Device/ottobock-bebionic-001"}],
+  "outcome": {"coding": [{"text": "LDA classifier 94.3% accuracy, 8 gestures"}]},
+  "note": [{"text": "Patient achieved CRT completion rate 85% at session end."}]
+}</code></pre>
+
+    <h2>7.7 Home Training App Integration</h2>
+    <p>
+        WIA-MYO Phase 4 integrates with patient-facing home training apps that guide daily practice exercises to maintain classifier accuracy and prevent rejection rate increase (phenomenon of "classifier drift" due to physiological changes, electrode placement variation):
+    </p>
+    <table>
+        <tr><th>Metric</th><th>Home Training Alert Threshold</th></tr>
+        <tr><td>Classifier accuracy (daily 2-min test)</td><td>&lt; 85% triggers alert to prosthetist</td></tr>
+        <tr><td>Rejection rate</td><td>&gt; 20% triggers guided re-calibration</td></tr>
+        <tr><td>Channel SNR</td><td>&lt; 20 dB for any channel → electrode check reminder</td></tr>
+        <tr><td>Daily training adherence</td><td>&lt; 5/7 days in past week → motivational nudge</td></tr>
+    </table>
+
+    <footer><p>WIA Myoelectric Standard · Chapter 7 · © 2026 WIA</p></footer>
+</body>
+</html>

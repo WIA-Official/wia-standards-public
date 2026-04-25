@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Proportional Control and Coapt Integration — WIA Myoelectric</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← Table of Contents</a></nav>
+
+    <h1>Chapter 4: Proportional Control and Coapt Integration</h1>
+
+    <h2>4.1 Proportional Myoelectric Control</h2>
+    <p>
+        Traditional <strong>proportional control</strong> (also called amplitude-based or threshold control) maps the rectified-and-smoothed sEMG amplitude directly to prosthesis velocity or grip force. It requires only two electrode sites (flexion and extension channels) and is the most widely deployed control strategy globally due to simplicity and robustness.
+    </p>
+    <p>Dual-site proportional control algorithm:</p>
+    <pre><code>def proportional_command(flex_rms_uv: float, ext_rms_uv: float) -> dict:
+    """Dual-site proportional controller per WIA-MYO-DATA-001 §5."""
+    DEAD_BAND = 8.0       # uV — noise floor
+    ACTIVATION_LOW = 15.0  # uV — activation threshold
+    ACTIVATION_HIGH = 25.0 # uV — full-speed threshold (two-speed mode)
+    SATURATION = 120.0     # uV — output saturates at this amplitude
+
+    def channel_output(rms: float) -> float:
+        if rms < DEAD_BAND:
+            return 0.0
+        raw = (rms - DEAD_BAND) / (SATURATION - DEAD_BAND)
+        return min(1.0, max(0.0, raw))
+
+    flex_out = channel_output(flex_rms_uv)
+    ext_out = channel_output(ext_rms_uv)
+
+    # Co-contraction rejection: if both > activation_high, enter mode switch
+    if flex_rms_uv > ACTIVATION_HIGH and ext_rms_uv > ACTIVATION_HIGH:
+        return {"command": 0.0, "direction": "mode_switch"}
+
+    if flex_out > ext_out:
+        return {"command": flex_out, "direction": "flexion"}
+    else:
+        return {"command": ext_out, "direction": "extension"}</code></pre>
+
+    <h2>4.2 Two-Speed and Mode Switching</h2>
+    <p>
+        Most commercial prosthetic hands extend proportional control with:
+    </p>
+    <ul>
+        <li><strong>Two-speed control</strong>: below activation_high → slow speed; above → fast speed. Enables both precision grip (slow) and rapid repositioning (fast).</li>
+        <li><strong>Co-contraction mode switch</strong>: simultaneous contraction of both muscles (above activation_high) triggers grip pattern selection. The WIA schema encodes this as <code>"direction": "mode_switch"</code>.</li>
+        <li><strong>Rate limiting / ramp</strong>: velocity command ramps at 0.02 per ms (WIA default) to prevent jerky motion onset.</li>
+    </ul>
+
+    <h2>4.3 Coapt COMPLETE CONTROL</h2>
+    <p>
+        The <strong>Coapt COMPLETE CONTROL</strong> system (Coapt LLC, Chicago) is the most widely deployed commercial pattern recognition controller for upper limb prosthetics. It combines 8-channel sEMG with an onboard LDA classifier, proprietary continuous re-calibration ("Adapt" mode), and a USB interface to commercially available prosthetic hands (BeBionic, Ottobock Michelangelo, Össur i-Limb).
+    </p>
+    <pre><code># Coapt RE-NET Python SDK (unofficial wrapper)
+from coapt_sdk import CoaptReNet
+
+device = CoaptReNet.connect(port="/dev/ttyUSB0", baud=115200)
+device.set_mode(CoaptReNet.MODE_PATTERN_RECOGNITION)
+device.set_gesture_set([
+    "rest", "open_hand", "close_hand", "pronate",
+    "supinate", "wrist_flex", "wrist_ext", "tripod_pinch"
+])
+
+# Start streaming classifications (10 Hz)
+for frame in device.stream_classifications():
+    print(f"Gesture: {frame.gesture} ({frame.confidence:.2f})"
+          f" latency={frame.latency_ms:.1f}ms")</code></pre>
+
+    <h2>4.4 Ottobock OrthoConnect SDK</h2>
+    <p>
+        Ottobock's <strong>OrthoConnect</strong> platform provides Bluetooth connectivity to the MyoHand, Michelangelo, and bebionic v4 prosthetic hands, enabling direct grip selection, force adjustment, and fitting data logging from a mobile app or custom clinical software.
+    </p>
+    <pre><code># Ottobock OrthoConnect BLE pairing (Python bleak library)
+import asyncio
+from bleak import BleakClient
+
+OTTOBOCK_SERVICE_UUID = "0000xxxx-0000-1000-8000-00805f9b34fb"  # product-specific
+
+async def send_grip_command(mac: str, grip_id: int):
+    async with BleakClient(mac) as client:
+        await client.write_gatt_char(
+            OTTOBOCK_SERVICE_UUID,
+            bytes([0x01, grip_id, 0x00])  # command format per OrthoConnect spec
+        )</code></pre>
+
+    <h2>4.5 WIA REST API for Pattern Recognition</h2>
+    <p>
+        The WIA Myoelectric REST API (Phase 2) exposes a model deployment endpoint that allows clinical software to push updated LDA models to a fitted prosthetic device over the air:
+    </p>
+    <pre><code>POST /v2/devices/{device_id}/classifier
+Content-Type: application/json
+Authorization: Bearer {clinical_token}
+
+{
+  "model_format": "sklearn_lda_v1",
+  "model_base64": "...",
+  "gesture_classes": ["rest","open_hand","close_hand","pronate",
+                       "supinate","wrist_flex","wrist_ext","tripod_pinch"],
+  "window_ms": 200,
+  "feature_set": "hudgins_td4",
+  "num_channels": 8,
+  "confidence_threshold": 0.70,
+  "trained_by": "prosthetist-KOR-001",
+  "training_date": "2026-04-25T09:00:00+09:00"
+}</code></pre>
+
+    <h2>4.6 Classifier Performance Metrics</h2>
+    <table>
+        <tr><th>Metric</th><th>Definition</th><th>WIA Clinical Threshold</th></tr>
+        <tr><td>Offline accuracy</td><td>% correct on held-out test set</td><td>≥ 90% for 4-class; ≥ 85% for 8-class</td></tr>
+        <tr><td>Rejection rate</td><td>% of windows below confidence threshold</td><td>≤ 15% during intended gestures</td></tr>
+        <tr><td>Completion rate</td><td>% of target tasks completed in Clothespin Relocation Test (CRT)</td><td>≥ 80%</td></tr>
+        <tr><td>Task completion time</td><td>Mean time per peg in CRT</td><td>≤ 30 s per peg (expert: ~10 s)</td></tr>
+        <tr><td>Adaptation rate</td><td>Accuracy change per 10 min of Coapt Adapt mode use</td><td>+2% per session (positive adaptation)</td></tr>
+    </table>
+
+    <footer><p>WIA Myoelectric Standard · Chapter 4 · © 2026 WIA</p></footer>
+</body>
+</html>

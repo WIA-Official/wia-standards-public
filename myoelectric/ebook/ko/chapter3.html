@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: API 엔드포인트 - WIA 근전 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA 근전 표준</h1>
+        <p class="subtitle">3장: API 엔드포인트</p>
+    </header>
+
+    <main>
+        <h1>3장: API 엔드포인트</h1>
+
+        <h2>3.1 API 개요</h2>
+
+        <p>WIA 근전 표준은 EMG 장치 제어, 보정 세션 관리 및 제스처 인식을 위한 RESTful API를 정의합니다. 모든 엔드포인트는 요청/응답 본문에 JSON을 사용하며 HTTP 규약을 따릅니다.</p>
+
+        <div class="info-box">
+            <h3>기본 URL 구조</h3>
+            <p><code>https://api.myoelectric.device/v1/{resource}</code></p>
+            <p>모든 API 요청에는 API 키 또는 OAuth 2.0 토큰을 통한 인증이 필요합니다.</p>
+        </div>
+
+        <h2>3.2 장치 관리 엔드포인트</h2>
+
+        <h3>3.2.1 장치 목록 조회</h3>
+
+        <pre><code>GET /devices</code></pre>
+
+        <p>연결된 모든 EMG 장치와 현재 상태를 반환합니다.</p>
+
+        <p><strong>응답:</strong></p>
+        <pre><code>{
+  "devices": [
+    {
+      "id": "EMG-SENSOR-001",
+      "name": "근전 센서 어레이",
+      "status": "connected",
+      "firmwareVersion": "2.3.1",
+      "batteryLevel": 85,
+      "channelCount": 8,
+      "sampleRate": 1000
+    }
+  ]
+}</code></pre>
+
+        <h3>3.2.2 장치 세부 정보 조회</h3>
+
+        <pre><code>GET /devices/{deviceId}</code></pre>
+
+        <p>구성 및 기능을 포함한 특정 장치의 세부 정보를 반환합니다.</p>
+
+        <h3>3.2.3 장치 구성</h3>
+
+        <pre><code>POST /devices/{deviceId}/configure</code></pre>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "sampleRate": 1000,
+  "resolution": 16,
+  "gain": 1000,
+  "referenceType": "bipolar",
+  "channels": [
+    {
+      "id": 0,
+      "enabled": true,
+      "muscle": "flexor_carpi_radialis"
+    }
+  ]
+}</code></pre>
+
+        <h2>3.3 보정 엔드포인트</h2>
+
+        <h3>3.3.1 MVC 보정 시작</h3>
+
+        <pre><code>POST /calibration/mvc/start</code></pre>
+
+        <p>최대 수의 수축(MVC) 보정 세션을 시작합니다.</p>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "deviceId": "EMG-SENSOR-001",
+  "channels": [0, 1, 2, 3],
+  "contractionDuration": 5000,
+  "restDuration": 30000,
+  "repetitions": 3
+}</code></pre>
+
+        <p><strong>응답:</strong></p>
+        <pre><code>{
+  "sessionId": "cal-session-12345",
+  "status": "in_progress",
+  "currentPhase": "rest_baseline",
+  "instructions": "5초 동안 모든 근육을 이완하세요"
+}</code></pre>
+
+        <h3>3.3.2 보정 상태 조회</h3>
+
+        <pre><code>GET /calibration/mvc/{sessionId}</code></pre>
+
+        <p>실시간 피드백과 함께 보정 세션의 현재 상태를 반환합니다.</p>
+
+        <h3>3.3.3 보정 완료</h3>
+
+        <pre><code>POST /calibration/mvc/{sessionId}/complete</code></pre>
+
+        <p><strong>응답:</strong></p>
+        <pre><code>{
+  "sessionId": "cal-session-12345",
+  "status": "completed",
+  "results": [
+    {
+      "channel": 0,
+      "muscle": "flexor_carpi_radialis",
+      "mvcValue": 0.85,
+      "restBaseline": 0.015,
+      "confidence": 0.95,
+      "quality": "excellent"
+    }
+  ]
+}</code></pre>
+
+        <h2>3.4 신호 처리 엔드포인트</h2>
+
+        <h3>3.4.1 원시 EMG 데이터 스트리밍</h3>
+
+        <pre><code>WebSocket: wss://api.myoelectric.device/v1/stream/raw</code></pre>
+
+        <p>원시 EMG 샘플 스트리밍을 위한 실시간 WebSocket 연결을 설정합니다.</p>
+
+        <p><strong>메시지 형식:</strong></p>
+        <pre><code>{
+  "timestamp": 1705312800123,
+  "deviceId": "EMG-SENSOR-001",
+  "samples": {
+    "ch0": [0.012, -0.008, 0.015],
+    "ch1": [-0.005, 0.003, -0.002],
+    "ch2": [0.018, 0.021, 0.017],
+    "ch3": [-0.012, -0.009, -0.015]
+  }
+}</code></pre>
+
+        <h3>3.4.2 특징 추출</h3>
+
+        <pre><code>POST /processing/features</code></pre>
+
+        <p>EMG 데이터에서 시간 영역 및 주파수 영역 특징을 계산합니다.</p>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "deviceId": "EMG-SENSOR-001",
+  "windowSize": 256,
+  "features": ["rms", "mav", "wl", "zc", "ssc", "mdf"]
+}</code></pre>
+
+        <h2>3.5 제스처 인식 엔드포인트</h2>
+
+        <h3>3.5.1 제스처 인식 시작</h3>
+
+        <pre><code>POST /recognition/start</code></pre>
+
+        <p>실시간 제스처 분류를 시작합니다.</p>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "deviceId": "EMG-SENSOR-001",
+  "modelId": "gesture-model-v2",
+  "gestures": ["rest", "hand_open", "hand_close", "wrist_flexion",
+               "wrist_extension", "pronation", "supination", "pinch"]
+}</code></pre>
+
+        <p><strong>응답 (WebSocket 스트림):</strong></p>
+        <pre><code>{
+  "timestamp": 1705312800456,
+  "gesture": "hand_close",
+  "confidence": 0.97,
+  "intensity": 0.65
+}</code></pre>
+
+        <h3>3.5.2 모델 학습</h3>
+
+        <pre><code>POST /recognition/train</code></pre>
+
+        <p>사용자별 제스처 인식 모델을 학습합니다.</p>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "userId": "patient-12345",
+  "trainingData": [
+    {
+      "gesture": "hand_close",
+      "samples": [ ... ],
+      "repetitions": 5
+    }
+  ],
+  "algorithm": "LDA",
+  "crossValidation": true
+}</code></pre>
+
+        <h2>3.6 의수 제어 엔드포인트</h2>
+
+        <h3>3.6.1 의수 명령 전송</h3>
+
+        <pre><code>POST /prosthetic/command</code></pre>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "prostheticId": "prosthetic-001",
+  "action": "grip",
+  "gripType": "power",
+  "force": 0.6,
+  "speed": 0.8
+}</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>매개변수</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>action</code></td>
+                    <td>문자열</td>
+                    <td>동작 타입: grip, release, rotate</td>
+                </tr>
+                <tr>
+                    <td><code>gripType</code></td>
+                    <td>문자열</td>
+                    <td>파지 유형: power, precision, lateral, tripod</td>
+                </tr>
+                <tr>
+                    <td><code>force</code></td>
+                    <td>숫자</td>
+                    <td>힘 강도 (0.0-1.0)</td>
+                </tr>
+                <tr>
+                    <td><code>speed</code></td>
+                    <td>숫자</td>
+                    <td>동작 속도 (0.0-1.0)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.7 API 인증</h2>
+
+        <div class="info-box">
+            <h3>인증 방법</h3>
+            <ul>
+                <li><strong>API 키:</strong> <code>Authorization: ApiKey YOUR_API_KEY</code></li>
+                <li><strong>OAuth 2.0:</strong> <code>Authorization: Bearer YOUR_TOKEN</code></li>
+                <li><strong>상호 TLS:</strong> 클라이언트 인증서 기반 인증</li>
+            </ul>
+        </div>
+
+        <h2>3.8 오류 처리</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>HTTP 코드</th>
+                    <th>오류 타입</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>400</td>
+                    <td>잘못된 요청</td>
+                    <td>요청 형식 또는 매개변수 오류</td>
+                </tr>
+                <tr>
+                    <td>401</td>
+                    <td>인증 실패</td>
+                    <td>유효하지 않거나 만료된 자격 증명</td>
+                </tr>
+                <tr>
+                    <td>404</td>
+                    <td>찾을 수 없음</td>
+                    <td>장치 또는 리소스가 존재하지 않음</td>
+                </tr>
+                <tr>
+                    <td>429</td>
+                    <td>속도 제한 초과</td>
+                    <td>너무 많은 요청</td>
+                </tr>
+                <tr>
+                    <td>500</td>
+                    <td>서버 오류</td>
+                    <td>내부 처리 오류</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="success-box">
+            <h3>다음 단계</h3>
+            <p><a href="chapter4.html" style="color: var(--primary-color); font-weight: 600;">4장: 프로토콜 명세</a>로 계속하여 실시간 EMG 스트리밍 및 신호 처리 프로토콜에 대해 알아보세요.</p>
+        </div>
+
+        </main>
+</body>
+</html>

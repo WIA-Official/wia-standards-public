@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 프로토콜 명세 - WIA 근전 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA 근전 표준</h1>
+        <p class="subtitle">4장: 프로토콜 명세</p>
+    </header>
+
+    <main>
+        <h1>4장: 프로토콜 명세</h1>
+
+        <h2>4.1 실시간 EMG 스트리밍</h2>
+
+        <p>WIA 표준은 저지연, 고처리량 EMG 데이터 전송을 위한 실시간 스트리밍 프로토콜을 정의합니다.</p>
+
+        <h3>4.1.1 WebSocket 프로토콜</h3>
+
+        <p>EMG 데이터 스트리밍에 권장되는 프로토콜입니다:</p>
+
+        <pre><code>wss://api.myoelectric.device/v1/stream/emg
+?deviceId=EMG-SENSOR-001
+&channels=0,1,2,3
+&sampleRate=1000</code></pre>
+
+        <div class="info-box">
+            <h3>프로토콜 특징</h3>
+            <ul>
+                <li><strong>저지연:</strong> &lt; 10ms 데이터 전송</li>
+                <li><strong>양방향:</strong> 클라이언트-서버 양방향 통신</li>
+                <li><strong>압축:</strong> 선택적 데이터 압축 (gzip, brotli)</li>
+                <li><strong>보안:</strong> TLS 1.3 암호화 필수</li>
+            </ul>
+        </div>
+
+        <h3>4.1.2 메시지 형식</h3>
+
+        <pre><code>{
+  "type": "emg_data",
+  "timestamp": 1705312800123,
+  "deviceId": "EMG-SENSOR-001",
+  "sequenceNumber": 12345,
+  "channels": [
+    {"id": 0, "samples": [0.012, -0.008, 0.015]},
+    {"id": 1, "samples": [-0.005, 0.003, -0.002]},
+    {"id": 2, "samples": [0.018, 0.021, 0.017]},
+    {"id": 3, "samples": [-0.012, -0.009, -0.015]}
+  ]
+}</code></pre>
+
+        <h2>4.2 신호 전처리 파이프라인</h2>
+
+        <p>표준 EMG 신호 처리 워크플로우:</p>
+
+        <h3>4.2.1 노치 필터</h3>
+
+        <p>전력선 간섭 제거 (50 Hz 또는 60 Hz):</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>매개변수</th>
+                    <th>값</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>중심 주파수</td>
+                    <td>50/60 Hz</td>
+                    <td>전력선 주파수</td>
+                </tr>
+                <tr>
+                    <td>Q 팩터</td>
+                    <td>30</td>
+                    <td>필터 대역폭 제어</td>
+                </tr>
+                <tr>
+                    <td>고조파</td>
+                    <td>2차, 3차</td>
+                    <td>추가 노치 (100/120, 150/180 Hz)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.2.2 대역통과 필터</h3>
+
+        <p>EMG 주파수 대역 분리 (20-450 Hz):</p>
+
+        <ul>
+            <li><strong>하한 주파수:</strong> 20 Hz (동작 아티팩트 제거)</li>
+            <li><strong>상한 주파수:</strong> 450 Hz (EMG 대역 보존)</li>
+            <li><strong>필터 유형:</strong> 4차 Butterworth</li>
+            <li><strong>제로 위상:</strong> 순방향-역방향 필터링</li>
+        </ul>
+
+        <h3>4.2.3 정류 및 엔벨로프 추출</h3>
+
+        <pre><code># 정류
+emg_rectified = abs(emg_filtered)
+
+# 선형 엔벨로프 (저역통과 필터)
+cutoff = 5 Hz  # 평활 주파수
+emg_envelope = lowpass_filter(emg_rectified, cutoff)</code></pre>
+
+        <h3>4.2.4 정규화</h3>
+
+        <p>MVC 기준 정규화:</p>
+
+        <pre><code>emg_normalized = (emg_envelope - rest_baseline) / (mvc_value - rest_baseline)</code></pre>
+
+        <h2>4.3 특징 추출</h2>
+
+        <p>패턴 인식을 위한 EMG 특징:</p>
+
+        <h3>4.3.1 시간 영역 특징</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>특징</th>
+                    <th>약어</th>
+                    <th>공식</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>평균 절대값</td>
+                    <td>MAV</td>
+                    <td>Σ|x[n]| / N</td>
+                </tr>
+                <tr>
+                    <td>제곱 평균 제곱근</td>
+                    <td>RMS</td>
+                    <td>√(Σx²[n] / N)</td>
+                </tr>
+                <tr>
+                    <td>파형 길이</td>
+                    <td>WL</td>
+                    <td>Σ|x[n+1] - x[n]|</td>
+                </tr>
+                <tr>
+                    <td>영교차</td>
+                    <td>ZC</td>
+                    <td>부호 변경 횟수</td>
+                </tr>
+                <tr>
+                    <td>기울기 부호 변경</td>
+                    <td>SSC</td>
+                    <td>기울기 반전 횟수</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.3.2 주파수 영역 특징</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>특징</th>
+                    <th>약어</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>중앙 주파수</td>
+                    <td>MDF</td>
+                    <td>전력 스펙트럼을 이등분하는 주파수</td>
+                </tr>
+                <tr>
+                    <td>평균 주파수</td>
+                    <td>MNF</td>
+                    <td>전력 가중 평균 주파수</td>
+                </tr>
+                <tr>
+                    <td>전력 스펙트럼 밀도</td>
+                    <td>PSD</td>
+                    <td>주파수별 전력 분포</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.4 패턴 인식 알고리즘</h2>
+
+        <h3>4.4.1 선형 판별 분석 (LDA)</h3>
+
+        <p>EMG 제스처 분류에 널리 사용됨:</p>
+
+        <ul>
+            <li>클래스 간 분산 최대화</li>
+            <li>클래스 내 분산 최소화</li>
+            <li>실시간 처리에 적합한 계산 효율성</li>
+            <li>일반적으로 95% 이상의 정확도</li>
+        </ul>
+
+        <h3>4.4.2 지원 벡터 머신 (SVM)</h3>
+
+        <p>복잡한 결정 경계를 위한 비선형 분류:</p>
+
+        <ul>
+            <li><strong>커널:</strong> RBF, 다항식, 시그모이드</li>
+            <li><strong>다중 클래스:</strong> 일대다 또는 일대일</li>
+            <li><strong>장점:</strong> 높은 정확도, 과적합에 강함</li>
+            <li><strong>단점:</strong> 학습 시간이 긴 편</li>
+        </ul>
+
+        <h3>4.4.3 신경망</h3>
+
+        <p>딥러닝 기반 EMG 처리:</p>
+
+        <pre><code>모델 아키텍처:
+입력층 (EMG 특징) →
+은닉층 1 (128 유닛, ReLU) →
+드롭아웃 (0.3) →
+은닉층 2 (64 유닛, ReLU) →
+출력층 (제스처 클래스, Softmax)</code></pre>
+
+        <h2>4.5 프로토콜 성능 요구사항</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>지표</th>
+                    <th>목표</th>
+                    <th>측정 방법</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>종단 간 지연</td>
+                    <td>&lt; 200 ms</td>
+                    <td>신호 수집부터 제어 명령까지</td>
+                </tr>
+                <tr>
+                    <td>처리량</td>
+                    <td>&gt; 1000 샘플/초</td>
+                    <td>채널당 샘플링 속도</td>
+                </tr>
+                <tr>
+                    <td>패킷 손실</td>
+                    <td>&lt; 0.1%</td>
+                    <td>전송된 패킷 대비 손실</td>
+                </tr>
+                <tr>
+                    <td>분류 정확도</td>
+                    <td>&gt; 95%</td>
+                    <td>교차 검증 테스트</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="warning-box">
+            <h3>성능 최적화</h3>
+            <ul>
+                <li>하드웨어 가속을 위한 GPU 사용</li>
+                <li>효율적인 특징 선택으로 차원 축소</li>
+                <li>실시간 처리를 위한 고정 소수점 연산</li>
+                <li>지연 최소화를 위한 증분 학습</li>
+            </ul>
+        </div>
+
+        <div class="success-box">
+            <h3>다음 단계</h3>
+            <p><a href="chapter5.html" style="color: var(--primary-color); font-weight: 600;">5장: 통합 가이드</a>로 계속하여 의수, 재활 시스템 및 VR 응용프로그램과의 통합에 대해 알아보세요.</p>
+        </div>
+
+        </main>
+</body>
+</html>

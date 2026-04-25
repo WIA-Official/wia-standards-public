@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Communication Protocols and BLE GATT — WIA Myoelectric</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2, h3 { color: #F97316; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #F97316; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #e2e8f0; }
+        table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        th, td { border: 1px solid #334155; padding: 10px 14px; }
+        th { background: #1e293b; color: #F97316; }
+        nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav><a href="index.html">← Table of Contents</a></nav>
+
+    <h1>Chapter 6: Communication Protocols and BLE GATT</h1>
+
+    <h2>6.1 Protocol Overview</h2>
+    <p>
+        WIA-MYO supports three primary communication protocols for myoelectric prosthetic devices:
+    </p>
+    <table>
+        <tr><th>Protocol</th><th>Use Case</th><th>Latency</th><th>Range</th></tr>
+        <tr><td>BLE 5.4 GATT</td><td>Wireless electrode streaming (2 kHz compressed) → mobile app / hub</td><td>7.5–15 ms connection interval</td><td>10–50 m</td></tr>
+        <tr><td>USB HID / CDC</td><td>Wired research-grade systems (Delsys, full-rate 2 kHz raw)</td><td>&lt; 1 ms</td><td>Wired (5 m)</td></tr>
+        <tr><td>CAN bus (ISO 11898)</td><td>Internal prosthetic hand actuator control (grip force, speed)</td><td>0.1–1 ms</td><td>Internal</td></tr>
+    </table>
+
+    <h2>6.2 BLE GATT Profile (WIA-MYO Profile)</h2>
+    <p>
+        The WIA-MYO BLE GATT profile defines standardised service and characteristic UUIDs for wireless sEMG electrode modules, compatible with BLE 5.4 (2 Mbps PHY, LE Audio CIS for time-synchronised multi-sensor arrays).
+    </p>
+    <pre><code># WIA-MYO GATT Profile (BLE 5.4)
+Service UUID: 181D-WIA-Myoelectric-Service
+  Characteristic: 2A56-WIA-EmgRawData
+    Properties: NOTIFY, READ
+    Format: Uint8 channel_id + Int16[] samples (little-endian)
+    Notify interval: 2.5 ms (8 samples at 2 kHz = 4 ms per packet)
+
+  Characteristic: 2A57-WIA-EmgFeatures
+    Properties: NOTIFY, READ
+    Format: Float32 mav + Float32 rms + Uint8 zc + Uint8 ssc + Float32 wl (per channel)
+    Notify interval: 25 ms (10 Hz feature output)
+
+  Characteristic: 2A58-WIA-Classification
+    Properties: NOTIFY, READ
+    Format: Uint8 class_index + Float32 confidence + Uint8 rejected
+    Notify interval: 100 ms (10 Hz output)
+
+  Characteristic: 2A59-WIA-DeviceConfig
+    Properties: READ, WRITE
+    Format: Uint8 gain + Uint16 sample_rate_hz + Uint8 num_channels</code></pre>
+
+    <h2>6.3 Python BLE Client (bleak)</h2>
+    <pre><code>import asyncio
+import struct
+from bleak import BleakClient
+
+WIA_EMG_FEATURES_UUID = "0000-2A57-0000-1000-8000-00805f9b34fb"
+
+async def stream_features(mac_address: str):
+    def feature_callback(handle, data: bytearray):
+        # Unpack 5 × float32 per channel (8 channels = 40 floats)
+        floats = struct.unpack(f"<{len(data)//4}f", data)
+        mav_ch0 = floats[0]
+        print(f"MAV ch0 = {mav_ch0:.2f} uV")
+
+    async with BleakClient(mac_address) as client:
+        await client.start_notify(WIA_EMG_FEATURES_UUID, feature_callback)
+        print(f"Streaming features from {mac_address}")
+        await asyncio.sleep(60.0)
+        await client.stop_notify(WIA_EMG_FEATURES_UUID)
+
+asyncio.run(stream_features("AA:BB:CC:DD:EE:FF"))</code></pre>
+
+    <h2>6.4 USB HID Protocol (Wired Systems)</h2>
+    <p>
+        Wired sEMG systems (Delsys Trigno, OTB Quattrocento) use USB HID or CDC-ACM (virtual serial port). WIA-MYO defines a standard USB descriptor for compliant devices:
+    </p>
+    <pre><code># WIA-MYO USB HID Report Descriptor (simplified)
+USAGE_PAGE Generic Desktop
+USAGE Sensor
+COLLECTION Application
+  USAGE 0xE1  # WIA sEMG raw data
+  REPORT_SIZE 16        # 16-bit ADC samples
+  REPORT_COUNT 256      # 16 channels × 16 samples per frame (8 ms at 2 kHz)
+  INPUT Data|Var|Abs
+END_COLLECTION
+
+# Python HID read (hidapi)
+import hid
+device = hid.device()
+device.open(0x1234, 0xABCD)  # VID, PID from WIA-MYO registry
+data = device.read(512, timeout_ms=10)
+samples = [int.from_bytes(data[i:i+2], 'little', signed=True)
+           for i in range(0, 512, 2)]</code></pre>
+
+    <h2>6.5 ROS 2 Topic Architecture</h2>
+    <pre><code># WIA-MYO ROS 2 Topic Map
+/emg/raw             wia_myo_msgs/EmgFrame          BEST_EFFORT 2 kHz
+/emg/features        wia_myo_msgs/EmgFeatureFrame    BEST_EFFORT 10 Hz
+/emg/classification  wia_myo_msgs/EmgClassification  RELIABLE    10 Hz
+/prosthetic/command  wia_myo_msgs/ProstheticCommand  RELIABLE    10 Hz
+/prosthetic/feedback wia_myo_msgs/ProstheticFeedback BEST_EFFORT 50 Hz
+/emg/lead_off        std_msgs/Bool[]                 RELIABLE    1 Hz
+/emg/quality         wia_myo_msgs/EmgQuality         BEST_EFFORT 1 Hz</code></pre>
+
+    <h2>6.6 Latency Measurement</h2>
+    <p>
+        End-to-end latency from muscle contraction to prosthetic motion onset is critical for intuitive control. WIA-MYO defines a standardised latency test protocol:
+    </p>
+    <pre><code># Latency test: LED flash at muscle contraction → camera detects prosthetic motion
+# Reference: WIA-MYO-LATENCY-TEST-001
+
+ros2 run wia_myo_diagnostics latency_test_node \
+  --ros-args \
+  -p emg_topic:=/emg/raw \
+  -p command_topic:=/prosthetic/command \
+  -p camera_topic:=/camera/image_raw \
+  -p num_trials:=50 \
+  -p output_csv:=/tmp/wia_myo_latency.csv
+
+# Expected output:
+# Mean latency: 127 ms (EMG onset → motion onset)
+# P95 latency: 185 ms
+# WIA target: P95 ≤ 300 ms</code></pre>
+
+    <footer><p>WIA Myoelectric Standard · Chapter 6 · © 2026 WIA</p></footer>
+</body>
+</html>
