@@ -22,14 +22,14 @@
 
     <h1>제3장: 특징 추출과 패턴 인식</h1>
 
-    <h2>3.1 Hudgins 시간 영역 특징 집합 (1993)</h2>
+    <h2>3.1 Hudgins TD4 시간 영역 특징 집합</h2>
     <p>
-        Hudgins, Parker, Scott(1993)의 "A new strategy for multifunction myoelectric control"은 200~256 ms 분석 윈도우에서 계산되는 4개의 시간 영역 특징(Hudgins TD4 집합)을 정립했습니다. 이 연구는 전완 sEMG에서 실시간 다중 클래스 분류(최대 4개 제스처)가 가능함을 처음 입증한 기념비적 연구입니다.
+        <strong>Hudgins TD4</strong>는 200~256 ms 분석 윈도우에서 계산되는 4개의 시간 영역 특징(MAV, ZC, SSC, WL) 집합으로, 근전도 패턴 인식의 사실상의 표준 베이스라인입니다. 계산 비용이 매우 낮아 임베디드 의지 프로세서에서도 실시간 분류가 가능하며, 후속 특징 집합(AR, RMS, IEMG, MDF/MPF, LD)과 결합하여 분류 성능을 점진적으로 확장할 수 있습니다.
     </p>
     <pre><code>import numpy as np
 
 def hudgins_td4(segment: np.ndarray) -> dict:
-    """Hudgins et al. 1993 4개 시간 영역 특징."""
+    """Hudgins TD4 — 4개 시간 영역 특징 (MAV/ZC/SSC/WL)."""
     threshold = 0.01 * np.max(np.abs(segment))
     # MAV: 평균 절댓값
     mav = np.mean(np.abs(segment))
@@ -55,7 +55,7 @@ def hudgins_td4(segment: np.ndarray) -> dict:
         <tr><td>로그 검출기</td><td>LD</td><td>시간 영역 비선형</td><td>클래스 분리성 향상</td></tr>
     </table>
     <p>
-        선행 패턴 인식 연구들에서 AR(4) 특징은 8채널 전완 sEMG의 8-클래스 분류 정확도를 Hudgins TD4 단독 대비 수 %p 향상시키는 것으로 일관되게 보고됩니다(Hargrove et al. 2007 *IEEE TBME*; Phinyomark et al. 2018).
+        AR(4) 특징은 신호의 자기상관 구조를 4개의 모델 계수로 압축해 인코딩하므로, Hudgins TD4의 단순 진폭/영교차 통계로는 잡히지 않는 스펙트럼 정보를 보완합니다. 8채널 전완 sEMG의 다중 클래스 분류에서 TD4 단독 대비 분류 정확도를 일반적으로 향상시키는 특징 조합으로 분류됩니다.
     </p>
 
     <h2>3.3 분석 윈도우 파라미터</h2>
@@ -87,7 +87,7 @@ def classify_window(window_32d):
 
     <h2>3.5 LSTM 신경망 — 연속 제스처</h2>
     <p>
-        장단기 기억(LSTM) 네트워크는 연속 EMG 프레임 간의 시간적 의존성을 포착하여 더 자연스러운 제스처 전환을 가능하게 합니다. 다수의 선행 연구는 2층 LSTM(은닉 크기 128 수준)이 LDA 정적 분류 대비 연속 제스처 전환 구간의 오류율을 유의하게 줄일 수 있음을 시사합니다(Atzori et al. 2016 *Frontiers Neurorobotics*; Geng et al. 2016).
+        장단기 기억(LSTM) 네트워크는 연속 EMG 프레임 간의 시간적 의존성을 포착하여 더 자연스러운 제스처 전환을 가능하게 합니다. LDA의 정적 윈도우 분류와 달리 직전 프레임 시퀀스를 입력에 함께 사용하므로, 정상 상태(steady-state) 제스처가 아닌 전환 구간에서 발생하는 분류 진동을 줄이는 데 유리합니다. 2층 구성에 은닉 크기 128 수준이 8채널 전완 sEMG의 8-클래스 분류에 일반적으로 권장됩니다.
     </p>
     <pre><code>import torch
 import torch.nn as nn

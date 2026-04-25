@@ -195,7 +195,7 @@ POST /devices/{id}/phosphene-map:dry-run
   body = proposed map → simulates cycles against last 100 recorded scenes
 ```
 
-The dry-run response includes a *percept quality index* (PQI, 0–100) based on Beyeler et al. (2019) axon-pathway model; clinicians are advised against committing maps with PQI delta < 0 without a written justification.
+The dry-run response includes a *percept quality index* (PQI, 0–100) computed from a retinal axon-pathway model; clinicians are advised against committing maps with PQI delta < 0 without a written justification.
 
 ---
 
@@ -372,14 +372,15 @@ The Emergency-stop endpoint mirrors every activation to the hospital's alarm cha
 
 ---
 
-## 14. References
+## 14. Normative References
 
-1. Levitt H (1971). Transformed up-down methods in psychoacoustics. *J. Acoust. Soc. Am.* 49.
-2. Beyeler M et al. (2019). A model of ganglion axon pathways accounts for percepts. *Scientific Reports* 9.
-3. SMART-on-FHIR App Launch Framework 2.0.
-4. RFC 9457; RFC 8785 (JSON Canonicalization).
-5. HL7 FHIR R5 — Device, Procedure, Observation, Communication.
-6. ISO 14971; ISO/IEC 81001-5-1; IEC 62366-1.
+1. SMART-on-FHIR App Launch Framework 2.0.
+2. RFC 9457 — Problem Details for HTTP APIs.
+3. RFC 8785 — JSON Canonicalization Scheme.
+4. HL7 FHIR R5 — Device, Procedure, Observation, Communication resources.
+5. ISO 14971 — Risk management for medical devices.
+6. ISO/IEC 81001-5-1 — Health software security lifecycle.
+7. IEC 62366-1 — Usability engineering for medical devices.
 
 ---
 

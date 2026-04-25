@@ -26,7 +26,7 @@ The objective is bidirectional: a WIA station's data lands in a cardiologist's E
 - WHO Global Air Quality Guidelines (2021)
 - EU Directive 2008/50/EC (amended 2024/2881) — Ambient Air Quality
 - Apache Parquet 2.9; Apache Iceberg 1.5; Delta Lake 3.1
-- Barkjohn et al. 2021 — EPA PurpleAir correction formula
+- US EPA PurpleAir correction methodology — published by EPA Office of Research and Development
 
 ---
 
@@ -278,7 +278,7 @@ Forecasts are exposed by `GET /stations/{id}/forecasts?source=cams|hrrr|wia-loca
 
 Low-cost networks (PurpleAir, Sensor.Community, AirGradient) are integrated under Tier 3 with **mandatory bias correction**.
 
-### 10.1 EPA PurpleAir correction (Barkjohn 2021)
+### 10.1 EPA PurpleAir PM2.5 correction
 
 For PurpleAir PA-II CF=1 values:
 
@@ -406,7 +406,7 @@ Produces an hourly BUFR bundle, MQTT-publishes the WIS 2.0 envelope, and writes 
 7. WHO Global Air Quality Guidelines (2021)
 8. US EPA NAAQS Primary Standards — 40 CFR 50
 9. EU Ambient Air Quality Directive 2008/50/EC, as amended by 2024/2881
-10. Barkjohn et al. (2021) — "Development and Application of a U.S.-Wide Correction for PM2.5 Data Collected with the PurpleAir Sensor", *Atmospheric Measurement Techniques* 14, 4617
+10. US EPA PurpleAir PM2.5 Correction Methodology — EPA Office of Research and Development
 11. Apache Iceberg 1.5, Apache Parquet 2.9, Delta Lake 3.1
 12. RFC 3161 — Time-Stamp Protocol (TSP)
 

@@ -222,7 +222,7 @@ Per-user privacy budget `ε_total ≤ 8.0` per year; once exhausted, the device 
 
 ### 6.2 Secure aggregation
 
-Gradients from at least 50 devices are combined via a secure-aggregation protocol (Bonawitz 2017) so that the coordinator only observes the sum, never individual contributions. The aggregate is published to clients as a signed model delta.
+Gradients from at least 50 devices are combined via a secure-aggregation protocol so that the coordinator only observes the sum, never individual contributions. The aggregate is published to clients as a signed model delta. Implementations rely on standard threshold-cryptography building blocks (Shamir secret sharing + Diffie-Hellman pairwise masking).
 
 ### 6.3 Opt-out
 
@@ -360,15 +360,14 @@ engine.record_symbol_selection("oatmeal", context, response_ms=620)
 
 ---
 
-## 12. References
+## 12. Normative References
 
-1. Bonawitz et al. (2017). Practical Secure Aggregation for Federated Learning. *CCS '17*.
-2. Abadi et al. (2016). Deep Learning with Differential Privacy. *CCS '16*.
-3. Dwork & Roth (2014). The Algorithmic Foundations of Differential Privacy.
-4. McSherry F (2009). Privacy Integrated Queries. *SIGMOD '09*.
-5. W3C WCAG 2.2 AAA — target sizes and motor accessibility.
-6. ISO/IEC 29100 — Privacy framework.
-7. Light J, McNaughton D (2015). Designing AAC Research and Intervention to Improve Outcomes.
+1. W3C WCAG 2.2 AAA — target sizes and motor accessibility.
+2. ISO/IEC 29100 — Privacy framework.
+3. RFC 8949 — CBOR; RFC 9052 — COSE.
+4. NIST SP 800-208 — Stateful hash-based signatures.
+5. HIPAA Privacy Rule (45 CFR Part 164).
+6. EU GDPR 2016/679 — special category data.
 8. RFC 7515 (JWS); RFC 8785 (JSON Canonicalization); RFC 8446 (TLS 1.3).
 
 ---

@@ -330,12 +330,10 @@ Implant → External unit: OP=0x40 TELEMETRY{fw=v1.7.2, sig_verified=true}
 
 1. ISO 14708-1:2014; IEC 60601-1 / 2-10; IEC 60601-1-2 ed. 4.1.
 2. FCC 47 CFR §95 Subpart I (MedRadio); ETSI EN 301 839.
-3. ITU-R RR Article 5 (MICS allocation 402–405 MHz).
+3. ITU-R RR Article 5 — MICS allocation 402–405 MHz.
 4. ISO/TS 10974 — MR safety for active implantable medical devices.
-5. Cogan SF (2008). Neural stimulation and recording electrodes. *Annu Rev Biomed Eng* 10.
-6. Cohen-Karni T et al. (2012). Graphene and CNT materials for neural recording. *Nature Materials*.
-7. IEEE 802.15.6 — Body Area Networks.
-8. NIST SP 800-175B — Guide to cryptographic standards.
+5. IEEE 802.15.6 — Body Area Networks.
+6. NIST SP 800-175B — Guide to cryptographic standards.
 
 ---
 

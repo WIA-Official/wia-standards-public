@@ -314,7 +314,6 @@ Patient Kim (RP, epiretinal 60-electrode implant) enters an unfamiliar room:
 6. FDA 21 CFR 803 — MDR; EU MDR Annex IX — Vigilance.
 7. WHO ICF — International Classification of Functioning.
 8. Matter 1.3 specification.
-9. Greenwald SH et al. (2020). Rehabilitation outcomes with retinal prostheses. *Ophthalmology*.
 
 ---
 

@@ -114,9 +114,9 @@ SENIAM (Surface EMG for Non-Invasive Assessment of Muscles) defines standardised
 
 ## 3. Feature Extraction
 
-### 3.1 Hudgins Feature Set (1993)
+### 3.1 Hudgins TD4 Feature Set
 
-The foundational Hudgins et al. (1993) feature set for EMG pattern recognition defines four time-domain features per channel computed over a 200–256 ms analysis window:
+The Hudgins TD4 feature set is the de-facto baseline for EMG pattern recognition. It defines four time-domain features per channel computed over a 200–256 ms analysis window:
 
 ```json
 {
@@ -292,7 +292,7 @@ Proportional myoelectric control maps sEMG signal amplitude directly to prosthes
 |-------------|-----------|-----------|
 | JSON schema v2 with `$schema` URI | WIA-MYO-DATA-001 §2 | Yes |
 | SENIAM electrode placement codes | SENIAM §3 | Yes |
-| Hudgins TD4 feature set minimum | Hudgins et al. 1993 | Yes |
+| Hudgins TD4 feature set minimum | WIA-MYO-DATA-001 §3.1 | Yes |
 | ISO 22523 prosthetic classification field | ISO 22523:2006 §5 | Yes |
 | Sample rate ≥ 2 kHz for pattern recognition | WIA-MYO-DATA-001 §2.2 | Yes |
 | SNR quality indicator | WIA-MYO-DATA-001 §7 | Yes |

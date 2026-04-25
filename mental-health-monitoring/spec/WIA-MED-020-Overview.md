@@ -108,12 +108,14 @@ Human intervention protocols required for crisis situations
 - **20% reduction** in suicide rates
 - **Enhanced treatment efficacy** through data-driven care
 
-## References
+## Normative References
 
-1. Insel, T. R. (2017). Digital phenotyping: Technology for a new science of behavior. JAMA.
-2. Saeb, S., et al. (2015). Mobile phone sensor correlates of depressive symptom severity. Journal of Medical Internet Research.
-3. Chung, K., & Marmar, C. R. (2019). Voice analysis for mental health detection. Nature.
-4. Stanley, B., & Brown, G. K. (2012). Safety planning intervention. Cognitive and Behavioral Practice.
+1. **HL7 FHIR R5** — Observation, QuestionnaireResponse, Procedure, Communication resources.
+2. **HIPAA Privacy Rule** (45 CFR Part 164) — protected health information handling.
+3. **EU GDPR 2016/679** — health data as special category (Art. 9).
+4. **개인정보보호법** (PIPA) — 의료·민감정보 처리 특례.
+5. **PHQ-9, GAD-7, PCL-5** — public-domain validated screening instruments.
+6. **Stanley-Brown Safety Planning Intervention** — public-domain crisis safety plan template.
 
 ---
 

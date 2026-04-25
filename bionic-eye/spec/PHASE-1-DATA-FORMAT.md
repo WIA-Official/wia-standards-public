@@ -192,7 +192,7 @@ interface PhospheneLocus {
 ### 5.2 Retinotopic and cortico-topic mapping
 
 - Retinal: `visual_field_deg` derived from OCT-A fundus alignment, anchored at the fovea.
-- Cortical: Benson et al. (2014) retinotopic atlas applied to the patient's MRI; V1 surface coordinates are *patient-specific*.
+- Cortical: a retinotopic atlas applied to the patient's MRI; V1 surface coordinates are *patient-specific*.
 
 ### 5.3 Percept stability
 
@@ -333,14 +333,13 @@ A complete schema (≈ 1200 lines) ships in `schema/wia-be-001.json` and is pinn
 
 ---
 
-## 11. References
+## 11. Normative References
 
-1. Weiland JD, Cho AK, Humayun MS (2011). Retinal prostheses: current clinical results and future needs. *Ophthalmology* 118(11).
-2. Benson NC et al. (2014). Correction of distortion in flattened representations of the cortical surface. *PLOS Comput. Biol.* 10(3).
-3. Shannon RV (1992). A model of safe levels for electrical stimulation. *IEEE Trans. Biomed. Eng.* 39(4).
-4. Beyeler M et al. (2019). A model of ganglion-axon pathways. *Sci Rep* 9.
-5. ISO 14708-1:2014; IEC 60601-1 / 2-10; ISO 10993-1.
-6. DICOM PS3.3 — Ophthalmic IODs.
+1. ISO 14708-1:2014 — Implants for surgery, active implantable medical devices.
+2. IEC 60601-1; IEC 60601-2-10 — Medical electrical equipment safety.
+3. ISO 10993-1 — Biocompatibility evaluation of medical devices.
+4. DICOM PS3.3 — Ophthalmic Information Object Definitions.
+5. HL7 FHIR R5 — Device, Procedure, Observation resources.
 
 ---
 
