@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Nano - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #06B6D4;
+            --primary-dark: #0891B2;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); color: #000; }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #22D3EE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); color: #000; }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin: 20px 0; }
+        .system-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .system-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .system-card.selected { border-color: var(--primary); background: rgba(6, 182, 212, 0.1); }
+        .system-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .system-name { font-weight: 600; margin-bottom: 5px; font-size: 0.95rem; }
+        .system-desc { font-size: 0.75rem; color: var(--text-muted); }
+
+        .scale-display { background: linear-gradient(135deg, #0c1929, #1a2744); border-radius: 16px; padding: 40px; text-align: center; margin: 20px 0; position: relative; }
+        .scale-value { font-size: 4rem; font-weight: bold; color: var(--primary); }
+        .scale-unit { font-size: 1.5rem; color: var(--text-muted); }
+        .scale-comparison { margin-top: 20px; color: var(--text-muted); }
+        .scale-bar { display: flex; justify-content: space-between; margin-top: 30px; padding: 0 20px; }
+        .scale-mark { text-align: center; font-size: 0.8rem; }
+        .scale-mark span { color: var(--primary); font-weight: bold; }
+
+        .nano-viz { display: flex; justify-content: center; gap: 10px; margin: 30px 0; }
+        .nano-particle { width: 20px; height: 20px; border-radius: 50%; background: var(--primary); animation: pulse 1.5s ease-in-out infinite; }
+        .nano-particle:nth-child(2) { animation-delay: 0.2s; background: #22D3EE; }
+        .nano-particle:nth-child(3) { animation-delay: 0.4s; background: #67E8F9; }
+        .nano-particle:nth-child(4) { animation-delay: 0.6s; background: #22D3EE; }
+        .nano-particle:nth-child(5) { animation-delay: 0.8s; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } }
+
+        .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .settings-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .settings-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .slider-row { padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .slider-row:last-child { border-bottom: none; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .slider-value { color: var(--primary); font-weight: 600; }
+        input[type="range"] { width: 100%; height: 8px; border-radius: 4px; background: var(--border); appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .safety-meter { background: var(--bg); border-radius: 12px; padding: 25px; margin: 20px 0; }
+        .meter-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .meter-bar { height: 20px; background: var(--border); border-radius: 10px; overflow: hidden; }
+        .meter-fill { height: 100%; border-radius: 10px; transition: width 0.5s; }
+        .meter-fill.safe { background: linear-gradient(90deg, var(--secondary), #34d399); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .settings-grid { grid-template-columns: 1fr; }
+        }
+            .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Nano</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🔬 WIA Nano</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Nanotechnology Standard" data-ko="나노기술 표준">Nanotechnology Standard</h1>
+            <p data-en="Molecular machines, nanorobots, nanomedicine" data-ko="분자 기계, 나노로봇, 나노의약품">Molecular machines, nanorobots</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🔬 Systems" data-ko="🔬 시스템">🔬 Systems</div>
+            <div class="tab" onclick="showPanel(1)" data-en="📐 Scale" data-ko="📐 스케일">📐 Scale</div>
+            <div class="tab" onclick="showPanel(2)" data-en="💊 NanoMed" data-ko="💊 나노의약">💊 NanoMed</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📡 Network" data-ko="📡 네트워크">📡 Network</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🛡️ Safety" data-ko="🛡️ 안전">🛡️ Safety</div>
+        </div>
+
+        <!-- Panel 0: Systems -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🔬 Nano Systems" data-ko="🔬 나노 시스템">🔬 Nano Systems</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select a nanosystem type to configure" data-ko="구성할 나노시스템 유형 선택">Select nanosystem type</p>
+
+            <div class="system-grid">
+                <div class="system-card selected" onclick="selectSystem('nanorobot')">
+                    <div class="system-icon">🤖</div>
+                    <div class="system-name" data-en="Nanorobot" data-ko="나노로봇">Nanorobot</div>
+                    <div class="system-desc" data-en="Autonomous nanoscale robot" data-ko="자율 나노스케일 로봇">Autonomous robot</div>
+                </div>
+                <div class="system-card" onclick="selectSystem('nanosensor')">
+                    <div class="system-icon">📡</div>
+                    <div class="system-name" data-en="Nanosensor" data-ko="나노센서">Nanosensor</div>
+                    <div class="system-desc" data-en="Molecular detection" data-ko="분자 검출">Detection</div>
+                </div>
+                <div class="system-card" onclick="selectSystem('drugdelivery')">
+                    <div class="system-icon">💊</div>
+                    <div class="system-name" data-en="Drug Delivery" data-ko="약물 전달">Drug Delivery</div>
+                    <div class="system-desc" data-en="Targeted nanomedicine" data-ko="표적 나노의약">Targeted</div>
+                </div>
+                <div class="system-card" onclick="selectSystem('assembler')">
+                    <div class="system-icon">⚙️</div>
+                    <div class="system-name" data-en="Assembler" data-ko="조립기">Assembler</div>
+                    <div class="system-desc" data-en="Molecular assembly" data-ko="분자 조립">Molecular</div>
+                </div>
+                <div class="system-card" onclick="selectSystem('memory')">
+                    <div class="system-icon">💾</div>
+                    <div class="system-name" data-en="NanoMemory" data-ko="나노메모리">NanoMemory</div>
+                    <div class="system-desc" data-en="DNA/molecular storage" data-ko="DNA/분자 저장">DNA storage</div>
+                </div>
+                <div class="system-card" onclick="selectSystem('motor')">
+                    <div class="system-icon">🔄</div>
+                    <div class="system-name" data-en="NanoMotor" data-ko="나노모터">NanoMotor</div>
+                    <div class="system-desc" data-en="Molecular motor" data-ko="분자 모터">Motor</div>
+                </div>
+            </div>
+
+            <div class="nano-viz">
+                <div class="nano-particle"></div>
+                <div class="nano-particle"></div>
+                <div class="nano-particle"></div>
+                <div class="nano-particle"></div>
+                <div class="nano-particle"></div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="configureSystem()" data-en="⚙️ Configure System" data-ko="⚙️ 시스템 구성">⚙️ Configure</button>
+            </div>
+            <div class="output" id="systemOutput"></div>
+        </div>
+
+        <!-- Panel 1: Scale -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="📐 Nanoscale Simulator" data-ko="📐 나노스케일 시뮬레이터">📐 Nanoscale</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Explore the nanoscale world (1-100 nm)" data-ko="나노스케일 세계 탐험 (1-100 nm)">Explore nanoscale (1-100 nm)</p>
+
+            <div class="scale-display">
+                <div class="scale-value" id="scaleValue">50</div>
+                <div class="scale-unit">nanometers</div>
+                <div class="scale-comparison" id="scaleComparison" data-en="≈ Width of a DNA helix" data-ko="≈ DNA 나선 너비">≈ DNA helix width</div>
+                <input type="range" min="1" max="100" value="50" style="margin-top: 30px;" oninput="updateScale(this.value)">
+                <div class="scale-bar">
+                    <div class="scale-mark"><span>1nm</span><br><span style="font-size:0.7rem; color:var(--text-muted)">Water</span></div>
+                    <div class="scale-mark"><span>2nm</span><br><span style="font-size:0.7rem; color:var(--text-muted)">DNA</span></div>
+                    <div class="scale-mark"><span>10nm</span><br><span style="font-size:0.7rem; color:var(--text-muted)">Virus</span></div>
+                    <div class="scale-mark"><span>50nm</span><br><span style="font-size:0.7rem; color:var(--text-muted)">Ribosome</span></div>
+                    <div class="scale-mark"><span>100nm</span><br><span style="font-size:0.7rem; color:var(--text-muted)">HIV</span></div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateScale()" data-en="🔍 Simulate" data-ko="🔍 시뮬레이션">🔍 Simulate</button>
+            </div>
+            <div class="output" id="scaleOutput"></div>
+        </div>
+
+        <!-- Panel 2: NanoMed -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="💊 Nanomedicine" data-ko="💊 나노의약품">💊 Nanomedicine</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Drug delivery system simulation" data-ko="약물 전달 시스템 시뮬레이션">Drug delivery simulation</p>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>💉 <span data-en="Payload" data-ko="페이로드">Payload</span></h5>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Drug Concentration" data-ko="약물 농도">Drug Conc.</span>
+                            <span class="slider-value" id="drugConc">50 μg/mL</span>
+                        </div>
+                        <input type="range" min="10" max="100" value="50" oninput="updateDrug(this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Particle Size" data-ko="입자 크기">Particle Size</span>
+                            <span class="slider-value" id="particleSize">80 nm</span>
+                        </div>
+                        <input type="range" min="20" max="200" value="80" oninput="updateParticle(this.value)">
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>🎯 <span data-en="Targeting" data-ko="표적화">Targeting</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Active Targeting" data-ko="능동 표적화">Active Targeting</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="pH-Responsive" data-ko="pH 반응형">pH-Responsive</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Temp-Responsive" data-ko="온도 반응형">Temp-Responsive</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>🧬 <span data-en="Carrier Type" data-ko="운반체 유형">Carrier Type</span></h5>
+                    <select style="width: 100%; padding: 12px; border-radius: 8px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border);">
+                        <option value="liposome">Liposome</option>
+                        <option value="micelle">Micelle</option>
+                        <option value="dendrimer">Dendrimer</option>
+                        <option value="nanoparticle">Nanoparticle</option>
+                        <option value="nanotube">Carbon Nanotube</option>
+                    </select>
+                </div>
+                <div class="settings-card">
+                    <h5>📍 <span data-en="Target Site" data-ko="표적 부위">Target Site</span></h5>
+                    <select style="width: 100%; padding: 12px; border-radius: 8px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border);">
+                        <option value="tumor">Tumor Cell</option>
+                        <option value="brain">Blood-Brain Barrier</option>
+                        <option value="liver">Liver</option>
+                        <option value="kidney">Kidney</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateDelivery()" data-en="🚀 Simulate Delivery" data-ko="🚀 전달 시뮬레이션">🚀 Simulate</button>
+            </div>
+            <div class="output" id="nanomedOutput"></div>
+        </div>
+
+        <!-- Panel 3: Network -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="📡 Nano Network" data-ko="📡 나노 네트워크">📡 Nano Network</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="IEEE 1906.1 nanonetwork simulation" data-ko="IEEE 1906.1 나노네트워크 시뮬레이션">IEEE 1906.1 simulation</p>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>📶 <span data-en="Communication" data-ko="통신">Communication</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Molecular Comm" data-ko="분자 통신">Molecular Comm</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="EM Nanocomm" data-ko="전자기 나노통신">EM Nanocomm</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Acoustic" data-ko="음향">Acoustic</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>🔢 <span data-en="Network Params" data-ko="네트워크 파라미터">Network Params</span></h5>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Node Count" data-ko="노드 수">Nodes</span>
+                            <span class="slider-value" id="nodeCount">100</span>
+                        </div>
+                        <input type="range" min="10" max="1000" value="100" oninput="updateNodes(this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Range (nm)" data-ko="범위 (nm)">Range</span>
+                            <span class="slider-value" id="rangeValue">500 nm</span>
+                        </div>
+                        <input type="range" min="100" max="2000" value="500" oninput="updateRange(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateNetwork()" data-en="📡 Simulate Network" data-ko="📡 네트워크 시뮬레이션">📡 Simulate</button>
+            </div>
+            <div class="output" id="networkOutput"></div>
+        </div>
+
+        <!-- Panel 4: Safety -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🛡️ Safety Assessment" data-ko="🛡️ 안전성 평가">🛡️ Safety</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Nanotoxicology and environmental safety" data-ko="나노독성학 및 환경 안전">Nanotoxicology assessment</p>
+
+            <div class="safety-meter">
+                <div class="meter-label">
+                    <span data-en="🛡️ Safety Score" data-ko="🛡️ 안전 점수">🛡️ Safety Score</span>
+                    <span id="safetyScore" style="color: var(--secondary);">94%</span>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-fill safe" id="safetyFill" style="width: 94%;"></div>
+                </div>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>☠️ <span data-en="Toxicity" data-ko="독성">Toxicity</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Cytotoxicity Test" data-ko="세포독성 검사">Cytotoxicity</span>
+                        <span style="color: var(--secondary);">✅ Pass</span>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Genotoxicity Test" data-ko="유전독성 검사">Genotoxicity</span>
+                        <span style="color: var(--secondary);">✅ Pass</span>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Immunotoxicity" data-ko="면역독성">Immunotoxicity</span>
+                        <span style="color: var(--secondary);">✅ Pass</span>
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>🌍 <span data-en="Environment" data-ko="환경">Environment</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Biodegradable" data-ko="생분해성">Biodegradable</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Eco-friendly" data-ko="친환경">Eco-friendly</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Containment" data-ko="격리">Containment</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runSafetyAssessment()" data-en="🔍 Run Assessment" data-ko="🔍 평가 실행">🔍 Assess</button>
+            </div>
+            <div class="output" id="safetyOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Nano: Building the future atom by atom" data-ko="WIA Nano: 원자 하나하나로 미래를 구축">WIA Nano: Atom by atom</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedSystem = 'nanorobot';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function selectSystem(system) {
+            selectedSystem = system;
+            document.querySelectorAll('.system-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.system-card').classList.add('selected');
+        }
+
+        function configureSystem() {
+            const systems = {
+                nanorobot: { size: '50-100nm', power: 'ATP hydrolysis', speed: '10 μm/s' },
+                nanosensor: { size: '10-50nm', sensitivity: 'femtomolar', response: '< 1ms' },
+                drugdelivery: { size: '50-200nm', payload: '10-50%', release: 'pH-triggered' },
+                assembler: { size: '100-500nm', precision: '0.1nm', rate: '10^6/s' },
+                memory: { size: '2nm (DNA)', density: '1 EB/mm³', stability: '1000+ years' },
+                motor: { size: '10-50nm', torque: '40 pN·nm', speed: '100 rps' }
+            };
+            document.getElementById('systemOutput').textContent = JSON.stringify({
+                system: selectedSystem, specs: systems[selectedSystem],
+                ieee1906: true, wiaCompliant: true,
+                message: currentLang === 'ko' ? '나노시스템 구성 완료' : 'Nanosystem configured'
+            }, null, 2);
+        }
+
+        function updateScale(val) {
+            document.getElementById('scaleValue').textContent = val;
+            const comparisons = {
+                1: { en: '≈ Water molecule', ko: '≈ 물 분자' },
+                2: { en: '≈ DNA helix width', ko: '≈ DNA 나선 너비' },
+                10: { en: '≈ Cell membrane', ko: '≈ 세포막' },
+                50: { en: '≈ Ribosome', ko: '≈ 리보솜' },
+                100: { en: '≈ HIV virus', ko: '≈ HIV 바이러스' }
+            };
+            const closest = Object.keys(comparisons).reduce((a, b) => Math.abs(b - val) < Math.abs(a - val) ? b : a);
+            document.getElementById('scaleComparison').textContent = comparisons[closest][currentLang];
+        }
+
+        function simulateScale() {
+            document.getElementById('scaleOutput').textContent = JSON.stringify({
+                scale: document.getElementById('scaleValue').textContent + ' nm',
+                atomCount: Math.pow(parseInt(document.getElementById('scaleValue').textContent), 3) * 10,
+                surfaceArea: (4 * Math.PI * Math.pow(parseInt(document.getElementById('scaleValue').textContent)/2, 2)).toFixed(2) + ' nm²',
+                message: currentLang === 'ko' ? '나노스케일 시뮬레이션 완료' : 'Nanoscale simulation complete'
+            }, null, 2);
+        }
+
+        function updateDrug(val) { document.getElementById('drugConc').textContent = val + ' μg/mL'; }
+        function updateParticle(val) { document.getElementById('particleSize').textContent = val + ' nm'; }
+        function updateNodes(val) { document.getElementById('nodeCount').textContent = val; }
+        function updateRange(val) { document.getElementById('rangeValue').textContent = val + ' nm'; }
+
+        function simulateDelivery() {
+            document.getElementById('nanomedOutput').textContent = JSON.stringify({
+                carrier: 'Liposome', targetSite: 'Tumor Cell',
+                deliveryEfficiency: '87.3%', releaseTime: '4.2 hours',
+                biodistribution: { tumor: '65%', liver: '20%', spleen: '10%', other: '5%' },
+                message: currentLang === 'ko' ? '약물 전달 시뮬레이션 완료' : 'Drug delivery simulation complete'
+            }, null, 2);
+        }
+
+        function simulateNetwork() {
+            document.getElementById('networkOutput').textContent = JSON.stringify({
+                protocol: 'IEEE 1906.1', communicationType: 'Molecular',
+                nodes: document.getElementById('nodeCount').textContent,
+                range: document.getElementById('rangeValue').textContent,
+                throughput: '1.2 Mbps', latency: '50 ms',
+                message: currentLang === 'ko' ? '나노네트워크 시뮬레이션 완료' : 'Nanonetwork simulation complete'
+            }, null, 2);
+        }
+
+        function runSafetyAssessment() {
+            document.getElementById('safetyOutput').textContent = JSON.stringify({
+                overallScore: '94%', grade: 'A',
+                toxicity: { cytotoxicity: 'Pass', genotoxicity: 'Pass', immunotoxicity: 'Pass' },
+                environment: { biodegradable: true, ecoFriendly: true, containment: 'Level 2' },
+                regulatory: { FDA: 'Pre-IND', EMA: 'Scientific Advice', PMDA: 'Consultation' },
+                message: currentLang === 'ko' ? '안전성 평가 완료' : 'Safety assessment complete'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

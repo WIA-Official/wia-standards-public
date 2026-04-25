@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 6 — Phase 3 Protocol · WIA Nanotechnology Standard</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#6366F1;margin-top:2em}
+h1{border-bottom:3px solid #6366F1;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #6366F1}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#6366F1}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#a5b4fc}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>Chapter 6: Phase 3 — Protocol</h1>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> The data plane — OPC UA Companion Specs for instruments, MQTT 5 broker for cross-lab fan-out, Allotrope ADF binary stream for raw evidence, SiLA 2 device control, TLS 1.3 + OAuth 2.1 + DPoP, and the failure modes you must handle.
+</div>
+
+<h2>6.1 OPC UA — instrument-level capture</h2>
+
+<p>OPC UA (IEC 62541) Companion Specifications turn each instrument vendor's API into a uniform information model. WIA-NANO-016 mandates the following:</p>
+
+<table>
+<tr><th>Instrument class</th><th>OPC UA spec</th><th>Vendors aligned</th></tr>
+<tr><td>Electron microscopes (TEM/SEM)</td><td>OPC UA Microscopy CS (in development; uses OPC UA Lab Devices CS)</td><td>FEI/Thermo, Hitachi, JEOL</td></tr>
+<tr><td>Lab devices (DLS, BET, Zetasizer)</td><td>OPC UA Lab Devices CS (LADS)</td><td>Malvern, Anton Paar, Micromeritics</td></tr>
+<tr><td>Mass spectrometers</td><td>OPC UA Lab Devices CS</td><td>Thermo, Agilent, Bruker</td></tr>
+<tr><td>SiLA 2 devices</td><td>SiLA 2 + OPC UA bridge</td><td>Lab automation (Tecan, Hamilton)</td></tr>
+</table>
+
+<h2>6.2 MQTT 5 broker for cross-lab fan-out</h2>
+
+<p>OPC UA captures are translated into MQTT 5 messages for cross-organisation distribution. Topics:</p>
+
+<pre><code>nano/{tenant}/lab/{labId}/instrument/{instrumentId}/measurement
+nano/{tenant}/lab/{labId}/instrument/{instrumentId}/state
+nano/{tenant}/lab/{labId}/exposure/sampler/{samplerId}/reading
+nano/{tenant}/substance/{substanceId}/event</code></pre>
+
+<p>QoS strategy: 0 for heartbeats, 1 for routine measurements, 2 for regulator-bound evidence and exposure-limit alerts.</p>
+
+<h2>6.3 Allotrope ADF binary stream</h2>
+
+<p>Allotrope Data Format (ADF) wraps raw instrument output (image stacks, correlograms, spectra) in HDF5 with controlled vocabulary. The standard supports two modes:</p>
+
+<ol>
+<li><strong>Static</strong> — finished ADF file uploaded at end of a measurement run.</li>
+<li><strong>Stream</strong> — ADF objects committed in chunks during long captures (e.g., 24 h cell-uptake live imaging) so partial results are queryable mid-run.</li>
+</ol>
+
+<h2>6.4 Sensor-frame example (CBOR + MQTT 5)</h2>
+
+<pre><code>{
+  "instrumentId":"DLS-MAL-Zetasizer-Ultra-A",
+  "ts":"2026-04-25T14:31:08+09:00",
+  "data":{
+    "intensityHydrodynamicDiameterNm": [22.4, 22.7, 22.5, 22.8, 22.6],
+    "polydispersityIndex": 0.082,
+    "zAverageNm": 22.6
+  },
+  "context":{
+    "substance":"urn:wia:nano:substance:zno-20nm-pegylated-2026-04-25",
+    "operator":"did:wia:operator:kims-pl-a-04",
+    "method":"iso:22412","cellTempC":25.0
+  }
+}</code></pre>
+
+<h2>6.5 SiLA 2 device control</h2>
+
+<p>SiLA 2 (Standardisation in Lab Automation, gRPC + Protocol Buffers) is the de-facto control protocol for liquid handlers, robotic platforms, and microreactors. The standard offers a SiLA-2-to-OPC-UA gateway so data + control share the same authorisation surface.</p>
+
+<h2>6.6 NIOSH-spec exposure samplers</h2>
+
+<p>For nanoEHS surveillance, NIOSH NMAM 7300 (ICP-MS for elemental nanoparticles) and NMAM 0500 (gravimetric) samplers feed time-series via MQTT 5. The standard requires a calibration certificate signed by an ISO/IEC 17025 accredited lab attached as a Verifiable Credential.</p>
+
+<h2>6.7 Tamper-evident anchoring</h2>
+
+<p>Every Iceberg snapshot of evidence and every dossier publish produces a Merkle root anchored on WIA Chain PoA + BSC mainnet. Auditors verify tamper-evidence without seeing private formulation chemistry.</p>
+
+<h2>6.8 Security baseline</h2>
+
+<table>
+<tr><th>Layer</th><th>Required</th></tr>
+<tr><td>Backend transport</td><td>TLS 1.3 with TLS_AES_256_GCM_SHA384 or TLS_CHACHA20_POLY1305_SHA256</td></tr>
+<tr><td>Token format</td><td>JWT EdDSA, audience-restricted, 30 min lifetime, DPoP-bound</td></tr>
+<tr><td>Application signing</td><td>Ed25519 (RFC 8032) over RFC 8785 canonical JSON</td></tr>
+<tr><td>Key management</td><td>HSM-backed, RFC 7517 JWKS rotation, 90-day max</td></tr>
+<tr><td>OPC UA authentication</td><td>X.509 certificates issued by lab-internal CA, end-to-end</td></tr>
+</table>
+
+<h2>6.9 Failure modes the protocol layer must handle</h2>
+
+<ul>
+<li><strong>Instrument offline mid-capture</strong> — replay the local ADF buffer with original timestamps; do NOT discard.</li>
+<li><strong>Clock drift</strong> — NTP every 6 h; ingest rejects readings with <code>|now − ts| &gt; 600 s</code>.</li>
+<li><strong>Late re-publish</strong> — use <code>cache/...</code> topic prefix so consumers can distinguish original vs. cached.</li>
+<li><strong>Schema break</strong> — registry compatibility set to <code>BACKWARD_TRANSITIVE</code> for substance subjects, <code>FULL_TRANSITIVE</code> for inter-org events.</li>
+<li><strong>Replay attacks</strong> — RFC 9421 nonces + JTI cache.</li>
+</ul>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>OPC UA Companion Specs unify instrument output regardless of vendor.</li>
+<li>MQTT 5 fan-out moves measurements between labs without proprietary middleware.</li>
+<li>Allotrope ADF preserves raw evidence, both static and streamed.</li>
+<li>SiLA 2 + OPC UA bridge means control and data live on the same authorisation surface.</li>
+<li>Merkle-root anchoring on WIA Chain PoA + BSC gives external auditability without leaking IP.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>Which OPC UA Companion Spec covers DLS and BET instruments?</li>
+<li>Why are exposure-limit alerts QoS 2 rather than QoS 1?</li>
+<li>What two modes does the ADF stream support?</li>
+<li>What lab-control protocol pairs with OPC UA via a gateway?</li>
+<li>Which RFC defines the canonical JSON form used before signing?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 7 closes the loop — FDA / EMA / PMDA / MFDS / REACH dossier integration, supply-chain traceability via EPCIS 2.0, and ESG reporting that ties nanomaterial production to corporate IFRS S2.</p>
+
+</body>
+</html>

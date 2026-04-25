@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>7장 — Phase 4 통합</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#6366F1;margin-top:2em}
+h1{border-bottom:3px solid #6366F1;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #6366F1}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#6366F1}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#a5b4fc}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>7장: Phase 4 — 통합</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> 시료 레코드를 실제 결과로 만드는 통합 — FDA / EMA / PMDA / MFDS / REACH 자료, EPCIS 2.0 공급망 추적성, WIA‑CLIMATE‑022 ESG 보고, DNA 데이터 저장, 소비자 공개 검증.
+</div>
+
+<h2>7.1 FDA 나노기술 태스크포스 경로</h2>
+
+<p>FDA NTF 가이드는 규제 대상 제품이 나노기술 적용에 해당하는지 묻는다. WIA‑NANO‑016이 SPL XML 모듈을 NTF 4가지 결정 기준에 따라 자동 생성한다.</p>
+
+<ol>
+<li>외부 치수 또는 내부 구조 1~100 nm.</li>
+<li>1 µm까지 영역 안에서 나노스케일 속성을 보이는 경우.</li>
+<li>특정 속성을 위해 의도적으로 설계.</li>
+<li>제품의 의도적 구성요소.</li>
+</ol>
+
+<h2>7.2 EU REACH 2018/1881 나노 형태 등록</h2>
+
+<p>REACH Annex VI(2018/1881 개정)는 나노 형태별 크기 분포·형상·표면 화학·표면 처리·비표면적·결정성 보고를 요구한다. 본 표준은 IUCLID 호환 JSON‑LD 트윈을 lead registrant 키로 서명해 생성.</p>
+
+<h2>7.3 EMA · PMDA · MFDS · NMPA</h2>
+
+<table>
+<tr><th>기관</th><th>형식</th><th>엔드포인트</th></tr>
+<tr><td>EMA centralised</td><td>eCTD + 나노의약품 reflection paper 정렬</td><td><code>POST /ema/v1/ectd</code></td></tr>
+<tr><td>PMDA</td><td>QbD + 나노 부속</td><td><code>POST /pmda/v1/qbd</code></td></tr>
+<tr><td>한국 MFDS</td><td>의약품 등의 안전에 관한 규칙 보충 신청</td><td><code>POST /mfds/v1/supplementary</code></td></tr>
+<tr><td>중국 NMPA</td><td>CMC DMF 보충</td><td><code>POST /nmpa/v1/cmc</code></td></tr>
+</table>
+
+<h2>7.4 EPCIS 2.0 공급망 추적성</h2>
+
+<p>전구체에서 제품까지 모든 변환을 EPCIS 2.0 TransformationEvent로:</p>
+
+<pre><code>{
+  "type":"TransformationEvent","eventTime":"2026-04-25T11:00:00Z",
+  "eventTimeZoneOffset":"+09:00",
+  "inputEPCList":["urn:wia:nano:substance:hauci4-precursor-2026-04-20"],
+  "outputEPCList":["urn:wia:nano:substance:au-15nm-citrate-2026-04-25"],
+  "bizStep":"https://ref.gs1.org/cbv/BizStep-creating",
+  "readPoint":{"id":"urn:epc:id:sgln:880123.45000.1"},
+  "wia:processParameters":{"method":"turkevich","reductantMolar":0.6}
+}</code></pre>
+
+<h2>7.5 DNA 데이터 저장 상호운용</h2>
+
+<p>합성 올리고에 디지털 데이터를 인코딩하는 DNA 저장. 표준은 벤더 중립 경로(Microsoft Project Silica, Twist Bioscience, Catalog DNA, Illumina BaseSpace)를 노출.</p>
+
+<pre><code>POST /v1/dna-storage/archive
+{
+  "archiveId":"arc-2026-Q2-genomes-9KB",
+  "encoder":{"name":"GoldmanCRC","version":"1.2"},
+  "synthesis":{"vendor":"twist","plate":"TWIST-2026-Q2-014","oligoCount":18432},
+  "redundancy":{"raid":"reed-solomon","k":12,"n":16},
+  "checkRead":{"reader":"Oxford-Nanopore-MinION","date":"2026-04-25"}
+}</code></pre>
+
+<h2>7.6 OECD WPMN 자료 컴파일</h2>
+
+<p>자발 OECD WPMN sponsorship 자료가 기관 간 컴파일된다. 표준은 시료의 TG 정렬 종점 레코드를 lead sponsor 키로 서명한 단일 WPMN 자료로 묶어낸다.</p>
+
+<h2>7.7 WIA‑CLIMATE‑022 ESG 결합</h2>
+
+<p>나노물질 생산은 IFRS S2 / ESRS E1에 보고되는 탄소·에너지 발자국이 있다. WIA‑CLIMATE‑022 결합으로 각 배치의 Scope 1/2/3 배출이 기업 공시 트윈으로 자동 흐른다. 운송 단계는 ISO 14083:2023이 다룬다.</p>
+
+<h2>7.8 소비자 검증</h2>
+
+<pre><code>GET https://verify.wia-nano.org/zno-20nm-pegylated-2026-04-25
+
+→ 시료 요약, ISO 19749 크기 레코드, OECD TG 318 분산 안정성,
+  NIOSH NMAM 7300 작업자 노출, FDA NTF 결정, REACH 나노 형태 ID,
+  발급자 DID 서명, WIA Chain 검증.</code></pre>
+
+<h2>7.9 WIA 생태계 결합</h2>
+
+<ul>
+<li><strong>WIA‑VC</strong> — GLP 진술서·인정 인증서·ISO 17025 보고서.</li>
+<li><strong>WIA‑IDENTITY</strong> — 스폰서·GLP 실험실·규제기관 DID.</li>
+<li><strong>WIA‑IOT</strong> — TEM·AFM·DLS·ICP‑MS·노출 샘플러 온보딩.</li>
+<li><strong>WIA‑CARBON</strong> — 생산 단계 배출.</li>
+<li><strong>WIA‑CLIMATE‑022</strong> — IFRS S2 / ESRS E1 라우팅.</li>
+<li><strong>WIA‑BLOCKCHAIN</strong> — 시료·자료 무결성 머클 앵커링.</li>
+</ul>
+
+<h2>7.10 단일 진실원 생애주기</h2>
+
+<pre><code>1. 기기 캡처    →  Phase 3 OPC UA + MQTT 5 + ADF
+2. 측정         →  Phase 1 JSON‑LD 시료 레코드
+3. 시료         →  Phase 2 STAC + OGC API 검색
+4. 집계         →  Phase 4 자료 트윈(FDA SPL, EMA, PMDA, MFDS, ECHA REACH)
+5. 제출         →  규제기관 포털(암호 영수증 첨부)
+6. 검증         →  WIA‑VC 발급 + WIA‑BLOCKCHAIN 앵커링
+7. 공개 소비   →  verify.wia-nano.org 또는 제품 QR</code></pre>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>FDA NTF 결정은 1급 시료 필드, 사후 문서가 아니다.</li>
+<li>EU REACH 2018/1881 나노 형태 등록은 IUCLID 호환 JSON‑LD 트윈으로.</li>
+<li>전구체→제품 공급망 변환은 EPCIS 2.0 이벤트.</li>
+<li>DNA 데이터 저장은 벤더 중립 archive·redundancy·read‑back API.</li>
+<li>공개 검증이 제품 QR에서 검증 가능 시료 요약까지 닫는다.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>FDA SPL XML 모듈이 기록하는 NTF 4가지 기준은?</li>
+<li>REACH 나노 형태 등록을 요구하는 EU 규정은?</li>
+<li>전구체에서 제품 합성을 캡처하는 EPCIS 이벤트는?</li>
+<li>ISO 14083이 어떻게 나노 생산을 기후 공시로 잇는가?</li>
+<li>소비자 verify URL이 보여주는 정보 범위는?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>마지막 8장은 12개월 도입 로드맵·인증 등급·ROI — 본 표준을 실제 도입 의사결정으로 만든다.</p>
+
+</body>
+</html>

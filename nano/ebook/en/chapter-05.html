@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 5 — Phase 2 API · WIA Nanotechnology Standard</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#6366F1;margin-top:2em}
+h1{border-bottom:3px solid #6366F1;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #6366F1}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#6366F1}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#a5b4fc}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>Chapter 5: Phase 2 — API Interface</h1>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> The HTTP wire — OpenAPI 3.1 + AsyncAPI 3.0, OAuth 2.1 + DPoP, idempotent CRUD on substance records, FAIR-aligned discovery, dossier-twin generation for FDA SPL / EMA / PMDA / MFDS / REACH, and the conformance suite that proves equivalence.
+</div>
+
+<h2>5.1 Two façades, one truth</h2>
+
+<ol>
+<li><strong>REST + OpenAPI 3.1</strong> — synchronous CRUD on <code>/substances</code>, <code>/measurements</code>, <code>/dossiers</code>, <code>/exposure</code>.</li>
+<li><strong>AsyncAPI 3.0</strong> — event stream of instrument captures, dossier state changes, regulator submissions.</li>
+</ol>
+
+<p>The conformance suite at <code>https://conformance.wia-nano.org</code> exercises both façades and compares result hashes.</p>
+
+<h2>5.2 Authentication menu</h2>
+
+<table>
+<tr><th>Method</th><th>RFC</th><th>Use case</th></tr>
+<tr><td>OAuth 2.1 + PKCE + DPoP</td><td>RFC 9700, 9449</td><td>Researcher portal, regulator desk</td></tr>
+<tr><td>mTLS X.509</td><td>RFC 8446</td><td>Instrument gateway, GLP lab system</td></tr>
+<tr><td>HTTP Message Signature</td><td>RFC 9421</td><td>Cross-org evidence push, dossier submission</td></tr>
+</table>
+
+<h2>5.3 Substance CRUD with Idempotency-Key</h2>
+
+<pre><code>curl -X POST https://api.wia-nano.org/v1/substances \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/ld+json" \
+  -H "Idempotency-Key: register-zno-20nm-pegylated-2026-04-25" \
+  -d @substance.jsonld</code></pre>
+
+<p>Response <code>201 Created</code> includes <code>Location</code>, strong <code>ETag</code>, and the canonical resource. Patch with concurrency:</p>
+
+<pre><code>PATCH /v1/substances/zno-20nm-pegylated-2026-04-25
+Content-Type: application/merge-patch+json
+If-Match: "v1:f3a2e1c"
+
+{ "regulatoryFlags": ["EU-REACH-NANO","FDA-NTF-CONSIDERED","KR-MFDS-PHARMA","JP-PMDA"] }</code></pre>
+
+<h2>5.4 Measurement upload</h2>
+
+<pre><code>POST /v1/substances/zno-20nm-pegylated/measurements
+Content-Type: multipart/form-data
+Idempotency-Key: meas-zno-tem-2026-04-25-batch1
+
+[ JSON-LD measurement record + Allotrope ADF binary ]</code></pre>
+
+<p>Response includes the Iceberg snapshot id committed for the substance's evidence-table.</p>
+
+<h2>5.5 FAIR discovery — STAC + OGC API — Records</h2>
+
+<pre><code>POST /v1/search
+{
+  "collections":["substances"],
+  "query":{
+    "iso:NanoObjectType":{"eq":"iso:Nanoparticle"},
+    "physicalProperties.primarySize.value":{"lt":50},
+    "regulatoryFlags":{"contains":"EU-REACH-NANO"}
+  },
+  "limit":50
+}</code></pre>
+
+<h2>5.6 Errors — RFC 9457 problem+json</h2>
+
+<pre><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":"https://errors.wia-nano.org/missing-uncertainty",
+  "title":"Measurement lacks uncertainty",
+  "status":422,
+  "detail":"physicalProperties.primarySize MUST report uncertaintyK1 and n",
+  "instance":"/v1/substances/zno-20nm-pegylated/measurements/meas-001",
+  "violations":[{"path":"primarySize.uncertaintyK1"},{"path":"primarySize.n"}]
+}</code></pre>
+
+<h2>5.7 Dossier twin generation</h2>
+
+<pre><code>POST /v1/dossiers
+Content-Type: application/json
+
+{
+  "substanceUri":"urn:wia:nano:substance:zno-20nm-pegylated-2026-04-25",
+  "targets":[
+    {"regulator":"FDA","format":"SPL","section":"3.2.S.3.1"},
+    {"regulator":"EMA","format":"eCTD","module":"3.2.S.3.1"},
+    {"regulator":"PMDA","format":"QbD"},
+    {"regulator":"MFDS","format":"KFDA-supplementary"},
+    {"regulator":"ECHA","format":"REACH-IUCLID-NanoForm"}
+  ]
+}</code></pre>
+
+<p>Response provides one signed bundle per regulator, ready to upload through the regulator's portal of record (FDA ESG, EMA EUSA, PMDA Gateway, MFDS Online, ECHA REACH-IT).</p>
+
+<h2>5.8 Worker exposure ingest</h2>
+
+<pre><code>POST /v1/exposure
+Content-Type: application/json
+
+{
+  "facility":{"glnr":"8801234500037","name":"KIMS pilot line A"},
+  "shift":{"start":"2026-04-25T09:00:00+09:00","end":"2026-04-25T17:00:00+09:00"},
+  "substance":"urn:wia:nano:substance:zno-20nm-pegylated-2026-04-25",
+  "samples":[{"method":"NIOSH-NMAM-7300","concentration":{"value":0.014,"unit":"mg/m3"},
+              "duration":{"value":480,"unit":"min"}}],
+  "compliance":{"rel":{"value":0.05,"unit":"mg/m3","source":"NIOSH-RNSH"},
+                "twa8h":0.014,"compliant":true}
+}</code></pre>
+
+<h2>5.9 Webhooks (CloudEvents 1.0 + RFC 9421)</h2>
+
+<pre><code>POST /webhooks/your-endpoint
+Content-Type: application/cloudevents+json
+Signature-Input: sig1=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="wia-nano";alg="ed25519"
+
+{"specversion":"1.0","id":"evt-7b9","source":"https://api.wia-nano.org/v1",
+ "type":"org.wia.nano.dossier.published","subject":"zno-20nm-pegylated/FDA-SPL",
+ "time":"2026-04-25T12:00:00Z","datacontenttype":"application/json",
+ "data":{"submissionRef":"FDA-SPL-2026-04-25-zn-001"}}</code></pre>
+
+<h2>5.10 Rate limits and SLOs</h2>
+
+<table>
+<tr><th>Tier</th><th>Sustained TPS</th><th>Evidence MB/s</th><th>P95 search</th><th>P95 measurement upload</th></tr>
+<tr><td>Standard</td><td>50</td><td>20</td><td>120 ms</td><td>800 ms</td></tr>
+<tr><td>Premium</td><td>500</td><td>200</td><td>80 ms</td><td>500 ms</td></tr>
+<tr><td>Enterprise</td><td>5 000</td><td>2 000</td><td>50 ms</td><td>250 ms</td></tr>
+</table>
+
+<h2>Chapter Summary</h2>
+
+<div class="info-box">
+<h3>Key Takeaways</h3>
+<ol>
+<li>REST + AsyncAPI must surface identical state; conformance compares result hashes.</li>
+<li>Idempotency-Key + ETag/If-Match make retries and concurrent updates safe.</li>
+<li>RFC 9457 problem+json is the contract for validation failures.</li>
+<li>Dossier twin endpoints render one record into FDA SPL, EMA, PMDA, MFDS, and ECHA REACH-IUCLID.</li>
+<li>Worker-exposure ingest and dossier twin live in the same API — no parallel data plumbing.</li>
+</ol>
+</div>
+
+<h2>Review Questions</h2>
+<ol>
+<li>Why is OAuth 2.1 + DPoP preferred over plain bearer tokens?</li>
+<li>What does Idempotency-Key promise on a measurement upload?</li>
+<li>Which problem+json field is the stable client-side switch key?</li>
+<li>List five regulator dossier formats the twin endpoint can produce.</li>
+<li>Where does worker-exposure data live relative to substance data?</li>
+</ol>
+
+<h2>Looking Ahead</h2>
+<p>Chapter 6 turns to the data plane — instrument capture via OPC UA + MQTT 5, Allotrope ADF stream, lab-bench OPC interfaces, and the security baseline.</p>
+
+</body>
+</html>

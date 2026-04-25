@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>5장 — Phase 2 API 인터페이스</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#6366F1;margin-top:2em}
+h1{border-bottom:3px solid #6366F1;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #6366F1}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#6366F1}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#a5b4fc}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>5장: Phase 2 — API 인터페이스</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> HTTP 와이어 — OpenAPI 3.1 + AsyncAPI 3.0, OAuth 2.1 + DPoP, idempotent CRUD, FAIR 검색, 자료 트윈(FDA SPL / EMA / PMDA / MFDS / REACH), conformance 동치성.
+</div>
+
+<h2>5.1 두 façade, 같은 진실</h2>
+
+<ol>
+<li><strong>REST + OpenAPI 3.1</strong> — <code>/substances</code>, <code>/measurements</code>, <code>/dossiers</code>, <code>/exposure</code> 동기 CRUD.</li>
+<li><strong>AsyncAPI 3.0</strong> — 기기 캡처·자료 상태·규제 제출 이벤트 스트림.</li>
+</ol>
+
+<p><code>https://conformance.wia-nano.org</code>가 두 façade를 동시 실행해 결과 해시 비교.</p>
+
+<h2>5.2 인증 메뉴</h2>
+
+<table>
+<tr><th>방식</th><th>RFC</th><th>활용</th></tr>
+<tr><td>OAuth 2.1 + PKCE + DPoP</td><td>RFC 9700, 9449</td><td>연구자 포털, 규제기관 데스크</td></tr>
+<tr><td>mTLS X.509</td><td>RFC 8446</td><td>기기 게이트웨이, GLP 실험실</td></tr>
+<tr><td>HTTP Message Signature</td><td>RFC 9421</td><td>cross‑org 증거 송출, 자료 제출</td></tr>
+</table>
+
+<h2>5.3 시료 CRUD + Idempotency‑Key</h2>
+
+<pre><code>curl -X POST https://api.wia-nano.org/v1/substances \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/ld+json" \
+  -H "Idempotency-Key: register-zno-20nm-pegylated-2026-04-25" \
+  -d @substance.jsonld</code></pre>
+
+<p>응답 <code>201 Created</code> + <code>Location</code> + 강한 <code>ETag</code>. 동시성 안전 patch:</p>
+
+<pre><code>PATCH /v1/substances/zno-20nm-pegylated-2026-04-25
+Content-Type: application/merge-patch+json
+If-Match: "v1:f3a2e1c"
+
+{ "regulatoryFlags":["EU-REACH-NANO","FDA-NTF-CONSIDERED","KR-MFDS-PHARMA","JP-PMDA"] }</code></pre>
+
+<h2>5.4 측정 업로드</h2>
+
+<pre><code>POST /v1/substances/zno-20nm-pegylated/measurements
+Content-Type: multipart/form-data
+Idempotency-Key: meas-zno-tem-2026-04-25-batch1
+
+[ JSON-LD 측정 레코드 + Allotrope ADF 바이너리 ]</code></pre>
+
+<p>응답에 시료의 증거 테이블 Iceberg 스냅샷 ID가 동봉.</p>
+
+<h2>5.5 FAIR 검색 — STAC + OGC API Records</h2>
+
+<pre><code>POST /v1/search
+{
+  "collections":["substances"],
+  "query":{
+    "iso:NanoObjectType":{"eq":"iso:Nanoparticle"},
+    "physicalProperties.primarySize.value":{"lt":50},
+    "regulatoryFlags":{"contains":"EU-REACH-NANO"}
+  },
+  "limit":50
+}</code></pre>
+
+<h2>5.6 오류 — RFC 9457 problem+json</h2>
+
+<pre><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":"https://errors.wia-nano.org/missing-uncertainty",
+  "title":"Measurement lacks uncertainty",
+  "status":422,
+  "detail":"physicalProperties.primarySize MUST report uncertaintyK1 and n",
+  "instance":"/v1/substances/zno-20nm-pegylated/measurements/meas-001",
+  "violations":[{"path":"primarySize.uncertaintyK1"},{"path":"primarySize.n"}]
+}</code></pre>
+
+<h2>5.7 자료 트윈 생성</h2>
+
+<pre><code>POST /v1/dossiers
+Content-Type: application/json
+
+{
+  "substanceUri":"urn:wia:nano:substance:zno-20nm-pegylated-2026-04-25",
+  "targets":[
+    {"regulator":"FDA","format":"SPL","section":"3.2.S.3.1"},
+    {"regulator":"EMA","format":"eCTD","module":"3.2.S.3.1"},
+    {"regulator":"PMDA","format":"QbD"},
+    {"regulator":"MFDS","format":"KFDA-supplementary"},
+    {"regulator":"ECHA","format":"REACH-IUCLID-NanoForm"}
+  ]
+}</code></pre>
+
+<p>응답으로 규제기관별 서명 번들이 들어 있어 FDA ESG, EMA EUSA, PMDA Gateway, MFDS Online, ECHA REACH‑IT에 곧장 업로드 가능.</p>
+
+<h2>5.8 작업자 노출 ingest</h2>
+
+<pre><code>POST /v1/exposure
+Content-Type: application/json
+
+{
+  "facility":{"glnr":"8801234500037","name":"KIMS pilot line A"},
+  "shift":{"start":"2026-04-25T09:00:00+09:00","end":"2026-04-25T17:00:00+09:00"},
+  "substance":"urn:wia:nano:substance:zno-20nm-pegylated-2026-04-25",
+  "samples":[{"method":"NIOSH-NMAM-7300","concentration":{"value":0.014,"unit":"mg/m3"},
+              "duration":{"value":480,"unit":"min"}}],
+  "compliance":{"rel":{"value":0.05,"unit":"mg/m3","source":"NIOSH-RNSH"},
+                "twa8h":0.014,"compliant":true}
+}</code></pre>
+
+<h2>5.9 웹훅 (CloudEvents 1.0 + RFC 9421)</h2>
+
+<pre><code>POST /webhooks/your-endpoint
+Content-Type: application/cloudevents+json
+Signature-Input: sig1=("@method" "@target-uri" "content-digest");
+                 created=1714032000;keyid="wia-nano";alg="ed25519"
+
+{"specversion":"1.0","id":"evt-7b9","source":"https://api.wia-nano.org/v1",
+ "type":"org.wia.nano.dossier.published","subject":"zno-20nm-pegylated/FDA-SPL",
+ "time":"2026-04-25T12:00:00Z","datacontenttype":"application/json",
+ "data":{"submissionRef":"FDA-SPL-2026-04-25-zn-001"}}</code></pre>
+
+<h2>5.10 SLO와 한도</h2>
+
+<table>
+<tr><th>등급</th><th>지속 TPS</th><th>증거 MB/s</th><th>P95 검색</th><th>P95 측정 업로드</th></tr>
+<tr><td>Standard</td><td>50</td><td>20</td><td>120 ms</td><td>800 ms</td></tr>
+<tr><td>Premium</td><td>500</td><td>200</td><td>80 ms</td><td>500 ms</td></tr>
+<tr><td>Enterprise</td><td>5 000</td><td>2 000</td><td>50 ms</td><td>250 ms</td></tr>
+</table>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>REST + AsyncAPI 두 façade는 동치성을 가져야 conformance 통과.</li>
+<li>Idempotency‑Key + ETag/If‑Match로 재시도·동시 갱신 안전.</li>
+<li>RFC 9457 problem+json이 검증 실패의 안정 식별 키.</li>
+<li>자료 트윈이 한 레코드를 FDA SPL·EMA·PMDA·MFDS·ECHA REACH‑IUCLID로 렌더.</li>
+<li>작업자 노출과 시료 데이터는 같은 API에 산다 — 별도 배관 금지.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>왜 단순 bearer보다 OAuth 2.1 + DPoP를 권장하는가?</li>
+<li>측정 업로드 시 Idempotency‑Key의 보장은?</li>
+<li>problem+json의 클라이언트 측 안정 스위치 키는?</li>
+<li>자료 트윈 엔드포인트가 만들어내는 다섯 규제 형식은?</li>
+<li>작업자 노출 데이터는 시료 데이터와 어떻게 같은 위치에 저장되는가?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>6장은 데이터 평면 — OPC UA + MQTT 5 + Allotrope ADF 스트림 + SiLA 2 + 보안 베이스라인.</p>
+
+</body>
+</html>

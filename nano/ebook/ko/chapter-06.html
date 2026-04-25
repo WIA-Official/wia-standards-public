@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>6장 — Phase 3 프로토콜</title>
+<style>
+body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#6366F1;margin-top:2em}
+h1{border-bottom:3px solid #6366F1;padding-bottom:10px}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #6366F1}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#6366F1}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#a5b4fc}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid #334155;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<h1>6장: Phase 3 — 프로토콜</h1>
+
+<div class="info-box">
+<strong>장 개요:</strong> 데이터 평면 — OPC UA Companion Specs(기기), MQTT 5(브로커), Allotrope ADF 스트림, SiLA 2 디바이스 제어, TLS 1.3 + OAuth 2.1 + DPoP, 실패 모드.
+</div>
+
+<h2>6.1 OPC UA — 기기 단위 캡처</h2>
+
+<p>OPC UA(IEC 62541) Companion Spec이 벤더별 API를 균일한 정보 모델로 변환한다. 본 표준이 요구하는 Companion Spec:</p>
+
+<table>
+<tr><th>기기 분류</th><th>OPC UA spec</th><th>정렬 벤더</th></tr>
+<tr><td>전자 현미경(TEM/SEM)</td><td>OPC UA Microscopy CS(개발 중) + Lab Devices CS</td><td>FEI/Thermo, Hitachi, JEOL</td></tr>
+<tr><td>실험실 디바이스(DLS, BET, Zetasizer)</td><td>OPC UA Lab Devices CS (LADS)</td><td>Malvern, Anton Paar, Micromeritics</td></tr>
+<tr><td>질량 분석기</td><td>OPC UA Lab Devices CS</td><td>Thermo, Agilent, Bruker</td></tr>
+<tr><td>SiLA 2 디바이스</td><td>SiLA 2 + OPC UA 브리지</td><td>Tecan, Hamilton 등 자동화</td></tr>
+</table>
+
+<h2>6.2 MQTT 5 브로커 — cross‑lab fan‑out</h2>
+
+<p>OPC UA 캡처를 MQTT 5 메시지로 변환해 cross‑org 분배. 토픽:</p>
+
+<pre><code>nano/{tenant}/lab/{labId}/instrument/{instrumentId}/measurement
+nano/{tenant}/lab/{labId}/instrument/{instrumentId}/state
+nano/{tenant}/lab/{labId}/exposure/sampler/{samplerId}/reading
+nano/{tenant}/substance/{substanceId}/event</code></pre>
+
+<p>QoS: 0(하트비트), 1(routine 측정), 2(규제 제출용 증거·노출 한도 알람).</p>
+
+<h2>6.3 Allotrope ADF 바이너리 스트림</h2>
+
+<p>ADF(HDF5)가 raw 기기 출력(이미지 스택, 상관도, 스펙트럼)을 통제 어휘로 감싼다. 두 모드:</p>
+
+<ol>
+<li><strong>Static</strong> — 측정 종료 후 완성된 ADF 업로드.</li>
+<li><strong>Stream</strong> — 장시간 캡처(예: 24시간 세포 흡수 라이브 이미징) 도중 청크 단위 ADF 객체 commit, 부분 결과 조회 가능.</li>
+</ol>
+
+<h2>6.4 센서 프레임 예시 (CBOR + MQTT 5)</h2>
+
+<pre><code>{
+  "instrumentId":"DLS-MAL-Zetasizer-Ultra-A",
+  "ts":"2026-04-25T14:31:08+09:00",
+  "data":{
+    "intensityHydrodynamicDiameterNm": [22.4, 22.7, 22.5, 22.8, 22.6],
+    "polydispersityIndex": 0.082,
+    "zAverageNm": 22.6
+  },
+  "context":{
+    "substance":"urn:wia:nano:substance:zno-20nm-pegylated-2026-04-25",
+    "operator":"did:wia:operator:kims-pl-a-04",
+    "method":"iso:22412","cellTempC":25.0
+  }
+}</code></pre>
+
+<h2>6.5 SiLA 2 디바이스 제어</h2>
+
+<p>SiLA 2(gRPC + Protocol Buffers)는 액체 핸들러·로봇 플랫폼·마이크로리액터의 사실상 표준 제어 프로토콜. 본 표준은 SiLA‑2‑to‑OPC‑UA 브리지를 제공해 데이터·제어가 같은 권한 표면을 공유한다.</p>
+
+<h2>6.6 NIOSH 사양 노출 샘플러</h2>
+
+<p>NIOSH NMAM 7300(원소 나노입자 ICP‑MS)·NMAM 0500(중량) 샘플러가 MQTT 5로 시계열 송출. 표준은 ISO/IEC 17025 인정 실험실의 교정 인증서를 W3C VC로 첨부 요구.</p>
+
+<h2>6.7 변조 불가능 앵커링</h2>
+
+<p>증거의 모든 Iceberg 스냅샷과 자료 publish가 머클 루트로 WIA Chain PoA + BSC 메인넷에 앵커링. 외부 감사인은 비공개 제형 화학을 보지 않고도 무결성을 검증.</p>
+
+<h2>6.8 보안 베이스라인</h2>
+
+<table>
+<tr><th>계층</th><th>요구</th></tr>
+<tr><td>전송</td><td>TLS 1.3 + TLS_AES_256_GCM_SHA384 / TLS_CHACHA20_POLY1305_SHA256</td></tr>
+<tr><td>토큰</td><td>EdDSA JWT, audience 제한, 30분 수명, DPoP 바인딩</td></tr>
+<tr><td>응용 서명</td><td>Ed25519 + RFC 8785 정규화</td></tr>
+<tr><td>키 관리</td><td>HSM 보관, RFC 7517 JWKS 회전, 90일 최대</td></tr>
+<tr><td>OPC UA 인증</td><td>실험실 내부 CA 발급 X.509, end‑to‑end</td></tr>
+</table>
+
+<h2>6.9 프로토콜 계층 실패 모드</h2>
+
+<ul>
+<li><strong>기기 캡처 중 오프라인:</strong> 로컬 ADF 버퍼를 원본 ts로 리플레이.</li>
+<li><strong>시계 드리프트:</strong> 6시간 NTP, <code>|now − ts| &gt; 600 s</code> 거절.</li>
+<li><strong>지연 재발행:</strong> <code>cache/...</code> 토픽 접두사 사용.</li>
+<li><strong>스키마 깨짐:</strong> 시료 subject는 <code>BACKWARD_TRANSITIVE</code>, 기관 간 이벤트는 <code>FULL_TRANSITIVE</code>.</li>
+<li><strong>리플레이 공격:</strong> RFC 9421 nonce + JTI 캐시.</li>
+</ul>
+
+<h2>장 요약</h2>
+
+<div class="info-box">
+<h3>핵심 요점</h3>
+<ol>
+<li>OPC UA Companion Specs가 벤더 무관 통일 출력을 만든다.</li>
+<li>MQTT 5 fan‑out이 자체 미들웨어 없이 실험실 간 측정을 옮긴다.</li>
+<li>Allotrope ADF는 static + stream 두 모드로 raw 증거를 보존.</li>
+<li>SiLA 2 + OPC UA 브리지로 데이터·제어가 같은 권한 표면.</li>
+<li>WIA Chain PoA + BSC 머클 앵커링이 IP 노출 없는 외부 감사 가능성.</li>
+</ol>
+</div>
+
+<h2>복습 문제</h2>
+<ol>
+<li>DLS·BET를 다루는 OPC UA Companion Spec은?</li>
+<li>왜 노출 한도 알람은 QoS 2인가?</li>
+<li>ADF 스트림이 지원하는 두 모드는?</li>
+<li>OPC UA와 브리지로 페어링되는 실험실 제어 프로토콜은?</li>
+<li>서명 전 정규화에 사용되는 RFC는?</li>
+</ol>
+
+<h2>다음 장 예고</h2>
+<p>7장은 통합 — FDA / EMA / PMDA / MFDS / REACH 자료 + EPCIS 2.0 공급망 + ESG + DNA 데이터 저장 + 공개 검증.</p>
+
+</body>
+</html>
