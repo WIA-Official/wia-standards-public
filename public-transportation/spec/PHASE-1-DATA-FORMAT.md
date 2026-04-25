@@ -403,3 +403,67 @@ All entities MUST include:
 弘益人間 - Benefit All Humanity
 
 © 2025 WIA / SmileStory Inc.
+
+---
+
+## Annex A — Conformance Tier Matrix
+
+WIA conformance for WIA-SOC-007 (Public Transportation) is evaluated across three tiers, applied to schedules · stop inventory · real-time arrivals · accessibility metadata:
+
+| Tier | Scope | Mandatory artifacts | Audit cadence |
+|------|-------|--------------------|----------------|
+| Tier 1 — Self-declared | Internal use, pilot deployments | OpenAPI 3.0 contract, JSON Schema validation report, security threat model | None (annual self-review recommended) |
+| Tier 2 — Third-party assessed | External partners, B2B integrations | Tier 1 artifacts + signed third-party assessor report against this PHASE | Every 24 months |
+| Tier 3 — Accredited | Public-facing or regulated deployments | Tier 2 artifacts + WIA accreditation, ISO/IEC 17065:2012 conformity assessment, evidence retention ≥ 7 years | Every 12 months |
+
+Implementations MUST clearly disclose their conformance tier in the OpenAPI `info.x-wia-tier` extension and on any public certification page. Tier downgrade events MUST be reported to the WIA registry within 30 days.
+
+---
+
+## Annex B — Cross-Walk to International Standards
+
+The PHASE specification reuses or normatively references the following published standards. Implementers SHOULD review the listed standards alongside this PHASE document; where a conflict exists, the more specific WIA requirement governs unless explicitly superseded by a binding national regulation.
+
+- GTFS Reference — General Transit Feed Specification (open spec, MobilityData)
+- GTFS-Realtime — protobuf schema for live updates (open spec, MobilityData)
+- ISO 17572-3:2018 — Intelligent transport systems — Location referencing
+- ISO/IEC 18004:2015 — QR Code (ticket encoding reference)
+- IETF RFC 7946 — GeoJSON (stop and shape geometry)
+
+This cross-walk is informative only. WIA does not republish the referenced documents; readers MUST obtain authoritative copies from the issuing body. Cross-walk entries are reviewed at every minor version of this PHASE.
+
+---
+
+## Annex C — Reference Implementations and Test Vectors
+
+### C.1 Reference Implementations
+
+WIA does not require implementers to use a particular library, but maintains pointers to the canonical reference implementation directories under the WIA-Official GitHub organization:
+
+- `wia-standards/standards/public-transportation/api/` — TypeScript SDK skeleton
+- `wia-standards/standards/public-transportation/cli/` — POSIX shell client demonstrating the request/response contract
+- `wia-standards/standards/public-transportation/simulator/` — interactive browser-based simulator for the PHASE protocol
+
+Each reference artifact ships with an MIT license and is intended as a starting point, not as a production-grade implementation.
+
+### C.2 Test Vectors
+
+A normative set of request/response pairs covering the schemas defined in this PHASE is published alongside this document. Implementations claiming Tier 2 or Tier 3 conformance MUST pass every published test vector in both serialization (request) and deserialization (response) directions, and MUST publish a signed report identifying which vectors were exercised.
+
+Test vectors are versioned independently of the PHASE document; refer to the `test-vectors/` directory for the active version.
+
+---
+
+## Annex D — Open Questions and Future Work
+
+This PHASE document captures the consensus position at v1.0. The following items are tracked for future minor or major revisions:
+
+1. **Schema versioning policy** — formal MUST/SHOULD rules for backward-compatible vs. breaking changes between minor releases.
+2. **Privacy-preserving aggregation** — guidance on differential privacy and secure aggregation patterns for telemetry channels, without prescribing a specific algorithm.
+3. **Multilingual error catalogs** — localization strategy for the standard error codes defined in this PHASE.
+4. **Long-term retention** — alignment with sectoral retention regulations across jurisdictions.
+5. **Sustainability disclosure** — optional fields for energy and emissions reporting tied to operations covered by this PHASE.
+
+Items in this annex are non-normative. Comments and proposals are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+---

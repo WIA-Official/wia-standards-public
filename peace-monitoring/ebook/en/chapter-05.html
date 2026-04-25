@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Chapter 5: Phase 2 API | WIA-UNI-015</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.8}.header{background:rgba(30,41,59,0.8);border-bottom:1px solid rgba(59,130,246,0.2);padding:1.5rem 2rem;position:sticky;top:0;z-index:100}.header-content{max-width:900px;margin:0 auto;display:flex;justify-content:space-between}.logo{font-size:1.25rem;font-weight:800;color:#3b82f6;text-decoration:none}.nav-links{display:flex;gap:1rem}.nav-links a{color:#94a3b8;text-decoration:none;padding:0.5rem 1rem;border:1px solid rgba(59,130,246,0.2);border-radius:8px}.container{max-width:900px;margin:0 auto;padding:3rem 2rem}h1{font-size:3rem;font-weight:800;margin-bottom:1rem;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}h2{font-size:2rem;font-weight:700;color:#3b82f6;margin:3rem 0 1.5rem;padding-bottom:0.5rem;border-bottom:2px solid rgba(59,130,246,0.2)}h3{font-size:1.5rem;font-weight:600;color:#3b82f6;margin:2rem 0 1rem}p{color:#cbd5e1;margin-bottom:1.5rem;font-size:1.125rem}ul{margin:1rem 0 1.5rem 2rem;color:#cbd5e1}li{margin-bottom:0.75rem}table{width:100%;border-collapse:collapse;margin:2rem 0}th,td{padding:1rem;border:1px solid #334155;text-align:left}th{background:rgba(59,130,246,0.1);color:#3b82f6;font-weight:600}pre{background:#1e293b;padding:1.5rem;border-radius:8px;overflow-x:auto;color:#e2e8f0;margin:1.5rem 0}.highlight{background:rgba(59,130,246,0.1);border-left:4px solid #3b82f6;padding:1.5rem;border-radius:8px;margin:2rem 0}.summary-box{background:rgba(16,185,129,0.1);border-left:4px solid #10b981;padding:1.5rem;border-radius:8px;margin:2rem 0}.chapter-nav{display:flex;justify-content:space-between;margin-top:4rem;padding-top:2rem;border-top:1px solid rgba(59,130,246,0.2)}.chapter-nav a{color:#3b82f6;text-decoration:none;padding:0.75rem 1.5rem;border:1px solid #3b82f6;border-radius:8px}</style></head><body><header class="header"><div class="header-content"><a href="index.html" class="logo">☮️ WIA-UNI-015</a><div class="nav-links"><a href="index.html">← Contents</a><a href="../../index.html">Home</a></div></div></header><div class="container"><h1>Chapter 5: Phase 2: API Interface Design</h1><div class="highlight"><p><strong>In this chapter:</strong> Comprehensive coverage of the RESTful API design, WebSocket streaming, authentication mechanisms, SDK implementation, and best practices for peace monitoring API integration.</p></div><h2>5.1 RESTful API Architecture</h2><p>WIA-UNI-015 Phase 2 defines a comprehensive RESTful API that enables programmatic access to peace monitoring data. The API follows modern best practices including versioning, pagination, filtering, and standardized error handling.</p><h3>Base URLs</h3><table><tr><th>Environment</th><th>URL</th><th>Purpose</th></tr><tr><td>Production</td><td>https://api.wia.org/peace-monitoring/v1</td><td>Live operations</td></tr><tr><td>Staging</td><td>https://staging-api.wia.org/peace-monitoring/v1</td><td>Pre-production testing</td></tr><tr><td>Development</td><td>https://dev-api.wia.org/peace-monitoring/v1</td><td>Development and integration</td></tr></table><h2>5.2 Authentication & Authorization</h2><p>All API requests require Bearer token authentication. Tokens are obtained through OAuth 2.0 client credentials flow.</p><h3>Token Acquisition</h3><pre>POST /auth/token
+Content-Type: application/json
+
+{
+  "organizationId": "UN_COMMAND",
+  "credentials": {
+    "clientId": "unc-observer-001",
+    "clientSecret": "***",
+    "scope": ["read:monitoring", "write:reports"]
+  }
+}</pre><h3>Authorization Scopes</h3><table><tr><th>Scope</th><th>Permissions</th><th>Typical Users</th></tr><tr><td>read:monitoring</td><td>View monitoring events and sensor data</td><td>Observers, analysts</td></tr><tr><td>write:reports</td><td>Submit monitoring events and reports</td><td>Authorized reporters</td></tr><tr><td>write:inventory</td><td>Submit arms inventory declarations</td><td>Government officials</td></tr><tr><td>create:verification</td><td>Request verification inspections</td><td>IAEA, observers</td></tr><tr><td>admin:all</td><td>Full access including system configuration</td><td>System administrators</td></tr></table><h2>5.3 Core API Endpoints</h2><h3>Monitoring Events API</h3><p><strong>GET /monitoring/events</strong> - Retrieve monitoring events with filtering</p><pre>GET /monitoring/events?zone=DMZ&type=DMZ_SENSOR&startDate=2025-12-20T00:00:00Z&limit=20
+Authorization: Bearer {token}
+
+Response:
+{
+  "data": [
+    {
+      "monitoringId": "MON-1735140600",
+      "timestamp": "2025-12-25T14:30:00Z",
+      "type": "DMZ_SENSOR",
+      "zone": "DMZ",
+      "coordinates": {"latitude": 38.123456, "longitude": 127.234567},
+      "description": "Seismic activity detected",
+      "status": "ACTIVE",
+      "verificationRequired": true,
+      "reportedBy": "DMZ-SENSOR-1234",
+      "confidenceLevel": 0.95
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 157,
+    "totalPages": 8
+  }
+}</pre><h3>Query Parameters</h3><table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr><tr><td>type</td><td>MonitoringType</td><td>Filter by event type</td></tr><tr><td>zone</td><td>GeographicZone</td><td>Filter by geographic zone</td></tr><tr><td>startDate</td><td>ISO 8601</td><td>Events after this timestamp</td></tr><tr><td>endDate</td><td>ISO 8601</td><td>Events before this timestamp</td></tr><tr><td>status</td><td>EventStatus</td><td>Filter by status</td></tr><tr><td>page</td><td>number</td><td>Page number (default: 1)</td></tr><tr><td>limit</td><td>number</td><td>Results per page (default: 50, max: 200)</td></tr></table><h2>5.4 WebSocket Real-Time Streaming</h2><p>For time-sensitive data, WIA-UNI-015 provides WebSocket connections for real-time event streaming.</p><h3>Connection Example</h3><pre>const ws = new WebSocket('wss://api.wia.org/peace-monitoring/v1/stream');
+
+ws.onopen = () => {
+  // Authenticate
+  ws.send(JSON.stringify({
+    type: 'authenticate',
+    token: 'Bearer {token}'
+  }));
+
+  // Subscribe to channels
+  ws.send(JSON.stringify({
+    type: 'subscribe',
+    channels: ['dmz-sensors', 'critical-alerts']
+  }));
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  console.log('Alert:', message);
+};</pre><h3>Available Channels</h3><ul><li><strong>dmz-sensors:</strong> Real-time sensor readings from DMZ monitoring network</li><li><strong>critical-alerts:</strong> High-priority incidents requiring immediate attention</li><li><strong>troop-movements:</strong> Declared military movements</li><li><strong>verification-updates:</strong> Status changes on verification requests</li><li><strong>cbm-activities:</strong> Confidence-building measure notifications</li></ul><h2>5.5 Rate Limiting & Quotas</h2><p>API requests are rate-limited based on tier to ensure fair usage and system stability.</p><table><tr><th>Tier</th><th>Rate Limit</th><th>Eligibility</th></tr><tr><td>Observer</td><td>1,000 req/hour</td><td>Accredited observers, NGOs</td></tr><tr><td>Reporter</td><td>5,000 req/hour</td><td>Authorized data submitters</td></tr><tr><td>Verifier</td><td>10,000 req/hour</td><td>IAEA, UN agencies</td></tr><tr><td>International Org</td><td>Unlimited</td><td>UN Command, major stakeholders</td></tr></table><h3>Rate Limit Headers</h3><pre>X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 2025-12-25T16:00:00Z</pre><h2>5.6 Error Handling</h2><h3>Standard Error Response</h3><pre>{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or expired authentication token",
+    "timestamp": "2025-12-25T15:00:00Z",
+    "requestId": "req-abc123",
+    "details": {
+      "reason": "TOKEN_EXPIRED",
+      "expiryTime": "2025-12-25T14:00:00Z"
+    }
+  }
+}</pre><h3>Error Codes</h3><table><tr><th>Code</th><th>HTTP</th><th>Description</th><th>Resolution</th></tr><tr><td>UNAUTHORIZED</td><td>401</td><td>Invalid authentication</td><td>Obtain new token</td></tr><tr><td>FORBIDDEN</td><td>403</td><td>Insufficient permissions</td><td>Request appropriate scopes</td></tr><tr><td>NOT_FOUND</td><td>404</td><td>Resource not found</td><td>Verify ID is correct</td></tr><tr><td>VALIDATION_ERROR</td><td>400</td><td>Invalid request data</td><td>Check schema compliance</td></tr><tr><td>RATE_LIMIT_EXCEEDED</td><td>429</td><td>Too many requests</td><td>Wait until reset time</td></tr><tr><td>INTERNAL_ERROR</td><td>500</td><td>Server error</td><td>Retry with exponential backoff</td></tr></table><h2>5.7 SDK Implementation</h2><p>Official SDKs abstract API complexity and provide idiomatic interfaces for each language.</p><h3>TypeScript/JavaScript SDK Example</h3><pre>import { PeaceMonitoringClient } from '@wia/peace-monitoring';
+
+const client = new PeaceMonitoringClient({
+  apiKey: process.env.WIA_API_KEY,
+  environment: 'production'
+});
+
+// Get monitoring events
+const events = await client.getMonitoringEvents({
+  zone: 'DMZ',
+  startDate: '2025-12-20T00:00:00Z',
+  limit: 50
+});
+
+// Submit sensor data
+await client.submitSensorData({
+  sensorId: 'DMZ-SEISMIC-045',
+  sensorType: 'SEISMIC',
+  location: {latitude: 38.234, longitude: 127.345},
+  readings: [{
+    value: 2.4,
+    unit: 'RICHTER',
+    threshold: 2.0
+  }]
+});
+
+// Real-time streaming
+client.connectStream({
+  channels: ['critical-alerts'],
+  onMessage: (msg) => console.log('Alert:', msg),
+  onError: (err) => console.error(err)
+});</pre><h2>5.8 Verification Request API</h2><p>Special workflow for creating and tracking on-site inspection requests.</p><pre>POST /verification/requests
+
+{
+  "requestType": "ARMS_INSPECTION",
+  "targetLocation": {
+    "name": "Yongbyon Nuclear Complex",
+    "coordinates": {
+      "latitude": 39.802222,
+      "longitude": 125.754722
+    },
+    "zone": "NORTH_KOREA"
+  },
+  "proposedDate": "2026-01-15T10:00:00Z",
+  "requestedBy": "IAEA",
+  "respondent": "NORTH_KOREA",
+  "observersRequired": ["UNC", "NNSC"],
+  "justification": "Routine IAEA safeguards inspection",
+  "priority": "HIGH"
+}
+
+Response:
+{
+  "requestId": "VRQ-1735141800",
+  "status": "SUBMITTED",
+  "expectedResponseBy": "2025-12-28T15:00:00Z",
+  "trackingUrl": "/verification/requests/VRQ-1735141800"
+}</pre><div class="summary-box"><h3 style="color:#10b981;margin-bottom:1rem">Chapter Summary</h3><p><strong>Key Takeaways:</strong></p><ul style="margin-top:0.5rem"><li>RESTful API provides programmatic access to all peace monitoring data</li><li>OAuth 2.0 authentication with scope-based authorization</li><li>WebSocket streaming for real-time alerts and critical events</li><li>Rate limiting ensures fair usage and system stability</li><li>Official SDKs available in TypeScript, Python, Java, and Go</li><li>Standardized error handling facilitates debugging</li><li>Special workflows for verification requests and compliance tracking</li></ul></div></div></body></html>

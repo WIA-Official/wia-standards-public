@@ -1364,13 +1364,10 @@ interface ThermalSimulationResponse {
 
 1. Janek, J., & Zeier, W. G. (2016). "A solid future for battery development". *Nature Energy*, 1(9), 16141.
 
-2. 선행 연구. "High-power all-solid-state batteries using sulfide superionic conductors". *Nature Energy*, 1(4), 16030.
 
 3. Manthiram, A., Yu, X., & Wang, S. (2017). "Lithium battery chemistries enabled by solid-state electrolytes". *Nature Reviews Materials*, 2(4), 16103.
 
-4. 선행 연구. "All-solid-state lithium-ion and lithium metal batteries". *Journal of Power Sources*, 382, 160-175.
 
-5. 선행 연구. "New horizons for inorganic solid state ion conductors". *Energy & Environmental Science*, 11(8), 1945-1976.
 
 ### 12.2 Technical Standards
 

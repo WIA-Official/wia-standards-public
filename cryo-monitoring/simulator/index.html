@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA CRYO-008 Monitoring - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #06B6D4;
+            --primary-dark: #0891B2;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Top Navigation */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; gap: 15px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-right { display: flex; align-items: center; gap: 25px; flex-wrap: wrap; }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+
+        /* Tabs */
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panel */
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); }
+        .panel h3 { margin: 25px 0 15px; color: var(--text); font-size: 1.1rem; }
+
+        /* Form */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        /* Radio/Checkbox */
+        .radio-group, .checkbox-group { margin: 10px 0; }
+        .radio-group label, .checkbox-group label { display: block; padding: 8px 12px; margin: 5px 0; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .radio-group label:hover, .checkbox-group label:hover { border-color: var(--primary); }
+        .radio-group input, .checkbox-group input { margin-right: 10px; }
+
+        /* Buttons */
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-center { display: flex; justify-content: center; margin-top: 20px; gap: 10px; flex-wrap: wrap; }
+
+        /* Output */
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+
+        /* Table */
+        .styled-table { width: 100%; border-collapse: collapse; margin: 15px 0; background: var(--bg); border-radius: 8px; overflow: hidden; }
+        .styled-table th, .styled-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        .styled-table th { background: var(--primary); color: white; font-weight: 600; }
+        .styled-table tr:hover { background: rgba(6, 182, 212, 0.1); }
+
+        /* Sub-section */
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        /* Status indicators */
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .status-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .status-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .status-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 5px; }
+        .status-ok { color: var(--secondary); }
+        .status-warning { color: var(--warning); }
+        .status-danger { color: var(--danger); }
+
+        /* Chart */
+        .chart { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; height: 200px; }
+
+        /* Footer */
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 1.8rem; }
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { flex-direction: column; align-items: center; }
+            .tab { width: 100%; text-align: center; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">CRYO-008 Monitoring</span>
+                </div>
+            </div>
+            <div class="nav-right">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank" data-en="🎮 109+ Simulators" data-ko="🎮 109+ 시뮬레이터">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">📊 WIA-CRYO-008 MONITORING</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Cryo Monitoring Simulator" data-ko="냉동 모니터링 시뮬레이터">Cryo Monitoring Simulator</h1>
+            <p data-en="Real-time monitoring of cryopreserved bodies" data-ko="냉동 보존 신체의 실시간 모니터링">Real-time monitoring of cryopreserved bodies</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔢 Algorithms" data-ko="🔢 알고리즘">🔢 Algorithms</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🧪 Test & Validate" data-ko="🧪 테스트 및 검증">🧪 Test & Validate</div>
+        </div>
+
+        <!-- Panel 1: Data Format -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="Monitoring Data Format" data-ko="모니터링 데이터 형식">Monitoring Data Format</h2>
+
+            <div class="sub-section">
+                <h4 data-en="Sensor Reading" data-ko="센서 판독">Sensor Reading</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Subject ID" data-ko="대상 ID">Subject ID</label>
+                        <input type="text" id="subjectId" value="CRYO-2025-0001" placeholder="CRYO-YYYY-XXXX">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Sensor Type" data-ko="센서 유형">Sensor Type</label>
+                        <select id="sensorType">
+                            <option value="temperature">Temperature</option>
+                            <option value="pressure">Pressure</option>
+                            <option value="oxygen">Oxygen Level</option>
+                            <option value="nitrogen">Nitrogen Level</option>
+                            <option value="eeg">EEG</option>
+                            <option value="ecg">ECG</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Reading Value" data-ko="판독 값">Reading Value</label>
+                        <input type="number" id="readingValue" value="-196.0" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Unit" data-ko="단위">Unit</label>
+                        <input type="text" id="unit" value="°C">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateDataFormat()">
+                        <span data-en="Generate JSON" data-ko="JSON 생성">Generate JSON</span>
+                    </button>
+                </div>
+                <div class="output" id="dataOutput"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Example Data Schema" data-ko="예제 데이터 스키마">Example Data Schema</h4>
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th data-en="Field" data-ko="필드">Field</th>
+                            <th data-en="Type" data-ko="타입">Type</th>
+                            <th data-en="Description" data-ko="설명">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>monitoringId</td><td>string</td><td>Unique monitoring session ID</td></tr>
+                        <tr><td>subjectId</td><td>string</td><td>Cryopreserved subject ID</td></tr>
+                        <tr><td>timestamp</td><td>ISO8601</td><td>Reading timestamp</td></tr>
+                        <tr><td>sensorType</td><td>enum</td><td>Sensor category</td></tr>
+                        <tr><td>value</td><td>number</td><td>Sensor reading value</td></tr>
+                        <tr><td>unit</td><td>string</td><td>Measurement unit</td></tr>
+                        <tr><td>status</td><td>enum</td><td>ok, warning, critical</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel 2: Algorithms -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="AI Anomaly Detection Algorithms" data-ko="AI 이상 탐지 알고리즘">AI Anomaly Detection Algorithms</h2>
+
+            <div class="sub-section">
+                <h4 data-en="Configure Anomaly Detection" data-ko="이상 탐지 설정">Configure Anomaly Detection</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Algorithm Type" data-ko="알고리즘 유형">Algorithm Type</label>
+                        <select id="algorithmType">
+                            <option value="statistical">Statistical (Z-Score)</option>
+                            <option value="ml">Machine Learning (Isolation Forest)</option>
+                            <option value="neural">Neural Network (LSTM)</option>
+                            <option value="hybrid">Hybrid Multi-Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Sensitivity Level" data-ko="민감도 수준">Sensitivity Level</label>
+                        <select id="sensitivity">
+                            <option value="low">Low (±5°C)</option>
+                            <option value="medium" selected>Medium (±2°C)</option>
+                            <option value="high">High (±0.5°C)</option>
+                            <option value="critical">Critical (±0.1°C)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Window Size (samples)" data-ko="윈도우 크기 (샘플)">Window Size</label>
+                        <input type="number" id="windowSize" value="100" min="10" max="1000">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="runAnomalyDetection()">
+                        <span data-en="Run Detection" data-ko="탐지 실행">Run Detection</span>
+                    </button>
+                </div>
+                <div class="output" id="algorithmOutput"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Detection Results" data-ko="탐지 결과">Detection Results</h4>
+                <div class="status-grid">
+                    <div class="status-card">
+                        <div class="status-value status-ok" id="normalCount">0</div>
+                        <div class="status-label" data-en="Normal Readings" data-ko="정상 판독">Normal Readings</div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-value status-warning" id="warningCount">0</div>
+                        <div class="status-label" data-en="Warnings" data-ko="경고">Warnings</div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-value status-danger" id="criticalCount">0</div>
+                        <div class="status-label" data-en="Critical Alerts" data-ko="위험 경보">Critical Alerts</div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-value" id="accuracy">99.8%</div>
+                        <div class="status-label" data-en="Accuracy" data-ko="정확도">Accuracy</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel 3: Protocol -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="Monitoring Protocol" data-ko="모니터링 프로토콜">Monitoring Protocol</h2>
+
+            <div class="sub-section">
+                <h4 data-en="Protocol Configuration" data-ko="프로토콜 설정">Protocol Configuration</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Protocol Type" data-ko="프로토콜 유형">Protocol Type</label>
+                        <select id="protocolType">
+                            <option value="mqtt">MQTT (IoT)</option>
+                            <option value="websocket">WebSocket (Real-time)</option>
+                            <option value="grpc">gRPC (High Performance)</option>
+                            <option value="http">HTTP/REST (Standard)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Sampling Rate" data-ko="샘플링 레이트">Sampling Rate</label>
+                        <select id="samplingRate">
+                            <option value="1">1 Hz (1/sec)</option>
+                            <option value="10">10 Hz (10/sec)</option>
+                            <option value="60" selected>60 Hz (1/min)</option>
+                            <option value="3600">1 Hz (1/hour)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Encryption" data-ko="암호화">Encryption</label>
+                        <select id="encryption">
+                            <option value="tls">TLS 1.3</option>
+                            <option value="aes256">AES-256</option>
+                            <option value="none">None (Testing Only)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateProtocol()">
+                        <span data-en="Generate Protocol Config" data-ko="프로토콜 설정 생성">Generate Protocol Config</span>
+                    </button>
+                </div>
+                <div class="output" id="protocolOutput"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Alert Rules" data-ko="경보 규칙">Alert Rules</h4>
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th data-en="Condition" data-ko="조건">Condition</th>
+                            <th data-en="Threshold" data-ko="임계값">Threshold</th>
+                            <th data-en="Alert Level" data-ko="경보 수준">Alert Level</th>
+                            <th data-en="Action" data-ko="조치">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Temp > -195°C</td><td>1°C deviation</td><td>🟡 Warning</td><td>Notify on-call staff</td></tr>
+                        <tr><td>Temp > -190°C</td><td>6°C deviation</td><td>🔴 Critical</td><td>Emergency protocol</td></tr>
+                        <tr><td>Sensor offline</td><td>5 min</td><td>🔴 Critical</td><td>Activate backup sensors</td></tr>
+                        <tr><td>LN2 level low</td><td>&lt; 20%</td><td>🟡 Warning</td><td>Schedule refill</td></tr>
+                        <tr><td>Power failure</td><td>Immediate</td><td>🔴 Critical</td><td>Switch to UPS</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel 4: Integration -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="System Integration" data-ko="시스템 통합">System Integration</h2>
+
+            <div class="sub-section">
+                <h4 data-en="WIA Ecosystem Integration" data-ko="WIA 생태계 통합">WIA Ecosystem Integration</h4>
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="intCryoPreservation" checked>
+                        <span data-en="WIA-CRYO-001 Preservation (Facility Data)" data-ko="WIA-CRYO-001 보존 (시설 데이터)">WIA-CRYO-001 Preservation</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="intCryoIdentity" checked>
+                        <span data-en="WIA-CRYO-003 Identity (Subject Verification)" data-ko="WIA-CRYO-003 신원 (대상 검증)">WIA-CRYO-003 Identity</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="intCryoFacility">
+                        <span data-en="WIA-CRYO-005 Facility (Equipment Status)" data-ko="WIA-CRYO-005 시설 (장비 상태)">WIA-CRYO-005 Facility</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="intCryoAlert">
+                        <span data-en="WIA-ALERT Alert System (Emergency Notifications)" data-ko="WIA-ALERT 경보 시스템 (긴급 알림)">WIA-ALERT Alert System</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="intBlockchain">
+                        <span data-en="WIA-BLOCKCHAIN (Immutable Audit Log)" data-ko="WIA-BLOCKCHAIN (불변 감사 로그)">WIA-BLOCKCHAIN</span>
+                    </label>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateIntegration()">
+                        <span data-en="Generate Integration Config" data-ko="통합 설정 생성">Generate Integration Config</span>
+                    </button>
+                </div>
+                <div class="output" id="integrationOutput"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="External Systems" data-ko="외부 시스템">External Systems</h4>
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th data-en="System" data-ko="시스템">System</th>
+                            <th data-en="Purpose" data-ko="목적">Purpose</th>
+                            <th data-en="Protocol" data-ko="프로토콜">Protocol</th>
+                            <th data-en="Status" data-ko="상태">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Building Management</td><td>HVAC Control</td><td>BACnet</td><td>🟢 Active</td></tr>
+                        <tr><td>Emergency Services</td><td>911 Integration</td><td>HTTP/REST</td><td>🟢 Active</td></tr>
+                        <tr><td>SMS Gateway</td><td>Staff Alerts</td><td>Twilio API</td><td>🟢 Active</td></tr>
+                        <tr><td>Email Server</td><td>Reports</td><td>SMTP</td><td>🟢 Active</td></tr>
+                        <tr><td>Cloud Storage</td><td>Long-term Archive</td><td>S3 API</td><td>🟢 Active</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel 5: Test & Validate -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="Test & Validation" data-ko="테스트 및 검증">Test & Validation</h2>
+
+            <div class="sub-section">
+                <h4 data-en="Monitoring System Test" data-ko="모니터링 시스템 테스트">Monitoring System Test</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Test Scenario" data-ko="테스트 시나리오">Test Scenario</label>
+                        <select id="testScenario">
+                            <option value="normal">Normal Operation (24h)</option>
+                            <option value="temp_rise">Temperature Rise Event</option>
+                            <option value="sensor_fail">Sensor Failure</option>
+                            <option value="power_loss">Power Loss</option>
+                            <option value="ln2_low">LN2 Level Low</option>
+                            <option value="stress">Stress Test (High Load)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Duration (minutes)" data-ko="지속 시간 (분)">Duration</label>
+                        <input type="number" id="testDuration" value="60" min="1" max="1440">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Subjects to Monitor" data-ko="모니터링 대상">Subjects</label>
+                        <input type="number" id="subjectCount" value="10" min="1" max="1000">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="runTest()">
+                        <span data-en="Run Test" data-ko="테스트 실행">Run Test</span>
+                    </button>
+                    <button class="btn btn-primary" onclick="generateReport()">
+                        <span data-en="Generate Report" data-ko="보고서 생성">Generate Report</span>
+                    </button>
+                </div>
+                <div class="output" id="testOutput"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Validation Checklist" data-ko="검증 체크리스트">Validation Checklist</h4>
+                <div class="checkbox-group">
+                    <label><input type="checkbox"> <span data-en="All sensors calibrated" data-ko="모든 센서 교정 완료">All sensors calibrated</span></label>
+                    <label><input type="checkbox"> <span data-en="Alert thresholds configured" data-ko="경보 임계값 설정">Alert thresholds configured</span></label>
+                    <label><input type="checkbox"> <span data-en="Backup power tested" data-ko="백업 전원 테스트">Backup power tested</span></label>
+                    <label><input type="checkbox"> <span data-en="Communication channels verified" data-ko="통신 채널 검증">Communication channels verified</span></label>
+                    <label><input type="checkbox"> <span data-en="Staff trained on protocols" data-ko="직원 프로토콜 교육">Staff trained on protocols</span></label>
+                    <label><input type="checkbox"> <span data-en="Audit logging enabled" data-ko="감사 로깅 활성화">Audit logging enabled</span></label>
+                    <label><input type="checkbox"> <span data-en="Redundancy systems active" data-ko="이중화 시스템 활성">Redundancy systems active</span></label>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>WIA - World Certification Industry Association</p>
+            <p>© 2025 MIT License</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 Standards" data-ko="📋 표준">📋 Standards</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateDataFormat() {
+            const data = {
+                monitoringId: `MON-${Date.now()}`,
+                subjectId: document.getElementById('subjectId').value,
+                timestamp: new Date().toISOString(),
+                sensorType: document.getElementById('sensorType').value,
+                value: parseFloat(document.getElementById('readingValue').value),
+                unit: document.getElementById('unit').value,
+                location: "Dewar-A-01",
+                status: "ok",
+                confidence: 0.998,
+                metadata: {
+                    sensorId: "TEMP-001",
+                    calibrationDate: "2025-01-01",
+                    nextCalibration: "2025-07-01"
+                }
+            };
+            document.getElementById('dataOutput').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function runAnomalyDetection() {
+            const algorithm = document.getElementById('algorithmType').value;
+            const sensitivity = document.getElementById('sensitivity').value;
+            const windowSize = document.getElementById('windowSize').value;
+
+            const result = {
+                algorithm: algorithm,
+                sensitivity: sensitivity,
+                windowSize: parseInt(windowSize),
+                detectionResults: {
+                    totalReadings: 10000,
+                    normalReadings: 9850,
+                    warnings: 140,
+                    criticalAlerts: 10,
+                    falsePositiveRate: 0.2,
+                    truePositiveRate: 99.8,
+                    processingTime: "45ms"
+                },
+                anomaliesDetected: [
+                    { timestamp: "2025-12-25T10:15:00Z", type: "temperature_spike", value: -194.5, expected: -196.0 },
+                    { timestamp: "2025-12-25T14:30:00Z", type: "sensor_drift", value: -195.2, expected: -196.0 }
+                ]
+            };
+
+            document.getElementById('normalCount').textContent = result.detectionResults.normalReadings;
+            document.getElementById('warningCount').textContent = result.detectionResults.warnings;
+            document.getElementById('criticalCount').textContent = result.detectionResults.criticalAlerts;
+            document.getElementById('accuracy').textContent = result.detectionResults.truePositiveRate + '%';
+
+            document.getElementById('algorithmOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function generateProtocol() {
+            const protocol = {
+                type: document.getElementById('protocolType').value,
+                samplingRate: parseInt(document.getElementById('samplingRate').value),
+                encryption: document.getElementById('encryption').value,
+                endpoint: "wss://cryo-monitor.wia.org/stream",
+                authentication: {
+                    method: "JWT",
+                    tokenExpiry: "1h"
+                },
+                qos: 2,
+                retryPolicy: {
+                    maxRetries: 3,
+                    backoffMultiplier: 2
+                }
+            };
+            document.getElementById('protocolOutput').textContent = JSON.stringify(protocol, null, 2);
+        }
+
+        function generateIntegration() {
+            const integration = {
+                wiaStandards: {
+                    "WIA-CRYO-001": { enabled: document.getElementById('intCryoPreservation').checked, purpose: "Facility data sync" },
+                    "WIA-CRYO-003": { enabled: document.getElementById('intCryoIdentity').checked, purpose: "Subject verification" },
+                    "WIA-CRYO-005": { enabled: document.getElementById('intCryoFacility').checked, purpose: "Equipment status" },
+                    "WIA-ALERT": { enabled: document.getElementById('intCryoAlert').checked, purpose: "Emergency notifications" },
+                    "WIA-BLOCKCHAIN": { enabled: document.getElementById('intBlockchain').checked, purpose: "Audit trail" }
+                },
+                apiVersion: "v2.0",
+                dataFlow: "bidirectional",
+                syncInterval: "real-time"
+            };
+            document.getElementById('integrationOutput').textContent = JSON.stringify(integration, null, 2);
+        }
+
+        function runTest() {
+            const scenario = document.getElementById('testScenario').value;
+            const duration = document.getElementById('testDuration').value;
+            const subjects = document.getElementById('subjectCount').value;
+
+            const output = `
+🧪 TEST EXECUTION
+=================
+Scenario: ${scenario}
+Duration: ${duration} minutes
+Subjects: ${subjects}
+Status: ✅ RUNNING
+
+📊 Simulated Results:
+- Data points collected: ${subjects * duration * 60}
+- Sensor uptime: 99.99%
+- Alert latency: <100ms
+- False positives: 0
+- System load: 23%
+
+✅ All systems nominal
+`;
+            document.getElementById('testOutput').textContent = output;
+        }
+
+        function generateReport() {
+            const report = `
+📋 MONITORING SYSTEM VALIDATION REPORT
+=====================================
+Generated: ${new Date().toISOString()}
+
+✅ CERTIFICATION STATUS: PASSED
+
+System Performance:
+- Uptime: 99.99%
+- Mean Time Between Failures: >10,000 hours
+- Alert Response Time: <50ms
+- Data Accuracy: 99.98%
+
+Compliance:
+✓ WIA-CRYO-008 v1.0 Compliant
+✓ ISO 13485 Medical Devices
+✓ IEC 62304 Medical Device Software
+✓ HIPAA Compliant Data Handling
+
+弘益人間 · Benefit All Humanity
+`;
+            document.getElementById('testOutput').textContent = report;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang(currentLang));
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

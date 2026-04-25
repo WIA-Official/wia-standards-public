@@ -480,3 +480,38 @@ jsonschema.validate(data, schema)  # Raises exception if invalid
 License: MIT
 
 弘益人間 · Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+
+- **Sensor populations** — Mixed RTD (IEC 60751 Class A) and Type-T
+  thermocouple (IEC 60584-1) installations are common in walk-in cryo
+  rooms; implementers SHOULD record the sensor class on every sensor
+  descriptor so that downstream calibration tooling can compute the
+  correct uncertainty envelope per the relevant tolerance class.
+- **LN2 dewar telemetry** — Capacitive level probes typically sample at
+  0.1 Hz; ultrasonic probes at 1 Hz. The wire formats accommodate both
+  without changing the schema.
+- **Operator workstations** — Operators typically supervise 4–16
+  rooms simultaneously; UI implementations SHOULD subscribe to the
+  facility-level alert topic class only and lazy-fetch reading streams
+  on demand. Eager-fetch designs raise broker load disproportionately
+  to the operator's attention budget.
+- **Audit retention** — A 7-year retention window is sufficient to
+  satisfy ISO 20387:2018 audit expectations in most jurisdictions; some
+  regulators require longer retention for human-derived materials, in
+  which case the deployment policy MUST extend the retention window
+  rather than the standard's defaults.
+- **Time synchronization** — Sub-second alert deadlines depend on
+  synchronized clocks. NTPv4 with stratum-2 servers is sufficient for
+  the deadlines defined in PHASE 3 §4; PTP is recommended for sites
+  that require deterministic interlocks.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA Cryo-Monitoring conformance.
+
+
