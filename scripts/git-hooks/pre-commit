@@ -1,0 +1,55 @@
+#!/bin/bash
+# WIA Citation Veracity pre-commit hook (public repo variant)
+# Per CITATION-POLICY.md v1.0 §4.2
+
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+R1='et al\.? \(?(199[0-9]|20[0-2][0-9])'
+R2='(KAIST|서울대|연세|성모|아산|삼성|대한|ETRI|KIRO|KITECH|분당|국립)[^<]*\(20[12][0-9]\)'
+R3='(20[12][0-9])[ ]+(ICRA|IROS|NeurIPS|CVPR|ICCV|ECCV|CHI|UIST|SIGGRAPH|TBME|TNSRE|JNE|NEJM|JAMA|Lancet)\b'
+R4='(RCT|무작위 대조 시험|이중 맹검)[^<]*n=[0-9]+'
+EXCL='/(api|cli|hardware|integrations|mobile-app|models|prompts|schemas|node_modules)/'
+
+staged=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -vE "^(README\.md|LICENSE|CLAUDE-CODE-GUIDE\.md|\.github/|\.git/|docs/)" || true)
+
+[ -z "$staged" ] && exit 0
+
+declare -A seen=()
+declare -a target_paths=()
+while IFS= read -r f; do
+    std="${f%%/*}"
+    [ "$std" = "$f" ] && continue
+    [ -n "${seen[$std]:-}" ] && continue
+    seen[$std]=1
+    target_paths+=("$REPO_ROOT/$std")
+done <<< "$staged"
+
+[ ${#target_paths[@]} -eq 0 ] && exit 0
+
+echo "🔍 WIA citation veracity gate — checking ${#target_paths[@]} standard(s)..."
+
+fail=0
+for path in "${target_paths[@]}"; do
+    [ -d "$path" ] || continue
+    name=$(basename "$path")
+    hits=$(grep -rEn "$R1|$R2|$R3|$R4" "$path" 2>/dev/null | grep -vE "$EXCL" || true)
+    if [ -n "$hits" ]; then
+        cnt=$(echo "$hits" | wc -l)
+        echo "❌ $name — $cnt forbidden citation(s):"
+        echo "$hits" | sed 's/^/    /' | head -10
+        [ $cnt -gt 10 ] && echo "    … (+$((cnt-10)) more)"
+        echo ""
+        fail=$((fail+cnt))
+    fi
+done
+
+if [ $fail -eq 0 ]; then
+    echo "✅ PASS"
+    exit 0
+fi
+
+echo "🛑 Commit BLOCKED: $fail forbidden pattern(s). Apply CITATION-POLICY.md §2.2 downgrade."
+exit 1

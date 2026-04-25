@@ -6,6 +6,15 @@
 
 ---
 
+## 📜 Citation & Veracity Policy
+
+All WIA standards are publishing-grade documents. Every citation, statistic, institution name, law name, and standard number must originate from a verifiable primary source. Fabricated academic citations and unverifiable clinical numbers are forbidden in body/spec text.
+
+→ **Full policy**: [`docs/CITATION-POLICY.md`](docs/CITATION-POLICY.md)
+→ Pre-commit hook + GitHub Actions automatically enforce the policy.
+
+---
+
 ## 📚 Published Standards (29)
 
 ### 🔬 Future Technology Standards (10)

@@ -1,0 +1,74 @@
+name: WIA Citation Veracity Gate (public)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  citation-gate:
+    name: Citation Policy Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Identify changed standards
+        id: changed
+        run: |
+          set -uo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            range="$base..$head"
+          else
+            range="${{ github.event.before }}..${{ github.sha }}"
+          fi
+          changed=$(git diff --name-only "$range" 2>/dev/null \
+            | grep -vE "^(README\.md|LICENSE|CLAUDE-CODE-GUIDE\.md|\.github/|docs/)" \
+            | awk -F/ 'NF>1 {print $1}' | sort -u | tr '\n' ' ')
+          echo "stds=$changed" >> "$GITHUB_OUTPUT"
+          echo "Changed standards: $changed"
+
+      - name: Run citation veracity check
+        if: steps.changed.outputs.stds != ''
+        env:
+          STDS: ${{ steps.changed.outputs.stds }}
+        run: |
+          set -uo pipefail
+          R1='et al\.? \(?(199[0-9]|20[0-2][0-9])'
+          R2='(KAIST|서울대|연세|성모|아산|삼성|대한|ETRI|KIRO|KITECH|분당|국립)[^<]*\(20[12][0-9]\)'
+          R3='(20[12][0-9])[ ]+(ICRA|IROS|NeurIPS|CVPR|ICCV|ECCV|CHI|UIST|SIGGRAPH|TBME|TNSRE|JNE|NEJM|JAMA|Lancet)\b'
+          R4='(RCT|무작위 대조 시험|이중 맹검)[^<]*n=[0-9]+'
+          EXCL='/(api|cli|hardware|integrations|mobile-app|models|prompts|schemas|node_modules)/'
+
+          fail=0
+          for s in $STDS; do
+            [ -d "$s" ] || continue
+            hits=$(grep -rEn "$R1|$R2|$R3|$R4" "$s" 2>/dev/null | grep -vE "$EXCL" || true)
+            if [ -n "$hits" ]; then
+              cnt=$(echo "$hits" | wc -l)
+              echo "::error title=Citation policy violation::$s — $cnt forbidden citation(s)"
+              echo "$hits" | head -10 | sed 's/^/  /'
+              fail=$((fail+cnt))
+            fi
+          done
+
+          if [ $fail -gt 0 ]; then
+            echo "❌ Citation veracity gate FAILED ($fail violations)"
+            echo "Per docs/CITATION-POLICY.md §2.3 these patterns are forbidden."
+            exit 1
+          fi
+
+          echo "✅ Citation veracity gate passed for: $STDS"
+
+      - name: No standards changed
+        if: steps.changed.outputs.stds == ''
+        run: echo "No standard subdirs changed — skipping citation gate."
