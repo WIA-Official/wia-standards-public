@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 5 — Orchestration · WIA-DATA-004</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#06B6D4;margin-top:2em}
+h1{border-bottom:3px solid #06B6D4;padding-bottom:10px}
+.standard-badge{display:inline-block;background:#1e293b;color:#06B6D4;padding:6px 12px;border-radius:6px;margin-bottom:10px}
+.subtitle{color:#94a3b8;margin:6px 0}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #06B6D4}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#06B6D4}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#22d3ee}
+.navigation{display:flex;justify-content:space-between;margin-top:60px;border-top:1px solid #334155;padding-top:20px}
+.nav-button{color:#60a5fa;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+<div class="standard-badge">WIA-DATA-004 v1.1</div>
+<h1>Chapter 5: Orchestration</h1>
+<p class="subtitle">Turning isolated jobs into a reliable graph</p>
+</header>
+
+<main>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> What orchestration solves, an Airflow 2.10 worked DAG, Dagster's software-defined assets, Prefect 3 deployments, scheduling strategy, dependency management, retries, resource governance, and the testing patterns that catch DAG breakage before merge.
+</div>
+
+<h2>5.1 What is orchestration?</h2>
+
+<p>Orchestration is the difference between &quot;a script ran&quot; and &quot;the data is ready&quot;. The orchestrator owns: scheduling, dependency graph, retries, alerting, observability, parameterisation, and the boundaries between teams. Pick one orchestrator and let everything else plug in.</p>
+
+<h2>5.2 Apache Airflow 2.10</h2>
+
+<p>Still the de-facto open-source default. The TaskFlow API removes the boilerplate that made early Airflow miserable.</p>
+
+<pre><code>from airflow.decorators import dag, task
+from datetime import datetime, timedelta
+
+@dag(
+    schedule="0 2 * * *",
+    start_date=datetime(2026, 4, 25),
+    catchup=False,
+    max_active_runs=1,
+    default_args={
+        "retries": 3,
+        "retry_delay": timedelta(minutes=5),
+        "execution_timeout": timedelta(hours=1),
+        "owner": "data-platform",
+    },
+    tags=["sales","daily","gold"],
+)
+def daily_sales_pipeline():
+
+    @task
+    def extract():
+        return run_extractor("orders", since="{{ prev_data_interval_end_success }}")
+
+    @task
+    def transform(payload):
+        return run_dbt_select(payload, models=["+orders_clean"])
+
+    @task
+    def load(snapshot_id):
+        return iceberg_merge(target="lake.orders", snapshot=snapshot_id)
+
+    @task
+    def quality(snapshot_id):
+        return run_soda("qg_orders", snapshot=snapshot_id)
+
+    quality(load(transform(extract())))
+
+daily_sales_pipeline()
+</code></pre>
+
+<h2>5.3 Dagster &amp; Prefect (alternatives)</h2>
+
+<p><strong>Dagster 1.10</strong> models the data graph as software-defined assets — assets, not tasks, are first-class. Asset checks and partition definitions are declarative.</p>
+
+<pre><code>import dagster as dg
+
+@dg.asset
+def orders_raw(context: dg.AssetExecutionContext): ...
+
+@dg.asset(deps=[orders_raw])
+def orders_clean(orders_raw): ...
+
+@dg.asset_check(asset=orders_clean)
+def orders_quality():
+    return dg.AssetCheckResult(passed=row_count() &gt; 0)
+</code></pre>
+
+<p><strong>Prefect 3</strong> takes a Python-first, dynamic-DAG approach with deployments. Useful when DAGs are determined at run time (e.g., per-customer pipelines).</p>
+
+<h2>5.4 Scheduling strategy</h2>
+
+<table>
+<tr><th>Trigger</th><th>When</th></tr>
+<tr><td>Cron / interval</td><td>Predictable cadence (daily, hourly)</td></tr>
+<tr><td>Sensor / event-driven</td><td>Wait for upstream signal (S3 file arrives, Kafka offset advances)</td></tr>
+<tr><td>SLA-driven</td><td>Run as late as possible while still meeting downstream SLA</td></tr>
+<tr><td>Manual</td><td>Backfills, hot-fixes, exploratory loads</td></tr>
+</table>
+
+<h2>5.5 Dependency management</h2>
+
+<p>Two anti-patterns produce 80% of orchestration incidents:</p>
+
+<ul>
+<li><strong>Implicit deps</strong> — task B reads a table that task A wrote, but the DAG does not encode the link. The orchestrator has no idea they belong together.</li>
+<li><strong>Cross-DAG hard deps</strong> — DAG A waits for DAG B's exact run. Use <code>ExternalTaskSensor</code> sparingly; prefer Datasets / asset materialisations.</li>
+</ul>
+
+<p>Airflow Datasets (2.4+) and Dagster's auto-materialise close this loop:</p>
+
+<pre><code>from airflow.datasets import Dataset
+
+orders_dataset = Dataset("iceberg://polaris-prod/lake.orders")
+
+@dag(schedule=[orders_dataset])              # consumer
+def daily_revenue():
+    ...
+</code></pre>
+
+<h2>5.6 Retries</h2>
+
+<ul>
+<li><strong>Per-task retries</strong> — 3 with exponential back-off, default.</li>
+<li><strong>On-failure callbacks</strong> — page on-call only on the final failure, not every retry.</li>
+<li><strong>Non-retryable exceptions</strong> — schema break, validation failure, auth — fail fast, do not retry.</li>
+<li><strong>Backfills</strong> — separate trigger from the live schedule; resource-isolated workers.</li>
+</ul>
+
+<h2>5.7 Comparing orchestrators</h2>
+
+<table>
+<tr><th>Feature</th><th>Airflow 2.10</th><th>Dagster 1.10</th><th>Prefect 3</th></tr>
+<tr><td>First-class concept</td><td>Task</td><td>Asset</td><td>Flow</td></tr>
+<tr><td>Schema/asset awareness</td><td>Datasets</td><td>Built-in</td><td>Result types</td></tr>
+<tr><td>Local dev experience</td><td>Heavy (Docker)</td><td>Excellent</td><td>Excellent</td></tr>
+<tr><td>Static DAG required</td><td>Yes</td><td>Yes</td><td>No (dynamic)</td></tr>
+<tr><td>OpenLineage native</td><td>Provider</td><td>Built-in</td><td>Plugin</td></tr>
+</table>
+
+<h2>5.8 Advanced DAG patterns</h2>
+
+<ul>
+<li><strong>Dynamic task mapping</strong> — fan out one task per partition / customer.</li>
+<li><strong>Trigger rules</strong> — <code>all_done</code>, <code>one_failed</code>, <code>none_skipped</code>.</li>
+<li><strong>Task groups</strong> — collapse complex sub-graphs in the UI without losing dependencies.</li>
+<li><strong>Pool concurrency</strong> — cap how many tasks may hit a shared resource (Postgres, partner API).</li>
+</ul>
+
+<h2>5.9 Resource management</h2>
+
+<pre><code>@task(
+    pool="snowflake_pool",                   # cap concurrent warehouse usage
+    pool_slots=2,                            # this task takes 2 of N slots
+    queue="heavy",                           # dispatch to a dedicated worker queue
+    executor_config={"KubernetesExecutor": {"request_memory":"8Gi","limit_memory":"16Gi"}},
+)
+def transform(payload): ...
+</code></pre>
+
+<h2>5.10 Testing DAGs</h2>
+
+<ul>
+<li><strong>DAG load test</strong> — pytest that imports every DAG file; catches syntax errors before merge.</li>
+<li><strong>Cycle detection</strong> — Airflow refuses to load cycles; CI step verifies.</li>
+<li><strong>Render test</strong> — render Jinja templates against frozen context.</li>
+<li><strong>Backfill simulation</strong> — run the DAG against a staging warehouse before promoting to prod.</li>
+</ul>
+
+<pre><code>def test_daily_sales_dag():
+    from airflow.models import DagBag
+    bag = DagBag(include_examples=False)
+    dag = bag.get_dag("daily_sales_pipeline")
+    assert dag is not None
+    assert {t.task_id for t in dag.tasks} == {"extract","transform","load","quality"}
+    assert not bag.import_errors
+</code></pre>
+
+<h2>5.11 Failure recovery</h2>
+
+<ol>
+<li><strong>Idempotent steps</strong> mean a single task retry is safe.</li>
+<li><strong>Atomic publishes</strong> (Iceberg snapshot commit) mean a partial run leaves no half-state.</li>
+<li><strong>Quarantine quality failures</strong> instead of failing the whole DAG when blockers are non-blocking.</li>
+<li><strong>Compaction job</strong> separately; do not couple curation latency to maintenance windows.</li>
+</ol>
+
+<h2>5.12 Looking ahead</h2>
+<p>Chapter 6 turns to observability — what to log, what to count, what to alert on, and how OpenLineage stitches it all together.</p>
+
+</main>
+
+<div class="navigation">
+<a href="chapter-04.html" class="nav-button">← Previous</a>
+<a href="chapter-06.html" class="nav-button">Next: Chapter 6 →</a>
+</div>
+</body>
+</html>

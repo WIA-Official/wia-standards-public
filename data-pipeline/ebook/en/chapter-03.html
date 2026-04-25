@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 3 — Data Transformation · WIA-DATA-004</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#06B6D4;margin-top:2em}
+h1{border-bottom:3px solid #06B6D4;padding-bottom:10px}
+.standard-badge{display:inline-block;background:#1e293b;color:#06B6D4;padding:6px 12px;border-radius:6px;margin-bottom:10px}
+.subtitle{color:#94a3b8;margin:6px 0}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #06B6D4}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#06B6D4}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#22d3ee}
+.navigation{display:flex;justify-content:space-between;margin-top:60px;border-top:1px solid #334155;padding-top:20px}
+.nav-button{color:#60a5fa;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+<div class="standard-badge">WIA-DATA-004 v1.1</div>
+<h1>Chapter 3: Data Transformation</h1>
+<p class="subtitle">Cleaning, normalising, deriving — without losing the audit trail</p>
+</header>
+
+<main>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> Five transformation types, when SQL beats code, when code beats SQL, a real-world windowed-aggregate example, the eight transformation patterns the standard recognises, and how to test transformations the way developers test functions.
+</div>
+
+<h2>3.1 What is transformation?</h2>
+
+<p>Transformation is the work between bronze (raw, faithful, unfiltered) and gold (curated, conformed, ready to consume). Every change must be reversible (the bronze layer is immutable) and traceable (column-level lineage to the input).</p>
+
+<h2>3.2 Five transformation types</h2>
+
+<table>
+<tr><th>Type</th><th>Example</th><th>Tool fit</th></tr>
+<tr><td>Cleaning</td><td>Trim whitespace, parse dates, drop NULLs</td><td>SQL (dbt)</td></tr>
+<tr><td>Normalisation</td><td>Currency to USD cents, units to SI, casing rules</td><td>SQL or Python</td></tr>
+<tr><td>Enrichment</td><td>Join with reference data, third-party feed, geocoder, ML model</td><td>SQL + UDF; Python for ML</td></tr>
+<tr><td>Aggregation</td><td>Hourly revenue, rolling P95 latency, churn cohorts</td><td>SQL with window functions</td></tr>
+<tr><td>Filter</td><td>Remove fraudulent rows, isolate one cohort, GDPR redaction</td><td>SQL</td></tr>
+</table>
+
+<h2>3.3 SQL-based transforms (dbt &amp; SQLMesh)</h2>
+
+<p>SQL is the lingua franca of warehouses. dbt 1.9 + SQLMesh 0.115 add testing, documentation, and lineage on top.</p>
+
+<pre><code>-- models/marts/finance/daily_revenue.sql
+{{ config(materialized='incremental', unique_key='date',
+          on_schema_change='sync_all_columns',
+          incremental_strategy='merge') }}
+
+SELECT
+  DATE(created_at)               AS date,
+  currency,
+  SUM(total_cents) / 100.0       AS revenue,
+  COUNT(*)                       AS orders,
+  COUNT(DISTINCT user_id)        AS unique_buyers
+FROM {{ ref('orders_clean') }}
+{% if is_incremental() %}
+WHERE DATE(created_at) &gt;= (SELECT MAX(date) - INTERVAL '3 days' FROM {{ this }})
+{% endif %}
+GROUP BY 1, 2</code></pre>
+
+<p>dbt tests (in <code>schema.yml</code>) attach to the model:</p>
+
+<pre><code>models:
+  - name: daily_revenue
+    columns:
+      - name: date
+        tests: [not_null, unique]
+      - name: revenue
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "&gt;= 0"</code></pre>
+
+<h2>3.4 Code-based transforms (PySpark, Polars, DuckDB)</h2>
+
+<p>Use code when SQL would be unreadable, when you need a non-trivial UDF (ML inference, geospatial), or when latency demands a streaming engine.</p>
+
+<pre><code>import polars as pl
+
+orders = pl.scan_parquet("s3://bronze/orders/dt=*/part-*.parquet")
+
+clean = (
+    orders
+    .filter(pl.col("total_cents") &gt;= 0)
+    .with_columns([
+        pl.col("created_at").dt.truncate("1d").alias("date"),
+        pl.col("currency").str.to_uppercase(),
+    ])
+    .group_by(["date","currency"])
+    .agg([
+        (pl.col("total_cents").sum() / 100).alias("revenue"),
+        pl.col("order_id").n_unique().alias("orders"),
+    ])
+)
+
+clean.sink_parquet("s3://silver/daily_revenue/", compression="zstd")</code></pre>
+
+<h2>3.5 Complex example — sliding 7-day cohort retention</h2>
+
+<pre><code>WITH user_first_seen AS (
+  SELECT user_id, MIN(DATE(created_at)) AS cohort_date
+  FROM {{ ref('orders_clean') }}
+  GROUP BY user_id
+),
+activity AS (
+  SELECT user_id, DATE(created_at) AS active_date
+  FROM {{ ref('orders_clean') }}
+  GROUP BY 1, 2
+)
+SELECT
+  ufs.cohort_date,
+  DATE_DIFF('day', ufs.cohort_date, a.active_date) AS day_offset,
+  COUNT(DISTINCT a.user_id) AS active_users,
+  ROUND(100.0 * COUNT(DISTINCT a.user_id) /
+        NULLIF(MAX(COUNT(DISTINCT a.user_id))
+               OVER (PARTITION BY ufs.cohort_date), 0), 2) AS retention_pct
+FROM user_first_seen ufs
+JOIN activity a USING (user_id)
+WHERE DATE_DIFF('day', ufs.cohort_date, a.active_date) BETWEEN 0 AND 30
+GROUP BY 1, 2
+ORDER BY 1, 2;</code></pre>
+
+<h2>3.6 Eight transformation patterns</h2>
+
+<ol>
+<li><strong>Slowly Changing Dimension (SCD) Type 2</strong> — preserve history with valid_from / valid_to.</li>
+<li><strong>Window aggregation</strong> — leading/lagging with <code>ROWS</code> / <code>RANGE</code>.</li>
+<li><strong>Pivoting</strong> — long-to-wide with <code>PIVOT</code> or conditional <code>SUM</code>.</li>
+<li><strong>Surrogate key</strong> — hash of natural keys (<code>MD5</code>) for stability across runs.</li>
+<li><strong>Snapshotting</strong> — daily point-in-time copy for compliance.</li>
+<li><strong>Deduplication</strong> — <code>QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY ts DESC) = 1</code>.</li>
+<li><strong>Conformed dimension</strong> — single calendar table joined by every fact.</li>
+<li><strong>Type 6 hybrid</strong> — current value + history in one table.</li>
+</ol>
+
+<h2>3.7 Optimisation</h2>
+
+<ul>
+<li><strong>Predicate pushdown</strong> — let Iceberg/Parquet skip files via min/max statistics.</li>
+<li><strong>Column pruning</strong> — read only what is needed (3-10× speed-up routine).</li>
+<li><strong>Broadcast small dimensions</strong> — under 100 MB usually beats shuffle joins.</li>
+<li><strong>Avoid <code>SELECT *</code> in incremental models</strong> — schema drift will silently change downstream.</li>
+<li><strong>Z-order on multi-key filters</strong> — for tables filtered by both date and user_id.</li>
+</ul>
+
+<h2>3.8 Testing transformations</h2>
+
+<p>Treat transforms like functions: inputs are fixtures, output is asserted. dbt tests, Soda CL contracts, and Great Expectations checkpoints share the same conformance role.</p>
+
+<pre><code># tests/test_daily_revenue.sql
+SELECT *
+FROM {{ ref('daily_revenue') }}
+WHERE revenue &lt; 0
+   OR orders &lt; 0
+   OR currency NOT IN ('USD','KRW','EUR','JPY','GBP')
+-- The model passes if this query returns 0 rows.</code></pre>
+
+<p>Property-based testing (Hypothesis for Python, ScalaCheck for JVM) is recommended for non-trivial UDFs.</p>
+
+<h2>3.9 Looking ahead</h2>
+
+<p>Chapter 4 covers loading — Full vs Incremental, Upsert via Iceberg MERGE, bulk loaders, partitioning strategy, indexing, and the failure modes you only learn about in production.</p>
+
+</main>
+
+<div class="navigation">
+<a href="chapter-02.html" class="nav-button">← Previous</a>
+<a href="chapter-04.html" class="nav-button">Next: Chapter 4 →</a>
+</div>
+</body>
+</html>

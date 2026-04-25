@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 6 — Observability · WIA-DATA-004</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#06B6D4;margin-top:2em}
+h1{border-bottom:3px solid #06B6D4;padding-bottom:10px}
+.standard-badge{display:inline-block;background:#1e293b;color:#06B6D4;padding:6px 12px;border-radius:6px;margin-bottom:10px}
+.subtitle{color:#94a3b8;margin:6px 0}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #06B6D4}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#06B6D4}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#22d3ee}
+.navigation{display:flex;justify-content:space-between;margin-top:60px;border-top:1px solid #334155;padding-top:20px}
+.nav-button{color:#60a5fa;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+<div class="standard-badge">WIA-DATA-004 v1.1</div>
+<h1>Chapter 6: Observability</h1>
+<p class="subtitle">Knowing whether the data is right, not just whether the job ran</p>
+</header>
+
+<main>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> The three pillars (metrics / logs / traces) plus a fourth specific to data — lineage. What to count, when to alert, how to log structurally, how to monitor freshness, and how OpenTelemetry + OpenLineage stitch it all together.
+</div>
+
+<h2>6.1 What is data observability?</h2>
+
+<p>Application observability tells you whether the program is running. Data observability tells you whether what it produced is right. The four pillars: <strong>freshness</strong> (is the data current?), <strong>volume</strong> (did the expected number of rows arrive?), <strong>schema</strong> (is the structure intact?), and <strong>distribution</strong> (do the values look like they should?).</p>
+
+<h2>6.2 The three operational pillars</h2>
+
+<ul>
+<li><strong>Metrics</strong> — counters, gauges, histograms (OTLP / Prometheus).</li>
+<li><strong>Logs</strong> — structured JSON with trace correlation IDs.</li>
+<li><strong>Traces</strong> — distributed spans across orchestrator → workers → warehouse.</li>
+</ul>
+
+<p>Add <strong>lineage</strong> (OpenLineage 1.21) for data systems specifically — it ties operational signals to the dataset graph.</p>
+
+<h2>6.3 Metrics every pipeline must emit</h2>
+
+<table>
+<tr><th>Metric</th><th>Type</th><th>Why</th></tr>
+<tr><td><code>pipeline.run.duration_seconds</code></td><td>Histogram</td><td>P50 / P95 latency budget</td></tr>
+<tr><td><code>pipeline.run.failed_total</code></td><td>Counter</td><td>SLO error budget burn</td></tr>
+<tr><td><code>pipeline.records.in / out / quarantined</code></td><td>Counter</td><td>Volume contract</td></tr>
+<tr><td><code>pipeline.lag_seconds</code></td><td>Gauge</td><td>Stream freshness</td></tr>
+<tr><td><code>pipeline.bytes_processed</code></td><td>Counter</td><td>Cost &amp; capacity</td></tr>
+<tr><td><code>pipeline.iceberg.snapshot_id</code></td><td>Info gauge</td><td>Forensics</td></tr>
+<tr><td><code>quality.checks.passed / failed</code></td><td>Counter</td><td>Quality gate health</td></tr>
+</table>
+
+<h2>6.4 Alerting strategy</h2>
+
+<ul>
+<li><strong>Alert on symptoms, not causes.</strong> &quot;Daily revenue table is more than 6 hours stale&quot; is a symptom; &quot;the third Airflow worker had high CPU&quot; is a cause that may not need waking anyone.</li>
+<li><strong>SLO-based alerting.</strong> Burn-rate alerts (Google SRE) give one page per real incident, not 47.</li>
+<li><strong>Severity ladder.</strong> P0 wakes a human; P1 emails on-call; P2 lands in Slack triage; P3 is a daily digest.</li>
+<li><strong>Mute the noisy.</strong> Quality warnings ride the daily digest until they trip a P1 threshold.</li>
+</ul>
+
+<h2>6.5 Dashboards (the three that matter)</h2>
+
+<ol>
+<li><strong>Operational health</strong> — DAG success rate, P95 duration, failed runs trend.</li>
+<li><strong>Data freshness</strong> — last-success-at per dataset, lag-by-dataset heatmap.</li>
+<li><strong>Quality scorecard</strong> — Soda CL pass / fail per dataset over time.</li>
+</ol>
+
+<h2>6.6 Logging best practices</h2>
+
+<pre><code>import logging, json, sys
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        payload = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%fZ"),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "logger": record.name,
+            "trace_id": getattr(record, "trace_id", None),
+            "pipeline_id": getattr(record, "pipeline_id", None),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JsonFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+</code></pre>
+
+<p>Three rules: no sensitive data in logs (masked at source); one event = one structured line; correlation IDs on every line.</p>
+
+<h2>6.7 Data quality monitoring</h2>
+
+<p>Soda CL, Great Expectations, and dbt tests are the three open-source pillars. The standard treats them as pluggable engines behind a single gate API.</p>
+
+<pre><code># soda CL — orders_clean.yml
+checks for orders_clean:
+  - row_count between 10000 and 5000000
+  - missing_count(user_id) = 0
+  - duplicate_count(order_id) = 0
+  - freshness(created_at) &lt; 1d
+  - schema:
+      fail:
+        when forbidden column present: [ssn, credit_card]
+  - invalid_count(currency) = 0:
+      valid values: [USD, KRW, EUR, JPY, GBP]
+</code></pre>
+
+<h2>6.8 Cost monitoring</h2>
+
+<ul>
+<li>Tag every warehouse query with <code>pipeline_id</code> + <code>run_id</code> via session parameters.</li>
+<li>Daily roll-up of compute cost / dataset / pipeline.</li>
+<li>Alert when a single run's cost exceeds 2× its 30-day median.</li>
+<li>Track storage tier hot / warm / cold and surface candidates for archival.</li>
+</ul>
+
+<h2>6.9 Distributed tracing</h2>
+
+<pre><code>from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+provider = TracerProvider()
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint="otel-collector:4317")))
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer("wia-data-pipeline")
+
+with tracer.start_as_current_span("transform_orders") as span:
+    span.set_attribute("pipeline.id", "pip_daily_sales")
+    span.set_attribute("pipeline.run_id", "exec_5b9a")
+    span.set_attribute("iceberg.snapshot_id", snapshot_id)
+    do_transform()
+</code></pre>
+
+<h2>6.10 Lineage with OpenLineage</h2>
+
+<p>Every job emits at minimum a <code>START</code> and a <code>COMPLETE</code> (or <code>FAIL</code>) event. The standard requires column-level lineage on outputs.</p>
+
+<pre><code>from openlineage.client import OpenLineageClient
+from openlineage.client.event_v2 import Job, Run, RunEvent, RunState
+from openlineage.client.facet_v2 import schema_dataset, column_lineage_dataset
+from datetime import datetime
+
+client = OpenLineageClient(url="https://api.wia-data-pipeline.org/v1")
+
+client.emit(RunEvent(
+    eventType=RunState.COMPLETE,
+    eventTime=datetime.utcnow().isoformat()+"Z",
+    run=Run(runId="5b9a..."),
+    job=Job(namespace="pip.daily_sales", name="transform_orders"),
+    inputs=[...],
+    outputs=[{
+        "namespace":"iceberg://polaris-prod","name":"lake.orders",
+        "facets":{
+            "schema": schema_dataset.SchemaDatasetFacet(fields=[...]),
+            "columnLineage": column_lineage_dataset.ColumnLineageDatasetFacet(fields={...})
+        }
+    }],
+    producer="https://wia-data-pipeline.org/sdk/1.1"
+))
+</code></pre>
+
+<h2>6.11 Freshness monitoring</h2>
+
+<p>Use <code>updated_at</code> max from the table itself; a freshness gate that simply checks if the latest row was within an SLA window catches 90 % of stale-data incidents.</p>
+
+<pre><code>SELECT
+  TIMESTAMPDIFF(SECOND, MAX(updated_at), CURRENT_TIMESTAMP) AS lag_seconds
+FROM lake.orders;
+</code></pre>
+
+<h2>6.12 Profiling &amp; performance</h2>
+
+<ul>
+<li>Snowflake Query History + Query Profile.</li>
+<li>BigQuery <code>INFORMATION_SCHEMA.JOBS_BY_PROJECT</code>.</li>
+<li>Iceberg snapshot summary — read time vs commit time.</li>
+<li>Worker-level CPU / memory via Prometheus node-exporter.</li>
+</ul>
+
+<div class="info-box">
+<h3>Summary</h3>
+<ol>
+<li>Four pillars: metrics, logs, traces, lineage. None is optional.</li>
+<li>Alert on symptoms (freshness, quality), not on causes (CPU spikes).</li>
+<li>Quality checks gate the publish — they are not after-thoughts.</li>
+<li>OpenLineage events tie operational signals to the dataset graph.</li>
+<li>Tag every query with run id; cost overruns become detectable.</li>
+</ol>
+</div>
+
+<h2>Looking ahead</h2>
+<p>Chapter 7 covers the durability story — idempotency, exactly-once, schema evolution, data contracts, and lineage as a first-class governance tool.</p>
+
+</main>
+
+<div class="navigation">
+<a href="chapter-05.html" class="nav-button">← Previous</a>
+<a href="chapter-07.html" class="nav-button">Next: Chapter 7 →</a>
+</div>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 2 — Data Ingestion · WIA-DATA-004</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#06B6D4;margin-top:2em}
+h1{border-bottom:3px solid #06B6D4;padding-bottom:10px}
+.standard-badge{display:inline-block;background:#1e293b;color:#06B6D4;padding:6px 12px;border-radius:6px;margin-bottom:10px}
+.subtitle{color:#94a3b8;margin:6px 0}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #06B6D4}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#06B6D4}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#22d3ee}
+.navigation{display:flex;justify-content:space-between;margin-top:60px;border-top:1px solid #334155;padding-top:20px}
+.nav-button{color:#60a5fa;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+<div class="standard-badge">WIA-DATA-004 v1.1</div>
+<h1>Chapter 2: Data Ingestion</h1>
+<p class="subtitle">Extracting data without dropping any</p>
+</header>
+
+<main>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> Ingestion patterns (full / incremental / CDC), per-source recipes (database, API, file, stream), validation, error handling, performance tactics, an end-to-end worked example (REST API → S3 → Iceberg), and the metrics every ingestion job MUST emit.
+</div>
+
+<h2>2.1 What is ingestion?</h2>
+
+<p>Ingestion is the boundary where data leaves the system that produced it and enters yours. Everything downstream — quality, lineage, freshness — is bounded by what ingestion captured. The cardinal rule: <strong>capture loud, drop nothing silently</strong>. Anything you can not capture, log explicitly with reason and identifier so a later run can pick it up.</p>
+
+<h2>2.2 Three ingestion patterns</h2>
+
+<h3>Full load</h3>
+<p>Read the entire source on every run. Simple, correct, expensive. Use it for slowly-changing reference tables (countries, currencies) or in development. Avoid for transactional tables &gt; 10 GB.</p>
+
+<h3>Incremental load (watermark)</h3>
+<p>Read only rows where <code>updated_at &gt; last_watermark</code>. Save the new high-water mark in a metadata table. Caveat: requires a monotonic timestamp on the source; deletes are invisible.</p>
+
+<pre><code>SELECT * FROM orders
+WHERE updated_at &gt; :last_watermark
+  AND updated_at &lt;= :now
+ORDER BY updated_at;
+
+-- Persist the new watermark only after sink commit succeeds.</code></pre>
+
+<h3>Change Data Capture (CDC)</h3>
+<p>Tail the database transaction log. Captures inserts, updates, AND deletes. Debezium 3 + Kafka Connect is the open-source default; AWS DMS, Oracle GoldenGate, and Fivetran HVR cover commercial use cases. Pair with the **Outbox pattern** to avoid dual-write inconsistency.</p>
+
+<h2>2.3 Source-specific recipes</h2>
+
+<h3>PostgreSQL via Debezium</h3>
+<pre><code>{
+  "name":"orders-cdc",
+  "config":{
+    "connector.class":"io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name":"pgoutput",
+    "database.hostname":"prod-db","database.port":"5432",
+    "database.user":"debezium","database.dbname":"app",
+    "slot.name":"wia_pip_orders","publication.name":"wia_pip_orders_pub",
+    "table.include.list":"public.orders,public.outbox_events",
+    "snapshot.mode":"initial",
+    "topic.prefix":"prod-db",
+    "schema.history.internal.kafka.bootstrap.servers":"kafka:9093",
+    "schema.history.internal.kafka.topic":"schema-changes.prod-db",
+    "transforms":"outbox",
+    "transforms.outbox.type":"io.debezium.transforms.outbox.EventRouter"
+  }
+}</code></pre>
+
+<h3>REST API extractor (with rate-limit etiquette)</h3>
+<pre><code>import time, requests
+from tenacity import retry, wait_exponential_jitter, stop_after_attempt
+
+@retry(wait=wait_exponential_jitter(initial=2, max=60), stop=stop_after_attempt(8))
+def fetch_page(url, params, headers):
+    r = requests.get(url, params=params, headers=headers, timeout=30)
+    if r.status_code == 429:
+        retry_after = int(r.headers.get("Retry-After","2"))
+        time.sleep(retry_after)
+        raise RuntimeError("rate-limited")
+    r.raise_for_status()
+    return r.json()
+
+cursor, page = None, 0
+while True:
+    data = fetch_page("https://api.partner.com/v1/orders",
+                      params={"cursor":cursor,"limit":500},
+                      headers={"Authorization":f"Bearer {TOKEN}"})
+    yield from data["items"]
+    if not data.get("next_cursor"): break
+    cursor = data["next_cursor"]; page += 1</code></pre>
+
+<h3>File-based: Parquet shards</h3>
+<pre><code>import pyarrow.dataset as ds, pyarrow.parquet as pq
+src = ds.dataset("s3://landing/orders/incoming/", format="parquet")
+scanner = src.scanner(filter=ds.field("created_at") &gt;= cutoff,
+                      columns=["order_id","user_id","total_cents","created_at"])
+pq.write_table(scanner.to_table(),
+               f"s3://bronze/orders/dt={today}/part-{shard:04d}.parquet",
+               compression="zstd", compression_level=3,
+               write_page_index=True, version="2.6")</code></pre>
+
+<h3>Kafka stream</h3>
+<pre><code>from confluent_kafka import Consumer
+c = Consumer({"bootstrap.servers":"kafka:9093","group.id":"pip-orders",
+              "isolation.level":"read_committed","enable.auto.commit":False,
+              "auto.offset.reset":"earliest"})
+c.subscribe(["events.orders"])
+while True:
+    msgs = c.consume(num_messages=500, timeout=1.0)
+    if not msgs: continue
+    process_and_write_iceberg(msgs)
+    c.commit(asynchronous=False)</code></pre>
+
+<h2>2.4 Validation at the boundary</h2>
+
+<p>Validate as soon as data enters. Reject loudly, never silently coerce.</p>
+
+<pre><code># Pydantic v2 model — runs on every record at ingest
+from pydantic import BaseModel, Field, conint, condecimal
+from datetime import datetime
+
+class OrderEvent(BaseModel):
+    order_id:    conint(ge=1)
+    user_id:     conint(ge=1)
+    total_cents: conint(ge=0, le=10**11)
+    currency:    str = Field(min_length=3, max_length=3)
+    created_at:  datetime
+    model_config = {"extra":"forbid"}   # reject unknown fields loudly
+
+def validate(record: dict) -&gt; OrderEvent:
+    return OrderEvent.model_validate(record)</code></pre>
+
+<h2>2.5 Error handling</h2>
+
+<p>Every ingestion run produces three buckets:</p>
+
+<ol>
+<li><strong>Accepted</strong> — written to bronze.</li>
+<li><strong>Quarantined</strong> — written to <code>s3://lake/quarantine/orders/dt=…/</code> with original row plus error reason.</li>
+<li><strong>Lost</strong> — should be empty. If non-empty, the run fails the quality gate.</li>
+</ol>
+
+<p>Quarantine is reviewable; backfill scripts replay quarantined rows after producers fix the schema.</p>
+
+<h2>2.6 Performance tactics</h2>
+
+<ul>
+<li><strong>Parallel partitions</strong> — split the source by primary key range or time bucket; one worker per range.</li>
+<li><strong>Column pruning</strong> — only fetch columns the destination actually needs (saves egress and decode).</li>
+<li><strong>Compression on the wire</strong> — gzip/zstd HTTP responses, lz4 over Kafka.</li>
+<li><strong>Connection pooling</strong> — pgbouncer for Postgres, redis-pool for cache.</li>
+<li><strong>Micro-batching</strong> — flush every 64 MB or 30 s, whichever comes first.</li>
+</ul>
+
+<h2>2.7 Worked example: REST API → Iceberg</h2>
+
+<pre><code>from datetime import datetime
+import pyarrow as pa, pyarrow.parquet as pq, pyiceberg.catalog as ic
+
+catalog = ic.load_catalog("polaris-prod", **{
+    "uri":"https://api.wia-data-pipeline.org/iceberg/v1",
+    "credential":f"{CLIENT_ID}:{CLIENT_SECRET}"
+})
+
+records = list(extract_orders())                  # §2.3 generator
+records = [validate(r).model_dump() for r in records]
+table = pa.Table.from_pylist(records, schema=ARROW_SCHEMA)
+
+# Land bronze parquet for replay safety
+pq.write_table(table, f"s3://bronze/orders/dt={today}/part-0001.parquet",
+               compression="zstd", write_page_index=True)
+
+# Append to Iceberg (transactional, snapshot-isolated)
+iceberg = catalog.load_table("lake.orders")
+iceberg.append(table)
+
+# Emit OpenLineage events: START, COMPLETE
+emit_lineage("COMPLETE", run_id=RUN_ID, inputs=["api://partner/orders"],
+             outputs=["iceberg://polaris-prod/lake.orders"])</code></pre>
+
+<h2>2.8 Mandatory ingestion metrics</h2>
+
+<table>
+<tr><th>Metric</th><th>Why</th></tr>
+<tr><td><code>ingest.records.in</code></td><td>How much arrived</td></tr>
+<tr><td><code>ingest.records.accepted</code></td><td>How much landed</td></tr>
+<tr><td><code>ingest.records.quarantined</code></td><td>How much we threw aside</td></tr>
+<tr><td><code>ingest.lag.seconds</code> (CDC/stream)</td><td>How far behind real-time we are</td></tr>
+<tr><td><code>ingest.bytes.in</code></td><td>Cost &amp; capacity</td></tr>
+<tr><td><code>ingest.iceberg.snapshot_id</code></td><td>Forensics &amp; lineage</td></tr>
+</table>
+
+<h2>2.9 Looking ahead</h2>
+
+<p>Chapter 3 turns to transformation — SQL with dbt, Python with PySpark, the five transformation types, and how to test transforms before they touch production.</p>
+
+</main>
+
+<div class="navigation">
+<a href="chapter-01.html" class="nav-button">← Previous</a>
+<a href="chapter-03.html" class="nav-button">Next: Chapter 3 →</a>
+</div>
+</body>
+</html>

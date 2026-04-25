@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 4 — Data Loading · WIA-DATA-004</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#06B6D4;margin-top:2em}
+h1{border-bottom:3px solid #06B6D4;padding-bottom:10px}
+.standard-badge{display:inline-block;background:#1e293b;color:#06B6D4;padding:6px 12px;border-radius:6px;margin-bottom:10px}
+.subtitle{color:#94a3b8;margin:6px 0}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #06B6D4}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#06B6D4}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#22d3ee}
+.navigation{display:flex;justify-content:space-between;margin-top:60px;border-top:1px solid #334155;padding-top:20px}
+.nav-button{color:#60a5fa;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+<div class="standard-badge">WIA-DATA-004 v1.1</div>
+<h1>Chapter 4: Data Loading</h1>
+<p class="subtitle">Where data lands — and the failure modes you learn in production</p>
+</header>
+
+<main>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> Full vs Incremental, the Upsert pattern with Iceberg MERGE, bulk loaders for warehouses, streaming sinks, destination-specific strategy (Snowflake / BigQuery / Redshift / Iceberg / Delta), partitioning, indexing, and the operational lessons that only appear under load.
+</div>
+
+<h2>4.1 What is loading?</h2>
+
+<p>Loading is the third L in (E)(T)(L). It is also where most production incidents originate — partial commits, primary key violations, throttled bulk endpoints, missing partitions, frozen warehouses. The standard's loading layer is engineered around <strong>idempotent, transactional, replay-safe</strong> writes.</p>
+
+<h2>4.2 Full Load vs Incremental Load</h2>
+
+<table>
+<tr><th>Property</th><th>Full</th><th>Incremental</th></tr>
+<tr><td>Source read cost</td><td>High</td><td>Low</td></tr>
+<tr><td>Destination write cost</td><td>High (truncate-and-rewrite)</td><td>Low (merge / append)</td></tr>
+<tr><td>Recovery from corruption</td><td>Trivial — rerun</td><td>Requires watermark rollback</td></tr>
+<tr><td>Captures source deletes</td><td>Yes (implicitly)</td><td>Only if CDC or soft-delete column</td></tr>
+<tr><td>Best for</td><td>Reference tables, &lt; 10 GB</td><td>Transactional, growing tables</td></tr>
+</table>
+
+<h2>4.3 Upsert / merge pattern</h2>
+
+<p>Iceberg v2's <code>MERGE INTO</code> is the canonical way to upsert into a lakehouse. It is transactional, supports schema evolution, and produces a snapshot per merge.</p>
+
+<pre><code>MERGE INTO lake.orders t
+USING (
+  SELECT order_id, user_id, total_cents, currency, created_at, updated_at
+  FROM bronze.orders_incoming
+  WHERE updated_at &gt;= :since
+) s
+ON t.order_id = s.order_id
+WHEN MATCHED AND s.updated_at &gt; t.updated_at THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;</code></pre>
+
+<p>For destinations without native MERGE (early Redshift, some MySQL): the canonical workaround is <strong>delete-then-insert</strong> inside one transaction.</p>
+
+<h2>4.4 Bulk loaders</h2>
+
+<table>
+<tr><th>Warehouse</th><th>Best loader</th><th>Throughput note</th></tr>
+<tr><td>Snowflake</td><td><code>COPY INTO ... FROM @stage</code> (gzipped CSV / Parquet)</td><td>Linear with virtual warehouse size</td></tr>
+<tr><td>BigQuery</td><td><code>LOAD DATA</code> + autodetect, or external Iceberg tables</td><td>Free in batch; charged on streaming</td></tr>
+<tr><td>Redshift</td><td><code>COPY ... FROM 's3://...' IAM_ROLE</code></td><td>Use 32 MB Parquet files for parallelism</td></tr>
+<tr><td>Iceberg / lake</td><td><code>iceberg.append(table)</code></td><td>Snapshot per call; commit batch sizes &gt; 64 MB</td></tr>
+<tr><td>Postgres OLTP target</td><td><code>COPY FROM STDIN</code></td><td>10× faster than INSERT batches</td></tr>
+</table>
+
+<h2>4.5 Streaming loads</h2>
+
+<p>For sub-minute freshness, use streaming sinks:</p>
+
+<ul>
+<li><strong>Snowflake Snowpipe Streaming</strong> — millisecond inserts; per-row pricing.</li>
+<li><strong>BigQuery Storage Write API</strong> — exactly-once writes via <code>committed_offset</code>.</li>
+<li><strong>Iceberg streaming</strong> with Flink Iceberg sink — `commit-interval=30s` is a reasonable default.</li>
+<li><strong>Kafka Connect S3 Sink</strong> with rotation policy `flush.size=10000, rotate.interval.ms=60000`.</li>
+</ul>
+
+<h2>4.6 Destination-specific strategy</h2>
+
+<h3>Snowflake</h3>
+<ul>
+<li>Use <strong>Snowpipe</strong> for files &lt; 250 MB; <strong>Snowpipe Streaming</strong> for sub-minute freshness.</li>
+<li>Cluster keys on (date, customer_id) when most queries filter by both.</li>
+<li>Multi-cluster warehouses for concurrent ELT.</li>
+</ul>
+
+<h3>BigQuery</h3>
+<ul>
+<li>Partition by ingestion time or a date column; cluster on up to four columns.</li>
+<li>External Iceberg tables via BigLake unify lake + warehouse.</li>
+<li>Reservations control cost; on-demand for spiky workloads.</li>
+</ul>
+
+<h3>Redshift</h3>
+<ul>
+<li>Distribution key on the join column; sort key on the filter column.</li>
+<li><code>VACUUM</code> after large deletes; <code>ANALYZE</code> after large appends.</li>
+<li>Spectrum (Redshift querying Parquet on S3) for cold archives.</li>
+</ul>
+
+<h3>Apache Iceberg lakehouse</h3>
+<ul>
+<li>Hidden partitioning eliminates `dt=` boilerplate.</li>
+<li>`copy-on-write` for read-heavy curated layers; `merge-on-read` for write-heavy bronze.</li>
+<li>Compact small files via `RewriteFiles` weekly; expire snapshots beyond retention.</li>
+</ul>
+
+<h2>4.7 Partitioning strategy</h2>
+
+<table>
+<tr><th>Pattern</th><th>When</th></tr>
+<tr><td>Daily date partition</td><td>Default; works for 95% of fact tables</td></tr>
+<tr><td>Hourly date partition</td><td>Very high volume (&gt; 100 M rows/day)</td></tr>
+<tr><td>Bucketed by hash(user_id, 16)</td><td>Hot-key skew avoidance</td></tr>
+<tr><td>Composite — days(date), bucket(16,user_id)</td><td>Joins by user; queries by date</td></tr>
+<tr><td>None</td><td>Reference tables &lt; 1 GB</td></tr>
+</table>
+
+<h2>4.8 Indexing strategy</h2>
+
+<p>Lakehouses do not have B-tree indexes; they rely on column statistics, page indexes, bloom filters, and z-order. Warehouses (Snowflake, Redshift, BigQuery) auto-maintain these. For OLTP destinations, build indexes on:</p>
+
+<ul>
+<li>Primary key (always).</li>
+<li>Foreign key columns used in joins.</li>
+<li>Columns in WHERE clauses with high selectivity.</li>
+</ul>
+
+<p>Avoid indexes on low-cardinality columns (status, country) unless used in selective filters; they cost write throughput.</p>
+
+<h2>4.9 Performance tactics</h2>
+
+<ul>
+<li><strong>Right-size files.</strong> 128 MB ± 25 % for Parquet; smaller files multiply metadata cost.</li>
+<li><strong>Stage close to compute.</strong> Same region as the warehouse, or you pay egress and latency.</li>
+<li><strong>Compress before transfer.</strong> ZSTD-3 saves 60-80 % vs uncompressed at &lt; 10 % CPU overhead.</li>
+<li><strong>Sort within partitions.</strong> Improves dictionary encoding and predicate pushdown.</li>
+<li><strong>Async commit.</strong> Iceberg snapshot commit is fast; the heavy file write should complete first, then commit.</li>
+</ul>
+
+<h2>4.10 Error handling at load</h2>
+
+<ol>
+<li><strong>Constraint violation</strong> — quarantine offending rows, do NOT abort the batch.</li>
+<li><strong>Partial file write</strong> — Iceberg snapshot is atomic; partial files become orphans removed by `RemoveOrphanFiles`.</li>
+<li><strong>Throttling</strong> — exponential back-off on `429 Too Many Requests`; respect `Retry-After`.</li>
+<li><strong>Out-of-order events</strong> — Iceberg MERGE with `WHEN MATCHED AND s.updated_at &gt; t.updated_at` resolves naturally.</li>
+<li><strong>Disk full</strong> — pre-flight `du -h` on workers; alert at 80 % capacity.</li>
+</ol>
+
+<div class="info-box">
+<h3>Summary</h3>
+<ol>
+<li>Idempotent merges (Iceberg MERGE) make replays safe.</li>
+<li>Bulk loaders win on throughput; streaming sinks win on freshness.</li>
+<li>Partitioning + sort order are the two most under-tuned levers.</li>
+<li>Quarantine constraint violators; never silently drop them.</li>
+<li>Right-size files (128 MB) and compress with ZSTD.</li>
+</ol>
+</div>
+
+<h2>Looking ahead</h2>
+<p>Chapter 5 covers orchestration — Apache Airflow, Dagster, and Prefect — and the patterns that turn isolated jobs into a reliable graph.</p>
+
+</main>
+
+<div class="navigation">
+<a href="chapter-03.html" class="nav-button">← Previous</a>
+<a href="chapter-05.html" class="nav-button">Next: Chapter 5 →</a>
+</div>
+</body>
+</html>

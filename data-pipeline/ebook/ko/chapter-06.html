@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6장: 모니터링과 관찰성 - WIA-DATA-004</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-004 v1.0</div>
+    <h1>6장</h1>
+    <p class="subtitle">모니터링과 관찰성</p>
+    <p class="subtitle">파이프라인 가시성</p>
+  </header>
+
+  <main>
+    <h2>6.1 관찰성이란?</h2>
+
+    <p>관찰성(Observability)은 시스템의 외부 출력을 관찰하여 내부 상태를 이해할 수 있는 능력입니다. 데이터 파이프라인에서는 로그, 메트릭, 트레이스를 통해 무슨 일이 일어나고 있는지 파악합니다.</p>
+
+    <h2>6.2 관찰성의 3요소</h2>
+
+    <h3>1. 로그 (Logs)</h3>
+    <p>시간에 따른 이벤트 기록:</p>
+    <pre><code>import logging
+
+logger = logging.getLogger(__name__)
+
+def extract_data():
+    logger.info("Starting data extraction")
+    try:
+        data = fetch_from_api()
+        logger.info(f"Extracted {len(data)} records")
+        return data
+    except Exception as e:
+        logger.error(f"Extraction failed: {e}", exc_info=True)
+        raise</code></pre>
+
+    <h3>2. 메트릭 (Metrics)</h3>
+    <p>시계열 수치 데이터:</p>
+    <pre><code>from prometheus_client import Counter, Histogram, Gauge
+
+# 카운터: 증가만 가능
+records_processed = Counter('records_processed_total', 'Total records processed')
+records_processed.inc(1000)
+
+# 히스토그램: 분포 추적
+processing_duration = Histogram('processing_duration_seconds', 'Time spent processing')
+with processing_duration.time():
+    process_data()
+
+# 게이지: 증감 가능
+pipeline_lag = Gauge('pipeline_lag_seconds', 'Data pipeline lag')
+pipeline_lag.set(120)</code></pre>
+
+    <h3>3. 트레이스 (Traces)</h3>
+    <p>요청의 전체 경로 추적:</p>
+    <pre><code>from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+
+with tracer.start_as_current_span("pipeline_run") as span:
+    with tracer.start_as_current_span("extract"):
+        data = extract()
+    with tracer.start_as_current_span("transform"):
+        cleaned = transform(data)
+    with tracer.start_as_current_span("load"):
+        load(cleaned)</code></pre>
+
+    <h2>6.3 주요 메트릭</h2>
+
+    <h3>처리 메트릭</h3>
+    <ul>
+      <li><strong>Records processed:</strong> 처리된 레코드 수</li>
+      <li><strong>Processing rate:</strong> 초당 처리 레코드 수</li>
+      <li><strong>Pipeline duration:</strong> 파이프라인 실행 시간</li>
+      <li><strong>Stage duration:</strong> 각 단계별 실행 시간</li>
+    </ul>
+
+    <h3>품질 메트릭</h3>
+    <ul>
+      <li><strong>Error rate:</strong> 오류율</li>
+      <li><strong>Null rate:</strong> NULL 값 비율</li>
+      <li><strong>Duplicate rate:</strong> 중복 레코드 비율</li>
+      <li><strong>Schema violations:</strong> 스키마 위반 건수</li>
+    </ul>
+
+    <h3>비즈니스 메트릭</h3>
+    <ul>
+      <li><strong>Data freshness:</strong> 데이터 신선도</li>
+      <li><strong>SLA compliance:</strong> SLA 준수율</li>
+      <li><strong>Cost per record:</strong> 레코드당 비용</li>
+    </ul>
+
+    <h2>6.4 알림 설정</h2>
+
+    <h3>Prometheus Alert Rules</h3>
+    <pre><code>groups:
+  - name: data_pipeline
+    rules:
+      - alert: HighErrorRate
+        expr: rate(pipeline_errors_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate in data pipeline"
+
+      - alert: PipelineLag
+        expr: pipeline_lag_seconds > 3600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pipeline lag exceeds 1 hour"</code></pre>
+
+    <h3>Slack 알림</h3>
+    <pre><code>import requests
+
+def send_slack_alert(message):
+    webhook_url = "https://hooks.slack.com/services/xxx"
+    payload = {
+        "text": message,
+        "username": "Data Pipeline Alert",
+        "icon_emoji": ":warning:"
+    }
+    requests.post(webhook_url, json=payload)</code></pre>
+
+    <h2>6.5 대시보드</h2>
+
+    <h3>Grafana 대시보드</h3>
+    <ul>
+      <li>실시간 메트릭 시각화</li>
+      <li>히스토리 추세 분석</li>
+      <li>다중 데이터 소스 통합</li>
+      <li>알림 통합</li>
+    </ul>
+
+    <h3>주요 차트</h3>
+    <ul>
+      <li><strong>처리량 차트:</strong> 시간별 처리된 레코드 수</li>
+      <li><strong>레이턴시 차트:</strong> P50, P95, P99 지연시간</li>
+      <li><strong>오류율 차트:</strong> 오류 발생 추이</li>
+      <li><strong>리소스 사용률:</strong> CPU, 메모리, 디스크</li>
+    </ul>
+
+    <h2>6.6 로깅 베스트 프랙티스</h2>
+
+    <h3>구조화된 로깅</h3>
+    <pre><code>import structlog
+
+logger = structlog.get_logger()
+
+logger.info(
+    "data_extracted",
+    source="api",
+    record_count=1000,
+    duration_sec=5.2,
+    timestamp="2025-12-26T10:00:00Z"
+)</code></pre>
+
+    <h3>로그 레벨</h3>
+    <ul>
+      <li><strong>DEBUG:</strong> 개발 디버깅용</li>
+      <li><strong>INFO:</strong> 일반 정보 (시작, 완료)</li>
+      <li><strong>WARNING:</strong> 주의 필요 (재시도 중)</li>
+      <li><strong>ERROR:</strong> 오류 발생</li>
+      <li><strong>CRITICAL:</strong> 치명적 오류</li>
+    </ul>
+
+    <h2>6.7 데이터 품질 모니터링</h2>
+
+    <h3>Great Expectations</h3>
+    <pre><code>import great_expectations as ge
+
+df = ge.read_csv('data.csv')
+
+# 검증
+df.expect_column_to_exist('user_id')
+df.expect_column_values_to_not_be_null('user_id')
+df.expect_column_values_to_be_unique('user_id')
+df.expect_column_values_to_be_between('age', min_value=0, max_value=120)
+
+# 결과 확인
+results = df.validate()
+if not results['success']:
+    send_alert("Data quality check failed!")</code></pre>
+
+    <h2>6.8 비용 모니터링</h2>
+
+    <pre><code>SELECT
+  job_id,
+  query,
+  total_bytes_processed / 1024 / 1024 / 1024 as gb_processed,
+  total_bytes_processed / 1024 / 1024 / 1024 * 0.005 as estimated_cost_usd
+FROM `project.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT`
+WHERE creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)
+ORDER BY total_bytes_processed DESC
+LIMIT 10;</code></pre>
+
+    <h2>6.9 분산 트레이싱</h2>
+
+    <h3>Jaeger로 트레이싱</h3>
+    <pre><code>from opentelemetry import trace
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+# Tracer 설정
+trace.set_tracer_provider(TracerProvider())
+jaeger_exporter = JaegerExporter(
+    agent_host_name="localhost",
+    agent_port=6831,
+)
+trace.get_tracer_provider().add_span_processor(
+    BatchSpanProcessor(jaeger_exporter)
+)
+
+tracer = trace.get_tracer(__name__)
+
+def etl_pipeline():
+    with tracer.start_as_current_span("etl_pipeline") as pipeline_span:
+        pipeline_span.set_attribute("pipeline.name", "daily_orders")
+        pipeline_span.set_attribute("pipeline.version", "1.0")
+
+        # Extract
+        with tracer.start_as_current_span("extract") as extract_span:
+            data = extract_data()
+            extract_span.set_attribute("records.count", len(data))
+
+        # Transform
+        with tracer.start_as_current_span("transform") as transform_span:
+            transformed = transform_data(data)
+            transform_span.set_attribute("records.transformed", len(transformed))
+
+        # Load
+        with tracer.start_as_current_span("load") as load_span:
+            load_data(transformed)
+            load_span.set_attribute("records.loaded", len(transformed))</code></pre>
+
+    <h3>트레이스 컨텍스트 전파</h3>
+    <pre><code>import requests
+from opentelemetry.propagate import inject
+
+def call_downstream_service():
+    with tracer.start_as_current_span("api_call") as span:
+        headers = {}
+        inject(headers)  # 트레이스 컨텍스트를 헤더에 주입
+
+        response = requests.get(
+            "https://downstream-service.com/api",
+            headers=headers
+        )
+
+        span.set_attribute("http.status_code", response.status_code)
+        return response.json()</code></pre>
+
+    <h2>6.10 로그 집계와 분석</h2>
+
+    <h3>ELK Stack (Elasticsearch, Logstash, Kibana)</h3>
+    <pre><code># Logstash 설정 (logstash.conf)
+input {
+  file {
+    path => "/var/log/pipeline/*.log"
+    type => "pipeline_log"
+    codec => json
+  }
+}
+
+filter {
+  if [type] == "pipeline_log" {
+    json {
+      source => "message"
+    }
+    date {
+      match => ["timestamp", "ISO8601"]
+    }
+    mutate {
+      add_field => {
+        "environment" => "production"
+      }
+    }
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["localhost:9200"]
+    index => "pipeline-logs-%{+YYYY.MM.dd}"
+  }
+}</code></pre>
+
+    <h3>Python에서 구조화된 로깅</h3>
+    <pre><code>import structlog
+import logging.config
+
+# structlog 설정
+logging.config.dictConfig({
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": structlog.stdlib.ProcessorFormatter,
+            "processor": structlog.processors.JSONRenderer(),
+        },
+    },
+    "handlers": {
+        "default": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "loggers": {
+        "": {
+            "handlers": ["default"],
+            "level": "INFO",
+        },
+    }
+})
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
+)
+
+logger = structlog.get_logger()
+
+# 사용 예시
+logger.info(
+    "pipeline_started",
+    pipeline_name="daily_orders",
+    execution_date="2025-12-26",
+    source="s3://bucket/data/"
+)
+
+logger.info(
+    "records_processed",
+    pipeline_name="daily_orders",
+    stage="transform",
+    records_input=10000,
+    records_output=9500,
+    duration_sec=15.2
+)</code></pre>
+
+    <h2>6.11 메트릭 수집 전략</h2>
+
+    <h3>커스텀 메트릭 정의</h3>
+    <pre><code>from prometheus_client import Counter, Histogram, Gauge, Summary
+import time
+
+# 카운터: 누적 값
+pipeline_runs_total = Counter(
+    'pipeline_runs_total',
+    'Total number of pipeline runs',
+    ['pipeline_name', 'status']
+)
+
+records_processed_total = Counter(
+    'records_processed_total',
+    'Total records processed',
+    ['pipeline_name', 'stage']
+)
+
+# 히스토그램: 분포 추적
+pipeline_duration_seconds = Histogram(
+    'pipeline_duration_seconds',
+    'Pipeline execution duration',
+    ['pipeline_name'],
+    buckets=[10, 30, 60, 120, 300, 600, 1800, 3600]
+)
+
+# 게이지: 현재 값
+active_pipelines = Gauge(
+    'active_pipelines',
+    'Number of currently running pipelines',
+    ['environment']
+)
+
+data_freshness_seconds = Gauge(
+    'data_freshness_seconds',
+    'Age of the latest data',
+    ['table_name']
+)
+
+# Summary: 백분위수
+api_response_time = Summary(
+    'api_response_time_seconds',
+    'API response time',
+    ['endpoint']
+)
+
+# 사용 예시
+def run_pipeline(pipeline_name):
+    active_pipelines.labels(environment='production').inc()
+    start_time = time.time()
+
+    try:
+        # Extract
+        records = extract_data()
+        records_processed_total.labels(
+            pipeline_name=pipeline_name,
+            stage='extract'
+        ).inc(len(records))
+
+        # Transform
+        transformed = transform_data(records)
+        records_processed_total.labels(
+            pipeline_name=pipeline_name,
+            stage='transform'
+        ).inc(len(transformed))
+
+        # Load
+        load_data(transformed)
+        records_processed_total.labels(
+            pipeline_name=pipeline_name,
+            stage='load'
+        ).inc(len(transformed))
+
+        # 성공
+        pipeline_runs_total.labels(
+            pipeline_name=pipeline_name,
+            status='success'
+        ).inc()
+
+    except Exception as e:
+        pipeline_runs_total.labels(
+            pipeline_name=pipeline_name,
+            status='failed'
+        ).inc()
+        raise
+
+    finally:
+        duration = time.time() - start_time
+        pipeline_duration_seconds.labels(pipeline_name=pipeline_name).observe(duration)
+        active_pipelines.labels(environment='production').dec()</code></pre>
+
+    <h2>6.12 알림 전략</h2>
+
+    <h3>다계층 알림 시스템</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>심각도</th>
+          <th>채널</th>
+          <th>응답 시간</th>
+          <th>예시</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Critical</td>
+          <td>PagerDuty + Slack</td>
+          <td>즉시</td>
+          <td>파이프라인 완전 중단</td>
+        </tr>
+        <tr>
+          <td>High</td>
+          <td>Slack + Email</td>
+          <td>15분 이내</td>
+          <td>SLA 위반</td>
+        </tr>
+        <tr>
+          <td>Medium</td>
+          <td>Slack</td>
+          <td>1시간 이내</td>
+          <td>데이터 품질 이슈</td>
+        </tr>
+        <tr>
+          <td>Low</td>
+          <td>Email + 대시보드</td>
+          <td>24시간 이내</td>
+          <td>성능 저하</td>
+        </tr>
+        <tr>
+          <td>Info</td>
+          <td>대시보드</td>
+          <td>-</td>
+          <td>일일 통계</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>PagerDuty 통합</h3>
+    <pre><code>import pdpyras
+
+def send_pagerduty_alert(severity, message, details):
+    session = pdpyras.EventsAPISession(PAGERDUTY_API_KEY)
+
+    session.trigger(
+        summary=message,
+        severity=severity,  # 'critical', 'error', 'warning', 'info'
+        source='data-pipeline',
+        custom_details=details
+    )
+
+# 사용
+if pipeline_failed:
+    send_pagerduty_alert(
+        severity='critical',
+        message='Daily orders pipeline failed',
+        details={
+            'pipeline': 'daily_orders',
+            'error': str(error),
+            'execution_date': '2025-12-26',
+            'affected_tables': ['orders', 'order_items']
+        }
+    )</code></pre>
+
+    <h3>Slack 고급 알림</h3>
+    <pre><code>from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+
+def send_rich_slack_alert(status, pipeline_name, metrics):
+    client = WebClient(token=SLACK_TOKEN)
+
+    color = {
+        'success': 'good',
+        'warning': 'warning',
+        'failed': 'danger'
+    }[status]
+
+    try:
+        client.chat_postMessage(
+            channel='#data-alerts',
+            text=f"Pipeline {pipeline_name}: {status}",
+            attachments=[
+                {
+                    "color": color,
+                    "title": f"{pipeline_name} Pipeline Report",
+                    "fields": [
+                        {
+                            "title": "Status",
+                            "value": status.upper(),
+                            "short": True
+                        },
+                        {
+                            "title": "Duration",
+                            "value": f"{metrics['duration']}s",
+                            "short": True
+                        },
+                        {
+                            "title": "Records Processed",
+                            "value": f"{metrics['records']:,}",
+                            "short": True
+                        },
+                        {
+                            "title": "Error Rate",
+                            "value": f"{metrics['error_rate']:.2%}",
+                            "short": True
+                        }
+                    ],
+                    "footer": "Data Pipeline Monitor",
+                    "ts": int(time.time())
+                }
+            ]
+        )
+    except SlackApiError as e:
+        logger.error(f"Slack alert failed: {e}")</code></pre>
+
+    <h2>6.13 대시보드 구축</h2>
+
+    <h3>Grafana 대시보드 구성</h3>
+    <pre><code># Prometheus 쿼리 예시
+
+# 파이프라인 성공률
+sum(rate(pipeline_runs_total{status="success"}[5m])) by (pipeline_name)
+/
+sum(rate(pipeline_runs_total[5m])) by (pipeline_name)
+
+# 처리량 (초당 레코드)
+rate(records_processed_total[5m])
+
+# P95 레이턴시
+histogram_quantile(0.95, pipeline_duration_seconds_bucket)
+
+# 에러율
+sum(rate(pipeline_runs_total{status="failed"}[5m]))
+/
+sum(rate(pipeline_runs_total[5m]))
+
+# 데이터 신선도 (분)
+data_freshness_seconds / 60</code></pre>
+
+    <h3>핵심 대시보드 패널</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>패널</th>
+          <th>메트릭</th>
+          <th>시각화</th>
+          <th>목적</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>파이프라인 상태</td>
+          <td>pipeline_runs_total</td>
+          <td>Stat Panel</td>
+          <td>전체 상태 한눈에</td>
+        </tr>
+        <tr>
+          <td>처리량 추이</td>
+          <td>records_processed_total</td>
+          <td>Time Series</td>
+          <td>시간대별 부하</td>
+        </tr>
+        <tr>
+          <td>레이턴시 분포</td>
+          <td>pipeline_duration_seconds</td>
+          <td>Heatmap</td>
+          <td>성능 패턴 분석</td>
+        </tr>
+        <tr>
+          <td>에러율</td>
+          <td>pipeline_errors_total</td>
+          <td>Graph</td>
+          <td>안정성 모니터링</td>
+        </tr>
+        <tr>
+          <td>데이터 신선도</td>
+          <td>data_freshness_seconds</td>
+          <td>Gauge</td>
+          <td>SLA 준수 확인</td>
+        </tr>
+        <tr>
+          <td>리소스 사용률</td>
+          <td>cpu/memory usage</td>
+          <td>Time Series</td>
+          <td>용량 계획</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6.14 데이터 신선도 모니터링</h2>
+
+    <h3>신선도 체크</h3>
+    <pre><code>from datetime import datetime, timedelta
+import psycopg2
+
+def check_data_freshness(table_name, max_age_hours=2):
+    """테이블의 최신 데이터 나이 확인"""
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+
+    cursor.execute(f"""
+        SELECT
+            NOW() - MAX(updated_at) as age,
+            MAX(updated_at) as last_update
+        FROM {table_name}
+    """)
+
+    age, last_update = cursor.fetchone()
+
+    if age > timedelta(hours=max_age_hours):
+        send_alert(
+            f"Data freshness SLA violated for {table_name}",
+            f"Last update: {last_update}, Age: {age}"
+        )
+
+    # Prometheus 메트릭 업데이트
+    data_freshness_seconds.labels(table_name=table_name).set(
+        age.total_seconds()
+    )
+
+    return age
+
+# 모든 테이블 체크
+tables = ['orders', 'users', 'products']
+for table in tables:
+    check_data_freshness(table, max_age_hours=2)</code></pre>
+
+    <h2>6.15 성능 프로파일링</h2>
+
+    <h3>cProfile로 병목 찾기</h3>
+    <pre><code>import cProfile
+import pstats
+from io import StringIO
+
+def profile_pipeline():
+    pr = cProfile.Profile()
+    pr.enable()
+
+    # 파이프라인 실행
+    run_etl_pipeline()
+
+    pr.disable()
+
+    # 결과 분석
+    s = StringIO()
+    ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+    ps.print_stats(20)  # 상위 20개 함수
+
+    print(s.getvalue())
+
+    # 파일로 저장
+    pr.dump_stats('pipeline_profile.prof')</code></pre>
+
+    <h3>Line Profiler로 라인별 분석</h3>
+    <pre><code>from line_profiler import LineProfiler
+
+def profile_transform():
+    lp = LineProfiler()
+    lp.add_function(transform_data)
+    lp.add_function(clean_data)
+    lp.add_function(enrich_data)
+
+    lp.run('run_etl_pipeline()')
+    lp.print_stats()
+
+# 결과 예시:
+# Line #      Hits         Time  Per Hit   % Time  Line Contents
+# =============================================================
+#     10       100      50000.0    500.0     25.0      df = pd.read_csv(...)
+#     11       100     100000.0   1000.0     50.0      df = clean_data(df)
+#     12       100      50000.0    500.0     25.0      return df</code></pre>
+
+    <h2>요약</h2>
+
+    <p>이 장에서는 데이터 파이프라인의 관찰성과 모니터링에 대해 배웠습니다:</p>
+
+    <ul>
+      <li><strong>관찰성 3요소:</strong> 로그, 메트릭, 트레이스</li>
+      <li><strong>로그 수집:</strong> 구조화된 로깅, ELK Stack</li>
+      <li><strong>메트릭 수집:</strong> Prometheus, 커스텀 메트릭</li>
+      <li><strong>분산 트레이싱:</strong> OpenTelemetry, Jaeger</li>
+      <li><strong>알림 시스템:</strong> 다계층 알림, PagerDuty, Slack</li>
+      <li><strong>대시보드:</strong> Grafana, 핵심 메트릭 시각화</li>
+      <li><strong>데이터 품질:</strong> Great Expectations, 신선도 모니터링</li>
+      <li><strong>성능 분석:</strong> 프로파일링, 병목 지점 찾기</li>
+    </ul>
+
+    <div class="info-box">
+      <h4>모니터링 체크리스트</h4>
+      <ul>
+        <li>✅ 모든 파이프라인에 로깅 추가</li>
+        <li>✅ 핵심 메트릭 추적 (처리량, 레이턴시, 에러율)</li>
+        <li>✅ 알림 임계값 설정 (심각도별 구분)</li>
+        <li>✅ 대시보드 구축 (실시간 모니터링)</li>
+        <li>✅ 데이터 품질 검증 (Great Expectations)</li>
+        <li>✅ 신선도 모니터링 (SLA 준수)</li>
+        <li>✅ 비용 추적 (리소스 사용량)</li>
+        <li>✅ 분산 트레이싱 (엔드투엔드 가시성)</li>
+        <li>✅ 성능 프로파일링 (병목 지점 식별)</li>
+      </ul>
+    </div>
+
+    <h2>복습 문제</h2>
+
+    <ol>
+      <li>관찰성의 3요소(로그, 메트릭, 트레이스)를 각각 설명하고 차이점을 비교하세요.</li>
+      <li>구조화된 로깅이 일반 텍스트 로깅보다 나은 이유는 무엇인가요?</li>
+      <li>Prometheus의 Counter, Gauge, Histogram의 차이점과 각각의 활용 사례를 설명하세요.</li>
+      <li>분산 트레이싱이 필요한 이유와 OpenTelemetry의 역할을 설명하세요.</li>
+      <li>알림 피로(Alert Fatigue)를 방지하기 위한 전략은 무엇인가요?</li>
+      <li>데이터 신선도 SLA를 설정하고 모니터링하는 방법을 설명하세요.</li>
+      <li>Grafana 대시보드에 반드시 포함되어야 할 핵심 메트릭은 무엇인가요?</li>
+      <li>성능 프로파일링을 통해 병목 지점을 찾는 방법을 설명하세요.</li>
+    </ol>
+
+    <h2>실습 과제</h2>
+
+    <ol>
+      <li>structlog를 사용하여 구조화된 로깅을 구현하세요 (JSON 포맷).</li>
+      <li>Prometheus 메트릭을 수집하고 Grafana 대시보드를 만드세요.</li>
+      <li>Slack 알림 시스템을 구축하여 파이프라인 실패 시 알림을 보내세요.</li>
+      <li>데이터 신선도를 모니터링하는 스크립트를 작성하세요.</li>
+    </ol>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-05.html" class="nav-button">← 5장</a>
+    <a href="chapter-07.html" class="nav-button">다음: 7장 →</a>
+  </div>
+</body>
+</html>

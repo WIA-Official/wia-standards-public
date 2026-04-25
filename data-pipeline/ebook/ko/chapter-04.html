@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4장: 데이터 적재 - WIA-DATA-004</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-004 v1.0</div>
+    <h1>4장</h1>
+    <p class="subtitle">데이터 적재</p>
+    <p class="subtitle">Load의 전략</p>
+  </header>
+
+  <main>
+    <h2>4.1 데이터 로딩이란?</h2>
+
+    <p>로딩(Loading)은 ETL 파이프라인의 마지막 단계로, 변환된 데이터를 최종 목적지에 저장하는 과정입니다. 올바른 로딩 전략은 쿼리 성능, 비용, 유지보수성, 그리고 데이터 신선도에 큰 영향을 미칩니다.</p>
+
+    <p>로딩 전략을 선택할 때 고려해야 할 핵심 요소:</p>
+    <ul>
+      <li><strong>데이터 볼륨:</strong> 처리할 데이터의 크기</li>
+      <li><strong>빈도:</strong> 얼마나 자주 로딩하는가</li>
+      <li><strong>레이턴시:</strong> 실시간성 요구사항</li>
+      <li><strong>비용:</strong> 스토리지 및 컴퓨팅 비용</li>
+      <li><strong>복잡도:</strong> 구현 및 유지보수 복잡도</li>
+    </ul>
+
+    <h2>4.2 Full Load vs Incremental Load</h2>
+
+    <p>데이터 로딩의 가장 기본적인 선택은 전체 로드와 증분 로드 사이의 결정입니다.</p>
+
+    <h3>Full Load (전체 로드)</h3>
+    <p>소스의 모든 데이터를 매번 다시 로드하는 방식:</p>
+
+    <pre><code>-- 1단계: 기존 데이터 삭제
+TRUNCATE TABLE target_table;
+
+-- 2단계: 전체 데이터 로드
+INSERT INTO target_table
+SELECT * FROM source_table;</code></pre>
+
+    <p><strong>장점:</strong></p>
+    <ul>
+      <li>구현이 간단함</li>
+      <li>데이터 일관성 보장</li>
+      <li>삭제된 레코드 자동 반영</li>
+      <li>디버깅이 쉬움</li>
+    </ul>
+
+    <p><strong>단점:</strong></p>
+    <ul>
+      <li>대용량 데이터에서 비효율적</li>
+      <li>네트워크 대역폭 낭비</li>
+      <li>처리 시간 증가</li>
+      <li>비용 증가 (특히 클라우드)</li>
+    </ul>
+
+    <p><strong>적용 사례:</strong></p>
+    <ul>
+      <li>소규모 레퍼런스 테이블 (국가 코드, 제품 카테고리 등)</li>
+      <li>일별 스냅샷 테이블</li>
+      <li>데이터가 자주 변경되는 경우</li>
+    </ul>
+
+    <h3>Incremental Load (증분 로드)</h3>
+    <p>변경된 데이터만 로드하는 방식:</p>
+
+    <pre><code>-- 마지막 로드 이후 변경된 데이터만 가져오기
+INSERT INTO target_table
+SELECT *
+FROM source_table
+WHERE updated_at > (
+  SELECT MAX(updated_at) FROM target_table
+);</code></pre>
+
+    <p><strong>장점:</strong></p>
+    <ul>
+      <li>처리 시간 대폭 감소</li>
+      <li>네트워크 대역폭 절약</li>
+      <li>비용 효율적</li>
+      <li>실시간에 가까운 데이터 동기화 가능</li>
+    </ul>
+
+    <p><strong>단점:</strong></p>
+    <ul>
+      <li>구현 복잡도 증가</li>
+      <li>타임스탬프 컬럼 필요</li>
+      <li>삭제 처리가 어려움</li>
+      <li>초기 Full Load 필요</li>
+    </ul>
+
+    <p><strong>적용 사례:</strong></p>
+    <ul>
+      <li>대용량 트랜잭션 테이블</li>
+      <li>로그 데이터</li>
+      <li>자주 업데이트되는 마스터 데이터</li>
+    </ul>
+
+    <h3>전략 비교표</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>항목</th>
+          <th>Full Load</th>
+          <th>Incremental Load</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>구현 복잡도</td>
+          <td>낮음</td>
+          <td>중간~높음</td>
+        </tr>
+        <tr>
+          <td>처리 시간</td>
+          <td>오래 걸림</td>
+          <td>빠름</td>
+        </tr>
+        <tr>
+          <td>비용</td>
+          <td>높음</td>
+          <td>낮음</td>
+        </tr>
+        <tr>
+          <td>데이터 일관성</td>
+          <td>보장됨</td>
+          <td>주의 필요</td>
+        </tr>
+        <tr>
+          <td>삭제 처리</td>
+          <td>자동</td>
+          <td>별도 구현 필요</td>
+        </tr>
+        <tr>
+          <td>필수 요구사항</td>
+          <td>없음</td>
+          <td>타임스탬프/CDC</td>
+        </tr>
+        <tr>
+          <td>적합한 데이터 크기</td>
+          <td>&lt; 100만 행</td>
+          <td>&gt; 100만 행</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4.3 Upsert 패턴</h2>
+
+    <p>Upsert(Update + Insert)는 데이터가 존재하면 업데이트하고, 없으면 삽입하는 패턴입니다. 증분 로드에서 가장 많이 사용됩니다.</p>
+
+    <h3>패턴 1: MERGE 문 (표준 SQL)</h3>
+    <pre><code>MERGE INTO dim_customers AS target
+USING staging.customers AS source
+ON target.customer_id = source.customer_id
+WHEN MATCHED THEN
+  UPDATE SET
+    name = source.name,
+    email = source.email,
+    phone = source.phone,
+    updated_at = CURRENT_TIMESTAMP()
+WHEN NOT MATCHED THEN
+  INSERT (customer_id, name, email, phone, created_at, updated_at)
+  VALUES (
+    source.customer_id,
+    source.name,
+    source.email,
+    source.phone,
+    CURRENT_TIMESTAMP(),
+    CURRENT_TIMESTAMP()
+  );</code></pre>
+
+    <h3>패턴 2: INSERT ... ON CONFLICT (PostgreSQL)</h3>
+    <pre><code>INSERT INTO products (product_id, name, price, stock)
+VALUES (101, 'MacBook Pro', 2499.99, 50)
+ON CONFLICT (product_id)
+DO UPDATE SET
+  name = EXCLUDED.name,
+  price = EXCLUDED.price,
+  stock = EXCLUDED.stock,
+  updated_at = CURRENT_TIMESTAMP();</code></pre>
+
+    <h3>패턴 3: REPLACE INTO (MySQL)</h3>
+    <pre><code>REPLACE INTO users (user_id, username, email)
+VALUES (1, 'john_doe', 'john@example.com');</code></pre>
+
+    <p><strong>주의:</strong> REPLACE는 DELETE + INSERT이므로 AUTO_INCREMENT가 증가합니다.</p>
+
+    <h3>패턴 4: Delta Lake MERGE (Spark)</h3>
+    <pre><code>from delta.tables import DeltaTable
+
+deltaTable = DeltaTable.forPath(spark, "/data/events")
+
+deltaTable.alias("target").merge(
+    source.alias("source"),
+    "target.event_id = source.event_id"
+).whenMatchedUpdateAll(
+).whenNotMatchedInsertAll(
+).execute()</code></pre>
+
+    <h3>패턴 5: 두 단계 Upsert (호환성 우선)</h3>
+    <pre><code>-- 1단계: 업데이트
+UPDATE target_table t
+SET
+  name = s.name,
+  email = s.email,
+  updated_at = CURRENT_TIMESTAMP()
+FROM staging_table s
+WHERE t.user_id = s.user_id;
+
+-- 2단계: 새 레코드 삽입
+INSERT INTO target_table (user_id, name, email, created_at)
+SELECT user_id, name, email, CURRENT_TIMESTAMP()
+FROM staging_table s
+WHERE NOT EXISTS (
+  SELECT 1 FROM target_table t WHERE t.user_id = s.user_id
+);</code></pre>
+
+    <h3>Upsert 성능 최적화</h3>
+    <ul>
+      <li><strong>인덱스:</strong> JOIN 키에 인덱스 생성</li>
+      <li><strong>배치 크기:</strong> 10K-100K 레코드 단위로 처리</li>
+      <li><strong>파티셔닝:</strong> 날짜별 파티션으로 스캔 범위 축소</li>
+      <li><strong>병렬 처리:</strong> 파티션별 병렬 Upsert</li>
+    </ul>
+
+    <h2>4.4 벌크 로딩 (Bulk Loading)</h2>
+
+    <p>대용량 데이터를 효율적으로 로드하는 기법입니다. 단건 INSERT보다 100배 이상 빠릅니다.</p>
+
+    <h3>CSV 파일에서 벌크 로드</h3>
+    <pre><code>-- PostgreSQL COPY
+COPY orders (order_id, user_id, total, order_date)
+FROM '/tmp/orders.csv'
+WITH (FORMAT csv, HEADER true);
+
+-- MySQL LOAD DATA
+LOAD DATA INFILE '/tmp/orders.csv'
+INTO TABLE orders
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;</code></pre>
+
+    <h3>클라우드 스토리지에서 벌크 로드</h3>
+
+    <h4>Amazon Redshift</h4>
+    <pre><code>COPY orders
+FROM 's3://my-bucket/data/orders/'
+IAM_ROLE 'arn:aws:iam::123456789:role/RedshiftLoadRole'
+FORMAT AS PARQUET;</code></pre>
+
+    <h4>Google BigQuery</h4>
+    <pre><code>bq load \
+  --source_format=PARQUET \
+  --autodetect \
+  my_dataset.orders \
+  gs://my-bucket/data/orders/*.parquet</code></pre>
+
+    <h4>Snowflake</h4>
+    <pre><code>COPY INTO orders
+FROM @my_s3_stage/orders/
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;</code></pre>
+
+    <h3>Python에서 벌크 로드</h3>
+    <pre><code>import pandas as pd
+from sqlalchemy import create_engine
+
+# 데이터 준비
+df = pd.read_csv('orders.csv')
+
+# 데이터베이스 연결
+engine = create_engine('postgresql://user:pass@localhost/db')
+
+# 벌크 로드 (기본: 1000 rows씩 배치)
+df.to_sql(
+    'orders',
+    engine,
+    if_exists='append',
+    index=False,
+    method='multi',  # 멀티 로우 INSERT
+    chunksize=10000  # 10K씩 배치
+)</code></pre>
+
+    <h3>Spark에서 벌크 로드</h3>
+    <pre><code>df = spark.read.parquet("s3://bucket/data/")
+
+df.write \
+  .format("jdbc") \
+  .option("url", "jdbc:postgresql://localhost/db") \
+  .option("dbtable", "orders") \
+  .option("user", "user") \
+  .option("password", "password") \
+  .option("batchsize", 100000) \
+  .mode("append") \
+  .save()</code></pre>
+
+    <h3>벌크 로딩 최적화 팁</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>기법</th>
+          <th>설명</th>
+          <th>성능 향상</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>인덱스 비활성화</td>
+          <td>로드 전 인덱스 제거, 로드 후 재생성</td>
+          <td>2-5배</td>
+        </tr>
+        <tr>
+          <td>제약조건 비활성화</td>
+          <td>FK, CHECK 제약 임시 비활성화</td>
+          <td>1.5-3배</td>
+        </tr>
+        <tr>
+          <td>압축 포맷 사용</td>
+          <td>Parquet, ORC 사용</td>
+          <td>5-10배</td>
+        </tr>
+        <tr>
+          <td>병렬 로드</td>
+          <td>파티션별 병렬 로딩</td>
+          <td>N배 (워커 수)</td>
+        </tr>
+        <tr>
+          <td>배치 크기 조정</td>
+          <td>10K-100K rows per batch</td>
+          <td>10-100배</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4.5 스트리밍 로딩</h2>
+
+    <p>실시간 데이터를 지속적으로 로드하는 방식입니다. 배치 로딩과 달리 데이터가 도착하는 즉시 처리합니다.</p>
+
+    <h3>Kafka to Database</h3>
+    <pre><code>from kafka import KafkaConsumer
+import psycopg2
+
+consumer = KafkaConsumer(
+    'orders-topic',
+    bootstrap_servers=['localhost:9092'],
+    group_id='order-loader'
+)
+
+conn = psycopg2.connect("dbname=mydb user=user")
+cursor = conn.cursor()
+
+batch = []
+BATCH_SIZE = 1000
+
+for message in consumer:
+    order = json.loads(message.value)
+    batch.append((
+        order['order_id'],
+        order['user_id'],
+        order['total']
+    ))
+
+    # 배치가 차면 벌크 삽입
+    if len(batch) >= BATCH_SIZE:
+        cursor.executemany(
+            "INSERT INTO orders VALUES (%s, %s, %s)",
+            batch
+        )
+        conn.commit()
+        batch = []</code></pre>
+
+    <h3>Spark Structured Streaming</h3>
+    <pre><code>from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("StreamingLoader").getOrCreate()
+
+# Kafka에서 스트림 읽기
+df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "orders") \
+    .load()
+
+# JSON 파싱
+orders = df.selectExpr("CAST(value AS STRING)") \
+    .select(from_json("value", schema).alias("data")) \
+    .select("data.*")
+
+# 데이터베이스에 스트리밍 쓰기
+query = orders.writeStream \
+    .foreachBatch(lambda df, epoch_id: df.write.jdbc(
+        url="jdbc:postgresql://localhost/db",
+        table="orders",
+        mode="append"
+    )) \
+    .trigger(processingTime='10 seconds') \
+    .start()
+
+query.awaitTermination()</code></pre>
+
+    <h3>Flink to PostgreSQL</h3>
+    <pre><code>StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+DataStream<Order> orders = env
+    .addSource(new FlinkKafkaConsumer<>("orders", schema, properties));
+
+orders.addSink(JdbcSink.sink(
+    "INSERT INTO orders (order_id, user_id, total) VALUES (?, ?, ?)",
+    (statement, order) -> {
+        statement.setLong(1, order.getOrderId());
+        statement.setLong(2, order.getUserId());
+        statement.setDouble(3, order.getTotal());
+    },
+    JdbcExecutionOptions.builder()
+        .withBatchSize(1000)
+        .withBatchIntervalMs(200)
+        .withMaxRetries(3)
+        .build(),
+    new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
+        .withUrl("jdbc:postgresql://localhost/db")
+        .withDriverName("org.postgresql.Driver")
+        .build()
+));
+
+env.execute("Stream to PostgreSQL");</code></pre>
+
+    <h3>스트리밍 로딩 고려사항</h3>
+    <ul>
+      <li><strong>백프레셔:</strong> 소스가 목적지보다 빠를 때 처리</li>
+      <li><strong>체크포인팅:</strong> 장애 복구를 위한 상태 저장</li>
+      <li><strong>정확히 한 번:</strong> 중복 방지 메커니즘</li>
+      <li><strong>지연 허용:</strong> 늦게 도착하는 데이터 처리</li>
+    </ul>
+
+    <h2>4.6 적재 목적지별 전략</h2>
+
+    <h3>Data Warehouse</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>플랫폼</th>
+          <th>권장 전략</th>
+          <th>파일 포맷</th>
+          <th>특징</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Snowflake</td>
+          <td>Bulk COPY</td>
+          <td>Parquet</td>
+          <td>자동 최적화, 클러스터링</td>
+        </tr>
+        <tr>
+          <td>BigQuery</td>
+          <td>Load Jobs</td>
+          <td>Avro, Parquet</td>
+          <td>서버리스, 파티셔닝 필수</td>
+        </tr>
+        <tr>
+          <td>Redshift</td>
+          <td>COPY from S3</td>
+          <td>Parquet, ORC</td>
+          <td>DIST KEY, SORT KEY 중요</td>
+        </tr>
+        <tr>
+          <td>Synapse</td>
+          <td>PolyBase</td>
+          <td>Parquet</td>
+          <td>분산 처리, 통계 필요</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Data Lake</h3>
+    <pre><code># Parquet로 파티션 저장
+df.write \
+  .partitionBy("year", "month", "day") \
+  .mode("append") \
+  .parquet("s3://lake/orders/")
+
+# 파티션 구조:
+# s3://lake/orders/year=2025/month=12/day=26/part-0000.parquet</code></pre>
+
+    <h3>OLTP Database</h3>
+    <pre><code>-- 트랜잭션 처리
+BEGIN;
+
+INSERT INTO orders VALUES (...);
+INSERT INTO order_items VALUES (...);
+UPDATE inventory SET stock = stock - 1 WHERE product_id = 123;
+
+COMMIT;</code></pre>
+
+    <h2>4.7 파티셔닝 전략</h2>
+
+    <h3>날짜 파티셔닝 (가장 일반적)</h3>
+    <pre><code>-- PostgreSQL
+CREATE TABLE orders (
+    order_id BIGINT,
+    user_id BIGINT,
+    total DECIMAL(10,2),
+    order_date DATE
+) PARTITION BY RANGE (order_date);
+
+CREATE TABLE orders_2025_01 PARTITION OF orders
+FOR VALUES FROM ('2025-01-01') TO ('2025-02-01');
+
+CREATE TABLE orders_2025_02 PARTITION OF orders
+FOR VALUES FROM ('2025-02-01') TO ('2025-03-01');</code></pre>
+
+    <h3>해시 파티셔닝</h3>
+    <pre><code>CREATE TABLE users (
+    user_id BIGINT,
+    username VARCHAR(50),
+    email VARCHAR(100)
+) PARTITION BY HASH (user_id);
+
+CREATE TABLE users_p0 PARTITION OF users
+FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+
+CREATE TABLE users_p1 PARTITION OF users
+FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+-- ... p2, p3</code></pre>
+
+    <h3>리스트 파티셔닝</h3>
+    <pre><code>CREATE TABLE sales (
+    sale_id BIGINT,
+    region VARCHAR(20),
+    amount DECIMAL(10,2)
+) PARTITION BY LIST (region);
+
+CREATE TABLE sales_asia PARTITION OF sales
+FOR VALUES IN ('KR', 'JP', 'CN', 'SG');
+
+CREATE TABLE sales_europe PARTITION OF sales
+FOR VALUES IN ('UK', 'FR', 'DE', 'IT');</code></pre>
+
+    <h2>4.8 인덱싱 전략</h2>
+
+    <h3>인덱스 타입별 활용</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>인덱스 타입</th>
+          <th>용도</th>
+          <th>예시</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>B-Tree (기본)</td>
+          <td>범위 검색, 정렬</td>
+          <td>날짜, ID, 숫자</td>
+        </tr>
+        <tr>
+          <td>Hash</td>
+          <td>등호 검색</td>
+          <td>고유 키</td>
+        </tr>
+        <tr>
+          <td>GIN</td>
+          <td>배열, JSON, 전문검색</td>
+          <td>태그, 문서</td>
+        </tr>
+        <tr>
+          <td>GiST</td>
+          <td>지리 데이터</td>
+          <td>위치 정보</td>
+        </tr>
+        <tr>
+          <td>BRIN</td>
+          <td>대용량 정렬 데이터</td>
+          <td>시계열 데이터</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <pre><code>-- B-Tree 인덱스
+CREATE INDEX idx_orders_date ON orders(order_date);
+
+-- 복합 인덱스
+CREATE INDEX idx_orders_user_date ON orders(user_id, order_date DESC);
+
+-- 부분 인덱스
+CREATE INDEX idx_active_users ON users(user_id)
+WHERE status = 'active';
+
+-- 표현식 인덱스
+CREATE INDEX idx_lower_email ON users(LOWER(email));</code></pre>
+
+    <h2>4.9 성능 최적화</h2>
+
+    <h3>로딩 전 최적화</h3>
+    <pre><code>-- 인덱스 비활성화
+DROP INDEX idx_orders_user_date;
+DROP INDEX idx_orders_date;
+
+-- 제약조건 비활성화
+ALTER TABLE orders DISABLE TRIGGER ALL;
+
+-- 벌크 로드 실행
+COPY orders FROM '/data/orders.csv' CSV;
+
+-- 인덱스 재생성
+CREATE INDEX idx_orders_user_date ON orders(user_id, order_date);
+CREATE INDEX idx_orders_date ON orders(order_date);
+
+-- 제약조건 활성화
+ALTER TABLE orders ENABLE TRIGGER ALL;
+
+-- 통계 업데이트
+ANALYZE orders;</code></pre>
+
+    <h3>병렬 로딩</h3>
+    <pre><code>import concurrent.futures
+from sqlalchemy import create_engine
+
+def load_partition(partition_date):
+    engine = create_engine(DATABASE_URL)
+    df = pd.read_parquet(f's3://bucket/data/{partition_date}/')
+    df.to_sql('orders', engine, if_exists='append', index=False)
+    print(f"Loaded {partition_date}")
+
+dates = ['2025-12-01', '2025-12-02', '2025-12-03', ...]
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    executor.map(load_partition, dates)</code></pre>
+
+    <h3>압축 포맷 비교</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>포맷</th>
+          <th>압축률</th>
+          <th>읽기 속도</th>
+          <th>쓰기 속도</th>
+          <th>용도</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CSV</td>
+          <td>1x</td>
+          <td>느림</td>
+          <td>빠름</td>
+          <td>간단한 전송</td>
+        </tr>
+        <tr>
+          <td>Parquet</td>
+          <td>5-10x</td>
+          <td>빠름</td>
+          <td>중간</td>
+          <td>분석 워크로드</td>
+        </tr>
+        <tr>
+          <td>ORC</td>
+          <td>5-10x</td>
+          <td>빠름</td>
+          <td>중간</td>
+          <td>Hive, Spark</td>
+        </tr>
+        <tr>
+          <td>Avro</td>
+          <td>3-5x</td>
+          <td>중간</td>
+          <td>빠름</td>
+          <td>스트리밍</td>
+        </tr>
+        <tr>
+          <td>JSON</td>
+          <td>1-2x</td>
+          <td>느림</td>
+          <td>빠름</td>
+          <td>API, 로그</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4.10 에러 핸들링</h2>
+
+    <h3>배드 레코드 처리</h3>
+    <pre><code>-- Redshift: 에러 허용
+COPY orders FROM 's3://bucket/data/'
+IAM_ROLE 'arn:aws:iam::123456789:role/RedshiftRole'
+MAXERROR 100;  -- 100개까지 에러 허용
+
+-- BigQuery: 에러 테이블 저장
+bq load \
+  --max_bad_records=100 \
+  --error_destination_table=dataset.load_errors \
+  dataset.orders \
+  gs://bucket/data/*.csv</code></pre>
+
+    <h3>Dead Letter Queue 패턴</h3>
+    <pre><code>def load_with_dlq(records):
+    good_records = []
+    bad_records = []
+
+    for record in records:
+        try:
+            validated = validate_and_transform(record)
+            good_records.append(validated)
+        except Exception as e:
+            bad_records.append({
+                'record': record,
+                'error': str(e),
+                'timestamp': datetime.now()
+            })
+
+    # 정상 레코드는 타겟 테이블로
+    if good_records:
+        load_to_target(good_records)
+
+    # 에러 레코드는 DLQ로
+    if bad_records:
+        load_to_dlq(bad_records)</code></pre>
+
+    <h2>요약</h2>
+
+    <p>이 장에서는 데이터 로딩의 다양한 전략과 기법을 배웠습니다:</p>
+
+    <ul>
+      <li><strong>Full Load vs Incremental:</strong> 데이터 크기와 변경 빈도에 따른 선택</li>
+      <li><strong>Upsert 패턴:</strong> 데이터 병합을 위한 다양한 SQL 기법</li>
+      <li><strong>벌크 로딩:</strong> 대용량 데이터를 효율적으로 로드하는 방법</li>
+      <li><strong>스트리밍 로딩:</strong> 실시간 데이터 처리</li>
+      <li><strong>파티셔닝과 인덱싱:</strong> 쿼리 성능 최적화</li>
+      <li><strong>성능 최적화:</strong> 병렬 처리, 압축, 인덱스 관리</li>
+    </ul>
+
+    <div class="info-box">
+      <h4>핵심 원칙</h4>
+      <ul>
+        <li>데이터 크기에 맞는 로딩 전략 선택</li>
+        <li>가능한 한 벌크 로딩 사용</li>
+        <li>파티셔닝으로 쿼리 성능 향상</li>
+        <li>압축 포맷으로 비용 절감</li>
+        <li>에러 핸들링으로 데이터 품질 보장</li>
+      </ul>
+    </div>
+
+    <h2>복습 문제</h2>
+
+    <ol>
+      <li>Full Load와 Incremental Load의 차이점과 각각의 적용 사례를 설명하세요.</li>
+      <li>Upsert 작업을 구현하는 3가지 이상의 방법을 제시하세요.</li>
+      <li>벌크 로딩이 단건 INSERT보다 빠른 이유는 무엇인가요?</li>
+      <li>1억 건의 데이터를 로드할 때 고려해야 할 최적화 기법을 나열하세요.</li>
+      <li>파티셔닝 전략 중 날짜 파티셔닝이 가장 많이 사용되는 이유는?</li>
+      <li>스트리밍 로딩과 배치 로딩의 차이점과 각각의 장단점을 비교하세요.</li>
+      <li>Parquet 포맷이 CSV보다 분석 워크로드에 적합한 이유를 설명하세요.</li>
+      <li>Dead Letter Queue 패턴이 필요한 이유와 구현 방법을 설명하세요.</li>
+    </ol>
+
+    <h2>실습 과제</h2>
+
+    <ol>
+      <li>100만 건의 CSV 데이터를 PostgreSQL에 로드하는 스크립트를 작성하세요 (벌크 로딩 사용).</li>
+      <li>Incremental Load 파이프라인을 구현하세요 (타임스탬프 기반).</li>
+      <li>Kafka에서 데이터를 읽어 데이터베이스에 스트리밍 로드하는 프로그램을 작성하세요.</li>
+      <li>날짜별 파티셔닝된 테이블을 생성하고, 쿼리 성능을 비교하세요.</li>
+    </ol>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-03.html" class="nav-button">← 3장</a>
+    <a href="chapter-05.html" class="nav-button">다음: 5장 →</a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-DATA-004 - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #3B82F6;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Top Navigation */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        /* Tabs */
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panels */
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        /* Forms */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; font-family: 'Monaco', 'Menlo', monospace; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+        .form-group textarea { min-height: 150px; resize: vertical; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        /* Buttons */
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
+
+        /* Output */
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        /* Pipeline Visualization */
+        .pipeline-viz { display: flex; align-items: center; gap: 15px; padding: 30px; background: var(--bg); border-radius: 10px; margin: 20px 0; overflow-x: auto; }
+        .pipeline-stage { background: var(--bg-card); border: 2px solid var(--border); border-radius: 10px; padding: 20px; min-width: 150px; text-align: center; transition: all 0.3s; }
+        .pipeline-stage:hover { border-color: var(--primary); transform: scale(1.05); }
+        .pipeline-stage.active { border-color: var(--primary); background: rgba(16, 185, 129, 0.1); }
+        .pipeline-stage .icon { font-size: 2rem; margin-bottom: 10px; }
+        .pipeline-stage .name { font-weight: 600; margin-bottom: 5px; }
+        .pipeline-stage .status { font-size: 0.8rem; color: var(--text-muted); }
+        .pipeline-arrow { color: var(--primary); font-size: 1.5rem; }
+
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; }
+        .stat-card .value { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        .stat-card .label { font-size: 0.85rem; color: var(--text-muted); margin-top: 5px; }
+
+        /* Log Display */
+        .log-container { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin: 20px 0; max-height: 300px; overflow-y: auto; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; }
+        .log-entry { padding: 5px 0; border-bottom: 1px solid var(--border); }
+        .log-entry:last-child { border-bottom: none; }
+        .log-entry.success { color: var(--primary); }
+        .log-entry.error { color: var(--danger); }
+        .log-entry.warning { color: var(--warning); }
+
+        /* Footer */
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .pipeline-viz { flex-direction: column; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">DATA-004</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank" data-en="🎮 109+ Simulators" data-ko="🎮 109+ 시뮬레이터">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header>
+            <div class="logo">🔄 WIA-DATA-004</div>
+        </header>
+
+        <!-- Hero -->
+        <section class="hero">
+            <h1 data-en="Data Pipeline Simulator" data-ko="데이터 파이프라인 시뮬레이터">Data Pipeline Simulator</h1>
+            <p data-en="Explore ETL/ELT patterns, orchestration, and monitoring" data-ko="ETL/ELT 패턴, 오케스트레이션, 모니터링 탐색">Explore ETL/ELT patterns, orchestration, and monitoring</p>
+            <p class="philosophy" data-en="弘益人間 - Benefit All Humanity" data-ko="弘益人間 - 널리 인간을 이롭게 하라">弘益人間 - Benefit All Humanity</p>
+        </section>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📥 Ingestion" data-ko="📥 수집">📥 Ingestion</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔄 Transform" data-ko="🔄 변환">🔄 Transform</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🎯 Orchestration" data-ko="🎯 오케스트레이션">🎯 Orchestration</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📊 Monitoring" data-ko="📊 모니터링">📊 Monitoring</div>
+            <div class="tab" onclick="showPanel(4)" data-en="✅ Quality" data-ko="✅ 품질">✅ Quality</div>
+        </div>
+
+        <!-- Panel 0: Ingestion -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📥 Data Ingestion" data-ko="📥 데이터 수집">📥 Data Ingestion</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Extract data from various sources" data-ko="다양한 소스에서 데이터 추출">Extract data from various sources</p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Data Source" data-ko="데이터 소스">Data Source</label>
+                    <select id="dataSource">
+                        <option value="kafka">Apache Kafka (Streaming)</option>
+                        <option value="s3">AWS S3 (Batch)</option>
+                        <option value="postgres">PostgreSQL (Database)</option>
+                        <option value="api">REST API</option>
+                        <option value="file">CSV/JSON File</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Ingestion Mode" data-ko="수집 모드">Ingestion Mode</label>
+                    <select id="ingestionMode">
+                        <option value="batch">Batch (Scheduled)</option>
+                        <option value="stream">Stream (Real-time)</option>
+                        <option value="micro-batch">Micro-batch</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Sample Data (JSON)" data-ko="샘플 데이터 (JSON)">Sample Data (JSON)</label>
+                <textarea id="sampleData" placeholder='{"user_id": 123, "event": "purchase", "amount": 99.99, "timestamp": "2025-12-26T10:00:00Z"}'></textarea>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="ingestData()" data-en="📥 Ingest Data" data-ko="📥 데이터 수집">📥 Ingest Data</button>
+                <button class="btn btn-secondary" onclick="validateSchema()" data-en="✅ Validate Schema" data-ko="✅ 스키마 검증">✅ Validate Schema</button>
+            </div>
+            <div class="output" id="ingestionOutput"></div>
+        </div>
+
+        <!-- Panel 1: Transform -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🔄 Data Transformation" data-ko="🔄 데이터 변환">🔄 Data Transformation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Transform and enrich your data" data-ko="데이터 변환 및 보강">Transform and enrich your data</p>
+
+            <div class="form-group">
+                <label data-en="Transformation Pattern" data-ko="변환 패턴">Transformation Pattern</label>
+                <select id="transformPattern">
+                    <option value="etl">ETL (Extract → Transform → Load)</option>
+                    <option value="elt">ELT (Extract → Load → Transform)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Transformations (Select multiple)" data-ko="변환 작업 (복수 선택)">Transformations</label>
+                <div style="display: grid; gap: 10px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="cleanData" checked> <span data-en="Clean & Deduplicate" data-ko="정제 및 중복 제거">Clean & Deduplicate</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="normalize" checked> <span data-en="Normalize Data" data-ko="데이터 정규화">Normalize Data</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="enrich"> <span data-en="Enrich with External Data" data-ko="외부 데이터 보강">Enrich with External Data</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="aggregate"> <span data-en="Aggregate & Group" data-ko="집계 및 그룹화">Aggregate & Group</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runTransform()" data-en="🔄 Run Transform" data-ko="🔄 변환 실행">🔄 Run Transform</button>
+            </div>
+            <div class="output" id="transformOutput"></div>
+        </div>
+
+        <!-- Panel 2: Orchestration -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🎯 Pipeline Orchestration" data-ko="🎯 파이프라인 오케스트레이션">🎯 Pipeline Orchestration</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Manage workflow dependencies and scheduling" data-ko="워크플로우 종속성 및 스케줄링 관리">Manage workflow dependencies and scheduling</p>
+
+            <div class="pipeline-viz">
+                <div class="pipeline-stage active">
+                    <div class="icon">📥</div>
+                    <div class="name">Extract</div>
+                    <div class="status">Ready</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-stage">
+                    <div class="icon">✅</div>
+                    <div class="name">Validate</div>
+                    <div class="status">Pending</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-stage">
+                    <div class="icon">🔄</div>
+                    <div class="name">Transform</div>
+                    <div class="status">Pending</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-stage">
+                    <div class="icon">💾</div>
+                    <div class="name">Load</div>
+                    <div class="status">Pending</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-stage">
+                    <div class="icon">✅</div>
+                    <div class="name">Verify</div>
+                    <div class="status">Pending</div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Orchestrator" data-ko="오케스트레이터">Orchestrator</label>
+                    <select id="orchestrator">
+                        <option value="airflow">Apache Airflow</option>
+                        <option value="prefect">Prefect</option>
+                        <option value="dagster">Dagster</option>
+                        <option value="temporal">Temporal</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Schedule" data-ko="스케줄">Schedule</label>
+                    <select id="schedule">
+                        <option value="realtime">Real-time</option>
+                        <option value="5min">Every 5 minutes</option>
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                        <option value="manual">Manual</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runPipeline()" data-en="▶️ Run Pipeline" data-ko="▶️ 파이프라인 실행">▶️ Run Pipeline</button>
+                <button class="btn btn-secondary" onclick="pausePipeline()" data-en="⏸️ Pause" data-ko="⏸️ 일시정지">⏸️ Pause</button>
+                <button class="btn btn-danger" onclick="retryFailed()" data-en="🔁 Retry Failed" data-ko="🔁 실패 재시도">🔁 Retry Failed</button>
+            </div>
+
+            <div class="log-container" id="orchestrationLogs"></div>
+        </div>
+
+        <!-- Panel 3: Monitoring -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="📊 Pipeline Monitoring" data-ko="📊 파이프라인 모니터링">📊 Pipeline Monitoring</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Track performance and detect issues" data-ko="성능 추적 및 이슈 감지">Track performance and detect issues</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="value" id="recordsProcessed">127.5K</div>
+                    <div class="label" data-en="Records Processed" data-ko="처리된 레코드">Records Processed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="throughput">2.4K/s</div>
+                    <div class="label" data-en="Throughput" data-ko="처리량">Throughput</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="latency">125ms</div>
+                    <div class="label" data-en="Avg Latency" data-ko="평균 지연">Avg Latency</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="errorRate">0.02%</div>
+                    <div class="label" data-en="Error Rate" data-ko="오류율">Error Rate</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Monitoring Tool" data-ko="모니터링 도구">Monitoring Tool</label>
+                <select id="monitoringTool">
+                    <option value="prometheus">Prometheus + Grafana</option>
+                    <option value="datadog">Datadog</option>
+                    <option value="newrelic">New Relic</option>
+                    <option value="cloudwatch">CloudWatch</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="refreshMetrics()" data-en="🔄 Refresh Metrics" data-ko="🔄 메트릭 새로고침">🔄 Refresh Metrics</button>
+                <button class="btn btn-secondary" onclick="exportMetrics()" data-en="📊 Export Metrics" data-ko="📊 메트릭 내보내기">📊 Export Metrics</button>
+                <button class="btn btn-secondary" onclick="setAlert()" data-en="🚨 Set Alert" data-ko="🚨 알림 설정">🚨 Set Alert</button>
+            </div>
+            <div class="output" id="monitoringOutput"></div>
+        </div>
+
+        <!-- Panel 4: Quality -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="✅ Data Quality" data-ko="✅ 데이터 품질">✅ Data Quality</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Ensure data accuracy and reliability" data-ko="데이터 정확성 및 신뢰성 보장">Ensure data accuracy and reliability</p>
+
+            <div class="form-group">
+                <label data-en="Quality Checks" data-ko="품질 검사">Quality Checks</label>
+                <div style="display: grid; gap: 10px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="checkSchema" checked> <span data-en="Schema Validation" data-ko="스키마 검증">Schema Validation</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="checkNull" checked> <span data-en="Null Check" data-ko="NULL 확인">Null Check</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="checkDuplicate" checked> <span data-en="Duplicate Detection" data-ko="중복 감지">Duplicate Detection</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="checkRange"> <span data-en="Range Validation" data-ko="범위 검증">Range Validation</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="checkFreshness"> <span data-en="Data Freshness" data-ko="데이터 신선도">Data Freshness</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg); border-radius: 6px;">
+                        <input type="checkbox" id="checkIdempotency" checked> <span data-en="Idempotency Check" data-ko="멱등성 확인">Idempotency Check</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Error Handling" data-ko="오류 처리">Error Handling</label>
+                    <select id="errorHandling">
+                        <option value="fail">Fail Fast</option>
+                        <option value="quarantine">Quarantine Bad Records</option>
+                        <option value="skip">Skip & Log</option>
+                        <option value="retry">Retry with Backoff</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Quality Framework" data-ko="품질 프레임워크">Quality Framework</label>
+                    <select id="qualityFramework">
+                        <option value="great-expectations">Great Expectations</option>
+                        <option value="deequ">Deequ (AWS)</option>
+                        <option value="soda">Soda</option>
+                        <option value="custom">Custom Validation</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runQualityCheck()" data-en="✅ Run Quality Check" data-ko="✅ 품질 검사 실행">✅ Run Quality Check</button>
+                <button class="btn btn-secondary" onclick="generateReport()" data-en="📄 Generate Report" data-ko="📄 보고서 생성">📄 Generate Report</button>
+            </div>
+            <div class="output" id="qualityOutput"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA-DATA-004: Building reliable data pipelines for humanity" data-ko="WIA-DATA-004: 인류를 위한 신뢰할 수 있는 데이터 파이프라인 구축">WIA-DATA-004: Building reliable data pipelines for humanity</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let pipelineRunning = false;
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateId() {
+            return 'xxxx-xxxx-xxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16));
+        }
+
+        // Ingestion functions
+        function ingestData() {
+            const source = document.getElementById('dataSource').value;
+            const mode = document.getElementById('ingestionMode').value;
+            const data = document.getElementById('sampleData').value || '{"user_id": 123, "event": "purchase"}';
+
+            document.getElementById('ingestionOutput').textContent = JSON.stringify({
+                status: '✅ Data Ingested Successfully',
+                ingestionId: 'ING-' + generateId(),
+                source: source,
+                mode: mode,
+                recordsIngested: Math.floor(Math.random() * 10000) + 1000,
+                bytesProcessed: (Math.random() * 100).toFixed(2) + ' MB',
+                duration: (Math.random() * 5).toFixed(2) + 's',
+                sampleRecord: JSON.parse(data),
+                message: currentLang === 'ko' ? '데이터가 성공적으로 수집되었습니다' : 'Data ingested successfully',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function validateSchema() {
+            document.getElementById('ingestionOutput').textContent = JSON.stringify({
+                status: '✅ Schema Valid',
+                validationId: 'VAL-' + generateId(),
+                schemaVersion: '1.0.0',
+                fieldsValidated: ['user_id', 'event', 'amount', 'timestamp'],
+                dataTypes: {
+                    user_id: 'integer',
+                    event: 'string',
+                    amount: 'decimal',
+                    timestamp: 'ISO8601'
+                },
+                message: currentLang === 'ko' ? '스키마가 유효합니다' : 'Schema is valid',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Transform functions
+        function runTransform() {
+            const pattern = document.getElementById('transformPattern').value;
+            const transformations = [];
+            if (document.getElementById('cleanData').checked) transformations.push('clean');
+            if (document.getElementById('normalize').checked) transformations.push('normalize');
+            if (document.getElementById('enrich').checked) transformations.push('enrich');
+            if (document.getElementById('aggregate').checked) transformations.push('aggregate');
+
+            document.getElementById('transformOutput').textContent = JSON.stringify({
+                status: '✅ Transformation Complete',
+                transformId: 'TRF-' + generateId(),
+                pattern: pattern.toUpperCase(),
+                transformationsApplied: transformations,
+                recordsBefore: 127500,
+                recordsAfter: 125800,
+                recordsCleaned: 1700,
+                duration: (Math.random() * 10 + 5).toFixed(2) + 's',
+                message: currentLang === 'ko' ? '데이터 변환이 완료되었습니다' : 'Data transformation complete',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Orchestration functions
+        function runPipeline() {
+            pipelineRunning = true;
+            const orchestrator = document.getElementById('orchestrator').value;
+            const schedule = document.getElementById('schedule').value;
+
+            const logs = document.getElementById('orchestrationLogs');
+            logs.innerHTML = '';
+
+            const stages = ['Extract', 'Validate', 'Transform', 'Load', 'Verify'];
+            let currentStage = 0;
+
+            function updateStage() {
+                if (currentStage < stages.length) {
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'log-entry success';
+                    logEntry.textContent = `[${new Date().toISOString()}] ✅ ${stages[currentStage]} completed`;
+                    logs.appendChild(logEntry);
+
+                    // Update visual stages
+                    document.querySelectorAll('.pipeline-stage').forEach((stage, i) => {
+                        if (i <= currentStage) {
+                            stage.classList.add('active');
+                            stage.querySelector('.status').textContent = 'Complete';
+                        }
+                    });
+
+                    currentStage++;
+                    if (currentStage < stages.length) {
+                        setTimeout(updateStage, 1000);
+                    } else {
+                        const finalLog = document.createElement('div');
+                        finalLog.className = 'log-entry success';
+                        finalLog.textContent = `[${new Date().toISOString()}] 🎉 Pipeline completed successfully`;
+                        logs.appendChild(finalLog);
+                    }
+                }
+            }
+
+            updateStage();
+        }
+
+        function pausePipeline() {
+            pipelineRunning = false;
+            const logs = document.getElementById('orchestrationLogs');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry warning';
+            logEntry.textContent = `[${new Date().toISOString()}] ⏸️ Pipeline paused by user`;
+            logs.appendChild(logEntry);
+        }
+
+        function retryFailed() {
+            const logs = document.getElementById('orchestrationLogs');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry success';
+            logEntry.textContent = `[${new Date().toISOString()}] 🔁 Retrying failed tasks...`;
+            logs.appendChild(logEntry);
+        }
+
+        // Monitoring functions
+        function refreshMetrics() {
+            document.getElementById('recordsProcessed').textContent = (Math.random() * 200 + 100).toFixed(1) + 'K';
+            document.getElementById('throughput').textContent = (Math.random() * 5 + 1).toFixed(1) + 'K/s';
+            document.getElementById('latency').textContent = Math.floor(Math.random() * 200 + 50) + 'ms';
+            document.getElementById('errorRate').textContent = (Math.random() * 0.1).toFixed(3) + '%';
+
+            document.getElementById('monitoringOutput').textContent = JSON.stringify({
+                status: '✅ Metrics Refreshed',
+                timestamp: new Date().toISOString(),
+                message: currentLang === 'ko' ? '메트릭이 업데이트되었습니다' : 'Metrics updated'
+            }, null, 2);
+        }
+
+        function exportMetrics() {
+            document.getElementById('monitoringOutput').textContent = JSON.stringify({
+                status: '✅ Metrics Exported',
+                exportId: 'EXP-' + generateId(),
+                format: 'JSON',
+                metrics: {
+                    recordsProcessed: document.getElementById('recordsProcessed').textContent,
+                    throughput: document.getElementById('throughput').textContent,
+                    latency: document.getElementById('latency').textContent,
+                    errorRate: document.getElementById('errorRate').textContent
+                },
+                message: currentLang === 'ko' ? '메트릭이 내보내기되었습니다' : 'Metrics exported',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function setAlert() {
+            document.getElementById('monitoringOutput').textContent = JSON.stringify({
+                status: '✅ Alert Configured',
+                alertId: 'ALT-' + generateId(),
+                triggers: [
+                    { metric: 'error_rate', condition: '> 1%', action: 'notify_slack' },
+                    { metric: 'latency', condition: '> 500ms', action: 'notify_email' },
+                    { metric: 'throughput', condition: '< 100/s', action: 'notify_pagerduty' }
+                ],
+                message: currentLang === 'ko' ? '알림이 설정되었습니다' : 'Alerts configured',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Quality functions
+        function runQualityCheck() {
+            const checks = [];
+            if (document.getElementById('checkSchema').checked) checks.push('schema');
+            if (document.getElementById('checkNull').checked) checks.push('null_check');
+            if (document.getElementById('checkDuplicate').checked) checks.push('duplicate');
+            if (document.getElementById('checkRange').checked) checks.push('range');
+            if (document.getElementById('checkFreshness').checked) checks.push('freshness');
+            if (document.getElementById('checkIdempotency').checked) checks.push('idempotency');
+
+            const errorHandling = document.getElementById('errorHandling').value;
+            const framework = document.getElementById('qualityFramework').value;
+
+            document.getElementById('qualityOutput').textContent = JSON.stringify({
+                status: '✅ Quality Check Passed',
+                checkId: 'QC-' + generateId(),
+                framework: framework,
+                checksPerformed: checks,
+                results: {
+                    totalRecords: 125800,
+                    validRecords: 125750,
+                    invalidRecords: 50,
+                    duplicates: 12,
+                    nullValues: 23,
+                    schemaViolations: 15,
+                    qualityScore: 99.96
+                },
+                errorHandling: errorHandling,
+                message: currentLang === 'ko' ? '데이터 품질 검사 통과' : 'Data quality check passed',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function generateReport() {
+            document.getElementById('qualityOutput').textContent = JSON.stringify({
+                status: '✅ Report Generated',
+                reportId: 'RPT-' + generateId(),
+                reportType: 'Data Quality Summary',
+                summary: {
+                    totalPipelines: 5,
+                    successfulRuns: 47,
+                    failedRuns: 3,
+                    avgQualityScore: 99.87,
+                    dataProcessed: '2.3 TB',
+                    uptime: '99.95%'
+                },
+                recommendations: [
+                    currentLang === 'ko' ? '중복 제거 규칙 강화' : 'Strengthen deduplication rules',
+                    currentLang === 'ko' ? 'NULL 값 처리 개선' : 'Improve null value handling',
+                    currentLang === 'ko' ? '스키마 버전 관리 도입' : 'Implement schema versioning'
+                ],
+                message: currentLang === 'ko' ? '품질 보고서가 생성되었습니다' : 'Quality report generated',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang('en');
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

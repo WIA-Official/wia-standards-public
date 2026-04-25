@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2장: 데이터 수집 - WIA-DATA-004</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-004 v1.0</div>
+    <h1>2장</h1>
+    <p class="subtitle">데이터 수집</p>
+    <p class="subtitle">Extract의 기술</p>
+  </header>
+
+  <main>
+    <h2>2.1 데이터 수집이란?</h2>
+
+    <p>데이터 수집(Data Ingestion)은 다양한 소스에서 데이터를 추출하여 파이프라인으로 가져오는 첫 번째 단계입니다. 이 단계의 품질이 전체 파이프라인의 품질을 결정합니다.</p>
+
+    <div class="info-box">
+      <h4>Garbage In, Garbage Out</h4>
+      <p>잘못된 데이터를 수집하면 아무리 좋은 변환을 해도 결과는 쓸모없습니다. 수집 단계에서 데이터 품질을 검증하는 것이 핵심입니다.</p>
+    </div>
+
+    <h2>2.2 수집 패턴</h2>
+
+    <h3>Full Load (전체 적재)</h3>
+    <p><strong>개념:</strong> 매번 전체 데이터를 다시 가져옴</p>
+    <pre><code>Day 1: 1만 건 로드
+Day 2: 1.2만 건 로드 (전체)
+Day 3: 1.5만 건 로드 (전체)
+</code></pre>
+    <p><strong>장점:</strong></p>
+    <ul>
+      <li>구현 간단</li>
+      <li>데이터 일관성 보장</li>
+      <li>삭제된 레코드도 반영</li>
+    </ul>
+    <p><strong>단점:</strong></p>
+    <ul>
+      <li>비효율적 (같은 데이터 반복 전송)</li>
+      <li>소스 시스템에 부하</li>
+      <li>처리 시간 증가</li>
+    </ul>
+    <p><strong>적합한 경우:</strong></p>
+    <ul>
+      <li>데이터가 작을 때 (수천 건)</li>
+      <li>삭제 추적이 중요할 때</li>
+      <li>단순함이 우선일 때</li>
+    </ul>
+
+    <h3>Incremental Load (증분 적재)</h3>
+    <p><strong>개념:</strong> 변경된 데이터만 가져옴</p>
+    <pre><code>Day 1: 1만 건 로드
+Day 2: 2천 건 로드 (신규/변경분만)
+Day 3: 3천 건 로드 (신규/변경분만)
+</code></pre>
+    <p><strong>장점:</strong></p>
+    <ul>
+      <li>효율적 (변경분만 전송)</li>
+      <li>빠른 처리</li>
+      <li>소스 시스템 부하 감소</li>
+    </ul>
+    <p><strong>단점:</strong></p>
+    <ul>
+      <li>구현 복잡</li>
+      <li>변경 감지 메커니즘 필요</li>
+      <li>삭제 추적 어려움</li>
+    </ul>
+    <p><strong>변경 감지 방법:</strong></p>
+    <ol>
+      <li><strong>Timestamp:</strong> updated_at 컬럼 사용</li>
+      <li><strong>Version:</strong> version 번호 증가</li>
+      <li><strong>CDC:</strong> 데이터베이스 로그 읽기</li>
+    </ol>
+
+    <h3>Change Data Capture (CDC)</h3>
+    <p>데이터베이스의 변경 로그를 읽어서 실시간으로 변경사항 추적:</p>
+    <pre><code>MySQL Binlog:
+INSERT INTO users VALUES (123, 'Alice')
+UPDATE users SET email='alice@new.com' WHERE id=123
+DELETE FROM users WHERE id=456
+</code></pre>
+    <p><strong>장점:</strong></p>
+    <ul>
+      <li>실시간 변경 감지</li>
+      <li>Insert/Update/Delete 모두 추적</li>
+      <li>소스 시스템 영향 최소</li>
+    </ul>
+    <p><strong>도구:</strong></p>
+    <ul>
+      <li>Debezium (오픈소스)</li>
+      <li>Maxwell</li>
+      <li>Airbyte</li>
+      <li>Fivetran</li>
+    </ul>
+
+    <h2>2.3 데이터 소스별 수집 방법</h2>
+
+    <h3>관계형 데이터베이스</h3>
+    <pre><code>-- PostgreSQL에서 증분 로드
+SELECT * FROM orders
+WHERE updated_at > '2025-12-25 00:00:00'
+ORDER BY updated_at
+LIMIT 10000;
+</code></pre>
+    <p><strong>주의사항:</strong></p>
+    <ul>
+      <li>인덱스 확인 (updated_at에 인덱스 필요)</li>
+      <li>타임존 일관성</li>
+      <li>페이지네이션 (메모리 부족 방지)</li>
+      <li>커넥션 풀 관리</li>
+    </ul>
+
+    <h3>REST API</h3>
+    <pre><code>import requests
+import time
+
+def fetch_api_data(endpoint, since_timestamp):
+    page = 1
+    all_data = []
+
+    while True:
+        response = requests.get(
+            f"{endpoint}?since={since_timestamp}&page={page}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        if response.status_code == 429:  # Rate limit
+            time.sleep(60)
+            continue
+
+        data = response.json()
+        if not data:
+            break
+
+        all_data.extend(data)
+        page += 1
+        time.sleep(0.1)  # 예의있게
+
+    return all_data
+</code></pre>
+    <p><strong>주의사항:</strong></p>
+    <ul>
+      <li>Rate limiting (속도 제한)</li>
+      <li>재시도 로직 (네트워크 오류)</li>
+      <li>페이지네이션</li>
+      <li>인증 토큰 갱신</li>
+    </ul>
+
+    <h3>Kafka 스트림</h3>
+    <pre><code>from kafka import KafkaConsumer
+
+consumer = KafkaConsumer(
+    'user-events',
+    bootstrap_servers=['localhost:9092'],
+    group_id='pipeline-consumer',
+    auto_offset_reset='earliest',
+    enable_auto_commit=False
+)
+
+for message in consumer:
+    process_event(message.value)
+    consumer.commit()  # 처리 성공 후 커밋
+</code></pre>
+    <p><strong>주의사항:</strong></p>
+    <ul>
+      <li>Consumer Group 관리</li>
+      <li>오프셋 관리 (정확히 한 번 처리)</li>
+      <li>Backpressure 처리</li>
+      <li>파티션 리밸런싱</li>
+    </ul>
+
+    <h3>CSV/JSON 파일</h3>
+    <pre><code>import pandas as pd
+from pathlib import Path
+
+def process_files(directory):
+    for file_path in Path(directory).glob('*.csv'):
+        # 청크 단위로 읽기 (메모리 효율)
+        for chunk in pd.read_csv(file_path, chunksize=10000):
+            validate_chunk(chunk)
+            transform_chunk(chunk)
+            load_chunk(chunk)
+
+        # 처리 완료 후 아카이브
+        archive_file(file_path)
+</code></pre>
+
+    <h2>2.4 데이터 검증</h2>
+
+    <p>수집 즉시 검증하여 문제를 조기에 발견:</p>
+
+    <h3>스키마 검증</h3>
+    <pre><code>from pydantic import BaseModel, validator
+
+class UserEvent(BaseModel):
+    user_id: int
+    event_type: str
+    timestamp: datetime
+    amount: float
+
+    @validator('amount')
+    def amount_must_be_positive(cls, v):
+        if v < 0:
+            raise ValueError('amount must be positive')
+        return v
+</code></pre>
+
+    <h3>비즈니스 룰 검증</h3>
+    <pre><code>def validate_order(order):
+    assert order['total'] > 0, "Total must be positive"
+    assert order['items'], "Order must have items"
+    assert order['user_id'] is not None, "User ID required"
+    assert order['created_at'] <= datetime.now(), "Future orders not allowed"
+</code></pre>
+
+    <h2>2.5 에러 핸들링</h2>
+
+    <h3>재시도 전략</h3>
+    <pre><code>import time
+from functools import wraps
+
+def retry_with_backoff(max_retries=3, backoff_factor=2):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    retries += 1
+                    if retries >= max_retries:
+                        raise
+                    wait_time = backoff_factor ** retries
+                    print(f"Retry {retries} after {wait_time}s: {e}")
+                    time.sleep(wait_time)
+        return wrapper
+    return decorator
+
+@retry_with_backoff(max_retries=5)
+def fetch_data_from_api(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.json()
+</code></pre>
+
+    <h3>Dead Letter Queue</h3>
+    <p>처리 실패한 데이터를 별도 저장:</p>
+    <pre><code>def process_message(message):
+    try:
+        validate(message)
+        transform(message)
+        load(message)
+    except ValidationError as e:
+        # 검증 실패 → DLQ
+        send_to_dlq(message, error=str(e))
+    except Exception as e:
+        # 기타 오류 → 재시도 큐
+        send_to_retry_queue(message)
+</code></pre>
+
+    <h2>2.6 성능 최적화</h2>
+
+    <h3>병렬 처리</h3>
+    <pre><code>from concurrent.futures import ThreadPoolExecutor
+
+def fetch_all_tables(tables):
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(fetch_table, table): table
+            for table in tables
+        }
+
+        for future in futures:
+            table = futures[future]
+            try:
+                data = future.result()
+                print(f"Fetched {len(data)} rows from {table}")
+            except Exception as e:
+                print(f"Failed to fetch {table}: {e}")
+</code></pre>
+
+    <h3>배치 처리</h3>
+    <pre><code>def fetch_in_batches(query, batch_size=10000):
+    offset = 0
+    while True:
+        batch = execute_query(
+            query + f" LIMIT {batch_size} OFFSET {offset}"
+        )
+        if not batch:
+            break
+
+        yield batch
+        offset += batch_size
+
+# 사용
+for batch in fetch_in_batches("SELECT * FROM large_table"):
+    process_batch(batch)
+</code></pre>
+
+    <h2>2.7 실전 예제: API to S3 Pipeline</h2>
+
+    <pre><code>import boto3
+import requests
+from datetime import datetime, timedelta
+
+class APItoS3Pipeline:
+    def __init__(self, api_url, s3_bucket):
+        self.api_url = api_url
+        self.s3_bucket = s3_bucket
+        self.s3_client = boto3.client('s3')
+
+    def extract(self, since_date):
+        """API에서 데이터 추출"""
+        response = requests.get(
+            self.api_url,
+            params={'since': since_date.isoformat()}
+        )
+        return response.json()
+
+    def load(self, data, key):
+        """S3에 적재"""
+        self.s3_client.put_object(
+            Bucket=self.s3_bucket,
+            Key=key,
+            Body=json.dumps(data)
+        )
+
+    def run(self):
+        """파이프라인 실행"""
+        # 어제 데이터 가져오기
+        since = datetime.now() - timedelta(days=1)
+
+        # Extract
+        print(f"Extracting data since {since}")
+        data = self.extract(since)
+        print(f"Extracted {len(data)} records")
+
+        # Load
+        key = f"raw/date={since.date()}/data.json"
+        print(f"Loading to s3://{self.s3_bucket}/{key}")
+        self.load(data, key)
+        print("Complete!")
+
+# 실행
+pipeline = APItoS3Pipeline(
+    api_url="https://api.example.com/events",
+    s3_bucket="my-data-lake"
+)
+pipeline.run()
+</code></pre>
+
+    <h2>2.8 모니터링 메트릭</h2>
+
+    <p>수집 단계에서 추적해야 할 주요 메트릭:</p>
+
+    <ul>
+      <li><strong>Records extracted:</strong> 추출된 레코드 수</li>
+      <li><strong>Extraction duration:</strong> 추출 소요 시간</li>
+      <li><strong>Error rate:</strong> 실패율</li>
+      <li><strong>Data freshness:</strong> 데이터 신선도 (얼마나 최신인가)</li>
+      <li><strong>Source lag:</strong> 소스와의 지연 시간</li>
+      <li><strong>API rate limit remaining:</strong> API 할당량 잔여</li>
+    </ul>
+
+    <div class="info-box">
+      <h4>핵심 원칙</h4>
+      <ol>
+        <li><strong>빠른 실패:</strong> 문제를 조기에 발견</li>
+        <li><strong>멱등성:</strong> 재실행해도 안전</li>
+        <li><strong>관찰성:</strong> 모든 것을 로깅</li>
+        <li><strong>복원력:</strong> 실패해도 복구</li>
+      </ol>
+    </div>
+
+    <h2>2.9 다음 장 미리보기</h2>
+
+    <p>다음 장에서는 수집한 데이터를 변환하는 방법을 배웁니다:</p>
+    <ul>
+      <li>데이터 정제 (Cleaning)</li>
+      <li>데이터 정규화 (Normalization)</li>
+      <li>데이터 보강 (Enrichment)</li>
+      <li>데이터 집계 (Aggregation)</li>
+      <li>SQL vs 코드 기반 변환</li>
+    </ul>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-01.html" class="nav-button">← 1장</a>
+    <a href="chapter-03.html" class="nav-button">다음: 3장 →</a>
+  </div>
+</body>
+</html>

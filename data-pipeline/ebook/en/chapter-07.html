@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 7 — Quality &amp; Idempotency · WIA-DATA-004</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#06B6D4;margin-top:2em}
+h1{border-bottom:3px solid #06B6D4;padding-bottom:10px}
+.standard-badge{display:inline-block;background:#1e293b;color:#06B6D4;padding:6px 12px;border-radius:6px;margin-bottom:10px}
+.subtitle{color:#94a3b8;margin:6px 0}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #06B6D4}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#06B6D4}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#22d3ee}
+.navigation{display:flex;justify-content:space-between;margin-top:60px;border-top:1px solid #334155;padding-top:20px}
+.nav-button{color:#60a5fa;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+<div class="standard-badge">WIA-DATA-004 v1.1</div>
+<h1>Chapter 7: Quality, Idempotency &amp; Durability</h1>
+<p class="subtitle">Why re-running yesterday's load must never double-count revenue</p>
+</header>
+
+<main>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> Why quality matters financially, how to validate at boundaries, idempotency in HTTP and pipeline form, exactly-once recipes, data contracts as governance, schema evolution, lineage, backpressure, and a quality-SLA scorecard you can ship next week.
+</div>
+
+<h2>7.1 Why data quality matters</h2>
+
+<p>A 2024 IBM/Forrester analysis put the cost of poor data quality at 15-25% of revenue for typical enterprises. The damage compounds: a wrong number in bronze becomes a wrong dashboard, becomes a wrong board decision, becomes a regulatory finding. Quality is not an after-thought; it is the boundary between trusted and untrusted data.</p>
+
+<h2>7.2 Validation at boundaries</h2>
+
+<p>Validate twice: at <strong>ingest</strong> (Pydantic / Avro schema) and at <strong>publish</strong> (Soda / Great Expectations). The first catches malformed records; the second catches statistical drift.</p>
+
+<h2>7.3 Idempotency</h2>
+
+<p>An operation is <strong>idempotent</strong> if applying it once or many times produces the same result. The standard requires:</p>
+
+<ul>
+<li><code>Idempotency-Key</code> on every mutating HTTP call (server caches response 24 h).</li>
+<li>Iceberg <code>MERGE INTO</code> on every loader (transactionally upsert by primary key).</li>
+<li>Deterministic surrogate keys (<code>md5(natural_key)</code>) so re-runs land on the same row.</li>
+<li>Watermark-based extracts that can be replayed without duplicates.</li>
+</ul>
+
+<pre><code>-- The classic idempotent merge
+MERGE INTO lake.orders t USING bronze.orders_in s ON t.order_id = s.order_id
+WHEN MATCHED AND s.updated_at &gt; t.updated_at THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;</code></pre>
+
+<h2>7.4 Error handling strategies</h2>
+
+<table>
+<tr><th>Strategy</th><th>When</th></tr>
+<tr><td>Retry</td><td>Transient: timeout, 5xx, rate-limit</td></tr>
+<tr><td>Quarantine</td><td>Per-record validation failure</td></tr>
+<tr><td>Fail run</td><td>Schema break, auth, structural error</td></tr>
+<tr><td>Circuit-break</td><td>Repeated failures against same downstream</td></tr>
+<tr><td>Escalate</td><td>Quality blocker — page on-call, do not auto-publish</td></tr>
+</table>
+
+<h2>7.5 Exactly-once processing</h2>
+
+<p>End-to-end exactly-once requires three pieces working in concert:</p>
+
+<ol>
+<li><strong>Idempotent producer</strong> — Kafka <code>enable.idempotence=true</code>, transactional id stable per worker.</li>
+<li><strong>Transactional consumer</strong> — <code>isolation.level=read_committed</code>, offsets committed inside producer transaction.</li>
+<li><strong>Idempotent sink</strong> — Iceberg MERGE, BigQuery Storage Write API <code>committed_offset</code>, or unique-key DELETE-INSERT.</li>
+</ol>
+
+<h2>7.6 Quality frameworks (engine-agnostic)</h2>
+
+<table>
+<tr><th>Tool</th><th>Strength</th><th>When</th></tr>
+<tr><td>Soda Core / SodaCL</td><td>Compact YAML checks, Slack-ready</td><td>Most teams; lakehouse + warehouse</td></tr>
+<tr><td>Great Expectations 1.x</td><td>Rich expectation library, profiling</td><td>Long-tail of ad-hoc checks</td></tr>
+<tr><td>dbt-tests + dbt-utils</td><td>Lives next to the model</td><td>SQL-only teams</td></tr>
+<tr><td>Pandera / Pandera-Polars</td><td>Schema-as-code in Python</td><td>Pandas / Polars pipelines</td></tr>
+</table>
+
+<h2>7.7 Data contracts (Bitol / Open Data Contract Standard 1.1.0)</h2>
+
+<pre><code>dataContractSpecification: "1.1.0"
+id: orders-clean.v1
+info:
+  title: Orders (cleaned)
+  version: 1.0.0
+  owner: data-platform@company.com
+schema:
+  models:
+    orders:
+      type: table
+      fields:
+        order_id:    { type: long, required: true, primary: true }
+        user_id:     { type: long, required: true }
+        total_cents: { type: long, required: true }
+        currency:    { type: string, required: true, format: ISO-4217 }
+        created_at:  { type: timestamp, required: true }
+quality:
+  type: SodaCL
+  specification: |
+    checks for orders:
+      - missing_count(order_id) = 0
+      - duplicate_count(order_id) = 0
+      - freshness(created_at) &lt; 1d
+servicelevels:
+  freshness: { threshold: P1D }
+  retention: { period: P7Y }
+</code></pre>
+
+<p>The contract is the agreement; the consumer can rely on the producer up to the SLA, and a violation is a contract incident, not a "what happened?" Slack thread.</p>
+
+<h2>7.8 Test-driven data</h2>
+
+<ol>
+<li>Write the failing test first (an expected-row count, a forbidden value).</li>
+<li>Build / fix the transform until the test passes.</li>
+<li>Add the check to the data contract so it stays passed.</li>
+<li>Schedule the check on every run.</li>
+</ol>
+
+<h2>7.9 Referential integrity</h2>
+
+<p>Lakehouses and most warehouses do not enforce foreign keys. The standard recommends:</p>
+
+<ul>
+<li>dbt's <code>relationships</code> test on every fact-to-dimension join.</li>
+<li>Soda CL <code>row_count</code> sanity (target rows ≥ source rows × expected ratio).</li>
+<li>Periodic <code>EXCEPT</code> queries between staging and curated layers.</li>
+</ul>
+
+<h2>7.10 Data lineage</h2>
+
+<p>Lineage is governance with teeth. Column-level lineage answers "if I change column X, what breaks?" before you change it. OpenLineage 1.21 events feed Marquez or DataHub; SQLLineage / sqlfluff parses dbt models; Iceberg tables expose column-id evolution.</p>
+
+<h2>7.11 Automated validation</h2>
+
+<pre><code># quality_gate.py — runs as the last task in every DAG
+def quality_gate(snapshot_id: str) -&gt; None:
+    result = soda.scan(
+        data_source="snowflake-prod",
+        checks_files=["contracts/orders.yml"],
+        variables={"snapshot_id": snapshot_id}
+    )
+    if result.has_failed_check_results():
+        raise RuntimeError(f"Quality gate failed: {result.summary()}")
+    publish_lineage_event(snapshot_id, "quality_pass")
+</code></pre>
+
+<h2>7.12 Schema evolution</h2>
+
+<table>
+<tr><th>Change</th><th>Action</th></tr>
+<tr><td>Add nullable column</td><td>Auto-merge schema; bump minor version</td></tr>
+<tr><td>Drop column</td><td>Bump minor version, keep column tombstoned 30 days</td></tr>
+<tr><td>Rename column</td><td>Iceberg id-rename + alias for 1 release</td></tr>
+<tr><td>Type change</td><td>Major version; require consumer migration</td></tr>
+</table>
+
+<h2>7.13 Backpressure &amp; flow control</h2>
+
+<p>Producers must slow down when sinks lag. Two mechanisms:</p>
+
+<ul>
+<li><strong>HTTP 429</strong> with <code>Retry-After</code> on REST writers.</li>
+<li><strong>Reactive Streams / Project Reactor</strong> backpressure for in-process JVM pipelines.</li>
+<li><strong>Kafka quotas</strong> per consumer group to cap downstream stress.</li>
+</ul>
+
+<h2>7.14 Transactions &amp; atomicity</h2>
+
+<p>Iceberg snapshots are atomic; the dataset is either at version N or N-1, never half-way. Multi-table transactions (e.g., <code>orders</code> + <code>order_items</code>) are coordinated through the orchestrator: load both into staging, then commit both in one merge transaction.</p>
+
+<h2>7.15 Reprocessing</h2>
+
+<p>Replays must be safe by default. The standard's three-step recipe:</p>
+
+<ol>
+<li>Roll back the watermark to the start of the bad window.</li>
+<li>Re-run the DAG with <code>--dry-run-quality</code> first; verify volume / distribution.</li>
+<li>Promote: real run, MERGE upserts overwrite the bad rows, lineage records the replay.</li>
+</ol>
+
+<h2>7.16 Quality SLA scorecard</h2>
+
+<table>
+<tr><th>Dimension</th><th>Target</th><th>Measurement</th></tr>
+<tr><td>Freshness</td><td>P95 lag &lt; 1 hour</td><td>max(updated_at) vs now</td></tr>
+<tr><td>Volume</td><td>±10% of 30-day median</td><td>row_count() vs baseline</td></tr>
+<tr><td>Schema</td><td>Zero unexpected columns</td><td>schema diff vs contract</td></tr>
+<tr><td>Distribution</td><td>K-S statistic &lt; 0.1 vs baseline</td><td>distribution check job</td></tr>
+<tr><td>Quality gate</td><td>100 % blockers pass</td><td>Soda CL run history</td></tr>
+</table>
+
+<h2>7.17 Putting it together — Quality SLI dashboard</h2>
+
+<ul>
+<li>Headline number: % of datasets meeting SLA in the last 7 days.</li>
+<li>Per-dataset row of (freshness, volume, schema, distribution) traffic lights.</li>
+<li>Drill-down to the OpenLineage run that produced the latest snapshot.</li>
+<li>Audit of the last 10 quality incidents and their resolution times.</li>
+</ul>
+
+<h2>Looking ahead</h2>
+<p>Chapter 8 brings everything together with real-world architectures — Kafka + Spark Streaming, CDC pipelines, Lambda &amp; Kappa, Data Mesh, CI/CD, cost optimisation, and a final checklist before you ship.</p>
+
+</main>
+
+<div class="navigation">
+<a href="chapter-06.html" class="nav-button">← Previous</a>
+<a href="chapter-08.html" class="nav-button">Next: Chapter 8 →</a>
+</div>
+</body>
+</html>

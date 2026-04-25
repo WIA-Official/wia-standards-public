@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 8 — Real-World Pipelines · WIA-DATA-004</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f8fafc;line-height:1.8;max-width:900px;margin:0 auto;padding:40px 20px}
+h1,h2,h3{color:#06B6D4;margin-top:2em}
+h1{border-bottom:3px solid #06B6D4;padding-bottom:10px}
+.standard-badge{display:inline-block;background:#1e293b;color:#06B6D4;padding:6px 12px;border-radius:6px;margin-bottom:10px}
+.subtitle{color:#94a3b8;margin:6px 0}
+.info-box{background:#1e293b;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #06B6D4}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{padding:12px;border:1px solid #334155}
+th{background:#1e293b;color:#06B6D4}
+pre{background:#1e293b;padding:15px;border-radius:6px;overflow-x:auto;font-size:0.9em}
+code{color:#22d3ee}
+.navigation{display:flex;justify-content:space-between;margin-top:60px;border-top:1px solid #334155;padding-top:20px}
+.nav-button{color:#60a5fa;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+<div class="standard-badge">WIA-DATA-004 v1.1</div>
+<h1>Chapter 8: Real-World Architectures</h1>
+<p class="subtitle">From "I read about it" to "I'm running it"</p>
+</header>
+
+<main>
+
+<div class="info-box">
+<strong>Chapter overview:</strong> Six production architectures drawn from real deployments — real-time Kafka + Spark Streaming, Debezium CDC, Lambda &amp; Kappa, Data Mesh, CI/CD for pipelines, and cost-optimised lakehouse — plus a final shipping checklist and the practices the standard treats as mandatory.
+</div>
+
+<h2>8.1 Real-time pipeline — Kafka + Spark Structured Streaming</h2>
+
+<pre><code>// Bronze ingest — Kafka → Iceberg
+val events = spark.readStream
+  .format("kafka")
+  .option("kafka.bootstrap.servers","kafka:9093")
+  .option("subscribe","events.orders")
+  .option("startingOffsets","earliest")
+  .option("kafka.isolation.level","read_committed")
+  .load()
+
+val parsed = events.select(
+  from_avro($"value", schemaRegistry, "orders-value").as("o"))
+  .select($"o.*", current_timestamp().as("ingest_ts"))
+
+parsed.writeStream
+  .format("iceberg")
+  .option("path","polaris-prod.bronze.orders")
+  .option("checkpointLocation","s3://checkpoints/orders/")
+  .trigger(Trigger.ProcessingTime("30 seconds"))
+  .outputMode("append")
+  .start()</code></pre>
+
+<h2>8.2 CDC pipeline — Debezium → Kafka → Iceberg MERGE</h2>
+
+<pre><code>-- streaming MERGE — Flink Iceberg sink, exactly-once
+INSERT INTO polaris-prod.lake.orders
+SELECT * FROM TABLE(
+  TUMBLE(TABLE prod-db.public.orders, DESCRIPTOR(updated_at), INTERVAL '1' MINUTES))
+GROUP BY order_id, user_id, total_cents, currency,
+         created_at, updated_at, window_start, window_end
+ON DUPLICATE order_id UPDATE WHEN s.updated_at &gt; t.updated_at;</code></pre>
+
+<p>Debezium's <code>schema.history.internal</code> topic preserves DDL events for replay; new consumers can rebuild state by replaying from the earliest offset.</p>
+
+<h2>8.3 Lambda architecture (when batch and stream both matter)</h2>
+
+<pre><code>┌────────────────────┐
+│      Source        │
+└─────┬─────────┬────┘
+      │         │
+      ▼         ▼
+┌─────────┐ ┌────────────┐
+│ Stream  │ │   Batch    │
+│ (Kafka  │ │ (Iceberg + │
+│ + Flink)│ │   Spark)   │
+└────┬────┘ └─────┬──────┘
+     │            │
+     ▼            ▼
+   Speed      Curated
+   layer        layer
+     │            │
+     └─────┬──────┘
+           ▼
+       Serving</code></pre>
+
+<p>Lambda still earns its keep when the batch path computes something the streaming path can not (heavy joins on multi-day windows). When that compromise is no longer required, prefer Kappa.</p>
+
+<h2>8.4 Data Mesh in practice</h2>
+
+<ul>
+<li><strong>Domain ownership</strong> — finance owns finance datasets, growth owns growth, etc.</li>
+<li><strong>Data products</strong> — every dataset has an owner, an SLA, a contract, an SLO dashboard.</li>
+<li><strong>Self-service platform</strong> — central platform provides Iceberg + Polaris + Airflow + DataHub.</li>
+<li><strong>Federated governance</strong> — global rules (PII tagging, retention) enforced via Open Policy Agent.</li>
+</ul>
+
+<h2>8.5 CI/CD for data pipelines</h2>
+
+<pre><code># .github/workflows/data-pipeline.yml
+name: data-pipeline-ci
+on: [pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install sqlfluff dbt-core dbt-snowflake
+      - run: sqlfluff lint dbt/models/
+      - run: dbt parse --profiles-dir ci-profiles
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/setup-python@v5
+      - run: pip install -r requirements-dev.txt
+      - run: pytest tests/dags                  # DAG load tests
+      - run: dbt build --target ci --select state:modified+
+      - run: soda scan -d ci -c configuration.yml contracts/
+  preview:
+    needs: [lint, test]
+    runs-on: ubuntu-22.04
+    steps:
+      - run: ./scripts/spin-up-staging.sh
+      - run: dbt run --target staging
+      - run: soda scan -d staging -c configuration.yml contracts/
+</code></pre>
+
+<h2>8.6 Cost optimisation</h2>
+
+<ul>
+<li><strong>Right-size files.</strong> 128 MB Parquet, ZSTD-3 default, ZSTD-9 for cold archives.</li>
+<li><strong>Compaction job.</strong> Iceberg <code>RewriteFiles</code> weekly removes small-file overhead.</li>
+<li><strong>Snapshot expiration.</strong> Keep 30 days of history; older snapshots become storage-only.</li>
+<li><strong>Workload separation.</strong> Heavy ELT on dedicated warehouse; BI on a separate one.</li>
+<li><strong>Auto-suspend.</strong> Snowflake / BigQuery reservations idle out aggressively.</li>
+<li><strong>Cold partitioning.</strong> Tag old partitions <code>STORAGE_CLASS=GLACIER</code>; reload only on query.</li>
+</ul>
+
+<h2>8.7 Scaling strategy</h2>
+
+<table>
+<tr><th>Scale axis</th><th>Lever</th></tr>
+<tr><td>Volume (rows / day)</td><td>Hash partitioning, parallel writers, row-group sizing</td></tr>
+<tr><td>Frequency (jobs / hour)</td><td>Pool concurrency, queue priorities, asset-driven scheduling</td></tr>
+<tr><td>Concurrency (analysts)</td><td>Multi-cluster warehouse, materialised views, BI cache</td></tr>
+<tr><td>Geography</td><td>Regional Iceberg replicas, cross-region S3 replication</td></tr>
+</table>
+
+<h2>8.8 Pre-flight checklist</h2>
+
+<ol>
+<li>Every dataset has a published Bitol data contract.</li>
+<li>Every pipeline has an OpenLineage event stream.</li>
+<li>Every mutating call carries an Idempotency-Key.</li>
+<li>Quality gate runs as the last task and blocks publish on failure.</li>
+<li>Snapshot retention &lt;= 30 days; compaction weekly.</li>
+<li>Cost tags applied to every warehouse session.</li>
+<li>Backfill recipe documented and tested.</li>
+<li>Runbook published; on-call rotation in place.</li>
+<li>PII columns tokenised at ingest, not at egress.</li>
+<li>Schema Registry compatibility level set to <code>BACKWARD_TRANSITIVE</code>.</li>
+</ol>
+
+<h2>8.9 Best-practice summary</h2>
+
+<ul>
+<li><strong>Idempotent everything.</strong> If you can not replay safely, you can not recover safely.</li>
+<li><strong>Contracts first.</strong> The contract is the agreement; the code is implementation.</li>
+<li><strong>Quality at boundaries.</strong> Validate at ingest, validate at publish.</li>
+<li><strong>Lineage by default.</strong> Every job emits OpenLineage events.</li>
+<li><strong>Open formats.</strong> Parquet / Avro / Iceberg keep your data portable.</li>
+<li><strong>Observability is non-optional.</strong> Metrics, logs, traces, lineage — all four pillars.</li>
+<li><strong>Cost discipline.</strong> Tag, monitor, alert — the bill controls itself only if you watch.</li>
+</ul>
+
+<h2>8.10 Where to next</h2>
+
+<ol>
+<li>Visit <a href="https://wiastandards.com/data-pipeline" target="_blank">wiastandards.com/data-pipeline</a> for the live conformance suite, OpenAPI / AsyncAPI specs, and reference implementations.</li>
+<li>Clone <code>github.com/WIA-Official/wia-data-pipeline-reference</code> for an end-to-end Docker-Compose stack — Postgres + Debezium + Kafka + Iceberg + Polaris + Airflow + DataHub.</li>
+<li>Join the <code>#data-pipeline</code> channel in the WIA Slack; monthly conformance call.</li>
+<li>Engage a WIA-recognised verifier early; their input shapes data contract design.</li>
+<li>Publish your first Bronze deployment within 90 days; iterate towards Silver and Gold.</li>
+</ol>
+
+<h2>Closing</h2>
+
+<p>A reliable data pipeline is not glamorous engineering. It is the quiet kind that lets a hospital trust its lab counts, a regulator trust its filings, a researcher trust their findings. WIA-DATA-004 turns that quiet reliability into a wire format. Build it carefully, build it generously, build it for the reader you will never meet who will rely on the number you produced today.</p>
+
+<div class="info-box"><p style="text-align:center;font-size:1.5em;color:#ffd700;margin:0;">弘益人間 · Benefit All Humanity</p></div>
+
+</main>
+
+<div class="navigation">
+<a href="chapter-07.html" class="nav-button">← Previous</a>
+<a href="index.html" class="nav-button">↑ Contents</a>
+</div>
+</body>
+</html>
