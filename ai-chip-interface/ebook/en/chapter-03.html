@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Hardware Abstraction Layer Design | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .chapter-header { border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; font-weight: bold; }
+        h1 { font-size: 2.5em; color: #1c1917; margin: 10px 0 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; padding-top: 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; text-align: justify; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; color: #059669; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border-left: 4px solid #10B981; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .highlight { background: #dcfce7; padding: 20px; border-left: 4px solid #10B981; margin: 20px 0; border-radius: 4px; }
+        .summary { background: #f0fdf4; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #10B981; }
+        .summary h2 { margin-top: 0; }
+        .review-questions { background: #fef3c7; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #10B981; color: white; }
+        tr:nth-child(even) { background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">Chapter 3</div>
+            <h1>Hardware Abstraction Layer Design</h1>
+        </div>
+
+        <h2>3.1 The Abstraction Challenge</h2>
+        <p>Creating a hardware abstraction layer (HAL) for AI accelerators presents unique challenges. Unlike traditional compute APIs that can expose a lowest-common-denominator interface, AI workloads demand both portability and performance. A poorly designed abstraction layer can easily negate the performance advantages of specialized hardware, rendering the entire exercise pointless.</p>
+
+        <p>WIA-AI-011's HAL design philosophy centers on "progressive disclosure": providing simple, portable APIs for common cases while allowing sophisticated users to access advanced, hardware-specific features. This approach ensures that porting code across devices is straightforward, while optimal performance remains achievable.</p>
+
+        <h2>3.2 Device Discovery and Enumeration</h2>
+        <p>Before any computation can occur, applications must discover available accelerators and query their capabilities. WIA-AI-011 provides a systematic device enumeration API:</p>
+
+        <pre>// Discover all WIA-compatible devices
+wia_device_t* devices;
+int device_count;
+wia_enumerate_devices(&devices, &device_count);
+
+for (int i = 0; i < device_count; i++) {
+    wia_device_info_t info;
+    wia_get_device_info(devices[i], &info);
+
+    printf("Device %d: %s\n", i, info.name);
+    printf("  Type: %s\n", device_type_string(info.type));
+    printf("  Memory: %zu MB\n", info.memory_size / (1024*1024));
+    printf("  Compute: %.2f TFLOPS\n", info.peak_tflops);
+    printf("  Version: %s\n", info.wia_version);
+}</pre>
+
+        <h3>3.2.1 Device Capabilities</h3>
+        <p>The capability system allows applications to query what features a device supports. Rather than assuming all devices are identical, applications can adapt to available features:</p>
+
+        <pre>wia_capability_t caps;
+wia_query_capabilities(device, &caps);
+
+if (caps.supports_fp16) {
+    // Use half-precision
+}
+
+if (caps.supports_sparse_ops) {
+    // Leverage sparse acceleration
+}
+
+if (caps.max_tensor_dims >= 8) {
+    // Use high-dimensional tensors
+}</pre>
+
+        <h2>3.3 Context Management</h2>
+        <p>A context represents the execution environment for accelerator operations. It encapsulates device state, memory pools, and execution streams. WIA-AI-011 uses explicit context objects to avoid hidden global state and enable multi-device programming:</p>
+
+        <pre>// Create context for device
+wia_context_config_t config = {
+    .device = device,
+    .memory_pool_size = 1024 * 1024 * 1024,  // 1GB
+    .max_streams = 4,
+    .profiling_enabled = true
+};
+
+wia_context_t ctx;
+wia_create_context(&config, &ctx);
+
+// Use context for operations
+wia_tensor_t input, output;
+wia_allocate_tensor(ctx, &input_desc, &input);
+wia_allocate_tensor(ctx, &output_desc, &output);
+
+// Cleanup
+wia_destroy_context(ctx);</pre>
+
+        <h3>3.3.1 Multi-Device Contexts</h3>
+        <p>For applications using multiple accelerators simultaneously, WIA-AI-011 supports multi-device contexts that facilitate peer-to-peer communication and synchronized execution:</p>
+
+        <pre>wia_device_t devices[] = {device0, device1, device2, device3};
+wia_multi_device_context_t mctx;
+
+wia_create_multi_device_context(devices, 4, &mctx);
+
+// Operations can now span devices
+wia_distributed_matmul(mctx, tensor_a, tensor_b, tensor_c);</pre>
+
+        <h2>3.4 Stream-Based Execution</h2>
+        <p>Streams (also called queues or command buffers) enable asynchronous, overlapped execution. Multiple streams can execute concurrently on a device, allowing computation to overlap with data transfer:</p>
+
+        <pre>// Create multiple streams
+wia_stream_t compute_stream, transfer_stream;
+wia_create_stream(ctx, WIA_STREAM_COMPUTE, &compute_stream);
+wia_create_stream(ctx, WIA_STREAM_TRANSFER, &transfer_stream);
+
+// Overlap transfer and compute
+wia_memcpy_async(dst, src, size, transfer_stream);
+wia_launch_kernel(kernel, input, output, compute_stream);
+
+// Synchronize when needed
+wia_stream_synchronize(compute_stream);
+wia_stream_synchronize(transfer_stream);</pre>
+
+        <h3>3.4.1 Stream Dependencies</h3>
+        <p>Complex workflows require expressing dependencies between operations. WIA-AI-011 provides event-based synchronization:</p>
+
+        <pre>wia_event_t transfer_complete;
+wia_create_event(&transfer_complete);
+
+// Transfer on stream 1
+wia_memcpy_async(dst, src, size, stream1);
+wia_record_event(transfer_complete, stream1);
+
+// Wait for transfer before computing
+wia_stream_wait_event(stream2, transfer_complete);
+wia_launch_kernel(kernel, dst, output, stream2);</pre>
+
+        <h2>3.5 Memory Management APIs</h2>
+        <p>Efficient memory management is critical for performance. WIA-AI-011 provides fine-grained control over allocation, with support for different memory types and allocation strategies.</p>
+
+        <h3>3.5.1 Memory Types</h3>
+        <p>Different memory types suit different use cases:</p>
+
+        <table>
+            <tr>
+                <th>Memory Type</th>
+                <th>Location</th>
+                <th>CPU Access</th>
+                <th>Speed</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td>Device</td>
+                <td>On-chip HBM</td>
+                <td>No</td>
+                <td>Fastest</td>
+                <td>Active computation</td>
+            </tr>
+            <tr>
+                <td>Pinned</td>
+                <td>System DRAM</td>
+                <td>Yes</td>
+                <td>Fast DMA</td>
+                <td>Staging buffers</td>
+            </tr>
+            <tr>
+                <td>Unified</td>
+                <td>Shared</td>
+                <td>Yes</td>
+                <td>Variable</td>
+                <td>CPU-GPU collaboration</td>
+            </tr>
+            <tr>
+                <td>Managed</td>
+                <td>Auto-migrated</td>
+                <td>Yes</td>
+                <td>Variable</td>
+                <td>Ease of use</td>
+            </tr>
+        </table>
+
+        <pre>// Allocate device memory
+wia_memory_desc_t desc = {
+    .size = tensor_size,
+    .type = WIA_MEMORY_DEVICE,
+    .alignment = 256,
+    .flags = WIA_MEM_READ_WRITE
+};
+wia_buffer_t buffer;
+wia_allocate_memory(ctx, &desc, &buffer);
+
+// Allocate pinned memory for transfers
+desc.type = WIA_MEMORY_PINNED;
+wia_buffer_t staging;
+wia_allocate_memory(ctx, &desc, &staging);</pre>
+
+        <h3>3.5.2 Memory Pools</h3>
+        <p>Frequent allocation and deallocation can be expensive. Memory pools pre-allocate large blocks and sub-allocate from them, reducing overhead:</p>
+
+        <pre>wia_memory_pool_t pool;
+wia_create_memory_pool(ctx, 1024*1024*1024, &pool);  // 1GB pool
+
+// Fast allocations from pool
+wia_buffer_t buf1, buf2, buf3;
+wia_pool_allocate(pool, size1, &buf1);
+wia_pool_allocate(pool, size2, &buf2);
+wia_pool_allocate(pool, size3, &buf3);
+
+// Return to pool for reuse
+wia_pool_free(pool, buf1);
+wia_pool_free(pool, buf2);</pre>
+
+        <h2>3.6 Kernel Launch Abstraction</h2>
+        <p>Kernels are the fundamental unit of computation on accelerators. WIA-AI-011 provides both high-level operation APIs and low-level kernel launch primitives.</p>
+
+        <h3>3.6.1 High-Level Operations</h3>
+        <p>For common operations, WIA-AI-011 provides optimized implementations:</p>
+
+        <pre>// Matrix multiplication
+wia_matmul_config_t config = {
+    .transpose_a = false,
+    .transpose_b = false,
+    .alpha = 1.0f,
+    .beta = 0.0f
+};
+wia_matmul(ctx, A, B, C, &config, stream);
+
+// Convolution
+wia_conv2d_config_t conv_config = {
+    .stride = {1, 1},
+    .padding = {1, 1},
+    .dilation = {1, 1},
+    .groups = 1
+};
+wia_conv2d(ctx, input, weight, bias, output, &conv_config, stream);</pre>
+
+        <h3>3.6.2 Custom Kernel Launch</h3>
+        <p>For specialized operations, developers can write and launch custom kernels:</p>
+
+        <pre>// Compile kernel from source
+wia_kernel_t kernel;
+wia_compile_kernel(ctx, kernel_source, "custom_op", &kernel);
+
+// Set up launch parameters
+wia_launch_params_t params = {
+    .grid_dim = {256, 256, 1},
+    .block_dim = {16, 16, 1},
+    .shared_memory_bytes = 4096
+};
+
+// Launch kernel
+void* args[] = {&input, &output, &params_struct};
+wia_launch_kernel(ctx, kernel, &params, args, 3, stream);</pre>
+
+        <h2>3.7 Tensor Operation APIs</h2>
+        <p>Beyond basic kernels, WIA-AI-011 provides a comprehensive library of tensor operations covering the full spectrum of deep learning primitives.</p>
+
+        <h3>3.7.1 Element-wise Operations</h3>
+        <pre>// Activation functions
+wia_relu(ctx, input, output, stream);
+wia_gelu(ctx, input, output, stream);
+wia_sigmoid(ctx, input, output, stream);
+
+// Arithmetic
+wia_add(ctx, a, b, output, stream);
+wia_multiply(ctx, a, b, output, stream);
+wia_div(ctx, a, b, output, stream);</pre>
+
+        <h3>3.7.2 Reduction Operations</h3>
+        <pre>// Compute sum across dimensions
+wia_reduce_config_t reduce_cfg = {
+    .operation = WIA_REDUCE_SUM,
+    .axes = {1, 2},  // Reduce over height and width
+    .keep_dims = false
+};
+wia_reduce(ctx, input, output, &reduce_cfg, stream);
+
+// Softmax
+wia_softmax_config_t softmax_cfg = {
+    .axis = -1,  // Last dimension
+    .temperature = 1.0
+};
+wia_softmax(ctx, logits, probabilities, &softmax_cfg, stream);</pre>
+
+        <h3>3.7.3 Transformation Operations</h3>
+        <pre>// Reshape (view, no copy)
+wia_reshape(ctx, input, new_shape, output);
+
+// Transpose
+wia_transpose(ctx, input, {0, 2, 1, 3}, output, stream);
+
+// Concatenate
+wia_tensor_t inputs[] = {tensor1, tensor2, tensor3};
+wia_concatenate(ctx, inputs, 3, /*axis=*/1, output, stream);</pre>
+
+        <h2>3.8 Synchronization Primitives</h2>
+        <p>Coordinating execution across streams and devices requires robust synchronization mechanisms.</p>
+
+        <h3>3.8.1 Host-Device Synchronization</h3>
+        <pre>// Wait for all operations on a stream
+wia_stream_synchronize(stream);
+
+// Wait for all operations on a context
+wia_context_synchronize(ctx);
+
+// Query if stream is idle
+bool is_idle = wia_stream_query(stream);</pre>
+
+        <h3>3.8.2 Device-Device Synchronization</h3>
+        <pre>// Cross-stream synchronization
+wia_event_t event;
+wia_create_event(&event);
+wia_record_event(event, stream1);
+wia_stream_wait_event(stream2, event);
+
+// Barrier across all streams in context
+wia_context_barrier(ctx);</pre>
+
+        <h2>3.9 Error Handling</h2>
+        <p>Robust error handling is essential for production systems. WIA-AI-011 uses explicit error codes and provides detailed error information:</p>
+
+        <pre>wia_status_t status = wia_matmul(ctx, A, B, C, &config, stream);
+
+if (status != WIA_SUCCESS) {
+    const char* error_msg = wia_get_error_string(status);
+    wia_error_info_t error_info;
+    wia_get_last_error(ctx, &error_info);
+
+    fprintf(stderr, "Error: %s\n", error_msg);
+    fprintf(stderr, "  Code: %d\n", error_info.code);
+    fprintf(stderr, "  File: %s:%d\n", error_info.file, error_info.line);
+    fprintf(stderr, "  Details: %s\n", error_info.details);
+}</pre>
+
+        <h2>3.10 Profiling and Debugging Support</h2>
+        <p>Understanding performance characteristics requires profiling support built into the HAL:</p>
+
+        <pre>// Enable profiling for a context
+wia_context_config_t config = {
+    .profiling_enabled = true,
+    .profiling_mode = WIA_PROFILE_DETAILED
+};
+wia_create_context(&config, &ctx);
+
+// Execute operations
+wia_matmul(ctx, A, B, C, &cfg, stream);
+wia_conv2d(ctx, input, weight, bias, output, &conv_cfg, stream);
+
+// Get profiling results
+wia_profile_results_t results;
+wia_get_profile_results(ctx, &results);
+
+for (int i = 0; i < results.num_kernels; i++) {
+    printf("%s: %.3f ms\n",
+           results.kernels[i].name,
+           results.kernels[i].duration_ms);
+}</pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>WIA-AI-011's HAL balances portability and performance through progressive disclosure of capabilities</li>
+                <li>Device discovery and capability queries enable adaptive code that works across diverse hardware</li>
+                <li>Contexts encapsulate device state and resources, enabling clean multi-device programming</li>
+                <li>Stream-based execution allows asynchronous, overlapped operations for maximum throughput</li>
+                <li>Multiple memory types (device, pinned, unified, managed) suit different use cases</li>
+                <li>Memory pools reduce allocation overhead for frequently allocated/deallocated buffers</li>
+                <li>High-level operations provide optimized implementations of common primitives</li>
+                <li>Custom kernel support enables specialized optimizations beyond standard operations</li>
+                <li>Comprehensive synchronization primitives coordinate execution within and across devices</li>
+                <li>Robust error handling and profiling support facilitate debugging and optimization</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What is "progressive disclosure" in the context of HAL design? Why is it important?</li>
+                <li>Explain the role of capability queries in writing portable yet performant code.</li>
+                <li>What is a context in WIA-AI-011? Why use explicit contexts instead of implicit global state?</li>
+                <li>How do streams enable performance improvements through operation overlap?</li>
+                <li>Compare the four memory types supported by WIA-AI-011. When would you use each?</li>
+                <li>What performance benefits do memory pools provide over direct allocation/deallocation?</li>
+                <li>Describe the difference between high-level operations and custom kernel launches.</li>
+                <li>How do events enable cross-stream synchronization? Provide a use case example.</li>
+                <li>Why is explicit error handling with detailed error information important for production systems?</li>
+                <li>What profiling capabilities does WIA-AI-011 provide at the HAL level?</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · Benefit All Humanity</strong>
+        </div>
+    </div>
+</body>
+</html>

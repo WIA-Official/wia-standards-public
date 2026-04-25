@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Mitigation Techniques | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <a href="index.html" class="back-link">← Back to Table of Contents</a>
+            <div class="chapter-number">Chapter 5</div>
+            <h1>Bias Mitigation Techniques</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            Once bias is detected, we must take action to reduce it. This chapter covers practical techniques
+            for mitigating bias at different stages of the machine learning pipeline, following 弘益人間 principles.
+        </p>
+
+        <h2>Overview of Mitigation Strategies</h2>
+        <p>
+            Bias mitigation techniques are typically categorized into three stages based on when they're applied
+            in the ML pipeline: pre-processing (data), in-processing (training), and post-processing (predictions).
+        </p>
+
+        <h2>Pre-processing Techniques</h2>
+        <p>
+            Pre-processing methods modify the training data to reduce bias before model training begins.
+        </p>
+
+        <h3>1. Resampling and Reweighting</h3>
+        <p>
+            Balance the dataset to ensure fair representation of all groups.
+        </p>
+
+        <pre><code># Reweighting for Fairness
+import numpy as np
+from sklearn.utils.class_weight import compute_sample_weight
+
+def fair_reweighting(X, y, protected_attr):
+    """
+    Compute sample weights to balance representation and labels
+    across protected groups
+    """
+    groups = np.unique(protected_attr)
+    n_samples = len(X)
+    weights = np.ones(n_samples)
+
+    for group in groups:
+        group_mask = protected_attr == group
+        n_group = group_mask.sum()
+
+        for label in [0, 1]:
+            label_mask = y == label
+            intersection = group_mask & label_mask
+            n_intersection = intersection.sum()
+
+            if n_intersection > 0:
+                # Weight inversely proportional to frequency
+                target_weight = n_samples / (len(groups) * 2 * n_intersection)
+                weights[intersection] = target_weight
+
+    # Normalize weights
+    weights = weights / weights.sum() * n_samples
+
+    print("Sample Weight Statistics:")
+    print(f"  Mean: {weights.mean():.3f}")
+    print(f"  Std: {weights.std():.3f}")
+    print(f"  Min: {weights.min():.3f}")
+    print(f"  Max: {weights.max():.3f}")
+
+    return weights
+
+# Usage with classifier
+# weights = fair_reweighting(X_train, y_train, protected_attr)
+# model.fit(X_train, y_train, sample_weight=weights)
+</code></pre>
+
+        <h3>2. Disparate Impact Remover</h3>
+        <p>
+            Transform features to remove correlation with protected attributes while preserving predictive power.
+        </p>
+
+        <pre><code># Disparate Impact Remover
+from sklearn.preprocessing import StandardScaler
+
+def disparate_impact_remover(X, protected_attr, repair_level=1.0):
+    """
+    Reduce correlation between features and protected attribute
+    repair_level: 0 = no repair, 1 = full repair
+    """
+    X_repaired = X.copy()
+    groups = np.unique(protected_attr)
+
+    for col in range(X.shape[1]):
+        feature = X[:, col]
+
+        # Calculate group means
+        group_means = {}
+        for group in groups:
+            mask = protected_attr == group
+            group_means[group] = feature[mask].mean()
+
+        # Calculate overall mean
+        overall_mean = feature.mean()
+
+        # Repair each group
+        for group in groups:
+            mask = protected_attr == group
+            group_mean = group_means[group]
+
+            # Shift group toward overall mean
+            repair_amount = repair_level * (overall_mean - group_mean)
+            X_repaired[mask, col] = feature[mask] + repair_amount
+
+    print(f"Applied disparate impact repair (level={repair_level})")
+
+    return X_repaired
+</code></pre>
+
+        <h3>3. Synthetic Data Generation</h3>
+        <p>
+            Generate synthetic samples for underrepresented groups using SMOTE or similar techniques.
+        </p>
+
+        <pre><code># Fair SMOTE Implementation
+from imblearn.over_sampling import SMOTE
+from collections import Counter
+
+def fair_smote(X, y, protected_attr, target_balance=0.5):
+    """
+    Apply SMOTE separately to achieve fair representation
+    """
+    groups = np.unique(protected_attr)
+    X_balanced_list = []
+    y_balanced_list = []
+    protected_balanced_list = []
+
+    for group in groups:
+        mask = protected_attr == group
+        X_group = X[mask]
+        y_group = y[mask]
+
+        # Apply SMOTE to this group
+        if len(np.unique(y_group)) > 1:
+            smote = SMOTE(sampling_strategy='auto', random_state=42)
+            X_resampled, y_resampled = smote.fit_resample(X_group, y_group)
+
+            X_balanced_list.append(X_resampled)
+            y_balanced_list.append(y_resampled)
+            protected_balanced_list.append(np.full(len(y_resampled), group))
+
+    # Combine all groups
+    X_balanced = np.vstack(X_balanced_list)
+    y_balanced = np.concatenate(y_balanced_list)
+    protected_balanced = np.concatenate(protected_balanced_list)
+
+    print("Original distribution:", Counter(zip(protected_attr, y)))
+    print("Balanced distribution:", Counter(zip(protected_balanced, y_balanced)))
+
+    return X_balanced, y_balanced, protected_balanced
+</code></pre>
+
+        <h2>In-processing Techniques</h2>
+        <p>
+            In-processing methods incorporate fairness constraints directly into the model training process.
+        </p>
+
+        <h3>1. Fairness-Constrained Optimization</h3>
+        <p>
+            Add fairness constraints to the optimization objective.
+        </p>
+
+        <pre><code># Fairness-Constrained Logistic Regression
+from sklearn.linear_model import LogisticRegression
+import cvxpy as cp
+
+def fair_logistic_regression(X, y, protected_attr, fairness_penalty=1.0):
+    """
+    Train logistic regression with demographic parity constraint
+    """
+    n_features = X.shape[1]
+
+    # Define variables
+    w = cp.Variable(n_features)
+    b = cp.Variable()
+
+    # Logistic loss
+    logits = X @ w + b
+    log_likelihood = cp.sum(cp.multiply(y, logits) - cp.logistic(logits))
+
+    # Fairness constraint: demographic parity
+    groups = np.unique(protected_attr)
+    positive_rates = []
+
+    for group in groups:
+        mask = protected_attr == group
+        X_group = X[mask]
+        group_logits = X_group @ w + b
+        positive_rate = cp.sum(cp.logistic(group_logits)) / mask.sum()
+        positive_rates.append(positive_rate)
+
+    # Minimize difference in positive rates
+    fairness_loss = cp.sum_squares(cp.hstack(positive_rates) - cp.mean(positive_rates))
+
+    # Combined objective
+    objective = cp.Maximize(log_likelihood - fairness_penalty * fairness_loss)
+
+    # Solve
+    problem = cp.Problem(objective)
+    problem.solve()
+
+    print(f"Training completed. Fairness penalty: {fairness_penalty}")
+    print(f"Final fairness loss: {fairness_loss.value:.4f}")
+
+    return w.value, b.value
+</code></pre>
+
+        <h3>2. Adversarial Debiasing</h3>
+        <p>
+            Use adversarial training to learn representations that cannot predict protected attributes.
+        </p>
+
+        <pre><code># Adversarial Debiasing with Neural Networks
+import torch
+import torch.nn as nn
+
+class FairClassifier(nn.Module):
+    """
+    Classifier with adversarial debiasing
+    """
+    def __init__(self, input_dim, hidden_dim=64):
+        super().__init__()
+
+        # Main predictor
+        self.predictor = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid()
+        )
+
+        # Adversary (tries to predict protected attribute)
+        self.adversary = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # Get intermediate representation
+        h = self.predictor[:-2](x)  # Hidden representation
+
+        # Main prediction
+        y_pred = self.predictor[-2:](h)
+
+        # Adversarial prediction
+        protected_pred = self.adversary(h.detach())  # Detach to prevent gradient flow
+
+        return y_pred, protected_pred
+
+def train_fair_classifier(model, X_train, y_train, protected_train,
+                          adversary_weight=1.0, epochs=100):
+    """
+    Train classifier with adversarial debiasing
+    """
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.BCELoss()
+
+    for epoch in range(epochs):
+        # Forward pass
+        y_pred, protected_pred = model(X_train)
+
+        # Main task loss
+        main_loss = criterion(y_pred, y_train)
+
+        # Adversarial loss (want adversary to fail)
+        adversary_loss = criterion(protected_pred, protected_train)
+
+        # Combined loss: maximize main task, minimize adversary success
+        total_loss = main_loss - adversary_weight * adversary_loss
+
+        # Backward pass
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
+
+        if (epoch + 1) % 20 == 0:
+            print(f"Epoch {epoch+1}: Main Loss={main_loss:.4f}, "
+                  f"Adversary Loss={adversary_loss:.4f}")
+
+    return model
+</code></pre>
+
+        <h3>3. Regularization for Fairness</h3>
+        <p>
+            Add fairness-promoting regularization terms to the loss function.
+        </p>
+
+        <pre><code># Fairness Regularization
+def fairness_regularized_loss(y_true, y_pred, protected_attr, lambda_fair=0.1):
+    """
+    Loss function with fairness regularization
+    """
+    # Standard loss (e.g., binary cross-entropy)
+    bce_loss = -np.mean(y_true * np.log(y_pred + 1e-7) +
+                        (1 - y_true) * np.log(1 - y_pred + 1e-7))
+
+    # Fairness regularization: penalize demographic parity violation
+    groups = np.unique(protected_attr)
+    positive_rates = []
+
+    for group in groups:
+        mask = protected_attr == group
+        positive_rates.append(np.mean(y_pred[mask]))
+
+    # Variance of positive rates across groups
+    fairness_penalty = np.var(positive_rates)
+
+    total_loss = bce_loss + lambda_fair * fairness_penalty
+
+    return total_loss, bce_loss, fairness_penalty
+</code></pre>
+
+        <h2>Post-processing Techniques</h2>
+        <p>
+            Post-processing methods adjust model predictions after training to improve fairness.
+        </p>
+
+        <h3>1. Threshold Optimization</h3>
+        <p>
+            Use different decision thresholds for different groups to achieve fairness criteria.
+        </p>
+
+        <pre><code># Group-Specific Threshold Optimization
+def optimize_group_thresholds(y_true, y_proba, protected_attr, fairness_metric='equal_opportunity'):
+    """
+    Find optimal thresholds for each group to satisfy fairness metric
+    """
+    groups = np.unique(protected_attr)
+    thresholds = {}
+
+    if fairness_metric == 'equal_opportunity':
+        # Optimize for equal TPR across groups
+        target_tpr = 0.8  # Desired TPR
+
+        for group in groups:
+            mask = protected_attr == group
+            y_true_group = y_true[mask]
+            y_proba_group = y_proba[mask]
+
+            # Find threshold that achieves target TPR
+            best_threshold = 0.5
+            best_diff = float('inf')
+
+            for threshold in np.linspace(0, 1, 101):
+                y_pred = (y_proba_group >= threshold).astype(int)
+
+                tp = np.sum((y_true_group == 1) & (y_pred == 1))
+                fn = np.sum((y_true_group == 1) & (y_pred == 0))
+                tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+
+                diff = abs(tpr - target_tpr)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_threshold = threshold
+
+            thresholds[group] = best_threshold
+            print(f"{group}: threshold = {best_threshold:.3f}")
+
+    return thresholds
+
+def apply_group_thresholds(y_proba, protected_attr, thresholds):
+    """
+    Apply group-specific thresholds
+    """
+    y_pred = np.zeros(len(y_proba))
+
+    for group, threshold in thresholds.items():
+        mask = protected_attr == group
+        y_pred[mask] = (y_proba[mask] >= threshold).astype(int)
+
+    return y_pred
+</code></pre>
+
+        <h3>2. Calibrated Equalized Odds</h3>
+        <p>
+            Post-process predictions to satisfy equalized odds while maintaining calibration.
+        </p>
+
+        <pre><code># Calibrated Equalized Odds Post-Processing
+def calibrated_equalized_odds(y_true, y_proba, protected_attr):
+    """
+    Adjust predictions to satisfy equalized odds
+    """
+    groups = np.unique(protected_attr)
+
+    # Calculate group-specific calibration parameters
+    calibration_params = {}
+
+    for group in groups:
+        mask = protected_attr == group
+
+        # For each outcome, calculate correction
+        for outcome in [0, 1]:
+            outcome_mask = y_true == outcome
+            group_outcome_mask = mask & outcome_mask
+
+            if group_outcome_mask.sum() == 0:
+                continue
+
+            # Calculate mean predicted probability for this group-outcome
+            mean_pred = y_proba[group_outcome_mask].mean()
+            calibration_params[(group, outcome)] = mean_pred
+
+    # Adjust predictions to equalize TPR and FPR
+    y_adjusted = y_proba.copy()
+
+    # Apply corrections (simplified version)
+    for group in groups:
+        mask = protected_attr == group
+        # Adjust probabilities based on calibration parameters
+        # (Full implementation would use optimization)
+        y_adjusted[mask] = y_proba[mask]  # Placeholder
+
+    print("Calibrated equalized odds post-processing applied")
+
+    return y_adjusted
+</code></pre>
+
+        <h3>3. Reject Option Classification</h3>
+        <p>
+            Flag predictions near the decision boundary for human review.
+        </p>
+
+        <pre><code># Reject Option Classification
+def reject_option_classification(y_proba, protected_attr, reject_margin=0.2):
+    """
+    Flag uncertain predictions for human review to improve fairness
+    """
+    groups = np.unique(protected_attr)
+
+    # Calculate critical region (around decision boundary)
+    lower_bound = 0.5 - reject_margin
+    upper_bound = 0.5 + reject_margin
+
+    predictions = {
+        'confident_positive': [],
+        'confident_negative': [],
+        'review_needed': []
+    }
+
+    for i, (proba, group) in enumerate(zip(y_proba, protected_attr)):
+        if proba < lower_bound:
+            predictions['confident_negative'].append(i)
+        elif proba > upper_bound:
+            predictions['confident_positive'].append(i)
+        else:
+            predictions['review_needed'].append(i)
+
+    print(f"Classification Results:")
+    print(f"  Confident Positive: {len(predictions['confident_positive'])}")
+    print(f"  Confident Negative: {len(predictions['confident_negative'])}")
+    print(f"  Needs Review: {len(predictions['review_needed'])}")
+    print(f"  Review Rate: {len(predictions['review_needed'])/len(y_proba)*100:.1f}%")
+
+    return predictions
+</code></pre>
+
+        <h2>Choosing the Right Mitigation Strategy</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Approach</th>
+                    <th>Advantages</th>
+                    <th>Disadvantages</th>
+                    <th>Best For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Pre-processing</td>
+                    <td>Model-agnostic, preserves ML pipeline</td>
+                    <td>May lose information, limited flexibility</td>
+                    <td>Legacy systems, data-level bias</td>
+                </tr>
+                <tr>
+                    <td>In-processing</td>
+                    <td>Directly optimizes fairness, flexible</td>
+                    <td>Requires custom training, complex implementation</td>
+                    <td>New models, controllable tradeoffs</td>
+                </tr>
+                <tr>
+                    <td>Post-processing</td>
+                    <td>Easy to implement, no retraining needed</td>
+                    <td>Limited by model quality, may reduce accuracy</td>
+                    <td>Deployed models, quick fixes</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Evaluating Mitigation Effectiveness</h2>
+
+        <pre><code># Evaluate Mitigation Impact
+def evaluate_mitigation(y_true, y_pred_before, y_pred_after, protected_attr):
+    """
+    Compare fairness and performance before and after mitigation
+    """
+    from sklearn.metrics import accuracy_score
+
+    groups = np.unique(protected_attr)
+
+    print("MITIGATION IMPACT ASSESSMENT")
+    print("=" * 80)
+    print(f"{'Metric':<25} {'Before':<15} {'After':<15} {'Change':<15}")
+    print("-" * 80)
+
+    # Overall accuracy
+    acc_before = accuracy_score(y_true, y_pred_before)
+    acc_after = accuracy_score(y_true, y_pred_after)
+    print(f"{'Overall Accuracy':<25} {acc_before:<15.3f} {acc_after:<15.3f} {acc_after-acc_before:+.3f}")
+
+    # Group-specific accuracy
+    for group in groups:
+        mask = protected_attr == group
+        acc_before_group = accuracy_score(y_true[mask], y_pred_before[mask])
+        acc_after_group = accuracy_score(y_true[mask], y_pred_after[mask])
+        print(f"{group + ' Accuracy':<25} {acc_before_group:<15.3f} {acc_after_group:<15.3f} {acc_after_group-acc_before_group:+.3f}")
+
+    # Fairness metrics
+    # Demographic parity before
+    rates_before = [np.mean(y_pred_before[protected_attr == g]) for g in groups]
+    dp_before = max(rates_before) - min(rates_before)
+
+    # Demographic parity after
+    rates_after = [np.mean(y_pred_after[protected_attr == g]) for g in groups]
+    dp_after = max(rates_after) - min(rates_after)
+
+    print(f"{'Demographic Parity Gap':<25} {dp_before:<15.3f} {dp_after:<15.3f} {dp_after-dp_before:+.3f}")
+
+    print("\n弘益人間 - Ensure improvements benefit all groups equitably")
+
+    return {
+        'accuracy_before': acc_before,
+        'accuracy_after': acc_after,
+        'fairness_before': dp_before,
+        'fairness_after': dp_after
+    }
+</code></pre>
+
+        <div class="callout">
+            <h3>弘益人間 Mitigation Principles</h3>
+            <ul>
+                <li>Choose mitigation strategies that align with your fairness goals and constraints</li>
+                <li>Always evaluate both fairness and performance impacts</li>
+                <li>Consider combining multiple techniques for best results</li>
+                <li>Document all mitigation efforts transparently</li>
+                <li>Continuously monitor effectiveness after deployment</li>
+                <li>Ensure mitigation benefits all groups, not just aggregate metrics</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">Chapter Summary</h2>
+            <ul>
+                <li>Bias mitigation can occur at three stages: pre-processing, in-processing, and post-processing</li>
+                <li>Pre-processing techniques like reweighting and SMOTE address data-level bias</li>
+                <li>In-processing methods incorporate fairness constraints directly into model training</li>
+                <li>Adversarial debiasing learns representations that cannot predict protected attributes</li>
+                <li>Post-processing techniques adjust predictions without retraining models</li>
+                <li>Threshold optimization can achieve fairness by using group-specific decision boundaries</li>
+                <li>Each approach has tradeoffs between ease of implementation, flexibility, and effectiveness</li>
+                <li>Always evaluate mitigation impact on both fairness and performance metrics</li>
+                <li>Combining multiple techniques often yields best results</li>
+                <li>弘익人間 requires transparent, equitable mitigation that benefits all groups</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">Review Questions</h2>
+            <ol>
+                <li>What are the three main categories of bias mitigation techniques? Give examples of each.</li>
+                <li>How does reweighting help mitigate bias? What are its limitations?</li>
+                <li>Explain how adversarial debiasing works. Why is gradient detachment important?</li>
+                <li>What is the difference between demographic parity constraints and equalized odds constraints?</li>
+                <li>When would you choose post-processing over in-processing mitigation?</li>
+                <li>How can group-specific thresholds improve fairness? What ethical concerns might this raise?</li>
+                <li>Describe a scenario where combining pre-processing and in-processing techniques would be beneficial.</li>
+                <li>What metrics should you track when evaluating mitigation effectiveness?</li>
+                <li>How does reject option classification improve fairness? What are the operational implications?</li>
+                <li>Design a mitigation strategy for a biased lending model following 弘익人間 principles.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-04.html" class="nav-button">← Previous Chapter</a>
+            <a href="chapter-06.html" class="nav-button">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

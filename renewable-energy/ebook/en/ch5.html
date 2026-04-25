@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Best Practices | WIA-ENE-004</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px 20px; border-bottom: 3px solid #059669; margin-bottom: 40px; }
+        h1 { color: #059669; font-size: 2.5em; margin-bottom: 15px; }
+        h2 { color: #059669; font-size: 1.8em; margin: 40px 0 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #10b981; font-size: 1.4em; margin: 30px 0 15px; }
+        p { margin-bottom: 20px; color: #cbd5e1; font-size: 1.05em; }
+        code { background: #1e293b; padding: 3px 8px; border-radius: 4px; color: #059669; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #059669; color: white; font-weight: 600; }
+        tr:hover { background: #0f172a; }
+        ul, ol { margin: 20px 0; padding-left: 30px; }
+        li { margin-bottom: 12px; color: #cbd5e1; }
+        .info-box { background: #1e293b; border-left: 4px solid #059669; padding: 20px; margin: 25px 0; border-radius: 4px; }
+        .info-box h4 { color: #059669; margin-bottom: 10px; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; }
+        .nav-button { padding: 12px 25px; background: #059669; color: white; text-decoration: none; border-radius: 6px; transition: all 0.3s ease; }
+        .nav-button:hover { background: #047857; transform: translateY(-2px); }
+        footer { margin-top: 80px; padding: 40px 20px; background: #1e293b; border-top: 3px solid #059669; text-align: center; }
+        .philosophy { font-size: 1.5em; color: #059669; margin-bottom: 10px; font-weight: 600; }
+        .chapter-meta { color: #94a3b8; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>♻️ Chapter 5: Best Practices</h1>
+            <p class="chapter-meta">WIA-ENE-004 eBook Series | Estimated reading time: 30 minutes</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <section>
+            <h2>5.1 Data Quality Management</h2>
+            <p>High-quality data is essential for accurate monitoring, forecasting, and optimization of renewable energy systems. This section covers best practices for maintaining data integrity.</p>
+
+            <h3>Data Validation Strategies</h3>
+            <table>
+                <thead>
+                    <tr><th>Validation Type</th><th>Description</th><th>Implementation</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Schema Validation</strong></td>
+                        <td>Ensure data conforms to WIA-ENE-004 schema</td>
+                        <td>JSON Schema validation on ingestion</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Range Checking</strong></td>
+                        <td>Values within physically possible ranges</td>
+                        <td>Min/max constraints (e.g., efficiency 0-100%)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Consistency Checks</strong></td>
+                        <td>Related values are logically consistent</td>
+                        <td>Power = Voltage × Current validation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Temporal Validation</strong></td>
+                        <td>Timestamps are reasonable and ordered</td>
+                        <td>Reject future timestamps, check ordering</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Anomaly Detection</strong></td>
+                        <td>Identify statistical outliers</td>
+                        <td>ML-based anomaly detection models</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code>// Data validation example
+function validateProductionData(data) {
+  const errors = []
+
+  // Schema validation
+  if (!data.timestamp || !data.sourceId || !data.production) {
+    errors.push('Missing required fields')
+  }
+
+  // Range validation
+  if (data.production.instantaneous.value < 0) {
+    errors.push('Power cannot be negative')
+  }
+
+  if (data.efficiency && (data.efficiency < 0 || data.efficiency > 100)) {
+    errors.push('Efficiency must be between 0-100%')
+  }
+
+  // Consistency validation
+  const calculatedPower = data.voltage * data.current / 1000 // kW
+  const reportedPower = data.production.instantaneous.value
+  if (Math.abs(calculatedPower - reportedPower) > 0.1) {
+    errors.push('Power calculation inconsistent with voltage/current')
+  }
+
+  // Temporal validation
+  const timestamp = new Date(data.timestamp)
+  if (timestamp > new Date()) {
+    errors.push('Timestamp is in the future')
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>5.2 API Design Best Practices</h2>
+            <p>Well-designed APIs make integration easier and improve developer experience. Follow these guidelines when implementing WIA-ENE-004 APIs.</p>
+
+            <h3>RESTful API Guidelines</h3>
+            <ul>
+                <li><strong>Use Noun-Based Resources:</strong> /sources, /production, /alerts (not /getSource, /createAlert)</li>
+                <li><strong>HTTP Methods Correctly:</strong> GET (read), POST (create), PUT/PATCH (update), DELETE (remove)</li>
+                <li><strong>Versioning:</strong> Include version in URL (/api/v1/) to allow evolution</li>
+                <li><strong>Filtering & Pagination:</strong> Support query parameters for large datasets</li>
+                <li><strong>HATEOAS:</strong> Include links to related resources in responses</li>
+                <li><strong>Error Handling:</strong> Return meaningful HTTP status codes and error messages</li>
+                <li><strong>Rate Limiting:</strong> Implement rate limits to prevent abuse</li>
+                <li><strong>Caching Headers:</strong> Use ETag and Cache-Control for efficient caching</li>
+            </ul>
+
+            <pre><code>// Example API response with best practices
+GET /api/v1/sources/SOLAR-PV-001/production?period=24h&resolution=15min
+
+Response: 200 OK
+{
+  "data": {
+    "sourceId": "SOLAR-PV-001",
+    "period": {
+      "start": "2025-12-24T14:30:00Z",
+      "end": "2025-12-25T14:30:00Z",
+      "resolution": "15min"
+    },
+    "dataPoints": [
+      {
+        "timestamp": "2025-12-24T14:30:00Z",
+        "production": 4250,
+        "efficiency": 94.4
+      }
+      // ... more data points
+    ],
+    "summary": {
+      "total": 28500,
+      "average": 1187.5,
+      "peak": 4750
+    }
+  },
+  "metadata": {
+    "resultCount": 96,
+    "page": 1,
+    "pageSize": 100,
+    "hasMore": false
+  },
+  "links": {
+    "self": "/api/v1/sources/SOLAR-PV-001/production?period=24h",
+    "source": "/api/v1/sources/SOLAR-PV-001",
+    "status": "/api/v1/sources/SOLAR-PV-001/status",
+    "alerts": "/api/v1/sources/SOLAR-PV-001/alerts"
+  }
+}
+
+Headers:
+ETag: "33a64df551425fcc55e4d42a148795d9f25f89d4"
+Cache-Control: public, max-age=300
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 987
+X-RateLimit-Reset: 1640444400</code></pre>
+
+            <h3>Error Response Format</h3>
+            <pre><code>// Standardized error response
+{
+  "error": {
+    "code": "INVALID_TIME_RANGE",
+    "message": "The specified time range is invalid",
+    "details": {
+      "field": "period",
+      "reason": "Start time must be before end time",
+      "providedStart": "2025-12-26T00:00:00Z",
+      "providedEnd": "2025-12-25T00:00:00Z"
+    },
+    "documentation": "https://docs.wia.org/ene-004/errors#INVALID_TIME_RANGE",
+    "requestId": "req_1234567890abcdef"
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>5.3 Security Best Practices</h2>
+            <p>Renewable energy systems are critical infrastructure requiring robust security measures.</p>
+
+            <h3>Authentication & Authorization</h3>
+            <ul>
+                <li><strong>Use OAuth 2.0 + JWT:</strong> Industry-standard authentication with stateless tokens</li>
+                <li><strong>Implement RBAC:</strong> Role-based access control with least privilege principle</li>
+                <li><strong>Enable MFA:</strong> Multi-factor authentication for sensitive operations</li>
+                <li><strong>Rotate Credentials:</strong> Regular rotation of API keys, tokens, and passwords</li>
+                <li><strong>Audit Logging:</strong> Log all access attempts and modifications</li>
+            </ul>
+
+            <h3>Data Protection</h3>
+            <table>
+                <thead>
+                    <tr><th>Layer</th><th>Protection Mechanism</th><th>Configuration</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Transport</td>
+                        <td>TLS 1.3 encryption</td>
+                        <td>Enforce TLS, disable older versions</td>
+                    </tr>
+                    <tr>
+                        <td>Storage</td>
+                        <td>Encryption at rest (AES-256)</td>
+                        <td>Database encryption, encrypted backups</td>
+                    </tr>
+                    <tr>
+                        <td>Application</td>
+                        <td>Input sanitization, parameterized queries</td>
+                        <td>Prevent SQL injection, XSS attacks</td>
+                    </tr>
+                    <tr>
+                        <td>Network</td>
+                        <td>Firewalls, VPN, network segmentation</td>
+                        <td>Whitelist IPs, isolate sensitive systems</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Security Checklist</h3>
+            <ul>
+                <li>✓ All API endpoints require authentication</li>
+                <li>✓ TLS 1.3 enforced, TLS 1.0/1.1 disabled</li>
+                <li>✓ Secrets stored in vault (not code or config files)</li>
+                <li>✓ Regular security audits and penetration testing</li>
+                <li>✓ Dependency scanning for known vulnerabilities</li>
+                <li>✓ Security headers configured (CSP, HSTS, etc.)</li>
+                <li>✓ Rate limiting prevents brute force attacks</li>
+                <li>✓ Incident response plan documented and tested</li>
+            </ul>
+
+            <pre><code>// Security configuration example
+{
+  "security": {
+    "tls": {
+      "minVersion": "1.3",
+      "cipherSuites": [
+        "TLS_AES_256_GCM_SHA384",
+        "TLS_CHACHA20_POLY1305_SHA256"
+      ]
+    },
+    "authentication": {
+      "oauth2": {
+        "enabled": true,
+        "tokenExpiry": 3600,
+        "refreshTokenExpiry": 2592000
+      },
+      "apiKey": {
+        "enabled": true,
+        "rotationDays": 90
+      },
+      "mfa": {
+        "required": false,
+        "methods": ["totp", "sms"]
+      }
+    },
+    "authorization": {
+      "defaultPolicy": "deny",
+      "roles": ["viewer", "operator", "admin"]
+    },
+    "rateLimit": {
+      "enabled": true,
+      "requestsPerMinute": 60,
+      "burstSize": 10
+    }
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>5.4 Performance Optimization</h2>
+            <p>Optimize your WIA-ENE-004 implementation for maximum performance and minimal resource consumption.</p>
+
+            <h3>Database Optimization</h3>
+            <ul>
+                <li><strong>Proper Indexing:</strong> Create indexes on frequently queried columns (sourceId, timestamp)</li>
+                <li><strong>Partitioning:</strong> Partition time-series data by time period (monthly/yearly)</li>
+                <li><strong>Data Retention:</strong> Implement tiered storage (hot/warm/cold) based on access patterns</li>
+                <li><strong>Query Optimization:</strong> Analyze and optimize slow queries using EXPLAIN plans</li>
+                <li><strong>Connection Pooling:</strong> Reuse database connections to reduce overhead</li>
+            </ul>
+
+            <pre><code>-- Create optimized indexes
+CREATE INDEX idx_production_source_time
+ON production (source_id, timestamp DESC);
+
+CREATE INDEX idx_alerts_severity_time
+ON alerts (severity, created_at DESC)
+WHERE status = 'OPEN';
+
+-- Partition table by month
+CREATE TABLE production_2025_12 PARTITION OF production
+FOR VALUES FROM ('2025-12-01') TO ('2026-01-01');
+
+-- Optimize query with covering index
+CREATE INDEX idx_production_summary
+ON production (source_id, timestamp)
+INCLUDE (power, energy, efficiency);</code></pre>
+
+            <h3>Caching Strategy</h3>
+            <table>
+                <thead>
+                    <tr><th>Data Type</th><th>Cache Duration</th><th>Invalidation</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Source Metadata</td>
+                        <td>24 hours</td>
+                        <td>On update</td>
+                    </tr>
+                    <tr>
+                        <td>Recent Production</td>
+                        <td>60 seconds</td>
+                        <td>Time-based</td>
+                    </tr>
+                    <tr>
+                        <td>Aggregated Data</td>
+                        <td>15 minutes</td>
+                        <td>Time-based</td>
+                    </tr>
+                    <tr>
+                        <td>Forecasts</td>
+                        <td>1 hour</td>
+                        <td>On model update</td>
+                    </tr>
+                    <tr>
+                        <td>Static Assets</td>
+                        <td>1 year</td>
+                        <td>On deployment</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.5 Monitoring and Alerting</h2>
+            <p>Proactive monitoring ensures issues are detected and resolved before they impact users.</p>
+
+            <h3>Monitoring Layers</h3>
+            <ul>
+                <li><strong>Infrastructure Monitoring:</strong> CPU, memory, disk, network (Prometheus, CloudWatch)</li>
+                <li><strong>Application Monitoring:</strong> Request rates, latency, errors (APM tools)</li>
+                <li><strong>Business Monitoring:</strong> Energy production, efficiency, revenue (custom dashboards)</li>
+                <li><strong>Security Monitoring:</strong> Failed auth attempts, suspicious activity (SIEM)</li>
+                <li><strong>User Monitoring:</strong> User experience, frontend performance (RUM)</li>
+            </ul>
+
+            <h3>Alert Prioritization</h3>
+            <table>
+                <thead>
+                    <tr><th>Priority</th><th>Response Time</th><th>Examples</th><th>Notification</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>P0 - Critical</td>
+                        <td>&lt; 5 minutes</td>
+                        <td>System down, data loss, security breach</td>
+                        <td>Page on-call, SMS, phone</td>
+                    </tr>
+                    <tr>
+                        <td>P1 - High</td>
+                        <td>&lt; 30 minutes</td>
+                        <td>Degraded performance, major feature down</td>
+                        <td>Slack, email, SMS</td>
+                    </tr>
+                    <tr>
+                        <td>P2 - Medium</td>
+                        <td>&lt; 4 hours</td>
+                        <td>Minor bugs, efficiency drop</td>
+                        <td>Slack, email</td>
+                    </tr>
+                    <tr>
+                        <td>P3 - Low</td>
+                        <td>&lt; 24 hours</td>
+                        <td>Cosmetic issues, optimization opportunities</td>
+                        <td>Ticket system</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box">
+                <h4>Alert Fatigue Prevention</h4>
+                <p>To prevent alert fatigue:</p>
+                <ul>
+                    <li>Only alert on actionable issues</li>
+                    <li>Aggregate similar alerts (e.g., multiple sources offline)</li>
+                    <li>Implement intelligent thresholds (not just static limits)</li>
+                    <li>Use progressive alerting (warning → error → critical)</li>
+                    <li>Regularly review and refine alert rules</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
+            <h2>5.6 Documentation Standards</h2>
+            <p>Comprehensive documentation is essential for maintainability and knowledge transfer.</p>
+
+            <h3>Documentation Types</h3>
+            <ul>
+                <li><strong>Architecture Docs:</strong> System design, component interactions, data flows</li>
+                <li><strong>API Documentation:</strong> Endpoint specs, request/response examples (OpenAPI/Swagger)</li>
+                <li><strong>Operational Runbooks:</strong> Common tasks, troubleshooting guides, escalation procedures</li>
+                <li><strong>Configuration Guides:</strong> Environment setup, parameter tuning</li>
+                <li><strong>Disaster Recovery:</strong> Backup procedures, recovery steps, RTO/RPO definitions</li>
+                <li><strong>Code Documentation:</strong> Inline comments, function documentation, architecture decision records (ADRs)</li>
+            </ul>
+
+            <h3>Documentation Best Practices</h3>
+            <ul>
+                <li>Keep docs close to code (e.g., in same repository)</li>
+                <li>Use diagrams to explain complex concepts</li>
+                <li>Include working code examples</li>
+                <li>Version documentation alongside code</li>
+                <li>Review and update docs during code reviews</li>
+                <li>Make docs searchable and easily accessible</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>5.7 Testing Strategies</h2>
+            <p>Comprehensive testing ensures reliability and prevents regressions.</p>
+
+            <h3>Testing Pyramid</h3>
+            <table>
+                <thead>
+                    <tr><th>Test Type</th><th>Coverage Goal</th><th>Execution Time</th><th>When to Run</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Unit Tests</td>
+                        <td>70-80%</td>
+                        <td>&lt; 5 minutes</td>
+                        <td>Every commit</td>
+                    </tr>
+                    <tr>
+                        <td>Integration Tests</td>
+                        <td>15-20%</td>
+                        <td>&lt; 15 minutes</td>
+                        <td>Every PR</td>
+                    </tr>
+                    <tr>
+                        <td>E2E Tests</td>
+                        <td>5-10%</td>
+                        <td>&lt; 30 minutes</td>
+                        <td>Pre-deployment</td>
+                    </tr>
+                    <tr>
+                        <td>Performance Tests</td>
+                        <td>Critical paths</td>
+                        <td>&lt; 1 hour</td>
+                        <td>Weekly, pre-release</td>
+                    </tr>
+                    <tr>
+                        <td>Security Tests</td>
+                        <td>All endpoints</td>
+                        <td>&lt; 2 hours</td>
+                        <td>Weekly, pre-release</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code>// Example unit test
+describe('ProductionDataValidator', () => {
+  it('should validate correct production data', () => {
+    const data = {
+      timestamp: '2025-12-25T14:30:00Z',
+      sourceId: 'SOLAR-PV-001',
+      production: {
+        instantaneous: { value: 142.5, unit: 'kW' }
+      },
+      efficiency: 94.5
+    }
+
+    const result = validateProductionData(data)
+    expect(result.valid).toBe(true)
+    expect(result.errors).toHaveLength(0)
+  })
+
+  it('should reject negative power values', () => {
+    const data = {
+      timestamp: '2025-12-25T14:30:00Z',
+      sourceId: 'SOLAR-PV-001',
+      production: {
+        instantaneous: { value: -10, unit: 'kW' }
+      }
+    }
+
+    const result = validateProductionData(data)
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('Power cannot be negative')
+  })
+
+  it('should reject efficiency outside 0-100% range', () => {
+    const data = {
+      timestamp: '2025-12-25T14:30:00Z',
+      sourceId: 'SOLAR-PV-001',
+      production: {
+        instantaneous: { value: 142.5, unit: 'kW' }
+      },
+      efficiency: 150
+    }
+
+    const result = validateProductionData(data)
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('Efficiency must be between 0-100%')
+  })
+})</code></pre>
+        </section>
+
+        <section>
+            <h2>5.8 Disaster Recovery Planning</h2>
+            <p>Prepare for the unexpected with comprehensive disaster recovery procedures.</p>
+
+            <h3>Recovery Objectives</h3>
+            <ul>
+                <li><strong>RTO (Recovery Time Objective):</strong> Maximum acceptable downtime (target: &lt; 1 hour)</li>
+                <li><strong>RPO (Recovery Point Objective):</strong> Maximum acceptable data loss (target: &lt; 5 minutes)</li>
+                <li><strong>MTTR (Mean Time To Recovery):</strong> Average time to restore service (target: &lt; 30 minutes)</li>
+            </ul>
+
+            <h3>Backup Strategy</h3>
+            <table>
+                <thead>
+                    <tr><th>Data Type</th><th>Frequency</th><th>Retention</th><th>Storage</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Database (full)</td>
+                        <td>Daily</td>
+                        <td>30 days</td>
+                        <td>S3 Glacier</td>
+                    </tr>
+                    <tr>
+                        <td>Database (incremental)</td>
+                        <td>Hourly</td>
+                        <td>7 days</td>
+                        <td>S3 Standard</td>
+                    </tr>
+                    <tr>
+                        <td>Configuration</td>
+                        <td>On change</td>
+                        <td>1 year</td>
+                        <td>Git + S3</td>
+                    </tr>
+                    <tr>
+                        <td>Application logs</td>
+                        <td>Real-time</td>
+                        <td>90 days</td>
+                        <td>CloudWatch + S3</td>
+                    </tr>
+                    <tr>
+                        <td>Time-series data</td>
+                        <td>Continuous</td>
+                        <td>5 years</td>
+                        <td>Multi-region replication</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Disaster Recovery Runbook</h3>
+            <pre><code># Disaster Recovery Procedure
+
+## Scenario: Complete database failure
+
+1. Assess Impact
+   - Identify failed components
+   - Estimate data loss (check last successful backup)
+   - Notify stakeholders
+
+2. Initiate Recovery
+   - Provision new database instance
+   - Restore latest full backup
+   - Apply incremental backups
+   - Verify data integrity
+
+3. Switch Traffic
+   - Update DNS records
+   - Point applications to new database
+   - Monitor for errors
+
+4. Post-Recovery
+   - Verify all systems operational
+   - Analyze root cause
+   - Update documentation
+   - Conduct post-mortem
+
+Estimated Time: 45 minutes
+Expected Data Loss: < 1 hour</code></pre>
+        </section>
+
+        <section>
+            <h2>5.9 Continuous Improvement</h2>
+            <p>Adopt a culture of continuous improvement to enhance your WIA-ENE-004 implementation over time.</p>
+
+            <h3>Improvement Process</h3>
+            <ol>
+                <li><strong>Measure:</strong> Collect metrics on performance, reliability, user satisfaction</li>
+                <li><strong>Analyze:</strong> Identify bottlenecks, inefficiencies, and pain points</li>
+                <li><strong>Plan:</strong> Prioritize improvements based on impact and effort</li>
+                <li><strong>Implement:</strong> Execute changes incrementally with proper testing</li>
+                <li><strong>Review:</strong> Evaluate results and iterate</li>
+            </ol>
+
+            <h3>Key Performance Indicators (KPIs)</h3>
+            <table>
+                <thead>
+                    <tr><th>Category</th><th>KPI</th><th>Target</th><th>Measurement</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Reliability</td>
+                        <td>System uptime</td>
+                        <td>&gt; 99.9%</td>
+                        <td>Uptime monitors</td>
+                    </tr>
+                    <tr>
+                        <td>Performance</td>
+                        <td>API latency (p95)</td>
+                        <td>&lt; 200ms</td>
+                        <td>APM tools</td>
+                    </tr>
+                    <tr>
+                        <td>Data Quality</td>
+                        <td>Data completeness</td>
+                        <td>&gt; 99%</td>
+                        <td>Data quality checks</td>
+                    </tr>
+                    <tr>
+                        <td>Efficiency</td>
+                        <td>Energy production vs forecast</td>
+                        <td>±10%</td>
+                        <td>Analytics dashboard</td>
+                    </tr>
+                    <tr>
+                        <td>Cost</td>
+                        <td>Infrastructure cost per kWh</td>
+                        <td>&lt; $0.001</td>
+                        <td>Cost monitoring</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.10 Team Best Practices</h2>
+            <p>Building and maintaining WIA-ENE-004 systems requires effective teamwork and processes.</p>
+
+            <h3>Development Workflow</h3>
+            <ul>
+                <li><strong>Code Reviews:</strong> All changes reviewed by at least one peer</li>
+                <li><strong>Automated Testing:</strong> CI/CD pipeline runs tests on every commit</li>
+                <li><strong>Feature Flags:</strong> Deploy features dark, enable gradually</li>
+                <li><strong>Pair Programming:</strong> For complex features or knowledge sharing</li>
+                <li><strong>Documentation:</strong> Update docs as part of development process</li>
+                <li><strong>Post-Mortems:</strong> Blameless analysis of incidents</li>
+            </ul>
+
+            <div class="info-box">
+                <h4>Chapter 6 Preview</h4>
+                <p>In Chapter 6, we'll cover security and compliance requirements for WIA-ENE-004 systems. You'll learn about regulatory frameworks, security certifications, and audit procedures.</p>
+            </div>
+        </section>
+
+        <div class="navigation">
+            <a href="ch4.html" class="nav-button">← Chapter 4: Implementation Guide</a>
+            <a href="ch6.html" class="nav-button">Next Chapter: Security & Compliance →</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 2: Core Architecture - WIA-SOC-005</title>
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Emergency Systemo, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #0f172a;
+    color: #f8fafc;
+    line-height: 1.8;
+}
+h1, h2, h3 { color: #10b981; }
+h2 { margin-top: 40px; border-bottom: 2px solid #334155; padding-bottom: 10px; }
+pre {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid #334155;
+}
+code { color: #10b981; }
+.nav { margin-bottom: 30px; }
+.nav a {
+    color: #10b981;
+    text-decoration: none;
+    margin-right: 20px;
+}
+.highlight {
+    background: rgba(139, 92, 246, 0.1);
+    padding: 20px;
+    border-left: 4px solid #10b981;
+    margin: 20px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #334155;
+}
+th {
+    background: #1e293b;
+    color: #10b981;
+}
+ul, ol { margin-left: 30px; }
+li { margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h1>Chapter 2: Core Architecture and SLAM Navigation</h1>
+
+<blockquote class="highlight">
+<strong>Core Principle:</strong> "Intelligent navigation is the foundation of effective autonomous cleaning. Know where you are, where you've been, and where you need to go."
+</blockquote>
+
+<h2>2.1 System Architecture Overview</h2>
+
+<p>The WIA-SOC-005 standard defines a modular architecture that separates concerns while enabling seamless integration. This architecture consists of six primary layers:</p>
+
+<h3>2.1.1 Hardware Abstraction Layer (HAL)</h3>
+
+<p>The Hardware Abstraction Layer provides a uniform interface to diverse hardware components:</p>
+
+<pre><code>Hardware Abstraction Layer Components:
+=======================================
+
+Sensor Interface:
+  • LiDAR driver abstraction
+  • Camera interface (RGB, depth, ToF)
+  • IMU (Inertial Measurement Unit) interface
+  • Ultrasonic sensor array
+  • Cliff detection sensors
+  • Bumper/contact sensors
+  • Wheel encoder interface
+
+Actuator Interface:
+  • Motor controller abstraction
+  • Brush motor control
+  • Vacuum motor control
+  • Water pump control (mop models)
+  • LED indicator control
+  • Speaker/buzzer control
+
+Power Management:
+  • Battery monitoring interface
+  • Charging state detection
+  • Power distribution control
+  • Low-power mode management
+
+Communication:
+  • WiFi module interface
+  • Bluetooth LE interface
+  • IR communication (dock finding)
+  • Serial communication (debugging)
+
+Benefits of HAL:
+  ✓ Hardware vendor independence
+  ✓ Easier hardware upgrades
+  ✓ Simplified testing with simulators
+  ✓ Reduced software porting effort
+  ✓ Support for multiple hardware configs</code></pre>
+
+<h3>2.1.2 Perception Layer</h3>
+
+<p>The perception layer transforms raw sensor data into meaningful environmental understanding:</p>
+
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Input</th>
+<th>Output</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SLAM Engine</td>
+<td>LiDAR, Odometry</td>
+<td>2D/3D Map, Pose</td>
+<td>Localization & Mapping</td>
+</tr>
+<tr>
+<td>Obstacle Detector</td>
+<td>Sensors, Camera</td>
+<td>Obstacle list</td>
+<td>Collision avoidance</td>
+</tr>
+<tr>
+<td>Floor Classifier</td>
+<td>Camera, Sensors</td>
+<td>Surface type</td>
+<td>Cleaning adaptation</td>
+</tr>
+<tr>
+<td>Dirt Detector</td>
+<td>Optical sensors</td>
+<td>Dirt level map</td>
+<td>Focus cleaning</td>
+</tr>
+<tr>
+<td>Cliff Detector</td>
+<td>ToF sensors</td>
+<td>Edge locations</td>
+<td>Fall prevention</td>
+</tr>
+<tr>
+<td>Dock Detector</td>
+<td>IR sensors</td>
+<td>Dock position</td>
+<td>Auto-charging</td>
+</tr>
+</tbody>
+</table>
+
+<h3>2.1.3 Planning Layer</h3>
+
+<p>The planning layer determines optimal cleaning strategies:</p>
+
+<pre><code>Planning Layer Architecture:
+=============================
+
+Global Path Planner:
+  Algorithm: A* / Dijkstra hybrid
+  Input: Map, current pose, goal pose
+  Output: Optimal path considering:
+    • Distance minimization
+    • Turn penalty
+    • Narrow passage avoidance
+    • Battery consumption
+  Update Rate: On demand or map change
+
+Local Path Planner:
+  Algorithm: Dynamic Window Approach (DWA)
+  Input: Global path, local obstacles
+  Output: Velocity commands (linear, angular)
+  Update Rate: 10-20 Hz
+  Considerations:
+    • Dynamic obstacle avoidance
+    • Smooth trajectory
+    • Emergency System kinematic constraints
+    • Safety margins
+
+Coverage Planner:
+  Patterns: Zigzag, Spiral, Edge-first
+  Input: Room polygons, obstacles
+  Output: Complete coverage path
+  Optimization:
+    • Minimize overlaps
+    • Reduce turns
+    • Handle concave areas
+    • Respect no-go zones
+
+Dirt-Based Replanning:
+  Trigger: Dirt sensor threshold
+  Action: Local intensive cleaning
+  Duration: Adaptive (1-5 passes)
+  Resume: Return to coverage plan
+
+Battery-Aware Planning:
+  Monitor: Battery level continuously
+  Threshold: 20% → Return to dock
+  Calculation: Distance to dock + margin
+  Resume: Auto-resume after charging
+  Persistence: Save progress state</code></pre>
+
+<h3>2.1.4 Control Layer</h3>
+
+<p>The control layer executes planned actions with precision:</p>
+
+<ul>
+<li><strong>Velocity Controller</strong>: PID control for smooth acceleration/deceleration</li>
+<li><strong>Heading Controller</strong>: Maintains desired orientation with gyroscope feedback</li>
+<li><strong>Brush Controller</strong>: Adaptive brush speed based on surface type</li>
+<li><strong>Suction Controller</strong>: Dynamic power adjustment (quiet to max modes)</li>
+<li><strong>Safety Controller</strong>: Emergency stop, bumper response, cliff avoidance</li>
+</ul>
+
+<h3>2.1.5 Application Layer</h3>
+
+<p>User-facing functionality and integration points:</p>
+
+<ul>
+<li><strong>Scheduling Engine</strong>: Calendar-based cleaning automation</li>
+<li><strong>Zone Management</strong>: Room labeling, no-go zones, preferred areas</li>
+<li><strong>Cleaning Modes</strong>: Auto, spot, edge, manual, custom patterns</li>
+<li><strong>Voice Control Interface</strong>: Natural language command processing</li>
+<li><strong>Mobile App Interface</strong>: Real-time monitoring and control</li>
+<li><strong>Smart Home Integration</strong>: Alexa, Google Home, HomeKit, etc.</li>
+</ul>
+
+<h3>2.1.6 Communication Layer</h3>
+
+<p>Standardized protocols for device connectivity:</p>
+
+<pre><code>Communication Layer Protocols:
+==============================
+
+Local Network:
+  • WiFi 802.11 b/g/n/ac (2.4GHz + 5GHz)
+  • Bluetooth LE 5.0+ (setup, proximity)
+  • mDNS/Bonjour (device discovery)
+  • WebSocket (real-time updates)
+  • MQTT (event streaming)
+
+Cloud Services:
+  • HTTPS/TLS 1.3 (secure API calls)
+  • OAuth 2.0 (authentication)
+  • JWT (session tokens)
+  • gRPC (efficient RPC)
+  • Protocol Buffers (data serialization)
+
+Smart Home:
+  • Matter/Thread (unified IoT)
+  • Zigbee 3.0 (low-power mesh)
+  • Z-Wave (some regions)
+  • Proprietary bridges (compatibility)
+
+Security:
+  • AES-256 encryption
+  • Certificate pinning
+  • Secure boot
+  • Firmware signing
+  • Regular security updates</code></pre>
+
+<h2>2.2 SLAM: Simultaneous Localization and Mapping</h2>
+
+<p>SLAM is the cornerstone technology enabling autonomous navigation. The WIA-SOC-005 standard supports multiple SLAM approaches:</p>
+
+<h3>2.2.1 LiDAR-Based SLAM</h3>
+
+<p>LiDAR (Light Detection and Ranging) SLAM provides robust, accurate mapping:</p>
+
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Specification</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sensor Type</td>
+<td>360° rotating or solid-state</td>
+<td>Full environment awareness</td>
+</tr>
+<tr>
+<td>Range</td>
+<td>0.15m - 12m minimum</td>
+<td>Room-scale coverage</td>
+</tr>
+<tr>
+<td>Resolution</td>
+<td>1° angular resolution</td>
+<td>Accurate obstacle detection</td>
+</tr>
+<tr>
+<td>Scan Rate</td>
+<td>5-10 Hz</td>
+<td>Real-time responsiveness</td>
+</tr>
+<tr>
+<td>Accuracy</td>
+<td>±3cm at 5m</td>
+<td>Precise mapping</td>
+</tr>
+<tr>
+<td>Algorithm</td>
+<td>GMapping, Cartographer, or equivalent</td>
+<td>Proven performance</td>
+</tr>
+</tbody>
+</table>
+
+<h4>LiDAR SLAM Pipeline:</h4>
+
+<pre><code>LiDAR SLAM Processing Pipeline:
+================================
+
+1. Scan Acquisition (10 Hz)
+   ↓
+   • Receive 360° distance measurements
+   • Timestamp synchronization
+   • Quality filtering (remove outliers)
+
+2. Scan Matching
+   ↓
+   • ICP (Iterative Closest Point) alignment
+   • Match current scan to previous scan
+   • Estimate emergency system motion (odometry)
+   • Accuracy: ±1cm, ±0.5°
+
+3. Map Update
+   ↓
+   • Occupancy grid update (5cm resolution)
+   • Probability-based cell updates
+   • Free space, obstacle, unknown regions
+   • Map size: adaptive (up to 100m x 100m)
+
+4. Loop Closure Detection
+   ↓
+   • Identify revisited areas
+   • Reduce accumulated drift
+   • Trigger: Similarity score &gt; 0.8
+   • Graph optimization (pose graph SLAM)
+
+5. Map Optimization
+   ↓
+   • Global map consistency
+   • Pose graph adjustment
+   • Edge-preserving smoothing
+   • Export: PNG, PGM, or JSON format
+
+Output:
+   ✓ 2D occupancy grid map
+   ✓ Emergency System pose (x, y, θ)
+   ✓ Trajectory history
+   ✓ Confidence estimates</code></pre>
+
+<h3>2.2.2 Visual SLAM (vSLAM)</h3>
+
+<p>Camera-based SLAM offers rich environmental understanding at lower cost:</p>
+
+<ul>
+<li><strong>Monocular SLAM</strong>: Single camera, scale ambiguity, low cost</li>
+<li><strong>Stereo SLAM</strong>: Depth perception, higher accuracy, moderate cost</li>
+<li><strong>RGB-D SLAM</strong>: Direct depth measurement, best accuracy, higher cost</li>
+</ul>
+
+<h4>Visual SLAM Advantages and Challenges:</h4>
+
+<pre><code>Visual SLAM Trade-offs:
+=======================
+
+ADVANTAGES:
+  ✓ Rich semantic information
+  ✓ Object recognition capability
+  ✓ Texture-based localization
+  ✓ Lower sensor cost (camera vs LiDAR)
+  ✓ Passive sensing (no emitted signals)
+
+CHALLENGES:
+  ⚠ Lighting dependency (fails in darkness)
+  ⚠ Texture dependency (featureless walls)
+  ⚠ Computational intensity (image processing)
+  ⚠ Scale ambiguity (monocular only)
+  ⚠ Motion blur sensitivity
+
+BEST PRACTICES:
+  → Combine with IMU for robustness
+  → Use feature-rich environments
+  → Implement lighting compensation
+  → Add infrared illumination for low-light
+  → Fallback to odometry when lost</code></pre>
+
+<h3>2.2.3 Hybrid SLAM Approaches</h3>
+
+<p>The WIA-SOC-005 standard recommends sensor fusion for optimal performance:</p>
+
+<table>
+<thead>
+<tr>
+<th>Sensor Combination</th>
+<th>Use Case</th>
+<th>Robustness</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LiDAR only</td>
+<td>Budget models</td>
+<td>★★★☆☆</td>
+<td>$</td>
+</tr>
+<tr>
+<td>Camera only</td>
+<td>Entry-level</td>
+<td>★★☆☆☆</td>
+<td>$</td>
+</tr>
+<tr>
+<td>LiDAR + Odometry</td>
+<td>Standard models</td>
+<td>★★★★☆</td>
+<td>$$</td>
+</tr>
+<tr>
+<td>Camera + IMU</td>
+<td>Mid-range</td>
+<td>★★★☆☆</td>
+<td>$$</td>
+</tr>
+<tr>
+<td>LiDAR + Camera</td>
+<td>Premium models</td>
+<td>★★★★★</td>
+<td>$$$</td>
+</tr>
+<tr>
+<td>LiDAR + Camera + IMU</td>
+<td>Commercial/Flagship</td>
+<td>★★★★★</td>
+<td>$$$$</td>
+</tr>
+</tbody>
+</table>
+
+<h2>2.3 Path Planning Algorithms</h2>
+
+<h3>2.3.1 Global Path Planning: A* Algorithm</h3>
+
+<p>The WIA-SOC-005 standard mandates A* or equivalent for global path planning:</p>
+
+<pre><code>A* Path Planning Implementation:
+================================
+
+function findPath(start, goal, map):
+    openSet = PriorityQueue()
+    openSet.add(start, 0)
+
+    cameFrom = {}
+    gScore = {start: 0}
+    fScore = {start: heuristic(start, goal)}
+
+    while not openSet.empty():
+        current = openSet.pop()
+
+        if current == goal:
+            return reconstructPath(cameFrom, current)
+
+        for neighbor in getNeighbors(current, map):
+            tentative_gScore = gScore[current] + distance(current, neighbor)
+
+            if neighbor not in gScore or tentative_gScore &lt; gScore[neighbor]:
+                cameFrom[neighbor] = current
+                gScore[neighbor] = tentative_gScore
+                fScore[neighbor] = gScore[neighbor] + heuristic(neighbor, goal)
+
+                if neighbor not in openSet:
+                    openSet.add(neighbor, fScore[neighbor])
+
+    return failure  // No path found
+
+Heuristic Options:
+  • Euclidean distance (straight-line)
+  • Manhattan distance (grid-aligned)
+  • Diagonal distance (8-connected)
+  • Custom (battery-aware, dirt-weighted)
+
+Optimizations:
+  ✓ Lazy evaluation (compute on demand)
+  ✓ Path smoothing (reduce zigzags)
+  ✓ Turn penalty (prefer straight paths)
+  ✓ Narrow passage detection
+  ✓ Dynamic obstacle buffer zones</code></pre>
+
+<h3>2.3.2 Local Path Planning: Dynamic Window Approach</h3>
+
+<p>DWA enables real-time obstacle avoidance:</p>
+
+<pre><code>Dynamic Window Approach (DWA):
+===============================
+
+Input:
+  • Current velocity (v, ω)
+  • Dynamic obstacles
+  • Global path waypoint
+  • Emergency System constraints
+
+Process:
+  1. Sample velocity space
+     - Linear velocity: [0, v_max]
+     - Angular velocity: [-ω_max, ω_max]
+     - Sampling: 20x20 grid
+
+  2. Forward simulate trajectories
+     - Simulate 1-2 seconds ahead
+     - Check collision-free
+     - Compute cost for each trajectory
+
+  3. Cost function
+     cost = α·heading(v,ω) + β·dist(v,ω) + γ·velocity(v,ω)
+
+     where:
+     - heading: alignment with goal direction
+     - dist: clearance to nearest obstacle
+     - velocity: forward progress preference
+     - α, β, γ: tunable weights
+
+  4. Select optimal velocity
+     - Choose lowest cost collision-free trajectory
+     - Apply smoothing filter
+     - Send to motor controllers
+
+Update Rate: 10-20 Hz
+Latency: &lt;50ms (critical for safety)
+
+Safety Features:
+  ⚠ Emergency stop if all trajectories blocked
+  ⚠ Gentle deceleration near obstacles
+  ⚠ Increased clearance in narrow passages
+  ⚠ Adaptive speed in complex environments</code></pre>
+
+<h2>2.4 Localization Techniques</h2>
+
+<h3>2.4.1 Particle Filter Localization</h3>
+
+<p>Monte Carlo Localization (MCL) for robust pose estimation:</p>
+
+<pre><code>Particle Filter Algorithm:
+==========================
+
+Initialize:
+  • Generate N particles (typically 500-2000)
+  • Each particle: (x, y, θ, weight)
+  • Uniform distribution across map
+
+Prediction Step (Motion Update):
+  for each particle p:
+    p.x += v·cos(θ)·dt + noise_x
+    p.y += v·sin(θ)·dt + noise_y
+    p.θ += ω·dt + noise_θ
+
+Update Step (Sensor Update):
+  for each particle p:
+    expected_scan = raytrace(p.pose, map)
+    actual_scan = lidar_reading
+    p.weight = similarity(expected_scan, actual_scan)
+
+Resampling:
+  if effective_sample_size &lt; threshold:
+    resample particles based on weights
+    add random particles (5%) for recovery
+
+Pose Estimation:
+  emergency system_pose = weighted_average(all_particles)
+  confidence = particle_cluster_compactness()
+
+Advantages:
+  ✓ Handles multi-modal distributions
+  ✓ Recovers from kidnapped emergency system problem
+  ✓ Naturally handles uncertainty
+  ✓ Robust to sensor noise
+
+Computational Cost:
+  O(N) per update
+  GPU acceleration possible
+  Real-time feasible on modern embedded systems</code></pre>
+
+<h2>2.5 Map Representation and Management</h2>
+
+<h3>2.5.1 Occupancy Grid Maps</h3>
+
+<p>The standard defines occupancy grid as the primary map format:</p>
+
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Resolution</td>
+<td>5cm (2cm for premium)</td>
+<td>Balance accuracy vs. memory</td>
+</tr>
+<tr>
+<td>Cell Values</td>
+<td>0-100 (probability)</td>
+<td>Uncertainty representation</td>
+</tr>
+<tr>
+<td>Unknown</td>
+<td>-1 or 255</td>
+<td>Unexplored areas</td>
+</tr>
+<tr>
+<td>Free Space</td>
+<td>0-49</td>
+<td>Navigable area</td>
+</tr>
+<tr>
+<td>Obstacle</td>
+<td>51-100</td>
+<td>Blocked area</td>
+</tr>
+<tr>
+<td>Inflation</td>
+<td>Emergency System radius + margin</td>
+<td>Safety buffer</td>
+</tr>
+</tbody>
+</table>
+
+<h3>2.5.2 Multi-Floor Map Management</h3>
+
+<p>Support for buildings with multiple floors:</p>
+
+<pre><code>Multi-Floor Map Structure:
+==========================
+
+MapDatabase:
+  floors: []
+    - floor_id: UUID
+    - floor_number: integer
+    - name: string
+    - map_data: OccupancyGrid
+    - rooms: []
+        - room_id: UUID
+        - label: string
+        - polygon: coordinates
+        - surface_type: enum
+        - last_cleaned: timestamp
+    - no_go_zones: []
+    - preferred_areas: []
+    - dock_location: (x, y, θ)
+    - metadata:
+        - creation_date
+        - last_updated
+        - total_area_m2
+        - cleaned_area_m2
+
+Floor Detection:
+  • Elevator/stairs detection (manual trigger)
+  • Barometric pressure sensor (altitude change)
+  • User notification for floor switching
+  • Map switching confirmation
+
+Storage:
+  • Local: 10 floors maximum
+  • Cloud sync: unlimited
+  • Compression: PNG format (~100KB per floor)
+  • Backup: automatic daily</code></pre>
+
+<h2>2.6 Real-Time Performance Requirements</h2>
+
+<p>The standard defines strict latency requirements for safe operation:</p>
+
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Update Rate</th>
+<th>Max Latency</th>
+<th>Criticality</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sensor Reading</td>
+<td>10-20 Hz</td>
+<td>50ms</td>
+<td>Critical</td>
+</tr>
+<tr>
+<td>SLAM Update</td>
+<td>10 Hz</td>
+<td>100ms</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Local Planning</td>
+<td>10-20 Hz</td>
+<td>50ms</td>
+<td>Critical</td>
+</tr>
+<tr>
+<td>Global Planning</td>
+<td>1 Hz</td>
+<td>1000ms</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Motor Control</td>
+<td>50-100 Hz</td>
+<td>20ms</td>
+<td>Critical</td>
+</tr>
+<tr>
+<td>UI Update</td>
+<td>1-5 Hz</td>
+<td>200ms</td>
+<td>Low</td>
+</tr>
+<tr>
+<td>Cloud Sync</td>
+<td>0.1 Hz</td>
+<td>10s</td>
+<td>Low</td>
+</tr>
+</tbody>
+</table>
+
+<h2>2.7 Reference Implementation</h2>
+
+<p>The WIA-SOC-005 standard provides open-source reference implementations:</p>
+
+<pre><code>Reference Implementation Stack:
+===============================
+
+Operating System:
+  • Linux (Ubuntu 22.04 or newer)
+  • Real-time kernel (PREEMPT_RT patch)
+  • ROS 2 (Emergency System Operating System)
+
+SLAM Libraries:
+  • Cartographer (LiDAR SLAM)
+  • ORB-SLAM3 (Visual SLAM)
+  • RTAB-Map (RGB-D SLAM)
+
+Navigation Stack:
+  • nav2 (ROS 2 navigation)
+  • move_base (ROS 1 legacy support)
+  • Custom path planners
+
+Simulation:
+  • Gazebo (physics simulation)
+  • RViz (visualization)
+  • Custom test environments
+
+Hardware Support:
+  • Raspberry Pi 4 (8GB recommended)
+  • NVIDIA Jetson Nano/Xavier
+  • Custom embedded platforms
+
+GitHub Repository:
+  https://github.com/WIA-Official/wia-rob-011-reference
+
+License: MIT (freely usable, commercial-friendly)</code></pre>
+
+<div class="highlight">
+<strong>Key Takeaways:</strong> This chapter covered the foundational architecture of cleaning emergency systems, from hardware abstraction to SLAM navigation. Understanding these core concepts is essential for implementing WIA-SOC-005 compliant systems.
+</div>
+
+<p style="text-align: center; color: #ffd700; margin-top: 50px;">
+弘益人間 (Hongik Ingan) - Benefit All Humanity
+</p>
+</body>
+</html>

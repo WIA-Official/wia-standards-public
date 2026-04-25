@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장 - 단어 임베딩과 표현 | WIA-AI-023</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 40px 20px;
+        }
+        .container { max-width: 850px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid var(--border);
+        }
+        .chapter-num {
+            color: var(--primary);
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: var(--text);
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.4rem;
+            margin: 30px 0 15px;
+        }
+        p {
+            margin: 15px 0;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+        .highlight {
+            background: var(--bg-card);
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+        code {
+            background: var(--bg-card);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: var(--primary);
+        }
+        pre {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text);
+        }
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 10px 0;
+            color: var(--text-muted);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: var(--bg-card);
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .summary {
+            background: var(--bg-card);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        .summary h2 {
+            border: none;
+            margin-top: 0;
+        }
+        .review {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        .review h2 {
+            border: none;
+            margin-top: 0;
+        }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid var(--border);
+        }
+        .philosophy {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin: 40px 0;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .nav-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-num">3장</div>
+            <h1>단어 임베딩과 표현</h1>
+        </div>
+
+        <h2>3.1 단어에서 벡터로</h2>
+        <p>
+            머신러닝 모델은 텍스트를 직접 처리할 수 없습니다—수치적 표현이 필요합니다. 단어 임베딩은 이산적인 단어를 기하학적 속성을 통해 의미론적 관계가 보존되는 연속적인 벡터 공간으로 변환합니다. 이 변환은 언어에 대한 수학적 연산을 가능하게 하고 현대 NLP 시스템을 강력하게 합니다.
+        </p>
+        <p>
+            단어 임베딩의 기본 통찰은 분포 가설입니다: 유사한 맥락에 나타나는 단어는 유사한 의미를 가지는 경향이 있습니다. 대규모 텍스트 말뭉치에서 단어 동시 출현 패턴을 분석함으로써, 임베딩 알고리즘은 의미론적 및 구문론적 관계를 포착하는 밀집 벡터 표현을 학습합니다.
+        </p>
+
+        <div class="highlight">
+            <h3>단어 임베딩이 중요한 이유</h3>
+            <ul>
+                <li><strong>의미적 유사성:</strong> 유사한 단어는 유사한 벡터를 가짐</li>
+                <li><strong>차원성 축소:</strong> 희소한 원-핫 인코딩 대비 밀집 벡터</li>
+                <li><strong>전이 학습:</strong> 사전 학습된 임베딩이 언어학적 지식을 인코딩</li>
+                <li><strong>산술 연산:</strong> 벡터 수학이 의미론적 관계를 포착</li>
+                <li><strong>일반화:</strong> 모델이 학습 데이터를 넘어 일반화되는 패턴 학습</li>
+            </ul>
+        </div>
+
+        <h2>3.2 전통적 접근법: 원-핫 및 TF-IDF</h2>
+        <p>
+            단어 임베딩이 표준이 되기 전에, NLP는 제한된 의미론적 정보로 단어를 고차원 벡터로 인코딩하는 희소 표현에 의존했습니다.
+        </p>
+
+        <h3>원-핫 인코딩</h3>
+        <p>
+            원-핫 인코딩은 각 단어를 어휘 크기와 같은 길이의 벡터로 표현하며, 단일 1과 나머지 모든 값이 0입니다. 이 간단한 접근법은 심각한 제한이 있습니다: 대규모 차원성, 의미론적 관계 없음, 비효율적인 계산.
+        </p>
+
+        <pre><code>import numpy as np
+
+# 어휘
+vocab = ['자연', '언어', '처리', '기계', '학습']
+
+# 원-핫 인코딩 함수
+def one_hot_encode(word, vocab):
+    vector = np.zeros(len(vocab))
+    if word in vocab:
+        vector[vocab.index(word)] = 1
+    return vector
+
+# 예제
+word = '언어'
+one_hot = one_hot_encode(word, vocab)
+print(f"{word}: {one_hot}")
+# 출력: [0. 1. 0. 0. 0.]
+
+# 문제: 의미론적 관계 없음
+vec_language = one_hot_encode('언어', vocab)
+vec_processing = one_hot_encode('처리', vocab)
+similarity = np.dot(vec_language, vec_processing)
+print(f"유사도: {similarity}")  # 항상 0!</code></pre>
+
+        <h3>TF-IDF (용어 빈도-역문서 빈도)</h3>
+        <p>
+            TF-IDF는 중요도에 따라 단어에 가중치를 부여합니다: 문서에서 자주 나타나지만 말뭉치 전체에서는 희귀한 단어가 더 높은 가중치를 받습니다. 원-핫보다 정보가 풍부하지만, TF-IDF는 여전히 의미론적 관계를 포착하지 않는 희소 벡터를 생성합니다.
+        </p>
+
+        <pre><code>from sklearn.feature_extraction.text import TfidfVectorizer
+
+documents = [
+    "자연어 처리는 기본적입니다",
+    "기계 학습이 NLP 시스템을 가능하게 합니다",
+    "딥러닝이 자연어 이해를 혁신했습니다"
+]
+
+vectorizer = TfidfVectorizer()
+tfidf_matrix = vectorizer.fit_transform(documents)
+
+print("어휘:", vectorizer.get_feature_names_out())
+print("TF-IDF 행렬 형태:", tfidf_matrix.shape)
+print("\n문서 0 벡터:\n", tfidf_matrix[0].toarray())</code></pre>
+
+        <h2>3.3 Word2Vec: 맥락으로부터 학습</h2>
+        <p>
+            2013년 Mikolov 등이 도입한 Word2Vec은 대규모 텍스트 말뭉치로부터 밀집 단어 임베딩을 학습하여 NLP에 혁명을 일으켰습니다. Word2Vec은 단어 맥락 예측 작업에 대해 학습된 얕은 신경망을 사용합니다.
+        </p>
+
+        <h3>Word2Vec 아키텍처</h3>
+
+        <div class="highlight">
+            <h3>CBOW (연속 단어 가방)</h3>
+            <p>
+                CBOW는 주변 맥락 단어로부터 대상 단어를 예측합니다. 창 내의 맥락 단어가 주어지면, 모델은 중심 단어를 예측하도록 학습합니다. CBOW는 더 빠르며 빈번한 단어에 잘 작동합니다.
+            </p>
+        </div>
+
+        <div class="highlight">
+            <h3>Skip-gram</h3>
+            <p>
+                Skip-gram은 반대로 작동합니다: 대상 단어가 주어지면, 주변 맥락 단어를 예측합니다. Skip-gram은 희귀 단어와 더 작은 데이터셋에서 더 잘 작동하며, 드물게 나타나는 용어에 대해 더 높은 품질의 임베딩을 생성합니다.
+            </p>
+        </div>
+
+        <pre><code>from gensim.models import Word2Vec
+import gensim.downloader as api
+
+# 사전 학습된 모델 로드 (또는 자체 학습)
+# 데모를 위해 작은 말뭉치 사용
+sentences = [
+    ['자연', '언어', '처리'],
+    ['기계', '학습', '알고리즘'],
+    ['딥', '학습', '신경', '네트워크'],
+    ['자연', '언어', '이해'],
+    ['텍스트', '처리', '기법']
+]
+
+# Word2Vec 모델 학습
+model = Word2Vec(sentences,
+                 vector_size=100,  # 임베딩 차원
+                 window=5,         # 맥락 창
+                 min_count=1,      # 최소 단어 빈도
+                 workers=4,        # 병렬 스레드
+                 sg=1)             # Skip-gram (0은 CBOW)
+
+# 단어 벡터 가져오기
+vector = model.wv['언어']
+print(f"벡터 형태: {vector.shape}")
+print(f"벡터 (처음 10개 차원): {vector[:10]}")
+
+# 유사 단어 찾기
+similar = model.wv.most_similar('언어', topn=3)
+print(f"\n'언어'와 유사한 단어: {similar}")
+
+# 벡터 산술
+result = model.wv.most_similar(positive=['처리', '기계'],
+                               negative=['자연'],
+                               topn=1)
+print(f"\n처리 + 기계 - 자연 = {result}")</code></pre>
+
+        <h2>3.4 GloVe: 전역 벡터</h2>
+        <p>
+            GloVe(Global Vectors for Word Representation)는 행렬 분해 방법의 이점과 지역 맥락 창 접근법을 결합합니다. Word2Vec이 지역 맥락을 사용하는 것과 달리, GloVe는 전체 말뭉치로부터 전역 단어 동시 출현 통계를 활용합니다.
+        </p>
+
+        <h3>GloVe 작동 방식</h3>
+        <ol>
+            <li>말뭉치로부터 단어 동시 출현 행렬 구성</li>
+            <li>단어 벡터를 학습하기 위해 행렬 분해</li>
+            <li>동시 출현 확률을 보존하도록 최적화</li>
+        </ol>
+
+        <pre><code># 사전 학습된 GloVe 임베딩 사용
+import numpy as np
+
+def load_glove_embeddings(glove_file):
+    """파일에서 GloVe 임베딩 로드"""
+    embeddings = {}
+    with open(glove_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            values = line.split()
+            word = values[0]
+            vector = np.asarray(values[1:], dtype='float32')
+            embeddings[word] = vector
+    return embeddings
+
+# 사용 예 (glove.6B.100d.txt가 사용 가능하다고 가정)
+# embeddings = load_glove_embeddings('glove.6B.100d.txt')
+
+# 유사도 계산
+def cosine_similarity(vec1, vec2):
+    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+
+# 가상 벡터를 사용한 예
+vec_king = np.random.randn(100)
+vec_queen = np.random.randn(100)
+similarity = cosine_similarity(vec_king, vec_queen)
+print(f"유사도: {similarity}")</code></pre>
+
+        <h2>3.5 FastText: 서브워드 임베딩</h2>
+        <p>
+            FastText는 단어를 문자 n-그램의 가방으로 표현함으로써 Word2Vec을 확장합니다. 이 접근법은 어휘 외 단어를 처리하고, 형태론적 정보를 포착하며, 형태론적으로 풍부한 언어에 잘 작동합니다.
+        </p>
+
+        <pre><code>from gensim.models import FastText
+
+# FastText 학습
+sentences = [
+    ['자연', '언어', '처리'],
+    ['자연화', '자연적으로', '자연'],
+    ['처리', '처리중', '처리됨', '처리들']
+]
+
+model = FastText(sentences,
+                 vector_size=100,
+                 window=5,
+                 min_count=1,
+                 min_n=2,      # 최소 n-그램 길이
+                 max_n=5,      # 최대 n-그램 길이
+                 workers=4)
+
+# OOV 단어 처리
+# '자연화하는'이 학습에 없었더라도 FastText는 처리 가능
+vector = model.wv['자연화하는']
+print(f"OOV 단어 벡터 형태: {vector.shape}")
+
+# 서브워드 정보
+print(f"\n'처리'에 대한 서브워드:")
+print(model.wv.key_to_index.keys())</code></pre>
+
+        <h2>3.6 문맥적 임베딩: ELMo 그리고 그 이후</h2>
+        <p>
+            전통적인 임베딩은 맥락과 관계없이 각 단어에 단일 벡터를 할당합니다. "은행"은 "강 은행"과 "저축 은행"에서 동일한 표현을 갖습니다. 문맥적 임베딩은 주변 단어를 기반으로 다른 표현을 생성함으로써 이를 해결합니다.
+        </p>
+
+        <h3>ELMo (언어 모델로부터의 임베딩)</h3>
+        <p>
+            ELMo는 양방향 LSTM 언어 모델을 사용하여 맥락 의존적 표현을 생성합니다. 각 단어는 문장에서의 위치와 맥락에 따라 고유한 벡터를 받습니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>모델</th>
+                    <th>유형</th>
+                    <th>문맥적</th>
+                    <th>연도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Word2Vec</td>
+                    <td>예측 기반</td>
+                    <td>아니오</td>
+                    <td>2013</td>
+                </tr>
+                <tr>
+                    <td>GloVe</td>
+                    <td>카운트 기반</td>
+                    <td>아니오</td>
+                    <td>2014</td>
+                </tr>
+                <tr>
+                    <td>FastText</td>
+                    <td>서브워드 기반</td>
+                    <td>아니오</td>
+                    <td>2016</td>
+                </tr>
+                <tr>
+                    <td>ELMo</td>
+                    <td>LSTM 기반</td>
+                    <td>예</td>
+                    <td>2018</td>
+                </tr>
+                <tr>
+                    <td>BERT</td>
+                    <td>트랜스포머 기반</td>
+                    <td>예</td>
+                    <td>2018</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.7 임베딩 평가</h2>
+        <p>
+            임베딩 품질 평가는 본질적 및 외부적 방법을 모두 포함합니다. 본질적 평가는 임베딩을 직접 테스트하고, 외부적 평가는 후속 작업에서의 성능을 측정합니다.
+        </p>
+
+        <h3>본질적 평가 방법</h3>
+        <ul>
+            <li><strong>단어 유사도:</strong> 인간 유사도 판단과의 상관관계</li>
+            <li><strong>단어 유추:</strong> 유추 작업 해결 (왕 - 남자 + 여자 = 여왕)</li>
+            <li><strong>클러스터링:</strong> 의미론적으로 유사한 단어 그룹화</li>
+        </ul>
+
+        <pre><code>from scipy.stats import spearmanr
+
+def evaluate_word_similarity(embeddings, word_pairs, human_scores):
+    """
+    단어 유사도 데이터셋을 사용하여 임베딩 평가
+    word_pairs: (word1, word2) 튜플 리스트
+    human_scores: 인간 유사도 등급 리스트
+    """
+    predicted_scores = []
+
+    for word1, word2 in word_pairs:
+        if word1 in embeddings and word2 in embeddings:
+            vec1 = embeddings[word1]
+            vec2 = embeddings[word2]
+            similarity = cosine_similarity(vec1, vec2)
+            predicted_scores.append(similarity)
+        else:
+            predicted_scores.append(0.0)
+
+    # 스피어먼 상관관계 계산
+    correlation, p_value = spearmanr(human_scores, predicted_scores)
+    return correlation, p_value
+
+# 사용 예
+word_pairs = [('고양이', '개'), ('자동차', '자동차'), ('컴퓨터', '키보드')]
+human_scores = [0.8, 0.95, 0.7]
+# correlation, p_value = evaluate_word_similarity(embeddings, word_pairs, human_scores)</code></pre>
+
+        <h2>3.8 WIA-AI-023 임베딩 표준</h2>
+        <p>
+            WIA-AI-023 표준은 다양한 NLP 시스템과 애플리케이션 간의 상호운용성을 보장하기 위해 단어 임베딩에 대한 형식과 프로토콜을 정의합니다.
+        </p>
+
+        <pre><code>{
+  "standard": "WIA-AI-023",
+  "version": "1.0",
+  "embeddings": {
+    "model_info": {
+      "name": "wia-embeddings-ko-v1",
+      "type": "word2vec",
+      "algorithm": "skipgram",
+      "dimensions": 300,
+      "vocabulary_size": 50000,
+      "training_corpus": "위키백과-2025",
+      "language": "ko"
+    },
+    "format": {
+      "encoding": "float32",
+      "normalization": "l2",
+      "storage": "binary"
+    },
+    "example": {
+      "word": "자연",
+      "vector": [0.234, -0.567, 0.123, "..."],
+      "metadata": {
+        "frequency": 45230,
+        "pos_tags": ["명사", "형용사"]
+      }
+    },
+    "api_endpoint": "https://api.wiastandards.com/embeddings/v1"
+  }
+}</code></pre>
+
+        <h2>3.9 실용적 고려사항</h2>
+        <p>
+            프로덕션 시스템에서 단어 임베딩을 작업할 때, 여러 실용적 고려사항이 성능, 효율성 및 신뢰성에 영향을 미칩니다.
+        </p>
+
+        <h3>임베딩 차원 선택</h3>
+        <ul>
+            <li><strong>50-100 차원:</strong> 작은 데이터셋, 제한된 컴퓨팅</li>
+            <li><strong>200-300 차원:</strong> 범용, 좋은 균형</li>
+            <li><strong>500-1000 차원:</strong> 대규모 데이터셋, 고성능 요구</li>
+        </ul>
+
+        <h3>어휘 외 단어 처리</h3>
+        <ul>
+            <li>서브워드 정보를 위해 FastText 사용</li>
+            <li>어휘 내 유사 단어의 임베딩 평균</li>
+            <li>특수 <code>[UNK]</code> 토큰 사용</li>
+            <li>도메인별 데이터에 대한 임베딩 미세 조정</li>
+        </ul>
+
+        <h2>3.10 고급 주제</h2>
+        <p>
+            현대 임베딩 연구는 제한사항을 해결하고 기능을 확장하면서 계속 발전하고 있습니다.
+        </p>
+
+        <h3>도메인별 임베딩</h3>
+        <p>
+            범용 임베딩은 도메인별 용어와 관계를 포착하지 못할 수 있습니다. 의료, 법률 또는 과학 말뭉치에 대한 임베딩 학습은 전문 애플리케이션의 성능을 향상시킵니다.
+        </p>
+
+        <h3>다국어 임베딩</h3>
+        <p>
+            다국어 임베딩은 다른 언어의 단어를 공유 벡터 공간으로 매핑하여 교차 언어 전이 및 기계 번역을 가능하게 합니다.
+        </p>
+
+        <pre><code># 예: 다국어 임베딩 사용
+from transformers import AutoTokenizer, AutoModel
+
+# 다국어 모델 로드
+model_name = "bert-base-multilingual-cased"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModel.from_pretrained(model_name)
+
+# 다양한 언어로 텍스트 처리
+texts = {
+    'en': 'Natural language processing',
+    'ko': '자연어 처리',
+    'es': 'Procesamiento del lenguaje natural'
+}
+
+for lang, text in texts.items():
+    inputs = tokenizer(text, return_tensors='pt')
+    outputs = model(**inputs)
+    print(f"{lang}: {outputs.last_hidden_state.shape}")</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <p><strong>핵심 내용:</strong></p>
+            <ul>
+                <li>단어 임베딩은 이산적인 단어를 의미론적 관계를 보존하는 연속 벡터로 변환</li>
+                <li>전통적인 희소 표현(원-핫, TF-IDF)은 의미론적 정보 부족</li>
+                <li>Word2Vec은 맥락 예측을 사용하여 밀집 임베딩의 효율적인 학습 도입</li>
+                <li>GloVe는 임베딩 생성을 위해 전역 동시 출현 통계 활용</li>
+                <li>FastText는 서브워드 표현을 통해 어휘 외 단어 처리</li>
+                <li>문맥적 임베딩(ELMo, BERT)은 맥락에 따라 다른 벡터 생성</li>
+                <li>임베딩 평가는 본질적(유사도, 유추) 및 외부적(작업 성능) 방법 사용</li>
+                <li>WIA-AI-023 표준은 시스템 간 임베딩 상호운용성 보장</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>분포 가설과 단어 임베딩과의 관계를 설명하시오.</li>
+                <li>Word2Vec에서 CBOW와 Skip-gram 아키텍처를 비교하시오. 각각 언제 사용하는가?</li>
+                <li>FastText가 Word2Vec과 다르게 어휘 외 단어를 어떻게 처리하는가?</li>
+                <li>문맥적 임베딩이 정적 임베딩에 비해 갖는 주요 장점은 무엇인가?</li>
+                <li>단어 임베딩 품질을 평가하는 두 가지 방법을 설명하시오.</li>
+                <li>범용 임베딩 대신 도메인별 임베딩이 필요한 이유는 무엇인가?</li>
+            </ol>
+        </div>
+
+        <div class="highlight">
+            <h3>다음 장 안내</h3>
+            <p>
+                4장에서는 트랜스포머와 어텐션 메커니즘을 탐구합니다—NLP를 혁신하고 BERT 및 GPT와 같은 현대 언어 모델을 강력하게 하는 아키텍처. 어텐션이 모델이 다양한 단어의 중요성을 가중하고 장거리 의존성을 포착하는 방법을 이해하게 됩니다.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

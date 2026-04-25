@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 07: 데이터 검증 및 품질 관리 | WIA-DATA_QUALITY</title>
+    <style>
+        :root{--primary:#8B5CF6;--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--border:#334155;--accent:#3b82f6;--code-bg:#1e1e1e;}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;}
+        .container{max-width:1000px;margin:0 auto;padding:40px 20px;}
+        header{background:linear-gradient(135deg,var(--bg-card) 0%,#2d1f4a 100%);padding:40px;border-radius:15px;margin-bottom:40px;border-left:5px solid var(--primary);}
+        h1{color:var(--primary);font-size:2.5em;margin-bottom:15px;}
+        h2{color:var(--primary);font-size:2em;margin:50px 0 25px 0;padding-bottom:10px;border-bottom:2px solid var(--primary);}
+        h3{color:var(--accent);font-size:1.5em;margin:35px 0 20px 0;}
+        p{margin:20px 0;font-size:1.1em;line-height:1.9;}
+        .code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin:25px 0;overflow-x:auto;font-family:'Consolas',monospace;font-size:0.95em;}
+        table{width:100%;border-collapse:collapse;margin:30px 0;background:var(--bg-card);border-radius:10px;overflow:hidden;}
+        th{background:var(--primary);color:white;padding:15px;text-align:left;}
+        td{padding:15px;border-bottom:1px solid var(--border);}
+        tr:hover{background:rgba(139,92,246,0.1);}
+        ul,ol{margin:20px 0;padding-left:30px;}
+        li{margin:10px 0;font-size:1.1em;line-height:1.8;}
+        .info-box{background:rgba(59,130,246,0.1);border-left:4px solid var(--accent);padding:25px;margin:30px 0;border-radius:8px;}
+        .key-takeaways{background:linear-gradient(135deg,rgba(139,92,246,0.2) 0%,rgba(59,130,246,0.2) 100%);padding:30px;border-radius:15px;margin:40px 0;}
+        .review-questions{background:var(--bg-card);padding:30px;border-radius:15px;margin:40px 0;}
+        .nav-buttons{display:flex;justify-content:space-between;margin-top:50px;gap:20px;}
+        .btn{padding:15px 30px;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.3s;flex:1;text-align:center;}
+        .btn-primary{background:var(--primary);color:white;}
+        .btn-secondary{background:var(--bg-card);color:var(--primary);border:2px solid var(--primary);}
+        footer{margin-top:60px;padding-top:30px;border-top:2px solid var(--border);text-align:center;color:var(--text-secondary);}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 07: 데이터 검증 및 품질 관리</h1>
+            <div style="color:var(--text-secondary);font-size:1.1em;">WIA-DATA_QUALITY 표준 가이드</div>
+        </header>
+
+        <section>
+            <h2>7.1 데이터 품질 차원</h2>
+            <p>데이터 품질은 6가지 핵심 차원으로 측정됩니다. 각 차원은 독립적으로 평가되며, 전체 품질 점수는 가중 평균으로 계산됩니다.</p>
+
+            <table>
+                <thead><tr><th>차원</th><th>설명</th><th>측정 방법</th><th>목표</th><th>가중치</th></tr></thead>
+                <tbody>
+                    <tr><td>정확성</td><td>실제 값과의 일치도</td><td>샘플 검증</td><td>99%+</td><td>25%</td></tr>
+                    <tr><td>완전성</td><td>필수 필드 채움</td><td>NULL 비율</td><td>95%+</td><td>20%</td></tr>
+                    <tr><td>일관성</td><td>시스템 간 동일성</td><td>크로스 체크</td><td>95%+</td><td>20%</td></tr>
+                    <tr><td>적시성</td><td>최신 상태 유지</td><td>시간 차이</td><td>&lt;1분</td><td>15%</td></tr>
+                    <tr><td>유효성</td><td>규칙 준수</td><td>규칙 검증</td><td>99%+</td><td>10%</td></tr>
+                    <tr><td>유일성</td><td>중복 제거</td><td>중복 탐지</td><td>&lt;1%</td><td>10%</td></tr>
+                </tbody>
+            </table>
+
+            <div class="code-block">// 품질 점수 계산
+function calculateQualityScore(metrics: QualityMetrics): number {
+  const weights = {
+    accuracy: 0.25,
+    completeness: 0.20,
+    consistency: 0.20,
+    timeliness: 0.15,
+    validity: 0.10,
+    uniqueness: 0.10
+  };
+
+  return Object.entries(metrics).reduce((score, [key, value]) => {
+    return score + (value * weights[key]);
+  }, 0);
+}
+
+// 사용 예시
+const metrics = {
+  accuracy: 0.99,
+  completeness: 0.96,
+  consistency: 0.97,
+  timeliness: 0.98,
+  validity: 0.99,
+  uniqueness: 0.99
+};
+
+const score = calculateQualityScore(metrics);
+console.log(`품질 점수: ${(score * 100).toFixed(2)}%`);
+// 출력: 품질 점수: 97.85%</div>
+        </section>
+
+        <section>
+            <h2>7.2 검증 규칙 엔진</h2>
+            <p>데이터 검증은 스키마 검증과 비즈니스 규칙 검증의 두 단계로 수행됩니다.</p>
+
+            <h3>7.2.1 스키마 검증</h3>
+            <div class="code-block">// JSON Schema 검증
+import Ajv from 'ajv';
+
+const schema = {
+  type: 'object',
+  required: ['name', 'email', 'age'],
+  properties: {
+    name: {
+      type: 'string',
+      minLength: 2,
+      maxLength: 100
+    },
+    email: {
+      type: 'string',
+      format: 'email'
+    },
+    age: {
+      type: 'number',
+      minimum: 0,
+      maximum: 150
+    }
+  }
+};
+
+const ajv = new Ajv();
+const validate = ajv.compile(schema);
+
+function validateData(data: any): ValidationResult {
+  const valid = validate(data);
+  return {
+    valid,
+    errors: validate.errors || []
+  };
+}</div>
+
+            <h3>7.2.2 비즈니스 규칙 검증</h3>
+            <div class="code-block">class BusinessRuleEngine {
+  private rules: Rule[] = [];
+
+  addRule(rule: Rule) {
+    this.rules.push(rule);
+  }
+
+  async validate(data: any): Promise&lt;RuleValidationResult&gt; {
+    const violations = [];
+
+    for (const rule of this.rules) {
+      const result = await rule.check(data);
+      if (!result.passed) {
+        violations.push({
+          ruleId: rule.id,
+          message: result.message,
+          severity: rule.severity
+        });
+      }
+    }
+
+    return {
+      passed: violations.length === 0,
+      violations
+    };
+  }
+}
+
+// 규칙 예시
+const ageRule: Rule = {
+  id: 'AGE_EMPLOYMENT_CHECK',
+  description: '고용 가능 나이 확인',
+  severity: 'error',
+  check: async (data) => {
+    if (data.employed && data.age < 16) {
+      return {
+        passed: false,
+        message: '16세 미만은 고용될 수 없습니다'
+      };
+    }
+    return { passed: true };
+  }
+};</div>
+        </section>
+
+        <section>
+            <h2>7.3 데이터 프로파일링</h2>
+            <p>데이터 프로파일링은 데이터셋의 통계적 특성을 분석하여 품질 문제를 식별합니다.</p>
+
+            <table>
+                <thead><tr><th>프로파일링 유형</th><th>분석 항목</th><th>활용</th></tr></thead>
+                <tbody>
+                    <tr><td>열 프로파일링</td><td>NULL 비율, 고유값 수, 데이터 타입 분포</td><td>완전성, 유효성 평가</td></tr>
+                    <tr><td>패턴 분석</td><td>정규식 매칭, 형식 일관성</td><td>표준화 필요성 식별</td></tr>
+                    <tr><td>통계 분석</td><td>평균, 중앙값, 표준편차, 이상치</td><td>품질 기준선 설정</td></tr>
+                    <tr><td>관계 분석</td><td>참조 무결성, 외래 키 검증</td><td>일관성 검증</td></tr>
+                </tbody>
+            </table>
+
+            <div class="code-block">class DataProfiler {
+  async profileColumn(
+    dataset: any[],
+    columnName: string
+  ): Promise&lt;ColumnProfile&gt; {
+    const values = dataset.map(row => row[columnName]);
+    const nonNullValues = values.filter(v => v != null);
+
+    return {
+      totalCount: values.length,
+      nullCount: values.length - nonNullValues.length,
+      nullPercentage: ((values.length - nonNullValues.length) / values.length) * 100,
+      uniqueCount: new Set(nonNullValues).size,
+      dataTypes: this.detectDataTypes(nonNullValues),
+      patterns: this.detectPatterns(nonNullValues),
+      statistics: this.calculateStatistics(nonNullValues)
+    };
+  }
+
+  private calculateStatistics(values: any[]) {
+    const numbers = values.filter(v => typeof v === 'number');
+    if (numbers.length === 0) return null;
+
+    return {
+      min: Math.min(...numbers),
+      max: Math.max(...numbers),
+      mean: numbers.reduce((a, b) => a + b, 0) / numbers.length,
+      median: this.calculateMedian(numbers),
+      stdDev: this.calculateStdDev(numbers)
+    };
+  }
+}</div>
+        </section>
+
+        <section>
+            <h2>7.4 이상 탐지</h2>
+            <p>머신러닝 기반 이상 탐지로 데이터 품질 문제를 자동으로 식별합니다.</p>
+
+            <h3>7.4.1 통계 기반 이상 탐지</h3>
+            <div class="code-block">class AnomalyDetector {
+  /**
+   * Z-Score 기반 이상치 탐지
+   * |z| > 3이면 이상치로 판단
+   */
+  detectOutliers(values: number[], threshold: number = 3): number[] {
+    const mean = values.reduce((a, b) => a + b) / values.length;
+    const stdDev = Math.sqrt(
+      values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length
+    );
+
+    return values.filter(v => {
+      const zScore = Math.abs((v - mean) / stdDev);
+      return zScore > threshold;
+    });
+  }
+
+  /**
+   * IQR (Interquartile Range) 기반
+   */
+  detectOutliersIQR(values: number[]): {value: number, index: number}[] {
+    const sorted = [...values].sort((a, b) => a - b);
+    const q1 = sorted[Math.floor(sorted.length * 0.25)];
+    const q3 = sorted[Math.floor(sorted.length * 0.75)];
+    const iqr = q3 - q1;
+    const lowerBound = q1 - 1.5 * iqr;
+    const upperBound = q3 + 1.5 * iqr;
+
+    return values
+      .map((value, index) => ({ value, index }))
+      .filter(({ value }) => value < lowerBound || value > upperBound);
+  }
+}</div>
+
+            <h3>7.4.2 머신러닝 기반 탐지</h3>
+            <div class="code-block">// Isolation Forest 알고리즘
+class IsolationForest {
+  private trees: IsolationTree[] = [];
+  private numTrees: number = 100;
+
+  fit(data: number[][]) {
+    for (let i = 0; i < this.numTrees; i++) {
+      const sample = this.randomSample(data);
+      const tree = this.buildTree(sample);
+      this.trees.push(tree);
+    }
+  }
+
+  predict(point: number[]): number {
+    const avgPathLength = this.trees.reduce((sum, tree) => {
+      return sum + tree.pathLength(point);
+    }, 0) / this.numTrees;
+
+    // 정규화된 이상 점수 (0~1, 1에 가까울수록 이상)
+    return Math.pow(2, -avgPathLength / this.averagePathLength);
+  }
+}</div>
+        </section>
+
+        <section>
+            <h2>7.5 데이터 정제 및 변환</h2>
+            <p>발견된 품질 문제를 자동으로 수정하는 정제 파이프라인을 구성합니다.</p>
+
+            <table>
+                <thead><tr><th>정제 작업</th><th>방법</th><th>적용 시점</th></tr></thead>
+                <tbody>
+                    <tr><td>중복 제거</td><td>Fuzzy matching, Levenshtein distance</td><td>데이터 로드 후</td></tr>
+                    <tr><td>NULL 처리</td><td>평균/중앙값 대체, 예측 모델</td><td>분석 전</td></tr>
+                    <tr><td>표준화</td><td>정규식 치환, 형식 통일</td><td>검증 전</td></tr>
+                    <tr><td>정규화</td><td>Min-max, Z-score normalization</td><td>ML 학습 전</td></tr>
+                </tbody>
+            </table>
+
+            <div class="code-block">class DataCleaner {
+  /**
+   * 중복 레코드 탐지 및 제거
+   */
+  async deduplicateRecords(
+    records: any[],
+    keyFields: string[]
+  ): Promise&lt;DeduplicationResult&gt; {
+    const seen = new Map();
+    const duplicates = [];
+    const unique = [];
+
+    for (const record of records) {
+      const key = keyFields.map(f => record[f]).join('|');
+
+      if (seen.has(key)) {
+        duplicates.push({
+          record,
+          duplicateOf: seen.get(key)
+        });
+      } else {
+        seen.set(key, record);
+        unique.push(record);
+      }
+    }
+
+    return { unique, duplicates };
+  }
+
+  /**
+   * Fuzzy 중복 탐지
+   */
+  async fuzzyDeduplicate(
+    records: any[],
+    field: string,
+    threshold: number = 0.8
+  ): Promise&lt;FuzzyMatch[]&gt; {
+    const matches = [];
+
+    for (let i = 0; i < records.length; i++) {
+      for (let j = i + 1; j < records.length; j++) {
+        const similarity = this.levenshteinSimilarity(
+          records[i][field],
+          records[j][field]
+        );
+
+        if (similarity >= threshold) {
+          matches.push({
+            record1: records[i],
+            record2: records[j],
+            similarity
+          });
+        }
+      }
+    }
+
+    return matches;
+  }
+
+  private levenshteinSimilarity(str1: string, str2: string): number {
+    const distance = this.levenshteinDistance(str1, str2);
+    const maxLength = Math.max(str1.length, str2.length);
+    return 1 - (distance / maxLength);
+  }
+}</div>
+        </section>
+
+        <section>
+            <h2>7.6 품질 모니터링 대시보드</h2>
+            <p>실시간으로 데이터 품질을 모니터링하고 시각화합니다.</p>
+
+            <div class="info-box">
+                <h4 style="color:var(--accent);margin-bottom:15px;">대시보드 핵심 메트릭</h4>
+                <ul>
+                    <li><strong>실시간 품질 점수:</strong> 현재 데이터셋의 전체 품질 점수 (0-100)</li>
+                    <li><strong>차원별 점수:</strong> 6가지 품질 차원별 세부 점수</li>
+                    <li><strong>추세 분석:</strong> 시간에 따른 품질 변화 그래프</li>
+                    <li><strong>문제 알림:</strong> 품질 기준 미달 시 즉시 알림</li>
+                    <li><strong>수정 제안:</strong> AI 기반 자동 수정 방안 제시</li>
+                </ul>
+            </div>
+
+            <div class="code-block">// 실시간 품질 모니터링
+class QualityMonitor {
+  private metrics: QualityMetricsCollector;
+  private alertManager: AlertManager;
+
+  async monitor(interval: number = 60000) {
+    setInterval(async () => {
+      const currentMetrics = await this.metrics.collect();
+      const qualityScore = calculateQualityScore(currentMetrics);
+
+      // 품질 점수가 90% 미만이면 경고
+      if (qualityScore < 0.90) {
+        await this.alertManager.sendAlert({
+          level: 'warning',
+          message: `데이터 품질 저하: ${(qualityScore * 100).toFixed(2)}%`,
+          metrics: currentMetrics
+        });
+      }
+
+      // 품질 점수가 80% 미만이면 긴급
+      if (qualityScore < 0.80) {
+        await this.alertManager.sendAlert({
+          level: 'critical',
+          message: `데이터 품질 심각: ${(qualityScore * 100).toFixed(2)}%`,
+          metrics: currentMetrics,
+          actions: ['즉시 조치 필요', '데이터 정제 실행']
+        });
+      }
+
+      // 메트릭 저장
+      await this.saveMetrics(currentMetrics, qualityScore);
+    }, interval);
+  }
+}</div>
+        </section>
+
+        <div class="key-takeaways">
+            <h2 style="margin-top:0;">핵심 요점</h2>
+            <ul>
+                <li>데이터 품질은 정확성(25%), 완전성(20%), 일관성(20%), 적시성(15%), 유효성(10%), 유일성(10%)의 6가지 차원으로 측정됩니다.</li>
+                <li>검증은 JSON Schema를 통한 스키마 검증과 비즈니스 규칙 엔진을 통한 규칙 검증의 두 단계로 수행됩니다.</li>
+                <li>데이터 프로파일링은 열 프로파일링, 패턴 분석, 통계 분석, 관계 분석의 4가지 유형으로 구성됩니다.</li>
+                <li>이상 탐지는 Z-Score, IQR 등 통계적 방법과 Isolation Forest 등 머신러닝 방법을 결합합니다.</li>
+                <li>데이터 정제는 중복 제거, NULL 처리, 표준화, 정규화 작업을 포함하며, Fuzzy matching으로 유사 중복을 탐지합니다.</li>
+                <li>실시간 품질 모니터링으로 품질 점수가 90% 미만이면 경고, 80% 미만이면 긴급 알림을 발송합니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>데이터 품질의 6가지 차원과 각각의 가중치를 나열하고, 총 품질 점수 계산 방법을 설명하세요.</li>
+                <li>스키마 검증과 비즈니스 규칙 검증의 차이점을 설명하고, 각각의 사용 사례를 제시하세요.</li>
+                <li>데이터 프로파일링의 4가지 유형을 설명하고, 각각이 평가하는 품질 차원을 제시하세요.</li>
+                <li>Z-Score 기반 이상치 탐지에서 임계값 3의 의미를 설명하세요.</li>
+                <li>IQR 방법에서 이상치 판정 기준(Q1 - 1.5*IQR, Q3 + 1.5*IQR)이 어떻게 계산되는지 설명하세요.</li>
+                <li>Isolation Forest 알고리즘의 작동 원리를 간단히 설명하세요.</li>
+                <li>Fuzzy matching에서 Levenshtein distance가 문자열 유사도를 어떻게 측정하는지 설명하세요.</li>
+                <li>데이터 정제의 4가지 주요 작업(중복 제거, NULL 처리, 표준화, 정규화)을 각각 설명하세요.</li>
+                <li>품질 모니터링 대시보드의 5가지 핵심 메트릭을 나열하세요.</li>
+                <li>품질 점수가 90% 미만일 때와 80% 미만일 때의 알림 레벨 차이를 설명하세요.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

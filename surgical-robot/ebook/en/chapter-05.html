@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - API Interface | WIA-ROB-006</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #10B981; --primary-light: #34d399; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.8rem; margin-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 2rem; margin: 3rem 0 1.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.5rem; margin: 2.5rem 0 1rem; }
+        p { margin: 1.2rem 0; text-align: justify; color: var(--text-secondary); }
+        ul { margin: 1.5rem 0 1.5rem 2.5rem; }
+        li { margin: 0.8rem 0; color: var(--text-secondary); }
+        table { width: 100%; border-collapse: collapse; margin: 2.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        pre { background: var(--bg); padding: 1.5rem; border-radius: 5px; margin: 1.5rem 0; border-left: 4px solid var(--primary); color: var(--primary-light); font-family: 'Monaco', monospace; font-size: 0.85rem; overflow-x: auto; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 4rem 0 2rem; padding-top: 2rem; border-top: 2px solid var(--border); }
+        .btn { padding: 0.9rem 2rem; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
+        .btn-secondary { background: var(--bg-tertiary); border: 2px solid var(--primary); color: var(--primary); }
+        .key-takeaways, .review-questions { background: rgba(16, 185, 129, 0.15); border: 2px solid var(--primary); border-radius: 10px; padding: 2rem; margin: 3rem 0; }
+        .key-takeaways h3, .review-questions h3 { color: var(--primary); margin-top: 0; margin-bottom: 1.5rem; font-size: 1.8rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Phase 2: API Interface</h1>
+
+        <h2>5.1 Introduction to Surgical Robot APIs</h2>
+        <p>
+            Phase 2 of WIA-ROB-006 defines standardized Application Programming Interfaces (APIs) enabling programmatic control, monitoring, and integration of surgical robots. RESTful APIs, WebSocket connections, and standardized protocols create an open ecosystem where third-party developers can build compatible applications, research tools, training simulators, and OR integration systems.
+        </p>
+
+        <h2>5.2 REST API Architecture</h2>
+
+        <h3>Core API Endpoints</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Purpose</th>
+                    <th>Authentication</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>/api/v1/robot/status</td><td>GET</td><td>Retrieve robot system status</td><td>OAuth 2.0</td></tr>
+                <tr><td>/api/v1/robot/control</td><td>POST</td><td>Send control commands</td><td>OAuth 2.0 + Role</td></tr>
+                <tr><td>/api/v1/instruments</td><td>GET</td><td>List installed instruments</td><td>OAuth 2.0</td></tr>
+                <tr><td>/api/v1/instruments/{id}/move</td><td>POST</td><td>Command instrument movement</td><td>OAuth 2.0 + Role</td></tr>
+                <tr><td>/api/v1/video/stream</td><td>WebSocket</td><td>Real-time video streaming</td><td>OAuth 2.0</td></tr>
+                <tr><td>/api/v1/telemetry</td><td>WebSocket</td><td>Real-time telemetry stream</td><td>OAuth 2.0</td></tr>
+                <tr><td>/api/v1/procedures</td><td>GET/POST</td><td>Procedure management</td><td>OAuth 2.0</td></tr>
+                <tr><td>/api/v1/emergency/stop</td><td>POST</td><td>Emergency stop activation</td><td>None (safety critical)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>API Request Example</h3>
+        <pre>
+POST /api/v1/instruments/ARM-1/move
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "target_position": {
+    "x": 125.5,
+    "y": 68.3,
+    "z": -24.1
+  },
+  "target_orientation": {
+    "roll": 15.0,
+    "pitch": -9.0,
+    "yaw": 46.0
+  },
+  "velocity": 10.0,
+  "acceleration": 5.0,
+  "collision_avoidance": true
+}
+</pre>
+
+        <h2>5.3 Real-Time Video Streaming</h2>
+
+        <h3>WebRTC Protocol</h3>
+        <p>
+            WIA-ROB-006 specifies WebRTC (Web Real-Time Communication) for low-latency video streaming:
+        </p>
+        <ul>
+            <li><strong>Codec:</strong> VP9 or H.265 with hardware acceleration</li>
+            <li><strong>Resolution:</strong> Adaptive 720p-4K based on bandwidth</li>
+            <li><strong>Latency:</strong> End-to-end < 100ms for real-time control</li>
+            <li><strong>Bandwidth:</strong> 5-50 Mbps depending on quality</li>
+            <li><strong>Encryption:</strong> DTLS-SRTP mandatory for all streams</li>
+        </ul>
+
+        <h3>Multi-Stream Support</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Stream Type</th>
+                    <th>Resolution</th>
+                    <th>FPS</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Primary Surgical View</td><td>4K (3840x2160)</td><td>60</td><td>Main display at console</td></tr>
+                <tr><td>Secondary View</td><td>1080p</td><td>30</td><td>Assistant surgeon display</td></tr>
+                <tr><td>Teaching Stream</td><td>1080p</td><td>30</td><td>Observation room broadcast</td></tr>
+                <tr><td>Recording Stream</td><td>4K</td><td>60</td><td>Archival and review</td></tr>
+                <tr><td>Thumbnail Preview</td><td>480p</td><td>15</td><td>OR monitoring dashboard</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.4 Haptic Feedback Interfaces</h2>
+
+        <h3>Force Feedback API</h3>
+        <p>
+            Standardized haptic feedback API enables force-reflecting master manipulators:
+        </p>
+
+        <pre>
+WebSocket: ws://robot.example.com/api/v1/haptic
+
+// Incoming force data from robot (100-1000 Hz)
+{
+  "timestamp": "2025-01-15T14:23:45.123Z",
+  "instrument_id": "ARM-1",
+  "force_vector": {"x": 0.23, "y": -0.15, "z": 0.87},
+  "contact_state": "soft_tissue",
+  "vibration": {"frequency": 120, "amplitude": 0.05}
+}
+
+// Outgoing haptic rendering command
+{
+  "master_id": "CONSOLE-RIGHT",
+  "force_feedback": {"x": 0.23, "y": -0.15, "z": 0.87},
+  "scaling_factor": 1.5,
+  "damping": 0.1
+}
+</pre>
+
+        <h2>5.5 Instrument Control APIs</h2>
+
+        <h3>Movement Control</h3>
+        <ul>
+            <li><strong>Position Control:</strong> Target absolute position in 3D space</li>
+            <li><strong>Velocity Control:</strong> Continuous motion at specified velocity</li>
+            <li><strong>Force Control:</strong> Apply specified force to tissues</li>
+            <li><strong>Hybrid Control:</strong> Combination of position and force control</li>
+        </ul>
+
+        <h3>Safety Constraints</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Constraint</th>
+                    <th>Limit</th>
+                    <th>Enforcement</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Maximum Velocity</td><td>100 mm/s</td><td>Hardware + software limiting</td></tr>
+                <tr><td>Maximum Force</td><td>10 N</td><td>Torque limiting + monitoring</td></tr>
+                <tr><td>Workspace Boundaries</td><td>Configurable 3D volume</td><td>Collision detection + prevention</td></tr>
+                <tr><td>Joint Limits</td><td>Per-joint angle limits</td><td>Encoder monitoring</td></tr>
+                <tr><td>Collision Avoidance</td><td>50mm minimum separation</td><td>Real-time proximity detection</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.6 Authentication and Security</h2>
+
+        <h3>OAuth 2.0 Implementation</h3>
+        <p>
+            All API access requires OAuth 2.0 authentication with role-based access control:
+        </p>
+        <ul>
+            <li><strong>Surgeon Role:</strong> Full control authority, all APIs accessible</li>
+            <li><strong>Assistant Role:</strong> Camera control, limited instrument access</li>
+            <li><strong>Observer Role:</strong> Read-only access, video streams, telemetry</li>
+            <li><strong>Technician Role:</strong> System diagnostics, maintenance, calibration</li>
+            <li><strong>Administrator Role:</strong> System configuration, user management</li>
+        </ul>
+
+        <h3>TLS 1.3 Encryption</h3>
+        <ul>
+            <li>All HTTP/HTTPS traffic encrypted with TLS 1.3</li>
+            <li>Perfect forward secrecy (PFS) required</li>
+            <li>Certificate pinning for robot-to-console connections</li>
+            <li>Mutual authentication (client and server certificates)</li>
+        </ul>
+
+        <h2>5.7 WebSocket for Low-Latency Communication</h2>
+
+        <h3>Telemetry Streaming</h3>
+        <pre>
+WebSocket: wss://robot.example.com/api/v1/telemetry
+
+// Real-time data stream (30-60 Hz)
+{
+  "timestamp": "2025-01-15T14:23:45.123Z",
+  "instruments": [
+    {
+      "id": "ARM-1",
+      "position": {"x": 123.45, "y": 67.89, "z": -23.45},
+      "velocity": {"x": 5.2, "y": -2.1, "z": 1.3},
+      "force": {"x": 0.23, "y": -0.15, "z": 0.87}
+    }
+  ],
+  "camera": {
+    "zoom": 1.5,
+    "focus": 150.0,
+    "exposure": "auto"
+  }
+}
+</pre>
+
+        <h2>5.8 Error Handling and Recovery</h2>
+
+        <h3>HTTP Status Codes</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Meaning</th>
+                    <th>Response Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>200</td><td>Success</td><td>Continue operation</td></tr>
+                <tr><td>400</td><td>Invalid request</td><td>Correct request format</td></tr>
+                <tr><td>401</td><td>Unauthorized</td><td>Re-authenticate</td></tr>
+                <tr><td>403</td><td>Forbidden</td><td>Insufficient privileges</td></tr>
+                <tr><td>409</td><td>Conflict</td><td>Resolve state conflict</td></tr>
+                <tr><td>500</td><td>Server error</td><td>Retry with backoff</td></tr>
+                <tr><td>503</td><td>Service unavailable</td><td>System maintenance mode</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.9 Batch Operations and Transaction APIs</h2>
+
+        <h3>Batch Command Execution</h3>
+        <p>
+            Complex surgical maneuvers require coordinated multi-instrument movements. Batch APIs enable atomic execution of multiple commands with rollback on failure:
+        </p>
+
+        <pre>
+POST /api/v1/batch
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "transactionId": "txn-2025-01-15-001",
+  "atomicity": "all_or_nothing",
+  "timeout": 5000,
+  "commands": [
+    {
+      "commandId": "cmd-1",
+      "endpoint": "/api/v1/instruments/ARM-1/move",
+      "payload": {
+        "target_position": {"x": 125.5, "y": 68.3, "z": -24.1},
+        "velocity": 10.0
+      }
+    },
+    {
+      "commandId": "cmd-2",
+      "endpoint": "/api/v1/instruments/ARM-2/move",
+      "payload": {
+        "target_position": {"x": 135.2, "y": 72.1, "z": -22.8},
+        "velocity": 10.0
+      }
+    },
+    {
+      "commandId": "cmd-3",
+      "endpoint": "/api/v1/camera/zoom",
+      "payload": {
+        "zoom_level": 2.5,
+        "focus_point": {"x": 130.0, "y": 70.0, "z": -23.5}
+      }
+    }
+  ]
+}
+
+Response:
+{
+  "transactionId": "txn-2025-01-15-001",
+  "status": "success",
+  "executionTime": 234,
+  "results": [
+    {"commandId": "cmd-1", "status": "completed", "latency": 87},
+    {"commandId": "cmd-2", "status": "completed", "latency": 91},
+    {"commandId": "cmd-3", "status": "completed", "latency": 56}
+  ]
+}
+</pre>
+
+        <h2>5.10 SDK Examples and Integration Patterns</h2>
+
+        <h3>Python SDK - Instrument Control</h3>
+        <pre>
+from wia_surgical_robot import SurgicalRobotAPI, InstrumentController
+
+# Initialize API client with OAuth 2.0
+api = SurgicalRobotAPI(
+    base_url="https://robot.hospital.org/api/v1",
+    client_id="surgical-app-001",
+    client_secret="secret-key",
+    scopes=["robot:read", "robot:control"]
+)
+
+# Authenticate
+api.authenticate()
+
+# Get instrument controller
+arm1 = InstrumentController(api, instrument_id="ARM-1")
+
+# Move to target position
+arm1.move_to(
+    position=(125.5, 68.3, -24.1),
+    orientation=(15.0, -9.0, 46.0),
+    velocity=10.0,
+    collision_avoidance=True
+)
+
+# Monitor movement progress
+while not arm1.is_at_target():
+    status = arm1.get_status()
+    print(f"Progress: {status.progress_percent}% - Distance: {status.distance_to_target}mm")
+    time.sleep(0.1)
+
+print("Movement complete")
+</pre>
+
+        <h3>JavaScript/TypeScript SDK - Real-Time Telemetry</h3>
+        <pre>
+import { SurgicalRobotClient, TelemetryStream } from '@wia/surgical-robot-sdk';
+
+// Initialize client
+const client = new SurgicalRobotClient({
+  baseUrl: 'https://robot.hospital.org/api/v1',
+  apiKey: process.env.ROBOT_API_KEY
+});
+
+// Subscribe to real-time telemetry
+const stream = new TelemetryStream(client, {
+  robotId: 'davinci-si-001',
+  streams: ['pose', 'force', 'video'],
+  sampleRate: 100 // Hz
+});
+
+stream.on('pose', (data) => {
+  console.log(`Position: (${data.position.x}, ${data.position.y}, ${data.position.z})`);
+  updateVisualization(data);
+});
+
+stream.on('force', (data) => {
+  if (data.magnitude > 5.0) {
+    console.warn(`High force detected: ${data.magnitude}N`);
+  }
+});
+
+stream.connect();
+</pre>
+
+        <h2>5.11 API Versioning and Deprecation Policy</h2>
+        <p>
+            WIA-ROB-006 APIs evolve over time. Version management ensures backward compatibility while enabling innovation:
+        </p>
+
+        <ul>
+            <li><strong>URL-Based Versioning:</strong> Major versions in path (/api/v1/, /api/v2/)</li>
+            <li><strong>Backward Compatibility:</strong> Minor updates (v1.1, v1.2) maintain compatibility within major version</li>
+            <li><strong>Deprecation Notice:</strong> Minimum 12 months notice before endpoint removal</li>
+            <li><strong>Migration Support:</strong> Detailed migration guides, automated conversion tools, parallel operation period</li>
+            <li><strong>Change Documentation:</strong> Comprehensive changelog, API diff tools, breaking change highlights</li>
+        </ul>
+
+        <h3>Version Compatibility Matrix</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>API Version</th>
+                    <th>Release Date</th>
+                    <th>Status</th>
+                    <th>End of Support</th>
+                    <th>Major Changes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>v1.0</td>
+                    <td>2023-01-15</td>
+                    <td>Deprecated</td>
+                    <td>2025-12-31</td>
+                    <td>Initial release</td>
+                </tr>
+                <tr>
+                    <td>v1.1</td>
+                    <td>2023-06-20</td>
+                    <td>Active</td>
+                    <td>2026-06-30</td>
+                    <td>Added haptic feedback API</td>
+                </tr>
+                <tr>
+                    <td>v2.0</td>
+                    <td>2024-03-10</td>
+                    <td>Current</td>
+                    <td>TBD</td>
+                    <td>WebRTC streaming, batch operations, improved auth</td>
+                </tr>
+                <tr>
+                    <td>v2.1</td>
+                    <td>2024-09-15</td>
+                    <td>Current</td>
+                    <td>TBD</td>
+                    <td>AI surgical planning integration</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="key-takeaways">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>RESTful APIs provide standardized endpoints for robot control, instrument manipulation, video streaming, and system monitoring.</li>
+                <li>WebRTC enables real-time video streaming with <100ms latency, supporting multiple concurrent streams at resolutions up to 4K 60fps.</li>
+                <li>Haptic feedback API standardizes force/torque data transmission at 100-1000 Hz for future force-reflecting master manipulators.</li>
+                <li>OAuth 2.0 with role-based access control ensures only authorized users can control surgical robots based on clinical roles.</li>
+                <li>TLS 1.3 encryption with mutual authentication protects all API communications from eavesdropping and tampering.</li>
+                <li>WebSocket connections enable low-latency bi-directional communication for telemetry streaming and real-time control.</li>
+                <li>Safety constraints (velocity limits, force limits, collision avoidance) are enforced at both hardware and software levels.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain why WebRTC is preferred over traditional HTTP streaming for surgical video. What latency requirements drive this choice?</li>
+                <li>Describe the OAuth 2.0 authentication flow for a third-party application accessing surgical robot APIs. What security measures prevent unauthorized access?</li>
+                <li>Why does haptic feedback require 100-1000 Hz update rates? Calculate the maximum allowable latency for a 1000 Hz haptic loop.</li>
+                <li>Compare REST APIs vs. WebSocket connections for surgical robot control. When is each approach appropriate?</li>
+                <li>Design an API call sequence for moving an instrument from position A to position B while avoiding collision with another instrument. Include safety checks.</li>
+                <li>Explain how role-based access control (RBAC) enhances surgical robot safety. What roles should exist and what permissions should each have?</li>
+                <li>Analyze the trade-offs between video quality (4K vs 1080p) and network bandwidth requirements. When might lower resolution be acceptable?</li>
+                <li>Describe error handling strategies for API failures during critical surgical moments. How should the system respond to network interruptions?</li>
+                <li>Explain how TLS 1.3 with mutual authentication prevents man-in-the-middle attacks on surgical robot APIs.</li>
+                <li>Design a third-party application that uses WIA-ROB-006 APIs to provide real-time surgical skill assessment. What endpoints would you use and how?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

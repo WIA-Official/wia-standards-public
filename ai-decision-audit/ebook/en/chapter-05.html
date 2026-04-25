@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Compliance and Verification | WIA-AI-018</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; margin-bottom: 40px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 15px; }
+        .chapter-nav { background: #1e293b; padding: 15px 20px; border-radius: 8px; margin-bottom: 30px; display: flex; justify-content: space-between; }
+        .chapter-nav a { color: #10B981; text-decoration: none; padding: 8px 16px; border-radius: 5px; transition: all 0.3s; }
+        .chapter-nav a:hover { background: #10B981; color: #0f172a; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.4rem; margin: 30px 0 15px 0; }
+        p { margin-bottom: 15px; }
+        code { background: #1e293b; padding: 2px 8px; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        ul, ol { margin-left: 30px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .callout { background: #1e293b; border-left: 4px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        .summary { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #0f172a; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .summary h2 { color: #0f172a; border-bottom: 2px solid #0f172a; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        tr:nth-child(even) { background: #1e293b; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 5: Compliance and Verification</h1>
+            <p style="color: #94a3b8;">Automated Policy Enforcement and Regulatory Checking</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>From Manual to Automated Compliance</h2>
+        <p>Traditional compliance verification relies on periodic manual audits—expensive, time-consuming, and reactive. By the time violations are discovered, harm may already be done. Automated compliance checking shifts the paradigm: real-time verification, continuous monitoring, and proactive violation prevention.</p>
+
+        <p>The principle of 弘益人間 demands that we prevent harm before it occurs. Automated compliance systems embody this principle by detecting and blocking problematic AI decisions in real-time, protecting individuals from algorithmic harm.</p>
+
+        <h2>Compliance Rule Engine Architecture</h2>
+        <p>A compliance rule engine evaluates audit logs against regulatory requirements and organizational policies:</p>
+
+        <pre><code>interface ComplianceRule {
+  id: string;
+  name: string;
+  framework: string;  // "GDPR", "CCPA", "EU AI Act", etc.
+  severity: "critical" | "high" | "medium" | "low";
+  check: (log: AuditLog) => ComplianceResult;
+  remediation?: (log: AuditLog) => Promise<void>;
+}
+
+interface ComplianceResult {
+  compliant: boolean;
+  message: string;
+  evidence?: any;
+  recommendation?: string;
+}
+
+class ComplianceRuleEngine {
+  private rules: Map<string, ComplianceRule> = new Map();
+
+  registerRule(rule: ComplianceRule): void {
+    this.rules.set(rule.id, rule);
+  }
+
+  async checkCompliance(log: AuditLog): Promise<ComplianceReport> {
+    const results: ComplianceResult[] = [];
+    const violations: ComplianceViolation[] = [];
+
+    for (const rule of this.rules.values()) {
+      const result = rule.check(log);
+      results.push(result);
+
+      if (!result.compliant) {
+        violations.push({
+          rule_id: rule.id,
+          rule_name: rule.name,
+          severity: rule.severity,
+          message: result.message,
+          evidence: result.evidence,
+          timestamp: new Date().toISOString()
+        });
+
+        // Attempt automated remediation
+        if (rule.remediation) {
+          await rule.remediation(log);
+        }
+      }
+    }
+
+    return {
+      decision_id: log.decision_id,
+      overall_compliant: violations.length === 0,
+      violations,
+      results,
+      checked_at: new Date().toISOString()
+    };
+  }
+}</code></pre>
+
+        <h2>Implementing GDPR Compliance Rules</h2>
+
+        <h3>Right to Explanation Verification</h3>
+        <pre><code>const gdprRightToExplanation: ComplianceRule = {
+  id: "gdpr-art22-explanation",
+  name: "GDPR Article 22 - Right to Explanation",
+  framework: "GDPR",
+  severity: "critical",
+
+  check: (log: AuditLog): ComplianceResult => {
+    // Article 22 applies to automated decisions with legal/significant effects
+    if (!log.compliance.automated) {
+      return { compliant: true, message: "Not automated decision" };
+    }
+
+    if (log.context.business_impact !== "high" &&
+        log.context.business_impact !== "critical") {
+      return { compliant: true, message: "Not significant effect" };
+    }
+
+    // Check for meaningful explanation
+    if (!log.reasoning || !log.reasoning.explanation) {
+      return {
+        compliant: false,
+        message: "Missing explanation for significant automated decision",
+        recommendation: "Add meaningful explanation to decision reasoning"
+      };
+    }
+
+    // Explanation must be substantive (min 100 characters)
+    if (log.reasoning.explanation.length < 100) {
+      return {
+        compliant: false,
+        message: "Explanation insufficient - must be meaningful and detailed",
+        recommendation: "Expand explanation to provide substantive information"
+      };
+    }
+
+    // Must include key factors
+    if (!log.reasoning.key_features || log.reasoning.key_features.length === 0) {
+      return {
+        compliant: false,
+        message: "Explanation must identify key factors influencing decision",
+        recommendation: "Add feature importance information"
+      };
+    }
+
+    return { compliant: true, message: "Explanation requirements satisfied" };
+  }
+};</code></pre>
+
+        <h3>Data Minimization Check</h3>
+        <pre><code>const gdprDataMinimization: ComplianceRule = {
+  id: "gdpr-art5-minimization",
+  name: "GDPR Article 5 - Data Minimization",
+  framework: "GDPR",
+  severity: "high",
+
+  check: (log: AuditLog): ComplianceResult => {
+    // Define allowed fields per decision type
+    const allowedFields = getAllowedFieldsForDecisionType(
+      log.context.decision_type
+    );
+
+    const actualFields = Object.keys(log.input.raw_data);
+    const excessFields = actualFields.filter(f => !allowedFields.includes(f));
+
+    if (excessFields.length > 0) {
+      return {
+        compliant: false,
+        message: `Excessive data collected: ${excessFields.join(', ')}`,
+        evidence: { excess_fields: excessFields },
+        recommendation: "Remove unnecessary fields from input data"
+      };
+    }
+
+    return { compliant: true, message: "Data minimization satisfied" };
+  }
+};</code></pre>
+
+        <h3>Consent Verification</h3>
+        <pre><code>const gdprConsent: ComplianceRule = {
+  id: "gdpr-art6-consent",
+  name: "GDPR Article 6 - Lawful Basis (Consent)",
+  framework: "GDPR",
+  severity: "critical",
+
+  check: (log: AuditLog): ComplianceResult => {
+    if (log.compliance.legal_basis !== "consent") {
+      // Other legal bases may apply
+      return { compliant: true, message: "Different legal basis applies" };
+    }
+
+    if (!log.compliance.data_subject_consent) {
+      return {
+        compliant: false,
+        message: "Consent required but not obtained",
+        recommendation: "Obtain explicit consent before processing"
+      };
+    }
+
+    // Verify consent is current (not expired)
+    const consentAge = Date.now() - new Date(log.compliance.consent_date).getTime();
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+
+    if (consentAge > oneYear) {
+      return {
+        compliant: false,
+        message: "Consent expired - must be refreshed annually",
+        recommendation: "Request renewed consent"
+      };
+    }
+
+    return { compliant: true, message: "Valid consent present" };
+  }
+};</code></pre>
+
+        <h2>Implementing CCPA Compliance Rules</h2>
+
+        <h3>Automated Decision Disclosure</h3>
+        <pre><code>const ccpaAutomatedDecisionDisclosure: ComplianceRule = {
+  id: "ccpa-1798-185-disclosure",
+  name: "CCPA Automated Decision Disclosure",
+  framework: "CCPA",
+  severity: "high",
+
+  check: (log: AuditLog): ComplianceResult => {
+    if (!log.compliance.automated) {
+      return { compliant: true, message: "Not automated decision" };
+    }
+
+    // Verify disclosure was provided
+    if (!log.compliance.disclosure_provided) {
+      return {
+        compliant: false,
+        message: "Automated decision-making not disclosed to consumer",
+        recommendation: "Provide clear disclosure of automated decision-making"
+      };
+    }
+
+    // Verify explanation availability
+    if (!log.compliance.explanation_available) {
+      return {
+        compliant: false,
+        message: "Explanation not made available to consumer",
+        recommendation: "Ensure consumers can access decision explanations"
+      };
+    }
+
+    return { compliant: true, message: "Disclosure requirements met" };
+  }
+};</code></pre>
+
+        <h3>Sale of Personal Information</h3>
+        <pre><code>const ccpaSaleProhibition: ComplianceRule = {
+  id: "ccpa-1798-120-sale",
+  name: "CCPA Do Not Sell Verification",
+  framework: "CCPA",
+  severity: "critical",
+
+  check: (log: AuditLog): ComplianceResult => {
+    // Check if user has opted out of sale
+    const optedOut = checkOptOutStatus(log.context.user_id);
+
+    if (optedOut && log.compliance.data_shared_with_third_party) {
+      return {
+        compliant: false,
+        message: "User opted out of sale but data shared with third party",
+        recommendation: "Stop sharing data for users who opted out"
+      };
+    }
+
+    return { compliant: true, message: "Sale restrictions respected" };
+  }
+};</code></pre>
+
+        <h2>EU AI Act Compliance Rules</h2>
+
+        <h3>High-Risk System Requirements</h3>
+        <pre><code>const euAIActHighRiskRequirements: ComplianceRule = {
+  id: "eu-ai-act-high-risk",
+  name: "EU AI Act High-Risk System Requirements",
+  framework: "EU AI Act",
+  severity: "critical",
+
+  check: (log: AuditLog): ComplianceResult => {
+    if (log.context.risk_category !== "high") {
+      return { compliant: true, message: "Not high-risk system" };
+    }
+
+    const violations: string[] = [];
+
+    // Requirement: Human oversight
+    if (!log.compliance.human_oversight_available) {
+      violations.push("Human oversight mechanism missing");
+    }
+
+    // Requirement: Technical documentation
+    if (!log.model.documentation_url) {
+      violations.push("Technical documentation not linked");
+    }
+
+    // Requirement: Accuracy metrics
+    if (!log.model.accuracy_metrics) {
+      violations.push("Model accuracy metrics not documented");
+    }
+
+    // Requirement: Bias testing
+    if (!log.model.bias_testing_completed) {
+      violations.push("Bias testing not completed");
+    }
+
+    // Requirement: Transparency
+    if (!log.compliance.transparency_notice_provided) {
+      violations.push("Transparency notice not provided to users");
+    }
+
+    if (violations.length > 0) {
+      return {
+        compliant: false,
+        message: `High-risk system violations: ${violations.join('; ')}`,
+        evidence: { violations },
+        recommendation: "Address all high-risk requirements before deployment"
+      };
+    }
+
+    return { compliant: true, message: "High-risk requirements satisfied" };
+  }
+};</code></pre>
+
+        <h2>Financial Services Compliance</h2>
+
+        <h3>Fair Lending (ECOA) Compliance</h3>
+        <pre><code>const ecoaFairLending: ComplianceRule = {
+  id: "ecoa-fair-lending",
+  name: "Equal Credit Opportunity Act - Fair Lending",
+  framework: "ECOA",
+  severity: "critical",
+
+  check: (log: AuditLog): ComplianceResult => {
+    if (log.context.decision_type !== "credit_decision") {
+      return { compliant: true, message: "Not credit decision" };
+    }
+
+    // Protected characteristics must not be used
+    const protectedCharacteristics = [
+      'race', 'color', 'religion', 'national_origin',
+      'sex', 'marital_status', 'age'
+    ];
+
+    const inputFields = Object.keys(log.input.raw_data);
+    const prohibitedFields = inputFields.filter(f =>
+      protectedCharacteristics.includes(f.toLowerCase())
+    );
+
+    if (prohibitedFields.length > 0) {
+      return {
+        compliant: false,
+        message: `Prohibited fields used in credit decision: ${prohibitedFields.join(', ')}`,
+        evidence: { prohibited_fields: prohibitedFields },
+        recommendation: "Remove protected characteristics from decision inputs"
+      };
+    }
+
+    // Adverse action notice required for denials
+    if (log.output.decision === "DENIED") {
+      if (!log.compliance.adverse_action_notice_sent) {
+        return {
+          compliant: false,
+          message: "Adverse action notice required for credit denial",
+          recommendation: "Send adverse action notice with specific reasons"
+        };
+      }
+    }
+
+    return { compliant: true, message: "Fair lending requirements met" };
+  }
+};</code></pre>
+
+        <h2>Real-Time Compliance Enforcement</h2>
+        <p>Real-time checking prevents non-compliant decisions from being executed:</p>
+
+        <pre><code>class RealTimeComplianceEnforcer {
+  async enforceCompliance(log: AuditLog): Promise<EnforcementResult> {
+    const report = await this.ruleEngine.checkCompliance(log);
+
+    // Block critical violations
+    const criticalViolations = report.violations.filter(
+      v => v.severity === "critical"
+    );
+
+    if (criticalViolations.length > 0) {
+      // Block decision
+      await this.blockDecision(log.decision_id, criticalViolations);
+
+      // Alert compliance team
+      await this.alertComplianceTeam({
+        decision_id: log.decision_id,
+        violations: criticalViolations,
+        action: "BLOCKED"
+      });
+
+      return {
+        allowed: false,
+        reason: "Critical compliance violations detected",
+        violations: criticalViolations
+      };
+    }
+
+    // Warn on high-severity violations but allow
+    const highViolations = report.violations.filter(
+      v => v.severity === "high"
+    );
+
+    if (highViolations.length > 0) {
+      await this.alertComplianceTeam({
+        decision_id: log.decision_id,
+        violations: highViolations,
+        action: "WARNING"
+      });
+    }
+
+    return {
+      allowed: true,
+      warnings: highViolations
+    };
+  }
+}</code></pre>
+
+        <h2>Compliance Dashboard and Reporting</h2>
+        <p>Executive dashboards provide visibility into compliance status:</p>
+
+        <pre><code>class ComplianceDashboard {
+  async generateDashboard(timeRange: DateRange): Promise<Dashboard> {
+    const logs = await this.loadLogsInRange(timeRange);
+    const reports = await Promise.all(
+      logs.map(log => this.ruleEngine.checkCompliance(log))
+    );
+
+    // Overall compliance rate
+    const compliantCount = reports.filter(r => r.overall_compliant).length;
+    const complianceRate = compliantCount / reports.length;
+
+    // Violations by severity
+    const violationsBySeverity = this.groupBySeverity(
+      reports.flatMap(r => r.violations)
+    );
+
+    // Violations by framework
+    const violationsByFramework = this.groupByFramework(
+      reports.flatMap(r => r.violations)
+    );
+
+    // Trend analysis
+    const trend = await this.analyzeTrend(timeRange);
+
+    return {
+      overview: {
+        total_decisions: logs.length,
+        compliant_decisions: compliantCount,
+        compliance_rate: complianceRate,
+        total_violations: reports.reduce((sum, r) => sum + r.violations.length, 0)
+      },
+      violations_by_severity: violationsBySeverity,
+      violations_by_framework: violationsByFramework,
+      trend,
+      top_violations: this.identifyTopViolations(reports),
+      recommendations: this.generateRecommendations(reports)
+    };
+  }
+}</code></pre>
+
+        <h2>Regulatory Reporting Automation</h2>
+        <p>Automated report generation satisfies regulatory filing requirements:</p>
+
+        <pre><code>class RegulatoryReportGenerator {
+  async generateGDPRReport(year: number): Promise<GDPRReport> {
+    const logs = await this.loadLogsForYear(year);
+
+    return {
+      reporting_period: year,
+      data_processing_activities: this.summarizeActivities(logs),
+      legal_bases: this.summarizeLegalBases(logs),
+      data_subject_requests: await this.loadDSRs(year),
+      data_breaches: await this.loadBreaches(year),
+      dpia_summaries: await this.loadDPIAs(year),
+      cross_border_transfers: this.summarizeTransfers(logs),
+      dpo_contact: this.getDPOContact()
+    };
+  }
+
+  async generateCCPAReport(year: number): Promise<CCPAReport> {
+    const logs = await this.loadLogsForYear(year);
+
+    return {
+      reporting_period: year,
+      personal_information_collected: this.summarizeDataCollected(logs),
+      purposes: this.summarizePurposes(logs),
+      categories_sold: this.summarizeSales(logs),
+      consumer_requests: await this.loadConsumerRequests(year),
+      opt_out_requests: await this.loadOptOutRequests(year),
+      disclosure_practices: this.summarizeDisclosures(logs)
+    };
+  }
+}</code></pre>
+
+        <h2>Policy as Code</h2>
+        <p>Express organizational policies as executable code:</p>
+
+        <pre><code>// Example: Internal AI ethics policy
+const ethicsPolicy: ComplianceRule = {
+  id: "internal-ethics-001",
+  name: "Minimum Confidence Threshold",
+  framework: "Internal Ethics Policy",
+  severity: "high",
+
+  check: (log: AuditLog): ComplianceResult => {
+    const minConfidence = getMinConfidenceForImpact(
+      log.context.business_impact
+    );
+
+    if (log.output.confidence < minConfidence) {
+      return {
+        compliant: false,
+        message: `Confidence ${log.output.confidence} below threshold ${minConfidence}`,
+        recommendation: "Require human review for low-confidence decisions"
+      };
+    }
+
+    return { compliant: true, message: "Confidence threshold met" };
+  },
+
+  // Automated remediation: route to human review
+  remediation: async (log: AuditLog) => {
+    await humanReviewQueue.add({
+      decision_id: log.decision_id,
+      reason: "Low confidence score",
+      priority: "high"
+    });
+  }
+};</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Automated compliance checking enables real-time verification and proactive violation prevention</li>
+                <li>Compliance rule engines evaluate audit logs against regulatory requirements and organizational policies</li>
+                <li>GDPR compliance rules verify right to explanation, data minimization, consent, and other requirements</li>
+                <li>CCPA rules check automated decision disclosure, sale prohibitions, and consumer rights</li>
+                <li>EU AI Act compliance verifies high-risk system requirements including human oversight and bias testing</li>
+                <li>Financial services compliance ensures fair lending and model risk management requirements</li>
+                <li>Real-time enforcement blocks critical violations before decisions are executed</li>
+                <li>Compliance dashboards provide executive visibility and trend analysis</li>
+                <li>Regulatory reporting automation generates required filings for GDPR, CCPA, and other frameworks</li>
+                <li>Policy as code enables expressing organizational ethics policies in executable form</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Design a compliance rule for GDPR's right to data portability. What checks would you implement?</li>
+                <li>How does real-time compliance enforcement differ from periodic audit checking? What are the trade-offs?</li>
+                <li>Implement a compliance rule that verifies bias testing requirements for high-risk AI systems under the EU AI Act.</li>
+                <li>What should happen when a critical compliance violation is detected? Design an incident response workflow.</li>
+                <li>How can automated remediation reduce compliance violations? Provide three examples.</li>
+                <li>Compare compliance requirements for GDPR and CCPA in the context of automated decision-making. What are the key differences?</li>
+                <li>Design a compliance dashboard for C-level executives. What metrics would you display?</li>
+                <li>How does "policy as code" improve compliance management compared to traditional policy documents?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

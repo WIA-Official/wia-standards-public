@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA SOC-009 Sewage System - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #34D399;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .lang-select {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        .lang-select:hover { border-color: var(--primary); }
+        .lang-select:focus { outline: none; border-color: var(--primary); }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 12px 24px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panel */
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 30px;
+            border: 1px solid var(--border);
+        }
+        .panel.active { display: block; }
+        .panel h2 {
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* System Viz */
+        .system-viz {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .system-display {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, #059669, #34D399);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .status-item {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .status-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .status-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 5px;
+            color: var(--primary);
+        }
+
+        /* Map */
+        .map-container {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+        .pipe-network {
+            position: absolute;
+            inset: 20px;
+            background-image:
+                linear-gradient(var(--border) 2px, transparent 2px),
+                linear-gradient(90deg, var(--border) 2px, transparent 2px);
+            background-size: 60px 60px;
+        }
+        .flow-marker {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: flowMove 8s linear infinite;
+        }
+        @keyframes flowMove {
+            0% { top: 10%; left: 10%; }
+            25% { top: 30%; left: 70%; }
+            50% { top: 70%; left: 80%; }
+            75% { top: 60%; left: 20%; }
+            100% { top: 10%; left: 10%; }
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .data-table th {
+            background: var(--bg);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        /* Logs */
+        .log-container {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .log-time {
+            color: var(--text-muted);
+        }
+        .log-info { color: var(--secondary); }
+        .log-warn { color: var(--warning); }
+        .log-error { color: var(--danger); }
+
+        /* Footer */
+        footer {
+            margin-top: 50px;
+            padding: 30px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 1.8rem; }
+            header { flex-direction: column; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Sewage System</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <div class="logo">🚿 WIA SOC-009 Sewage System</div>
+            <select class="lang-select" id="languageSelect" onchange="changeLanguage()">
+                <option value="en">🇬🇧 English</option>
+                <option value="ko">🇰🇷 한국어 (Korean)</option>
+                <option value="zh">🇨🇳 中文 (Chinese)</option>
+                <option value="ja">🇯🇵 日本語 (Japanese)</option>
+                <option value="es">🇪🇸 Español (Spanish)</option>
+                <option value="fr">🇫🇷 Français (French)</option>
+                <option value="de">🇩🇪 Deutsch (German)</option>
+                <option value="it">🇮🇹 Italiano (Italian)</option>
+                <option value="pt">🇵🇹 Português (Portuguese)</option>
+                <option value="ru">🇷🇺 Русский (Russian)</option>
+                <option value="ar">🇸🇦 العربية (Arabic)</option>
+                <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
+                <option value="bn">🇧🇩 বাংলা (Bengali)</option>
+                <option value="id">🇮🇩 Bahasa Indonesia</option>
+                <option value="tr">🇹🇷 Türkçe (Turkish)</option>
+                <option value="vi">🇻🇳 Tiếng Việt (Vietnamese)</option>
+                <option value="th">🇹🇭 ไทย (Thai)</option>
+                <option value="pl">🇵🇱 Polski (Polish)</option>
+                <option value="uk">🇺🇦 Українська (Ukrainian)</option>
+                <option value="nl">🇳🇱 Nederlands (Dutch)</option>
+                <option value="sv">🇸🇪 Svenska (Swedish)</option>
+                <option value="da">🇩🇰 Dansk (Danish)</option>
+                <option value="no">🇳🇴 Norsk (Norwegian)</option>
+                <option value="fi">🇫🇮 Suomi (Finnish)</option>
+                <option value="cs">🇨🇿 Čeština (Czech)</option>
+                <option value="ro">🇷🇴 Română (Romanian)</option>
+                <option value="hu">🇭🇺 Magyar (Hungarian)</option>
+                <option value="el">🇬🇷 Ελληνικά (Greek)</option>
+                <option value="he">🇮🇱 עברית (Hebrew)</option>
+                <option value="fa">🇮🇷 فارسی (Persian)</option>
+                <option value="ur">🇵🇰 اردو (Urdu)</option>
+                <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+                <option value="te">🇮🇳 తెలుగు (Telugu)</option>
+                <option value="mr">🇮🇳 मराठी (Marathi)</option>
+                <option value="gu">🇮🇳 ગુજરાતી (Gujarati)</option>
+                <option value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+                <option value="ml">🇮🇳 മലയാളം (Malayalam)</option>
+                <option value="pa">🇮🇳 ਪੰਜਾਬੀ (Punjabi)</option>
+                <option value="sw">🇰🇪 Kiswahili (Swahili)</option>
+                <option value="am">🇪🇹 አማርኛ (Amharic)</option>
+                <option value="yo">🇳🇬 Yorùbá (Yoruba)</option>
+                <option value="ig">🇳🇬 Igbo</option>
+                <option value="ha">🇳🇬 Hausa</option>
+                <option value="my">🇲🇲 မြန်မာ (Burmese)</option>
+                <option value="km">🇰🇭 ខ្មែរ (Khmer)</option>
+                <option value="lo">🇱🇦 ລາວ (Lao)</option>
+                <option value="ne">🇳🇵 नेपाली (Nepali)</option>
+                <option value="si">🇱🇰 සිංහල (Sinhala)</option>
+                <option value="ms">🇲🇾 Bahasa Melayu (Malay)</option>
+                <option value="tl">🇵🇭 Tagalog</option>
+                <option value="af">🇿🇦 Afrikaans</option>
+                <option value="zu">🇿🇦 isiZulu (Zulu)</option>
+                <option value="xh">🇿🇦 isiXhosa (Xhosa)</option>
+                <option value="sr">🇷🇸 Српски (Serbian)</option>
+                <option value="hr">🇭🇷 Hrvatski (Croatian)</option>
+                <option value="bg">🇧🇬 Български (Bulgarian)</option>
+                <option value="sk">🇸🇰 Slovenčina (Slovak)</option>
+                <option value="sl">🇸🇮 Slovenščina (Slovenian)</option>
+                <option value="lt">🇱🇹 Lietuvių (Lithuanian)</option>
+                <option value="lv">🇱🇻 Latviešu (Latvian)</option>
+                <option value="et">🇪🇪 Eesti (Estonian)</option>
+                <option value="sq">🇦🇱 Shqip (Albanian)</option>
+                <option value="mk">🇲🇰 Македонски (Macedonian)</option>
+                <option value="bs">🇧🇦 Bosanski (Bosnian)</option>
+                <option value="is">🇮🇸 Íslenska (Icelandic)</option>
+                <option value="mt">🇲🇹 Malti (Maltese)</option>
+                <option value="ga">🇮🇪 Gaeilge (Irish)</option>
+                <option value="cy">🏴󠁧󠁢󠁷󠁬󠁳󠁿 Cymraeg (Welsh)</option>
+                <option value="eu">🏴 Euskara (Basque)</option>
+                <option value="ca">🏴 Català (Catalan)</option>
+                <option value="gl">🏴 Galego (Galician)</option>
+                <option value="ka">🇬🇪 ქართული (Georgian)</option>
+                <option value="hy">🇦🇲 Հայերեն (Armenian)</option>
+                <option value="az">🇦🇿 Azərbaycan (Azerbaijani)</option>
+                <option value="kk">🇰🇿 Қазақ (Kazakh)</option>
+                <option value="uz">🇺🇿 Oʻzbek (Uzbek)</option>
+                <option value="mn">🇲🇳 Монгол (Mongolian)</option>
+                <option value="ps">🇦🇫 پښتو (Pashto)</option>
+                <option value="ku">🏴 Kurdî (Kurdish)</option>
+                <option value="sd">🇵🇰 سنڌي (Sindhi)</option>
+                <option value="ug">🇨🇳 ئۇيغۇر (Uyghur)</option>
+                <option value="bo">🇨🇳 བོད་ (Tibetan)</option>
+                <option value="dz">🇧🇹 རྫོང་ཁ (Dzongkha)</option>
+                <option value="jv">🇮🇩 Basa Jawa (Javanese)</option>
+                <option value="su">🇮🇩 Basa Sunda (Sundanese)</option>
+                <option value="mg">🇲🇬 Malagasy</option>
+                <option value="ny">🇲🇼 Chichewa</option>
+                <option value="sn">🇿🇼 chiShona (Shona)</option>
+                <option value="st">🇱🇸 Sesotho (Sotho)</option>
+                <option value="so">🇸🇴 Soomaali (Somali)</option>
+                <option value="rw">🇷🇼 Kinyarwanda</option>
+                <option value="lg">🇺🇬 Luganda</option>
+                <option value="wo">🇸🇳 Wolof</option>
+                <option value="ff">🇸🇳 Fulfulde (Fula)</option>
+                <option value="ti">🇪🇷 ትግርኛ (Tigrinya)</option>
+                <option value="om">🇪🇹 Oromoo (Oromo)</option>
+                <option value="gd">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Gàidhlig (Scottish Gaelic)</option>
+                <option value="lb">🇱🇺 Lëtzebuergesch (Luxembourgish)</option>
+                <option value="fy">🇳🇱 Frysk (Frisian)</option>
+            </select>
+        </header>
+
+        <section class="hero">
+            <h1 data-lang="title">Sewage System Simulator</h1>
+            <p data-lang="subtitle">Interactive demo of WIA-SOC-009 standard</p>
+        </section>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showPanel('monitoring')" data-lang="tab-monitoring">System Monitoring</button>
+            <button class="tab" onclick="showPanel('network')" data-lang="tab-network">Pipe Network</button>
+            <button class="tab" onclick="showPanel('quality')" data-lang="tab-quality">Water Quality</button>
+            <button class="tab" onclick="showPanel('analytics')" data-lang="tab-analytics">Analytics</button>
+            <button class="tab" onclick="showPanel('logs')" data-lang="tab-logs">System Logs</button>
+        </div>
+
+        <!-- Monitoring Panel -->
+        <div id="monitoring" class="panel active">
+            <h2 data-lang="monitoring-title">Real-time System Monitoring</h2>
+
+            <div class="system-viz">
+                <div class="system-display">🚿</div>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label" data-lang="status-flow">Flow Rate</div>
+                        <div class="status-value" id="flowRate">4.2 m³/s</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label" data-lang="status-pressure">Pressure</div>
+                        <div class="status-value" id="pressure">2.8 bar</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label" data-lang="status-ph">pH Level</div>
+                        <div class="status-value" id="ph">7.2</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label" data-lang="status-temp">Temperature</div>
+                        <div class="status-value" id="temp">18.5°C</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label data-lang="form-zone">Monitoring Zone</label>
+                    <select id="zone">
+                        <option value="zone1" data-lang="zone-main">Main Collection</option>
+                        <option value="zone2" data-lang="zone-treatment">Treatment Plant</option>
+                        <option value="zone3" data-lang="zone-distribution">Distribution</option>
+                        <option value="zone4" data-lang="zone-overflow">Overflow System</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-lang="form-alert">Alert Level</label>
+                    <select id="alertLevel">
+                        <option value="normal">Normal</option>
+                        <option value="warning">Warning</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-primary" onclick="refreshMonitoring()" data-lang="btn-refresh">🔄 Refresh Data</button>
+                <button class="btn btn-secondary" onclick="exportData()" data-lang="btn-export">📊 Export Report</button>
+            </div>
+        </div>
+
+        <!-- Network Panel -->
+        <div id="network" class="panel">
+            <h2 data-lang="network-title">Pipe Network Map</h2>
+            <div class="map-container">
+                <div class="pipe-network"></div>
+                <div class="flow-marker"></div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-primary" data-lang="btn-view-network">🗺️ View Full Network</button>
+                <button class="btn btn-secondary" data-lang="btn-detect-leak">🔍 Detect Leaks</button>
+            </div>
+        </div>
+
+        <!-- Quality Panel -->
+        <div id="quality" class="panel">
+            <h2 data-lang="quality-title">Water Quality Parameters</h2>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th data-lang="th-parameter">Parameter</th>
+                        <th data-lang="th-value">Value</th>
+                        <th data-lang="th-unit">Unit</th>
+                        <th data-lang="th-status">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>pH</td>
+                        <td>7.2</td>
+                        <td>-</td>
+                        <td>✅ Normal</td>
+                    </tr>
+                    <tr>
+                        <td>BOD</td>
+                        <td>15</td>
+                        <td>mg/L</td>
+                        <td>✅ Normal</td>
+                    </tr>
+                    <tr>
+                        <td>COD</td>
+                        <td>45</td>
+                        <td>mg/L</td>
+                        <td>✅ Normal</td>
+                    </tr>
+                    <tr>
+                        <td>TSS</td>
+                        <td>12</td>
+                        <td>mg/L</td>
+                        <td>✅ Normal</td>
+                    </tr>
+                    <tr>
+                        <td>Ammonia-N</td>
+                        <td>2.1</td>
+                        <td>mg/L</td>
+                        <td>⚠️ Warning</td>
+                    </tr>
+                    <tr>
+                        <td>Turbidity</td>
+                        <td>8</td>
+                        <td>NTU</td>
+                        <td>✅ Normal</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <button class="btn btn-primary" onclick="runTest()" style="margin-top: 15px;" data-lang="btn-run-test">🧪 Run Full Test</button>
+        </div>
+
+        <!-- Analytics Panel -->
+        <div id="analytics" class="panel">
+            <h2 data-lang="analytics-title">System Analytics</h2>
+
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label" data-lang="stat-daily-volume">Daily Volume</div>
+                    <div class="status-value">285,400 m³</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label" data-lang="stat-efficiency">Treatment Efficiency</div>
+                    <div class="status-value">97.8%</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label" data-lang="stat-uptime">System Uptime</div>
+                    <div class="status-value">99.2%</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label" data-lang="stat-energy">Energy Usage</div>
+                    <div class="status-value">1,245 kWh</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label" data-lang="stat-maintenance">Next Maintenance</div>
+                    <div class="status-value">15 days</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label" data-lang="stat-incidents">Incidents (30d)</div>
+                    <div class="status-value">3</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h3 style="color: var(--text); margin-bottom: 15px;" data-lang="alerts-title">Active Alerts</h3>
+                <div class="status-item" style="background: rgba(245, 158, 11, 0.1); border-color: var(--warning);">
+                    <p style="color: var(--warning);" data-lang="alert-ammonia">⚠️ Elevated ammonia levels in Zone 3 - Action required</p>
+                </div>
+                <div class="status-item" style="background: rgba(16, 185, 129, 0.1); border-color: var(--secondary); margin-top: 10px;">
+                    <p style="color: var(--secondary);" data-lang="alert-all-clear">✅ All other parameters within normal range</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Panel -->
+        <div id="logs" class="panel">
+            <h2 data-lang="logs-title">System Event Logs</h2>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 14:32:15]</span>
+                    <span class="log-info">[INFO]</span> System initialization completed
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 14:35:00]</span>
+                    <span class="log-info">[INFO]</span> Flow rate monitoring started
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 14:38:22]</span>
+                    <span class="log-info">[INFO]</span> Water quality test completed - All parameters normal
+                </div>
+                <div class="log-entry log-warn">
+                    <span class="log-time">[2025-12-26 14:42:10]</span>
+                    <span class="log-warn">[WARN]</span> Ammonia-N level elevated in Zone 3 (2.1 mg/L)
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 14:45:00]</span>
+                    <span class="log-info">[INFO]</span> Alert notification sent to operators
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 14:50:15]</span>
+                    <span class="log-info">[INFO]</span> Flow adjustment applied - Zone 3
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 15:00:00]</span>
+                    <span class="log-info">[INFO]</span> Scheduled maintenance check - Pump #3
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 15:15:30]</span>
+                    <span class="log-info">[INFO]</span> Backup system test successful
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 15:30:00]</span>
+                    <span class="log-info">[INFO]</span> Daily report generated
+                </div>
+                <div class="log-entry log-info">
+                    <span class="log-time">[2025-12-26 15:45:20]</span>
+                    <span class="log-info">[INFO]</span> All systems operating normally
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="clearLogs()" style="margin-top: 15px;" data-lang="btn-clear-logs">🗑️ Clear Logs</button>
+        </div>
+
+        <footer>
+            <p>WIA - World Certification Industry Association</p>
+            <p data-lang="footer-philosophy">Philosophy: 弘益人間 (Hongik Ingan) - Benefit All Humanity</p>
+            <p style="margin-top: 10px;">
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a> |
+                <a href="https://wiastandards.com" target="_blank">WIA Standards</a> |
+                <a href="../README.md">Documentation</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        const translations = {
+            en: {
+                title: "Sewage System Simulator",
+                subtitle: "Interactive demo of WIA-SOC-009 standard",
+                "tab-monitoring": "System Monitoring",
+                "tab-network": "Pipe Network",
+                "tab-quality": "Water Quality",
+                "tab-analytics": "Analytics",
+                "tab-logs": "System Logs",
+                "monitoring-title": "Real-time System Monitoring",
+                "status-flow": "Flow Rate",
+                "status-pressure": "Pressure",
+                "status-ph": "pH Level",
+                "status-temp": "Temperature",
+                "form-zone": "Monitoring Zone",
+                "zone-main": "Main Collection",
+                "zone-treatment": "Treatment Plant",
+                "zone-distribution": "Distribution",
+                "zone-overflow": "Overflow System",
+                "form-alert": "Alert Level",
+                "btn-refresh": "🔄 Refresh Data",
+                "btn-export": "📊 Export Report",
+                "network-title": "Pipe Network Map",
+                "btn-view-network": "🗺️ View Full Network",
+                "btn-detect-leak": "🔍 Detect Leaks",
+                "quality-title": "Water Quality Parameters",
+                "th-parameter": "Parameter",
+                "th-value": "Value",
+                "th-unit": "Unit",
+                "th-status": "Status",
+                "btn-run-test": "🧪 Run Full Test",
+                "analytics-title": "System Analytics",
+                "stat-daily-volume": "Daily Volume",
+                "stat-efficiency": "Treatment Efficiency",
+                "stat-uptime": "System Uptime",
+                "stat-energy": "Energy Usage",
+                "stat-maintenance": "Next Maintenance",
+                "stat-incidents": "Incidents (30d)",
+                "alerts-title": "Active Alerts",
+                "alert-ammonia": "⚠️ Elevated ammonia levels in Zone 3 - Action required",
+                "alert-all-clear": "✅ All other parameters within normal range",
+                "logs-title": "System Event Logs",
+                "btn-clear-logs": "🗑️ Clear Logs",
+                "footer-philosophy": "Philosophy: 弘益人間 (Hongik Ingan) - Benefit All Humanity"
+            },
+            ko: {
+                title: "하수도 시스템 시뮬레이터",
+                subtitle: "WIA-SOC-009 표준 인터랙티브 데모",
+                "tab-monitoring": "시스템 모니터링",
+                "tab-network": "파이프 네트워크",
+                "tab-quality": "수질",
+                "tab-analytics": "분석",
+                "tab-logs": "시스템 로그",
+                "monitoring-title": "실시간 시스템 모니터링",
+                "status-flow": "유량",
+                "status-pressure": "압력",
+                "status-ph": "pH 수준",
+                "status-temp": "온도",
+                "form-zone": "모니터링 구역",
+                "zone-main": "주 집수",
+                "zone-treatment": "처리장",
+                "zone-distribution": "배수",
+                "zone-overflow": "오버플로 시스템",
+                "form-alert": "경고 수준",
+                "btn-refresh": "🔄 데이터 새로고침",
+                "btn-export": "📊 보고서 내보내기",
+                "network-title": "파이프 네트워크 맵",
+                "btn-view-network": "🗺️ 전체 네트워크 보기",
+                "btn-detect-leak": "🔍 누출 감지",
+                "quality-title": "수질 매개변수",
+                "th-parameter": "매개변수",
+                "th-value": "값",
+                "th-unit": "단위",
+                "th-status": "상태",
+                "btn-run-test": "🧪 전체 테스트 실행",
+                "analytics-title": "시스템 분석",
+                "stat-daily-volume": "일일 용량",
+                "stat-efficiency": "처리 효율",
+                "stat-uptime": "시스템 가동 시간",
+                "stat-energy": "에너지 사용",
+                "stat-maintenance": "다음 유지보수",
+                "stat-incidents": "사고 (30일)",
+                "alerts-title": "활성 경고",
+                "alert-ammonia": "⚠️ 구역 3의 암모니아 수준 상승 - 조치 필요",
+                "alert-all-clear": "✅ 모든 다른 매개변수 정상 범위 내",
+                "logs-title": "시스템 이벤트 로그",
+                "btn-clear-logs": "🗑️ 로그 지우기",
+                "footer-philosophy": "철학: 弘益人間 (홍익인간) - 널리 인간을 이롭게 하라"
+            }
+        };
+
+        function changeLanguage() {
+            const lang = document.getElementById('languageSelect').value;
+            const t = translations[lang] || translations.en;
+
+            document.querySelectorAll('[data-lang]').forEach(el => {
+                const key = el.getAttribute('data-lang');
+                if (t[key]) {
+                    if (el.tagName === 'OPTION') {
+                        el.textContent = t[key];
+                    } else if (el.tagName === 'BUTTON' || el.tagName === 'LABEL' ||
+                               el.tagName === 'H1' || el.tagName === 'H2' ||
+                               el.tagName === 'P' || el.tagName === 'TH' ||
+                               el.classList.contains('status-label')) {
+                        el.textContent = t[key];
+                    }
+                }
+            });
+        }
+
+        function showPanel(panelId) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function refreshMonitoring() {
+            alert('Data refreshed!');
+        }
+
+        function exportData() {
+            alert('Report exported!');
+        }
+
+        function runTest() {
+            alert('Water quality test started!');
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '<div class="log-entry log-info"><span class="log-time">[' + new Date().toISOString().replace('T', ' ').substr(0, 19) + ']</span> <span class="log-info">[INFO]</span> Logs cleared</div>';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            changeLanguage();
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

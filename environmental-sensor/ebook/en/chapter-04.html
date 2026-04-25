@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04: Phase 1 - Data Format - WIA Environmental Sensor</title>
+    <style>
+        :root {--primary: #8B5CF6;--primary-dark: #7C3AED;--bg: #0f172a;--bg-card: #1e293b;--text: #f8fafc;--text-muted: #94a3b8;--border: #334155;}
+        * {margin:0;padding:0;box-sizing:border-box;}
+        body {font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px;}
+        .container {max-width:900px;margin:0 auto;}
+        header {margin-bottom:40px;padding-bottom:20px;border-bottom:2px solid var(--border);}
+        .chapter-num {color:var(--primary);font-size:1rem;font-weight:600;margin-bottom:10px;}
+        h1 {font-size:2.5rem;margin-bottom:20px;color:var(--text);}
+        h2 {font-size:1.8rem;margin-top:40px;margin-bottom:20px;color:var(--primary);}
+        h3 {font-size:1.4rem;margin-top:30px;margin-bottom:15px;color:var(--text);}
+        p {margin-bottom:20px;color:var(--text-muted);}
+        ul,ol {margin-bottom:20px;margin-left:30px;color:var(--text-muted);}
+        li {margin-bottom:10px;}
+        table {width:100%;border-collapse:collapse;margin:30px 0;background:var(--bg-card);border-radius:8px;overflow:hidden;}
+        th,td {padding:15px;text-align:left;border-bottom:1px solid var(--border);}
+        th {background:var(--bg);color:var(--primary);font-weight:600;}
+        tr:hover {background:var(--bg);}
+        .callout {background:var(--bg-card);border-left:4px solid var(--primary);padding:20px;margin:30px 0;border-radius:4px;}
+        .callout-title {color:var(--primary);font-weight:600;margin-bottom:10px;}
+        .summary {background:var(--bg-card);border:2px solid var(--primary);border-radius:12px;padding:30px;margin:40px 0;}
+        .summary h2 {margin-top:0;}
+        .key-takeaways {list-style:none;margin-left:0;}
+        .key-takeaways li {padding-left:30px;position:relative;}
+        .key-takeaways li:before {content:"✓";position:absolute;left:0;color:var(--primary);font-weight:bold;}
+        .review-questions {background:var(--bg-card);border-radius:12px;padding:30px;margin:40px 0;}
+        .code-block {background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;font-family:'Courier New',monospace;overflow-x:auto;font-size:0.9rem;}
+        .nav-buttons {display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border);}
+        .btn {background:var(--primary);color:white;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.3s;}
+        .btn:hover {background:var(--primary-dark);transform:translateY(-2px);}
+        .btn-secondary {background:var(--bg-card);border:2px solid var(--border);}
+        .btn-secondary:hover {border-color:var(--primary);}
+        @media (max-width:768px) {body {padding:20px 15px;}h1 {font-size:2rem;}h2 {font-size:1.5rem;}table {font-size:0.9rem;}th,td {padding:10px;}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-num">CHAPTER 04</div>
+            <h1>Phase 1 - Data Format</h1>
+        </header>
+
+        <main>
+            <h2>4.1 Introduction to WIA Data Formats</h2>
+            <p>Phase 1 of the WIA Environmental Sensor Standard establishes standardized data schemas that form the foundation for all higher phases. These schemas define how environmental sensor data is structured, what fields are required or optional, what data types are used, and how values should be represented. By standardizing these fundamental elements, Phase 1 enables the most critical form of interoperability—data-level compatibility.</p>
+
+            <p>The data format standard uses JSON (JavaScript Object Notation) as its primary serialization format. JSON was chosen for several compelling reasons: it's human-readable and easy to debug, it's supported natively by virtually all programming languages, it efficiently represents hierarchical data structures, it's well-suited for both storage and transmission, and it has robust schema validation tools through JSON Schema.</p>
+
+            <p>While JSON is the normative format, the standard also provides guidance for equivalent representations in XML, Protocol Buffers, and CBOR for scenarios where these formats are more appropriate. All representations must be semantically equivalent to the canonical JSON format.</p>
+
+            <h2>4.2 Core Data Model Structure</h2>
+            <p>All WIA environmental sensor data messages share a common core structure that provides essential context for measurements. This core structure includes standard fields that appear in every message regardless of sensor type.</p>
+
+            <h3>Mandatory Core Fields</h3>
+            <p>Every WIA-compliant sensor data message must include these fields:</p>
+
+            <ul>
+                <li><strong>version</strong>: String specifying the WIA standard version (e.g., "1.0.0"). This enables parsers to handle schema evolution gracefully.</li>
+                <li><strong>standard</strong>: String identifying the WIA standard (e.g., "WIA-ENE-027"). This allows data from different WIA standards to coexist and be distinguished.</li>
+                <li><strong>deviceId</strong>: Unique identifier for the sensor device. Should be globally unique, typically using UUID format or manufacturer-assigned serial numbers.</li>
+                <li><strong>timestamp</strong>: ISO 8601 formatted timestamp indicating when the measurement was taken (e.g., "2024-01-15T14:23:45.123Z"). Must include timezone, preferably UTC.</li>
+                <li><strong>sensorType</strong>: String indicating the category of sensor (e.g., "air_quality", "water_quality", "soil"). Maps to specific type definitions.</li>
+            </ul>
+
+            <h3>Optional Core Fields</h3>
+            <p>The following fields are optional but strongly recommended:</p>
+
+            <ul>
+                <li><strong>location</strong>: Object containing latitude, longitude, and optionally altitude. Critical for spatial analysis and mapping.</li>
+                <li><strong>metadata</strong>: Object containing additional context like firmware version, battery level, signal strength, sensor manufacturer, sensor model.</li>
+                <li><strong>quality</strong>: Object containing quality indicators and flags (good, suspect, bad, calibration, maintenance_required).</li>
+                <li><strong>calibration</strong>: Object containing calibration information including last calibration date, calibration method, calibration parameters.</li>
+            </ul>
+
+            <div class="code-block">
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-AIR-00F3A2B5",
+  "timestamp": "2024-12-26T10:30:00.000Z",
+  "sensorType": "air_quality",
+  "location": {
+    "latitude": 37.5665,
+    "longitude": 126.9780,
+    "altitude": 38.5,
+    "accuracy": 5.0
+  },
+  "metadata": {
+    "manufacturer": "AirSense Corp",
+    "model": "AS-3000",
+    "firmware": "v2.4.1",
+    "battery": 85,
+    "signalStrength": -65
+  },
+  "quality": {
+    "overall": "good",
+    "flags": []
+  },
+  "readings": {
+    // Sensor-specific measurements
+  }
+}
+            </div>
+
+            <h2>4.3 Air Quality Sensor Data Format</h2>
+            <p>Air quality sensors measure atmospheric pollutants and conditions. The WIA standard defines comprehensive schemas for various air quality parameters.</p>
+
+            <h3>Particulate Matter Measurements</h3>
+            <p>Particulate matter sensors measure the concentration of airborne particles of different sizes. The standard supports PM1.0, PM2.5, PM4.0, and PM10 measurements.</p>
+
+            <div class="code-block">
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-AIR-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "sensorType": "air_quality",
+  "readings": {
+    "pm1_0": {
+      "value": 8.5,
+      "unit": "μg/m³",
+      "method": "laser_scattering",
+      "uncertainty": 1.5
+    },
+    "pm2_5": {
+      "value": 15.3,
+      "unit": "μg/m³",
+      "method": "laser_scattering",
+      "uncertainty": 2.0
+    },
+    "pm10": {
+      "value": 22.7,
+      "unit": "μg/m³",
+      "method": "laser_scattering",
+      "uncertainty": 3.0
+    },
+    "aqi": {
+      "value": 58,
+      "category": "moderate",
+      "pollutant": "pm2_5"
+    }
+  }
+}
+            </div>
+
+            <h3>Gaseous Pollutants</h3>
+            <p>Gas sensors measure concentrations of various atmospheric gases. Each gas measurement includes value, unit, detection method, and uncertainty.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Unit</th>
+                        <th>Typical Range</th>
+                        <th>Detection Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>CO2 (Carbon Dioxide)</td>
+                        <td>ppm</td>
+                        <td>400-2000</td>
+                        <td>NDIR (Non-Dispersive Infrared)</td>
+                    </tr>
+                    <tr>
+                        <td>CO (Carbon Monoxide)</td>
+                        <td>ppm</td>
+                        <td>0-50</td>
+                        <td>Electrochemical</td>
+                    </tr>
+                    <tr>
+                        <td>NO2 (Nitrogen Dioxide)</td>
+                        <td>ppb</td>
+                        <td>0-200</td>
+                        <td>Electrochemical</td>
+                    </tr>
+                    <tr>
+                        <td>O3 (Ozone)</td>
+                        <td>ppb</td>
+                        <td>0-150</td>
+                        <td>Electrochemical/UV absorption</td>
+                    </tr>
+                    <tr>
+                        <td>SO2 (Sulfur Dioxide)</td>
+                        <td>ppb</td>
+                        <td>0-100</td>
+                        <td>Electrochemical</td>
+                    </tr>
+                    <tr>
+                        <td>VOC (Volatile Organic Compounds)</td>
+                        <td>ppb</td>
+                        <td>0-1000</td>
+                        <td>Metal oxide semiconductor (MOS)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4.4 Water Quality Sensor Data Format</h2>
+            <p>Water quality sensors monitor physical, chemical, and biological properties of water. The standard defines schemas for common water quality parameters used in drinking water monitoring, wastewater treatment, aquaculture, and environmental assessment.</p>
+
+            <div class="code-block">
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-WATER-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "sensorType": "water_quality",
+  "location": {
+    "latitude": 37.5665,
+    "longitude": 126.9780,
+    "waterBody": "Han River",
+    "samplingDepth": 1.5
+  },
+  "readings": {
+    "ph": {
+      "value": 7.2,
+      "unit": "pH",
+      "method": "glass_electrode",
+      "temperature_compensated": true,
+      "uncertainty": 0.05
+    },
+    "dissolved_oxygen": {
+      "value": 8.5,
+      "unit": "mg/L",
+      "method": "optical",
+      "saturation": 92.3,
+      "uncertainty": 0.2
+    },
+    "turbidity": {
+      "value": 12.5,
+      "unit": "NTU",
+      "method": "nephelometric",
+      "uncertainty": 1.0
+    },
+    "conductivity": {
+      "value": 450,
+      "unit": "μS/cm",
+      "temperature": 20.0,
+      "specific_conductance": 448,
+      "uncertainty": 5.0
+    },
+    "temperature": {
+      "value": 18.5,
+      "unit": "°C",
+      "uncertainty": 0.1
+    },
+    "orp": {
+      "value": 220,
+      "unit": "mV",
+      "uncertainty": 10
+    }
+  }
+}
+            </div>
+
+            <h2>4.5 Soil Sensor Data Format</h2>
+            <p>Soil sensors measure parameters critical for agriculture, land management, and environmental monitoring. The standard supports soil moisture, temperature, electrical conductivity (salinity), and nutrient measurements.</p>
+
+            <h3>Soil Moisture and Temperature</h3>
+            <p>Soil moisture is typically expressed as volumetric water content (VWC) representing the ratio of water volume to total soil volume. Temperature affects many soil processes and is usually measured alongside moisture.</p>
+
+            <div class="code-block">
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-SOIL-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "sensorType": "soil",
+  "location": {
+    "latitude": 37.5665,
+    "longitude": 126.9780,
+    "depth": 0.15,
+    "soilType": "loamy_sand"
+  },
+  "readings": {
+    "moisture": {
+      "value": 28.5,
+      "unit": "%VWC",
+      "method": "capacitance",
+      "uncertainty": 2.0
+    },
+    "temperature": {
+      "value": 22.3,
+      "unit": "°C",
+      "uncertainty": 0.3
+    },
+    "electrical_conductivity": {
+      "value": 320,
+      "unit": "μS/cm",
+      "uncertainty": 15
+    },
+    "nutrients": {
+      "nitrogen": {
+        "value": 45,
+        "unit": "ppm",
+        "form": "nitrate_NO3",
+        "uncertainty": 5
+      },
+      "phosphorus": {
+        "value": 12,
+        "unit": "ppm",
+        "form": "available_P",
+        "uncertainty": 2
+      },
+      "potassium": {
+        "value": 180,
+        "unit": "ppm",
+        "form": "exchangeable_K",
+        "uncertainty": 10
+      }
+    }
+  }
+}
+            </div>
+
+            <h2>4.6 Meteorological Sensor Data Format</h2>
+            <p>Meteorological sensors measure atmospheric conditions including temperature, humidity, pressure, wind, and precipitation. These measurements are fundamental to environmental monitoring and provide context for other sensor types.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Field Name</th>
+                        <th>Unit</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Air Temperature</td>
+                        <td>temperature</td>
+                        <td>°C</td>
+                        <td>Measured in shade, ventilated</td>
+                    </tr>
+                    <tr>
+                        <td>Relative Humidity</td>
+                        <td>humidity</td>
+                        <td>%RH</td>
+                        <td>0-100% range</td>
+                    </tr>
+                    <tr>
+                        <td>Atmospheric Pressure</td>
+                        <td>pressure</td>
+                        <td>hPa</td>
+                        <td>Station or sea-level adjusted</td>
+                    </tr>
+                    <tr>
+                        <td>Wind Speed</td>
+                        <td>wind_speed</td>
+                        <td>m/s</td>
+                        <td>Average and gust values</td>
+                    </tr>
+                    <tr>
+                        <td>Wind Direction</td>
+                        <td>wind_direction</td>
+                        <td>degrees</td>
+                        <td>0-360, from north</td>
+                    </tr>
+                    <tr>
+                        <td>Precipitation</td>
+                        <td>precipitation</td>
+                        <td>mm</td>
+                        <td>Cumulative or rate</td>
+                    </tr>
+                    <tr>
+                        <td>Solar Radiation</td>
+                        <td>solar_radiation</td>
+                        <td>W/m²</td>
+                        <td>Global horizontal irradiance</td>
+                    </tr>
+                    <tr>
+                        <td>UV Index</td>
+                        <td>uv_index</td>
+                        <td>index</td>
+                        <td>0-11+ scale</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4.7 Radiation and Noise Sensor Formats</h2>
+            <p>Radiation and noise sensors serve specialized monitoring needs in environmental safety and urban planning.</p>
+
+            <h3>Radiation Sensors</h3>
+            <p>Radiation sensors detect ionizing radiation from natural and artificial sources. The standard supports measurements of alpha, beta, gamma, and neutron radiation.</p>
+
+            <div class="code-block">
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-RAD-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "sensorType": "radiation",
+  "readings": {
+    "dose_rate": {
+      "value": 0.12,
+      "unit": "μSv/h",
+      "type": "gamma",
+      "detector": "geiger_mueller",
+      "uncertainty": 0.02
+    },
+    "counts_per_minute": {
+      "value": 45,
+      "unit": "CPM",
+      "background_subtracted": true
+    }
+  }
+}
+            </div>
+
+            <h3>Noise Level Sensors</h3>
+            <p>Noise sensors measure sound levels, critical for urban planning and regulatory compliance. Measurements use various weighting curves (A, C, Z) to match different applications.</p>
+
+            <div class="code-block">
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-NOISE-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "sensorType": "noise",
+  "readings": {
+    "sound_level": {
+      "instantaneous": {
+        "value": 65.5,
+        "unit": "dB(A)",
+        "weighting": "A"
+      },
+      "leq": {
+        "value": 62.3,
+        "unit": "dB(A)",
+        "period": 3600,
+        "uncertainty": 1.5
+      },
+      "lmax": {
+        "value": 78.2,
+        "unit": "dB(A)"
+      },
+      "lmin": {
+        "value": 48.7,
+        "unit": "dB(A)"
+      }
+    },
+    "frequency_spectrum": {
+      "octave_bands": [
+        {"frequency": 63, "level": 55.2},
+        {"frequency": 125, "level": 58.5},
+        {"frequency": 250, "level": 60.1},
+        {"frequency": 500, "level": 62.8},
+        {"frequency": 1000, "level": 64.5},
+        {"frequency": 2000, "level": 61.2},
+        {"frequency": 4000, "level": 57.8},
+        {"frequency": 8000, "level": 52.3}
+      ]
+    }
+  }
+}
+            </div>
+
+            <h2>4.8 Validation Rules and Data Quality</h2>
+            <p>The WIA standard includes comprehensive validation rules that data should satisfy. These rules enable automated quality checking and ensure data reliability.</p>
+
+            <h3>Range Validation</h3>
+            <p>All measurements must fall within physically plausible ranges. Out-of-range values indicate sensor malfunction or communication errors.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Minimum</th>
+                        <th>Maximum</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Temperature (ambient)</td>
+                        <td>-50°C</td>
+                        <td>60°C</td>
+                        <td>Typical environmental range</td>
+                    </tr>
+                    <tr>
+                        <td>Relative Humidity</td>
+                        <td>0%</td>
+                        <td>100%</td>
+                        <td>Physical limits</td>
+                    </tr>
+                    <tr>
+                        <td>PM2.5</td>
+                        <td>0 μg/m³</td>
+                        <td>1000 μg/m³</td>
+                        <td>Extreme pollution events</td>
+                    </tr>
+                    <tr>
+                        <td>pH</td>
+                        <td>0</td>
+                        <td>14</td>
+                        <td>Theoretical pH scale</td>
+                    </tr>
+                    <tr>
+                        <td>Dissolved Oxygen</td>
+                        <td>0 mg/L</td>
+                        <td>20 mg/L</td>
+                        <td>Supersaturation possible</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Temporal Consistency</h3>
+            <p>Rate-of-change validation detects unrealistic rapid changes that likely indicate errors rather than genuine environmental variability. For example, ambient temperature shouldn't change more than 10°C per hour under normal circumstances.</p>
+
+            <h3>Cross-Parameter Validation</h3>
+            <p>Some parameters have expected relationships. Relative humidity and dew point should be consistent with temperature. PM2.5 should generally be less than or equal to PM10. These cross-checks identify inconsistent data.</p>
+
+            <h2>4.9 Extensibility and Custom Fields</h2>
+            <p>While the standard defines common fields, real-world deployments often require additional information. The standard supports extensibility through custom fields while maintaining core compatibility.</p>
+
+            <p>Custom fields should use vendor-specific prefixes to avoid namespace conflicts (e.g., "acme_proprietary_field"). The presence of unknown fields should not prevent parsing of standard fields. This approach enables vendors to add value while ensuring basic interoperability.</p>
+
+            <div class="code-block">
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-AIR-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "sensorType": "air_quality",
+  "readings": {
+    "pm2_5": {
+      "value": 15.3,
+      "unit": "μg/m³"
+    }
+  },
+  "acme_calibration_curve": {
+    "slope": 1.02,
+    "intercept": -0.5,
+    "r_squared": 0.995
+  },
+  "acme_last_maintenance": "2024-11-15T09:00:00Z"
+}
+            </div>
+
+            <div class="callout">
+                <div class="callout-title">Best Practice: Metadata is Critical</div>
+                <p>While it's tempting to focus only on measurement values, comprehensive metadata is essential for data quality and usability. Always include location information for spatial analysis, calibration data for quality assessment, sensor specifications for interpretation, and quality flags for appropriate use. Rich metadata transforms raw numbers into scientifically valuable information that can be confidently used for decision-making.</p>
+            </div>
+
+            <div class="summary">
+                <h2>Chapter Summary</h2>
+                <p>Chapter 4 detailed Phase 1 of the WIA standard—Data Format standardization. We explored the core data model structure common to all sensor types, examined specific schemas for air quality, water quality, soil, meteorological, radiation, and noise sensors, and discussed validation rules and extensibility mechanisms that ensure data quality while supporting diverse deployment needs.</p>
+
+                <h3>Key Takeaways</h3>
+                <ul class="key-takeaways">
+                    <li>All WIA-compliant sensor data shares a common core structure with mandatory fields (version, standard, deviceId, timestamp, sensorType) and optional but recommended fields (location, metadata, quality, calibration) that provide essential context.</li>
+                    <li>Sensor-specific schemas extend the core model with parameters appropriate to each sensor category, using consistent field naming, standard units, and uncertainty quantification to enable meaningful comparison across sensors.</li>
+                    <li>Validation rules including range checks, temporal consistency validation, and cross-parameter verification enable automated quality assurance and detect sensor malfunctions or communication errors.</li>
+                    <li>The standard uses JSON as the normative format for human readability and universal tool support while allowing equivalent representations in other formats (XML, Protocol Buffers, CBOR) for specialized applications.</li>
+                    <li>Extensibility mechanisms using vendor-specific prefixes enable proprietary extensions while maintaining core interoperability, balancing standardization benefits with flexibility for innovation and specific deployment requirements.</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Explain the purpose of the core data model structure and list the mandatory fields that must appear in every WIA-compliant sensor message. Why is each field necessary?</li>
+                    <li>Compare the data formats for air quality and water quality sensors. What parameters does each measure, and how are uncertainties represented?</li>
+                    <li>Describe three types of validation rules defined in the standard. How do these rules contribute to data quality assurance?</li>
+                    <li>Why does the standard use JSON as the normative format? What are the advantages and potential limitations of this choice?</li>
+                    <li>How does the standard support extensibility while maintaining interoperability? Provide an example of how a vendor might add custom fields.</li>
+                    <li>Discuss the importance of metadata in environmental sensor data. What types of metadata are most critical and why?</li>
+                </ol>
+            </div>
+
+            <div class="callout">
+                <div class="callout-title">Looking Ahead</div>
+                <p>Chapter 5 explores Phase 2 of the WIA standard—API Interface. We'll examine RESTful API design for sensor data access, authentication mechanisms, real-time streaming interfaces, and query patterns that enable applications to discover and retrieve environmental sensor data from any WIA-compliant platform.</p>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

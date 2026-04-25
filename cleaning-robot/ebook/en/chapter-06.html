@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Communication Protocol | WIA-ROB-011</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--cleaning-color:#06B6D4;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--cleaning-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--cleaning-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--cleaning-color);margin:40px 0 20px;border-bottom:2px solid var(--cleaning-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--cleaning-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--cleaning-color);margin:20px 0;font-size:18px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border}}
+        .nav a{color:var(--cleaning-color);text-decoration:none;padding:10px 20px;border:2px solid var(--cleaning-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--cleaning-color)}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--cleaning-color);padding:20px;margin:25px 0}
+        strong{color:var(--cleaning-color)}
+        ul,ol{margin:15px 0 15px 30px}
+        li{margin:8px 0}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;color:#06B6D4;font-family:monospace;font-size:14px;line-height:1.6}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Phase 3 - Communication Protocol</h1>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · Benefit All Humanity
+        </div>
+
+        <h2>6.1 Phase 3 Overview and Advanced Capabilities</h2>
+        <p>Phase 3 introduces MQTT-based messaging protocols enabling sophisticated real-time coordination between robots, edge computing infrastructure, and central management systems. This phase unlocks advanced scenarios like swarm cleaning, dynamic task reallocation, and 5G-enabled fleet orchestration.</p>
+
+        <h3>Beyond Request-Response</h3>
+        <p>While Phase 2 APIs excel at direct robot control, they follow request-response patterns unsuitable for real-time multi-robot coordination. Phase 3 adopts publish-subscribe messaging where robots, controllers, and edge systems communicate asynchronously through message brokers.</p>
+
+        <h3>Key Capabilities Enabled</h3>
+        <ul>
+            <li><strong>Swarm Coordination:</strong> Multiple robots negotiate task distribution and avoid conflicts</li>
+            <li><strong>Dynamic Reallocation:</strong> Tasks reassigned instantly when robots encounter problems</li>
+            <li><strong>Edge Intelligence:</strong> AI models deployed and synchronized across robot fleets</li>
+            <li><strong>5G Integration:</strong> Ultra-low latency coordination through network slicing</li>
+            <li><strong>Predictive Operations:</strong> Anticipate maintenance needs and optimize schedules</li>
+        </ul>
+
+        <h2>6.2 MQTT Protocol Foundation</h2>
+        <p>MQTT (Message Queuing Telemetry Transport) serves as the Phase 3 protocol foundation. Originally designed for IoT devices with limited bandwidth and unreliable networks, MQTT provides lightweight publish-subscribe messaging ideal for cleaning robot coordination.</p>
+
+        <h3>MQTT Advantages for Robotics</h3>
+        <table>
+            <tr>
+                <th>Feature</th>
+                <th>Benefit</th>
+                <th>Robotics Application</th>
+            </tr>
+            <tr>
+                <td><strong>Publish-Subscribe</strong></td>
+                <td>Decoupled communication</td>
+                <td>Robots broadcast status, subscribers receive updates</td>
+            </tr>
+            <tr>
+                <td><strong>Quality of Service</strong></td>
+                <td>Guaranteed delivery levels</td>
+                <td>Critical commands delivered exactly once</td>
+            </tr>
+            <tr>
+                <td><strong>Persistent Sessions</strong></td>
+                <td>Survive disconnections</td>
+                <td>Robots reconnect without losing state</td>
+            </tr>
+            <tr>
+                <td><strong>Last Will Testament</strong></td>
+                <td>Automatic disconnect detection</td>
+                <td>Fleet notified when robot goes offline</td>
+            </tr>
+            <tr>
+                <td><strong>Retained Messages</strong></td>
+                <td>Late subscribers get state</td>
+                <td>New controllers receive current robot status</td>
+            </tr>
+            <tr>
+                <td><strong>Lightweight Protocol</strong></td>
+                <td>Minimal bandwidth usage</td>
+                <td>Works over cellular, WiFi, Ethernet equally</td>
+            </tr>
+        </table>
+
+        <h3>QoS Levels for Robot Messaging</h3>
+        <div class="highlight-box">
+            <p><strong>QoS 0 (At Most Once):</strong> Used for high-frequency telemetry where occasional loss acceptable. Position updates at 10Hz don't need guaranteed delivery since next update arrives 100ms later.</p>
+
+            <p><strong>QoS 1 (At Least Once):</strong> Used for status changes and alerts where duplicate messages tolerable. Robot state transitions (cleaning → paused) may arrive twice but produce same result.</p>
+
+            <p><strong>QoS 2 (Exactly Once):</strong> Used for critical commands requiring precise execution. Task assignments, emergency stops, and configuration changes must execute exactly once.</p>
+        </div>
+
+        <h2>6.3 Topic Namespace Design</h2>
+        <p>MQTT topics organize messages hierarchically. WIA-ROB-011 defines a standardized namespace enabling logical message routing and access control.</p>
+
+        <h3>Topic Hierarchy</h3>
+        <pre>
+wia/rob-011/{version}/{facility}/{area}/{robot_id}/{category}/{subcategory}
+
+Examples:
+wia/rob-011/v1/building-a/floor-1/robot-001/status/battery
+wia/rob-011/v1/building-a/floor-1/robot-001/telemetry/position
+wia/rob-011/v1/building-a/floor-1/robot-001/commands/start
+wia/rob-011/v1/building-a/floor-1/+/status/online
+wia/rob-011/v1/building-a/+/+/alerts/error
+wia/rob-011/v1/+/+/+/fleet/coordination
+</pre>
+
+        <h3>Standard Topic Categories</h3>
+        <table>
+            <tr>
+                <th>Category</th>
+                <th>Direction</th>
+                <th>QoS</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td><strong>status/*</strong></td>
+                <td>Robot → Subscribers</td>
+                <td>1</td>
+                <td>State changes (online, cleaning, error)</td>
+            </tr>
+            <tr>
+                <td><strong>telemetry/*</strong></td>
+                <td>Robot → Subscribers</td>
+                <td>0</td>
+                <td>High-frequency sensor data</td>
+            </tr>
+            <tr>
+                <td><strong>commands/*</strong></td>
+                <td>Controller → Robot</td>
+                <td>2</td>
+                <td>Control instructions</td>
+            </tr>
+            <tr>
+                <td><strong>alerts/*</strong></td>
+                <td>Robot → Subscribers</td>
+                <td>1</td>
+                <td>Warnings, errors, maintenance needs</td>
+            </tr>
+            <tr>
+                <td><strong>fleet/*</strong></td>
+                <td>Bidirectional</td>
+                <td>2</td>
+                <td>Multi-robot coordination</td>
+            </tr>
+            <tr>
+                <td><strong>edge/*</strong></td>
+                <td>Edge → Robot</td>
+                <td>1</td>
+                <td>AI model updates, parameters</td>
+            </tr>
+        </table>
+
+        <h2>6.4 Real-Time Navigation Coordination</h2>
+        <p>When multiple robots operate in shared spaces, collision avoidance and path optimization require continuous position sharing and negotiation.</p>
+
+        <h3>Position Broadcasting</h3>
+        <pre>
+Topic: wia/rob-011/v1/warehouse/zone-a/robot-001/telemetry/position
+QoS: 0 (high frequency acceptable loss)
+Frequency: 5 Hz
+
+Payload:
+{
+  "timestamp": "2025-01-15T14:30:15.234Z",
+  "position": {
+    "x": 15.23,
+    "y": 8.47,
+    "z": 0.0,
+    "theta": 1.571
+  },
+  "velocity": {
+    "linear": 0.35,
+    "angular": 0.0
+  },
+  "trajectory": {
+    "waypoints": [
+      {"x": 15.5, "y": 8.5, "eta_ms": 500},
+      {"x": 16.0, "y": 8.5, "eta_ms": 1500}
+    ]
+  },
+  "state": "navigating"
+}
+</pre>
+
+        <h3>Collision Avoidance Protocol</h3>
+        <p>Robots subscribe to position topics of nearby robots. When trajectories intersect, robots negotiate right-of-way based on priority rules:</p>
+
+        <pre>
+Topic: wia/rob-011/v1/warehouse/zone-a/fleet/collision-avoidance
+QoS: 2
+
+Robot-001 detects potential collision with Robot-002:
+{
+  "type": "collision_warning",
+  "robot_id": "robot-001",
+  "conflicting_robot": "robot-002",
+  "intersection_point": {"x": 16.0, "y": 8.5},
+  "time_to_collision_ms": 2000,
+  "priority": 5,
+  "proposed_action": "slow_and_yield"
+}
+
+Robot-002 responds:
+{
+  "type": "collision_response",
+  "robot_id": "robot-002",
+  "priority": 3,
+  "action": "maintain_course"
+}
+
+Robot-001 adjusts:
+{
+  "type": "collision_resolved",
+  "robot_id": "robot-001",
+  "action_taken": "stopped_at_safe_distance"
+}
+</pre>
+
+        <h2>6.5 Fleet Management and Task Coordination</h2>
+        <p>Commercial cleaning operations require intelligent task distribution, load balancing, and dynamic reallocation when robots encounter problems or complete work faster than expected.</p>
+
+        <h3>Task Assignment Protocol</h3>
+        <pre>
+Topic: wia/rob-011/v1/building-a/floor-1/fleet/tasks
+QoS: 2
+
+Fleet coordinator publishes task:
+{
+  "task_id": "task-uuid-789",
+  "type": "cleaning_task",
+  "area_id": "conference-room-b",
+  "priority": "high",
+  "deadline": "2025-01-15T17:00:00Z",
+  "requirements": {
+    "mode": "vacuum_and_mop",
+    "surface_types": ["carpet", "tile"],
+    "estimated_duration_minutes": 25
+  },
+  "constraints": {
+    "requires_full_battery": true,
+    "avoid_occupied_spaces": true
+  },
+  "status": "available"
+}
+
+Robots evaluate and bid:
+{
+  "task_id": "task-uuid-789",
+  "robot_id": "robot-003",
+  "bid": {
+    "can_complete": true,
+    "estimated_start": "2025-01-15T16:30:00Z",
+    "estimated_completion": "2025-01-15T16:55:00Z",
+    "battery_at_start": 85,
+    "current_distance_meters": 45,
+    "priority_score": 0.87
+  }
+}
+
+Coordinator assigns task:
+{
+  "task_id": "task-uuid-789",
+  "assigned_to": "robot-003",
+  "status": "assigned",
+  "confirmed_start": "2025-01-15T16:30:00Z"
+}
+</pre>
+
+        <h3>Dynamic Reallocation</h3>
+        <p>When robots encounter obstacles, battery depletion, or mechanical issues, tasks automatically reassign to available robots:</p>
+
+        <pre>
+Robot-003 encounters problem:
+{
+  "task_id": "task-uuid-789",
+  "robot_id": "robot-003",
+  "status": "unable_to_complete",
+  "reason": "obstacle_blocking_area",
+  "completion_percent": 30,
+  "work_remaining": {
+    "area_id": "conference-room-b",
+    "sections_remaining": ["section-2", "section-3"]
+  }
+}
+
+Coordinator reassigns:
+{
+  "task_id": "task-uuid-789-continuation",
+  "original_task": "task-uuid-789",
+  "assigned_to": "robot-005",
+  "work_scope": "sections_remaining",
+  "priority": "urgent"
+}
+</pre>
+
+        <h2>6.6 Edge Computing Integration</h2>
+        <p>Edge servers deployed in facilities provide computational resources for AI inference, data aggregation, and fleet optimization. Phase 3 protocol integrates robots with edge infrastructure.</p>
+
+        <h3>AI Model Distribution</h3>
+        <pre>
+Topic: wia/rob-011/v1/building-a/+/edge/model-update
+QoS: 1
+
+Edge server publishes updated model:
+{
+  "model_id": "dirt-detection-v3.2",
+  "model_type": "tensorflow_lite",
+  "version": "3.2.0",
+  "download_url": "https://edge.example.com/models/dirt-v3.2.tflite",
+  "checksum_sha256": "abc123...",
+  "size_bytes": 8388608,
+  "deployment": {
+    "target_robots": ["robot-001", "robot-002", "robot-003"],
+    "rollout_strategy": "gradual",
+    "activation_time": "2025-01-16T02:00:00Z"
+  },
+  "performance_improvements": {
+    "accuracy_increase": 0.05,
+    "inference_speed_ms": 12
+  }
+}
+
+Robots acknowledge and download:
+{
+  "model_id": "dirt-detection-v3.2",
+  "robot_id": "robot-001",
+  "download_status": "completed",
+  "validation_passed": true,
+  "ready_for_activation": true
+}
+</pre>
+
+        <h3>Edge-Assisted Path Planning</h3>
+        <p>Complex path optimization calculations offload to edge servers with more computational power than robot hardware:</p>
+
+        <pre>
+Robot requests path optimization:
+Topic: wia/rob-011/v1/building-a/floor-1/robot-001/edge/path-request
+
+{
+  "request_id": "path-req-456",
+  "current_position": {"x": 2.0, "y": 3.0},
+  "destinations": [
+    {"area_id": "room-5", "priority": "high"},
+    {"area_id": "room-8", "priority": "medium"},
+    {"area_id": "room-3", "priority": "low"}
+  ],
+  "constraints": {
+    "battery_remaining": 65,
+    "time_limit_minutes": 45,
+    "avoid_areas": ["room-6-occupied"]
+  }
+}
+
+Edge responds with optimized path:
+Topic: wia/rob-011/v1/building-a/floor-1/robot-001/edge/path-response
+
+{
+  "request_id": "path-req-456",
+  "optimal_path": {
+    "waypoints": [...],
+    "total_distance_meters": 127.3,
+    "estimated_duration_minutes": 42,
+    "battery_required": 58,
+    "route_efficiency": 0.91
+  },
+  "alternative_paths": [...]
+}
+</pre>
+
+        <h2>6.7 5G Network Slicing and QoS</h2>
+        <p>5G networks provide guaranteed quality of service through network slicing—dedicated virtual networks with specific latency, bandwidth, and reliability characteristics.</p>
+
+        <h3>Network Slice Types for Robotics</h3>
+        <table>
+            <tr>
+                <th>Slice Type</th>
+                <th>Latency</th>
+                <th>Bandwidth</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td><strong>Ultra-Reliable Low-Latency (URLLC)</strong></td>
+                <td>&lt; 10ms</td>
+                <td>Medium</td>
+                <td>Emergency stops, collision avoidance</td>
+            </tr>
+            <tr>
+                <td><strong>Enhanced Mobile Broadband (eMBB)</strong></td>
+                <td>20-50ms</td>
+                <td>High</td>
+                <td>Video streaming, map updates</td>
+            </tr>
+            <tr>
+                <td><strong>Massive IoT (mMTC)</strong></td>
+                <td>100-500ms</td>
+                <td>Low</td>
+                <td>Periodic telemetry, status updates</td>
+            </tr>
+        </table>
+
+        <h3>Network Slice Selection</h3>
+        <pre>
+Robots request appropriate network slice based on operation:
+
+Emergency stop command:
+{
+  "command": "emergency_stop",
+  "network_requirements": {
+    "slice_type": "URLLC",
+    "max_latency_ms": 10,
+    "reliability": 0.999999
+  }
+}
+
+Routine status update:
+{
+  "status": "cleaning",
+  "network_requirements": {
+    "slice_type": "mMTC",
+    "max_latency_ms": 500,
+    "reliability": 0.99
+  }
+}
+</pre>
+
+        <h2>6.8 Swarm Intelligence Algorithms</h2>
+        <p>Multiple robots cleaning collaboratively employ swarm intelligence principles inspired by ant colonies, bee hives, and flocking birds.</p>
+
+        <h3>Coverage Optimization Through Pheromones</h3>
+        <p>Virtual pheromones mark cleaned areas, preventing redundant coverage while ensuring completeness:</p>
+
+        <pre>
+Topic: wia/rob-011/v1/warehouse/zone-a/fleet/pheromones
+QoS: 0 (high frequency, ephemeral data)
+
+Robot deposits virtual pheromone after cleaning:
+{
+  "robot_id": "robot-002",
+  "timestamp": "2025-01-15T14:30:45Z",
+  "pheromone": {
+    "position": {"x": 10.5, "y": 12.3},
+    "type": "cleaned",
+    "strength": 1.0,
+    "decay_rate": 0.1
+  }
+}
+
+Other robots sense pheromone strength and avoid recently cleaned areas,
+naturally distributing across uncleaned space.
+</pre>
+
+        <h3>Emergent Task Allocation</h3>
+        <p>Rather than centralized task assignment, robots self-organize based on local information:</p>
+
+        <div class="highlight-box">
+            <p><strong>Algorithm:</strong> Each robot calculates attraction scores for uncleaned areas based on distance, dirt level, time since last cleaning, and number of nearby robots. Robots gravitate toward high-scoring areas, automatically balancing the fleet across the facility without central coordination.</p>
+
+            <p><strong>Benefit:</strong> System remains functional even if some robots fail or communication degrades. No single point of failure.</p>
+        </div>
+
+        <h2>6.9 Predictive Maintenance Protocol</h2>
+        <p>Robots monitor component health and predict maintenance needs before failures occur, minimizing downtime and extending equipment life.</p>
+
+        <h3>Health Telemetry</h3>
+        <pre>
+Topic: wia/rob-011/v1/building-a/floor-1/robot-001/health/components
+QoS: 1
+
+{
+  "timestamp": "2025-01-15T14:30:00Z",
+  "components": [
+    {
+      "component": "main_brush",
+      "health_score": 0.65,
+      "runtime_hours": 287,
+      "expected_lifespan_hours": 300,
+      "failure_probability_30days": 0.42,
+      "recommended_action": "replace_within_2_weeks"
+    },
+    {
+      "component": "left_wheel_motor",
+      "health_score": 0.92,
+      "anomalies_detected": [
+        {
+          "type": "vibration_increase",
+          "severity": "low",
+          "trend": "worsening"
+        }
+      ],
+      "recommended_action": "monitor"
+    }
+  ]
+}
+</pre>
+
+        <h3>Maintenance Scheduling Coordination</h3>
+        <pre>
+Fleet coordinator optimizes maintenance timing:
+Topic: wia/rob-011/v1/building-a/fleet/maintenance-schedule
+
+{
+  "schedule": [
+    {
+      "robot_id": "robot-001",
+      "maintenance_type": "brush_replacement",
+      "recommended_window": {
+        "start": "2025-01-20T08:00:00Z",
+        "end": "2025-01-20T10:00:00Z"
+      },
+      "urgency": "medium",
+      "impact_if_delayed": "reduced_cleaning_efficiency"
+    }
+  ],
+  "optimization_criteria": {
+    "minimize_fleet_downtime": true,
+    "consolidate_technician_visits": true,
+    "respect_cleaning_schedules": true
+  }
+}
+</pre>
+
+        <h2>6.10 Security and Encryption</h2>
+        <p>MQTT communication requires robust security to prevent unauthorized robot control, data interception, or denial-of-service attacks.</p>
+
+        <h3>TLS Encryption</h3>
+        <p>All MQTT connections use TLS 1.3 with mutual authentication. Robots present client certificates verifying their identity, while servers present certificates proving legitimacy.</p>
+
+        <pre>
+MQTT Connection:
+- Protocol: MQTT 5.0 over TLS 1.3
+- Client Certificate: Robot-specific X.509 certificate
+- Server Certificate: Broker CA-signed certificate
+- Cipher Suite: TLS_AES_256_GCM_SHA384
+- Perfect Forward Secrecy: Enabled
+</pre>
+
+        <h3>Topic-Level Access Control</h3>
+        <p>MQTT brokers enforce fine-grained access control lists (ACLs):</p>
+
+        <table>
+            <tr>
+                <th>Client Type</th>
+                <th>Publish Topics</th>
+                <th>Subscribe Topics</th>
+            </tr>
+            <tr>
+                <td><strong>Robot</strong></td>
+                <td>Own status/telemetry/alerts</td>
+                <td>Own commands, fleet messages</td>
+            </tr>
+            <tr>
+                <td><strong>Fleet Controller</strong></td>
+                <td>Fleet commands, task assignments</td>
+                <td>All robot status/telemetry</td>
+            </tr>
+            <tr>
+                <td><strong>Edge Server</strong></td>
+                <td>Model updates, path responses</td>
+                <td>Path requests, health data</td>
+            </tr>
+            <tr>
+                <td><strong>Monitoring Dashboard</strong></td>
+                <td>None</td>
+                <td>All status (read-only)</td>
+            </tr>
+        </table>
+
+        <div class="highlight-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>Phase 3 uses MQTT publish-subscribe messaging for real-time multi-robot coordination</li>
+                <li>QoS levels ensure appropriate delivery guarantees based on message criticality</li>
+                <li>Hierarchical topic namespace enables logical routing and access control</li>
+                <li>Real-time position broadcasting and negotiation prevents robot collisions</li>
+                <li>Fleet management protocols enable dynamic task assignment and reallocation</li>
+                <li>Edge computing integration offloads AI inference and path optimization</li>
+                <li>5G network slicing provides guaranteed latency and reliability for critical operations</li>
+                <li>Swarm intelligence algorithms enable decentralized coordination without single points of failure</li>
+                <li>Predictive maintenance protocols forecast component failures before they occur</li>
+                <li>TLS encryption and topic-level ACLs ensure secure communication</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+        <ol>
+            <li>Why is publish-subscribe messaging better than request-response for multi-robot coordination?</li>
+            <li>Explain the difference between MQTT QoS levels 0, 1, and 2.</li>
+            <li>How does the topic hierarchy enable flexible subscription patterns?</li>
+            <li>Describe the collision avoidance protocol when robot trajectories intersect.</li>
+            <li>What triggers dynamic task reallocation in fleet operations?</li>
+            <li>How does edge computing enhance robot capabilities beyond on-device processing?</li>
+            <li>What are the three 5G network slice types and their robotics applications?</li>
+            <li>Explain how virtual pheromones optimize coverage in swarm cleaning.</li>
+            <li>Why is predictive maintenance more effective than reactive maintenance?</li>
+            <li>What security mechanisms protect MQTT communications from unauthorized access?</li>
+        </ol>
+
+        </div>
+</body>
+</html>

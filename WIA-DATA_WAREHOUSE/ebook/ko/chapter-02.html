@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 02: 차원 모델링 - WIA-DATA_WAREHOUSE</title>
+    <style>:root{--primary:#6366f1;--primary-dark:#4f46e5;--primary-light:#818cf8;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--dark:#1e293b;--light:#f8fafc;--border:#e2e8f0;--text:#334155;--text-light:#64748b}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.6;color:var(--text);background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,.2)}.header p{font-size:1.2em;opacity:.95}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:var(--primary);margin:25px 0 15px}.content p{margin:15px 0;text-align:justify}.content ul,.content ol{margin:15px 0 15px 30px}.content li{margin:8px 0}.info-box{background:linear-gradient(135deg,#e0e7ff,#e0f2fe);border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:linear-gradient(135deg,#fef3c7,#fed7aa);border-left:5px solid var(--warning);padding:20px;margin:25px 0;border-radius:8px}.success-box{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-left:5px solid var(--success);padding:20px;margin:25px 0;border-radius:8px}.code-block{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border-left:4px solid var(--primary)}.code-block code{font-family:"Courier New",monospace;font-size:.9em;line-height:1.5}table{width:100%;border-collapse:collapse;margin:20px 0;box-shadow:0 2px 8px rgba(0,0,0,.1)}table th{background:var(--primary);color:white;padding:15px;text-align:left;font-weight:600}table td{padding:12px 15px;border-bottom:1px solid var(--border)}table tr:hover{background:var(--light)}.review-section{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--warning)}.review-section h3{color:#92400e;margin-bottom:20px}.review-section ol{margin-left:25px}.review-section li{margin:12px 0;color:#78350f}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--success)}.key-takeaways h3{color:#065f46;margin-bottom:20px}.key-takeaways ul{margin-left:25px}.key-takeaways li{margin:12px 0;color:#064e3b}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid var(--border)}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:all .3s;display:inline-block}.nav-button:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 12px rgba(99,102,241,.4)}.footer{background:var(--dark);color:white;text-align:center;padding:30px;font-size:.9em}.footer p{margin:5px 0}.diagram{background:white;border:2px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;text-align:center}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Chapter 02</h1>
+            <p>차원 모델링: Star Schema와 Snowflake Schema</p>
+        </div>
+
+        <div class="content">
+            <h2>1. 차원 모델링이란?</h2>
+            <p>
+                차원 모델링(Dimensional Modeling)은 Ralph Kimball이 체계화한 데이터 웨어하우스 설계 방법론으로,
+                비즈니스 사용자가 이해하기 쉽고 쿼리 성능을 최적화하는 것을 목표로 합니다.
+                차원 모델링은 데이터를 <strong>팩트(Fact)</strong>와 <strong>차원(Dimension)</strong>으로 나눕니다.
+            </p>
+
+            <div class="info-box">
+                <h3>🎯 차원 모델링의 핵심 원칙</h3>
+                <ul>
+                    <li><strong>비즈니스 프로세스 중심</strong>: 기술이 아닌 비즈니스 질문에 초점</li>
+                    <li><strong>Grain 우선</strong>: 가장 세밀한 수준의 데이터 결정</li>
+                    <li><strong>Denormalization</strong>: 성능을 위한 의도적 중복</li>
+                    <li><strong>일관성</strong>: Conformed Dimension으로 전사적 통합</li>
+                </ul>
+            </div>
+
+            <h3>1.1 Fact Table (팩트 테이블)</h3>
+            <p>
+                팩트 테이블은 비즈니스 프로세스의 <strong>측정값(Measure)</strong>을 저장합니다.
+                주로 숫자형 데이터(매출액, 수량, 금액 등)와 외래 키(Foreign Key)로 구성됩니다.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>팩트 타입</th>
+                        <th>설명</th>
+                        <th>예시</th>
+                        <th>Grain</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Transaction Fact</strong></td>
+                        <td>개별 트랜잭션 기록</td>
+                        <td>판매, 주문, 클릭</td>
+                        <td>각 거래당 1행</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Periodic Snapshot</strong></td>
+                        <td>정기적 스냅샷</td>
+                        <td>일별 재고, 월별 잔액</td>
+                        <td>기간당 1행</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Accumulating Snapshot</strong></td>
+                        <td>누적 프로세스</td>
+                        <td>주문 이행 파이프라인</td>
+                        <td>프로세스당 1행</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Factless Fact</strong></td>
+                        <td>발생 여부만 기록</td>
+                        <td>출석, 프로모션 적용</td>
+                        <td>이벤트당 1행</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-block">
+<code>-- Transaction Fact Table 예시 (매출 팩트)
+CREATE TABLE fact_sales (
+    -- 비즈니스 키 (복합 Primary Key)
+    sale_key BIGINT PRIMARY KEY,
+
+    -- 차원 외래 키 (Dimension Foreign Keys)
+    date_key INT NOT NULL,
+    customer_key INT NOT NULL,
+    product_key INT NOT NULL,
+    store_key INT NOT NULL,
+    promotion_key INT,
+
+    -- 측정값 (Measures)
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    discount_amount DECIMAL(10,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    cost_amount DECIMAL(10,2) NOT NULL,
+
+    -- 계산 측정값
+    profit_amount AS (total_amount - cost_amount),
+
+    -- 메타데이터
+    etl_insert_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- 외래 키 제약 조건
+    FOREIGN KEY (date_key) REFERENCES dim_date(date_key),
+    FOREIGN KEY (customer_key) REFERENCES dim_customer(customer_key),
+    FOREIGN KEY (product_key) REFERENCES dim_product(product_key),
+    FOREIGN KEY (store_key) REFERENCES dim_store(store_key)
+);</code>
+            </div>
+
+            <h3>1.2 Dimension Table (차원 테이블)</h3>
+            <p>
+                차원 테이블은 팩트를 설명하는 <strong>컨텍스트(Context)</strong>를 제공합니다.
+                "누가(Who), 무엇을(What), 언제(When), 어디서(Where), 왜(Why), 어떻게(How)"를 답합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- Dimension Table 예시 (제품 차원)
+CREATE TABLE dim_product (
+    -- Surrogate Key (대리 키)
+    product_key INT PRIMARY KEY,
+
+    -- Business Key (비즈니스 키)
+    product_id VARCHAR(50) NOT NULL,
+
+    -- 속성들 (Attributes)
+    product_name VARCHAR(200) NOT NULL,
+    product_description TEXT,
+
+    -- 계층 구조 (Hierarchy)
+    brand VARCHAR(100),
+    category VARCHAR(100),
+    subcategory VARCHAR(100),
+    department VARCHAR(100),
+
+    -- 물리적 속성
+    color VARCHAR(50),
+    size VARCHAR(20),
+    weight_kg DECIMAL(8,2),
+
+    -- 가격 속성
+    list_price DECIMAL(10,2),
+    standard_cost DECIMAL(10,2),
+
+    -- SCD 관리 필드
+    effective_date DATE NOT NULL,
+    expiration_date DATE,
+    is_current BOOLEAN DEFAULT TRUE,
+
+    -- 메타데이터
+    created_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(product_id, effective_date)
+);</code>
+            </div>
+
+            <div class="success-box">
+                <h3>✅ Surrogate Key vs Business Key</h3>
+                <ul>
+                    <li><strong>Surrogate Key (대리 키)</strong>: DW에서 생성한 정수형 키 (product_key: 1, 2, 3...)</li>
+                    <li><strong>Business Key (비즈니스 키)</strong>: 원천 시스템의 실제 식별자 (product_id: "PROD-12345")</li>
+                    <li><strong>왜 Surrogate Key를 사용하나?</strong>
+                        <ul>
+                            <li>성능: 정수형 조인이 문자열보다 빠름</li>
+                            <li>SCD 지원: 동일 제품의 여러 버전 관리</li>
+                            <li>독립성: 원천 시스템 변경에 영향 없음</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <h2>2. Star Schema (스타 스키마)</h2>
+            <p>
+                Star Schema는 중앙의 팩트 테이블을 여러 차원 테이블이 둘러싸는 별 모양의 구조입니다.
+                가장 널리 사용되는 차원 모델링 패턴으로, <strong>단순성</strong>과 <strong>성능</strong>이 장점입니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.85em;text-align:left;line-height:1.3;">
+    ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+    │ dim_date    │         │ dim_customer│         │ dim_product │
+    │─────────────│         │─────────────│         │─────────────│
+    │ date_key PK │───┐     │ customer_key│─────┐   │ product_key │───┐
+    │ full_date   │   │     │ name        │     │   │ product_name│   │
+    │ year        │   │     │ email       │     │   │ category    │   │
+    │ quarter     │   │     │ city        │     │   │ brand       │   │
+    │ month       │   │     │ country     │     │   │ list_price  │   │
+    │ day_of_week │   │     │ segment     │     │   │ ...         │   │
+    └─────────────┘   │     └─────────────┘     │   └─────────────┘   │
+                      │                         │                     │
+                      ▼                         ▼                     ▼
+                 ┌────────────────────────────────────────────────────┐
+                 │         fact_sales (FACT TABLE)                    │
+                 │────────────────────────────────────────────────────│
+                 │ sale_key PK                                        │
+                 │ date_key FK ──────────────────────────────────────▶│
+                 │ customer_key FK ──────────────────────────────────▶│
+                 │ product_key FK ───────────────────────────────────▶│
+                 │ store_key FK ─────────────────────────────────────▶│
+                 │ promotion_key FK ─────────────────────────────────▶│
+                 │ quantity (measure)                                 │
+                 │ total_amount (measure)                             │
+                 │ profit_amount (measure)                            │
+                 └────────────────────────────────────────────────────┘
+                      ▲                         ▲
+                      │                         │
+    ┌─────────────┐   │     ┌─────────────┐    │
+    │ dim_store   │───┘     │ dim_promotion│────┘
+    │─────────────│         │─────────────│
+    │ store_key PK│         │ promotion_key│
+    │ store_name  │         │ promo_name  │
+    │ store_type  │         │ discount_pct│
+    │ city        │         │ start_date  │
+    │ region      │         │ end_date    │
+    └─────────────┘         └─────────────┘
+                </pre>
+            </div>
+
+            <h3>2.1 Star Schema의 장점</h3>
+            <ul>
+                <li><strong>단순한 구조</strong>: 비즈니스 사용자가 쉽게 이해</li>
+                <li><strong>빠른 쿼리</strong>: 조인 횟수 최소화 (팩트 ↔ 차원 1회)</li>
+                <li><strong>쉬운 유지보수</strong>: 차원 추가/변경이 간단</li>
+                <li><strong>BI 도구 친화적</strong>: Tableau, Power BI 최적화</li>
+            </ul>
+
+            <div class="code-block">
+<code>-- Star Schema 쿼리 예시: 2024년 카테고리별 매출 TOP 10
+SELECT
+    p.category,
+    p.brand,
+    SUM(f.total_amount) AS total_revenue,
+    SUM(f.quantity) AS total_quantity,
+    AVG(f.profit_amount) AS avg_profit
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_customer c ON f.customer_key = c.customer_key
+WHERE d.year = 2024
+  AND c.country = 'South Korea'
+GROUP BY p.category, p.brand
+ORDER BY total_revenue DESC
+LIMIT 10;
+
+-- 단 3개의 조인만으로 복잡한 분석 가능 (Star Schema의 강점!)</code>
+            </div>
+
+            <h2>3. Snowflake Schema (스노우플레이크 스키마)</h2>
+            <p>
+                Snowflake Schema는 차원 테이블을 <strong>정규화(Normalization)</strong>하여 계층 구조를 분리한 모델입니다.
+                별 모양에서 눈송이 모양으로 확장됩니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.8em;text-align:left;line-height:1.3;">
+                          ┌──────────────┐
+                          │ dim_department│
+                          │──────────────│
+                          │ dept_key PK  │
+                          │ dept_name    │
+                          └──────────────┘
+                                 ▲
+                                 │
+                          ┌──────────────┐
+                          │ dim_category │
+                          │──────────────│
+                          │ category_key │◀────┐
+                          │ category_name│     │
+                          │ dept_key FK  │─────┘
+                          └──────────────┘
+                                 ▲
+                                 │
+                          ┌──────────────┐
+                          │ dim_brand    │
+                          │──────────────│
+                          │ brand_key PK │◀────┐
+                          │ brand_name   │     │
+                          └──────────────┘     │
+                                 ▲              │
+                                 │              │
+                          ┌──────────────┐     │
+                          │ dim_product  │     │
+                          │──────────────│     │
+                          │ product_key  │─────┤
+                          │ product_name │     │
+                          │ category_key │─────┘
+                          │ brand_key FK │
+                          └──────────────┘
+                                 ▲
+                                 │
+                          ┌──────────────┐
+                          │  fact_sales  │
+                          │──────────────│
+                          │ product_key  │
+                          │ ...          │
+                          └──────────────┘
+                </pre>
+            </div>
+
+            <h3>3.1 Star vs Snowflake 비교</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>비교 항목</th>
+                        <th>Star Schema</th>
+                        <th>Snowflake Schema</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>정규화</strong></td>
+                        <td>비정규화 (Denormalized)</td>
+                        <td>정규화 (Normalized)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>조인 횟수</strong></td>
+                        <td>적음 (1-2회)</td>
+                        <td>많음 (3-5회 이상)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쿼리 성능</strong></td>
+                        <td>빠름 ⚡⚡⚡</td>
+                        <td>느림 ⚡</td>
+                    </tr>
+                    <tr>
+                        <td><strong>저장 공간</strong></td>
+                        <td>많음 (중복 허용)</td>
+                        <td>적음 (중복 제거)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>유지보수</strong></td>
+                        <td>간단</td>
+                        <td>복잡</td>
+                    </tr>
+                    <tr>
+                        <td><strong>이해 용이성</strong></td>
+                        <td>매우 쉬움 👍</td>
+                        <td>복잡함</td>
+                    </tr>
+                    <tr>
+                        <td><strong>사용 사례</strong></td>
+                        <td>대부분의 DW (95%)</td>
+                        <td>저장 공간 극도로 제한적인 경우</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="warning-box">
+                <h3>⚠️ Snowflake Schema 주의사항</h3>
+                <p>
+                    현대 DW에서는 <strong>Star Schema를 압도적으로 선호</strong>합니다. 그 이유는:
+                </p>
+                <ul>
+                    <li><strong>저장 공간이 저렴</strong>: 클라우드 스토리지 비용이 급격히 하락</li>
+                    <li><strong>쿼리 성능 우선</strong>: 디스크는 싸지만 CPU/메모리는 비쌈</li>
+                    <li><strong>컬럼 저장소(Columnar Storage)</strong>: Snowflake, BigQuery, Redshift는 중복 데이터를 효율적으로 압축</li>
+                    <li><strong>비즈니스 민첩성</strong>: 복잡한 조인은 분석 속도를 저하</li>
+                </ul>
+                <p>
+                    <strong>결론</strong>: 특별한 이유가 없다면 Star Schema를 사용하세요!
+                </p>
+            </div>
+
+            <h2>4. Grain (입도)</h2>
+            <p>
+                Grain은 팩트 테이블의 <strong>한 행이 나타내는 의미</strong>입니다.
+                차원 모델링에서 가장 중요한 의사결정이며, Grain을 먼저 정의해야 합니다.
+            </p>
+
+            <div class="info-box">
+                <h3>🎯 Grain 정의 예시</h3>
+                <ul>
+                    <li><strong>주문 팩트</strong>: "하나의 주문 라인 아이템" (Order Line Item)</li>
+                    <li><strong>재고 팩트</strong>: "특정 제품의 특정 창고에서의 일별 재고량"</li>
+                    <li><strong>웹 클릭 팩트</strong>: "하나의 페이지뷰 이벤트"</li>
+                    <li><strong>ATM 팩트</strong>: "하나의 ATM 거래"</li>
+                </ul>
+            </div>
+
+            <h3>4.1 Grain이 중요한 이유</h3>
+            <ol>
+                <li><strong>일관성</strong>: 모든 측정값이 같은 수준에서 집계</li>
+                <li><strong>정확성</strong>: 잘못된 Grain은 중복 집계 발생</li>
+                <li><strong>확장성</strong>: 새 측정값 추가 시 기준</li>
+            </ol>
+
+            <div class="code-block">
+<code>-- 잘못된 Grain 예시: 주문 헤더와 라인 아이템 혼합 ❌
+CREATE TABLE fact_order_bad (
+    order_key INT,           -- 주문당 1개
+    product_key INT,         -- 라인 아이템당 1개
+    order_total DECIMAL,     -- 주문 수준 (중복!)
+    line_quantity INT        -- 라인 아이템 수준
+);
+-- 문제: SUM(order_total)하면 같은 주문이 여러 번 집계됨!
+
+-- 올바른 Grain 예시 1: 주문 라인 아이템 수준 ✅
+CREATE TABLE fact_order_line (
+    order_line_key BIGINT PRIMARY KEY,
+    order_key INT,
+    product_key INT,
+    line_number INT,
+    quantity INT,
+    unit_price DECIMAL,
+    line_total DECIMAL      -- 라인 수준 측정값
+);
+
+-- 올바른 Grain 예시 2: 주문 헤더 수준 (별도 팩트) ✅
+CREATE TABLE fact_order_header (
+    order_key INT PRIMARY KEY,
+    customer_key INT,
+    order_date_key INT,
+    order_total DECIMAL,    -- 주문 수준 측정값
+    tax_amount DECIMAL,
+    shipping_amount DECIMAL
+);</code>
+            </div>
+
+            <h2>5. Conformed Dimensions (일치 차원)</h2>
+            <p>
+                Conformed Dimension은 <strong>여러 팩트 테이블에서 공유</strong>되는 차원입니다.
+                전사적 데이터 통합의 핵심이며, "단일 진실 공급원(Single Source of Truth)"을 구현합니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.85em;text-align:left;">
+    ┌─────────────────┐         ┌─────────────────┐
+    │  fact_sales     │         │  fact_inventory │
+    │─────────────────│         │─────────────────│
+    │ date_key FK ────┼────┐    │ date_key FK ────┼─┐
+    │ product_key FK ─┼──┐ │    │ product_key FK ─┼┐│
+    │ customer_key FK │  │ │    │ warehouse_key FK│││
+    │ total_amount    │  │ │    │ quantity_on_hand│││
+    └─────────────────┘  │ │    └─────────────────┘││
+                         │ │                        ││
+                         │ └──────────┬─────────────┘│
+                         │            ▼              │
+                         │     ┌──────────────┐      │
+                         │     │  dim_date    │      │
+                         │     │  (CONFORMED) │      │
+                         │     │──────────────│      │
+                         │     │ date_key PK  │      │
+                         │     │ full_date    │      │
+                         │     │ year, month  │      │
+                         │     └──────────────┘      │
+                         │                           │
+                         └──────────┬────────────────┘
+                                    ▼
+                             ┌──────────────┐
+                             │ dim_product  │
+                             │ (CONFORMED)  │
+                             │──────────────│
+                             │ product_key  │
+                             │ product_name │
+                             └──────────────┘
+                </pre>
+            </div>
+
+            <h3>5.1 Conformed Dimension의 이점</h3>
+            <ul>
+                <li><strong>일관된 보고</strong>: "2024년 Q1 매출"과 "2024년 Q1 재고"가 같은 날짜 정의 사용</li>
+                <li><strong>크로스 팩트 분석</strong>: 서로 다른 프로세스 간 연결</li>
+                <li><strong>중복 제거</strong>: 차원 테이블을 한 번만 관리</li>
+                <li><strong>거버넌스</strong>: 전사적 마스터 데이터 관리</li>
+            </ul>
+
+            <div class="code-block">
+<code>-- Conformed Dimension 활용: 판매와 재고 통합 분석
+WITH sales_summary AS (
+    SELECT
+        d.year,
+        d.quarter,
+        p.category,
+        SUM(s.total_amount) AS total_sales
+    FROM fact_sales s
+    JOIN dim_date d ON s.date_key = d.date_key
+    JOIN dim_product p ON s.product_key = p.product_key
+    GROUP BY d.year, d.quarter, p.category
+),
+inventory_summary AS (
+    SELECT
+        d.year,
+        d.quarter,
+        p.category,
+        AVG(i.quantity_on_hand) AS avg_inventory
+    FROM fact_inventory i
+    JOIN dim_date d ON i.date_key = d.date_key
+    JOIN dim_product p ON i.product_key = p.product_key
+    GROUP BY d.year, d.quarter, p.category
+)
+SELECT
+    s.year,
+    s.quarter,
+    s.category,
+    s.total_sales,
+    i.avg_inventory,
+    s.total_sales / NULLIF(i.avg_inventory, 0) AS inventory_turnover
+FROM sales_summary s
+JOIN inventory_summary i
+    ON s.year = i.year
+    AND s.quarter = i.quarter
+    AND s.category = i.category
+ORDER BY s.year DESC, s.quarter DESC, inventory_turnover DESC;
+
+-- dim_date와 dim_product가 Conformed되어 있어 두 팩트 연결 가능!</code>
+            </div>
+
+            <h2>6. Date Dimension (날짜 차원)</h2>
+            <p>
+                Date Dimension은 가장 중요한 Conformed Dimension입니다.
+                거의 모든 팩트 테이블이 날짜와 연결되며, 풍부한 속성으로 시계열 분석을 지원합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- 완전한 Date Dimension 예시
+CREATE TABLE dim_date (
+    date_key INT PRIMARY KEY,          -- 20240315 (YYYYMMDD 형식)
+    full_date DATE NOT NULL UNIQUE,    -- 2024-03-15
+
+    -- 연도 관련
+    year INT NOT NULL,                 -- 2024
+    year_quarter VARCHAR(10),          -- 2024-Q1
+    year_month VARCHAR(10),            -- 2024-03
+
+    -- 분기 관련
+    quarter INT,                       -- 1 (1~4)
+    quarter_name VARCHAR(10),          -- Q1
+
+    -- 월 관련
+    month INT,                         -- 3 (1~12)
+    month_name VARCHAR(20),            -- March
+    month_name_ko VARCHAR(20),         -- 3월
+    month_abbr VARCHAR(5),             -- Mar
+    days_in_month INT,                 -- 31
+
+    -- 주 관련
+    week_of_year INT,                  -- 11 (1~53)
+    week_of_month INT,                 -- 3
+
+    -- 일 관련
+    day_of_month INT,                  -- 15 (1~31)
+    day_of_year INT,                   -- 75 (1~366)
+    day_of_week INT,                   -- 5 (1=Monday ~ 7=Sunday)
+    day_name VARCHAR(20),              -- Friday
+    day_name_ko VARCHAR(20),           -- 금요일
+    day_abbr VARCHAR(5),               -- Fri
+
+    -- 비즈니스 플래그
+    is_weekday BOOLEAN,                -- TRUE (월~금)
+    is_weekend BOOLEAN,                -- FALSE
+    is_holiday BOOLEAN,                -- FALSE
+    holiday_name VARCHAR(100),         -- NULL (또는 '설날', '추석' 등)
+
+    -- 회계 연도 (Fiscal Year) - 기업마다 다름
+    fiscal_year INT,                   -- 2024 (예: 4월 시작이면 다를 수 있음)
+    fiscal_quarter INT,
+    fiscal_month INT,
+
+    -- 상대적 기간
+    is_current_day BOOLEAN,
+    is_current_week BOOLEAN,
+    is_current_month BOOLEAN,
+    is_current_quarter BOOLEAN,
+    is_current_year BOOLEAN
+);
+
+-- Date Dimension 채우기 (10년치)
+INSERT INTO dim_date
+SELECT
+    TO_CHAR(d, 'YYYYMMDD')::INT AS date_key,
+    d AS full_date,
+    EXTRACT(YEAR FROM d) AS year,
+    TO_CHAR(d, 'YYYY-"Q"Q') AS year_quarter,
+    TO_CHAR(d, 'YYYY-MM') AS year_month,
+    EXTRACT(QUARTER FROM d) AS quarter,
+    'Q' || EXTRACT(QUARTER FROM d) AS quarter_name,
+    EXTRACT(MONTH FROM d) AS month,
+    TO_CHAR(d, 'Month') AS month_name,
+    TO_CHAR(d, 'MM') || '월' AS month_name_ko,
+    TO_CHAR(d, 'Mon') AS month_abbr,
+    DATE_PART('days', DATE_TRUNC('month', d) + INTERVAL '1 month' - INTERVAL '1 day') AS days_in_month,
+    EXTRACT(WEEK FROM d) AS week_of_year,
+    EXTRACT(ISODOW FROM d) AS day_of_week,
+    TO_CHAR(d, 'Day') AS day_name,
+    CASE EXTRACT(ISODOW FROM d)
+        WHEN 1 THEN '월요일'
+        WHEN 2 THEN '화요일'
+        WHEN 3 THEN '수요일'
+        WHEN 4 THEN '목요일'
+        WHEN 5 THEN '금요일'
+        WHEN 6 THEN '토요일'
+        WHEN 7 THEN '일요일'
+    END AS day_name_ko,
+    EXTRACT(ISODOW FROM d) BETWEEN 1 AND 5 AS is_weekday,
+    EXTRACT(ISODOW FROM d) IN (6, 7) AS is_weekend
+FROM GENERATE_SERIES('2020-01-01'::DATE, '2029-12-31'::DATE, '1 day'::INTERVAL) d;</code>
+            </div>
+
+            <div class="success-box">
+                <h3>✅ Date Dimension 활용 예시</h3>
+                <pre style="font-family:monospace;background:rgba(255,255,255,0.5);padding:10px;border-radius:4px;">
+-- 월요일 매출 vs 금요일 매출 비교
+SELECT
+    d.day_name_ko,
+    SUM(f.total_amount) AS total_sales,
+    COUNT(*) AS transaction_count
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+WHERE d.year = 2024 AND d.is_weekday = TRUE
+GROUP BY d.day_of_week, d.day_name_ko
+ORDER BY d.day_of_week;
+
+-- 공휴일 vs 평일 매출 비교
+SELECT
+    CASE WHEN d.is_holiday THEN '공휴일' ELSE '평일' END AS day_type,
+    AVG(daily_sales.total) AS avg_daily_sales
+FROM (
+    SELECT date_key, SUM(total_amount) AS total
+    FROM fact_sales
+    GROUP BY date_key
+) daily_sales
+JOIN dim_date d ON daily_sales.date_key = d.date_key
+WHERE d.year = 2024
+GROUP BY CASE WHEN d.is_holiday THEN '공휴일' ELSE '평일' END;</pre>
+            </div>
+
+            <h2>7. 차원 모델링 설계 프로세스</h2>
+            <p>
+                Ralph Kimball의 4단계 설계 프로세스를 따릅니다:
+            </p>
+
+            <div class="info-box">
+                <h3>📋 Kimball의 4단계 설계 프로세스</h3>
+                <ol>
+                    <li>
+                        <strong>비즈니스 프로세스 선택</strong>
+                        <ul>
+                            <li>예: 소매 판매, 주문 이행, 고객 서비스</li>
+                            <li>하나의 프로세스 = 하나의 팩트 테이블</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Grain 선언</strong>
+                        <ul>
+                            <li>"한 행은 무엇을 나타내는가?"</li>
+                            <li>가능한 한 <strong>가장 세밀한(Atomic) 수준</strong> 선택</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>차원 식별</strong>
+                        <ul>
+                            <li>Who, What, When, Where, Why, How에 답하는 컨텍스트</li>
+                            <li>Conformed Dimension 재사용 우선</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>팩트 식별</strong>
+                        <ul>
+                            <li>Grain에 맞는 측정값만 포함</li>
+                            <li>주로 숫자형, 가산적(Additive) 측정값</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <h3>7.1 실전 예시: 전자상거래 주문 모델링</h3>
+            <div class="code-block">
+<code>-- Step 1: 비즈니스 프로세스 = "온라인 주문"
+-- Step 2: Grain = "주문의 각 라인 아이템"
+
+-- Step 3: 차원 식별
+/*
+- dim_date: 주문 날짜
+- dim_customer: 누가 주문했는가?
+- dim_product: 무엇을 주문했는가?
+- dim_promotion: 어떤 프로모션을 적용했는가?
+- dim_payment_method: 어떻게 결제했는가?
+- dim_shipping_method: 어떻게 배송하는가?
+*/
+
+-- Step 4: 팩트 식별
+CREATE TABLE fact_order_line (
+    -- Surrogate Key
+    order_line_key BIGINT PRIMARY KEY,
+
+    -- 차원 FK
+    order_date_key INT NOT NULL,
+    customer_key INT NOT NULL,
+    product_key INT NOT NULL,
+    promotion_key INT,
+    payment_method_key INT NOT NULL,
+    shipping_method_key INT NOT NULL,
+
+    -- 비즈니스 키
+    order_number VARCHAR(50) NOT NULL,
+    line_number INT NOT NULL,
+
+    -- 측정값 (Grain에 맞는 것만!)
+    quantity INT NOT NULL,                  -- 가산적 ✅
+    unit_price DECIMAL(10,2) NOT NULL,      -- 반가산적 (평균 가능)
+    discount_amount DECIMAL(10,2),          -- 가산적 ✅
+    tax_amount DECIMAL(10,2),               -- 가산적 ✅
+    line_total DECIMAL(10,2) NOT NULL,      -- 가산적 ✅
+    cost_of_goods DECIMAL(10,2),            -- 가산적 ✅
+    gross_profit AS (line_total - cost_of_goods), -- 계산 컬럼
+
+    -- 메타데이터
+    etl_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 이제 어떤 질문도 답할 수 있습니다:
+-- "2024년 Q1에 프로모션을 적용한 모바일 결제 고객의 평균 주문 금액은?"
+SELECT
+    AVG(line_total)
+FROM fact_order_line f
+JOIN dim_date d ON f.order_date_key = d.date_key
+JOIN dim_promotion p ON f.promotion_key = p.promotion_key
+JOIN dim_payment_method pm ON f.payment_method_key = pm.payment_method_key
+WHERE d.year = 2024 AND d.quarter = 1
+  AND p.promotion_key > 0  -- 프로모션 적용
+  AND pm.method_type = 'Mobile Payment';</code>
+            </div>
+
+            <div class="review-section">
+                <h3>📝 복습 질문</h3>
+                <ol>
+                    <li>Fact Table과 Dimension Table의 차이는 무엇이며, 각각 어떤 데이터를 저장하나요?</li>
+                    <li>Surrogate Key를 사용하는 3가지 이유를 설명하세요.</li>
+                    <li>Star Schema와 Snowflake Schema의 차이점은 무엇이며, 왜 현대 DW에서는 Star Schema를 선호하나요?</li>
+                    <li>Grain이란 무엇이며, 왜 차원 모델링에서 가장 먼저 정의해야 하나요?</li>
+                    <li>Conformed Dimension이란 무엇이며, 어떤 이점을 제공하나요?</li>
+                    <li>Date Dimension에 year, month, day_of_week 같은 속성을 미리 계산해서 저장하는 이유는?</li>
+                    <li>Transaction Fact, Periodic Snapshot, Accumulating Snapshot의 차이를 예시와 함께 설명하세요.</li>
+                    <li>팩트 테이블에 측정값이 아닌 텍스트 속성을 저장하면 안 되는 이유는?</li>
+                    <li>Kimball의 4단계 차원 모델링 프로세스를 순서대로 나열하세요.</li>
+                    <li>가산적(Additive) 측정값과 반가산적(Semi-Additive) 측정값의 차이는 무엇인가요?</li>
+                </ol>
+            </div>
+
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li>차원 모델링은 <strong>Fact(측정값)</strong>와 <strong>Dimension(컨텍스트)</strong>로 데이터를 구조화</li>
+                    <li><strong>Star Schema</strong>가 95% 이상의 DW에서 사용되는 표준 (단순성 + 성능)</li>
+                    <li><strong>Grain</strong>은 팩트 테이블 설계의 첫 번째 결정사항 - "한 행은 무엇을 나타내는가?"</li>
+                    <li><strong>Surrogate Key</strong>는 성능, SCD 지원, 독립성을 위해 필수</li>
+                    <li><strong>Conformed Dimension</strong>으로 여러 프로세스를 통합하고 일관성 확보</li>
+                    <li><strong>Date Dimension</strong>은 가장 중요한 Conformed Dimension - 풍부한 시계열 분석 지원</li>
+                    <li>Kimball의 4단계: ① 비즈니스 프로세스 → ② Grain → ③ 차원 → ④ 팩트</li>
+                    <li>팩트 테이블은 주로 <strong>숫자형 측정값</strong>, 차원 테이블은 <strong>설명적 속성</strong></li>
+                    <li>현대 클라우드 DW에서는 저장 공간보다 <strong>쿼리 성능이 우선</strong> (Star > Snowflake)</li>
+                    <li>弘益人間: 비즈니스 사용자가 쉽게 이해할 수 있는 모델이 인류에게 이로움 🌍</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-01.html" class="nav-button">← 01. 데이터 웨어하우스 기초</a>
+                <a href="chapter-03.html" class="nav-button">03. ETL/ELT 프로세스 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

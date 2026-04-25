@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>4장: 메모리 관리 및 할당 | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { font-size: 2.5em; margin: 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        .summary { background: #f0fdf4; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #10B981; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="color: #10B981; font-weight: bold; border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px;">
+            <div>4장</div><h1>메모리 관리 및 할당</h1>
+        </div>
+
+        <h2>4.1 AI 가속기의 메모리 계층</h2>
+        <p>현대 AI 가속기는 용량, 대역폭 및 지연 시간의 균형을 맞추도록 설계된 복잡한 메모리 계층을 특징으로 합니다. 이 계층을 이해하는 것은 효율적인 메모리 관리에 필수적입니다.</p>
+
+        <table>
+            <tr>
+                <th>메모리 레벨</th>
+                <th>용량</th>
+                <th>대역폭</th>
+                <th>지연시간</th>
+                <th>용도</th>
+            </tr>
+            <tr>
+                <td>레지스터</td>
+                <td>수 KB</td>
+                <td>수십 TB/s</td>
+                <td>1 사이클</td>
+                <td>커널 내 임시 변수</td>
+            </tr>
+            <tr>
+                <td>공유 메모리/L1 캐시</td>
+                <td>수십-수백 KB</td>
+                <td>수 TB/s</td>
+                <td>수십 사이클</td>
+                <td>작업 그룹 데이터 공유</td>
+            </tr>
+            <tr>
+                <td>L2 캐시</td>
+                <td>수 MB</td>
+                <td>1-10 TB/s</td>
+                <td>수백 사이클</td>
+                <td>컴퓨팅 유닛 간 데이터</td>
+            </tr>
+            <tr>
+                <td>HBM/GDDR</td>
+                <td>16-80 GB</td>
+                <td>900-2500 GB/s</td>
+                <td>수백 사이클</td>
+                <td>주 작업 데이터</td>
+            </tr>
+            <tr>
+                <td>시스템 DRAM</td>
+                <td>수백 GB</td>
+                <td>50-100 GB/s</td>
+                <td>수천 사이클</td>
+                <td>입력/출력 데이터</td>
+            </tr>
+        </table>
+
+        <pre>// 메모리 계층 활용 예제
+__kernel void optimized_matmul(
+    __global const float* A,
+    __global const float* B,
+    __global float* C,
+    int N
+) {
+    // 1. 공유 메모리 활용 (빠른 접근)
+    __local float tile_A[16][16];
+    __local float tile_B[16][16];
+
+    // 2. 레지스터 활용 (가장 빠름)
+    float sum = 0.0f;
+
+    int row = get_local_id(0);
+    int col = get_local_id(1);
+
+    // 3. HBM에서 공유 메모리로 타일 로드
+    for (int tile = 0; tile < N/16; tile++) {
+        // 협력하여 타일 로드 (메모리 통합)
+        tile_A[row][col] = A[...];
+        tile_B[row][col] = B[...];
+        barrier(CLK_LOCAL_MEM_FENCE);  // 동기화
+
+        // 4. 공유 메모리에서 계산 (빠른 액세스)
+        for (int k = 0; k < 16; k++) {
+            sum += tile_A[row][k] * tile_B[k][col];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // 5. 레지스터에서 HBM으로 결과 저장
+    C[...] = sum;
+}</pre>
+
+        <h2>4.2 할당 전략</h2>
+        <p>WIA-AI-011은 다양한 사용 패턴에 최적화된 여러 할당 전략을 지원합니다.</p>
+
+        <h3>4.2.1 버디 할당자 (Buddy Allocator)</h3>
+        <pre>// 버디 할당자 구현
+typedef struct {
+    size_t size;
+    bool is_free;
+    struct block* left_buddy;
+    struct block* right_buddy;
+} memory_block_t;
+
+void* buddy_alloc(size_t size) {
+    // 1. 요청 크기를 2의 거듭제곱으로 반올림
+    size_t rounded_size = next_power_of_2(size);
+
+    // 2. 적합한 블록 찾기
+    memory_block_t* block = find_free_block(rounded_size);
+
+    // 3. 블록이 너무 크면 분할
+    while (block->size > rounded_size * 2) {
+        split_block(block);  // 버디로 분할
+    }
+
+    // 4. 블록 할당
+    block->is_free = false;
+    return block->data;
+}
+
+void buddy_free(void* ptr) {
+    memory_block_t* block = get_block(ptr);
+    block->is_free = true;
+
+    // 버디와 병합 시도 (단편화 감소)
+    while (block->buddy && block->buddy->is_free) {
+        merge_buddies(block, block->buddy);
+    }
+}</pre>
+
+        <h3>4.2.2 슬랩 할당자 (Slab Allocator)</h3>
+        <pre>// 슬랩 할당자 - 고정 크기 객체에 최적
+typedef struct {
+    size_t object_size;
+    size_t objects_per_slab;
+    void* free_list;  // 사용 가능 객체 목록
+} slab_t;
+
+slab_t* create_slab(size_t object_size) {
+    slab_t* slab = malloc(sizeof(slab_t));
+    slab->object_size = object_size;
+    slab->objects_per_slab = 256;  // 슬랩당 256개 객체
+
+    // 슬랩 메모리 할당
+    void* slab_mem = aligned_alloc(256,
+        object_size * slab->objects_per_slab);
+
+    // 프리 리스트 초기화
+    for (int i = 0; i < slab->objects_per_slab - 1; i++) {
+        void* obj = slab_mem + i * object_size;
+        *(void**)obj = slab_mem + (i + 1) * object_size;
+    }
+    slab->free_list = slab_mem;
+
+    return slab;
+}
+
+void* slab_alloc(slab_t* slab) {
+    // O(1) 할당
+    if (!slab->free_list) {
+        return NULL;  // 슬랩 가득 참
+    }
+
+    void* obj = slab->free_list;
+    slab->free_list = *(void**)obj;  // 다음으로 이동
+    return obj;
+}
+
+void slab_free(slab_t* slab, void* obj) {
+    // O(1) 해제
+    *(void**)obj = slab->free_list;
+    slab->free_list = obj;
+}</pre>
+
+        <h2>4.3 통합 메모리 아키텍처</h2>
+        <p>통합 메모리는 CPU와 가속기 모두에서 액세스할 수 있는 단일 주소 공간을 제공하여 프로그래밍을 단순화합니다.</p>
+
+        <pre>// 통합 메모리 사용 예제
+void process_data_unified() {
+    // 1. 통합 메모리 할당
+    float* data = wia_alloc_unified(ctx, size);
+
+    // 2. CPU에서 초기화 (자동 마이그레이션)
+    for (int i = 0; i < n; i++) {
+        data[i] = initialize_value(i);
+    }
+
+    // 3. GPU에서 계산 (런타임이 자동 전송)
+    wia_compute_kernel<<<blocks, threads>>>(data, n);
+
+    // 4. CPU에서 결과 읽기 (자동 전송)
+    float result = data[0];
+
+    // 5. 정리
+    wia_free_unified(data);
+}
+
+// 명시적 힌트로 성능 최적화
+void process_with_hints() {
+    float* data = wia_alloc_unified(ctx, size);
+
+    // CPU에서 주로 사용될 것임을 힌트
+    wia_advise_memory(data, size, WIA_MEM_ADVISE_CPU_PREFER);
+
+    // CPU 초기화
+    initialize_on_cpu(data, n);
+
+    // GPU로 프리페치 (미리 전송)
+    wia_prefetch_async(data, size, device, stream);
+
+    // GPU 계산
+    wia_compute_kernel<<<blocks, threads>>>(data, n);
+
+    wia_free_unified(data);
+}</pre>
+
+        <h2>4.4 효율적인 전송을 위한 고정 메모리</h2>
+        <p>고정(페이지 잠금) 메모리는 CPU 개입 없이 DMA 전송을 가능하게 하여 호스트-디바이스 대역폭을 극적으로 향상시킵니다.</p>
+
+        <pre>// 고정 메모리 vs 일반 메모리 성능 비교
+void compare_transfer_performance() {
+    size_t size = 1024 * 1024 * 1024;  // 1GB
+
+    // 1. 일반 메모리 (페이징 가능)
+    float* pageable_host = malloc(size);
+    float* device_mem = wia_alloc_device(ctx, size);
+
+    double start = get_time();
+    wia_copy_h2d(device_mem, pageable_host, size);
+    double pageable_time = get_time() - start;
+
+    // 2. 고정 메모리 (페이징 불가)
+    float* pinned_host = wia_alloc_pinned(ctx, size);
+
+    start = get_time();
+    wia_copy_h2d(device_mem, pinned_host, size);
+    double pinned_time = get_time() - start;
+
+    printf("일반 메모리 전송: %.3f ms (%.2f GB/s)\n",
+           pageable_time * 1000,
+           size / pageable_time / 1e9);
+    printf("고정 메모리 전송: %.3f ms (%.2f GB/s)\n",
+           pinned_time * 1000,
+           size / pinned_time / 1e9);
+    printf("속도 향상: %.2fx\n", pageable_time / pinned_time);
+
+    // 일반적으로 3-5배 빠름
+    free(pageable_host);
+    wia_free_pinned(pinned_host);
+    wia_free_device(device_mem);
+}</pre>
+
+        <h2>4.5 메모리 풀링 및 캐싱</h2>
+        <p>반복적인 할당과 해제는 단편화와 오버헤드를 유발합니다. 메모리 풀은 해제된 버퍼를 캐시에 유지하여 O(1) 재할당을 가능하게 합니다.</p>
+
+        <pre>// 고급 메모리 풀 구현
+typedef struct {
+    size_t size_class;
+    wia_memory_t** cache;  // LRU 캐시
+    int cache_size;
+    int cache_capacity;
+} size_class_pool_t;
+
+typedef struct {
+    size_class_pool_t* pools[32];  // 다양한 크기 클래스
+    wia_mutex_t lock;
+    size_t total_allocated;
+    size_t peak_allocated;
+} memory_pool_t;
+
+wia_memory_t* pool_alloc(memory_pool_t* pool, size_t size) {
+    // 1. 크기 클래스 결정
+    int size_class = get_size_class(size);
+    size_class_pool_t* class_pool = pool->pools[size_class];
+
+    wia_mutex_lock(&pool->lock);
+
+    // 2. 캐시에서 검색
+    if (class_pool->cache_size > 0) {
+        wia_memory_t* mem = class_pool->cache[--class_pool->cache_size];
+        wia_mutex_unlock(&pool->lock);
+        return mem;  // 캐시 적중 - O(1)
+    }
+
+    wia_mutex_unlock(&pool->lock);
+
+    // 3. 캐시 미스 - 새로 할당
+    wia_memory_t* mem = wia_alloc_device(ctx, size_class_size(size_class));
+    pool->total_allocated += size_class_size(size_class);
+
+    if (pool->total_allocated > pool->peak_allocated) {
+        pool->peak_allocated = pool->total_allocated;
+    }
+
+    return mem;
+}
+
+void pool_free(memory_pool_t* pool, wia_memory_t* mem) {
+    size_t size = wia_memory_size(mem);
+    int size_class = get_size_class(size);
+    size_class_pool_t* class_pool = pool->pools[size_class];
+
+    wia_mutex_lock(&pool->lock);
+
+    // 캐시에 공간이 있으면 저장 (실제 해제 안 함)
+    if (class_pool->cache_size < class_pool->cache_capacity) {
+        class_pool->cache[class_pool->cache_size++] = mem;
+        wia_mutex_unlock(&pool->lock);
+        return;
+    }
+
+    wia_mutex_unlock(&pool->lock);
+
+    // 캐시 가득참 - LRU 제거 후 실제 해제
+    wia_free_device(class_pool->cache[0]);
+    memmove(class_pool->cache, class_pool->cache + 1,
+            (class_pool->cache_size - 1) * sizeof(wia_memory_t*));
+    class_pool->cache[class_pool->cache_size - 1] = mem;
+}</pre>
+
+        <h2>4.6 가비지 컬렉션 및 수명 관리</h2>
+        <p>수동 메모리 관리는 오류가 발생하기 쉽습니다. WIA-AI-011은 메모리 버퍼에 대한 선택적 참조 카운팅 및 가비지 컬렉션을 지원합니다.</p>
+
+        <pre>// 참조 카운팅 메모리 관리
+typedef struct {
+    void* data;
+    size_t size;
+    atomic_int ref_count;
+    wia_device_t* device;
+} ref_counted_memory_t;
+
+ref_counted_memory_t* create_ref_counted(size_t size) {
+    ref_counted_memory_t* mem = malloc(sizeof(ref_counted_memory_t));
+    mem->data = wia_alloc_device(ctx, size);
+    mem->size = size;
+    atomic_init(&mem->ref_count, 1);  // 초기 참조 = 1
+    return mem;
+}
+
+void retain_memory(ref_counted_memory_t* mem) {
+    atomic_fetch_add(&mem->ref_count, 1);
+}
+
+void release_memory(ref_counted_memory_t* mem) {
+    int old_count = atomic_fetch_sub(&mem->ref_count, 1);
+    if (old_count == 1) {
+        // 마지막 참조 해제 - 메모리 반환
+        wia_free_device(mem->data);
+        free(mem);
+    }
+}
+
+// 사용 예제
+void shared_memory_example() {
+    // 메모리 생성 (ref_count = 1)
+    ref_counted_memory_t* mem = create_ref_counted(1024 * 1024);
+
+    // 다른 컴포넌트와 공유
+    retain_memory(mem);  // ref_count = 2
+    process_in_thread_a(mem);
+
+    retain_memory(mem);  // ref_count = 3
+    process_in_thread_b(mem);
+
+    // 각 컴포넌트가 완료 후 해제
+    release_memory(mem);  // ref_count = 2
+    // ... thread_a 완료
+    release_memory(mem);  // ref_count = 1
+    // ... thread_b 완료
+    release_memory(mem);  // ref_count = 0, 메모리 해제됨
+}</pre>
+
+        <h2>4.7 메모리 조각 모음</h2>
+        <p>장시간 실행되는 애플리케이션은 메모리 단편화로 고통받습니다. WIA-AI-011은 라이브 버퍼를 재배치하여 여유 공간을 통합하는 압축 알고리즘을 구현합니다.</p>
+
+        <pre>// 메모리 조각 모음 (압축) 알고리즘
+typedef struct {
+    void* address;
+    size_t size;
+    bool is_free;
+    wia_tensor_t* owner;  // 참조 업데이트용
+} memory_block_t;
+
+void defragment_memory(wia_context_t* ctx) {
+    memory_block_t* blocks = get_all_blocks(ctx);
+    int num_blocks = get_num_blocks(ctx);
+
+    // 1. 사용 중인 블록을 앞으로 이동
+    void* compact_base = get_heap_base(ctx);
+
+    for (int i = 0; i < num_blocks; i++) {
+        if (!blocks[i].is_free) {
+            // 블록을 새 위치로 이동
+            void* new_addr = compact_base;
+
+            if (new_addr != blocks[i].address) {
+                // 디바이스 내 메모리 복사
+                wia_copy_device_to_device(
+                    new_addr, blocks[i].address, blocks[i].size
+                );
+
+                // 텐서 포인터 업데이트
+                if (blocks[i].owner) {
+                    update_tensor_pointer(blocks[i].owner, new_addr);
+                }
+            }
+
+            // 다음 블록 위치
+            compact_base += blocks[i].size;
+        }
+    }
+
+    // 2. 남은 공간을 하나의 큰 여유 블록으로 병합
+    size_t free_size = get_heap_end(ctx) - compact_base;
+    create_free_block(compact_base, free_size);
+
+    printf("조각 모음 완료: %.1f%% 공간 회수\n",
+           (float)free_size / get_total_memory(ctx) * 100);
+}</pre>
+
+        <h2>4.8 다중 디바이스 메모리 관리</h2>
+        <p>여러 가속기를 사용하는 애플리케이션은 디바이스 간 메모리를 관리해야 합니다.</p>
+
+        <pre>// 피어 투 피어 메모리 액세스
+void enable_peer_access_example() {
+    wia_device_t* gpu0 = wia_get_device(0);
+    wia_device_t* gpu1 = wia_get_device(1);
+
+    // 1. P2P 지원 확인
+    bool can_p2p = wia_can_access_peer(gpu0, gpu1);
+    if (can_p2p) {
+        // 2. P2P 액세스 활성화
+        wia_enable_peer_access(gpu0, gpu1);
+
+        // 3. GPU0에 메모리 할당
+        wia_tensor_t* tensor = wia_create_tensor(gpu0, shape);
+
+        // 4. GPU1에서 직접 액세스 (복사 없음!)
+        wia_compute_on_device(gpu1, tensor);
+
+        // 대역폭: 50-100 GB/s (NVLink) vs 10-15 GB/s (PCIe)
+    } else {
+        // P2P 불가 - 명시적 복사 필요
+        wia_tensor_t* tensor_gpu0 = wia_create_tensor(gpu0, shape);
+        wia_tensor_t* tensor_gpu1 = wia_create_tensor(gpu1, shape);
+
+        wia_copy_peer(tensor_gpu1, tensor_gpu0);
+        wia_compute_on_device(gpu1, tensor_gpu1);
+    }
+}
+
+// NUMA 인식 할당
+wia_tensor_t* alloc_numa_aware(int preferred_device) {
+    wia_device_t* device = wia_get_device(preferred_device);
+    wia_numa_node_t numa_node = wia_get_numa_node(device);
+
+    // NUMA 노드에 가까운 메모리 할당
+    wia_tensor_t* tensor = wia_create_tensor_numa(
+        device, shape, numa_node
+    );
+
+    return tensor;
+}</pre>
+
+        <h2>4.9 메모리 대역폭 최적화</h2>
+        <p>메모리 대역폭은 종종 가속기 성능을 제한합니다.</p>
+
+        <pre>// 메모리 통합 (Coalescing) 예제
+__kernel void uncoalesced_access(
+    __global float* data,
+    int stride
+) {
+    int gid = get_global_id(0);
+    // 나쁨: 스트라이드 액세스 (통합되지 않음)
+    float value = data[gid * stride];
+    // ...
+}
+
+__kernel void coalesced_access(
+    __global float* data,
+    int N
+) {
+    int gid = get_global_id(0);
+    // 좋음: 연속 액세스 (통합됨)
+    float value = data[gid];
+    // 32-128배 빠를 수 있음
+}
+
+// 뱅크 충돌 회피
+__kernel void avoid_bank_conflicts() {
+    __local float shared[256];
+    int lid = get_local_id(0);
+
+    // 나쁨: 뱅크 충돌
+    shared[lid * 2] = ...;  // 홀수 뱅크만 사용
+
+    // 좋음: 패딩으로 충돌 회피
+    __local float shared_padded[256 + 32];
+    shared_padded[lid] = ...;  // 모든 뱅크 사용
+}
+
+// 이중 버퍼링으로 지연 숨기기
+void double_buffering_example() {
+    wia_memory_t* buffer_a = wia_alloc_device(ctx, size);
+    wia_memory_t* buffer_b = wia_alloc_device(ctx, size);
+
+    for (int i = 0; i < num_batches; i++) {
+        if (i % 2 == 0) {
+            // 버퍼 A: 계산, 버퍼 B: 전송
+            wia_compute_async(buffer_a, stream_compute);
+            wia_copy_async(host_data[i+1], buffer_b, stream_transfer);
+        } else {
+            // 버퍼 B: 계산, 버퍼 A: 전송
+            wia_compute_async(buffer_b, stream_compute);
+            wia_copy_async(host_data[i+1], buffer_a, stream_transfer);
+        }
+    }
+}</pre>
+
+        <h2>4.10 메모리 안전성 및 디버깅</h2>
+        <p>메모리 오류는 미묘한 버그와 보안 취약점을 유발합니다.</p>
+
+        <pre>// 메모리 안전 기능
+#ifdef WIA_DEBUG_MEMORY
+
+// 1. 경계 검사
+void* safe_alloc(size_t size) {
+    // 가드 페이지 추가
+    size_t guard_size = 4096;
+    size_t total_size = size + 2 * guard_size;
+
+    void* ptr = wia_alloc_device(ctx, total_size);
+
+    // 가드 페이지를 보호 모드로 설정
+    wia_protect_memory(ptr, guard_size, WIA_PROT_NONE);
+    wia_protect_memory(ptr + guard_size + size, guard_size, WIA_PROT_NONE);
+
+    return ptr + guard_size;
+}
+
+// 2. 사용 후 해제 감지
+typedef struct {
+    void* ptr;
+    size_t size;
+    bool is_freed;
+    const char* alloc_site;
+    const char* free_site;
+} allocation_record_t;
+
+void track_allocation(void* ptr, size_t size) {
+    allocation_record_t record = {
+        .ptr = ptr,
+        .size = size,
+        .is_freed = false,
+        .alloc_site = __FILE__ ":" STRINGIFY(__LINE__)
+    };
+    add_to_tracker(&record);
+}
+
+void safe_free(void* ptr) {
+    allocation_record_t* record = find_allocation(ptr);
+
+    if (!record) {
+        fprintf(stderr, "오류: 할당되지 않은 메모리 해제 시도\n");
+        abort();
+    }
+
+    if (record->is_freed) {
+        fprintf(stderr, "오류: 이중 해제 감지\n");
+        fprintf(stderr, "  할당 위치: %s\n", record->alloc_site);
+        fprintf(stderr, "  첫 해제: %s\n", record->free_site);
+        fprintf(stderr, "  두 번째 해제: %s:%d\n", __FILE__, __LINE__);
+        abort();
+    }
+
+    record->is_freed = true;
+    record->free_site = __FILE__ ":" STRINGIFY(__LINE__);
+    wia_free_device(ptr);
+}
+
+// 3. 누수 감지
+void detect_leaks() {
+    for (int i = 0; i < num_allocations; i++) {
+        if (!allocations[i].is_freed) {
+            fprintf(stderr, "메모리 누수 감지:\n");
+            fprintf(stderr, "  주소: %p\n", allocations[i].ptr);
+            fprintf(stderr, "  크기: %zu bytes\n", allocations[i].size);
+            fprintf(stderr, "  할당 위치: %s\n", allocations[i].alloc_site);
+        }
+    }
+}
+
+#endif // WIA_DEBUG_MEMORY</pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>AI 가속기는 레지스터부터 시스템 DRAM까지 5단계 메모리 계층 보유</li>
+                <li>버디 할당자는 빠른 할당과 낮은 단편화, 슬랩은 고정 크기 객체에 최적</li>
+                <li>통합 메모리는 단일 주소 공간으로 프로그래밍 단순화, 힌트로 성능 최적화</li>
+                <li>고정 메모리는 DMA 전송으로 일반 메모리 대비 3-5배 빠른 전송</li>
+                <li>메모리 풀은 LRU 캐싱으로 할당 오버헤드 제거, O(1) 성능</li>
+                <li>참조 카운팅은 자동 메모리 관리로 누수와 이중 해제 방지</li>
+                <li>조각 모음은 라이브 블록 재배치로 여유 공간 통합, 단편화 해결</li>
+                <li>피어 투 피어는 NVLink로 50-100 GB/s 대역폭, 디바이스 간 복사 제거</li>
+                <li>메모리 통합과 이중 버퍼링으로 대역폭 활용 극대화</li>
+                <li>가드 페이지, 경계 검사, 누수 감지로 메모리 안전성 보장</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>AI 가속기의 5단계 메모리 계층을 나열하고 각각의 용량, 대역폭, 지연시간 특성을 설명하십시오.</li>
+                <li>버디 할당자와 슬랩 할당자의 차이점을 설명하십시오. 각각 어떤 사용 패턴에 적합합니까?</li>
+                <li>통합 메모리가 프로그래밍을 어떻게 단순화합니까? 성능을 최적화하기 위한 힌트 메커니즘을 설명하십시오.</li>
+                <li>고정 메모리가 일반 메모리보다 빠른 전송을 제공하는 이유를 DMA의 관점에서 설명하십시오.</li>
+                <li>메모리 풀의 LRU 캐싱 메커니즘을 설명하고 할당/해제가 O(1) 시간에 수행되는 과정을 서술하십시오.</li>
+                <li>참조 카운팅이 어떻게 자동 메모리 관리를 제공합니까? 원자적 연산이 필요한 이유는?</li>
+                <li>메모리 조각 모음(압축) 알고리즘의 동작 과정을 단계별로 설명하십시오. 텐서 포인터 업데이트가 중요한 이유는?</li>
+                <li>피어 투 피어 메모리 액세스와 일반 PCIe 전송의 차이를 대역폭 측면에서 비교하십시오.</li>
+                <li>메모리 통합(coalescing)이 성능에 미치는 영향을 설명하고 통합된 액세스와 스트라이드 액세스의 예를 작성하십시오.</li>
+                <li>이중 버퍼링이 전송 지연시간을 숨기는 원리를 설명하십시오. 계산과 전송의 중복이 어떻게 달성됩니까?</li>
+                <li>가드 페이지, 사용 후 해제 감지, 누수 감지의 각 메모리 안전 기능이 방지하는 오류를 설명하십시오.</li>
+                <li>1GB 데이터를 전송할 때 일반 메모리(5 GB/s)와 고정 메모리(20 GB/s)의 전송 시간 차이를 계산하십시오.</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+            <span style="font-size: 0.9em; color: #6b7280;">효율적인 메모리 관리로 모든 개발자가 AI 가속기의 성능을 극대화</span>
+        </div>
+    </div>
+</body>
+</html>

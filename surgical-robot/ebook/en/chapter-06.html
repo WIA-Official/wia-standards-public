@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Phase 3 - Protocol | WIA-ROB-006</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #10B981; --primary-light: #34d399; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.8rem; margin-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 2rem; margin: 3rem 0 1.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.5rem; margin: 2.5rem 0 1rem; }
+        p { margin: 1.2rem 0; text-align: justify; color: var(--text-secondary); }
+        ul { margin: 1.5rem 0 1.5rem 2.5rem; }
+        li { margin: 0.8rem 0; color: var(--text-secondary); }
+        table { width: 100%; border-collapse: collapse; margin: 2.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 4rem 0 2rem; padding-top: 2rem; border-top: 2px solid var(--border); }
+        .btn { padding: 0.9rem 2rem; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
+        .btn-secondary { background: var(--bg-tertiary); border: 2px solid var(--primary); color: var(--primary); }
+        .key-takeaways, .review-questions { background: rgba(16, 185, 129, 0.15); border: 2px solid var(--primary); border-radius: 10px; padding: 2rem; margin: 3rem 0; }
+        .key-takeaways h3, .review-questions h3 { color: var(--primary); margin-top: 0; margin-bottom: 1.5rem; font-size: 1.8rem; }
+        .state-diagram { background: var(--bg); border: 2px solid var(--primary); padding: 2rem; margin: 2rem 0; border-radius: 10px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Phase 3: Protocol</h1>
+
+        <h2>6.1 Introduction to Surgical Workflow Protocols</h2>
+        <p>
+            Phase 3 of WIA-ROB-006 establishes standardized protocols for surgical workflows, safety procedures, verification checklists, and emergency response. These protocols ensure consistent, safe operation across all certified robotic systems, reducing human error and improving patient outcomes through systematic, validated procedures.
+        </p>
+
+        <h2>6.2 Surgical Workflow State Machines</h2>
+
+        <h3>Primary Workflow States</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>State</th>
+                    <th>Description</th>
+                    <th>Allowed Transitions</th>
+                    <th>Required Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>SETUP</td><td>Robot positioning and draping</td><td>→ INSTRUMENT_INSTALL</td><td>Robot arm positioning, sterile draping</td></tr>
+                <tr><td>INSTRUMENT_INSTALL</td><td>Installing surgical instruments</td><td>→ SYSTEM_CHECK</td><td>Instrument attachment, verification</td></tr>
+                <tr><td>SYSTEM_CHECK</td><td>Pre-operative system verification</td><td>→ TIMEOUT</td><td>Calibration, diagnostics, connectivity test</td></tr>
+                <tr><td>TIMEOUT</td><td>Surgical safety timeout</td><td>→ ACTIVE</td><td>WHO checklist, team verification</td></tr>
+                <tr><td>ACTIVE</td><td>Surgical procedure in progress</td><td>→ CLOSURE, → EMERGENCY</td><td>Surgical tasks, continuous monitoring</td></tr>
+                <tr><td>CLOSURE</td><td>Closing incisions</td><td>→ INSTRUMENT_REMOVAL</td><td>Final hemostasis, closure</td></tr>
+                <tr><td>INSTRUMENT_REMOVAL</td><td>Removing instruments</td><td>→ SIGN_OUT</td><td>Instrument count, removal</td></tr>
+                <tr><td>SIGN_OUT</td><td>Post-operative sign-out</td><td>→ SHUTDOWN</td><td>Final checklist, documentation</td></tr>
+                <tr><td>EMERGENCY</td><td>Emergency stop activated</td><td>→ any state</td><td>Immediate halt, safety assessment</td></tr>
+            </tbody>
+        </table>
+
+        <div class="state-diagram">
+            <pre>
+SETUP → INSTRUMENT_INSTALL → SYSTEM_CHECK → TIMEOUT → ACTIVE
+                                                          ↓
+                                                       CLOSURE
+                                                          ↓
+                                                  INSTRUMENT_REMOVAL
+                                                          ↓
+                                                       SIGN_OUT
+                                                          ↓
+                                                       SHUTDOWN
+
+                        EMERGENCY (can interrupt any state)
+            </pre>
+        </div>
+
+        <h2>6.3 Safety Interlock Mechanisms</h2>
+
+        <h3>Hardware Interlocks</h3>
+        <ul>
+            <li><strong>Foot Pedal Enabling:</strong> Instrument motion only when surgeon foot pedal depressed</li>
+            <li><strong>Dead-man Switch:</strong> Master manipulator sensors detect surgeon hand presence</li>
+            <li><strong>Emergency Stop Buttons:</strong> Hard-wired E-stop accessible from console, patient-side cart, and OR walls</li>
+            <li><strong>Clutch Mechanism:</strong> Physical disengagement separating master from slave when activated</li>
+            <li><strong>Workspace Boundaries:</strong> Hard stops preventing instrument exit from safe workspace volume</li>
+        </ul>
+
+        <h3>Software Interlocks</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Interlock</th>
+                    <th>Trigger Condition</th>
+                    <th>Response Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Collision Detection</td><td>Arm proximity < 50mm</td><td>Stop motion, alert surgeon</td></tr>
+                <tr><td>Force Limit</td><td>Applied force > 10N</td><td>Limit torque, audible warning</td></tr>
+                <tr><td>Velocity Limit</td><td>Speed > 100mm/s</td><td>Reduce velocity, maintain direction</td></tr>
+                <tr><td>Communication Loss</td><td>Telemetry timeout > 100ms</td><td>Freeze position, alert</td></tr>
+                <tr><td>Calibration Drift</td><td>Position error > 2mm</td><td>Disable control, require recalibration</td></tr>
+                <tr><td>Instrument Detachment</td><td>Attachment sensor failure</td><td>Immediate stop, visual/audio alarm</td></tr>
+            </tbody>
+        </table>
+
+        <h2>6.4 Emergency Stop and Failsafe Protocols</h2>
+
+        <h3>E-Stop Activation Sequence</h3>
+        <ol>
+            <li><strong>Immediate Action (< 100ms):</strong> Cut power to all motors, engage mechanical brakes</li>
+            <li><strong>Position Hold:</strong> Maintain current instrument positions via brakes</li>
+            <li><strong>Alert Generation:</strong> Visual and audible alarms throughout OR</li>
+            <li><strong>Event Logging:</strong> Timestamp, triggering condition, system state recorded</li>
+            <li><strong>Notification:</strong> Alert surgical team, biomedical engineering, manufacturer if applicable</li>
+            <li><strong>State Assessment:</strong> System diagnostics determine recovery path</li>
+            <li><strong>Recovery or Conversion:</strong> Resume if safe, otherwise convert to open surgery</li>
+        </ol>
+
+        <h3>Failsafe Behaviors</h3>
+        <ul>
+            <li><strong>Power Loss:</strong> Engage mechanical brakes, maintain instrument positions, activate battery backup for critical systems</li>
+            <li><strong>Network Failure:</strong> Freeze current state, prevent new commands, maintain video stream if possible</li>
+            <li><strong>Software Crash:</strong> Activate watchdog timer, safe state transition, automatic system restart if appropriate</li>
+            <li><strong>Sensor Failure:</strong> Disable affected subsystem, alert operator, switch to degraded mode or stop</li>
+            <li><strong>Instrument Malfunction:</strong> Disable faulty instrument, maintain other instruments, support transition to alternative tools</li>
+        </ul>
+
+        <h2>6.5 Sterile Field Maintenance Procedures</h2>
+
+        <h3>Draping Protocol</h3>
+        <ul>
+            <li>Robot arms draped with sterile covers before entering surgical field</li>
+            <li>Sterile adapter interfaces for instrument attachment</li>
+            <li>Camera and light source covered with sterile sleeves</li>
+            <li>Cable management preventing contamination of sterile field</li>
+            <li>Defined sterile boundary zones marked visually</li>
+        </ul>
+
+        <h3>Instrument Exchange Procedure</h3>
+        <ol>
+            <li>Surgeon requests instrument change via console menu</li>
+            <li>System transitions to INSTRUMENT_EXCHANGE state</li>
+            <li>Affected arm retracts to safe position outside patient</li>
+            <li>Scrub nurse/tech performs sterile instrument exchange</li>
+            <li>System verifies new instrument attachment and type</li>
+            <li>Calibration check confirms proper function</li>
+            <li>System returns to ACTIVE state, surgeon resumes control</li>
+        </ol>
+
+        <h2>6.6 Timeout and Verification Checklists</h2>
+
+        <h3>WHO Surgical Safety Checklist Integration</h3>
+        <p>
+            WIA-ROB-006 extends the WHO Surgical Safety Checklist with robotic-specific items:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Phase</th>
+                    <th>Standard WHO Items</th>
+                    <th>WIA-ROB-006 Additions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Sign In (Before Induction)</td>
+                    <td>Patient identity, procedure, consent verified</td>
+                    <td>Robot system operational, instruments available, emergency conversion plan</td>
+                </tr>
+                <tr>
+                    <td>Time Out (Before Incision)</td>
+                    <td>Team introductions, procedure confirmation</td>
+                    <td>Robot calibrated, workspace boundaries set, E-stop locations confirmed, communication protocols verified</td>
+                </tr>
+                <tr>
+                    <td>Sign Out (Before Closure)</td>
+                    <td>Instrument count, specimen labeling</td>
+                    <td>Robot instrument count, data logging confirmed, equipment function documented</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.7 Alarm Management Protocols</h2>
+
+        <h3>Alarm Priority Levels</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Priority</th>
+                    <th>Response Time</th>
+                    <th>Examples</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Critical (Red)</td>
+                    <td>Immediate</td>
+                    <td>E-stop, power loss, instrument detachment</td>
+                    <td>Automatic system stop, loud alarm, visual alert</td>
+                </tr>
+                <tr>
+                    <td>High (Yellow)</td>
+                    <td>< 30 seconds</td>
+                    <td>Collision warning, force limit approach</td>
+                    <td>Reduce capability, audible warning, require acknowledgment</td>
+                </tr>
+                <tr>
+                    <td>Medium (Blue)</td>
+                    <td>< 2 minutes</td>
+                    <td>Calibration drift, communication latency</td>
+                    <td>Visual notification, log event, plan intervention</td>
+                </tr>
+                <tr>
+                    <td>Low (Green)</td>
+                    <td>Non-urgent</td>
+                    <td>Informational messages, status updates</td>
+                    <td>Display notification, no action required</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.8 Quality Metrics and Documentation</h2>
+
+        <h3>Mandatory Outcome Metrics</h3>
+        <ul>
+            <li><strong>Operative Time:</strong> Total procedure duration, setup time, console time</li>
+            <li><strong>Blood Loss:</strong> Estimated blood loss volume</li>
+            <li><strong>Complications:</strong> Intra-operative and post-operative events</li>
+            <li><strong>Conversion Rate:</strong> Frequency of conversion to open surgery</li>
+            <li><strong>Technical Failures:</strong> System malfunctions, instrument failures</li>
+            <li><strong>E-Stop Events:</strong> Emergency stop activations and reasons</li>
+            <li><strong>Near-Miss Events:</strong> Close calls that didn't result in harm</li>
+            <li><strong>Patient Outcomes:</strong> Length of stay, pain scores, return to activity</li>
+        </ul>
+
+        <h2>6.9 Training and Competency Validation</h2>
+
+        <h3>Surgeon Training Requirements</h3>
+        <ol>
+            <li><strong>Didactic Education:</strong> 8-16 hours covering robotic surgery principles, system operation, complications</li>
+            <li><strong>Simulation Training:</strong> 20-40 hours on certified simulators achieving proficiency benchmarks</li>
+            <li><strong>Animal Lab (Optional):</strong> 5-10 procedures on animal models for complex cases</li>
+            <li><strong>Clinical Observation:</strong> Observe 5-10 robotic procedures by experienced surgeon</li>
+            <li><strong>Proctored Cases:</strong> Perform 10-20 supervised procedures with expert proctor</li>
+            <li><strong>Independent Practice:</strong> 30-50 cases to achieve full proficiency</li>
+            <li><strong>Ongoing Assessment:</strong> Annual competency evaluation and outcomes review</li>
+        </ol>
+
+        <h3>OR Team Training</h3>
+        <ul>
+            <li><strong>Scrub Nurses:</strong> Instrument handling, sterile technique, troubleshooting (8-16 hours)</li>
+            <li><strong>Circulating Nurses:</strong> System setup, documentation, emergency procedures (4-8 hours)</li>
+            <li><strong>Anesthesiologists:</strong> Patient positioning, physiological effects, communication (2-4 hours)</li>
+            <li><strong>Surgical Technicians:</strong> Equipment maintenance, troubleshooting, sterile processing (4-8 hours)</li>
+        </ul>
+
+        <div class="key-takeaways">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>Surgical workflow state machines define nine primary states (SETUP → TIMEOUT → ACTIVE → CLOSURE → SHUTDOWN) with clear transition criteria and required actions.</li>
+                <li>Safety interlocks include hardware mechanisms (foot pedals, E-stop, clutch) and software checks (collision detection, force limits, communication monitoring).</li>
+                <li>Emergency stop protocols ensure < 100ms response time with mechanical brakes, position hold, comprehensive logging, and safe recovery or conversion.</li>
+                <li>WHO Surgical Safety Checklist extended with robotic-specific verification items covering system status, calibration, workspace boundaries, and emergency plans.</li>
+                <li>Alarm management defines four priority levels (Critical, High, Medium, Low) with specific response times and actions for each category.</li>
+                <li>Mandatory outcome metrics include operative time, complications, conversion rate, technical failures, and patient outcomes for continuous quality improvement.</li>
+                <li>Comprehensive training requirements for surgeons (80-150 hours total) and OR teams ensure competent, safe robotic surgery practice.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Trace the complete state machine workflow from SETUP to SHUTDOWN. What happens if EMERGENCY state is triggered during ACTIVE state?</li>
+                <li>Explain the difference between hardware and software safety interlocks. Why are both necessary?</li>
+                <li>Describe the emergency stop activation sequence. Why is < 100ms response time critical?</li>
+                <li>How does WIA-ROB-006 extend the WHO Surgical Safety Checklist? Provide specific robotic-specific additions for each phase.</li>
+                <li>Analyze the alarm priority system. What criteria determine whether an alarm is Critical vs. High priority?</li>
+                <li>Design a failsafe response for complete network failure during active surgery. What information must be preserved and how should the system behave?</li>
+                <li>Explain the sterile instrument exchange procedure. What verification steps prevent surgical site infection?</li>
+                <li>Calculate the total training hours required for a surgeon with no robotic experience to achieve independent practice competency.</li>
+                <li>Why are mandatory outcome metrics essential for WIA-ROB-006 compliance? How do they support continuous improvement?</li>
+                <li>Critically evaluate whether the training requirements specified by WIA-ROB-006 are sufficient to ensure patient safety. What additional measures might be needed?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

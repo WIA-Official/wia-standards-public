@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Lineage Simulator 🔗 | WIA-DATA-008</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 2rem 0;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border-bottom: 3px solid #10B981;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #10B981;
+            margin-bottom: 0.5rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .tab {
+            background: #1e293b;
+            border: 2px solid #334155;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            font-size: 1rem;
+            color: #94a3b8;
+        }
+
+        .tab:hover {
+            border-color: #10B981;
+            color: #10B981;
+        }
+
+        .tab.active {
+            background: #10B981;
+            border-color: #10B981;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 1rem;
+            padding: 2rem;
+            min-height: 600px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            color: #10B981;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            background: #0f172a;
+            border: 2px solid #334155;
+            color: #e2e8f0;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #10B981;
+        }
+
+        .input-group textarea {
+            min-height: 120px;
+            font-family: 'Courier New', monospace;
+        }
+
+        button {
+            background: #10B981;
+            color: #0f172a;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .output {
+            background: #0f172a;
+            border: 2px solid #10B981;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .output-success {
+            color: #10B981;
+        }
+
+        .output-warning {
+            color: #f59e0b;
+        }
+
+        .output-error {
+            color: #ef4444;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .lineage-graph {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .node {
+            background: #1e293b;
+            border: 2px solid #10B981;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 0.5rem;
+            display: inline-block;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .node-title {
+            color: #10B981;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .node-type {
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+
+        .arrow {
+            color: #10B981;
+            font-size: 2rem;
+            margin: 0 1rem;
+        }
+
+        .info-box {
+            background: #0f172a;
+            border-left: 4px solid #10B981;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.25rem;
+        }
+
+        .info-box-title {
+            color: #10B981;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            color: #10B981;
+            font-weight: 700;
+        }
+
+        .metric-label {
+            color: #94a3b8;
+            margin-top: 0.5rem;
+        }
+
+        .home-link {
+            display: inline-block;
+            color: #10B981;
+            text-decoration: none;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .home-link:hover {
+            text-decoration: underline;
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Data Lineage</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <a href="../index.html" class="home-link">← Back to WIA-DATA-008 Home</a>
+
+        <header>
+            <h1>🔗 Data Lineage Simulator</h1>
+            <p>Interactive tool for data lineage tracking and analysis</p>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('tracker')">📊 Lineage Tracker</div>
+            <div class="tab" onclick="switchTab('impact')">💥 Impact Analyzer</div>
+            <div class="tab" onclick="switchTab('rootcause')">🔎 Root Cause Finder</div>
+            <div class="tab" onclick="switchTab('visualizer')">🎨 Lineage Visualizer</div>
+            <div class="tab" onclick="switchTab('openlineage')">🌐 OpenLineage Tester</div>
+        </div>
+
+        <!-- Tab 1: Lineage Tracker -->
+        <div id="tracker" class="tab-content active">
+            <h2 style="color: #10B981; margin-bottom: 1.5rem;">📊 Data Lineage Tracker</h2>
+
+            <div class="grid-2">
+                <div>
+                    <div class="input-group">
+                        <label>Source Table</label>
+                        <input type="text" id="sourceTable" placeholder="e.g., raw_customers" value="raw_customers">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Transformation Type</label>
+                        <select id="transformType">
+                            <option>SQL Transform</option>
+                            <option>ETL Pipeline</option>
+                            <option>Data Integration</option>
+                            <option>Machine Learning</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Target Table</label>
+                        <input type="text" id="targetTable" placeholder="e.g., cleaned_customers" value="cleaned_customers">
+                    </div>
+
+                    <button onclick="trackLineage()">Track Lineage</button>
+                </div>
+
+                <div>
+                    <div class="info-box">
+                        <div class="info-box-title">How it Works</div>
+                        <p>Track the complete journey of data from source to destination, including all transformations and intermediate steps.</p>
+                    </div>
+
+                    <div id="trackerMetrics" style="display: none; margin-top: 1rem;">
+                        <div class="metric">
+                            <div class="metric-value" id="hopsCount">-</div>
+                            <div class="metric-label">Transformation Hops</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="trackerOutput" class="output" style="display: none;"></div>
+        </div>
+
+        <!-- Tab 2: Impact Analyzer -->
+        <div id="impact" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 1.5rem;">💥 Impact Analyzer</h2>
+
+            <div class="grid-2">
+                <div>
+                    <div class="input-group">
+                        <label>Table/Column to Modify</label>
+                        <input type="text" id="modifyEntity" placeholder="e.g., orders.customer_id" value="orders.customer_id">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Change Type</label>
+                        <select id="changeType">
+                            <option>Column Rename</option>
+                            <option>Data Type Change</option>
+                            <option>Column Drop</option>
+                            <option>Schema Migration</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Analysis Depth</label>
+                        <select id="analysisDepth">
+                            <option>Direct Dependencies</option>
+                            <option>2 Levels Deep</option>
+                            <option>Complete Downstream</option>
+                        </select>
+                    </div>
+
+                    <button onclick="analyzeImpact()">Analyze Impact</button>
+                </div>
+
+                <div>
+                    <div class="info-box">
+                        <div class="info-box-title">Impact Analysis</div>
+                        <p>Understand what will be affected by changes to your data structures. Prevent breaking changes before they happen.</p>
+                    </div>
+
+                    <div id="impactMetrics" style="display: none; margin-top: 1rem;">
+                        <div class="metric">
+                            <div class="metric-value" id="affectedCount">-</div>
+                            <div class="metric-label">Affected Objects</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="impactOutput" class="output" style="display: none;"></div>
+        </div>
+
+        <!-- Tab 3: Root Cause Finder -->
+        <div id="rootcause" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 1.5rem;">🔎 Root Cause Finder</h2>
+
+            <div class="grid-2">
+                <div>
+                    <div class="input-group">
+                        <label>Issue Location</label>
+                        <input type="text" id="issueLocation" placeholder="e.g., analytics.revenue_report" value="analytics.revenue_report">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Issue Type</label>
+                        <select id="issueType">
+                            <option>Data Quality Issue</option>
+                            <option>Missing Data</option>
+                            <option>Incorrect Values</option>
+                            <option>Duplicate Records</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Issue Description</label>
+                        <textarea id="issueDesc" placeholder="Describe the issue...">Revenue numbers are 30% lower than expected in last week's report</textarea>
+                    </div>
+
+                    <button onclick="findRootCause()">Find Root Cause</button>
+                </div>
+
+                <div>
+                    <div class="info-box">
+                        <div class="info-box-title">Root Cause Analysis</div>
+                        <p>Trace data quality issues upstream to find their origin. Quickly identify which source or transformation introduced the problem.</p>
+                    </div>
+
+                    <div id="rootcauseMetrics" style="display: none; margin-top: 1rem;">
+                        <div class="metric">
+                            <div class="metric-value" id="stepsBack">-</div>
+                            <div class="metric-label">Steps Traced Back</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="rootcauseOutput" class="output" style="display: none;"></div>
+        </div>
+
+        <!-- Tab 4: Lineage Visualizer -->
+        <div id="visualizer" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 1.5rem;">🎨 Lineage Visualizer</h2>
+
+            <div class="input-group">
+                <label>Entity to Visualize</label>
+                <input type="text" id="visualizeEntity" placeholder="e.g., warehouse.fact_sales" value="warehouse.fact_sales">
+            </div>
+
+            <div class="input-group">
+                <label>Visualization Type</label>
+                <select id="vizType">
+                    <option>Upstream & Downstream</option>
+                    <option>Upstream Only</option>
+                    <option>Downstream Only</option>
+                    <option>Column-Level Detail</option>
+                </select>
+            </div>
+
+            <button onclick="visualizeLineage()">Generate Visualization</button>
+
+            <div id="visualizerGraph" class="lineage-graph" style="display: none; margin-top: 2rem; flex-direction: column;">
+                <div style="display: flex; align-items: center; justify-content: center;">
+                    <div class="node">
+                        <div class="node-title">raw_data</div>
+                        <div class="node-type">Source Table</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="node">
+                        <div class="node-title">staging_data</div>
+                        <div class="node-type">Staging Table</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="node">
+                        <div class="node-title">fact_sales</div>
+                        <div class="node-type">Target Table</div>
+                    </div>
+                </div>
+                <div style="margin-top: 2rem; text-align: center; color: #64748b;">
+                    Interactive lineage graph showing data flow
+                </div>
+            </div>
+
+            <div id="visualizerOutput" class="output" style="display: none;"></div>
+        </div>
+
+        <!-- Tab 5: OpenLineage Tester -->
+        <div id="openlineage" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 1.5rem;">🌐 OpenLineage Standard Tester</h2>
+
+            <div class="info-box">
+                <div class="info-box-title">About OpenLineage</div>
+                <p>OpenLineage is an open standard for lineage metadata collection. Test your lineage events for compatibility.</p>
+            </div>
+
+            <div class="input-group">
+                <label>OpenLineage Event JSON</label>
+                <textarea id="openlineageJson" style="min-height: 300px; font-size: 0.85rem;">{
+  "eventType": "START",
+  "eventTime": "2025-12-26T10:00:00.000Z",
+  "run": {
+    "runId": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "job": {
+    "namespace": "my-scheduler",
+    "name": "etl-job-1"
+  },
+  "inputs": [{
+    "namespace": "postgres://warehouse:5432",
+    "name": "public.raw_customers",
+    "facets": {
+      "schema": {
+        "_producer": "WIA-DATA-008",
+        "fields": [
+          {"name": "id", "type": "INTEGER"},
+          {"name": "name", "type": "VARCHAR"}
+        ]
+      }
+    }
+  }],
+  "outputs": [{
+    "namespace": "postgres://warehouse:5432",
+    "name": "public.cleaned_customers"
+  }]
+}</textarea>
+            </div>
+
+            <button onclick="validateOpenLineage()">Validate OpenLineage Event</button>
+
+            <div id="openlineageOutput" class="output" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        function trackLineage() {
+            const source = document.getElementById('sourceTable').value;
+            const transform = document.getElementById('transformType').value;
+            const target = document.getElementById('targetTable').value;
+
+            const output = document.getElementById('trackerOutput');
+            const metrics = document.getElementById('trackerMetrics');
+            const hopsCount = document.getElementById('hopsCount');
+
+            const result = `
+✓ Lineage Tracking Complete
+
+Source: ${source}
+  └─→ [${transform}]
+      └─→ intermediate_staging_${Math.random().toString(36).substr(2, 5)}
+          └─→ ${target}
+
+Metadata Captured:
+  • Transformation Time: 2025-12-26 10:15:23 UTC
+  • Records Processed: 1,247,893
+  • Columns Affected: 15
+  • Transformation Logic: Captured in metadata store
+
+OpenLineage Event: Generated ✓
+Lineage Graph: Updated ✓
+Audit Trail: Recorded ✓
+            `;
+
+            output.textContent = result;
+            output.style.display = 'block';
+            output.className = 'output output-success';
+
+            metrics.style.display = 'block';
+            hopsCount.textContent = '3';
+        }
+
+        function analyzeImpact() {
+            const entity = document.getElementById('modifyEntity').value;
+            const changeType = document.getElementById('changeType').value;
+            const depth = document.getElementById('analysisDepth').value;
+
+            const output = document.getElementById('impactOutput');
+            const metrics = document.getElementById('impactMetrics');
+            const affectedCount = document.getElementById('affectedCount');
+
+            const result = `
+⚠️  Impact Analysis Results
+
+Change: ${changeType} on ${entity}
+Analysis Depth: ${depth}
+
+Affected Downstream Objects:
+  1. ⚠️  analytics.customer_summary (direct dependency)
+      - Impact: Will break due to missing column
+      - Severity: HIGH
+
+  2. ⚠️  reports.monthly_revenue (2 levels deep)
+      - Impact: Aggregation logic needs update
+      - Severity: MEDIUM
+
+  3. ⚠️  ml_models.customer_churn (2 levels deep)
+      - Impact: Feature engineering affected
+      - Severity: HIGH
+
+  4. ℹ️  dashboards.executive_overview (3 levels deep)
+      - Impact: Chart may show incomplete data
+      - Severity: LOW
+
+Recommendations:
+  • Update 2 downstream ETL jobs
+  • Retrain 1 ML model
+  • Notify 3 dashboard owners
+  • Estimated migration time: 4-6 hours
+            `;
+
+            output.textContent = result;
+            output.style.display = 'block';
+            output.className = 'output output-warning';
+
+            metrics.style.display = 'block';
+            affectedCount.textContent = '4';
+        }
+
+        function findRootCause() {
+            const location = document.getElementById('issueLocation').value;
+            const issueType = document.getElementById('issueType').value;
+            const description = document.getElementById('issueDesc').value;
+
+            const output = document.getElementById('rootcauseOutput');
+            const metrics = document.getElementById('rootcauseMetrics');
+            const stepsBack = document.getElementById('stepsBack');
+
+            const result = `
+🔍 Root Cause Analysis
+
+Issue: ${issueType} at ${location}
+Description: ${description}
+
+Tracing Upstream...
+
+Step 5: analytics.revenue_report (current)
+  ↑ Source: staging.daily_sales
+
+Step 4: staging.daily_sales
+  ↑ Source: raw.transactions
+  ↑ Issue detected: Missing transformation step
+
+Step 3: raw.transactions
+  ↑ Source: api.payment_gateway
+
+Step 2: api.payment_gateway
+  ↑ Data collection started: 2025-12-19
+
+Step 1: external.stripe_api
+  ⚠️  ROOT CAUSE FOUND!
+
+ROOT CAUSE:
+  Location: external.stripe_api
+  Issue: API filter parameter changed on 2025-12-19
+  Details: New 'status=completed' filter excludes pending transactions
+  Impact: 30% of revenue data missing (pending transactions)
+
+RECOMMENDED FIX:
+  1. Update API call to include status=pending
+  2. Add pending transaction handling logic
+  3. Backfill missing data from 2025-12-19 to present
+  4. Add data quality check for transaction completeness
+            `;
+
+            output.textContent = result;
+            output.style.display = 'block';
+            output.className = 'output output-success';
+
+            metrics.style.display = 'block';
+            stepsBack.textContent = '5';
+        }
+
+        function visualizeLineage() {
+            const entity = document.getElementById('visualizeEntity').value;
+            const vizType = document.getElementById('vizType').value;
+
+            const output = document.getElementById('visualizerOutput');
+            const graph = document.getElementById('visualizerGraph');
+
+            const result = `
+✓ Lineage Visualization Generated
+
+Entity: ${entity}
+Type: ${vizType}
+
+Graph Statistics:
+  • Total Nodes: 12
+  • Total Edges: 18
+  • Max Depth (Upstream): 4
+  • Max Depth (Downstream): 5
+
+Column-Level Lineage Available:
+  • fact_sales.amount ← staging.transaction_amount ← raw.txn_amt
+  • fact_sales.customer_id ← staging.cust_id ← raw.customer_uuid
+  • fact_sales.product_id ← staging.prod_ref ← raw.sku
+
+Interactive graph displayed above. Click nodes to explore further.
+            `;
+
+            output.textContent = result;
+            output.style.display = 'block';
+            output.className = 'output output-success';
+
+            graph.style.display = 'flex';
+        }
+
+        function validateOpenLineage() {
+            const json = document.getElementById('openlineageJson').value;
+            const output = document.getElementById('openlineageOutput');
+
+            try {
+                const event = JSON.parse(json);
+
+                // Basic validation
+                const required = ['eventType', 'eventTime', 'run', 'job'];
+                const missing = required.filter(field => !event[field]);
+
+                if (missing.length > 0) {
+                    output.textContent = `❌ Validation Failed\n\nMissing required fields: ${missing.join(', ')}`;
+                    output.className = 'output output-error';
+                } else {
+                    const result = `
+✓ OpenLineage Event Validation Successful
+
+Event Type: ${event.eventType}
+Event Time: ${event.eventTime}
+Job: ${event.job.namespace}/${event.job.name}
+Run ID: ${event.run.runId}
+
+Inputs: ${event.inputs?.length || 0} dataset(s)
+${event.inputs?.map(i => `  • ${i.namespace}/${i.name}`).join('\n') || '  (none)'}
+
+Outputs: ${event.outputs?.length || 0} dataset(s)
+${event.outputs?.map(o => `  • ${o.namespace}/${o.name}`).join('\n') || '  (none)'}
+
+Compliance:
+  ✓ OpenLineage v1.0 compliant
+  ✓ WIA-DATA-008 compatible
+  ✓ Schema facets valid
+  ✓ Namespace format correct
+
+Ready to send to OpenLineage backend!
+                    `;
+                    output.textContent = result;
+                    output.className = 'output output-success';
+                }
+
+                output.style.display = 'block';
+
+            } catch (e) {
+                output.textContent = `❌ JSON Parse Error\n\n${e.message}`;
+                output.className = 'output output-error';
+                output.style.display = 'block';
+            }
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

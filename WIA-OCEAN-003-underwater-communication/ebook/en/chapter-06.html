@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Data Encoding and Error Correction | WIA-OCEAN-003</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #0EA5E9; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: white; text-decoration: none; border-radius: 5px; }
+        .btn:hover { background: var(--success); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 6</p>
+        <h1>Data Encoding and Error Correction</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Fighting the noise: advanced coding techniques that detect and correct errors from multipath, fading, and interference to ensure reliable data delivery through the hostile underwater channel.
+        </p>
+
+        <h2>The Need for Error Correction</h2>
+        <p>
+            Underwater channels exhibit bit error rates (BER) of 10⁻³ to 10⁻² without coding—1000 to 10,000 times worse than fiber optics. Multipath creates inter-symbol interference, ambient noise corrupts weak signals, and Doppler spread introduces frequency errors. Forward error correction (FEC) codes add redundancy, enabling receivers to detect and correct errors without retransmission.
+        </p>
+        <p>
+            WIA-OCEAN-003 mandates minimum coding gains and specifies approved FEC schemes. Target BER after decoding: <10⁻⁶ for data, <10⁻⁹ for critical command/control.
+        </p>
+
+        <h2>Block Codes</h2>
+        <p>
+            Block codes encode k data bits into n code bits (n > k), adding n-k redundancy bits. The code rate R = k/n indicates efficiency (R=0.5 means 50% overhead).
+        </p>
+
+        <h3>Hamming Codes</h3>
+        <p>
+            Classic block codes that correct single-bit errors using parity checks. Hamming(7,4) encodes 4 data bits into 7 coded bits, achieving single error correction. Simple to implement but limited error correction capability—unsuitable for harsh underwater channels.
+        </p>
+
+        <h3>Reed-Solomon (RS) Codes</h3>
+        <p>
+            RS codes operate on symbols (groups of bits) rather than individual bits, making them highly effective against burst errors. RS(255,223) encodes 223 bytes into 255 bytes, correcting up to 16 byte errors. Widely used in underwater acoustic modems due to excellent burst error performance.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Code</th><th>Parameters</th><th>Rate</th><th>Correction Capability</th><th>Best For</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Hamming(7,4)</td><td>n=7, k=4</td><td>0.57</td><td>1-bit errors</td><td>Low-noise channels</td></tr>
+                <tr><td>RS(255,223)</td><td>n=255, k=223</td><td>0.875</td><td>16 symbol bursts</td><td>Burst errors</td></tr>
+                <tr><td>BCH(127,64)</td><td>n=127, k=64</td><td>0.504</td><td>10-bit errors</td><td>Random errors</td></tr>
+                <tr><td>Turbo(1/3)</td><td>Variable</td><td>0.33</td><td>Near Shannon limit</td><td>Very noisy channels</td></tr>
+                <tr><td>LDPC(1/2)</td><td>Variable</td><td>0.50</td><td>Near Shannon limit</td><td>OFDM systems</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Convolutional Codes</h2>
+        <p>
+            Convolutional codes encode data continuously using shift registers and modulo-2 adders. The Viterbi algorithm performs maximum likelihood decoding, finding the most probable transmitted sequence. Constraint length K determines memory and complexity—typical underwater systems use K=7 to K=9.
+        </p>
+
+        <h3>Punctured Convolutional Codes</h3>
+        <p>
+            Puncturing periodically deletes coded bits to increase code rate while retaining most coding gain. Rate-1/2 code punctured to rate-2/3 or 3/4 provides flexible trade-off between throughput and robustness. WIA-OCEAN-003 specifies puncture patterns for common rates.
+        </p>
+
+        <h2>Turbo Codes and LDPC</h2>
+        <p>
+            Modern iterative codes approach the Shannon limit—the theoretical maximum channel capacity. Turbo codes and low-density parity-check (LDPC) codes achieve <1 dB from Shannon limit with reasonable complexity.
+        </p>
+
+        <h3>Turbo Codes</h3>
+        <p>
+            Two parallel convolutional encoders with an interleaver between them create a powerful code. Iterative decoding exchanges probability information between decoders, refining estimates with each iteration. Typical systems use 4-8 iterations for BER <10⁻⁶. Excellent for low SNR but high latency due to iteration.
+        </p>
+
+        <h3>LDPC Codes</h3>
+        <p>
+            LDPC codes use sparse parity-check matrices, enabling efficient decoding via belief propagation. Parallelizable decoder suits FPGA/ASIC implementation. LDPC outperforms Turbo codes slightly and offers lower decoding latency—ideal for real-time acoustic OFDM systems.
+        </p>
+
+        <div class="info-box">
+            <h3>TypeScript Implementation: Reed-Solomon Encoder</h3>
+            <pre><code>// Simplified RS(7,3) encoder over GF(8) for demonstration
+class ReedSolomonEncoder {
+  private n: number = 7;  // Codeword length
+  private k: number = 3;  // Data symbols
+  private t: number = 2;  // Error correction capability = (n-k)/2
+
+  // Galois Field GF(8) primitive polynomial: x^3 + x + 1
+  private gfExp: number[] = [1, 2, 4, 3, 6, 7, 5, 1];  // Powers of alpha
+  private gfLog: number[] = [0, 0, 1, 3, 2, 6, 4, 5];  // Logarithm table
+
+  encode(dataSymbols: number[]): number[] {
+    if (dataSymbols.length !== this.k) {
+      throw new Error(\`Expected \${this.k} data symbols\`);
+    }
+
+    // Generator polynomial for 2-error correction
+    const generator = this.getGenerator();
+
+    // Multiply data by x^(n-k) (shift left by n-k positions)
+    const message = [...dataSymbols, 0, 0, 0, 0];
+
+    // Divide by generator polynomial, get remainder
+    const remainder = this.polyDivide(message, generator);
+
+    // Codeword = data || remainder
+    return [...dataSymbols, ...remainder.slice(0, this.n - this.k)];
+  }
+
+  private getGenerator(): number[] {
+    // Generator g(x) = (x - alpha^1)(x - alpha^2)(x - alpha^3)(x - alpha^4)
+    // For RS(7,3), we need 4 roots
+    let g = [1];  // Start with 1
+
+    for (let i = 1; i <= 2 * this.t; i++) {
+      // Multiply by (x - alpha^i)
+      g = this.polyMultiply(g, [1, this.gfExp[i % 7]]);
+    }
+
+    return g;
+  }
+
+  private polyMultiply(p1: number[], p2: number[]): number[] {
+    const result = new Array(p1.length + p2.length - 1).fill(0);
+
+    for (let i = 0; i < p1.length; i++) {
+      for (let j = 0; j < p2.length; j++) {
+        result[i + j] ^= this.gfMultiply(p1[i], p2[j]);
+      }
+    }
+
+    return result;
+  }
+
+  private polyDivide(dividend: number[], divisor: number[]): number[] {
+    const result = [...dividend];
+
+    for (let i = 0; i < dividend.length - divisor.length + 1; i++) {
+      if (result[i] !== 0) {
+        const coef = result[i];
+        for (let j = 0; j < divisor.length; j++) {
+          result[i + j] ^= this.gfMultiply(coef, divisor[j]);
+        }
+      }
+    }
+
+    return result.slice(-(this.n - this.k));
+  }
+
+  private gfMultiply(a: number, b: number): number {
+    if (a === 0 || b === 0) return 0;
+    return this.gfExp[(this.gfLog[a] + this.gfLog[b]) % 7];
+  }
+
+  // Error correction (simplified syndrome decoding)
+  decode(received: number[]): { corrected: number[], errors: number } {
+    // Calculate syndromes
+    const syndromes = this.calculateSyndromes(received);
+
+    // If all syndromes zero, no errors
+    if (syndromes.every(s => s === 0)) {
+      return { corrected: received.slice(0, this.k), errors: 0 };
+    }
+
+    // Error locator polynomial (Berlekamp-Massey algorithm)
+    // Simplified: assume single error for demonstration
+    const errorLocation = this.findErrorLocation(syndromes);
+    const errorValue = syndromes[0];
+
+    const corrected = [...received];
+    if (errorLocation >= 0) {
+      corrected[errorLocation] ^= errorValue;
+    }
+
+    return {
+      corrected: corrected.slice(0, this.k),
+      errors: errorLocation >= 0 ? 1 : -1
+    };
+  }
+
+  private calculateSyndromes(received: number[]): number[] {
+    const syndromes: number[] = [];
+
+    for (let i = 1; i <= 2 * this.t; i++) {
+      let syndrome = 0;
+      for (let j = 0; j < received.length; j++) {
+        syndrome ^= this.gfMultiply(
+          received[j],
+          this.gfExp[(i * j) % 7]
+        );
+      }
+      syndromes.push(syndrome);
+    }
+
+    return syndromes;
+  }
+
+  private findErrorLocation(syndromes: number[]): number {
+    // Simplified: search for single error location
+    for (let i = 0; i < this.n; i++) {
+      let match = true;
+      for (let j = 0; j < syndromes.length; j++) {
+        const expected = this.gfMultiply(
+          syndromes[0],
+          this.gfExp[(j * i) % 7]
+        );
+        if (syndromes[j] !== expected) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return i;
+    }
+    return -1; // Uncorrectable
+  }
+}</code></pre>
+        </div>
+
+        <h2>Interleaving</h2>
+        <p>
+            Multipath fading creates burst errors—consecutive symbols corrupted by a deep fade. Interleaving spreads codeword symbols across time/frequency, converting burst errors into isolated errors that FEC codes handle better. Block interleavers rearrange symbols in a matrix; convolutional interleavers use shift registers.
+        </p>
+
+        <h3>Depth-Time Interleaving</h3>
+        <p>
+            For OFDM systems, interleaving across both OFDM symbols (time) and subcarriers (frequency) provides diversity against time-selective and frequency-selective fading. WIA-OCEAN-003 specifies minimum interleaver depths based on channel coherence time and bandwidth.
+        </p>
+
+        <h2>Automatic Repeat Request (ARQ)</h2>
+        <p>
+            ARQ combines error detection (CRC, checksum) with retransmission. Three basic schemes:
+        </p>
+        <ul>
+            <li><strong>Stop-and-Wait:</strong> Send one packet, wait for ACK. Simple but inefficient with long delays.</li>
+            <li><strong>Go-Back-N:</strong> Send N packets without waiting, retransmit from error point. Better throughput.</li>
+            <li><strong>Selective Repeat:</strong> Retransmit only erroneous packets. Best throughput but complex buffering.</li>
+        </ul>
+
+        <h3>Hybrid ARQ</h3>
+        <p>
+            Combines FEC with ARQ. Type-I HARQ: FEC detects/corrects; if fail, ARQ requests retransmission. Type-II/III HARQ: Initial transmission uses low-redundancy code; retransmissions send additional parity for incremental redundancy.
+        </p>
+
+        <h2>WIA-OCEAN-003 Coding Requirements</h2>
+        <p>
+            The standard mandates minimum coding performance for certification:
+        </p>
+        <table>
+            <thead>
+                <tr><th>Application</th><th>Target BER</th><th>Min Coding Gain</th><th>Recommended Codes</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Sensor Data</td><td><10⁻⁶</td><td>5 dB</td><td>RS(255,223) + Convolutional</td></tr>
+                <tr><td>Voice/Video</td><td><10⁻⁴</td><td>3 dB</td><td>Punctured Convolutional</td></tr>
+                <tr><td>Command/Control</td><td><10⁻⁹</td><td>7 dB</td><td>Turbo or LDPC + ARQ</td></tr>
+                <tr><td>File Transfer</td><td>0 errors</td><td>N/A</td><td>Any FEC + ARQ</td></tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <h3>Summary: Key Takeaways</h3>
+            <ul>
+                <li><strong>High Error Rates:</strong> Underwater BER 10⁻³–10⁻² requires strong FEC for reliable communication</li>
+                <li><strong>Block Codes:</strong> RS codes excel at burst errors from fading; simple implementation</li>
+                <li><strong>Convolutional Codes:</strong> Viterbi decoding provides good performance/complexity trade-off</li>
+                <li><strong>Advanced Codes:</strong> Turbo and LDPC approach Shannon limit; essential for low SNR</li>
+                <li><strong>Interleaving:</strong> Converts burst errors to random errors for better FEC performance</li>
+                <li><strong>Hybrid ARQ:</strong> Combines FEC and retransmission for guaranteed reliability</li>
+                <li><strong>WIA-OCEAN-003:</strong> Specifies codes and target BER for different applications</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+        <div class="info-box">
+            <ol>
+                <li>A channel has 10⁻² BER. What RS code parameters would achieve <10⁻⁶ BER after decoding?</li>
+                <li>Explain why RS codes outperform Hamming codes for burst errors. Use an example.</li>
+                <li>Calculate the throughput of Stop-and-Wait ARQ on a 10 km acoustic link at 1 kbps with 10% packet loss.</li>
+                <li>Why do Turbo codes require iteration? What determines the number of iterations needed?</li>
+                <li>Design an interleaver for OFDM with 100 subcarriers and 50 ms coherence time. What depth?</li>
+                <li>Compare Type-I and Type-II HARQ for underwater channels. Which is better and why?</li>
+                <li>What is the Shannon limit and why can't FEC codes exceed it?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 모델 편향 분석 | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="chapter-number">4장</div>
+            <h1>모델 편향 분석</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            모델이 학습된 후에는 예측에서 편향을 나타내는지 평가해야 합니다. 이 장에서는
+            학습된 모델을 분석하여 인구통계학적 그룹 전체에 걸쳐 편향을 탐지하고 정량화하는 기술을 다룹니다.
+        </p>
+
+        <h2>모델 분석 소개</h2>
+        <p>
+            깨끗한 데이터가 있더라도 모델은 학습 프로세스를 통해 편향을 학습하고 증폭시킬 수 있습니다.
+            모든 사용자에게 공평하게 이익이 되는 공정한 AI 시스템을 보장하려면 체계적인 모델 분석이
+            필수적입니다.
+        </p>
+
+        <h2>분리된 성능 평가</h2>
+        <p>
+            모델 편향 탐지의 기초는 집계된 지표만 보는 대신 각 인구통계학적 그룹에 대해 별도로
+            성능을 평가하는 것입니다.
+        </p>
+
+        <pre><code># 분리된 평가 프레임워크
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+def disaggregated_evaluation(model, X_test, y_test, protected_attr):
+    """
+    각 그룹에 대해 별도로 모델 성능 평가
+    """
+    groups = np.unique(protected_attr)
+    y_pred = model.predict(X_test)
+
+    print("분리된 성능 평가")
+    print("=" * 80)
+    print(f"{'그룹':<15} {'정확도':<12} {'정밀도':<12} {'재현율':<12} {'F1 점수':<12}")
+    print("-" * 80)
+
+    results = {}
+    for group in groups:
+        mask = protected_attr == group
+
+        acc = accuracy_score(y_test[mask], y_pred[mask])
+        prec = precision_score(y_test[mask], y_pred[mask], zero_division=0)
+        rec = recall_score(y_test[mask], y_pred[mask], zero_division=0)
+        f1 = f1_score(y_test[mask], y_pred[mask], zero_division=0)
+
+        results[group] = {'accuracy': acc, 'precision': prec, 'recall': rec, 'f1': f1}
+        print(f"{group:<15} {acc:<12.3f} {prec:<12.3f} {rec:<12.3f} {f1:<12.3f}")
+
+    # 불균형 계산
+    print("\n" + "=" * 80)
+    print("성능 불균형")
+    print("-" * 80)
+
+    for metric in ['accuracy', 'precision', 'recall', 'f1']:
+        values = [r[metric] for r in results.values()]
+        disparity = max(values) - min(values)
+        status = "⚠️ 높음" if disparity > 0.1 else "✓ 양호"
+        print(f"{metric.capitalize():<15} 불균형: {disparity:.3f} {status}")
+
+    return results
+</code></pre>
+
+        <h2>그룹별 혼동 행렬 분석</h2>
+        <p>
+            각 그룹에 대한 혼동 행렬을 검사하면 오류가 어떻게 분산되어 있는지에 대한 패턴이 드러납니다.
+        </p>
+
+        <pre><code># 그룹별 혼동 행렬
+from sklearn.metrics import confusion_matrix
+
+def confusion_matrix_by_group(y_true, y_pred, protected_attr):
+    """
+    각 인구통계학적 그룹에 대한 혼동 행렬 생성
+    """
+    groups = np.unique(protected_attr)
+
+    print("그룹별 혼동 행렬")
+    print("=" * 60)
+
+    for group in groups:
+        mask = protected_attr == group
+        cm = confusion_matrix(y_true[mask], y_pred[mask])
+
+        tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
+
+        print(f"\n{group}:")
+        print(f"  진음성:  {tn:>6}  |  위양성: {fp:>6}")
+        print(f"  위음성: {fn:>6}  |  진양성:  {tp:>6}")
+
+        # 비율 계산
+        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+        tnr = tn / (tn + fp) if (tn + fp) > 0 else 0
+        fnr = fn / (fn + tp) if (fn + tp) > 0 else 0
+
+        print(f"  TPR: {tpr:.3f}  FPR: {fpr:.3f}  TNR: {tnr:.3f}  FNR: {fnr:.3f}")
+
+    return True
+</code></pre>
+
+        <h2>결정 임계값 분석</h2>
+        <p>
+            확률적 분류기의 경우 결정 임계값이 공정성에 큰 영향을 미칠 수 있습니다.
+            공정성 기준을 달성하기 위해 다른 그룹에 대해 다른 임계값이 필요할 수 있습니다.
+        </p>
+
+        <pre><code># 공정성을 위한 임계값 최적화
+def analyze_thresholds(model, X_test, y_test, protected_attr, metric='tpr'):
+    """
+    다른 임계값이 공정성에 어떤 영향을 미치는지 분석
+    """
+    y_proba = model.predict_proba(X_test)[:, 1]
+    groups = np.unique(protected_attr)
+
+    thresholds = np.linspace(0, 1, 101)
+    results = {group: [] for group in groups}
+
+    for threshold in thresholds:
+        y_pred = (y_proba >= threshold).astype(int)
+
+        for group in groups:
+            mask = protected_attr == group
+
+            if metric == 'tpr':
+                tp = np.sum((y_test[mask] == 1) & (y_pred[mask] == 1))
+                fn = np.sum((y_test[mask] == 1) & (y_pred[mask] == 0))
+                value = tp / (tp + fn) if (tp + fn) > 0 else 0
+            elif metric == 'fpr':
+                fp = np.sum((y_test[mask] == 0) & (y_pred[mask] == 1))
+                tn = np.sum((y_test[mask] == 0) & (y_pred[mask] == 0))
+                value = fp / (fp + tn) if (fp + tn) > 0 else 0
+
+            results[group].append(value)
+
+    # 공정성을 위한 최적 임계값 찾기
+    min_disparity = float('inf')
+    best_threshold = 0.5
+
+    for i, threshold in enumerate(thresholds):
+        values = [results[group][i] for group in groups]
+        disparity = max(values) - min(values)
+        if disparity < min_disparity:
+            min_disparity = disparity
+            best_threshold = threshold
+
+    print(f"{metric.upper()} 균등성을 위한 최적 임계값: {best_threshold:.3f}")
+    print(f"최소 불균형: {min_disparity:.3f}")
+
+    return best_threshold, results
+</code></pre>
+
+        <h2>피처 중요도 및 SHAP 분석</h2>
+        <p>
+            어떤 피처가 예측을 주도하는지 이해하면 잠재적 편향 원인을 식별하는 데 도움이 됩니다.
+        </p>
+
+        <pre><code># 피처 중요도 분석
+def analyze_feature_importance_by_group(model, X_test, protected_attr, feature_names):
+    """
+    피처 중요도가 그룹 간에 다른지 분석
+    """
+    from sklearn.inspection import permutation_importance
+
+    groups = np.unique(protected_attr)
+
+    print("그룹별 피처 중요도")
+    print("=" * 80)
+
+    for group in groups:
+        mask = protected_attr == group
+        X_group = X_test[mask]
+        y_group = y_test[mask]
+
+        # 순열 중요도 계산
+        perm_importance = permutation_importance(
+            model, X_group, y_group, n_repeats=10, random_state=42
+        )
+
+        print(f"\n{group} - 상위 5개 가장 중요한 피처:")
+        indices = perm_importance.importances_mean.argsort()[-5:][::-1]
+
+        for idx in indices:
+            importance = perm_importance.importances_mean[idx]
+            print(f"  {feature_names[idx]:<30} {importance:.4f}")
+
+    print("\n⚠️ 한 그룹에는 중요하지만 다른 그룹에는 중요하지 않은 피처를 찾으세요")
+    print("   이는 차별적 대우를 나타낼 수 있습니다")
+</code></pre>
+
+        <h2>보정 분석</h2>
+        <p>
+            잘 보정된 모델의 확률 예측은 모든 그룹에 걸쳐 관찰된 빈도와 일치해야 합니다.
+        </p>
+
+        <pre><code># 그룹별 보정 분석
+from sklearn.calibration import calibration_curve
+
+def calibration_analysis(model, X_test, y_test, protected_attr, n_bins=10):
+    """
+    각 그룹에 대해 별도로 보정 평가
+    """
+    y_proba = model.predict_proba(X_test)[:, 1]
+    groups = np.unique(protected_attr)
+
+    print("보정 분석")
+    print("=" * 80)
+
+    calibration_errors = {}
+
+    for group in groups:
+        mask = protected_attr == group
+
+        prob_true, prob_pred = calibration_curve(
+            y_test[mask],
+            y_proba[mask],
+            n_bins=n_bins,
+            strategy='quantile'
+        )
+
+        # 보정 오차 계산 (ECE - 예상 보정 오차)
+        calibration_error = np.mean(np.abs(prob_true - prob_pred))
+        calibration_errors[group] = calibration_error
+
+        print(f"\n{group}:")
+        print(f"  예상 보정 오차: {calibration_error:.4f}")
+
+        print(f"  {'예측':<12} {'실제':<12} {'차이':<12}")
+        print(f"  {'-'*36}")
+        for pred, true in zip(prob_pred, prob_true):
+            diff = abs(pred - true)
+            print(f"  {pred:<12.3f} {true:<12.3f} {diff:<12.3f}")
+
+    # 보정 불균형 확인
+    errors = list(calibration_errors.values())
+    disparity = max(errors) - min(errors)
+
+    print(f"\n보정 오차 불균형: {disparity:.4f}")
+    if disparity > 0.05:
+        print("⚠️ 유의미한 보정 불균형 탐지됨")
+
+    return calibration_errors
+</code></pre>
+
+        <h2>하위 그룹 분석</h2>
+        <p>
+            편향에 특히 취약할 수 있는 특정 하위 그룹에 대한 성능을 검토합니다.
+        </p>
+
+        <pre><code># 하위 그룹 성능 분석
+def subgroup_analysis(model, X_test, y_test, protected_attrs):
+    """
+    교차성 하위 그룹 전체에 걸친 성능 분석
+    """
+    # 하위 그룹 식별자 생성
+    subgroups = X_test[protected_attrs].apply(
+        lambda x: '_'.join(x.astype(str)), axis=1
+    )
+
+    unique_subgroups = subgroups.unique()
+    y_pred = model.predict(X_test)
+
+    print("하위 그룹 분석")
+    print("=" * 80)
+    print(f"{'하위 그룹':<30} {'개수':<10} {'정확도':<12} {'정밀도':<12} {'재현율':<12}")
+    print("-" * 80)
+
+    subgroup_results = []
+
+    for subgroup in unique_subgroups:
+        mask = subgroups == subgroup
+        count = mask.sum()
+
+        if count < 10:  # 매우 작은 하위 그룹 건너뛰기
+            continue
+
+        acc = accuracy_score(y_test[mask], y_pred[mask])
+        prec = precision_score(y_test[mask], y_pred[mask], zero_division=0)
+        rec = recall_score(y_test[mask], y_pred[mask], zero_division=0)
+
+        subgroup_results.append({
+            'subgroup': subgroup,
+            'count': count,
+            'accuracy': acc,
+            'precision': prec,
+            'recall': rec
+        })
+
+        print(f"{subgroup:<30} {count:<10} {acc:<12.3f} {prec:<12.3f} {rec:<12.3f}")
+
+    # 최악의 성능 하위 그룹 식별
+    sorted_results = sorted(subgroup_results, key=lambda x: x['accuracy'])
+
+    print("\n⚠️ 최악의 성능 하위 그룹:")
+    for result in sorted_results[:3]:
+        print(f"  {result['subgroup']}: 정확도 = {result['accuracy']:.3f}")
+
+    return subgroup_results
+</code></pre>
+
+        <h2>반사실적 공정성 테스트</h2>
+        <p>
+            보호 속성을 변경하면 (다른 피처는 일정하게 유지) 예측이 변경되는지 테스트합니다.
+        </p>
+
+        <pre><code># 반사실적 공정성 테스트
+def counterfactual_test(model, X_test, protected_attr_col, protected_attr_values):
+    """
+    보호 속성만 변경될 때 예측이 변경되는지 테스트
+    """
+    X_counterfactual = X_test.copy()
+
+    original_predictions = model.predict_proba(X_test)[:, 1]
+    counterfactual_predictions = {}
+
+    for value in protected_attr_values:
+        X_counterfactual[protected_attr_col] = value
+        counterfactual_predictions[value] = model.predict_proba(X_counterfactual)[:, 1]
+
+    # 예측이 얼마나 자주 변경되는지 계산
+    changes = 0
+    total = len(X_test)
+
+    for i in range(total):
+        preds = [counterfactual_predictions[v][i] for v in protected_attr_values]
+        if max(preds) - min(preds) > 0.1:  # 유의미한 변경
+            changes += 1
+
+    change_rate = changes / total
+
+    print(f"반사실적 변경률: {change_rate:.3f}")
+    if change_rate > 0.1:
+        print("⚠️ 모델이 보호 속성에 민감함")
+        print("   이는 잠재적 차별을 시사합니다")
+
+    return change_rate
+</code></pre>
+
+        <h2>편향 증폭 탐지</h2>
+        <p>
+            모델이 학습 데이터에 존재하는 편향을 증폭시키는지 확인합니다.
+        </p>
+
+        <pre><code># 편향 증폭 분석
+def detect_bias_amplification(train_data, model, X_test, protected_attr):
+    """
+    학습 데이터 대 모델 예측의 편향 비교
+    """
+    # 학습 데이터의 편향 측정
+    train_positive_rates = {}
+    for group in train_data[protected_attr].unique():
+        mask = train_data[protected_attr] == group
+        train_positive_rates[group] = train_data[mask]['label'].mean()
+
+    # 예측의 편향 측정
+    y_pred = model.predict(X_test)
+    test_protected = X_test[protected_attr]
+
+    pred_positive_rates = {}
+    for group in test_protected.unique():
+        mask = test_protected == group
+        pred_positive_rates[group] = y_pred[mask].mean()
+
+    print("편향 증폭 분석")
+    print("=" * 80)
+    print(f"{'그룹':<15} {'학습 %':<15} {'예측 %':<15} {'변화':<15}")
+    print("-" * 80)
+
+    for group in train_positive_rates.keys():
+        train_rate = train_positive_rates.get(group, 0) * 100
+        pred_rate = pred_positive_rates.get(group, 0) * 100
+        change = pred_rate - train_rate
+
+        status = "⚠️ 증폭됨" if abs(change) > 5 else "✓ 양호"
+        print(f"{group:<15} {train_rate:<15.2f} {pred_rate:<15.2f} {change:+.2f}% {status}")
+
+    return train_positive_rates, pred_positive_rates
+</code></pre>
+
+        <h2>포괄적인 모델 감사</h2>
+
+        <pre><code># 완전한 모델 편향 감사
+def comprehensive_model_audit(model, X_train, y_train, X_test, y_test,
+                              protected_attrs, feature_names):
+    """
+    학습된 모델의 완전한 편향 감사 수행
+    """
+    print("\n" + "=" * 80)
+    print("포괄적인 모델 편향 감사")
+    print("=" * 80)
+
+    # 1. 분리된 성능
+    print("\n1. 분리된 성능")
+    print("-" * 80)
+    for attr in protected_attrs:
+        disaggregated_evaluation(model, X_test, y_test, X_test[attr])
+
+    # 2. 혼동 행렬 분석
+    print("\n2. 혼동 행렬 분석")
+    print("-" * 80)
+    for attr in protected_attrs:
+        confusion_matrix_by_group(y_test, model.predict(X_test), X_test[attr])
+
+    # 3. 보정 확인
+    print("\n3. 보정 분석")
+    print("-" * 80)
+    for attr in protected_attrs:
+        calibration_analysis(model, X_test, y_test, X_test[attr])
+
+    # 4. 하위 그룹 분석
+    if len(protected_attrs) > 1:
+        print("\n4. 교차성 하위 그룹 분석")
+        print("-" * 80)
+        subgroup_analysis(model, X_test, y_test, protected_attrs)
+
+    # 최종 권장 사항
+    print("\n" + "=" * 80)
+    print("감사 요약 및 권장 사항")
+    print("=" * 80)
+    print("1. 10% 이상의 모든 성능 불균형 검토")
+    print("2. 높은 오류율을 가진 그룹 조사")
+    print("3. 편향 증폭 확인")
+    print("4. 공정성을 위한 임계값 조정 고려")
+    print("5. 필요시 완화 기법 구현")
+    print("\n弘益人間 - 모델이 모든 사용자에게 공정하게 서비스하도록 보장하십시오")
+    print("=" * 80)
+
+    return True
+</code></pre>
+
+        <div class="callout">
+            <h3>弘益人間 모델 분석 원칙</h3>
+            <ul>
+                <li>항상 각 인구통계학적 그룹에 대해 별도로 성능 평가</li>
+                <li>집계 지표를 넘어 불균등한 영향을 이해</li>
+                <li>맥락에서 위양성과 위음성 모두 고려</li>
+                <li>반사실적 공정성과 편향 증폭 테스트</li>
+                <li>모든 발견 사항을 투명하게 문서화</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">장 요약</h2>
+            <ul>
+                <li>분리된 평가가 기본입니다—집계 지표에만 의존하지 마세요</li>
+                <li>혼동 행렬 분석은 오류가 그룹 간에 어떻게 분산되어 있는지 패턴을 드러냅니다</li>
+                <li>결정 임계값 최적화는 확률적 분류기의 공정성을 개선할 수 있습니다</li>
+                <li>피처 중요도 분석은 각 그룹에 대한 예측을 주도하는 피처를 식별합니다</li>
+                <li>보정은 확률 예측이 모든 그룹에 걸쳐 의미 있도록 보장합니다</li>
+                <li>하위 그룹 분석은 교차성 성능 문제를 검토합니다</li>
+                <li>반사실적 테스트는 보호 속성이 예측에 직접 영향을 미치는지 드러냅니다</li>
+                <li>편향 증폭 탐지는 모델 편향을 학습 데이터 편향과 비교합니다</li>
+                <li>포괄적인 감사는 완전한 평가를 위해 여러 분석 기술을 결합합니다</li>
+                <li>弘益人間은 철저하고 투명한 모델 평가를 요구합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">복습 질문</h2>
+            <ol>
+                <li>공정성 평가를 위해 분리된 평가가 집계 지표보다 더 유익한 이유는 무엇입니까?</li>
+                <li>혼동 행렬 분석이 정확도만으로는 제공할 수 없는 어떤 통찰력을 제공할 수 있습니까?</li>
+                <li>결정 임계값을 조정하면 공정성이 어떻게 개선될 수 있습니까? 절충안은 무엇입니까?</li>
+                <li>피처 중요도가 인구통계학적 그룹 간에 크게 다르다는 것은 무엇을 의미합니까?</li>
+                <li>모델이 전체적으로는 잘 보정되었지만 특정 그룹에 대해서는 잘못 보정될 수 있는 방법을 설명하세요.</li>
+                <li>하위 그룹 분석이 중요한 이유는 무엇입니까? 단일 속성 분석이 드러낼 수 없는 것을 무엇을 드러낼 수 있습니까?</li>
+                <li>반사실적 공정성 테스트는 무엇을 측정합니까? 다른 공정성 지표와 어떻게 다릅니까?</li>
+                <li>모델이 학습 데이터에 존재하는 것 이상으로 편향을 증폭시킬 수 있는 방법은 무엇입니까? 메커니즘의 예를 제공하세요.</li>
+                <li>형사 위험 평가 시스템을 위한 모델 감사 전략을 설계하세요. 무엇을 우선시하시겠습니까?</li>
+                <li>弘益人間 철학이 수용 가능한 성능 불균형에 대한 결정을 어떻게 알립니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-05.html" class="nav-button">다음 장 →</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SPACE-023: Space Medicine - Interactive Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: rgba(139, 92, 246, 0.1); border: 1px solid #8B5CF6; border-radius: 16px;
+            padding: 30px; margin-bottom: 30px; text-align: center; position: relative; }
+        h1 { color: #8B5CF6; font-size: 2.2em; margin-bottom: 10px; }
+        .tagline { color: #cbd5e1; font-size: 1.1em; }
+        .philosophy { display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            color: white; padding: 10px 25px; border-radius: 20px; font-weight: bold; margin-top: 10px;
+            animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .lang-selector { position: absolute; top: 20px; right: 20px; }
+        .lang-btn { background: rgba(139, 92, 246, 0.2); border: 1px solid #8B5CF6; color: #e2e8f0;
+            padding: 8px 20px; border-radius: 8px; cursor: pointer; margin-left: 5px; transition: all 0.3s; }
+        .lang-btn:hover { background: rgba(139, 92, 246, 0.4); }
+        .lang-btn.active { background: #8B5CF6; color: white; }
+        #allLangs { padding: 8px; background: #1e293b; border: 1px solid #8B5CF6; color: #e2e8f0;
+            border-radius: 8px; font-size: 14px; cursor: pointer; margin-left: 10px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(139, 92, 246, 0.3); padding: 15px 30px;
+            border-radius: 10px; cursor: pointer; transition: all 0.3s; }
+        .tab:hover { background: rgba(139, 92, 246, 0.2); border-color: #8B5CF6; }
+        .tab.active { background: #8B5CF6; border-color: #8B5CF6; color: white; }
+        .panel { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px; padding: 30px; display: none; }
+        .panel.active { display: block; }
+        .control-group { margin: 20px 0; }
+        .control-group label { display: block; color: #8B5CF6; font-weight: bold; margin-bottom: 8px; }
+        .control-group input, .control-group select { width: 100%; max-width: 400px; padding: 10px;
+            background: #1e293b; border: 1px solid #8B5CF6; border-radius: 8px; color: #e2e8f0; }
+        .btn { background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: white;
+            padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 1em;
+            font-weight: bold; transition: all 0.3s; margin: 10px 10px 10px 0; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3); }
+        .output { background: #1e293b; border: 1px solid #8B5CF6; border-radius: 8px; padding: 20px;
+            margin-top: 20px; font-family: 'Courier New', monospace; color: #7C3AED; min-height: 150px;
+            max-height: 400px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+        .card { background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 10px; padding: 20px; }
+        .card h3 { color: #8B5CF6; margin-bottom: 10px; }
+        .metric { font-size: 2em; color: #8B5CF6; font-weight: bold; }
+        .lang-content { display: none; }
+        .lang-content.active { display: block; }
+        footer { text-align: center; padding: 40px 20px; margin-top: 60px;
+            border-top: 1px solid rgba(139, 92, 246, 0.3); color: #94a3b8; }
+        .logo { font-size: 3em; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Space Medicine</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <header style="position: relative;">
+            <div class="lang-selector">
+                <button class="lang-btn active" onclick="switchLang('en')">EN</button>
+                <button class="lang-btn" onclick="switchLang('ko')">KO</button>
+                <select id="allLangs" onchange="handleLangChange()">
+                    <option value="en">🇬🇧 English</option>
+                    <option value="ko">🇰🇷 한국어</option>
+                    <option value="zh-CN">🇨🇳 中文</option>
+                    <option value="ja">🇯🇵 日本語</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                    <option value="pt">🇵🇹 Português</option>
+                    <option value="ru">🇷🇺 Русский</option>
+                    <option value="ar">🇸🇦 العربية</option>
+                    <option value="hi">🇮🇳 हिन्दी</option>
+                    <option value="bn">🇧🇩 বাংলা</option>
+                    <option value="pa">🇮🇳 ਪੰਜਾਬੀ</option>
+                    <option value="vi">🇻🇳 Tiếng Việt</option>
+                    <option value="th">🇹🇭 ไทย</option>
+                    <option value="tr">🇹🇷 Türkçe</option>
+                    <option value="pl">🇵🇱 Polski</option>
+                    <option value="uk">🇺🇦 Українська</option>
+                    <option value="ro">🇷🇴 Română</option>
+                    <option value="nl">🇳🇱 Nederlands</option>
+                    <option value="el">🇬🇷 Ελληνικά</option>
+                    <option value="cs">🇨🇿 Čeština</option>
+                    <option value="sv">🇸🇪 Svenska</option>
+                    <option value="hu">🇭🇺 Magyar</option>
+                    <option value="fi">🇫🇮 Suomi</option>
+                    <option value="no">🇳🇴 Norsk</option>
+                    <option value="da">🇩🇰 Dansk</option>
+                    <option value="he">🇮🇱 עברית</option>
+                    <option value="id">🇮🇩 Bahasa Indonesia</option>
+                    <option value="ms">🇲🇾 Bahasa Melayu</option>
+                    <option value="tl">🇵🇭 Tagalog</option>
+                    <option value="sw">🇰🇪 Kiswahili</option>
+                    <option value="fa">🇮🇷 فارسی</option>
+                    <option value="ur">🇵🇰 اردو</option>
+                    <option value="ta">🇮🇳 தமிழ்</option>
+                    <option value="te">🇮🇳 తెలుగు</option>
+                    <option value="mr">🇮🇳 मराठी</option>
+                    <option value="gu">🇮🇳 ગુજરાતી</option>
+                    <option value="kn">🇮🇳 ಕನ್ನಡ</option>
+                    <option value="ml">🇮🇳 മലയാളം</option>
+                    <option value="si">🇱🇰 සිංහල</option>
+                    <option value="km">🇰🇭 ខ្មែរ</option>
+                    <option value="lo">🇱🇦 ລາວ</option>
+                    <option value="my">🇲🇲 မြန်မာ</option>
+                    <option value="ne">🇳🇵 नेपाली</option>
+                    <option value="am">🇪🇹 አማርኛ</option>
+                    <option value="ha">🇳🇬 Hausa</option>
+                    <option value="yo">🇳🇬 Yorùbá</option>
+                    <option value="ig">🇳🇬 Igbo</option>
+                    <option value="zu">🇿🇦 isiZulu</option>
+                    <option value="af">🇿🇦 Afrikaans</option>
+                    <option value="sq">🇦🇱 Shqip</option>
+                    <option value="hy">🇦🇲 Հայերեն</option>
+                    <option value="az">🇦🇿 Azərbaycan</option>
+                    <option value="eu">🇪🇸 Euskara</option>
+                    <option value="be">🇧🇾 Беларуская</option>
+                    <option value="bs">🇧🇦 Bosanski</option>
+                    <option value="bg">🇧🇬 Български</option>
+                    <option value="ca">🇪🇸 Català</option>
+                    <option value="hr">🇭🇷 Hrvatski</option>
+                    <option value="eo">🌍 Esperanto</option>
+                    <option value="et">🇪🇪 Eesti</option>
+                    <option value="gl">🇪🇸 Galego</option>
+                    <option value="ka">🇬🇪 ქართული</option>
+                    <option value="is">🇮🇸 Íslenska</option>
+                    <option value="ga">🇮🇪 Gaeilge</option>
+                    <option value="kk">🇰🇿 Қазақ</option>
+                    <option value="ky">🇰🇬 Кыргызча</option>
+                    <option value="lv">🇱🇻 Latviešu</option>
+                    <option value="lt">🇱🇹 Lietuvių</option>
+                    <option value="lb">🇱🇺 Lëtzebuergesch</option>
+                    <option value="mk">🇲🇰 Македонски</option>
+                    <option value="mt">🇲🇹 Malti</option>
+                    <option value="mn">🇲🇳 Монгол</option>
+                    <option value="ps">🇦🇫 پښتو</option>
+                    <option value="sr">🇷🇸 Српски</option>
+                    <option value="sk">🇸🇰 Slovenčina</option>
+                    <option value="sl">🇸🇮 Slovenščina</option>
+                    <option value="so">🇸🇴 Soomaali</option>
+                    <option value="tg">🇹🇯 Тоҷикӣ</option>
+                    <option value="tk">🇹🇲 Türkmen</option>
+                    <option value="uz">🇺🇿 Oʻzbek</option>
+                    <option value="cy">🏴󠁧󠁢󠁷󠁬󠁳󠁿 Cymraeg</option>
+                    <option value="yi">🇮🇱 ייִדיש</option>
+                    <option value="mi">🇳🇿 Māori</option>
+                    <option value="sm">🇼🇸 Samoan</option>
+                    <option value="haw">🇺🇸 Hawaiian</option>
+                    <option value="ht">🇭🇹 Kreyòl</option>
+                    <option value="la">🏛️ Latina</option>
+                    <option value="gd">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Gàidhlig</option>
+                    <option value="ku">🇮🇶 Kurdî</option>
+                    <option value="sd">🇵🇰 سنڌي</option>
+                    <option value="xh">🇿🇦 isiXhosa</option>
+                    <option value="st">🇱🇸 Sesotho</option>
+                    <option value="sn">🇿🇼 Shona</option>
+                    <option value="rw">🇷🇼 Kinyarwanda</option>
+                </select>
+            </div>
+            <div class="logo">🚀🏥</div>
+            <h1>WIA-SPACE-023</h1>
+            <p class="tagline">Space Medicine Simulator</p>
+            <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+        </header>
+
+        <div id="en" class="lang-content active">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab(0)">Dashboard</div>
+                <div class="tab" onclick="switchTab(1)">Physiological Monitor</div>
+                <div class="tab" onclick="switchTab(2)">Radiation Tracker</div>
+                <div class="tab" onclick="switchTab(3)">Medical Operations</div>
+                <div class="tab" onclick="switchTab(4)">Analytics</div>
+            </div>
+
+            <div class="panel active" id="panel0">
+                <h2 style="color: #8B5CF6; margin-bottom: 20px;">Space Medicine Dashboard</h2>
+                <div class="grid">
+                    <div class="card"><h3>System Status</h3><div class="metric">ACTIVE</div></div>
+                    <div class="card"><h3>Crew Members</h3><div class="metric">6</div></div>
+                    <div class="card"><h3>Mission Day</h3><div class="metric" id="missionDay">45</div></div>
+                    <div class="card"><h3>Health Index</h3><div class="metric">98%</div></div>
+                </div>
+                <div class="control-group">
+                    <label>Mission Duration (days):</label>
+                    <input type="range" id="durationSlider" min="1" max="1000" value="45" oninput="updateDuration(this.value)">
+                    <span id="durationValue">45 days</span>
+                </div>
+                <button class="btn" onclick="simulatePhysiological()">Simulate Microgravity Effects</button>
+                <button class="btn" onclick="simulateRadiation()">Calculate Radiation Exposure</button>
+                <button class="btn" onclick="simulateMedical()">Run Medical Diagnostic</button>
+                <div class="output" id="output">Simulator ready. Select a simulation to begin...</div>
+            </div>
+
+            <div class="panel" id="panel1">
+                <h2 style="color: #8B5CF6; margin-bottom: 20px;">Physiological Monitor</h2>
+                <p>Track microgravity effects on human physiology</p>
+                <div class="control-group">
+                    <label>Select System:</label>
+                    <select id="physioSystem">
+                        <option>Cardiovascular</option>
+                        <option>Musculoskeletal</option>
+                        <option>Neuro-vestibular</option>
+                        <option>Vision (SANS)</option>
+                        <option>Immune</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Days in Space:</label>
+                    <input type="number" id="physioDays" value="180" min="1" max="1000">
+                </div>
+                <button class="btn" onclick="analyzePhysiology()">Analyze System</button>
+                <div class="output" id="physioOutput"></div>
+            </div>
+
+            <div class="panel" id="panel2">
+                <h2 style="color: #8B5CF6; margin-bottom: 20px;">Radiation Exposure Tracker</h2>
+                <p>Monitor cumulative radiation dose and calculate cancer risk</p>
+                <div class="control-group">
+                    <label>Mission Location:</label>
+                    <select id="radLocation">
+                        <option>ISS (Low Earth Orbit)</option>
+                        <option>Lunar Surface</option>
+                        <option>Mars Transit</option>
+                        <option>Mars Surface</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Astronaut Age:</label>
+                    <input type="number" id="radAge" value="35" min="25" max="60">
+                </div>
+                <div class="control-group">
+                    <label>Gender:</label>
+                    <select id="radGender">
+                        <option>Male</option>
+                        <option>Female</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="calculateRadiation()">Calculate Exposure</button>
+                <div class="output" id="radOutput"></div>
+            </div>
+
+            <div class="panel" id="panel3">
+                <h2 style="color: #8B5CF6; margin-bottom: 20px;">Medical Operations</h2>
+                <p>Simulate medical procedures in microgravity environment</p>
+                <div class="control-group">
+                    <label>Procedure Type:</label>
+                    <select id="procedureType">
+                        <option>CPR in Microgravity</option>
+                        <option>Ultrasound Examination</option>
+                        <option>IV Insertion</option>
+                        <option>Wound Management</option>
+                        <option>Emergency Surgery</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="simulateProcedure()">Simulate Procedure</button>
+                <button class="btn" onclick="showProtocol()">View Protocol</button>
+                <div class="output" id="medOutput"></div>
+            </div>
+
+            <div class="panel" id="panel4">
+                <h2 style="color: #8B5CF6; margin-bottom: 20px;">Analytics & Reports</h2>
+                <p>Generate comprehensive health analytics and mission reports</p>
+                <div class="control-group">
+                    <label>Report Type:</label>
+                    <select id="reportType">
+                        <option>Crew Health Summary</option>
+                        <option>Bone Density Trends</option>
+                        <option>Radiation Exposure Log</option>
+                        <option>Psychological Assessment</option>
+                        <option>Exercise Compliance</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="generateReport()">Generate Report</button>
+                <button class="btn" onclick="exportData()">Export Data (JSON)</button>
+                <div class="output" id="analyticsOutput"></div>
+            </div>
+        </div>
+
+        <div id="ko" class="lang-content">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab(0)">대시보드</div>
+                <div class="tab" onclick="switchTab(1)">생리 모니터</div>
+                <div class="tab" onclick="switchTab(2)">방사선 추적기</div>
+                <div class="tab" onclick="switchTab(3)">의료 운영</div>
+                <div class="tab" onclick="switchTab(4)">분석</div>
+            </div>
+            <div class="panel active">
+                <h2 style="color: #8B5CF6;">우주 의학 대시보드</h2>
+                <p>미세중력 환경에서의 의료 시뮬레이션</p>
+                <button class="btn" onclick="alert('한국어 시뮬레이션 실행')">시뮬레이션 시작</button>
+                <div class="output">시뮬레이터 준비 완료...</div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>WIA-SPACE-023: Space Medicine Standard</strong></p>
+            <p>© 2025 WIA (World Certification Industry Association)</p>
+            <p><strong>弘益人間 (홍익인간) · Benefit All Humanity</strong></p>
+        </footer>
+    </div>
+
+    <script>
+        let currentTab = 0;
+        let currentLang = 'en';
+
+        function switchLang(lang) {
+            document.querySelectorAll('.lang-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(lang).classList.add('active');
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            currentLang = lang;
+        }
+
+        function handleLangChange() {
+            const select = document.getElementById('allLangs');
+            const lang = select.value;
+            document.getElementById('output').innerHTML = `Language selected: ${lang}<br>Simulator interface will be translated accordingly.`;
+        }
+
+        function switchTab(index) {
+            const tabs = document.querySelectorAll('.tab');
+            const panels = document.querySelectorAll('.panel');
+            tabs.forEach(t => t.classList.remove('active'));
+            panels.forEach(p => p.classList.remove('active'));
+            tabs[index].classList.add('active');
+            panels[index].classList.add('active');
+            currentTab = index;
+        }
+
+        function updateDuration(days) {
+            document.getElementById('durationValue').textContent = days + ' days';
+            document.getElementById('missionDay').textContent = days;
+        }
+
+        function simulatePhysiological() {
+            const days = document.getElementById('durationSlider').value;
+            const boneLoss = (days * 0.015).toFixed(1);
+            const muscleLoss = (days * 0.02).toFixed(1);
+            const fluidShift = Math.min(17, days * 0.5).toFixed(1);
+
+            document.getElementById('output').innerHTML = `
+                <strong>Microgravity Effects Simulation (Day ${days})</strong><br><br>
+                <strong>Bone Mineral Density Loss:</strong> ${boneLoss}%<br>
+                <strong>Muscle Mass Loss:</strong> ${muscleLoss}%<br>
+                <strong>Blood Volume Reduction:</strong> ${fluidShift}%<br>
+                <strong>Cardiovascular Deconditioning:</strong> VO2max reduced by ${(days * 0.025).toFixed(1)}%<br><br>
+                <strong>Countermeasures Required:</strong><br>
+                - ARED resistance exercise: 2.5 hours/day<br>
+                - Treadmill running: 1 hour/day<br>
+                - Nutritional supplementation: Calcium, Vitamin D<br>
+                - Lower Body Negative Pressure sessions<br>
+            `;
+        }
+
+        function simulateRadiation() {
+            const days = document.getElementById('durationSlider').value;
+            const dailyDose = 0.8;
+            const totalDose = (days * dailyDose).toFixed(0);
+            const cancerRisk = (totalDose * 0.005).toFixed(2);
+
+            document.getElementById('output').innerHTML = `
+                <strong>Radiation Exposure Calculation</strong><br><br>
+                <strong>Mission Duration:</strong> ${days} days<br>
+                <strong>Daily Dose (ISS):</strong> ${dailyDose} mSv/day<br>
+                <strong>Cumulative Dose:</strong> ${totalDose} mSv<br>
+                <strong>Career Limit Consumed:</strong> ${(totalDose / 1000 * 100).toFixed(1)}%<br>
+                <strong>Estimated Cancer Risk Increase:</strong> ${cancerRisk}%<br><br>
+                <strong>Protective Measures:</strong><br>
+                - Water shielding in sleeping quarters<br>
+                - Storm shelter during solar events<br>
+                - Dosimetry monitoring (TLD, OSL)<br>
+                - Minimized EVA exposure during solar maximum<br>
+            `;
+        }
+
+        function simulateMedical() {
+            document.getElementById('output').innerHTML = `
+                <strong>Medical Diagnostic Simulation</strong><br><br>
+                Running comprehensive health assessment...<br><br>
+                <strong>Vital Signs:</strong><br>
+                - Heart Rate: 68 bpm<br>
+                - Blood Pressure: 115/75 mmHg<br>
+                - SpO2: 98%<br>
+                - Temperature: 37.1°C<br><br>
+                <strong>Ultrasound Findings:</strong><br>
+                - Cardiac function: Normal EF 60%<br>
+                - Optic nerve sheath diameter: 5.8mm (elevated - monitor for SANS)<br>
+                - Lower extremity: No DVT detected<br><br>
+                <strong>Laboratory Results:</strong><br>
+                - CBC: Within normal limits<br>
+                - Bone turnover markers: Elevated CTX (increased resorption)<br>
+                - Vitamin D: 28 ng/mL (supplement recommended)<br>
+            `;
+        }
+
+        function analyzePhysiology() {
+            const system = document.getElementById('physioSystem').value;
+            const days = document.getElementById('physioDays').value;
+            const output = document.getElementById('physioOutput');
+
+            const data = {
+                'Cardiovascular': `Left ventricular mass: -${(days * 0.02).toFixed(1)}%<br>VO2max: -${(days * 0.025).toFixed(1)}%<br>Orthostatic tolerance: Severely impaired`,
+                'Musculoskeletal': `Bone density (lumbar): -${(days * 0.015).toFixed(1)}%<br>Muscle volume: -${(days * 0.02).toFixed(1)}%<br>Type I to Type II fiber conversion: ${(days * 0.01).toFixed(1)}%`,
+                'Neuro-vestibular': `Space motion sickness: Resolved (day 3-5)<br>Spatial disorientation: Adapted<br>Vestibular suppression: Significant`,
+                'Vision (SANS)': `Optic disc edema: ${days > 90 ? 'Detected' : 'Not detected'}<br>Globe flattening: ${days > 120 ? 'Present' : 'Absent'}<br>Hyperopic shift: +${(days * 0.003).toFixed(2)} diopters`,
+                'Immune': `NK cell activity: -${(days * 0.015).toFixed(1)}%<br>T-cell function: Impaired<br>Viral reactivation risk: ${days > 60 ? 'Elevated' : 'Normal'}`
+            };
+
+            output.innerHTML = `<strong>${system} Analysis (Day ${days})</strong><br><br>${data[system]}`;
+        }
+
+        function calculateRadiation() {
+            const location = document.getElementById('radLocation').value;
+            const age = document.getElementById('radAge').value;
+            const gender = document.getElementById('radGender').value;
+
+            const doses = {
+                'ISS (Low Earth Orbit)': 0.8,
+                'Lunar Surface': 1.7,
+                'Mars Transit': 2.0,
+                'Mars Surface': 0.9
+            };
+
+            const dailyDose = doses[location];
+            const days = document.getElementById('durationSlider').value;
+            const totalDose = (days * dailyDose).toFixed(0);
+            const careerLimit = gender === 'Female' ? 600 : 800;
+
+            document.getElementById('radOutput').innerHTML = `
+                <strong>Radiation Exposure Analysis</strong><br><br>
+                <strong>Location:</strong> ${location}<br>
+                <strong>Astronaut:</strong> ${age} years old, ${gender}<br>
+                <strong>Mission Duration:</strong> ${days} days<br>
+                <strong>Daily Dose:</strong> ${dailyDose} mSv/day<br>
+                <strong>Total Dose:</strong> ${totalDose} mSv<br>
+                <strong>Career Limit:</strong> ${careerLimit} mSv<br>
+                <strong>Limit Consumed:</strong> ${(totalDose / careerLimit * 100).toFixed(1)}%<br>
+                <strong>Cancer Risk:</strong> ~${(totalDose * 0.005).toFixed(2)}% above baseline<br>
+            `;
+        }
+
+        function simulateProcedure() {
+            const procedure = document.getElementById('procedureType').value;
+            document.getElementById('medOutput').innerHTML = `<strong>Simulating: ${procedure}</strong><br><br>Procedure simulation in progress...<br>Training mode activated. Follow step-by-step protocol.`;
+        }
+
+        function showProtocol() {
+            document.getElementById('medOutput').innerHTML = `<strong>Medical Protocol Reference</strong><br><br>Access comprehensive procedural guidelines, equipment checklists, and emergency protocols for space medical operations.`;
+        }
+
+        function generateReport() {
+            const type = document.getElementById('reportType').value;
+            document.getElementById('analyticsOutput').innerHTML = `<strong>Generating: ${type}</strong><br><br>Report compiled successfully.<br>Data visualization and trends analysis available.`;
+        }
+
+        function exportData() {
+            const data = { mission: "WIA-SPACE-023", duration: document.getElementById('durationSlider').value, status: "active" };
+            document.getElementById('analyticsOutput').innerHTML = `<strong>Data Export</strong><br><br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+    </script>
+</body>
+</html>

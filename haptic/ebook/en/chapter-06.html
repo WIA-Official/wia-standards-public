@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Chapter 6: Phase 3 - Device Protocol - WIA Haptic Standard</title>
+    <style>
+        :root { --primary: #8B5CF6; --primary-dark: #7C3AED; --secondary: #10b981; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 40px 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: var(--primary); margin-bottom: 30px; font-size: 2.2rem; border-bottom: 3px solid var(--primary); padding-bottom: 15px; }
+        h2 { color: var(--primary); margin: 40px 0 20px; }
+        h3 { color: var(--secondary); margin: 30px 0 15px; }
+        p { margin: 15px 0; color: var(--text-muted); }
+        a { color: var(--primary); text-decoration: none; }
+        blockquote { border-left: 4px solid #ffd700; padding: 20px; margin: 30px 0; background: var(--bg-card); border-radius: 0 8px 8px 0; }
+        blockquote p { color: var(--text); margin: 5px 0; }
+        pre { background: var(--bg-card); padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid var(--border); font-size: 0.85rem; }
+        code { font-family: 'Monaco', monospace; font-size: 0.85rem; color: var(--secondary); }
+        pre code { color: var(--text); }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--bg-card); color: var(--primary); }
+        td { color: var(--text-muted); }
+        ul, ol { margin: 15px 0; padding-left: 30px; color: var(--text-muted); }
+        li { margin: 8px 0; }
+        hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 30px; flex-wrap: wrap; gap: 10px; }
+        .nav a { color: var(--text-muted); padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; }
+        .chapter-nav { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 1px solid var(--border); }
+        .footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--border); }
+        .footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        .info-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤚 Chapter 6: Phase 3 - Device Protocol</h1>
+
+        <blockquote>
+            <p>This chapter defines cross-platform communication protocols for haptic devices, including API mappings for iOS, Android, Web, and wearables.</p>
+        </blockquote>
+
+        <hr>
+
+        <h2>6.1 Platform API Mapping</h2>
+
+        <h3>6.1.1 iOS Core Haptics</h3>
+
+        <pre><code>// WIA Haptic → iOS Core Haptics Mapping
+
+import CoreHaptics
+
+func playWIAHaptic(_ primitive: HapticPrimitive) throws {
+    guard CHHapticEngine.capabilitiesForHardware()
+        .supportsHaptics else { return }
+
+    let engine = try CHHapticEngine()
+    try engine.start()
+
+    // Map WIA waveform to Core Haptics event
+    let intensity = CHHapticEventParameter(
+        parameterID: .hapticIntensity,
+        value: Float(primitive.intensity)
+    )
+
+    let sharpness = CHHapticEventParameter(
+        parameterID: .hapticSharpness,
+        value: waveformToSharpness(primitive.waveform)
+    )
+
+    let event = CHHapticEvent(
+        eventType: .hapticContinuous,
+        parameters: [intensity, sharpness],
+        relativeTime: 0,
+        duration: Double(primitive.duration) / 1000.0
+    )
+
+    // Apply ADSR envelope
+    let pattern = try createPatternWithEnvelope(
+        event: event,
+        envelope: primitive.envelope
+    )
+
+    let player = try engine.makePlayer(with: pattern)
+    try player.start(atTime: 0)
+}</code></pre>
+
+        <h3>6.1.2 Android Vibration API</h3>
+
+        <pre><code>// WIA Haptic → Android VibrationEffect Mapping
+
+fun playWIAHaptic(primitive: HapticPrimitive) {
+    val vibrator = context.getSystemService(Vibrator::class.java)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        // Modern API with amplitude control
+        val amplitudes = generateADSRAmplitudes(
+            primitive.envelope,
+            primitive.duration
+        )
+
+        val timings = LongArray(amplitudes.size) {
+            primitive.duration / amplitudes.size.toLong()
+        }
+
+        val effect = VibrationEffect.createWaveform(
+            timings,
+            amplitudes,
+            -1 // no repeat
+        )
+
+        vibrator.vibrate(effect)
+    } else {
+        // Legacy fallback
+        vibrator.vibrate(primitive.duration.toLong())
+    }
+}
+
+fun generateADSRAmplitudes(
+    envelope: HapticEnvelope,
+    duration: Int
+): IntArray {
+    // Convert ADSR to amplitude array
+    val samples = duration / 10 // 10ms resolution
+    return IntArray(samples) { i ->
+        val t = i * 10
+        calculateEnvelopeAmplitude(envelope, t, duration)
+    }
+}</code></pre>
+
+        <h3>6.1.3 Web Vibration API</h3>
+
+        <pre><code>// WIA Haptic → Web Vibration API Mapping
+
+function playWIAHaptic(primitive: HapticPrimitive): void {
+    if (!navigator.vibrate) {
+        console.warn('Vibration API not supported');
+        return;
+    }
+
+    // Web API only supports duration patterns
+    // Apply graceful degradation
+    const pattern = convertToWebPattern(primitive);
+    navigator.vibrate(pattern);
+}
+
+function convertToWebPattern(primitive: HapticPrimitive): number[] {
+    // Convert complex haptic to simple on/off pattern
+    const { envelope, duration } = primitive;
+
+    if (envelope.sustain > 0.5) {
+        // Sustained pattern: continuous vibration
+        return [duration];
+    } else {
+        // Transient pattern: pulse sequence
+        const pulseCount = Math.ceil(duration / 50);
+        const pattern: number[] = [];
+
+        for (let i = 0; i < pulseCount; i++) {
+            pattern.push(20);  // vibrate
+            pattern.push(30);  // pause
+        }
+
+        return pattern;
+    }
+}</code></pre>
+
+        <hr>
+
+        <h2>6.2 Capability Detection</h2>
+
+        <h3>6.2.1 Capability Schema</h3>
+
+        <pre><code>interface DeviceCapabilities {
+    // Basic haptic support
+    hasHaptics: boolean;
+
+    // Advanced features
+    hasAmplitudeControl: boolean;
+    hasFrequencyControl: boolean;
+    hasWaveformSupport: boolean;
+
+    // Frequency range
+    frequencyRange: {
+        min: number;
+        max: number;
+    };
+
+    // Intensity resolution
+    amplitudeSteps: number;
+
+    // Actuator type (if known)
+    actuatorType?: 'erm' | 'lra' | 'piezo' | 'unknown';
+}</code></pre>
+
+        <h3>6.2.2 Capability Detection Implementation</h3>
+
+        <pre><code>async function detectCapabilities(): Promise&lt;DeviceCapabilities&gt; {
+    // Platform-specific detection
+    if (isIOS()) {
+        return detectIOSCapabilities();
+    } else if (isAndroid()) {
+        return detectAndroidCapabilities();
+    } else if (isWeb()) {
+        return detectWebCapabilities();
+    }
+
+    return getDefaultCapabilities();
+}
+
+function detectWebCapabilities(): DeviceCapabilities {
+    return {
+        hasHaptics: 'vibrate' in navigator,
+        hasAmplitudeControl: false,
+        hasFrequencyControl: false,
+        hasWaveformSupport: false,
+        frequencyRange: { min: 0, max: 0 },
+        amplitudeSteps: 1,
+        actuatorType: 'unknown'
+    };
+}</code></pre>
+
+        <hr>
+
+        <h2>6.3 Graceful Degradation</h2>
+
+        <h3>6.3.1 Degradation Strategies</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Missing Capability</th>
+                    <th>Degradation Strategy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>No amplitude control</td>
+                    <td>Use on/off patterns with timing</td>
+                </tr>
+                <tr>
+                    <td>No frequency control</td>
+                    <td>Vary duration and intensity instead</td>
+                </tr>
+                <tr>
+                    <td>No ADSR support</td>
+                    <td>Approximate with stepped patterns</td>
+                </tr>
+                <tr>
+                    <td>Limited resolution</td>
+                    <td>Quantize to available levels</td>
+                </tr>
+                <tr>
+                    <td>No haptics at all</td>
+                    <td>Fall back to audio/visual cues</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.3.2 Degradation Implementation</h3>
+
+        <pre><code>function adaptPrimitive(
+    primitive: HapticPrimitive,
+    capabilities: DeviceCapabilities
+): AdaptedPrimitive {
+
+    let adapted = { ...primitive };
+
+    // Quantize intensity
+    if (capabilities.amplitudeSteps < 256) {
+        adapted.intensity = quantize(
+            primitive.intensity,
+            capabilities.amplitudeSteps
+        );
+    }
+
+    // Clamp frequency
+    adapted.frequency = clamp(
+        primitive.frequency,
+        capabilities.frequencyRange.min,
+        capabilities.frequencyRange.max
+    );
+
+    // Simplify envelope if needed
+    if (!capabilities.hasWaveformSupport) {
+        adapted.envelope = simplifyEnvelope(primitive.envelope);
+    }
+
+    return adapted;
+}</code></pre>
+
+        <hr>
+
+        <h2>6.4 Device Communication Protocol</h2>
+
+        <h3>6.4.1 Bluetooth LE Haptic Service</h3>
+
+        <pre><code>// WIA Haptic BLE Service UUID
+const WIA_HAPTIC_SERVICE = '0000FE01-0000-1000-8000-00805F9B34FB';
+
+// Characteristics
+const CHARACTERISTICS = {
+    CAPABILITIES:  '0000FE02-...',  // Read capabilities
+    PLAY_PATTERN:  '0000FE03-...',  // Write pattern to play
+    QUEUE_PATTERN: '0000FE04-...',  // Queue pattern
+    STOP:          '0000FE05-...',  // Stop playback
+    STATUS:        '0000FE06-...',  // Read status (notify)
+};
+
+// Pattern payload format
+interface BLEHapticPayload {
+    version: 1;
+    patternId: string;
+    overrides?: {
+        intensity?: number;
+        duration?: number;
+    };
+}</code></pre>
+
+        <h3>6.4.2 USB HID Haptic Protocol</h3>
+
+        <pre><code>// WIA Haptic HID Report Structure
+struct WIAHapticReport {
+    uint8_t  reportId;       // 0x01 for haptic
+    uint8_t  command;        // PLAY=1, STOP=2, QUERY=3
+    uint16_t patternId;      // Pattern library ID
+    uint8_t  intensity;      // 0-255
+    uint16_t duration;       // milliseconds
+    uint8_t  flags;          // repeat, priority, etc.
+};</code></pre>
+
+        <hr>
+
+        <h2>6.5 Chapter Summary</h2>
+
+        <div class="info-box">
+            <p><strong>Key Takeaways:</strong></p>
+            <ol style="color: var(--text);">
+                <li><strong>iOS:</strong> Core Haptics with full ADSR and waveform support</li>
+                <li><strong>Android:</strong> VibrationEffect with amplitude arrays</li>
+                <li><strong>Web:</strong> Basic Vibration API with graceful degradation</li>
+                <li><strong>Capability Detection:</strong> Query device features before playback</li>
+                <li><strong>Degradation:</strong> Adapt patterns to device limitations</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

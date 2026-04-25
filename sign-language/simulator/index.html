@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Sign Language Recognition - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #2563EB;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Top Navigation */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+
+        /* Tabs */
+        .tabs {
+            justify-content: center;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 12px 24px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panel */
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 30px;
+            border: 1px solid var(--border);
+        }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); }
+
+        /* Form */
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .btn-outline:hover { border-color: var(--primary); }
+        .btn-center { display: flex; justify-content: center; margin-top: 20px; gap: 15px; }
+
+        /* Video Preview */
+        .video-preview {
+            background: linear-gradient(135deg, #1a1a2e, #0f172a);
+            border-radius: 16px;
+            padding: 30px;
+            border: 3px solid var(--primary);
+            margin: 20px 0;
+            text-align: center;
+        }
+        .video-placeholder {
+            width: 100%;
+            max-width: 640px;
+            height: 360px;
+            background: #000;
+            border-radius: 12px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+            border: 2px solid var(--border);
+        }
+        .gesture-icon {
+            font-size: 80px;
+            animation: wave 2s ease-in-out infinite;
+        }
+        @keyframes wave {
+            0%, 100% { transform: rotate(-10deg); }
+            50% { transform: rotate(10deg); }
+        }
+
+        /* Gesture Grid */
+        .gesture-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .gesture-card {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .gesture-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        .gesture-card.active {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .gesture-card .emoji { font-size: 40px; margin-bottom: 10px; }
+        .gesture-card .label { font-size: 0.85rem; color: var(--text-muted); }
+
+        /* Output Display */
+        .output-display {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        /* Language Grid */
+        .language-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .language-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .language-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        .language-card.active {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .language-card h4 { color: var(--primary); margin-bottom: 10px; }
+        .language-card p { color: var(--text-muted); font-size: 0.9rem; }
+        .language-icon { font-size: 2rem; margin-bottom: 10px; }
+
+        /* Translation Display */
+        .translation-display {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+        .translation-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .translation-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 100px;
+        }
+        .translation-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+        .translation-text {
+            font-size: 1.2rem;
+            color: var(--text);
+        }
+        .translation-arrow {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+
+        /* Test Result */
+        .test-result {
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        .test-pass {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--secondary);
+        }
+        .test-fail {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+        }
+        .test-list { list-style: none; }
+        .test-list li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 5px; }
+
+        /* CTA Section */
+        .cta-section {
+            margin-top: 50px;
+            padding: 40px;
+            background: linear-gradient(135deg, var(--bg-card), var(--bg));
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .cta-section h2 { margin-bottom: 15px; }
+        .cta-section p { color: var(--text-muted); margin-bottom: 25px; }
+        .cta-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .price-tag {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--secondary);
+            margin: 15px 0;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 50px;
+            padding: 30px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        footer a { color: var(--primary); text-decoration: none; }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        footer .links a:hover { color: var(--primary); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 1.8rem; }
+            .tabs { justify-content: center; }
+            .translation-row { grid-template-columns: 1fr; }
+            .translation-arrow { transform: rotate(90deg); }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Sign Language Recognition</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🤟 WIA Sign Language Recognition</div>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                <button class="lang-btn" onclick="setLang('ko')">KO</button>
+            </div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Sign Language Recognition Simulator" data-ko="수화 인식 시뮬레이터">Sign Language Recognition Simulator</h1>
+            <p data-en="Interactive demo of WIA Sign Language Recognition Standard for Real-time Translation"
+               data-ko="실시간 번역을 위한 WIA 수화 인식 표준 인터랙티브 데모"></p>
+        </section>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showPanel('data')"
+                    data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</button>
+            <button class="tab" onclick="showPanel('algorithms')"
+                    data-en="🔢 Algorithms" data-ko="🔢 알고리즘">🔢 Algorithms</button>
+            <button class="tab" onclick="showPanel('protocol')"
+                    data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</button>
+            <button class="tab" onclick="showPanel('integration')"
+                    data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</button>
+            <button class="tab" onclick="showPanel('test')"
+                    data-en="🧪 Test" data-ko="🧪 테스트">🧪 Test</button>
+        </div>
+
+        <!-- Data Format Panel -->
+        <div id="data" class="panel active">
+            <h2 data-en="Sign Language Data Format" data-ko="수화 데이터 형식">Sign Language Data Format</h2>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Sign Language" data-ko="수화 언어">Sign Language</label>
+                    <select id="signLanguage">
+                        <option value="ASL">ASL (American Sign Language)</option>
+                        <option value="BSL">BSL (British Sign Language)</option>
+                        <option value="KSL">KSL (Korean Sign Language)</option>
+                        <option value="JSL">JSL (Japanese Sign Language)</option>
+                        <option value="CSL">CSL (Chinese Sign Language)</option>
+                        <option value="LSF">LSF (French Sign Language)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Input Type" data-ko="입력 유형">Input Type</label>
+                    <select id="inputType">
+                        <option value="video" data-en="Video Stream" data-ko="비디오 스트림">Video Stream</option>
+                        <option value="image" data-en="Image Sequence" data-ko="이미지 시퀀스">Image Sequence</option>
+                        <option value="skeleton" data-en="Skeleton Data" data-ko="스켈레톤 데이터">Skeleton Data</option>
+                        <option value="depth" data-en="Depth Camera" data-ko="깊이 카메라">Depth Camera</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="video-preview">
+                <div class="video-placeholder">
+                    <div class="gesture-icon">🤟</div>
+                    <div style="color: var(--text-muted);">
+                        <span data-en="Camera preview area for sign language recognition"
+                              data-ko="수화 인식을 위한 카메라 미리보기 영역">Camera preview area for sign language recognition</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gesture-grid">
+                <div class="gesture-card active" onclick="selectGesture('hello')">
+                    <div class="emoji">👋</div>
+                    <div class="label" data-en="Hello" data-ko="안녕하세요">Hello</div>
+                </div>
+                <div class="gesture-card" onclick="selectGesture('thank')">
+                    <div class="emoji">🙏</div>
+                    <div class="label" data-en="Thank You" data-ko="감사합니다">Thank You</div>
+                </div>
+                <div class="gesture-card" onclick="selectGesture('yes')">
+                    <div class="emoji">👍</div>
+                    <div class="label" data-en="Yes" data-ko="네">Yes</div>
+                </div>
+                <div class="gesture-card" onclick="selectGesture('no')">
+                    <div class="emoji">👎</div>
+                    <div class="label" data-en="No" data-ko="아니오">No</div>
+                </div>
+                <div class="gesture-card" onclick="selectGesture('love')">
+                    <div class="emoji">🤟</div>
+                    <div class="label" data-en="I Love You" data-ko="사랑해요">I Love You</div>
+                </div>
+                <div class="gesture-card" onclick="selectGesture('help')">
+                    <div class="emoji">🆘</div>
+                    <div class="label" data-en="Help" data-ko="도와주세요">Help</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateSignData()"
+                        data-en="📊 Generate WIA Data" data-ko="📊 WIA 데이터 생성">📊 Generate WIA Data</button>
+            </div>
+
+            <div class="output-display" id="dataOutput" style="display: none;"></div>
+        </div>
+
+        <!-- Algorithms Panel -->
+        <div id="algorithms" class="panel">
+            <h2 data-en="Recognition Algorithms" data-ko="인식 알고리즘">Recognition Algorithms</h2>
+
+            <div class="form-group">
+                <label data-en="AI/ML Model" data-ko="AI/ML 모델">AI/ML Model</label>
+                <select id="mlModel">
+                    <option value="mediapipe">MediaPipe Holistic</option>
+                    <option value="openpose">OpenPose</option>
+                    <option value="yolo">YOLO-v8 Pose</option>
+                    <option value="transformer">Sign Language Transformer</option>
+                    <option value="lstm">LSTM Sequence Model</option>
+                    <option value="cnn">3D CNN</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Detection Confidence" data-ko="감지 신뢰도">Detection Confidence</label>
+                    <input type="range" id="confidence" min="0" max="100" value="85"
+                           oninput="document.getElementById('confValue').textContent = this.value + '%'">
+                    <div style="text-align: center; margin-top: 5px; color: var(--primary);">
+                        <span id="confValue">85%</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-en="Processing Mode" data-ko="처리 모드">Processing Mode</label>
+                    <select id="processingMode">
+                        <option value="realtime" data-en="Real-time" data-ko="실시간">Real-time</option>
+                        <option value="batch" data-en="Batch Processing" data-ko="배치 처리">Batch Processing</option>
+                        <option value="offline" data-en="Offline Analysis" data-ko="오프라인 분석">Offline Analysis</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <div class="stat-value">98.5%</div>
+                    <div class="stat-label" data-en="Accuracy" data-ko="정확도">Accuracy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">30fps</div>
+                    <div class="stat-label" data-en="Frame Rate" data-ko="프레임률">Frame Rate</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">45ms</div>
+                    <div class="stat-label" data-en="Latency" data-ko="지연시간">Latency</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">21</div>
+                    <div class="stat-label" data-en="Keypoints" data-ko="키포인트">Keypoints</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="analyzeGesture()"
+                        data-en="🔢 Analyze Gesture" data-ko="🔢 제스처 분석">🔢 Analyze Gesture</button>
+            </div>
+
+            <div class="output-display" id="algorithmOutput" style="display: none;"></div>
+
+            <div style="margin-top: 30px; padding: 20px; background: var(--bg); border-radius: 12px;">
+                <h4 style="margin-bottom: 15px; color: var(--primary);" data-en="Hand Keypoints Detection" data-ko="손 키포인트 감지">Hand Keypoints Detection</h4>
+                <pre style="color: var(--text-muted);">
+21 Hand Landmarks (MediaPipe):
+  0: Wrist
+  1-4: Thumb (CMC, MCP, IP, TIP)
+  5-8: Index (MCP, PIP, DIP, TIP)
+  9-12: Middle (MCP, PIP, DIP, TIP)
+  13-16: Ring (MCP, PIP, DIP, TIP)
+  17-20: Pinky (MCP, PIP, DIP, TIP)
+
+Pose: 33 body landmarks
+Face: 468 facial landmarks
+                </pre>
+            </div>
+        </div>
+
+        <!-- Protocol Panel -->
+        <div id="protocol" class="panel">
+            <h2 data-en="Communication Protocol" data-ko="통신 프로토콜">Communication Protocol</h2>
+
+            <p style="margin-bottom: 20px; color: var(--text-muted);"
+               data-en="WIA Sign Language Recognition Standard supports multiple protocols for real-time and batch processing."
+               data-ko="WIA 수화 인식 표준은 실시간 및 배치 처리를 위한 여러 프로토콜을 지원합니다."></p>
+
+            <div class="language-grid">
+                <div class="language-card active" onclick="selectProtocol('websocket')">
+                    <div class="language-icon">⚡</div>
+                    <h4>WebSocket Stream</h4>
+                    <p data-en="Real-time bidirectional communication. Low latency streaming."
+                       data-ko="실시간 양방향 통신. 저지연 스트리밍."></p>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--secondary);">
+                        ws://api.wia.sign/v1/stream
+                    </div>
+                </div>
+
+                <div class="language-card" onclick="selectProtocol('rest')">
+                    <div class="language-icon">🌐</div>
+                    <h4>REST API</h4>
+                    <p data-en="HTTP-based request/response. Batch processing support."
+                       data-ko="HTTP 기반 요청/응답. 배치 처리 지원."></p>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--secondary);">
+                        https://api.wia.sign/v1/recognize
+                    </div>
+                </div>
+
+                <div class="language-card" onclick="selectProtocol('grpc')">
+                    <div class="language-icon">📡</div>
+                    <h4>gRPC</h4>
+                    <p data-en="High-performance RPC framework. Binary protocol efficiency."
+                       data-ko="고성능 RPC 프레임워크. 바이너리 프로토콜 효율성."></p>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--secondary);">
+                        grpc://api.wia.sign:50051
+                    </div>
+                </div>
+
+                <div class="language-card" onclick="selectProtocol('mqtt')">
+                    <div class="language-icon">📨</div>
+                    <h4>MQTT</h4>
+                    <p data-en="IoT messaging protocol. Pub/sub pattern for devices."
+                       data-ko="IoT 메시징 프로토콜. 기기용 게시/구독 패턴."></p>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--secondary);">
+                        mqtt://broker.wia.sign:1883
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testProtocol()"
+                        data-en="📡 Test Connection" data-ko="📡 연결 테스트">📡 Test Connection</button>
+            </div>
+
+            <div class="output-display" id="protocolOutput" style="display: none;"></div>
+        </div>
+
+        <!-- Integration Panel -->
+        <div id="integration" class="panel">
+            <h2 data-en="Real-time Translation" data-ko="실시간 번역">Real-time Translation</h2>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Source Sign Language" data-ko="원본 수화">Source Sign Language</label>
+                    <select id="sourceLanguage">
+                        <option value="ASL">ASL (American)</option>
+                        <option value="BSL">BSL (British)</option>
+                        <option value="KSL">KSL (Korean)</option>
+                        <option value="JSL">JSL (Japanese)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Target Language" data-ko="대상 언어">Target Language</label>
+                    <select id="targetLanguage">
+                        <option value="en">English</option>
+                        <option value="ko">Korean (한국어)</option>
+                        <option value="ja">Japanese (日本語)</option>
+                        <option value="zh">Chinese (中文)</option>
+                        <option value="es">Spanish (Español)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="translation-display">
+                <div class="translation-row">
+                    <div class="translation-box">
+                        <div class="translation-label" data-en="Sign Language Input" data-ko="수화 입력">Sign Language Input</div>
+                        <div class="translation-text" style="font-size: 3rem; text-align: center;">🤟</div>
+                        <div style="text-align: center; margin-top: 10px; color: var(--text-muted);">
+                            <span data-en="ASL: 'Hello'" data-ko="ASL: '안녕하세요'">ASL: "Hello"</span>
+                        </div>
+                    </div>
+                    <div class="translation-arrow">→</div>
+                    <div class="translation-box">
+                        <div class="translation-label" data-en="Text Output" data-ko="텍스트 출력">Text Output</div>
+                        <div class="translation-text">Hello, how are you?</div>
+                        <div style="margin-top: 10px; font-size: 0.85rem; color: var(--secondary);">
+                            ✓ <span data-en="Confidence: 98.5%" data-ko="신뢰도: 98.5%">Confidence: 98.5%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Voice Output" data-ko="음성 출력">Voice Output</label>
+                    <select id="voiceOutput">
+                        <option value="enabled" data-en="Enabled (TTS)" data-ko="활성화 (TTS)">Enabled (TTS)</option>
+                        <option value="disabled" data-en="Disabled" data-ko="비활성화">Disabled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Caption Display" data-ko="자막 표시">Caption Display</label>
+                    <select id="captionDisplay">
+                        <option value="overlay" data-en="Video Overlay" data-ko="비디오 오버레이">Video Overlay</option>
+                        <option value="separate" data-en="Separate Window" data-ko="별도 창">Separate Window</option>
+                        <option value="none" data-en="None" data-ko="없음">None</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startTranslation()"
+                        data-en="▶️ Start Translation" data-ko="▶️ 번역 시작">▶️ Start Translation</button>
+                <button class="btn btn-outline" onclick="stopTranslation()"
+                        data-en="⏸️ Stop" data-ko="⏸️ 정지">⏸️ Stop</button>
+            </div>
+
+            <div class="output-display" id="integrationOutput" style="display: none;"></div>
+        </div>
+
+        <!-- Test Panel -->
+        <div id="test" class="panel">
+            <h2 data-en="Recognition Test & Validation" data-ko="인식 테스트 및 검증">Recognition Test & Validation</h2>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Test Dataset" data-ko="테스트 데이터셋">Test Dataset</label>
+                    <select id="testDataset">
+                        <option value="wlasl">WLASL (Word-Level ASL)</option>
+                        <option value="phoenix">PHOENIX-2014</option>
+                        <option value="csl">CSL Dataset</option>
+                        <option value="jsl">JSL Corpus</option>
+                        <option value="custom">Custom Dataset</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Test Type" data-ko="테스트 유형">Test Type</label>
+                    <select id="testType">
+                        <option value="full" data-en="Full Validation" data-ko="전체 검증">Full Validation</option>
+                        <option value="quick" data-en="Quick Test" data-ko="빠른 테스트">Quick Test</option>
+                        <option value="gesture" data-en="Gesture Only" data-ko="제스처만">Gesture Only</option>
+                        <option value="sentence" data-en="Sentence Level" data-ko="문장 레벨">Sentence Level</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runRecognitionTest()"
+                        data-en="🧪 Run Test" data-ko="🧪 테스트 실행">🧪 Run Test</button>
+            </div>
+
+            <div id="testResult" class="test-result test-pass" style="display: none;">
+                <h3 id="testTitle" data-en="✅ Recognition Test Passed" data-ko="✅ 인식 테스트 통과">✅ Recognition Test Passed</h3>
+                <ul class="test-list" id="testList">
+                    <li><span style="color: var(--secondary);">✅</span> <span>Model loaded successfully</span></li>
+                    <li><span style="color: var(--secondary);">✅</span> <span>Hand detection: 100% (21/21 landmarks)</span></li>
+                    <li><span style="color: var(--secondary);">✅</span> <span>Gesture recognition: 98.5% accuracy</span></li>
+                    <li><span style="color: var(--secondary);">✅</span> <span>Translation latency: 45ms</span></li>
+                    <li><span style="color: var(--secondary);">✅</span> <span>WIA format compliant</span></li>
+                </ul>
+            </div>
+
+            <div class="stats-bar" style="margin-top: 30px;">
+                <div class="stat-item">
+                    <div class="stat-value">5,000+</div>
+                    <div class="stat-label" data-en="Gestures" data-ko="제스처">Gestures</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">300+</div>
+                    <div class="stat-label" data-en="Languages" data-ko="언어">Languages</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">98.5%</div>
+                    <div class="stat-label" data-en="Accuracy" data-ko="정확도">Accuracy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">70M+</div>
+                    <div class="stat-label" data-en="Users" data-ko="사용자">Users</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <h2 data-en="Master the WIA Sign Language Recognition Standard"
+                data-ko="WIA 수화 인식 표준 마스터하기"></h2>
+            <p data-en="Get the official ebook with complete specifications, ML models, and implementation guides."
+               data-ko="완전한 사양, ML 모델 및 구현 가이드가 포함된 공식 전자책을 받으세요."></p>
+            <div class="price-tag">$99 USD</div>
+            <div class="cta-buttons">
+                <a href="../ebook/en/index.html" class="btn btn-primary"
+                   data-en="📚 Get the Ebook" data-ko="📚 전자책 구매">📚 Get the Ebook</a>
+                <a href="https://cert.wiastandards.com" target="_blank"
+                   class="btn btn-secondary"
+                   data-en="🏆 Get Certified" data-ko="🏆 인증 받기">🏆 Get Certified</a>
+            </div>
+        </section>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="Breaking communication barriers for the deaf community" data-ko="청각장애인 커뮤니티를 위한 소통 장벽 허물기">Breaking communication barriers for the deaf community</p>
+            <p style="margin-top: 15px;">WIA - World Certification Industry Association</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        let currentGesture = 'hello';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('[data-en]').forEach(el => {
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                } else if (el.tagName === 'OPTION') {
+                    el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                } else {
+                    el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                }
+            });
+        }
+
+        function showPanel(panelId) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function selectGesture(gesture) {
+            currentGesture = gesture;
+            document.querySelectorAll('.gesture-card').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function generateSignData() {
+            const signLang = document.getElementById('signLanguage').value;
+            const inputType = document.getElementById('inputType').value;
+
+            const data = {
+                format: "WIA-SIGN-LANGUAGE-v1.0",
+                timestamp: new Date().toISOString(),
+                input: {
+                    type: inputType,
+                    language: signLang,
+                    fps: 30,
+                    resolution: "1280x720"
+                },
+                gesture: {
+                    id: currentGesture,
+                    confidence: 0.985,
+                    keypoints: {
+                        left_hand: [[0.5, 0.5, 0.9], [0.52, 0.48, 0.95]],
+                        right_hand: [[0.6, 0.5, 0.92], [0.62, 0.48, 0.94]],
+                        pose: [[0.55, 0.3, 0.88]]
+                    },
+                    bounding_box: {
+                        x: 320, y: 180, width: 640, height: 360
+                    }
+                },
+                recognition: {
+                    text: "Hello",
+                    language: signLang,
+                    confidence: 0.985,
+                    alternatives: [
+                        { text: "Hi", confidence: 0.92 },
+                        { text: "Hey", confidence: 0.88 }
+                    ]
+                }
+            };
+
+            const output = document.getElementById('dataOutput');
+            output.style.display = 'block';
+            output.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function analyzeGesture() {
+            const model = document.getElementById('mlModel').value;
+            const confidence = document.getElementById('confidence').value;
+            const mode = document.getElementById('processingMode').value;
+
+            const analysis = {
+                model: model,
+                confidence_threshold: parseFloat(confidence) / 100,
+                processing_mode: mode,
+                detected_landmarks: {
+                    left_hand: 21,
+                    right_hand: 21,
+                    pose: 33,
+                    face: 468
+                },
+                performance: {
+                    fps: 30,
+                    latency_ms: 45,
+                    gpu_usage: "45%",
+                    memory_mb: 512
+                },
+                recognition: {
+                    gesture: currentGesture,
+                    confidence: 0.985,
+                    processing_time_ms: 33
+                }
+            };
+
+            const output = document.getElementById('algorithmOutput');
+            output.style.display = 'block';
+            output.textContent = JSON.stringify(analysis, null, 2);
+        }
+
+        function selectProtocol(protocol) {
+            document.querySelectorAll('.language-card').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function testProtocol() {
+            const output = document.getElementById('protocolOutput');
+            output.style.display = 'block';
+            output.textContent = JSON.stringify({
+                protocol: "WebSocket Stream",
+                status: "Connected",
+                endpoint: "wss://api.wia.sign/v1/stream",
+                connection: {
+                    latency_ms: 12,
+                    bandwidth_mbps: 5.2,
+                    packet_loss: 0.01
+                },
+                test_results: {
+                    handshake: "PASS",
+                    authentication: "PASS",
+                    streaming: "PASS",
+                    wia_compatible: true
+                }
+            }, null, 2);
+        }
+
+        function startTranslation() {
+            const output = document.getElementById('integrationOutput');
+            output.style.display = 'block';
+            output.textContent = "Translation started...\n\n" + JSON.stringify({
+                status: "streaming",
+                source: document.getElementById('sourceLanguage').value,
+                target: document.getElementById('targetLanguage').value,
+                voice: document.getElementById('voiceOutput').value,
+                caption: document.getElementById('captionDisplay').value,
+                fps: 30,
+                latency_ms: 45
+            }, null, 2);
+        }
+
+        function stopTranslation() {
+            const output = document.getElementById('integrationOutput');
+            if (output.style.display === 'block') {
+                output.textContent += "\n\nTranslation stopped.";
+            }
+        }
+
+        function runRecognitionTest() {
+            const result = document.getElementById('testResult');
+            result.style.display = 'block';
+            result.className = 'test-result test-pass';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

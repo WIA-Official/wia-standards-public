@@ -1,0 +1,631 @@
+<<<<<<< HEAD
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Sensor Fusion & Multi-Modal Sensing | WIA-SEMI-015</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #8B5CF6; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1rem; border-radius: 5px; overflow-x: auto; border: 1px solid var(--border); margin: 1rem 0; }
+        pre code { padding: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 5</p>
+        <h1>Sensor Fusion & Multi-Modal Sensing</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Combining accelerometer, gyroscope, magnetometer, environmental sensors; Kalman filtering, complementary filters, and multi-sensor data integration
+        </p>
+
+        <h2>Overview</h2>
+        <p>
+            Sensor fusion combines data from multiple sensors to achieve superior performance, reliability, and accuracy compared to individual sensors. By intelligently merging complementary information, smart sensor systems can determine 3D orientation, detect complex activities, estimate position, compensate for sensor drift and noise, and provide redundancy for safety-critical applications. The WIA-SEMI-015 standard encourages multi-sensor architectures, particularly for applications requiring high reliability or complex environmental understanding.
+        </p>
+        <p>
+            This chapter explores sensor fusion algorithms ranging from simple complementary filters to sophisticated Kalman filters, multi-modal sensing strategies combining motion, environmental, and audio sensors, and practical implementation considerations for resource-constrained microcontrollers.
+        </p>
+
+        <div class="highlight-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>Sensor fusion improves accuracy, reduces noise, and provides redundancy</li>
+                <li>Complementary filters offer simplicity and low computational cost</li>
+                <li>Kalman filters provide optimal estimation but require careful tuning</li>
+                <li>9-axis IMUs (accel + gyro + mag) enable robust 3D orientation tracking</li>
+                <li>Multi-modal sensing (motion + environmental + audio) enhances context awareness</li>
+            </ul>
+        </div>
+
+        <h2>Fundamentals of Sensor Fusion</h2>
+        <p>
+            Individual sensors have inherent limitations: accelerometers suffer from vibration noise and cannot measure rotation around gravity vector, gyroscopes accumulate drift over time due to bias instability, magnetometers are affected by local magnetic disturbances (hard iron, soft iron), and barometric pressure sensors exhibit altitude noise and weather-related variations. Sensor fusion addresses these limitations by combining complementary information.
+        </p>
+
+        <h3>Complementary Sensor Characteristics</h3>
+        <p>
+            Different sensor types excel at different frequency ranges and timescales. Accelerometers provide accurate static orientation (gravity direction) with high-frequency noise, suitable for DC to 10 Hz accurate measurements. Gyroscopes measure angular velocity with low noise at high frequencies but drift at DC, accurate from 0.1 Hz to 100+ Hz. Magnetometers determine absolute heading (yaw) but are slow to respond, useful for DC to 1 Hz. Fusion algorithms leverage these complementary characteristics by using each sensor where it performs best.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Sensor</th><th>Strengths</th><th>Weaknesses</th><th>Frequency Range</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Accelerometer</td><td>Accurate static tilt, gravity sensing</td><td>Vibration noise, no yaw info</td><td>DC - 10 Hz</td></tr>
+                <tr><td>Gyroscope</td><td>Dynamic motion, high bandwidth</td><td>Drift over time, no absolute ref</td><td>0.1 Hz - 100 Hz</td></tr>
+                <tr><td>Magnetometer</td><td>Absolute heading (yaw)</td><td>Magnetic disturbances, slow</td><td>DC - 1 Hz</td></tr>
+                <tr><td>Barometer</td><td>Altitude/floor detection</td><td>Weather drift, noise</td><td>DC - 0.1 Hz</td></tr>
+            </tbody>
+        </table>
+
+        <h2>6-Axis Sensor Fusion (Accelerometer + Gyroscope)</h2>
+        <p>
+            The most common fusion configuration combines 3-axis accelerometer and 3-axis gyroscope to estimate device orientation (roll, pitch, yaw). This 6-DOF (Degrees of Freedom) IMU provides reliable pitch and roll but cannot determine absolute yaw without magnetometer.
+        </p>
+
+        <h3>Complementary Filter</h3>
+        <p>
+            The complementary filter represents the simplest and most computationally efficient fusion approach. It applies a high-pass filter to gyroscope-derived orientation (removing drift) and a low-pass filter to accelerometer-derived orientation (removing noise), then combines the results.
+        </p>
+
+<pre><code>// Complementary filter for pitch/roll estimation
+// alpha = filter coefficient (typically 0.98-0.99)
+const float alpha = 0.98;
+const float dt = 0.01;  // 10ms sample interval
+
+// Previous orientation estimate (pitch, roll in radians)
+float pitch = 0, roll = 0;
+
+// Read sensors
+float accel_x, accel_y, accel_z;      // m/s²
+float gyro_x, gyro_y, gyro_z;         // rad/s
+read_accelerometer(&accel_x, &accel_y, &accel_z);
+read_gyroscope(&gyro_x, &gyro_y, &gyro_z);
+
+// Integrate gyroscope (high-frequency component)
+pitch += gyro_x * dt;
+roll  += gyro_y * dt;
+
+// Calculate orientation from accelerometer (low-frequency)
+float accel_pitch = atan2(accel_y, sqrt(accel_x*accel_x + accel_z*accel_z));
+float accel_roll  = atan2(-accel_x, accel_z);
+
+// Complementary fusion
+pitch = alpha * pitch + (1 - alpha) * accel_pitch;
+roll  = alpha * roll  + (1 - alpha) * accel_roll;
+</code></pre>
+
+        <p>
+            The complementary filter provides 5-10° accuracy for gentle motions, runs in <1ms on Cortex-M4, requires minimal memory (<100 bytes state), and is simple to implement and tune. However, it degrades during high acceleration (linear motion confuses accelerometer) and cannot estimate yaw without magnetometer.
+        </p>
+
+        <h3>Madgwick Filter</h3>
+        <p>
+            The Madgwick filter, developed by Sebastian Madgwick, uses gradient descent optimization to find the orientation quaternion that best aligns predicted gravity/magnetic field with measured values. It offers better performance than complementary filters with similar computational cost.
+        </p>
+        <p>
+            The algorithm represents orientation as quaternion (q0, q1, q2, q3), runs at 100-500 Hz sampling rate, achieves 2-5° accuracy under normal conditions, and executes in 2-5ms on Cortex-M4. Open-source implementations are widely available, and the single tuning parameter (beta, filter gain) simplifies configuration.
+        </p>
+
+        <h2>9-Axis Sensor Fusion (Accelerometer + Gyroscope + Magnetometer)</h2>
+        <p>
+            Adding a 3-axis magnetometer enables full 3D orientation estimation including absolute yaw (heading). This 9-DOF IMU configuration is essential for navigation, AR/VR, and robotics applications.
+        </p>
+
+        <h3>Extended Kalman Filter (EKF)</h3>
+        <p>
+            The Kalman filter provides optimal state estimation in the presence of noise, predicting system state based on motion model and correcting predictions using sensor measurements. The Extended Kalman Filter handles the nonlinear orientation dynamics.
+        </p>
+
+        <h3>EKF Algorithm Overview</h3>
+        <p>
+            The algorithm maintains state vector (orientation quaternion, gyro bias) and covariance matrix (uncertainty estimate). The prediction step integrates gyroscope measurements to predict orientation change and propagates uncertainty. The update step compares predicted gravity/magnetic field with accelerometer/magnetometer measurements, computes Kalman gain (optimal weighting), and updates state estimate and covariance.
+        </p>
+        <p>
+            EKF provides optimal estimation (minimum variance), handles sensor noise rigorously, estimates gyro bias online, and achieves 1-3° accuracy with proper tuning. However, it requires higher computational cost (10-30ms on Cortex-M4), needs careful tuning of process/measurement noise covariance, and demands 2-4KB memory for matrices.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Algorithm</th><th>Complexity</th><th>Accuracy</th><th>CPU Time (M4)</th><th>Memory</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Complementary Filter</td><td>Low</td><td>5-10°</td><td><1 ms</td><td><100 B</td></tr>
+                <tr><td>Madgwick Filter</td><td>Medium</td><td>2-5°</td><td>2-5 ms</td><td>~200 B</td></tr>
+                <tr><td>Mahony Filter</td><td>Medium</td><td>2-5°</td><td>2-5 ms</td><td>~200 B</td></tr>
+                <tr><td>Extended Kalman Filter</td><td>High</td><td>1-3°</td><td>10-30 ms</td><td>2-4 KB</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Magnetometer Calibration</h2>
+        <p>
+            Magnetometers require calibration to compensate for hard iron (constant offset from ferromagnetic materials) and soft iron (distortion from paramagnetic materials) effects. Without calibration, heading errors can exceed 20-40°.
+        </p>
+
+        <h3>Hard Iron Calibration</h3>
+        <p>
+            Hard iron effects cause constant offset in all three axes. Calibration involves rotating the sensor through all orientations, collecting magnetometer readings forming a sphere offset from origin, calculating sphere center (hard iron offset), and subtracting offset from all future measurements.
+        </p>
+
+        <h3>Soft Iron Calibration</h3>
+        <p>
+            Soft iron effects distort the magnetic field, stretching the measurement sphere into an ellipsoid. Calibration determines the transformation matrix converting ellipsoid to sphere. This is more complex than hard iron correction and may require factory calibration or sophisticated field procedures.
+        </p>
+
+        <h2>Activity Recognition Through Multi-Modal Fusion</h2>
+        <p>
+            Combining motion sensors (accelerometer, gyroscope) with environmental sensors (pressure, temperature) and audio enables sophisticated activity recognition and context awareness.
+        </p>
+
+        <h3>Common Activity Patterns</h3>
+        <p>
+            Walking exhibits periodic accelerometer pattern (1-2 Hz stride frequency), low gyroscope activity (minimal rotation), and gradual pressure changes (floor-to-floor). Running shows higher frequency accelerometer pattern (2-3 Hz), moderate gyroscope activity, and rapid pressure changes. Cycling presents low-frequency pedaling motion (1-1.5 Hz), steady orientation, and variable pressure (terrain). Ascending stairs displays distinct vertical acceleration, periodic gyroscope rotation, and consistent pressure decrease (~12 Pa per meter).
+        </p>
+
+        <h3>ML-Based Activity Classification</h3>
+        <p>
+            TinyML models trained on multi-modal sensor data achieve 95%+ accuracy for common activities. The feature extraction process includes accelerometer magnitude and spectral features, gyroscope energy in frequency bands, barometer rate of change, and window-based statistics (mean, variance, peak). The classification employs 1D CNN or LSTM networks (10-30KB models) with 5-20ms inference time and 92-98% accuracy on standard datasets.
+        </p>
+
+        <h2>Environmental Context from Multi-Sensor Data</h2>
+        <p>
+            Combining environmental sensors provides rich context for smart building, agricultural, and industrial applications.
+        </p>
+
+        <h3>Indoor/Outdoor Detection</h3>
+        <p>
+            Algorithms combine multiple cues: light level (indoor: <500 lux, outdoor: >5000 lux), UV index (indoor: near zero, outdoor: measurable), temperature variation (indoor: stable, outdoor: diurnal cycle), and barometric pressure patterns. Machine learning models achieve 90-95% accuracy using these features.
+        </p>
+
+        <h3>HVAC Optimization</h3>
+        <p>
+            Smart building sensors measure temperature (multiple zones), humidity (comfort and mold prevention), CO2 (occupancy proxy, air quality), and VOC (volatile organic compounds, indoor air quality). Fusion algorithms correlate occupancy (PIR, CO2) with thermal comfort, predict HVAC load from weather and schedule, and optimize setpoints for energy efficiency while maintaining comfort.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Application</th><th>Primary Sensors</th><th>Fusion Output</th><th>Accuracy Target</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Activity Recognition</td><td>Accel, Gyro, Pressure</td><td>Activity class, energy expenditure</td><td>>95%</td></tr>
+                <tr><td>Fall Detection</td><td>Accel, Gyro, Pressure</td><td>Fall event, impact severity</td><td>>98%</td></tr>
+                <tr><td>Navigation</td><td>Accel, Gyro, Mag, GPS</td><td>Position, heading, velocity</td><td>1-3m, 2-5°</td></tr>
+                <tr><td>Occupancy Detection</td><td>PIR, CO2, Temp, Audio</td><td>Occupant count, presence</td><td>90-95%</td></tr>
+                <tr><td>Indoor Positioning</td><td>Accel, Gyro, Mag, BLE RSSI</td><td>Room-level location</td><td>2-5m</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Implementation Considerations</h2>
+        <p>
+            Practical sensor fusion implementation on microcontrollers requires attention to numerical precision, sampling synchronization, and computational efficiency.
+        </p>
+
+        <h3>Fixed-Point Arithmetic</h3>
+        <p>
+            For Cortex-M4F and higher, floating-point hardware makes FP32 practical. For Cortex-M0/M3 without FPU, fixed-point representations (Q15, Q31) provide 5-10× speedup. Carefully manage scaling and overflow in filter implementations.
+        </p>
+
+        <h3>Sensor Synchronization</h3>
+        <p>
+            Fusion algorithms assume simultaneous sensor readings. Implement synchronized sampling using hardware timer triggering all ADC/I2C reads, software timestamping to correct for delays, or interpolation when sensors have different rates. Typical requirements demand <10ms synchronization tolerance for inertial fusion.
+        </p>
+
+        <h3>Calibration Storage</h3>
+        <p>
+            Store calibration parameters (accelerometer offset/scale, magnetometer hard/soft iron, gyroscope bias) in non-volatile memory. Implement field calibration routines, validate calibration quality, and provide user feedback during calibration procedures.
+        </p>
+
+        <h2>Review Questions</h2>
+        <div class="info-box">
+            <ol>
+                <li>Explain why sensor fusion is necessary for accurate orientation estimation. What are the limitations of using accelerometer or gyroscope alone?</li>
+                <li>Compare complementary filter and Extended Kalman Filter in terms of computational cost, accuracy, and ease of implementation.</li>
+                <li>What are hard iron and soft iron effects in magnetometers? How are they calibrated?</li>
+                <li>Describe how multi-modal sensing (accelerometer + gyroscope + barometer) improves activity recognition accuracy.</li>
+                <li>Why is 9-axis fusion (accel + gyro + mag) necessary for absolute heading estimation?</li>
+                <li>What are the typical accuracy targets for orientation estimation in wearable and navigation applications?</li>
+                <li>Explain the importance of sensor synchronization in fusion algorithms.</li>
+            </ol>
+        </div>
+
+        <h2>Summary</h2>
+        <p>
+            This chapter explored sensor fusion techniques that combine data from multiple sensors to achieve superior performance compared to individual sensors. We covered complementary filters (simple, efficient, 5-10° accuracy), Madgwick/Mahony filters (moderate complexity, 2-5° accuracy), and Extended Kalman Filters (optimal estimation, 1-3° accuracy). Multi-modal sensing combining motion, environmental, and audio sensors enables sophisticated activity recognition (>95% accuracy) and context awareness for smart building, wearable, and industrial applications. Practical implementation requires attention to magnetometer calibration, sensor synchronization, and computational efficiency on resource-constrained microcontrollers.
+        </p>
+
+        </div>
+</body>
+</html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Power Optimization Strategies | WIA-SMART-SENSOR</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #22c55e; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .code-block { background: #1a1a2e; border: 1px solid var(--border); border-radius: 5px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Monaco', monospace; font-size: 0.9rem; }
+        .code-block code { color: #a5f3fc; background: none; padding: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; }
+        .spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
+        .spec-card { background: var(--bg); padding: 1.5rem; border-radius: 8px; text-align: center; border: 2px solid var(--border); }
+        .spec-value { font-size: 1.8rem; color: var(--primary); font-weight: bold; }
+        .spec-label { color: var(--text-secondary); margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 5</p>
+        <h1>Power Optimization Strategies</h1>
+
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Power consumption is often the primary constraint in smart sensor design. This chapter explores comprehensive strategies for minimizing energy usage while maintaining required functionality, from hardware selection to software optimization and energy harvesting techniques.
+        </p>
+
+        <h2>Power Budget Analysis</h2>
+
+        <p>
+            Effective power optimization begins with a thorough understanding of where energy is consumed. A detailed power budget analysis identifies the major consumers and guides optimization efforts to areas with the highest impact. Modern smart sensors must operate within strict power envelopes, often measured in microwatts for always-on operation.
+        </p>
+
+        <div class="spec-grid">
+            <div class="spec-card">
+                <div class="spec-value">1-10 µA</div>
+                <div class="spec-label">Deep Sleep Current</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">100-500 µA</div>
+                <div class="spec-label">Sensing Current</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">1-10 mA</div>
+                <div class="spec-label">Processing Current</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">10-100 mA</div>
+                <div class="spec-label">Transmission Current</div>
+            </div>
+        </div>
+
+        <h3>Power Consumption Components</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Active Power</th>
+                    <th>Sleep Power</th>
+                    <th>Duty Cycle Impact</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>MCU Core</strong></td>
+                    <td>50-200 µA/MHz</td>
+                    <td>0.5-5 µA</td>
+                    <td>High - optimize algorithms</td>
+                </tr>
+                <tr>
+                    <td><strong>Sensors (MEMS)</strong></td>
+                    <td>10-500 µA</td>
+                    <td>0.1-1 µA</td>
+                    <td>Medium - duty cycle sensing</td>
+                </tr>
+                <tr>
+                    <td><strong>ADC</strong></td>
+                    <td>100-1000 µA</td>
+                    <td>0 (power gated)</td>
+                    <td>Medium - sample rate reduction</td>
+                </tr>
+                <tr>
+                    <td><strong>Radio (BLE)</strong></td>
+                    <td>5-15 mA TX, 5-10 mA RX</td>
+                    <td>0.5-2 µA</td>
+                    <td>Very High - minimize TX time</td>
+                </tr>
+                <tr>
+                    <td><strong>Voltage Regulators</strong></td>
+                    <td>1-50 µA quiescent</td>
+                    <td>0.1-1 µA</td>
+                    <td>Low - careful selection</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Hardware-Level Optimization</h2>
+
+        <h3>Low-Power Component Selection</h3>
+
+        <p>
+            Selecting components with the lowest power consumption for the required performance is fundamental. Modern ultra-low-power MCUs achieve active currents below 30 µA/MHz and sleep currents under 1 µA with full RAM retention. Similarly, sensors should be chosen based on both performance and power specifications, considering the specific duty cycle requirements of the application.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Component Selection Criteria:</strong>
+            <ul>
+                <li><strong>MCU:</strong> Active current per MHz, sleep modes, wake-up time, integrated peripherals</li>
+                <li><strong>Sensors:</strong> Operating current, standby current, measurement time, on-chip processing</li>
+                <li><strong>Radio:</strong> TX/RX current, sleep current, wake-up latency, data rate</li>
+                <li><strong>Regulators:</strong> Quiescent current, efficiency at light loads, dropout voltage</li>
+                <li><strong>Memory:</strong> Retention current, access energy, standby power</li>
+            </ul>
+        </div>
+
+        <h3>Power Domain Management</h3>
+
+        <p>
+            Dividing the system into independently controllable power domains allows unused sections to be completely powered off. This is more effective than sleep modes for components that are needed only intermittently. Power gating transistors or load switches enable fine-grained control over power delivery.
+        </p>
+
+        <div class="code-block">
+<code>// Power Domain Control Example
+typedef enum {
+    DOMAIN_CORE,      // MCU core, always on
+    DOMAIN_SENSORS,   // Sensor subsystem
+    DOMAIN_RADIO,     // Wireless communication
+    DOMAIN_STORAGE,   // External flash/EEPROM
+    DOMAIN_DISPLAY    // Optional display
+} PowerDomain;
+
+typedef struct {
+    GPIO_TypeDef* enable_port;
+    uint16_t enable_pin;
+    uint32_t startup_delay_us;
+    float quiescent_current_uA;
+} DomainConfig;
+
+void power_domain_enable(PowerDomain domain) {
+    DomainConfig* cfg = &domain_configs[domain];
+    
+    // Enable power switch
+    HAL_GPIO_WritePin(cfg->enable_port, cfg->enable_pin, GPIO_PIN_SET);
+    
+    // Wait for power rail to stabilize
+    delay_us(cfg->startup_delay_us);
+    
+    // Initialize peripherals in this domain
+    domain_init_peripherals(domain);
+}
+
+void power_domain_disable(PowerDomain domain) {
+    // Deinitialize peripherals first
+    domain_deinit_peripherals(domain);
+    
+    // Disable power switch
+    DomainConfig* cfg = &domain_configs[domain];
+    HAL_GPIO_WritePin(cfg->enable_port, cfg->enable_pin, GPIO_PIN_RESET);
+}</code>
+        </div>
+
+        <h2>Software-Level Optimization</h2>
+
+        <h3>Duty Cycling Strategies</h3>
+
+        <p>
+            The most effective power reduction technique is minimizing the time spent in high-power states. Duty cycling involves waking the system only when necessary, performing required operations as quickly as possible, and returning to sleep. The key metrics are duty cycle (active time / total time) and the efficiency of wake/sleep transitions.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy</th>
+                    <th>Description</th>
+                    <th>Power Savings</th>
+                    <th>Trade-offs</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Periodic Sampling</strong></td>
+                    <td>Wake at fixed intervals</td>
+                    <td>90-99%</td>
+                    <td>May miss events</td>
+                </tr>
+                <tr>
+                    <td><strong>Event-Driven</strong></td>
+                    <td>Wake on sensor threshold</td>
+                    <td>95-99.9%</td>
+                    <td>Requires always-on comparator</td>
+                </tr>
+                <tr>
+                    <td><strong>Adaptive Sampling</strong></td>
+                    <td>Adjust rate based on activity</td>
+                    <td>80-95%</td>
+                    <td>Algorithm complexity</td>
+                </tr>
+                <tr>
+                    <td><strong>Burst Mode</strong></td>
+                    <td>High-rate bursts with long sleep</td>
+                    <td>85-98%</td>
+                    <td>Latency between bursts</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Algorithm Optimization</h3>
+
+        <p>
+            Reducing the computational complexity of algorithms directly translates to reduced energy consumption. This includes using integer instead of floating-point arithmetic, lookup tables instead of calculations, and early-exit conditions in processing pipelines. For ML inference, model optimization techniques discussed in Chapter 4 are particularly important.
+        </p>
+
+        <div class="code-block">
+<code>// Energy-Efficient Algorithm Example: Fixed-Point RMS Calculation
+// Instead of: sqrt(sum(x^2)/n) with floating point
+
+uint16_t calculate_rms_fixed(int16_t* samples, uint16_t count) {
+    uint32_t sum_sq = 0;
+    
+    // Accumulate squared values (Q15 format)
+    for (uint16_t i = 0; i < count; i++) {
+        int32_t sq = ((int32_t)samples[i] * samples[i]) >> 15;
+        sum_sq += sq;
+    }
+    
+    // Calculate mean
+    uint32_t mean_sq = sum_sq / count;
+    
+    // Integer square root using binary search
+    uint16_t rms = 0;
+    uint16_t bit = 0x8000;
+    
+    while (bit > 0) {
+        uint16_t test = rms | bit;
+        if ((uint32_t)test * test <= mean_sq) {
+            rms = test;
+        }
+        bit >>= 1;
+    }
+    
+    return rms;
+}</code>
+        </div>
+
+        <h2>Communication Optimization</h2>
+
+        <p>
+            Wireless communication is typically the most power-hungry operation in IoT sensors. Optimization strategies focus on minimizing transmission time, reducing protocol overhead, and leveraging efficient modulation schemes.
+        </p>
+
+        <h3>Data Compression</h3>
+
+        <p>
+            Compressing sensor data before transmission reduces the number of bytes sent, directly reducing radio-on time. Simple compression techniques like delta encoding or run-length encoding add minimal processing overhead while achieving significant compression for sensor data with temporal correlation.
+        </p>
+
+        <h3>Protocol Efficiency</h3>
+
+        <div class="highlight-box">
+            <strong>Communication Power Reduction Techniques:</strong>
+            <ul>
+                <li><strong>Payload Aggregation:</strong> Batch multiple readings into single transmissions</li>
+                <li><strong>Advertising Optimization:</strong> Reduce BLE advertising interval and channels</li>
+                <li><strong>Connection Parameters:</strong> Optimize connection interval and slave latency</li>
+                <li><strong>Coded PHY:</strong> Trade data rate for range, reducing retransmissions</li>
+                <li><strong>LPWAN Protocols:</strong> Use LoRa, NB-IoT for long-range, low-power scenarios</li>
+            </ul>
+        </div>
+
+        <h2>Energy Harvesting</h2>
+
+        <p>
+            Energy harvesting enables battery-free or battery-supplemented operation by capturing energy from the environment. The feasibility depends on available ambient energy sources and the sensor's power requirements.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Power Density</th>
+                    <th>Typical Output</th>
+                    <th>Applications</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Indoor Light</strong></td>
+                    <td>10-100 µW/cm²</td>
+                    <td>10-100 µW</td>
+                    <td>Building sensors, wearables</td>
+                </tr>
+                <tr>
+                    <td><strong>Outdoor Solar</strong></td>
+                    <td>10-100 mW/cm²</td>
+                    <td>1-100 mW</td>
+                    <td>Outdoor monitoring, agriculture</td>
+                </tr>
+                <tr>
+                    <td><strong>Vibration</strong></td>
+                    <td>1-100 µW/cm³</td>
+                    <td>10-1000 µW</td>
+                    <td>Industrial equipment, vehicles</td>
+                </tr>
+                <tr>
+                    <td><strong>Thermal (TEG)</strong></td>
+                    <td>10-50 µW/cm²/°C</td>
+                    <td>10-100 µW</td>
+                    <td>Body heat, industrial heat</td>
+                </tr>
+                <tr>
+                    <td><strong>RF Energy</strong></td>
+                    <td>0.1-1 µW/cm²</td>
+                    <td>1-100 µW</td>
+                    <td>RFID, NFC, dedicated sources</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Power Management ICs</h2>
+
+        <p>
+            Specialized power management ICs (PMICs) integrate multiple functions needed for efficient power management: voltage regulation, battery charging, energy harvesting interfaces, and power sequencing. Selecting the right PMIC can significantly simplify design and improve overall system efficiency.
+        </p>
+
+        <h2>Summary</h2>
+
+        <div class="highlight-box">
+            <h3 style="margin-top: 0;">Key Takeaways</h3>
+            <ul>
+                <li><strong>Power Budget First:</strong> Understand where energy is consumed before optimizing</li>
+                <li><strong>Component Selection:</strong> Choose ultra-low-power components matched to requirements</li>
+                <li><strong>Duty Cycling:</strong> Minimize time in high-power states through smart scheduling</li>
+                <li><strong>Algorithm Efficiency:</strong> Optimize computational complexity for energy savings</li>
+                <li><strong>Communication Optimization:</strong> Compress data, batch transmissions, tune protocols</li>
+                <li><strong>Energy Harvesting:</strong> Consider ambient energy sources for extended operation</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li>What are the main components contributing to smart sensor power consumption?</li>
+            <li>Explain the trade-offs between different duty cycling strategies.</li>
+            <li>How does power domain management differ from MCU sleep modes?</li>
+            <li>What software optimization techniques reduce energy consumption?</li>
+            <li>Compare different energy harvesting sources and their typical applications.</li>
+            <li>How can communication protocols be optimized for power efficiency?</li>
+            <li>What factors determine whether energy harvesting is viable for an application?</li>
+            <li>Describe the role of PMICs in smart sensor power management.</li>
+        </ol>
+
+        </div>
+</body>
+</html>
+>>>>>>> origin/main

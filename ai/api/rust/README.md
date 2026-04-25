@@ -20,6 +20,9 @@ The WIA AI Rust SDK provides a high-performance implementation of the WIA AI Sta
 - **Simulation Support**: Test agents without connecting to AI providers
 - **Serialization**: Full JSON serialization/deserialization support
 - **Multi-Agent**: Swarm orchestration for multi-agent systems
+- **Communication Protocol**: Full WIA AI protocol for agent-to-agent communication
+- **Streaming Support**: SSE parsing and stream management for real-time responses
+- **Transport Layer**: HTTP transport with streaming support (optional `http` feature)
 
 ## Installation
 
@@ -123,6 +126,106 @@ async fn main() -> Result<()> {
 }
 ```
 
+### Protocol Messages
+
+```rust
+use wia_ai::prelude::*;
+
+// Create a protocol message
+let message = ProtocolMessageBuilder::new()
+    .message_type(MessageType::Message)
+    .source(EntityReference::agent("agent-001", "Researcher"))
+    .target(EntityReference::agent("agent-002", "Coder"))
+    .payload(serde_json::json!({
+        "role": "user",
+        "content": [{"type": "text", "text": "Hello!"}]
+    }))
+    .build()?;
+
+// Serialize to JSON
+let json = serde_json::to_string(&message)?;
+```
+
+### Agent Handoff
+
+```rust
+use wia_ai::prelude::*;
+
+let handoff = HandoffBuilder::new(
+    EntityReference::agent("agent-researcher", "Researcher"),
+    EntityReference::agent("agent-coder", "Coder"),
+    "Code implementation required",
+)
+.priority(HandoffPriority::High)
+.task("Implement search algorithm")
+.requirement("Python 3.10+")
+.requirement("Include unit tests")
+.build()?;
+```
+
+### Tool Calls
+
+```rust
+use wia_ai::prelude::*;
+
+// Create a tool call
+let tool_call = ToolCallBuilder::new(
+    EntityReference::agent("agent-001", "Assistant"),
+    "web_search",
+    serde_json::json!({
+        "query": "WIA AI protocol",
+        "max_results": 5
+    }),
+)
+.build()?;
+
+// Track tool calls
+let tracker = ToolCallTracker::new();
+let payload: ToolCallPayload = serde_json::from_value(tool_call.payload.unwrap())?;
+tracker.track_call(payload.clone()).await;
+
+// Complete when result received
+tracker.complete_call(&payload.call_id).await;
+```
+
+### Streaming with SSE
+
+```rust
+use wia_ai::prelude::*;
+use wia_ai::streaming::{SseParser, StreamProcessor, PrintStreamHandler};
+
+// Parse SSE events
+let mut parser = SseParser::new();
+let events = parser.feed("data: {\"type\": \"text\", \"text\": \"Hello\"}\n\n");
+
+for event in events {
+    if event.is_done() {
+        break;
+    }
+    if let Some(data) = event.data {
+        println!("Received: {}", data);
+    }
+}
+
+// Use stream processor with handlers
+let processor = StreamProcessor::new();
+processor.add_handler(Arc::new(PrintStreamHandler::new()));
+```
+
+### Protocol Router
+
+```rust
+use wia_ai::prelude::*;
+use std::sync::Arc;
+
+let mut router = ProtocolRouter::new();
+router.register(Arc::new(PingPongHandler));
+
+// Route messages
+let ping = ProtocolMessage::ping();
+let responses = router.route(ping).await?;
+```
+
 ### Multi-Agent Swarm
 
 ```rust
@@ -180,6 +283,10 @@ let orchestrator = SwarmOrchestrator::new(swarm);
 | `Prompt` | Prompt template |
 | `Swarm` | Multi-agent configuration |
 | `Tool` | Tool definition |
+| `ProtocolMessage` | Communication protocol message |
+| `EntityReference` | Reference to an agent, tool, or client |
+| `Delta` | Streaming delta content |
+| `StreamState` | Stream tracking state |
 
 ### Enums
 
@@ -189,6 +296,10 @@ let orchestrator = SwarmOrchestrator::new(swarm);
 | `AgentType` | Assistant, Researcher, Coder, Writer, Analyst, Orchestrator |
 | `ModelProvider` | Anthropic, Openai, Google, Meta, Mistral, Local, Other |
 | `Modality` | Text, Image, Audio, Video, Code, StructuredData |
+| `MessageType` | Connect, Message, StreamStart, StreamDelta, ToolCall, Handoff, etc. |
+| `ErrorCode` | ConnectionLost, AuthFailed, RateLimited, AgentNotFound, etc. |
+| `DeltaType` | TextDelta, ToolUseDelta, ThinkingDelta |
+| `StopReason` | EndTurn, MaxTokens, StopSequence, ToolUse |
 
 ### Core Functions
 
@@ -228,20 +339,37 @@ trait ToolExecutor: Send + Sync {
 
 ```
 src/
-├── lib.rs           # Main library entry
-├── types.rs         # Type definitions
-├── error.rs         # Error types
+├── lib.rs              # Main library entry
+├── types.rs            # Type definitions
+├── error.rs            # Error types
 ├── core/
-│   ├── mod.rs       # Core module
-│   └── ai.rs        # AI operations
-└── adapters/
-    ├── mod.rs       # Adapters module
-    └── simulator.rs # Test simulators
+│   ├── mod.rs          # Core module
+│   └── ai.rs           # AI operations
+├── adapters/
+│   ├── mod.rs          # Adapters module
+│   └── simulator.rs    # Test simulators
+├── protocol/           # Communication Protocol (Phase 3)
+│   ├── mod.rs          # Protocol module entry
+│   ├── message.rs      # Message types & payloads
+│   ├── builder.rs      # Message builders
+│   ├── error.rs        # Protocol errors
+│   └── handler.rs      # Protocol handlers
+├── streaming/          # Streaming Support (Phase 3)
+│   ├── mod.rs          # Streaming module entry
+│   ├── sse.rs          # SSE parser
+│   └── stream_handler.rs # Stream event handlers
+└── transport/          # Transport Layer (Phase 3)
+    ├── mod.rs          # Transport traits
+    ├── mock.rs         # Mock transport for testing
+    └── http.rs         # HTTP transport (optional)
 tests/
 └── integration_test.rs
 examples/
 ├── basic_usage.rs
-└── agent_demo.rs
+├── agent_demo.rs
+├── streaming_client.rs   # Streaming example
+├── multi_agent_demo.rs   # Multi-agent coordination
+└── tool_invocation.rs    # Tool call handling
 ```
 
 ## Running Examples
@@ -252,6 +380,15 @@ cargo run --example basic_usage
 
 # Agent demo
 cargo run --example agent_demo
+
+# Streaming client (Phase 3)
+cargo run --example streaming_client
+
+# Multi-agent demo (Phase 3)
+cargo run --example multi_agent_demo
+
+# Tool invocation (Phase 3)
+cargo run --example tool_invocation
 ```
 
 ## Running Tests
@@ -272,6 +409,7 @@ cargo test test_model_creation
 | Feature | Description |
 |---------|-------------|
 | `default` | Basic functionality |
+| `http` | HTTP transport with streaming support |
 | `wasm` | WebAssembly support |
 | `python` | Python bindings (PyO3) |
 | `full` | All features |

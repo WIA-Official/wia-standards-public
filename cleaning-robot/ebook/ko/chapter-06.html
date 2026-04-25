@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 3단계 - 통신 프로토콜 | WIA-ROB-011 청소 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--cleaning-color:#06B6D4;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--cleaning-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--cleaning-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--cleaning-color);margin:40px 0 20px;border-bottom:2px solid var(--cleaning-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--cleaning-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--cleaning-color);text-decoration:none;padding:10px 20px;border:2px solid var(--cleaning-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--cleaning-color)}
+        strong{color:var(--cleaning-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:monospace;color:#06B6D4}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--cleaning-color);margin:20px 0;font-size:18px}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--cleaning-color);padding:20px;margin:25px 0;border-radius:5px}
+        ul,ol{margin-left:30px;margin-top:15px}
+        li{margin:10px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: 3단계 - 통신 프로토콜</h1>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) - 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>6.1 통신 프로토콜 개요</h2>
+        <p>
+            WIA-ROB-011은 다양한 환경과 요구사항에 맞춰 여러 통신 프로토콜을 지원합니다.
+            각 프로토콜은 특정 사용 사례에 최적화되어 있으며, 필요에 따라 조합하여 사용할 수 있습니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>프로토콜</th>
+                    <th>용도</th>
+                    <th>특징</th>
+                    <th>권장 사용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>WebSocket</td>
+                    <td>실시간 양방향 통신</td>
+                    <td>저지연, 지속 연결</td>
+                    <td>상태 모니터링, 원격 제어</td>
+                </tr>
+                <tr>
+                    <td>MQTT</td>
+                    <td>IoT 메시징</td>
+                    <td>경량, Pub/Sub</td>
+                    <td>센서 데이터, 이벤트</td>
+                </tr>
+                <tr>
+                    <td>CoAP</td>
+                    <td>제약 환경</td>
+                    <td>초경량, UDP</td>
+                    <td>저전력 기기</td>
+                </tr>
+                <tr>
+                    <td>HTTP/2</td>
+                    <td>일반 통신</td>
+                    <td>멀티플렉싱, 압축</td>
+                    <td>API 호출</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.2 WebSocket 프로토콜</h2>
+        <p>
+            WebSocket은 클라이언트와 서버 간 지속적인 양방향 통신 채널을 제공합니다.
+            실시간 상태 업데이트와 원격 제어에 이상적입니다.
+        </p>
+
+        <h3>6.2.1 연결 설정</h3>
+        <pre><code>// WebSocket 연결
+wss://robot.example.com/ws/v1/robots/CR-2025-001
+
+// 연결 헤더
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+Sec-WebSocket-Version: 13
+Authorization: Bearer eyJhbGc...
+
+// 서버 응답
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=</code></pre>
+
+        <h3>6.2.2 메시지 형식</h3>
+        <pre><code>// 클라이언트 → 서버 (명령)
+{
+  "type": "command",
+  "id": "cmd_001",
+  "timestamp": "2025-12-29T10:30:00Z",
+  "command": "start_cleaning",
+  "parameters": {
+    "mode": "auto",
+    "rooms": ["living_room"]
+  }
+}
+
+// 서버 → 클라이언트 (응답)
+{
+  "type": "response",
+  "request_id": "cmd_001",
+  "timestamp": "2025-12-29T10:30:01Z",
+  "status": "success",
+  "data": {
+    "task_id": "task_001",
+    "estimated_duration": 1800
+  }
+}
+
+// 서버 → 클라이언트 (상태 업데이트)
+{
+  "type": "status_update",
+  "timestamp": "2025-12-29T10:30:15Z",
+  "data": {
+    "state": "cleaning",
+    "battery": 85,
+    "location": {"x": 1250, "y": 3400},
+    "progress": 12
+  }
+}</code></pre>
+
+        <h3>6.2.3 하트비트 (Heartbeat)</h3>
+        <p>
+            연결 상태를 확인하기 위해 주기적으로 핑-퐁 메시지를 교환합니다.
+        </p>
+
+        <pre><code>// 클라이언트 → 서버 (30초마다)
+{
+  "type": "ping",
+  "timestamp": "2025-12-29T10:30:00Z"
+}
+
+// 서버 → 클라이언트
+{
+  "type": "pong",
+  "timestamp": "2025-12-29T10:30:00Z"
+}
+
+// 응답 없으면 재연결 시도</code></pre>
+
+        <h2>6.3 MQTT 프로토콜</h2>
+        <p>
+            MQTT는 경량 메시징 프로토콜로, IoT 환경에서 효율적인 Publish/Subscribe 패턴을 제공합니다.
+        </p>
+
+        <h3>6.3.1 토픽 구조</h3>
+        <pre><code>// 토픽 네이밍 규칙
+wia-rob-011/{version}/{robot_id}/{category}/{subcategory}
+
+// 예시
+wia-rob-011/v1/CR-2025-001/status/battery
+wia-rob-011/v1/CR-2025-001/status/location
+wia-rob-011/v1/CR-2025-001/commands/start
+wia-rob-011/v1/CR-2025-001/events/cleaning_complete
+wia-rob-011/v1/CR-2025-001/sensors/dust_level</code></pre>
+
+        <h3>6.3.2 주요 토픽</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>토픽</th>
+                    <th>방향</th>
+                    <th>QoS</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>status/#</td>
+                    <td>Robot → Cloud</td>
+                    <td>0</td>
+                    <td>상태 정보</td>
+                </tr>
+                <tr>
+                    <td>commands/#</td>
+                    <td>Cloud → Robot</td>
+                    <td>1</td>
+                    <td>제어 명령</td>
+                </tr>
+                <tr>
+                    <td>events/#</td>
+                    <td>Robot → Cloud</td>
+                    <td>1</td>
+                    <td>이벤트 알림</td>
+                </tr>
+                <tr>
+                    <td>sensors/#</td>
+                    <td>Robot → Cloud</td>
+                    <td>0</td>
+                    <td>센서 데이터</td>
+                </tr>
+                <tr>
+                    <td>config/#</td>
+                    <td>양방향</td>
+                    <td>2</td>
+                    <td>설정 변경</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.3.3 QoS 레벨 선택</h3>
+        <div class="highlight-box">
+            <ul>
+                <li><strong>QoS 0 (At most once):</strong> 실시간 센서 데이터, 상태 정보 - 지연 최소화</li>
+                <li><strong>QoS 1 (At least once):</strong> 명령, 이벤트 - 중요하지만 중복 허용</li>
+                <li><strong>QoS 2 (Exactly once):</strong> 설정 변경, 펌웨어 업데이트 - 중복 불가</li>
+            </ul>
+        </div>
+
+        <h3>6.3.4 메시지 예시</h3>
+        <pre><code>// 배터리 상태 게시 (QoS 0)
+Topic: wia-rob-011/v1/CR-2025-001/status/battery
+Payload:
+{
+  "timestamp": "2025-12-29T10:30:00Z",
+  "level": 85,
+  "charging": false,
+  "voltage": 14.8,
+  "health": 95
+}
+
+// 청소 시작 명령 (QoS 1)
+Topic: wia-rob-011/v1/CR-2025-001/commands/start
+Payload:
+{
+  "command_id": "cmd_001",
+  "timestamp": "2025-12-29T10:30:00Z",
+  "mode": "auto",
+  "rooms": ["living_room"]
+}
+
+// 청소 완료 이벤트 (QoS 1)
+Topic: wia-rob-011/v1/CR-2025-001/events/cleaning_complete
+Payload:
+{
+  "event_id": "evt_001",
+  "timestamp": "2025-12-29T11:30:00Z",
+  "session_id": "clean_001",
+  "duration": 3600,
+  "area_cleaned": 85.3
+}</code></pre>
+
+        <h2>6.4 CoAP 프로토콜</h2>
+        <p>
+            CoAP(Constrained Application Protocol)은 제약된 환경(저전력, 저대역폭)에서 사용하는 경량 프로토콜입니다.
+        </p>
+
+        <h3>6.4.1 CoAP 요청</h3>
+        <pre><code>// 상태 조회
+coap://robot.local:5683/status
+
+Method: GET
+Type: CON (Confirmable)
+Token: 0x1234
+
+Response:
+{
+  "state": "idle",
+  "battery": 95
+}
+
+// 청소 시작
+coap://robot.local:5683/commands/start
+
+Method: POST
+Type: CON
+Payload:
+{
+  "mode": "auto"
+}</code></pre>
+
+        <h3>6.4.2 관찰 (Observe) 패턴</h3>
+        <pre><code>// 상태 변화 관찰
+GET /status
+Observe: 0
+
+// 서버는 상태 변경 시마다 알림
+Notification 1:
+{
+  "state": "cleaning",
+  "battery": 90
+}
+
+Notification 2:
+{
+  "state": "cleaning",
+  "battery": 85
+}</code></pre>
+
+        <h2>6.5 보안 통신</h2>
+        <p>
+            모든 통신은 암호화되어야 하며, 강력한 인증 메커니즘을 사용해야 합니다.
+        </p>
+
+        <h3>6.5.1 전송 계층 보안</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>프로토콜</th>
+                    <th>보안 버전</th>
+                    <th>암호화</th>
+                    <th>최소 버전</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>WebSocket</td>
+                    <td>WSS (WebSocket Secure)</td>
+                    <td>TLS 1.3</td>
+                    <td>TLS 1.2</td>
+                </tr>
+                <tr>
+                    <td>MQTT</td>
+                    <td>MQTTS</td>
+                    <td>TLS 1.3</td>
+                    <td>TLS 1.2</td>
+                </tr>
+                <tr>
+                    <td>CoAP</td>
+                    <td>CoAPS (DTLS)</td>
+                    <td>DTLS 1.3</td>
+                    <td>DTLS 1.2</td>
+                </tr>
+                <tr>
+                    <td>HTTP</td>
+                    <td>HTTPS</td>
+                    <td>TLS 1.3</td>
+                    <td>TLS 1.2</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.5.2 인증서 관리</h3>
+        <pre><code>// TLS 설정 예시
+{
+  "tls": {
+    "version": "1.3",
+    "cipher_suites": [
+      "TLS_AES_256_GCM_SHA384",
+      "TLS_CHACHA20_POLY1305_SHA256"
+    ],
+    "certificates": {
+      "robot_cert": "/path/to/robot.crt",
+      "robot_key": "/path/to/robot.key",
+      "ca_cert": "/path/to/ca.crt"
+    },
+    "verify_peer": true,
+    "verify_hostname": true
+  }
+}</code></pre>
+
+        <h3>6.5.3 메시지 수준 보안</h3>
+        <p>
+            전송 계층 보안 외에도 메시지 자체를 암호화하고 서명할 수 있습니다.
+        </p>
+
+        <pre><code>// 메시지 서명
+{
+  "type": "command",
+  "command": "start_cleaning",
+  "timestamp": "2025-12-29T10:30:00Z",
+  "nonce": "random_nonce_123",
+  "signature": "sha256_hmac_signature...",
+  "data": {
+    "mode": "auto"
+  }
+}
+
+// 서명 검증
+HMAC-SHA256(secret_key, message_content + timestamp + nonce)</code></pre>
+
+        <h2>6.6 연결 관리</h2>
+
+        <h3>6.6.1 재연결 전략</h3>
+        <p>
+            네트워크 불안정 시 자동 재연결 메커니즘이 필요합니다.
+        </p>
+
+        <pre><code>// 지수 백오프 재연결
+class ReconnectionManager {
+  constructor() {
+    this.baseDelay = 1000;      // 1초
+    this.maxDelay = 60000;      // 60초
+    this.maxRetries = 10;
+    this.retryCount = 0;
+  }
+
+  async reconnect() {
+    if (this.retryCount >= this.maxRetries) {
+      throw new Error('Max retries exceeded');
+    }
+
+    const delay = Math.min(
+      this.baseDelay * Math.pow(2, this.retryCount),
+      this.maxDelay
+    );
+
+    await sleep(delay);
+    this.retryCount++;
+
+    try {
+      await this.connect();
+      this.retryCount = 0; // 성공 시 리셋
+    } catch (error) {
+      await this.reconnect(); // 재귀 재시도
+    }
+  }
+}</code></pre>
+
+        <h3>6.6.2 연결 상태 관리</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>상태</th>
+                    <th>설명</th>
+                    <th>다음 행동</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>DISCONNECTED</td>
+                    <td>연결 안됨</td>
+                    <td>연결 시도</td>
+                </tr>
+                <tr>
+                    <td>CONNECTING</td>
+                    <td>연결 중</td>
+                    <td>대기</td>
+                </tr>
+                <tr>
+                    <td>CONNECTED</td>
+                    <td>연결됨</td>
+                    <td>정상 통신</td>
+                </tr>
+                <tr>
+                    <td>RECONNECTING</td>
+                    <td>재연결 중</td>
+                    <td>백오프 대기</td>
+                </tr>
+                <tr>
+                    <td>FAILED</td>
+                    <td>연결 실패</td>
+                    <td>오류 보고</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.7 대역폭 최적화</h2>
+
+        <h3>6.7.1 메시지 압축</h3>
+        <p>
+            대용량 데이터는 압축하여 전송합니다.
+        </p>
+
+        <pre><code>// WebSocket 압축 활성화
+const ws = new WebSocket('wss://robot.example.com', {
+  perMessageDeflate: {
+    zlibDeflateOptions: {
+      chunkSize: 1024,
+      level: 6
+    }
+  }
+});
+
+// MQTT 압축 (페이로드 수준)
+const payload = gzip(JSON.stringify(largeData));
+client.publish(topic, payload, {
+  properties: {
+    contentType: 'application/json+gzip'
+  }
+});</code></pre>
+
+        <h3>6.7.2 배칭 (Batching)</h3>
+        <p>
+            여러 센서 데이터를 묶어서 한 번에 전송합니다.
+        </p>
+
+        <pre><code>// 개별 전송 (비효율)
+publish('sensors/dust', {level: 3});
+publish('sensors/battery', {level: 85});
+publish('sensors/water', {level: 45});
+
+// 배칭 전송 (효율)
+publish('sensors/batch', {
+  timestamp: "2025-12-29T10:30:00Z",
+  readings: [
+    {sensor: 'dust', value: 3},
+    {sensor: 'battery', value: 85},
+    {sensor: 'water', value: 45}
+  ]
+});</code></pre>
+
+        <h3>6.7.3 델타 인코딩</h3>
+        <p>
+            변경된 필드만 전송하여 대역폭을 절약합니다.
+        </p>
+
+        <pre><code>// 전체 상태 (1000 bytes)
+{
+  "state": "cleaning",
+  "battery": 85,
+  "location": {"x": 1250, "y": 3400},
+  "cleaning": {...},
+  "sensors": {...}
+}
+
+// 델타 업데이트 (50 bytes)
+{
+  "type": "delta",
+  "changes": {
+    "battery": 84,
+    "location.x": 1260
+  }
+}</code></pre>
+
+        <h2>6.8 멀티캐스트 및 브로드캐스트</h2>
+        <p>
+            여러 로봇을 동시에 제어하거나 모니터링할 때 효율적입니다.
+        </p>
+
+        <pre><code>// MQTT 토픽 와일드카드
+// 모든 로봇의 배터리 상태 구독
+subscribe('wia-rob-011/v1/+/status/battery');
+
+// 특정 건물의 모든 로봇 제어
+publish('wia-rob-011/v1/building-a/+/commands/return', {});
+
+// 그룹 명령
+publish('wia-rob-011/v1/group/floor-1/commands/start', {
+  mode: 'auto'
+});</code></pre>
+
+        <h2>6.9 오프라인 처리</h2>
+        <p>
+            네트워크 연결이 끊겨도 로봇은 계속 작동하고, 재연결 시 동기화됩니다.
+        </p>
+
+        <pre><code>// 오프라인 큐
+class OfflineQueue {
+  constructor() {
+    this.queue = [];
+    this.maxSize = 1000;
+  }
+
+  enqueue(message) {
+    if (this.queue.length >= this.maxSize) {
+      this.queue.shift(); // 오래된 메시지 제거
+    }
+    message.queued_at = Date.now();
+    this.queue.push(message);
+  }
+
+  async flush() {
+    while (this.queue.length > 0) {
+      const message = this.queue.shift();
+      try {
+        await send(message);
+      } catch (error) {
+        this.queue.unshift(message); // 실패 시 재삽입
+        break;
+      }
+    }
+  }
+}</code></pre>
+
+        <div class="highlight-box">
+            <h3>핵심 내용 요약</h3>
+            <ul>
+                <li>4가지 주요 프로토콜: WebSocket, MQTT, CoAP, HTTP/2</li>
+                <li>WebSocket: 실시간 양방향 통신, 하트비트 메커니즘</li>
+                <li>MQTT: 경량 Pub/Sub, 3단계 QoS 레벨</li>
+                <li>CoAP: 제약 환경용, Observe 패턴 지원</li>
+                <li>필수 보안: TLS 1.2 이상, 메시지 서명</li>
+                <li>재연결: 지수 백오프 전략</li>
+                <li>최적화: 압축, 배칭, 델타 인코딩</li>
+                <li>오프라인 처리: 큐 기반 동기화</li>
+            </ul>
+        </div>
+
+        <div class="highlight-box">
+            <h3>복습 질문</h3>
+            <ol>
+                <li>WebSocket과 MQTT의 주요 차이점과 각각의 적합한 사용 사례는?</li>
+                <li>MQTT QoS 레벨 0, 1, 2의 차이를 설명하고 각각 언제 사용해야 하나요?</li>
+                <li>지수 백오프 재연결 전략이 필요한 이유는 무엇인가요?</li>
+                <li>델타 인코딩을 사용하면 얼마나 대역폭을 절약할 수 있나요?</li>
+                <li>오프라인 상태에서 로봇이 데이터를 어떻게 관리해야 하나요?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

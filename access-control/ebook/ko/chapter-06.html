@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 3단계 프로토콜 - WIA 접근 제어 표준 전자책</title>
+</head>
+<body>
+
+<p><a href="index.html">🔐 WIA 접근 제어 표준 전자책</a> | 제6장 (총 8장)</p>
+
+<hr>
+
+<h1>🔐 제6장: 3단계 - 프로토콜</h1>
+
+<hr>
+
+<h2>6.1 프로토콜 아키텍처</h2>
+
+<p>WIA 접근 제어 프로토콜 계층은 세션 관리, 토큰 교환 및 안전한 시스템 간 통신을 위한 실시간 통신 표준을 정의합니다.</p>
+
+<h3>6.1.1 프로토콜 스택</h3>
+
+<pre>
+WIA-AC 프로토콜 스택:
+┌─────────────────────────────────────────────────────────┐
+│                 애플리케이션 프로토콜                    │
+│  (WIA-AC 메시지, 정책 업데이트, 이벤트)                 │
+├─────────────────────────────────────────────────────────┤
+│                 세션 프로토콜                            │
+│  (세션 관리, 토큰 교환)                                  │
+├─────────────────────────────────────────────────────────┤
+│                 전송 프로토콜                            │
+│  (WebSocket, gRPC, HTTP/2)                              │
+├─────────────────────────────────────────────────────────┤
+│                 보안 프로토콜                            │
+│  (TLS 1.3, mTLS, DTLS)                                  │
+└─────────────────────────────────────────────────────────┘
+</pre>
+
+<h3>6.1.2 지원되는 전송</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>전송</th>
+            <th>사용 사례</th>
+            <th>포트</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>HTTPS (REST)</td>
+            <td>요청-응답, 동기</td>
+            <td>443</td>
+        </tr>
+        <tr>
+            <td>WebSocket</td>
+            <td>실시간, 양방향</td>
+            <td>443 (/ws)</td>
+        </tr>
+        <tr>
+            <td>gRPC</td>
+            <td>고성능, 스트리밍</td>
+            <td>8443</td>
+        </tr>
+        <tr>
+            <td>MQTT</td>
+            <td>IoT 장치, 펍/섭</td>
+            <td>8883</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.2 세션 관리</h2>
+
+<h3>6.2.1 세션 수명 주기</h3>
+
+<pre>
+세션 상태:
+┌──────────────┐
+│   생성됨     │
+└──────┬───────┘
+       │ 인증
+       ▼
+┌──────────────┐
+│   활성      │◄────────┐
+└──────┬───────┘         │
+       │                 │ 갱신
+       │ 타임아웃/로그아웃│
+       ▼                 │
+┌──────────────┐         │
+│   만료됨     │─────────┘
+└──────┬───────┘
+       │ 종료
+       ▼
+┌──────────────┐
+│   종료됨     │
+└──────────────┘
+</pre>
+
+<h3>6.2.2 세션 토큰 구조</h3>
+
+<pre>
+{
+  "header": {
+    "alg": "RS256",
+    "typ": "JWT",
+    "kid": "key-2025-01"
+  },
+  "payload": {
+    "iss": "https://ac.company.com",
+    "sub": "urn:wia:ac:subject:user:john.doe",
+    "aud": ["app-12345", "api-gateway"],
+    "exp": 1705312800,
+    "iat": 1705309200,
+    "jti": "session-550e8400-e29b",
+    "sid": "ses-123456789",
+    "scope": "read write",
+    "wia_roles": ["developer", "team-lead"],
+    "wia_groups": ["engineering", "project-x"]
+  }
+}
+</pre>
+
+<h3>6.2.3 세션 작업</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>작업</th>
+            <th>설명</th>
+            <th>프로토콜</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>생성</td>
+            <td>새 세션 초기화</td>
+            <td>POST /sessions</td>
+        </tr>
+        <tr>
+            <td>검증</td>
+            <td>세션 유효성 확인</td>
+            <td>GET /sessions/{id}</td>
+        </tr>
+        <tr>
+            <td>갱신</td>
+            <td>세션 수명 연장</td>
+            <td>POST /sessions/{id}/refresh</td>
+        </tr>
+        <tr>
+            <td>취소</td>
+            <td>세션 종료</td>
+            <td>DELETE /sessions/{id}</td>
+        </tr>
+        <tr>
+            <td>목록</td>
+            <td>사용자의 활성 세션 조회</td>
+            <td>GET /subjects/{id}/sessions</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.3 토큰 교환 프로토콜</h2>
+
+<h3>6.3.1 토큰 교환 흐름</h3>
+
+<pre>
+토큰 교환 (RFC 8693):
+
+┌──────────┐                        ┌───────────────┐
+│  클라이언트│                        │  토큰 서버    │
+└────┬─────┘                        └───────┬───────┘
+     │                                      │
+     │  POST /token                         │
+     │  grant_type=token_exchange           │
+     │  subject_token={jwt}                 │
+     │  subject_token_type=access_token     │
+     │  requested_token_type=access_token   │
+     │  audience=target-service             │
+     │─────────────────────────────────────►│
+     │                                      │
+     │  {                                   │
+     │    access_token: {new_jwt},          │
+     │    token_type: "Bearer",             │
+     │    expires_in: 3600                  │
+     │  }                                   │
+     │◄─────────────────────────────────────│
+</pre>
+
+<h3>6.3.2 토큰 유형</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>토큰 유형</th>
+            <th>URN</th>
+            <th>용도</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>접근 토큰</td>
+            <td>urn:ietf:params:oauth:token-type:access_token</td>
+            <td>API 권한 부여</td>
+        </tr>
+        <tr>
+            <td>갱신 토큰</td>
+            <td>urn:ietf:params:oauth:token-type:refresh_token</td>
+            <td>토큰 갱신</td>
+        </tr>
+        <tr>
+            <td>ID 토큰</td>
+            <td>urn:ietf:params:oauth:token-type:id_token</td>
+            <td>신원 클레임</td>
+        </tr>
+        <tr>
+            <td>WIA-AC 토큰</td>
+            <td>urn:wia:ac:token-type:authorization</td>
+            <td>AC 결정</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.4 실시간 이벤트</h2>
+
+<h3>6.4.1 WebSocket 연결</h3>
+
+<pre>
+# 이벤트 스트림에 연결
+ws://ac.company.com/wia-ac/v1/events
+
+# 인증
+{
+  "type": "auth",
+  "token": "eyJhbGciOiJSUzI1NiIs..."
+}
+
+# 이벤트 구독
+{
+  "type": "subscribe",
+  "channels": [
+    "policy-updates",
+    "session-events",
+    "access-decisions"
+  ]
+}
+</pre>
+
+<h3>6.4.2 이벤트 유형</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>이벤트</th>
+            <th>채널</th>
+            <th>페이로드</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>policy.created</td>
+            <td>policy-updates</td>
+            <td>새 정책 세부 정보</td>
+        </tr>
+        <tr>
+            <td>policy.updated</td>
+            <td>policy-updates</td>
+            <td>변경된 정책</td>
+        </tr>
+        <tr>
+            <td>policy.deleted</td>
+            <td>policy-updates</td>
+            <td>정책 ID</td>
+        </tr>
+        <tr>
+            <td>session.created</td>
+            <td>session-events</td>
+            <td>새 세션 정보</td>
+        </tr>
+        <tr>
+            <td>session.terminated</td>
+            <td>session-events</td>
+            <td>세션 ID, 이유</td>
+        </tr>
+        <tr>
+            <td>access.denied</td>
+            <td>access-decisions</td>
+            <td>거부된 요청 세부 정보</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.5 연합 프로토콜</h2>
+
+<h3>6.5.1 신원 연합 흐름</h3>
+
+<pre>
+교차 도메인 인증:
+
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+│  사용자   │   │   앱     │   │  WIA-AC  │   │ 외부 IdP │
+└────┬─────┘   └────┬─────┘   └────┬─────┘   └────┬─────┘
+     │              │              │              │
+     │  1. 접근     │              │              │
+     │─────────────►│              │              │
+     │              │              │              │
+     │  2. WIA-AC로 리다이렉트     │              │
+     │◄─────────────│              │              │
+     │              │              │              │
+     │  3. IdP 선택               │              │
+     │─────────────────────────────►              │
+     │              │              │              │
+     │  4. 외부 IdP로 리다이렉트  │              │
+     │◄─────────────────────────────              │
+     │              │              │              │
+     │  5. 인증                    │              │
+     │───────────────────────────────────────────►│
+     │              │              │              │
+     │  6. SAML/OIDC 응답          │              │
+     │◄───────────────────────────────────────────│
+     │              │              │              │
+     │  7. 토큰 교환               │              │
+     │─────────────────────────────►              │
+     │              │              │              │
+     │  8. WIA-AC 토큰             │              │
+     │◄─────────────────────────────              │
+</pre>
+
+<hr>
+
+<h2>6.6 보안 프로토콜</h2>
+
+<h3>6.6.1 TLS 요구 사항</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>요구 사항</th>
+            <th>사양</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>최소 버전</td>
+            <td>TLS 1.2 (TLS 1.3 권장)</td>
+        </tr>
+        <tr>
+            <td>암호 모음</td>
+            <td>AEAD 암호 (AES-GCM, ChaCha20)</td>
+        </tr>
+        <tr>
+            <td>키 교환</td>
+            <td>ECDHE (P-256, P-384, X25519)</td>
+        </tr>
+        <tr>
+            <td>인증서</td>
+            <td>RSA 2048+ 또는 ECDSA P-256+</td>
+        </tr>
+        <tr>
+            <td>HSTS</td>
+            <td>필수, max-age 1년</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.6.2 상호 TLS (mTLS)</h3>
+
+<pre>
+mTLS 구성:
+{
+  "mtls": {
+    "enabled": true,
+    "clientCertRequired": true,
+    "trustedCAs": [
+      "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+    ],
+    "subjectMapping": {
+      "cn": "subject.id",
+      "o": "subject.attributes.organization"
+    }
+  }
+}
+</pre>
+
+<h3>6.6.3 토큰 보안</h3>
+
+<ul>
+    <li><strong>서명:</strong> RS256 또는 ES256 필수</li>
+    <li><strong>암호화:</strong> 민감한 토큰에 A256GCM</li>
+    <li><strong>키 순환:</strong> 최소 90일마다</li>
+    <li><strong>토큰 바인딩:</strong> DPoP 지원</li>
+</ul>
+
+<hr>
+
+<h2>6.7 프로토콜 성능</h2>
+
+<h3>6.7.1 성능 목표</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>작업</th>
+            <th>목표 지연 시간</th>
+            <th>처리량</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>권한 부여 결정</td>
+            <td>&lt; 10ms (P99)</td>
+            <td>100,000/초</td>
+        </tr>
+        <tr>
+            <td>토큰 검증</td>
+            <td>&lt; 5ms (P99)</td>
+            <td>200,000/초</td>
+        </tr>
+        <tr>
+            <td>세션 조회</td>
+            <td>&lt; 3ms (P99)</td>
+            <td>500,000/초</td>
+        </tr>
+        <tr>
+            <td>정책 평가</td>
+            <td>&lt; 15ms (P99)</td>
+            <td>50,000/초</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>6.8 장 요약</h2>
+
+<p>[OK] <strong>핵심 내용:</strong></p>
+
+<ol>
+    <li><strong>프로토콜 스택:</strong> 애플리케이션, 세션, 전송, 보안 계층</li>
+    <li><strong>전송:</strong> HTTPS, WebSocket, gRPC, MQTT 지원</li>
+    <li><strong>세션:</strong> 전체 수명 주기 관리가 있는 JWT 기반</li>
+    <li><strong>토큰 교환:</strong> 서비스 간 RFC 8693 준수</li>
+    <li><strong>실시간:</strong> 정책 및 세션 업데이트를 위한 WebSocket 이벤트</li>
+    <li><strong>연합:</strong> OIDC 및 SAML2 신원 공급자 통합</li>
+    <li><strong>보안:</strong> TLS 1.2+, mTLS, 토큰 서명 및 암호화</li>
+</ol>
+
+<hr>
+
+<h2>6.9 복습 문제</h2>
+
+<ol>
+    <li>WIA-AC 프로토콜 스택의 4개 계층은 무엇입니까?</li>
+    <li>세션 수명 주기 상태와 전환을 설명하세요.</li>
+    <li>서비스 간 토큰 교환은 어떻게 작동합니까?</li>
+    <li>실시간 업데이트에 사용할 수 있는 이벤트 채널은 무엇입니까?</li>
+    <li>외부 신원 공급자를 위한 연합 흐름을 설명하세요.</li>
+    <li>WIA-AC 구현을 위한 TLS 요구 사항은 무엇입니까?</li>
+</ol>
+
+<hr>
+
+<h2>6.10 다음 장 미리보기</h2>
+
+<p>제7장에서는 커넥터 프레임워크, 레거시 시스템 브리지 및 기업 환경을 위한 배포 패턴을 다루는 4단계: 통합을 탐구합니다.</p>
+
+<hr>
+
+<p><a href="chapter-07.html">다음: 제7장 - 4단계: 통합</a></p>
+</body>
+</html>

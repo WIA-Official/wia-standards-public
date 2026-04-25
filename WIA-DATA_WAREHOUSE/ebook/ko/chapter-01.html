@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 01: 데이터 웨어하우스 기초 - WIA-DATA_WAREHOUSE</title>
+    <style>:root{--primary:#8B5CF6;--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--border:#334155;--accent:#3b82f6;--code-bg:#1e1e1e;--success:#10b981;}*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;}.container{max-width:1000px;margin:0 auto;padding:40px 20px;}header{background:linear-gradient(135deg,var(--bg-card) 0%,#2d1f4a 100%);padding:40px;border-radius:15px;margin-bottom:40px;border-left:5px solid var(--primary);}h1{color:var(--primary);font-size:2.5em;margin-bottom:15px;}h2{color:var(--primary);font-size:2em;margin:50px 0 25px 0;padding-bottom:10px;border-bottom:2px solid var(--primary);}h3{color:var(--accent);font-size:1.5em;margin:35px 0 20px 0;}p{margin:20px 0;font-size:1.1em;line-height:1.9;}table{width:100%;border-collapse:collapse;margin:30px 0;background:var(--bg-card);border-radius:10px;overflow:hidden;}th{background:var(--primary);color:white;padding:15px;text-align:left;}td{padding:15px;border-bottom:1px solid var(--border);}tr:hover{background:rgba(139,92,246,0.1);}ul,ol{margin:20px 0;padding-left:30px;}li{margin:10px 0;font-size:1.1em;line-height:1.8;}.code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin:25px 0;overflow-x:auto;font-family:Consolas,monospace;font-size:0.95em;}.info-box{background:rgba(59,130,246,0.1);border-left:4px solid var(--accent);padding:25px;margin:30px 0;border-radius:8px;}.warning-box{background:rgba(245,158,11,0.1);border-left:4px solid #f59e0b;padding:25px;margin:30px 0;border-radius:8px;}.success-box{background:rgba(16,185,129,0.1);border-left:4px solid var(--success);padding:25px;margin:30px 0;border-radius:8px;}.key-takeaways{background:linear-gradient(135deg,rgba(139,92,246,0.2) 0%,rgba(59,130,246,0.2) 100%);padding:30px;border-radius:15px;margin:40px 0;}.review-questions{background:var(--bg-card);padding:30px;border-radius:15px;margin:40px 0;}.nav-buttons{display:flex;justify-content:space-between;margin-top:50px;gap:20px;}.btn{padding:15px 30px;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.3s;flex:1;text-align:center;}.btn-primary{background:var(--primary);color:white;}.btn-secondary{background:var(--bg-card);color:var(--primary);border:2px solid var(--primary);}footer{margin-top:60px;padding-top:30px;border-top:2px solid var(--border);text-align:center;color:var(--text-secondary);}</style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 01: 데이터 웨어하우스 기초</h1>
+            <p style="margin-top:15px;font-size:1.2em;color:var(--text-secondary);">
+                OLTP vs OLAP, Inmon vs Kimball, 히스토리 관리, SCD 타입
+            </p>
+        </header>
+
+        <h2>1. 데이터 웨어하우스란?</h2>
+        <p>
+            <strong>데이터 웨어하우스(Data Warehouse, DW)</strong>는 Bill Inmon이 1990년에 정의한 개념으로,
+            "의사결정 지원을 목적으로 주제 지향적(Subject-Oriented), 통합적(Integrated), 시간 변화(Time-Variant),
+            비휘발성(Non-Volatile) 데이터의 집합"입니다.
+        </p>
+
+        <div class="info-box">
+            <strong>데이터 웨어하우스 4대 특징 (Bill Inmon, 1990)</strong><br><br>
+            1️⃣ <strong>주제 지향적 (Subject-Oriented):</strong> 고객, 제품, 판매 등 비즈니스 주제 중심<br>
+            2️⃣ <strong>통합적 (Integrated):</strong> 여러 소스의 데이터를 일관된 형식으로 통합<br>
+            3️⃣ <strong>시간 변화 (Time-Variant):</strong> 과거 데이터 보존, 히스토리 추적<br>
+            4️⃣ <strong>비휘발성 (Non-Volatile):</strong> 삽입과 조회만 가능, 업데이트/삭제 불가
+        </div>
+
+        <h3>1.1 OLTP vs OLAP</h3>
+        <p>
+            데이터베이스 시스템은 크게 <strong>OLTP</strong>와 <strong>OLAP</strong>로 나뉩니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>특성</th>
+                    <th>OLTP<br>(Online Transaction Processing)</th>
+                    <th>OLAP<br>(Online Analytical Processing)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>목적</strong></td>
+                    <td>일상 업무 처리<br>(주문, 결제, 재고 관리)</td>
+                    <td>분석 및 의사결정<br>(매출 추세, 고객 세그먼트)</td>
+                </tr>
+                <tr>
+                    <td><strong>데이터 구조</strong></td>
+                    <td>정규화된 관계형 DB<br>(3NF, BCNF)</td>
+                    <td>비정규화된 스타/스노우플레이크 스키마</td>
+                </tr>
+                <tr>
+                    <td><strong>쿼리 패턴</strong></td>
+                    <td>짧고 빠른 쿼리<br>(INSERT, UPDATE, DELETE)</td>
+                    <td>복잡하고 긴 쿼리<br>(JOIN, GROUP BY, 집계)</td>
+                </tr>
+                <tr>
+                    <td><strong>응답 시간</strong></td>
+                    <td>밀리초 단위<br>(< 100ms)</td>
+                    <td>초~분 단위<br>(1s ~ 10분)</td>
+                </tr>
+                <tr>
+                    <td><strong>데이터 크기</strong></td>
+                    <td>GB ~ TB</td>
+                    <td>TB ~ PB</td>
+                </tr>
+                <tr>
+                    <td><strong>사용자 수</strong></td>
+                    <td>수천~수백만 명<br>(동시 접속)</td>
+                    <td>수십~수백 명<br>(분석가, 경영진)</td>
+                </tr>
+                <tr>
+                    <td><strong>업데이트 빈도</strong></td>
+                    <td>실시간 (초당 수천 건)</td>
+                    <td>배치 (일일/주간)</td>
+                </tr>
+                <tr>
+                    <td><strong>예시</strong></td>
+                    <td>MySQL, PostgreSQL, Oracle OLTP</td>
+                    <td>Snowflake, BigQuery, Redshift</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block">
+-- OLTP 쿼리 예시: 단일 레코드 CRUD
+-- 주문 생성 (10ms)
+INSERT INTO orders (customer_id, product_id, quantity, price)
+VALUES (12345, 67890, 2, 29.99);
+
+-- 재고 업데이트 (5ms)
+UPDATE inventory
+SET stock = stock - 2
+WHERE product_id = 67890;
+
+-- OLAP 쿼리 예시: 집계 및 분석
+-- 지난 12개월 월별 카테고리별 매출 TOP 10 (30초)
+SELECT
+    DATE_TRUNC('month', order_date) AS month,
+    p.category,
+    SUM(o.quantity * o.price) AS total_revenue,
+    COUNT(DISTINCT o.customer_id) AS unique_customers,
+    AVG(o.quantity * o.price) AS avg_order_value
+FROM
+    fact_sales o
+    JOIN dim_product p ON o.product_key = p.product_key
+    JOIN dim_date d ON o.date_key = d.date_key
+WHERE
+    d.date BETWEEN '2024-01-01' AND '2024-12-31'
+GROUP BY
+    month, p.category
+ORDER BY
+    total_revenue DESC
+LIMIT 10;
+</div>
+
+        <h2>2. 데이터 웨어하우스 아키텍처</h2>
+
+        <h3>2.1 Inmon 방법론 (Top-Down)</h3>
+        <p>
+            Bill Inmon의 <strong>기업 데이터 웨어하우스(Enterprise Data Warehouse, EDW)</strong> 접근법은
+            정규화된 중앙 DW를 먼저 구축한 후 부서별 데이터 마트를 파생시킵니다.
+        </p>
+
+        <div class="success-box">
+            <strong>✅ Inmon 방법론 특징</strong><br><br>
+            <strong>아키텍처:</strong><br>
+            소스 시스템 → ETL → EDW (3NF 정규화) → 데이터 마트 (부서별)<br><br>
+
+            <strong>장점:</strong><br>
+            • 단일 진실 공급원 (Single Source of Truth, SSOT)<br>
+            • 데이터 일관성 보장<br>
+            • 중복 최소화<br>
+            • 장기적 유지보수 용이<br><br>
+
+            <strong>단점:</strong><br>
+            • 초기 구축 비용 높음 (6개월 ~ 2년)<br>
+            • 첫 ROI까지 시간 오래 걸림<br>
+            • 유연성 낮음
+        </div>
+
+        <h3>2.2 Kimball 방법론 (Bottom-Up)</h3>
+        <p>
+            Ralph Kimball의 <strong>차원 모델링(Dimensional Modeling)</strong> 접근법은
+            비즈니스 프로세스별로 데이터 마트를 먼저 구축한 후 통합합니다.
+        </p>
+
+        <div class="success-box">
+            <strong>✅ Kimball 방법론 특징</strong><br><br>
+            <strong>아키텍처:</strong><br>
+            소스 시스템 → ETL → 데이터 마트 (스타 스키마) → DW Bus (통합)<br><br>
+
+            <strong>장점:</strong><br>
+            • 빠른 초기 ROI (2~3개월)<br>
+            • 비즈니스 요구에 민첩하게 대응<br>
+            • 쿼리 성능 우수<br>
+            • 사용자 친화적 (비정규화)<br><br>
+
+            <strong>단점:</strong><br>
+            • 데이터 중복 가능<br>
+            • 일관성 유지 어려움<br>
+            • 장기적으로 복잡도 증가
+        </div>
+
+        <h3>2.3 Inmon vs Kimball 비교</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>항목</th>
+                    <th>Inmon (Top-Down)</th>
+                    <th>Kimball (Bottom-Up)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>접근 방식</strong></td>
+                    <td>기업 전체 DW 먼저</td>
+                    <td>부서별 마트 먼저</td>
+                </tr>
+                <tr>
+                    <td><strong>데이터 모델</strong></td>
+                    <td>3NF 정규화 (ER 모델)</td>
+                    <td>스타/스노우플레이크 (차원 모델)</td>
+                </tr>
+                <tr>
+                    <td><strong>구축 기간</strong></td>
+                    <td>12~24개월</td>
+                    <td>2~3개월 (마트당)</td>
+                </tr>
+                <tr>
+                    <td><strong>초기 비용</strong></td>
+                    <td>높음 ($500K ~ $5M)</td>
+                    <td>낮음 ($50K ~ $500K)</td>
+                </tr>
+                <tr>
+                    <td><strong>쿼리 성능</strong></td>
+                    <td>느림 (정규화로 인한 JOIN)</td>
+                    <td>빠름 (비정규화)</td>
+                </tr>
+                <tr>
+                    <td><strong>데이터 일관성</strong></td>
+                    <td>높음 (SSOT)</td>
+                    <td>중간 (컨포멀 차원 필요)</td>
+                </tr>
+                <tr>
+                    <td><strong>유연성</strong></td>
+                    <td>낮음</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td><strong>적합한 조직</strong></td>
+                    <td>대기업, 금융, 정부</td>
+                    <td>중소기업, 스타트업</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3. 히스토리 관리 및 SCD</h2>
+        <p>
+            데이터 웨어하우스의 핵심 기능 중 하나는 <strong>시간에 따른 데이터 변화를 추적</strong>하는 것입니다.
+            이를 위해 <strong>Slowly Changing Dimension (SCD)</strong> 기법을 사용합니다.
+        </p>
+
+        <h3>3.1 SCD Type 1: 덮어쓰기</h3>
+        <p>
+            변경 사항을 히스토리 없이 바로 덮어씁니다. <strong>과거 데이터 손실</strong>됩니다.
+        </p>
+
+        <div class="code-block">
+-- SCD Type 1: 고객 주소 변경
+-- BEFORE
+customer_id | name      | address
+1           | 홍길동    | 서울시 강남구
+
+-- UPDATE
+UPDATE dim_customer
+SET address = '부산시 해운대구'
+WHERE customer_id = 1;
+
+-- AFTER (히스토리 없음)
+customer_id | name      | address
+1           | 홍길동    | 부산시 해운대구
+</div>
+
+        <div class="warning-box">
+            <strong>⚠️ SCD Type 1 사용 사례</strong><br>
+            • 오타 수정 (이메일 주소, 전화번호)<br>
+            • 히스토리가 중요하지 않은 속성<br>
+            • 저장 공간 제약이 심한 경우
+        </div>
+
+        <h3>3.2 SCD Type 2: 새 행 추가</h3>
+        <p>
+            변경 사항을 <strong>새 행</strong>으로 추가하고 기존 행을 유지합니다. 완전한 히스토리 추적 가능.
+        </p>
+
+        <div class="code-block">
+-- SCD Type 2: 고객 등급 변경 (가장 많이 사용)
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,        -- 서로게이트 키 (DW 내부 키)
+    customer_id INT,                     -- 비즈니스 키 (자연 키)
+    name VARCHAR(100),
+    grade VARCHAR(20),
+    effective_date DATE,                 -- 유효 시작일
+    expiration_date DATE,                -- 유효 종료일
+    is_current BOOLEAN                   -- 현재 유효 여부
+);
+
+-- 초기 데이터 (2024-01-01)
+INSERT INTO dim_customer VALUES
+(1, 1001, '홍길동', 'Silver', '2024-01-01', '9999-12-31', TRUE);
+
+-- 등급 변경: Silver → Gold (2024-06-15)
+-- 1) 기존 행 만료
+UPDATE dim_customer
+SET expiration_date = '2024-06-14',
+    is_current = FALSE
+WHERE customer_key = 1;
+
+-- 2) 새 행 추가
+INSERT INTO dim_customer VALUES
+(2, 1001, '홍길동', 'Gold', '2024-06-15', '9999-12-31', TRUE);
+
+-- 결과: 히스토리 완벽 추적
+customer_key | customer_id | name | grade  | effective_date | expiration_date | is_current
+1            | 1001        | 홍길동 | Silver | 2024-01-01     | 2024-06-14      | FALSE
+2            | 1001        | 홍길동 | Gold   | 2024-06-15     | 9999-12-31      | TRUE
+</div>
+
+        <div class="success-box">
+            <strong>✅ SCD Type 2 장점</strong><br>
+            • 완전한 히스토리 추적<br>
+            • 시점별 분석 가능 (2024년 1월에는 Silver 등급이었던 고객)<br>
+            • 감사(Audit) 요구사항 충족<br><br>
+
+            <strong>⚠️ SCD Type 2 단점</strong><br>
+            • 저장 공간 증가<br>
+            • 쿼리 복잡도 증가 (JOIN 시 is_current 조건 필요)<br>
+            • 업데이트 로직 복잡
+        </div>
+
+        <h3>3.3 SCD Type 3: 이전 값 컬럼 추가</h3>
+        <p>
+            변경 사항을 <strong>별도 컬럼</strong>에 저장합니다. 제한적 히스토리만 유지 (보통 1~2단계).
+        </p>
+
+        <div class="code-block">
+-- SCD Type 3: 부서 변경 (제한적 히스토리)
+CREATE TABLE dim_employee (
+    employee_id INT PRIMARY KEY,
+    name VARCHAR(100),
+    current_department VARCHAR(50),
+    previous_department VARCHAR(50),
+    department_change_date DATE
+);
+
+-- 초기 데이터
+INSERT INTO dim_employee VALUES
+(1, '김철수', 'IT', NULL, NULL);
+
+-- 부서 변경: IT → HR
+UPDATE dim_employee
+SET
+    previous_department = current_department,
+    current_department = 'HR',
+    department_change_date = '2024-08-01'
+WHERE employee_id = 1;
+
+-- 결과
+employee_id | name  | current_dept | previous_dept | change_date
+1           | 김철수 | HR           | IT            | 2024-08-01
+</div>
+
+        <h3>3.4 SCD Type 4: 히스토리 테이블 분리</h3>
+        <p>
+            현재 데이터와 히스토리를 <strong>별도 테이블</strong>로 분리합니다.
+        </p>
+
+        <div class="code-block">
+-- SCD Type 4: 현재 + 히스토리 테이블
+-- 현재 테이블
+CREATE TABLE dim_product_current (
+    product_id INT PRIMARY KEY,
+    name VARCHAR(100),
+    price DECIMAL(10,2),
+    category VARCHAR(50)
+);
+
+-- 히스토리 테이블
+CREATE TABLE dim_product_history (
+    product_id INT,
+    name VARCHAR(100),
+    price DECIMAL(10,2),
+    category VARCHAR(50),
+    effective_date DATE,
+    expiration_date DATE,
+    PRIMARY KEY (product_id, effective_date)
+);
+</div>
+
+        <h3>3.5 SCD Type 6: Type 1 + 2 + 3 하이브리드</h3>
+        <p>
+            Type 2의 완전한 히스토리 + Type 3의 이전 값 컬럼을 조합합니다.
+        </p>
+
+        <div class="code-block">
+-- SCD Type 6: 하이브리드
+CREATE TABLE dim_customer_type6 (
+    customer_key INT PRIMARY KEY,
+    customer_id INT,
+    name VARCHAR(100),
+    grade VARCHAR(20),                   -- Type 2: 히스토리
+    current_grade VARCHAR(20),           -- Type 3: 현재 값
+    previous_grade VARCHAR(20),          -- Type 3: 이전 값
+    effective_date DATE,
+    expiration_date DATE,
+    is_current BOOLEAN
+);
+</div>
+
+        <h2>4. 단일 진실 공급원 (SSOT)</h2>
+        <p>
+            <strong>Single Source of Truth (SSOT)</strong>는 데이터 웨어하우스의 핵심 가치입니다.
+            모든 부서가 동일한 정의, 동일한 계산 로직, 동일한 데이터를 사용하도록 보장합니다.
+        </p>
+
+        <div class="info-box">
+            <strong>SSOT가 없을 때 발생하는 문제</strong><br><br>
+            <strong>시나리오:</strong> "작년 매출이 얼마였나요?"<br><br>
+
+            • <strong>영업팀:</strong> 50억 원 (계약 체결일 기준)<br>
+            • <strong>재무팀:</strong> 48억 원 (수금 완료일 기준)<br>
+            • <strong>경영진:</strong> 49억 원 (발주일 기준)<br><br>
+
+            → 회의에서 혼란 발생! 어느 숫자가 맞나?<br><br>
+
+            <strong>SSOT 적용 후:</strong><br>
+            데이터 웨어하우스에서 "매출 = 발주일 기준, VAT 포함"으로 정의 통일<br>
+            모든 부서가 동일한 쿼리 사용 → 49억 원으로 합의
+        </div>
+
+        <div class="key-takeaways">
+            <h3 style="color:var(--primary);margin-top:0;">핵심 요점</h3>
+            <ul>
+                <li><strong>데이터 웨어하우스 4대 특징:</strong> 주제 지향적, 통합적, 시간 변화, 비휘발성</li>
+                <li><strong>OLTP vs OLAP:</strong> 업무 처리 vs 분석, 정규화 vs 비정규화, ms vs 초</li>
+                <li><strong>Inmon (Top-Down):</strong> EDW 먼저, 3NF, 높은 일관성, 긴 구축 기간</li>
+                <li><strong>Kimball (Bottom-Up):</strong> 데이터 마트 먼저, 스타 스키마, 빠른 ROI</li>
+                <li><strong>SCD Type 1:</strong> 덮어쓰기, 히스토리 없음</li>
+                <li><strong>SCD Type 2:</strong> 새 행 추가, 완전한 히스토리 (가장 많이 사용)</li>
+                <li><strong>SCD Type 3:</strong> 이전 값 컬럼, 제한적 히스토리</li>
+                <li><strong>SCD Type 4:</strong> 히스토리 테이블 분리</li>
+                <li><strong>SSOT:</strong> 단일 진실 공급원으로 데이터 일관성 보장</li>
+                <li><strong>히스토리 관리:</strong> 시점별 분석 가능, 감사 요구사항 충족</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3 style="color:var(--primary);margin-top:0;">복습 질문</h3>
+            <ol>
+                <li>Bill Inmon이 정의한 데이터 웨어하우스 4대 특징을 설명하세요.</li>
+                <li>OLTP와 OLAP의 차이점을 데이터 구조, 쿼리 패턴, 응답 시간 관점에서 비교하세요.</li>
+                <li>Inmon 방법론과 Kimball 방법론의 장단점을 설명하고, 각각 어떤 조직에 적합한가요?</li>
+                <li>SCD Type 1, 2, 3의 차이점과 각각의 사용 사례를 예시와 함께 설명하세요.</li>
+                <li>SCD Type 2에서 서로게이트 키가 필요한 이유는 무엇인가요?</li>
+                <li>SCD Type 2 테이블에서 "2024년 6월 1일 시점의 고객 등급"을 조회하는 쿼리를 작성하세요.</li>
+                <li>단일 진실 공급원(SSOT)이 중요한 이유를 실제 비즈니스 사례와 함께 설명하세요.</li>
+                <li>3NF 정규화와 스타 스키마 비정규화의 trade-off는 무엇인가요?</li>
+                <li>데이터 웨어하우스에서 UPDATE/DELETE가 금지되는 이유는?</li>
+                <li>SCD Type 6 (하이브리드)가 Type 2와 Type 3를 조합하는 이유와 장점은?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

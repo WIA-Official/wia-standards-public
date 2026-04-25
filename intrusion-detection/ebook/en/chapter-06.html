@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: SIEM Integration - WIA Intrusion Detection Standard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e0e0e0; line-height: 1.8; min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+        .nav-header { background: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; margin-bottom: 30px; border-left: 5px solid #EF4444; }
+        .nav-header a { color: #EF4444; text-decoration: none; font-weight: bold; margin-right: 20px; }
+        h1 { font-size: 3em; color: #EF4444; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #EF4444; }
+        h2 { font-size: 2em; color: #EF4444; margin-top: 40px; margin-bottom: 20px; }
+        h3 { font-size: 1.5em; color: #f87171; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 15px; font-size: 1.1em; color: #d0d0d0; }
+        .highlight-box { background: rgba(239, 68, 68, 0.1); border-left: 5px solid #EF4444; padding: 25px; margin: 30px 0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th { background: #EF4444; color: white; padding: 15px; text-align: left; font-weight: bold; }
+        td { padding: 12px 15px; border-bottom: 1px solid #334155; }
+        tr:hover { background: rgba(239, 68, 68, 0.1); }
+        pre { background: #1e293b; border: 2px solid #EF4444; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 25px 0; font-size: 0.9em; }
+        code { color: #f87171; font-family: 'Courier New', monospace; }
+        .code-title { background: #EF4444; color: white; padding: 8px 15px; border-radius: 5px 5px 0 0; font-weight: bold; margin-bottom: -10px; display: inline-block; }
+        ul, ol { margin: 20px 0; padding-left: 30px; }
+        li { margin-bottom: 10px; color: #d0d0d0; }
+        .nav-footer { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 2px solid #334155; }
+        .nav-footer a { background: #EF4444; color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: all 0.3s ease; }
+        .nav-footer a:hover { background: #dc2626; transform: translateY(-2px); }
+        .review-questions { background: rgba(239, 68, 68, 0.05); border: 2px solid #EF4444; border-radius: 10px; padding: 30px; margin: 40px 0; }
+        .review-questions h3 { color: #EF4444; margin-top: 0; }
+        .review-questions ol { margin-top: 20px; }
+        .review-questions li { margin-bottom: 15px; font-weight: 500; }
+        footer { text-align: center; padding: 40px 20px; margin-top: 60px; border-top: 2px solid #334155; color: #888; }
+        .hongik { font-size: 1.5em; color: #EF4444; margin-bottom: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-header">
+            <a href="index.html">← Table of Contents</a>
+            <span style="color: #888;">Chapter 6 of 8</span>
+        </div>
+
+        <h1>Chapter 6: SIEM Integration</h1>
+
+        <div class="highlight-box">
+            <h3>Chapter Overview</h3>
+            <p>This chapter explores the integration of IDS/IPS with Security Information and Event Management (SIEM) platforms. We'll examine integration methods, correlation rules, alert enrichment, automated response, threat intelligence integration, and best practices for building a comprehensive security operations center (SOC).</p>
+        </div>
+
+        <h2>6.1 Why SIEM Integration Matters</h2>
+
+        <p>IDS operating in isolation provides limited security value. SIEM integration enables:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Capability</th>
+                    <th>IDS Alone</th>
+                    <th>IDS + SIEM</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Context</strong></td>
+                    <td>Network traffic alerts only</td>
+                    <td>Correlated with logs, auth, endpoint, cloud events</td>
+                </tr>
+                <tr>
+                    <td><strong>Multi-Stage Attacks</strong></td>
+                    <td>Sees individual phases separately</td>
+                    <td>Correlates reconnaissance → exploit → persistence → exfiltration</td>
+                </tr>
+                <tr>
+                    <td><strong>Threat Intelligence</strong></td>
+                    <td>Limited IOC matching</td>
+                    <td>Enriched with IP reputation, malware families, campaigns</td>
+                </tr>
+                <tr>
+                    <td><strong>Investigation</strong></td>
+                    <td>Manual log search across systems</td>
+                    <td>Centralized search across all security data</td>
+                </tr>
+                <tr>
+                    <td><strong>Response</strong></td>
+                    <td>Manual SOC analyst action</td>
+                    <td>Automated playbooks via SOAR integration</td>
+                </tr>
+                <tr>
+                    <td><strong>Compliance</strong></td>
+                    <td>IDS logs only</td>
+                    <td>Comprehensive audit trail (PCI DSS, HIPAA, SOX)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.2 Integration Methods</h2>
+
+        <h3>Syslog Integration</h3>
+
+        <p>The most common integration method, using RFC 5424 syslog protocol:</p>
+
+        <div class="code-title">Snort/Suricata Syslog Output Configuration</div>
+<pre><code># Snort configuration (snort.conf)
+output alert_syslog: LOG_AUTH LOG_ALERT
+
+# Suricata configuration (suricata.yaml)
+outputs:
+  - syslog:
+      enabled: yes
+      facility: local5
+      level: Info
+      format: "[%i] <%d> -- "
+
+# rsyslog configuration (/etc/rsyslog.conf)
+# Forward IDS alerts to SIEM
+local5.* @@siem.company.com:514
+
+# Syslog Message Format (RFC 5424)
+<134>1 2025-01-15T14:23:15.003Z ids-sensor-01 snort - ID47 [custom@32473 classification="web-application-attack" priority="1" sid="2100498"] SQL injection detected: 192.168.1.100:54321 -> 10.0.1.50:80
+
+# Breakdown:
+# <134>: Priority (facility=local5, severity=info)
+# 1: Version
+# Timestamp: ISO 8601 format
+# Hostname: ids-sensor-01
+# App-name: snort
+# Structured Data: Attack classification, priority, signature ID
+# Message: Human-readable alert details
+</code></pre>
+
+        <h3>API Integration</h3>
+
+        <p>Modern platforms use REST APIs for rich, structured data exchange:</p>
+
+        <div class="code-title">Splunk HTTP Event Collector (HEC)</div>
+<pre><code>#!/usr/bin/env python3
+import requests
+import json
+
+# IDS alert data
+alert = {
+    "sourcetype": "suricata:alert",
+    "event": {
+        "timestamp": "2025-01-15T14:23:15.003Z",
+        "alert": {
+            "signature": "ET WEB_SPECIFIC_APPS SQL Injection",
+            "signature_id": 2100498,
+            "category": "Web Application Attack",
+            "severity": 1
+        },
+        "flow": {
+            "src_ip": "192.168.1.100",
+            "src_port": 54321,
+            "dest_ip": "10.0.1.50",
+            "dest_port": 80
+        },
+        "http": {
+            "hostname": "www.example.com",
+            "url": "/app?id=1 UNION SELECT password FROM users",
+            "http_method": "GET",
+            "http_user_agent": "Mozilla/5.0..."
+        },
+        "packet": "base64_encoded_packet_data..."
+    }
+}
+
+# Send to Splunk HEC
+response = requests.post(
+    'https://splunk.company.com:8088/services/collector/event',
+    headers={
+        'Authorization': 'Splunk HEC_TOKEN_HERE',
+        'Content-Type': 'application/json'
+    },
+    data=json.dumps(alert),
+    verify=True
+)
+
+print(f"Status: {response.status_code}")
+# Response: {"text":"Success","code":0}
+</code></pre>
+
+        <h3>Database Integration</h3>
+
+        <p>Direct database insertion for platforms supporting SQL queries:</p>
+
+        <div class="code-title">Snort Database Output (Barnyard2)</div>
+<pre><code># Barnyard2 configuration
+# Processes Snort unified2 output and stores in database
+
+output database: log, mysql, user=snort password=SecureP@ss dbname=snort host=siem-db.company.com
+
+# Database schema (simplified)
+CREATE TABLE event (
+    sid INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    signature INT UNSIGNED NOT NULL,
+    timestamp DATETIME NOT NULL,
+    src_ip INT UNSIGNED NOT NULL,
+    dst_ip INT UNSIGNED NOT NULL,
+    src_port SMALLINT UNSIGNED,
+    dst_port SMALLINT UNSIGNED,
+    protocol TINYINT UNSIGNED,
+    INDEX (timestamp),
+    INDEX (src_ip),
+    INDEX (signature)
+);
+
+# SIEM queries database for analytics
+SELECT DATE(timestamp) as date,
+       signature_name,
+       COUNT(*) as alert_count
+FROM event e
+JOIN signature s ON e.signature = s.sig_id
+WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY DATE(timestamp), signature_name
+ORDER BY alert_count DESC
+LIMIT 20;
+</code></pre>
+
+        <h2>6.3 Event Correlation</h2>
+
+        <p>SIEM correlates IDS alerts with other security events to detect complex attack patterns:</p>
+
+        <h3>Multi-Stage Attack Detection</h3>
+
+        <div class="code-title">Example: Detecting APT Kill Chain</div>
+<pre><code># Splunk SPL (Search Processing Language) Correlation Rule
+
+# Stage 1: Reconnaissance (Port Scan)
+sourcetype=suricata:alert alert.category="Attempted Information Leak"
+| stats count by src_ip
+| where count > 100
+| eval stage="reconnaissance"
+
+# Stage 2: Initial Compromise (Exploit)
+| join src_ip [
+    search sourcetype=suricata:alert alert.category="Web Application Attack"
+    | eval stage="initial_compromise"
+]
+
+# Stage 3: Credential Access (from endpoint logs)
+| join src_ip [
+    search sourcetype=WinEventLog:Security EventCode=4625
+    | stats count as failed_logins by src_ip
+    | where failed_logins > 20
+    | eval stage="credential_access"
+]
+
+# Stage 4: Lateral Movement
+| join src_ip [
+    search sourcetype=suricata:alert alert.signature="*SMB*"  OR alert.signature="*RDP*"
+    | where dest_ip!="10.0.1.50"  # Not original target
+    | eval stage="lateral_movement"
+]
+
+# Stage 5: Data Exfiltration
+| join src_ip [
+    search sourcetype=suricata:alert alert.category="Potential Corporate Privacy Violation"
+    | stats sum(bytes_sent) as total_exfil by src_ip
+    | where total_exfil > 100000000  # > 100MB
+    | eval stage="exfiltration"
+]
+
+# Alert if all stages detected within 24 hours
+| stats values(stage) as stages, count by src_ip
+| where count >= 3
+| eval severity="critical", alert_name="APT Kill Chain Detected"
+</code></pre>
+
+        <h3>Insider Threat Detection</h3>
+
+        <div class="code-title">Example: Anomalous Data Access</div>
+<pre><code># ELK Stack (Elasticsearch) Correlation Query
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        # User accessed sensitive files
+        {
+          "term": { "event.category": "file_access" }
+        },
+        {
+          "term": { "file.path": "/data/confidential/*" }
+        },
+
+        # Outside normal working hours
+        {
+          "range": {
+            "@timestamp": {
+              "gte": "now/d",
+              "lte": "now/d",
+              "format": "hour",
+              "time_zone": "America/New_York"
+            }
+          }
+        },
+        {
+          "script": {
+            "script": "doc['@timestamp'].value.getHourOfDay() < 6 || doc['@timestamp'].value.getHourOfDay() > 22"
+          }
+        },
+
+        # Large data transfer detected by IDS
+        {
+          "range": {
+            "network.bytes": { "gte": 50000000 }  # > 50MB
+          }
+        },
+
+        # Destination IP not in whitelist
+        {
+          "bool": {
+            "must_not": {
+              "terms": {
+                "destination.ip": ["10.0.0.0/8", "172.16.0.0/12"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+
+  # Aggregate by user
+  "aggs": {
+    "by_user": {
+      "terms": { "field": "user.name" },
+      "aggs": {
+        "total_bytes": { "sum": { "field": "network.bytes" } },
+        "file_count": { "cardinality": { "field": "file.path" } }
+      }
+    }
+  }
+}
+
+# Alert if user accessed >100 files and transferred >500MB
+</code></pre>
+
+        <h2>6.4 Alert Enrichment</h2>
+
+        <p>SIEM enhances raw IDS alerts with contextual information:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Enrichment Type</th>
+                    <th>Data Sources</th>
+                    <th>Value Added</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Threat Intelligence</strong></td>
+                    <td>VirusTotal, AlienVault OTX, MISP, commercial feeds</td>
+                    <td>IP reputation, malware family, known campaigns, TTPs</td>
+                </tr>
+                <tr>
+                    <td><strong>Asset Context</strong></td>
+                    <td>CMDB, asset inventory, vulnerability scanners</td>
+                    <td>Asset criticality, owner, patch level, known vulnerabilities</td>
+                </tr>
+                <tr>
+                    <td><strong>User Context</strong></td>
+                    <td>Active Directory, HR systems, IAM</td>
+                    <td>Job title, department, access privileges, manager</td>
+                </tr>
+                <tr>
+                    <td><strong>Geolocation</strong></td>
+                    <td>MaxMind GeoIP, IP2Location</td>
+                    <td>Country, city, ASN, organization</td>
+                </tr>
+                <tr>
+                    <td><strong>Historical Context</strong></td>
+                    <td>SIEM historical data</td>
+                    <td>Previous alerts from source, baseline behavior</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-title">Example: Threat Intelligence Enrichment (Splunk)</div>
+<pre><code># Enrich IDS alerts with VirusTotal IP reputation
+
+# Incoming IDS alert
+sourcetype=suricata:alert
+
+# Extract source IP
+| eval src_ip=mvindex(split(alert.flow_id, ":"), 0)
+
+# Lookup VirusTotal (via custom command or REST API)
+| lookup virustotal_ip ip AS src_ip OUTPUT malicious_count, detection_names, last_analysis_date
+
+# Enrich with asset data
+| lookup asset_inventory ip AS dest_ip OUTPUT asset_name, asset_owner, criticality, patch_level
+
+# Enrich with geolocation
+| iplocation src_ip
+
+# Calculate risk score
+| eval risk_score=case(
+    criticality="critical" AND malicious_count>5, 100,
+    criticality="high" AND malicious_count>3, 80,
+    criticality="medium" AND malicious_count>0, 50,
+    1==1, 20
+)
+
+# Generate enriched alert
+| eval enriched_alert=mvappend(
+    "Original Alert: " . alert.signature,
+    "Source IP: " . src_ip . " (" . City . ", " . Country . ")",
+    "VT Detections: " . malicious_count . "/90 engines",
+    "Target Asset: " . asset_name . " (Owner: " . asset_owner . ")",
+    "Asset Criticality: " . criticality,
+    "Risk Score: " . risk_score
+)
+
+# Route high-risk alerts to SOC
+| where risk_score >= 70
+| sendalert email to="soc@company.com" with="High-Risk Alert Detected"
+</code></pre>
+
+        <h2>6.5 Automated Response</h2>
+
+        <p>SIEM triggers automated playbooks based on IDS alerts:</p>
+
+        <h3>SOAR Integration</h3>
+
+        <div class="code-title">Example: Phantom/Splunk SOAR Playbook</div>
+<pre><code># Phantom Playbook: Respond to IDS Alert
+
+playbook_name: "IDS Alert - Automated Response"
+
+triggers:
+  - source: "Splunk"
+    search: "sourcetype=suricata:alert severity=1"
+
+actions:
+
+  # 1. Validate alert is true positive
+  - name: "Check IP Reputation"
+    app: "VirusTotal"
+    action: "ip_reputation"
+    parameters:
+      ip: "{{ alert.src_ip }}"
+    save_result_as: "vt_result"
+
+  - name: "Conditional - Malicious IP?"
+    condition: "{{ vt_result.positives > 5 }}"
+    if_true: continue
+    if_false: close_case
+
+  # 2. Gather additional context
+  - name: "Query Active Sessions"
+    app: "Firewall"
+    action: "list_sessions"
+    parameters:
+      src_ip: "{{ alert.src_ip }}"
+    save_result_as: "active_sessions"
+
+  - name: "Get Host Details"
+    app: "Active Directory"
+    action: "get_computer"
+    parameters:
+      ip_address: "{{ alert.dest_ip }}"
+    save_result_as: "host_info"
+
+  # 3. Containment actions
+  - name: "Block IP at Firewall"
+    app: "Palo Alto"
+    action: "block_ip"
+    parameters:
+      ip: "{{ alert.src_ip }}"
+      duration: 3600  # 1 hour
+
+  - name: "Isolate Endpoint"
+    app: "CrowdStrike"
+    action: "contain_host"
+    parameters:
+      hostname: "{{ host_info.hostname }}"
+
+  # 4. Forensics
+  - name: "Capture Memory Dump"
+    app: "EDR"
+    action: "memory_dump"
+    parameters:
+      hostname: "{{ host_info.hostname }}"
+
+  - name: "Collect Packet Capture"
+    app: "IDS"
+    action: "export_pcap"
+    parameters:
+      flow_id: "{{ alert.flow_id }}"
+      time_range: "5m"
+
+  # 5. Notification
+  - name: "Create Ticket"
+    app: "ServiceNow"
+    action: "create_incident"
+    parameters:
+      short_description: "IDS Alert: {{ alert.signature }}"
+      description: |
+        Source IP: {{ alert.src_ip }}
+        Destination: {{ alert.dest_ip }} ({{ host_info.hostname }})
+        VT Detections: {{ vt_result.positives }}/90
+        Actions Taken: IP blocked, endpoint isolated
+      urgency: "1-Critical"
+      assigned_to: "SOC Team"
+
+  - name: "Send Email"
+    app: "SMTP"
+    action: "send_email"
+    parameters:
+      to: "soc@company.com, {{ host_info.owner }}"
+      subject: "URGENT: Security Incident - {{ host_info.hostname }}"
+      body: "{{ playbook.summary }}"
+</code></pre>
+
+        <h2>6.6 Use Case Examples</h2>
+
+        <h3>Use Case 1: Ransomware Detection</h3>
+
+        <div class="code-title">Multi-Source Correlation for Ransomware</div>
+<pre><code># Correlate IDS, EDR, and file system events
+
+# Indicators:
+# 1. IDS: Suspicious outbound connection (C2 callback)
+# 2. EDR: Rapid file modification activity
+# 3. File System: Mass file encryption (.encrypted extension)
+# 4. Network: SMB lateral movement
+
+index=security
+| multisearch
+    [ search sourcetype=suricata:alert alert.signature="*TOR*" OR alert.signature="*C2*" ]
+    [ search sourcetype=edr:process process.name="*.exe" process.command_line="*vssadmin delete shadows*" ]
+    [ search sourcetype=windows:sysmon EventCode=11 file_path="*.encrypted" | stats count by host | where count>50 ]
+    [ search sourcetype=suricata:alert protocol=smb ]
+
+| stats values(sourcetype) as indicators, count by host, user
+
+| where count >=3
+
+| eval severity="critical", alert="Ransomware Activity Detected"
+
+# Automated Response:
+# 1. Isolate affected hosts via EDR
+# 2. Block C2 domains at DNS/firewall
+# 3. Disable user accounts
+# 4. Alert CISO and IR team
+# 5. Initiate backup restoration procedures
+</code></pre>
+
+        <h3>Use Case 2: Lateral Movement Detection</h3>
+
+        <div class="code-title">Detecting Pass-the-Hash / RDP Lateral Movement</div>
+<pre><code># Detect unusual internal authentication patterns
+
+# Step 1: Identify source of compromise
+sourcetype=windows:security EventCode=4625  # Failed login
+| stats count as failed_attempts by src_ip, dest_host
+| where failed_attempts > 20
+
+# Step 2: Correlate with successful logins
+| join src_ip [
+    search sourcetype=windows:security EventCode=4624 LogonType=3  # Network logon
+    | stats count as successful_logins, dc(dest_host) as unique_hosts by src_ip
+    | where unique_hosts > 5  # Logged into >5 different hosts
+]
+
+# Step 3: Check for IDS alerts on lateral movement protocols
+| join src_ip [
+    search sourcetype=suricata:alert (alert.signature="*RDP*" OR alert.signature="*SMB*" OR alert.signature="*WMI*")
+    | stats count as lateral_alerts by src_ip
+]
+
+# Step 4: Validate against normal behavior baseline
+| lookup user_baseline_logins src_ip OUTPUT avg_hosts_per_day
+
+| where unique_hosts > (avg_hosts_per_day * 3)  # 3x normal behavior
+
+# Alert and respond
+| eval alert_name="Lateral Movement Detected", severity="high"
+| sendalert soar_playbook param.playbook="contain_and_investigate"
+</code></pre>
+
+        <h2>6.7 Popular SIEM Platforms</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>Strengths</th>
+                    <th>IDS Integration</th>
+                    <th>Best For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Splunk</strong></td>
+                    <td>Powerful SPL, extensive app ecosystem, scalability</td>
+                    <td>Syslog, HEC, DB Connect, Universal Forwarder</td>
+                    <td>Large enterprises, advanced analytics</td>
+                </tr>
+                <tr>
+                    <td><strong>Elastic (ELK)</strong></td>
+                    <td>Open source, flexible, machine learning</td>
+                    <td>Filebeat, Logstash, Elasticsearch REST API</td>
+                    <td>Cost-conscious orgs, customization</td>
+                </tr>
+                <tr>
+                    <td><strong>IBM QRadar</strong></td>
+                    <td>Network flow analysis, offense management</td>
+                    <td>Syslog, LEEF, REST API, QRadar DSM</td>
+                    <td>Compliance-heavy industries, MSSP</td>
+                </tr>
+                <tr>
+                    <td><strong>ArcSight</strong></td>
+                    <td>Complex correlation, ESM, threat intelligence</td>
+                    <td>SmartConnectors, Syslog, CEF format</td>
+                    <td>Government, critical infrastructure</td>
+                </tr>
+                <tr>
+                    <td><strong>Microsoft Sentinel</strong></td>
+                    <td>Cloud-native, Azure integration, KQL queries</td>
+                    <td>Azure Monitor, Syslog, REST API, connectors</td>
+                    <td>Microsoft-centric environments, cloud</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.8 Best Practices</h2>
+
+        <h3>Data Normalization</h3>
+        <ul>
+            <li><strong>Common Event Format (CEF):</strong> Standardize IDS alerts to CEF for easier parsing</li>
+            <li><strong>Field Mapping:</strong> Map IDS fields to SIEM's data model (src_ip, dest_ip, signature_id)</li>
+            <li><strong>Timestamp Normalization:</strong> Ensure all sources use consistent timezone and format</li>
+        </ul>
+
+        <h3>Correlation Rule Development</h3>
+        <ol>
+            <li><strong>Start Simple:</strong> Single-source rules before multi-source correlation</li>
+            <li><strong>Test with Historical Data:</strong> Validate rules against past incidents</li>
+            <li><strong>Tune Thresholds:</strong> Adjust count/time windows to minimize false positives</li>
+            <li><strong>Document Rules:</strong> Maintain runbooks for each correlation rule</li>
+            <li><strong>Regular Review:</strong> Monthly review and update of correlation rules</li>
+        </ol>
+
+        <h3>Performance Optimization</h3>
+        <ul>
+            <li><strong>Filter Early:</strong> Apply filters before joins/aggregations</li>
+            <li><strong>Use Summary Indexes:</strong> Pre-aggregate common queries (Splunk)</li>
+            <li><strong>Limit Search Windows:</strong> Search last 24h, not all-time</li>
+            <li><strong>Index Optimization:</strong> Proper indexing on commonly queried fields</li>
+        </ul>
+
+        <h2>6.9 Chapter Summary</h2>
+
+        <ul>
+            <li>SIEM integration enables correlation of IDS alerts with logs, endpoint, cloud, and auth events</li>
+            <li>Integration methods include syslog (RFC 5424), REST APIs (HEC), and database connections</li>
+            <li>Event correlation detects multi-stage attacks spanning reconnaissance to exfiltration</li>
+            <li>Alert enrichment adds threat intelligence, asset context, user data, and geolocation</li>
+            <li>SOAR automation triggers playbooks for containment, forensics, and notification</li>
+            <li>Use cases include ransomware detection, lateral movement, and insider threats</li>
+            <li>Popular platforms: Splunk, Elastic, QRadar, ArcSight, Microsoft Sentinel</li>
+            <li>Best practices: data normalization, simple-to-complex correlation, performance optimization</li>
+        </ul>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain why IDS alerts provide limited value without SIEM correlation. Provide a specific attack scenario.</li>
+                <li>Compare syslog and REST API integration methods for IDS-SIEM connectivity. When would you choose each?</li>
+                <li>Design a correlation rule to detect an APT kill chain from reconnaissance to data exfiltration.</li>
+                <li>What types of threat intelligence would enrich an IDS alert about a suspicious IP address?</li>
+                <li>Describe a SOAR playbook that automatically responds to a high-severity IDS alert.</li>
+                <li>How does alert enrichment with asset criticality and patch level improve prioritization?</li>
+                <li>Explain the difference between SIEM and SOAR, and how they work together.</li>
+                <li>Design a correlation rule for detecting Pass-the-Hash lateral movement using IDS and Windows Event logs.</li>
+                <li>Why is data normalization (CEF, field mapping) important for effective SIEM correlation?</li>
+                <li>Calculate: If an IDS generates 10,000 alerts/day and SIEM correlation reduces actionable alerts to 500, what is the noise reduction percentage?</li>
+            </ol>
+        </div>
+
+        <div class="nav-footer">
+            <a href="chapter-05.html">← Chapter 5</a>
+            <a href="chapter-07.html">Next: Chapter 7 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

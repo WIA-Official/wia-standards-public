@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: API Interface Specifications | WIA-TIME-001</title>
+    <style>
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #8B5CF6; --text: #f1f5f9; --text-dim: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3rem; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text); }
+        .callout { background: rgba(6, 182, 212, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: API Interface Specifications</h1>
+
+        <p>Modern temporal research systems comprise numerous interconnected software components that must communicate reliably and efficiently. The WIA-TIME-001 Phase 2 specification defines standardized Application Programming Interfaces (APIs) that enable this communication, establishing common patterns for requesting calculations, submitting displacement operations, verifying causality, and exchanging temporal data. This chapter provides comprehensive coverage of these API specifications, demonstrating how software systems interact within the WIA-TIME-001 framework.</p>
+
+        <p>The API design philosophy emphasizes simplicity, security, and reliability. All APIs use RESTful conventions with JSON payloads, ensuring compatibility with virtually any programming environment. Authentication and authorization mechanisms protect against unauthorized access, while comprehensive error handling ensures that failures are detected and reported appropriately. The APIs are versioned to support evolution while maintaining backward compatibility for existing implementations.</p>
+
+        <h2>REST API Architecture</h2>
+
+        <p>The WIA-TIME-001 REST API follows standard HTTP conventions, using appropriate methods (GET, POST, PUT, DELETE) for different operation types. All endpoints require HTTPS to ensure transport security. The base URL for production systems is standardized as <code>https://api.wia-time.org/v1/</code>, though facilities may deploy local instances with different base URLs while maintaining API compatibility.</p>
+
+        <p>Request and response bodies use JSON format exclusively. All timestamps in API communications use ISO 8601 format with explicit timezone specification. Numeric values use standard JSON number representation with sufficient precision for temporal calculations. The API supports content negotiation through Accept headers, though JSON is the only currently specified format.</p>
+
+        <pre>Base URL: https://api.wia-time.org/v1/
+
+Common Headers:
+  Content-Type: application/json
+  Authorization: Bearer {token}
+  X-Request-ID: {unique-request-identifier}
+  X-Temporal-Signature: {hmac-signature}</pre>
+
+        <h2>Temporal Calculation Endpoints</h2>
+
+        <p>The calculation endpoints provide access to the computational capabilities required for temporal displacement planning. These endpoints accept displacement parameters and return calculated results including energy requirements, feasibility assessments, and risk evaluations. All calculations are performed server-side to ensure consistency and to leverage high-performance computing resources.</p>
+
+        <h3>Calculate Displacement</h3>
+
+        <p>The displacement calculation endpoint accepts origin and destination coordinates along with traveler parameters, returning comprehensive displacement metrics. This endpoint performs the fundamental calculations required to plan any temporal displacement operation.</p>
+
+        <pre>POST /calculate/displacement
+
+Request:
+{
+  "origin": {
+    "time": "2025-01-01T00:00:00Z",
+    "coordinates": { "x": 0, "y": 0, "z": 0 },
+    "referenceFrame": "earth"
+  },
+  "destination": {
+    "time": "2020-01-01T00:00:00Z",
+    "coordinates": { "x": 0, "y": 0, "z": 0 },
+    "referenceFrame": "earth"
+  },
+  "travelerMass": 75
+}
+
+Response 200:
+{
+  "displacementId": "TD-2025-001-ALPHA",
+  "deltaTime": -157766400,
+  "energyRequired": 6.75e18,
+  "causalityRisk": "low",
+  "feasibility": "possible"
+}</pre>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.1: Displacement Calculation Response Fields</caption>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>displacementId</td><td>string</td><td>Unique identifier for referencing this calculation</td></tr>
+                <tr><td>deltaTime</td><td>number</td><td>Temporal displacement in seconds (negative = past)</td></tr>
+                <tr><td>energyRequired</td><td>number</td><td>Total energy requirement in joules</td></tr>
+                <tr><td>causalityRisk</td><td>enum</td><td>Risk level: none, low, medium, high, critical</td></tr>
+                <tr><td>feasibility</td><td>enum</td><td>Assessment: possible, marginal, infeasible</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Calculate Energy Requirements</h3>
+
+        <p>The energy calculation endpoint provides detailed breakdown of energy requirements for a specific displacement method. Different temporal displacement mechanisms have vastly different energy profiles, and this endpoint enables comparison between available methods.</p>
+
+        <pre>POST /calculate/energy
+
+Request:
+{
+  "displacementId": "TD-2025-001-ALPHA",
+  "method": "wormhole"
+}
+
+Response 200:
+{
+  "totalEnergy": 6.75e18,
+  "exoticMatter": -1e15,
+  "powerDuration": 3.5,
+  "sources": [
+    { "type": "antimatter", "amount": 75, "unit": "kg" },
+    { "type": "vacuum_energy", "amount": 1e12, "unit": "J" }
+  ]
+}</pre>
+
+        <h2>Causality Verification Endpoints</h2>
+
+        <p>The causality endpoints enable verification of temporal operations against paradox risk thresholds. These endpoints analyze planned actions within the context of known timeline structure and return risk assessments that inform operational decisions. Causality verification is mandatory before any displacement operation proceeds.</p>
+
+        <h3>Check Paradox Risk</h3>
+
+        <p>The paradox check endpoint accepts a displacement identifier and a list of planned actions, returning detailed risk assessment including probability estimates and specific warnings. This endpoint must be called before any displacement operation and the response must indicate approval before proceeding.</p>
+
+        <pre>POST /causality/check
+
+Request:
+{
+  "displacementId": "TD-2025-001-ALPHA",
+  "plannedActions": [
+    { "type": "observation", "target": "historical_event" },
+    { "type": "sample_collection", "target": "geological" }
+  ]
+}
+
+Response 200:
+{
+  "paradoxRisk": "low",
+  "probability": 0.001,
+  "warnings": [],
+  "approved": true,
+  "validUntil": "2025-01-15T12:00:00Z"
+}</pre>
+
+        <h3>Verify Timeline Integrity</h3>
+
+        <p>The timeline integrity endpoint provides real-time assessment of timeline stability. This endpoint is used both before operations to verify baseline stability and after operations to confirm that no unintended modifications occurred.</p>
+
+        <pre>GET /causality/timeline/{timelineId}/integrity
+
+Response 200:
+{
+  "timelineId": "TL-PRIME-A1-001",
+  "integrity": 0.9999,
+  "anomalies": 0,
+  "lastVerified": "2025-01-15T10:00:00Z",
+  "status": "stable"
+}</pre>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.2: Timeline Integrity Status Values</caption>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Integrity Range</th>
+                    <th>Operational Impact</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>stable</td><td>≥ 0.999</td><td>Normal operations permitted</td></tr>
+                <tr><td>minor_variance</td><td>0.99 - 0.999</td><td>Enhanced monitoring required</td></tr>
+                <tr><td>significant_variance</td><td>0.9 - 0.99</td><td>New operations suspended</td></tr>
+                <tr><td>critical</td><td>&lt; 0.9</td><td>Emergency protocols activated</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Navigation Endpoints</h2>
+
+        <p>Navigation endpoints support worldline calculation and trajectory optimization. These endpoints accept origin and destination coordinates along with navigational constraints, returning optimized paths through spacetime that minimize risk while respecting physical limitations.</p>
+
+        <pre>POST /navigation/worldline
+
+Request:
+{
+  "origin": { /* SpacetimeCoordinate */ },
+  "destination": { /* SpacetimeCoordinate */ },
+  "constraints": {
+    "maxAcceleration": 10,
+    "avoidMassive": true,
+    "preferredMethod": "wormhole"
+  }
+}
+
+Response 200:
+{
+  "worldlineId": "WL-2025-001",
+  "segments": [ /* array of path segments */ ],
+  "totalProperTime": 3600,
+  "waypoints": [ /* critical navigation points */ ],
+  "hazards": []
+}</pre>
+
+        <h2>Authentication and Authorization</h2>
+
+        <p>The WIA-TIME-001 API implements multiple authentication mechanisms to accommodate different operational contexts. All mechanisms require TLS 1.3 or higher for transport security. API keys provide simple authentication for automated systems, while OAuth 2.0 supports interactive applications with user-specific permissions.</p>
+
+        <p>Temporal signatures provide an additional security layer that binds requests to specific times, preventing replay attacks. The signature is computed as HMAC-SHA256 over the concatenation of timestamp and request hash, using the facility's secret key. Requests with temporal signatures more than five minutes old are rejected.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.3: Authentication Methods</caption>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Header Format</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>API Key</td><td>Authorization: Bearer {api_key}</td><td>Automated systems</td></tr>
+                <tr><td>OAuth 2.0</td><td>Authorization: Bearer {access_token}</td><td>Interactive applications</td></tr>
+                <tr><td>Temporal Signature</td><td>X-Temporal-Signature: {hmac}</td><td>High-security operations</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Rate Limiting and Quotas</h2>
+
+        <p>To ensure fair resource allocation and prevent abuse, the API implements rate limiting and quota systems. Limits vary by subscription tier, with higher tiers receiving greater allocation. Rate limit status is returned in response headers, enabling clients to implement appropriate backoff strategies.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.4: Rate Limits by Tier</caption>
+            <thead>
+                <tr>
+                    <th>Tier</th>
+                    <th>Requests/Hour</th>
+                    <th>Calculations/Day</th>
+                    <th>Displacement Ops/Month</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Free</td><td>100</td><td>10</td><td>0</td></tr>
+                <tr><td>Basic</td><td>1,000</td><td>100</td><td>1</td></tr>
+                <tr><td>Professional</td><td>10,000</td><td>1,000</td><td>10</td></tr>
+                <tr><td>Enterprise</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Error Handling</h2>
+
+        <p>The API uses standard HTTP status codes augmented with detailed error responses. All error responses include a machine-readable error code, human-readable message, and when applicable, specific field-level details. Clients should implement robust error handling that appropriately responds to different error categories.</p>
+
+        <pre>Error Response Format:
+{
+  "error": {
+    "code": "CAUSALITY_VIOLATION",
+    "message": "Proposed action would create grandfather paradox",
+    "details": {
+      "paradoxType": "grandfather",
+      "probability": 0.87,
+      "affectedEntities": ["traveler_ancestor_3"]
+    }
+  }
+}</pre>
+
+        <div class="callout">
+            <strong>Critical Error Codes:</strong> Error code 403 with CAUSALITY_VIOLATION indicates that the proposed operation would create an unacceptable paradox risk. Error code 503 with TIMELINE_UNSTABLE indicates that current timeline conditions prevent safe operations. Both require immediate attention and may trigger facility-wide safety protocols.
+        </div>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li>The WIA-TIME-001 REST API uses standard HTTP methods with JSON payloads, providing calculation, causality verification, and navigation endpoints essential for temporal operations planning and execution.</li>
+                <li>Temporal calculation endpoints return displacement metrics, energy requirements, and feasibility assessments that inform operational decisions, with all calculations performed server-side for consistency.</li>
+                <li>Causality verification is mandatory before any displacement operation, with the paradox check endpoint returning approval status that must be positive before proceeding.</li>
+                <li>Multiple authentication mechanisms (API keys, OAuth 2.0, temporal signatures) accommodate different security requirements, with all communications requiring TLS 1.3 encryption.</li>
+                <li>Rate limiting ensures fair resource allocation across subscription tiers, while comprehensive error handling with specific codes enables appropriate client responses to different failure conditions.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain the role of the displacementId in the API workflow. How does it connect calculation, causality verification, and execution endpoints?</li>
+                <li>Why does the causality check response include a validUntil field? What operational implications does this have?</li>
+                <li>Compare the three authentication methods. Under what circumstances would temporal signatures be required in addition to API key authentication?</li>
+                <li>Analyze the timeline integrity status thresholds. Why might significant_variance suspend new operations while permitting in-progress operations to continue?</li>
+                <li>Design error handling logic for a client application. How should the client respond differently to 403 CAUSALITY_VIOLATION versus 503 TIMELINE_UNSTABLE?</li>
+                <li>Calculate the maximum number of displacement operations a Professional tier facility could perform in one year. What factors beyond quotas might limit actual operations?</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 5 examines the communication and operational protocols specified in WIA-TIME-001 Phase 3, describing the message formats, state machines, and procedural requirements that govern actual temporal displacement operations. Understanding these protocols is essential for implementing safe operational procedures.</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-03.html">← Previous Chapter</a>
+            <a href="chapter-05.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

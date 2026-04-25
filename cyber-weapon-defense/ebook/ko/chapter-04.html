@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: APT 탐지 및 대응 | WIA-SEC-025</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #e2e8f0; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>제4장: APT 탐지 및 대응</h1>
+
+    <div class="objectives-box">
+        <h3>🎯 학습 목표</h3>
+        <ul>
+            <li>APT 행동 지표 식별</li>
+            <li>위협 헌팅 기법 구현</li>
+            <li>구조화된 APT 대응 절차 실행</li>
+            <li>침해된 시스템의 포렌식 분석 수행</li>
+            <li>지속적 위협 행위자 접근 제거</li>
+        </ul>
+    </div>
+
+    <h2>4.1 APT 행동 지표</h2>
+
+    <p>고급 지속 위협은 일반 악성코드나 기회주의적 공격과 다른 뚜렷한 행동 패턴을 보입니다. 이러한 패턴을 이해하면 특정 악성코드 서명이 알려지지 않은 경우에도 방어자가 APT 활동을 탐지할 수 있습니다.</p>
+
+    <h3>4.1.1 주요 행동 지표</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>지표 범주</th>
+                <th>관찰 가능한 행동</th>
+                <th>탐지 방법</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>C2 통신</td>
+                <td>주기적 비콘, DNS 터널링, 암호화 채널</td>
+                <td>네트워크 트래픽 분석, 비콘 탐지</td>
+            </tr>
+            <tr>
+                <td>횡적 이동</td>
+                <td>RDP, PsExec, WMI, 자격 증명 재사용</td>
+                <td>인증 로그, 프로세스 모니터링</td>
+            </tr>
+            <tr>
+                <td>데이터 스테이징</td>
+                <td>파일 수집, 압축, 암호화</td>
+                <td>파일 시스템 모니터링, DLP</td>
+            </tr>
+            <tr>
+                <td>지속성</td>
+                <td>예약 작업, 레지스트리, 서비스</td>
+                <td>구성 모니터링, 자동실행</td>
+            </tr>
+            <tr>
+                <td>현지 자원 활용</td>
+                <td>PowerShell, WMI, certutil 남용</td>
+                <td>명령줄 로깅, 행동 분석</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.2 위협 헌팅</h2>
+
+    <pre><code>// 위협 헌팅 프레임워크
+{
+  "가설_주도": {
+    "description": "공격자 행동에 대한 가설로 시작",
+    "sources": ["위협 정보", "MITRE ATT&CK", "사고 학습"],
+    "example": "APT-29는 지속성을 위해 예약 작업 사용"
+  },
+  "데이터_소스": {
+    "network": ["프록시 로그", "DNS 로그", "NetFlow", "PCAP"],
+    "endpoint": ["프로세스 생성", "PowerShell 로그", "레지스트리 변경"],
+    "identity": ["인증 로그", "권한 변경", "그룹 멤버십"]
+  },
+  "헌팅_기법": [
+    {
+      "technique": "스택 카운팅",
+      "description": "일반 이벤트의 드문 발생 찾기"
+    },
+    {
+      "technique": "기준선 이탈",
+      "description": "정상 행동에서의 이상 식별"
+    },
+    {
+      "technique": "IOC 스윕",
+      "description": "환경 전체에서 알려진 지표 검색"
+    },
+    {
+      "technique": "TTP 매핑",
+      "description": "특정 공격 기법 헌팅"
+    }
+  ]
+}</code></pre>
+
+    <h2>4.3 APT 대응 절차</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>단계</th>
+                <th>활동</th>
+                <th>소요 시간</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1. 탐지</td>
+                <td>경보 분류, 초기 분석, 범위 파악</td>
+                <td>수 시간</td>
+            </tr>
+            <tr>
+                <td>2. 봉쇄</td>
+                <td>시스템 격리, C2 차단, 증거 보존</td>
+                <td>수 시간~수일</td>
+            </tr>
+            <tr>
+                <td>3. 조사</td>
+                <td>포렌식 분석, 범위 결정</td>
+                <td>수일~수주</td>
+            </tr>
+            <tr>
+                <td>4. 제거</td>
+                <td>악성코드 제거, 접근 벡터 폐쇄</td>
+                <td>수일~수주</td>
+            </tr>
+            <tr>
+                <td>5. 복구</td>
+                <td>시스템 복원, 정상 상태 검증</td>
+                <td>수일~수주</td>
+            </tr>
+            <tr>
+                <td>6. 교훈</td>
+                <td>문서화, 개선, 정보 공유</td>
+                <td>지속</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.4 봉쇄 전략</h2>
+
+    <blockquote>
+        <h3>봉쇄 결정 매트릭스</h3>
+        <p>봉쇄는 진행 중인 피해를 막을 필요와 적대자에게 인지 사실을 경고할 위험 사이에서 균형을 맞춰야 합니다. 탐지에 대한 위협 행위자의 예상 반응을 고려하세요.</p>
+    </blockquote>
+
+    <h3>4.4.1 봉쇄 옵션</h3>
+
+    <ul>
+        <li><strong>네트워크 격리:</strong> 영향받은 시스템을 네트워크에서 분리</li>
+        <li><strong>방화벽 차단:</strong> 경계에서 C2 인프라 차단</li>
+        <li><strong>자격 증명 재설정:</strong> 침해된 자격 증명 재설정</li>
+        <li><strong>DNS 싱크홀:</strong> 악성 도메인 리다이렉트</li>
+        <li><strong>강화된 모니터링:</strong> 공개 조치 전 가시성 증가</li>
+    </ul>
+
+    <h2>4.5 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>APT 행동 지표는 일반 악성코드 패턴과 다름</li>
+            <li>위협 헌팅은 숨겨진 위협을 사전에 검색</li>
+            <li>구조화된 대응 절차가 일관된 처리 가능케 함</li>
+            <li>봉쇄는 속도와 적대자 인지 사이 균형 필요</li>
+            <li>포렌식 분석은 휘발성 증거 보존 우선</li>
+        </ul>
+    </blockquote>
+
+    <h2>4.6 복습 문제</h2>
+
+    <ol>
+        <li>5가지 주요 APT 행동 지표 범주는?</li>
+        <li>가설 주도 위협 헌팅이란?</li>
+        <li>APT 대응의 6단계는?</li>
+        <li>봉쇄 조치를 지연시킬 수 있는 경우는?</li>
+        <li>메모리 포렌식이 디스크 이미징보다 우선시되는 이유는?</li>
+    </ol>
+
+    <h2>4.7 다음 장 미리보기</h2>
+
+    <p>제5장에서는 산업 제어 시스템, 운영 기술, 필수 서비스 방어의 고유한 과제를 다루는 핵심 인프라 보호를 다룹니다.</p>
+</body>
+</html>

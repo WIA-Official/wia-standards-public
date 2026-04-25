@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SOC-016 Census Data Simulator 📊</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .simulator-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 3px solid #667eea;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 20px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab.active {
+            color: #667eea;
+            background: white;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 40px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .result-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #667eea;
+        }
+
+        .stat-item .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-item .label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+        }
+
+        .privacy-indicator {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .privacy-high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .privacy-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .privacy-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .data-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #0c5460;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #155724;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #856404;
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Census Data</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="simulator-container">
+        <div class="header">
+            <h1>📊 WIA-SOC-016 Census Data Simulator</h1>
+            <p>Interactive Census Data Collection, Analysis & Privacy Protection Platform</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab(0)">📋 Data Collection</button>
+            <button class="tab" onclick="switchTab(1)">🔐 Privacy Protection</button>
+            <button class="tab" onclick="switchTab(2)">📊 Statistical Analysis</button>
+            <button class="tab" onclick="switchTab(3)">🌐 Data Sharing</button>
+            <button class="tab" onclick="switchTab(4)">📈 Demographics Dashboard</button>
+        </div>
+
+        <!-- Tab 1: Data Collection -->
+        <div class="tab-content active">
+            <h2>📋 Census Data Collection Form</h2>
+            <div class="alert alert-info">
+                <strong>Info:</strong> This simulator demonstrates how census data is collected using standardized forms. All data is processed with privacy protection.
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <div class="form-group">
+                        <label>Country/Region:</label>
+                        <select id="country">
+                            <option value="USA">United States</option>
+                            <option value="KOR">South Korea</option>
+                            <option value="JPN">Japan</option>
+                            <option value="CHN">China</option>
+                            <option value="IND">India</option>
+                            <option value="BRA">Brazil</option>
+                            <option value="GBR">United Kingdom</option>
+                            <option value="DEU">Germany</option>
+                            <option value="FRA">France</option>
+                            <option value="CAN">Canada</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Census Year:</label>
+                        <select id="censusYear">
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="2020">2020</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Age:</label>
+                        <input type="number" id="age" placeholder="Enter age" min="0" max="120">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Gender:</label>
+                        <select id="gender">
+                            <option value="">Select...</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                            <option value="prefer-not-to-say">Prefer not to say</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Education Level:</label>
+                        <select id="education">
+                            <option value="">Select...</option>
+                            <option value="no-formal">No formal education</option>
+                            <option value="primary">Primary school</option>
+                            <option value="secondary">Secondary school</option>
+                            <option value="high-school">High school</option>
+                            <option value="bachelor">Bachelor's degree</option>
+                            <option value="master">Master's degree</option>
+                            <option value="doctorate">Doctorate</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="form-group">
+                        <label>Employment Status:</label>
+                        <select id="employment">
+                            <option value="">Select...</option>
+                            <option value="employed-full">Employed (Full-time)</option>
+                            <option value="employed-part">Employed (Part-time)</option>
+                            <option value="self-employed">Self-employed</option>
+                            <option value="unemployed">Unemployed</option>
+                            <option value="student">Student</option>
+                            <option value="retired">Retired</option>
+                            <option value="homemaker">Homemaker</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Household Size:</label>
+                        <input type="number" id="householdSize" placeholder="Number of people" min="1" max="20">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Housing Type:</label>
+                        <select id="housingType">
+                            <option value="">Select...</option>
+                            <option value="house">Single-family house</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="condo">Condominium</option>
+                            <option value="mobile">Mobile home</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Internet Access:</label>
+                        <select id="internetAccess">
+                            <option value="">Select...</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Additional Demographics:</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="veteran">
+                                <label for="veteran">Veteran</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="disability">
+                                <label for="disability">Has disability</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="migrant">
+                                <label for="migrant">Recent migrant</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn" onclick="submitCensusData()">Submit Census Data</button>
+            <div id="collectionResult" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Tab 2: Privacy Protection -->
+        <div class="tab-content">
+            <h2>🔐 Privacy Protection & Anonymization</h2>
+            <div class="alert alert-warning">
+                <strong>Privacy First:</strong> This tab demonstrates various privacy protection techniques used in census data processing.
+            </div>
+
+            <div class="card">
+                <h3>Differential Privacy Simulator</h3>
+                <p>Add calibrated noise to protect individual privacy while maintaining statistical accuracy.</p>
+
+                <div class="form-group">
+                    <label>Original Value (e.g., household income):</label>
+                    <input type="number" id="originalValue" placeholder="e.g., 75000" value="75000">
+                </div>
+
+                <div class="form-group">
+                    <label>Privacy Budget (ε - epsilon):</label>
+                    <input type="range" id="privacyBudget" min="0.1" max="10" step="0.1" value="1.0" oninput="updatePrivacyLevel()">
+                    <div>Current ε: <strong id="epsilonValue">1.0</strong>
+                        <span id="privacyLevel" class="privacy-indicator privacy-high">High Privacy</span>
+                    </div>
+                </div>
+
+                <button class="btn" onclick="applyDifferentialPrivacy()">Apply Differential Privacy</button>
+                <div id="privacyResult" class="result-box" style="display: none;"></div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Data Anonymization Techniques</h3>
+                <div class="grid-2">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="maskIds" checked>
+                        <label for="maskIds">Mask Personal IDs</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="aggregateGeo" checked>
+                        <label for="aggregateGeo">Aggregate Geographic Data</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="generalizeAge" checked>
+                        <label for="generalizeAge">Generalize Age to Ranges</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="suppressRare" checked>
+                        <label for="suppressRare">Suppress Rare Categories</label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>Sample Raw Data:</label>
+                    <textarea id="rawData" rows="4" placeholder='{"id": "123-45-6789", "age": 34, "location": "Exact Address", "ethnicity": "Rare Group"}'></textarea>
+                </div>
+
+                <button class="btn" onclick="anonymizeData()">Anonymize Data</button>
+                <div id="anonymizedResult" class="result-box" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Statistical Analysis -->
+        <div class="tab-content">
+            <h2>📊 Statistical Analysis & Quality Control</h2>
+            <div class="alert alert-info">
+                <strong>Statistical Rigor:</strong> Apply advanced statistical methods for accurate census results.
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Sampling Calculator</h3>
+                    <div class="form-group">
+                        <label>Population Size:</label>
+                        <input type="number" id="populationSize" placeholder="e.g., 1000000" value="1000000">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Confidence Level:</label>
+                        <select id="confidenceLevel">
+                            <option value="90">90%</option>
+                            <option value="95" selected>95%</option>
+                            <option value="99">99%</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Margin of Error:</label>
+                        <select id="marginError">
+                            <option value="1">±1%</option>
+                            <option value="3">±3%</option>
+                            <option value="5" selected>±5%</option>
+                            <option value="10">±10%</option>
+                        </select>
+                    </div>
+
+                    <button class="btn" onclick="calculateSampleSize()">Calculate Sample Size</button>
+                    <div id="sampleResult" class="result-box" style="display: none;"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Response Rate Analysis</h3>
+                    <div class="form-group">
+                        <label>Expected Responses:</label>
+                        <input type="number" id="expectedResponses" placeholder="e.g., 10000" value="10000">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Actual Responses:</label>
+                        <input type="number" id="actualResponses" placeholder="e.g., 8500" value="8500">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Non-response Bias Adjustment:</label>
+                        <select id="biasAdjustment">
+                            <option value="none">None</option>
+                            <option value="weighting" selected>Post-stratification Weighting</option>
+                            <option value="imputation">Hot-deck Imputation</option>
+                            <option value="both">Both Methods</option>
+                        </select>
+                    </div>
+
+                    <button class="btn" onclick="analyzeResponseRate()">Analyze Response Rate</button>
+                    <div id="responseResult" class="result-box" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Data Quality Indicators</h3>
+                <div class="stat-display">
+                    <div class="stat-item">
+                        <div class="value">94.3%</div>
+                        <div class="label">Completeness</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value">98.7%</div>
+                        <div class="label">Accuracy</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value">96.1%</div>
+                        <div class="label">Consistency</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value">92.8%</div>
+                        <div class="label">Timeliness</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Data Sharing -->
+        <div class="tab-content">
+            <h2>🌐 Census Data Sharing & API</h2>
+            <div class="alert alert-success">
+                <strong>Interoperability:</strong> Share census data securely across organizations using standardized APIs.
+            </div>
+
+            <div class="card">
+                <h3>API Request Builder</h3>
+                <div class="form-group">
+                    <label>Endpoint:</label>
+                    <select id="apiEndpoint">
+                        <option value="/api/v1/census/population">Population Statistics</option>
+                        <option value="/api/v1/census/demographics">Demographic Breakdown</option>
+                        <option value="/api/v1/census/housing">Housing Data</option>
+                        <option value="/api/v1/census/employment">Employment Statistics</option>
+                        <option value="/api/v1/census/education">Education Levels</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Geographic Level:</label>
+                    <select id="geoLevel">
+                        <option value="national">National</option>
+                        <option value="state">State/Province</option>
+                        <option value="county">County/District</option>
+                        <option value="city">City/Municipality</option>
+                        <option value="tract">Census Tract</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Data Format:</label>
+                    <select id="dataFormat">
+                        <option value="json">JSON</option>
+                        <option value="xml">XML</option>
+                        <option value="csv">CSV</option>
+                        <option value="parquet">Parquet</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Privacy Level:</label>
+                    <select id="apiPrivacyLevel">
+                        <option value="public">Public (Aggregated)</option>
+                        <option value="researcher">Researcher (De-identified)</option>
+                        <option value="government">Government (Full Access)</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="buildAPIRequest()">Generate API Request</button>
+                <div id="apiResult" class="result-box" style="display: none;"></div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Data Sharing Protocols</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Protocol</th>
+                            <th>Use Case</th>
+                            <th>Security Level</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>REST API</td>
+                            <td>Public data access</td>
+                            <td>Medium</td>
+                            <td>✅ Active</td>
+                        </tr>
+                        <tr>
+                            <td>GraphQL</td>
+                            <td>Flexible queries</td>
+                            <td>Medium-High</td>
+                            <td>✅ Active</td>
+                        </tr>
+                        <tr>
+                            <td>SFTP</td>
+                            <td>Bulk data transfer</td>
+                            <td>High</td>
+                            <td>✅ Active</td>
+                        </tr>
+                        <tr>
+                            <td>Secure Enclave</td>
+                            <td>Sensitive research</td>
+                            <td>Very High</td>
+                            <td>✅ Active</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 5: Demographics Dashboard -->
+        <div class="tab-content">
+            <h2>📈 Demographics Dashboard</h2>
+            <div class="alert alert-info">
+                <strong>Insights:</strong> Visualize and analyze census data with interactive dashboards.
+            </div>
+
+            <div class="stat-display">
+                <div class="stat-item">
+                    <div class="value">331.9M</div>
+                    <div class="label">Total Population</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">38.5</div>
+                    <div class="label">Median Age</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">2.53</div>
+                    <div class="label">Avg Household Size</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">87.3%</div>
+                    <div class="label">Internet Access</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Age Distribution</h3>
+                    <div class="chart-container">
+                        <div>0-17 years: 22.1%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 22.1%;">22.1%</div>
+                        </div>
+
+                        <div style="margin-top: 10px;">18-64 years: 62.4%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 62.4%;">62.4%</div>
+                        </div>
+
+                        <div style="margin-top: 10px;">65+ years: 15.5%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 15.5%;">15.5%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Education Level Distribution</h3>
+                    <div class="chart-container">
+                        <div>Less than High School: 11.2%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 11.2%;">11.2%</div>
+                        </div>
+
+                        <div style="margin-top: 10px;">High School: 27.5%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 27.5%;">27.5%</div>
+                        </div>
+
+                        <div style="margin-top: 10px;">Bachelor's: 32.9%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 32.9%;">32.9%</div>
+                        </div>
+
+                        <div style="margin-top: 10px;">Graduate: 28.4%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 28.4%;">28.4%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Employment Statistics</h3>
+                <div class="stat-display">
+                    <div class="stat-item">
+                        <div class="value">63.1%</div>
+                        <div class="label">Labor Force Participation</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value">3.8%</div>
+                        <div class="label">Unemployment Rate</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value">15.2%</div>
+                        <div class="label">Self-Employed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value">$67,521</div>
+                        <div class="label">Median Household Income</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Housing Characteristics</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Housing Type</th>
+                            <th>Percentage</th>
+                            <th>Median Value</th>
+                            <th>Ownership Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Single-family homes</td>
+                            <td>61.7%</td>
+                            <td>$295,300</td>
+                            <td>65.4%</td>
+                        </tr>
+                        <tr>
+                            <td>Apartments</td>
+                            <td>26.3%</td>
+                            <td>N/A</td>
+                            <td>12.3%</td>
+                        </tr>
+                        <tr>
+                            <td>Condominiums</td>
+                            <td>8.4%</td>
+                            <td>$245,800</td>
+                            <td>78.2%</td>
+                        </tr>
+                        <tr>
+                            <td>Mobile homes</td>
+                            <td>3.6%</td>
+                            <td>$87,200</td>
+                            <td>81.5%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label>Export Dashboard Data:</label>
+                <button class="btn" onclick="exportDashboard('pdf')">📄 Export as PDF</button>
+                <button class="btn" onclick="exportDashboard('excel')" style="margin-left: 10px;">📊 Export as Excel</button>
+                <button class="btn" onclick="exportDashboard('csv')" style="margin-left: 10px;">📋 Export as CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(index) {
+            const tabs = document.querySelectorAll('.tab');
+            const contents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+            contents.forEach(content => content.classList.remove('active'));
+
+            tabs[index].classList.add('active');
+            contents[index].classList.add('active');
+        }
+
+        function submitCensusData() {
+            const data = {
+                country: document.getElementById('country').value,
+                censusYear: document.getElementById('censusYear').value,
+                age: document.getElementById('age').value,
+                gender: document.getElementById('gender').value,
+                education: document.getElementById('education').value,
+                employment: document.getElementById('employment').value,
+                householdSize: document.getElementById('householdSize').value,
+                housingType: document.getElementById('housingType').value,
+                internetAccess: document.getElementById('internetAccess').value,
+                veteran: document.getElementById('veteran').checked,
+                disability: document.getElementById('disability').checked,
+                migrant: document.getElementById('migrant').checked
+            };
+
+            const resultDiv = document.getElementById('collectionResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+✅ Census Data Submitted Successfully!
+
+Record ID: CENSUS-${Date.now()}
+Timestamp: ${new Date().toISOString()}
+Privacy Level: HIGH (Differential Privacy Applied)
+
+Collected Data (Anonymized):
+${JSON.stringify(data, null, 2)}
+
+Next Steps:
+1. Data validated and quality-checked
+2. Privacy protection applied (ε = 1.0)
+3. Data aggregated with population statistics
+4. Available for statistical analysis after 24 hours
+
+Status: ✅ PROCESSED
+            `;
+        }
+
+        function updatePrivacyLevel() {
+            const epsilon = parseFloat(document.getElementById('privacyBudget').value);
+            document.getElementById('epsilonValue').textContent = epsilon.toFixed(1);
+
+            const levelSpan = document.getElementById('privacyLevel');
+            if (epsilon < 1) {
+                levelSpan.textContent = 'Very High Privacy';
+                levelSpan.className = 'privacy-indicator privacy-high';
+            } else if (epsilon < 3) {
+                levelSpan.textContent = 'High Privacy';
+                levelSpan.className = 'privacy-indicator privacy-high';
+            } else if (epsilon < 7) {
+                levelSpan.textContent = 'Medium Privacy';
+                levelSpan.className = 'privacy-indicator privacy-medium';
+            } else {
+                levelSpan.textContent = 'Lower Privacy';
+                levelSpan.className = 'privacy-indicator privacy-low';
+            }
+        }
+
+        function applyDifferentialPrivacy() {
+            const originalValue = parseFloat(document.getElementById('originalValue').value);
+            const epsilon = parseFloat(document.getElementById('privacyBudget').value);
+
+            // Laplace mechanism: add noise from Laplace distribution
+            const sensitivity = 1000; // Example sensitivity
+            const scale = sensitivity / epsilon;
+            const noise = laplacianNoise(scale);
+            const noisyValue = Math.max(0, originalValue + noise);
+
+            const resultDiv = document.getElementById('privacyResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+🔐 Differential Privacy Applied
+
+Original Value: $${originalValue.toLocaleString()}
+Privacy Budget (ε): ${epsilon}
+Sensitivity: ${sensitivity}
+Laplace Scale: ${scale.toFixed(2)}
+
+Added Noise: ${noise >= 0 ? '+' : ''}${noise.toFixed(2)}
+Protected Value: $${noisyValue.toFixed(2).toLocaleString()}
+
+Privacy Guarantee:
+With ε = ${epsilon}, an adversary cannot distinguish whether any individual's
+data was included in the dataset with confidence greater than e^${epsilon} ≈ ${Math.exp(epsilon).toFixed(2)}
+
+Recommended ε values:
+- ε < 1.0: Very high privacy (more noise)
+- ε = 1.0: High privacy (standard)
+- ε > 3.0: Lower privacy (less noise, more accuracy)
+            `;
+        }
+
+        function laplacianNoise(scale) {
+            // Generate Laplace-distributed noise
+            const u = Math.random() - 0.5;
+            return -scale * Math.sign(u) * Math.log(1 - 2 * Math.abs(u));
+        }
+
+        function anonymizeData() {
+            const rawData = document.getElementById('rawData').value ||
+                '{"id": "123-45-6789", "age": 34, "location": "123 Main St, Springfield", "ethnicity": "Rare Group", "income": 75000}';
+
+            let data;
+            try {
+                data = JSON.parse(rawData);
+            } catch (e) {
+                alert('Invalid JSON format');
+                return;
+            }
+
+            const anonymized = { ...data };
+
+            if (document.getElementById('maskIds').checked && anonymized.id) {
+                anonymized.id = '***-**-' + anonymized.id.slice(-4);
+            }
+
+            if (document.getElementById('generalizeAge').checked && anonymized.age) {
+                const age = parseInt(anonymized.age);
+                anonymized.age_range = `${Math.floor(age/10)*10}-${Math.floor(age/10)*10+9}`;
+                delete anonymized.age;
+            }
+
+            if (document.getElementById('aggregateGeo').checked && anonymized.location) {
+                anonymized.location = anonymized.location.split(',').pop().trim() || 'Geographic Area';
+            }
+
+            if (document.getElementById('suppressRare').checked && anonymized.ethnicity) {
+                if (anonymized.ethnicity.includes('Rare')) {
+                    anonymized.ethnicity = 'Other/Suppressed';
+                }
+            }
+
+            const resultDiv = document.getElementById('anonymizedResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+🔒 Data Anonymization Complete
+
+Original Data:
+${JSON.stringify(JSON.parse(rawData), null, 2)}
+
+Anonymized Data:
+${JSON.stringify(anonymized, null, 2)}
+
+Techniques Applied:
+${document.getElementById('maskIds').checked ? '✅ Personal ID Masking\n' : ''}${document.getElementById('generalizeAge').checked ? '✅ Age Generalization\n' : ''}${document.getElementById('aggregateGeo').checked ? '✅ Geographic Aggregation\n' : ''}${document.getElementById('suppressRare').checked ? '✅ Rare Category Suppression\n' : ''}
+Privacy Level: HIGH
+Re-identification Risk: LOW
+            `;
+        }
+
+        function calculateSampleSize() {
+            const N = parseInt(document.getElementById('populationSize').value);
+            const confidence = parseInt(document.getElementById('confidenceLevel').value);
+            const margin = parseInt(document.getElementById('marginError').value);
+
+            // Z-scores for confidence levels
+            const zScores = { 90: 1.645, 95: 1.96, 99: 2.576 };
+            const z = zScores[confidence];
+            const p = 0.5; // Maximum variability
+
+            // Sample size formula
+            const n = (z * z * p * (1 - p)) / ((margin / 100) * (margin / 100));
+            const adjustedN = n / (1 + (n - 1) / N);
+
+            const resultDiv = document.getElementById('sampleResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+📊 Sample Size Calculation Results
+
+Population Size (N): ${N.toLocaleString()}
+Confidence Level: ${confidence}%
+Margin of Error: ±${margin}%
+Z-Score: ${z}
+
+Required Sample Size: ${Math.ceil(adjustedN).toLocaleString()}
+Sampling Fraction: ${(Math.ceil(adjustedN) / N * 100).toFixed(2)}%
+
+Recommendation:
+- Minimum sample: ${Math.ceil(adjustedN).toLocaleString()} responses
+- Recommended (with 20% buffer): ${Math.ceil(adjustedN * 1.2).toLocaleString()} responses
+- For stratified sampling: Allocate proportionally by strata
+
+Formula used: Cochran's formula with finite population correction
+            `;
+        }
+
+        function analyzeResponseRate() {
+            const expected = parseInt(document.getElementById('expectedResponses').value);
+            const actual = parseInt(document.getElementById('actualResponses').value);
+            const adjustment = document.getElementById('biasAdjustment').value;
+
+            const responseRate = (actual / expected * 100).toFixed(2);
+            const nonResponseRate = (100 - responseRate).toFixed(2);
+
+            const resultDiv = document.getElementById('responseResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+📈 Response Rate Analysis
+
+Expected Responses: ${expected.toLocaleString()}
+Actual Responses: ${actual.toLocaleString()}
+Missing Responses: ${(expected - actual).toLocaleString()}
+
+Response Rate: ${responseRate}%
+Non-Response Rate: ${nonResponseRate}%
+
+Quality Assessment:
+${responseRate >= 80 ? '✅ Excellent response rate' : responseRate >= 60 ? '⚠️ Good response rate, but monitor quality' : '❌ Low response rate, high non-response bias risk'}
+
+Non-Response Bias Adjustment: ${adjustment}
+${adjustment === 'weighting' ? `
+Post-Stratification Weighting:
+- Adjust weights based on known population characteristics
+- Reduce bias from differential non-response
+- Recommended weight ranges: 0.5 - 2.0
+` : ''}${adjustment === 'imputation' ? `
+Hot-Deck Imputation:
+- Fill missing values from similar respondents
+- Maintain distributional properties
+- Quality indicators required
+` : ''}${adjustment === 'both' ? `
+Combined Approach:
+- Impute missing values first
+- Then apply post-stratification weights
+- Provides robust bias correction
+` : ''}
+Next Steps:
+1. Investigate patterns in non-response
+2. Apply selected adjustment method
+3. Conduct sensitivity analysis
+4. Document assumptions and limitations
+            `;
+        }
+
+        function buildAPIRequest() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const geoLevel = document.getElementById('geoLevel').value;
+            const format = document.getElementById('dataFormat').value;
+            const privacyLevel = document.getElementById('apiPrivacyLevel').value;
+
+            const apiUrl = `https://api.census.wia.org${endpoint}?geo=${geoLevel}&format=${format}&privacy=${privacyLevel}`;
+
+            const curlCommand = `curl -X GET "${apiUrl}" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Accept: application/${format}" \\
+  -H "X-Privacy-Level: ${privacyLevel}"`;
+
+            const resultDiv = document.getElementById('apiResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+🌐 API Request Generated
+
+Endpoint: ${endpoint}
+Geographic Level: ${geoLevel}
+Format: ${format.toUpperCase()}
+Privacy Level: ${privacyLevel}
+
+Request URL:
+${apiUrl}
+
+cURL Command:
+${curlCommand}
+
+Example Response:
+{
+  "meta": {
+    "api_version": "1.0",
+    "timestamp": "${new Date().toISOString()}",
+    "geo_level": "${geoLevel}",
+    "privacy_applied": true
+  },
+  "data": {
+    "total_population": 331900000,
+    "median_age": 38.5,
+    "breakdown": {
+      "age_groups": [...],
+      "education": [...],
+      "employment": [...]
+    }
+  },
+  "quality": {
+    "margin_of_error": "±0.5%",
+    "confidence_level": "95%"
+  }
+}
+
+Rate Limits:
+- Public: 100 requests/hour
+- Researcher: 1,000 requests/hour
+- Government: 10,000 requests/hour
+            `;
+        }
+
+        function exportDashboard(format) {
+            alert(`Dashboard data would be exported as ${format.toUpperCase()} file.\n\nThis is a simulation - in production, this would generate a downloadable file with all census statistics and visualizations.`);
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

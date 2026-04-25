@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 구현 및 인증 - WIA 접근 제어 표준 전자책</title>
+</head>
+<body>
+
+<p><a href="index.html">🔐 WIA 접근 제어 표준 전자책</a> | 제8장 (총 8장)</p>
+
+<hr>
+
+<h1>🔐 제8장: 구현 및 인증</h1>
+
+<hr>
+
+<h2>8.1 시작하기</h2>
+
+<p>WIA 접근 제어 표준 구현은 평가 및 계획에서 시작됩니다. 이 장에서는 모든 규모의 조직을 위한 실용적인 가이드를 제공합니다.</p>
+
+<h3>8.1.1 사전 요구 사항</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>카테고리</th>
+            <th>요구 사항</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>인프라</td>
+            <td>Kubernetes 1.24+ 또는 Docker 환경</td>
+        </tr>
+        <tr>
+            <td>데이터베이스</td>
+            <td>PostgreSQL 14+ 또는 호환</td>
+        </tr>
+        <tr>
+            <td>캐시</td>
+            <td>Redis 6+ 클러스터</td>
+        </tr>
+        <tr>
+            <td>TLS</td>
+            <td>유효한 인증서 (Let's Encrypt 또는 CA 서명)</td>
+        </tr>
+        <tr>
+            <td>DNS</td>
+            <td>AC 서비스를 위한 전용 서브도메인</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>8.1.2 빠른 시작</h3>
+
+<pre>
+# WIA-AC CLI 설치
+curl -sSL https://install.wiastandards.com/ac | sh
+
+# 새 프로젝트 초기화
+wia-ac init my-company-ac
+
+# 환경 구성
+cd my-company-ac
+cp .env.example .env
+# .env 파일 편집
+
+# 서비스 시작
+wia-ac up
+
+# 설치 확인
+wia-ac health
+
+# 첫 번째 관리자 사용자 생성
+wia-ac admin create \
+  --email admin@company.com \
+  --name "관리자" \
+  --password-stdin
+</pre>
+
+<hr>
+
+<h2>8.2 구현 체크리스트</h2>
+
+<h3>8.2.1 1단계: 기반</h3>
+
+<ul>
+    <li>[ ] 인프라 프로비저닝 및 보안</li>
+    <li>[ ] WIA-AC 서비스 배포</li>
+    <li>[ ] TLS 인증서 설치</li>
+    <li>[ ] 데이터베이스 스키마 초기화</li>
+    <li>[ ] 관리자 계정 생성</li>
+    <li>[ ] 기본 정책 정의</li>
+</ul>
+
+<h3>8.2.2 2단계: 신원 통합</h3>
+
+<ul>
+    <li>[ ] 신원 소스 연결 (LDAP, IdP)</li>
+    <li>[ ] 사용자 동기화 구성</li>
+    <li>[ ] 그룹/역할 매핑 정의</li>
+    <li>[ ] SSO 통합 테스트</li>
+    <li>[ ] 특권 사용자에 MFA 구성</li>
+</ul>
+
+<h3>8.2.3 3단계: 애플리케이션 통합</h3>
+
+<ul>
+    <li>[ ] 애플리케이션에 PEP 배포</li>
+    <li>[ ] API 게이트웨이 구성</li>
+    <li>[ ] 권한 부여 정책 시행</li>
+    <li>[ ] 감사 로깅 활성화</li>
+    <li>[ ] 오류 처리 구현</li>
+</ul>
+
+<h3>8.2.4 4단계: 운영</h3>
+
+<ul>
+    <li>[ ] 모니터링 대시보드 배포</li>
+    <li>[ ] 알림 규칙 구성</li>
+    <li>[ ] 백업 절차 테스트</li>
+    <li>[ ] 재해 복구 검증</li>
+    <li>[ ] 문서화 완료</li>
+</ul>
+
+<hr>
+
+<h2>8.3 샘플 구현</h2>
+
+<h3>8.3.1 Docker Compose 배포</h3>
+
+<pre>
+# docker-compose.yml
+version: '3.8'
+services:
+  wia-ac-pdp:
+    image: wia/access-control-pdp:1.0
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://wia:password@db:5432/wia_ac
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - db
+      - redis
+
+  wia-ac-admin:
+    image: wia/access-control-admin:1.0
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://wia-ac-pdp:8080
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=wia
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=wia_ac
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+
+volumes:
+  pgdata:
+  redis-data:
+</pre>
+
+<h3>8.3.2 기본 정책 예시</h3>
+
+<pre>
+{
+  "id": "urn:wia:ac:policy:company:base-access",
+  "version": "1.0.0",
+  "description": "기본 접근 제어 정책",
+  "rules": [
+    {
+      "id": "authenticated-read",
+      "description": "인증된 사용자는 공개 리소스 읽기 가능",
+      "effect": "permit",
+      "target": {
+        "subjects": {
+          "conditions": [
+            { "attribute": "authenticated", "operator": "equals", "value": true }
+          ]
+        },
+        "resources": {
+          "conditions": [
+            { "attribute": "classification", "operator": "equals", "value": "public" }
+          ]
+        },
+        "actions": ["read"]
+      }
+    },
+    {
+      "id": "admin-full-access",
+      "description": "관리자는 모든 곳에 전체 접근",
+      "effect": "permit",
+      "target": {
+        "subjects": {
+          "conditions": [
+            { "attribute": "roles", "operator": "contains", "value": "admin" }
+          ]
+        },
+        "actions": ["*"]
+      }
+    },
+    {
+      "id": "default-deny",
+      "description": "다른 모든 접근 거부",
+      "effect": "deny",
+      "target": {},
+      "priority": 1000
+    }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>8.4 테스트 및 검증</h2>
+
+<h3>8.4.1 정책 단위 테스트</h3>
+
+<pre>
+# test-policies.yaml
+tests:
+  - name: "관리자는 모든 리소스에 접근 가능"
+    request:
+      subject:
+        id: "urn:wia:ac:subject:user:admin"
+        attributes:
+          roles: ["admin"]
+      resource:
+        id: "/api/sensitive-data"
+        classification: "restricted"
+      action: "read"
+    expected:
+      decision: "permit"
+
+  - name: "일반 사용자는 제한된 리소스 거부"
+    request:
+      subject:
+        id: "urn:wia:ac:subject:user:john"
+        attributes:
+          roles: ["employee"]
+      resource:
+        id: "/api/sensitive-data"
+        classification: "restricted"
+      action: "read"
+    expected:
+      decision: "deny"
+
+# 테스트 실행
+wia-ac policy test --file test-policies.yaml
+</pre>
+
+<h3>8.4.2 통합 테스트</h3>
+
+<pre>
+# 통합 테스트 스크립트
+#!/bin/bash
+
+# 테스트 1: 상태 검사
+curl -f http://localhost:8080/health || exit 1
+
+# 테스트 2: 인증
+TOKEN=$(curl -s -X POST http://localhost:8080/wia-ac/v1/auth/token \
+  -d "grant_type=password&username=test@example.com&password=test123" \
+  | jq -r '.access_token')
+
+[ -n "$TOKEN" ] || exit 1
+
+# 테스트 3: 권한 부여 결정
+DECISION=$(curl -s -X POST http://localhost:8080/wia-ac/v1/authorize \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": {"id": "urn:wia:ac:subject:user:test"},
+    "resource": {"id": "/api/users"},
+    "action": "read"
+  }' | jq -r '.decision')
+
+[ "$DECISION" = "permit" ] || exit 1
+
+echo "모든 통합 테스트 통과!"
+</pre>
+
+<hr>
+
+<h2>8.5 WIA 인증 프로세스</h2>
+
+<h3>8.5.1 인증 레벨</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>레벨</th>
+            <th>요구 사항</th>
+            <th>기간</th>
+            <th>비용</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>브론즈</td>
+            <td>데이터 형식 준수, 기본 테스트</td>
+            <td>1-2주</td>
+            <td>$500</td>
+        </tr>
+        <tr>
+            <td>실버</td>
+            <td>브론즈 + API 준수, 통합 테스트</td>
+            <td>2-4주</td>
+            <td>$2,000</td>
+        </tr>
+        <tr>
+            <td>골드</td>
+            <td>실버 + 프로토콜 + 통합 준수</td>
+            <td>4-8주</td>
+            <td>$5,000</td>
+        </tr>
+        <tr>
+            <td>플래티넘</td>
+            <td>골드 + 고급 기능, 현장 감사</td>
+            <td>8-12주</td>
+            <td>$15,000</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>8.5.2 인증 단계</h3>
+
+<ol>
+    <li><strong>신청:</strong> WIA 포털을 통해 인증 요청 제출</li>
+    <li><strong>자체 평가:</strong> WIA-AC 준수 체크리스트 완료</li>
+    <li><strong>문서화:</strong> 구현 문서 제공</li>
+    <li><strong>자동화 테스트:</strong> WIA 인증 테스트 스위트 실행</li>
+    <li><strong>수동 검토:</strong> WIA 팀이 제출물 검토</li>
+    <li><strong>수정:</strong> 식별된 문제 해결</li>
+    <li><strong>인증:</strong> 인증 배지 및 목록 수령</li>
+</ol>
+
+<h3>8.5.3 인증 유지</h3>
+
+<ul>
+    <li><strong>연간 갱신:</strong> 매년 재인증 필요</li>
+    <li><strong>버전 업데이트:</strong> 메이저 버전 준수에 90일 기간</li>
+    <li><strong>보안 패치:</strong> 30일 이내에 적용 필수</li>
+    <li><strong>사고 보고:</strong> 보안 사고 보고 필수</li>
+</ul>
+
+<hr>
+
+<h2>8.6 성공 사례</h2>
+
+<h3>8.6.1 사례 연구: 글로벌 은행 구현</h3>
+
+<table border="1" cellpadding="10">
+    <tr>
+        <td><strong>조직</strong></td>
+        <td>주요 금융 기관 (직원 50,000명)</td>
+    </tr>
+    <tr>
+        <td><strong>과제</strong></td>
+        <td>레거시 IAM, 500개 이상 애플리케이션, 규제 준수</td>
+    </tr>
+    <tr>
+        <td><strong>솔루션</strong></td>
+        <td>18개월에 걸친 단계적 WIA-AC 마이그레이션</td>
+    </tr>
+    <tr>
+        <td><strong>결과</strong></td>
+        <td>
+            <ul>
+                <li>접근 관련 사고 80% 감소</li>
+                <li>프로비저닝 95% 빨라짐 (5일 → 4시간)</li>
+                <li>감사 비용 연간 200만 달러 절감</li>
+                <li>완전한 GDPR 및 SOX 준수</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+<h3>8.6.2 사례 연구: 의료 네트워크</h3>
+
+<table border="1" cellpadding="10">
+    <tr>
+        <td><strong>조직</strong></td>
+        <td>지역 의료 제공업체 (15개 병원)</td>
+    </tr>
+    <tr>
+        <td><strong>과제</strong></td>
+        <td>HIPAA 준수, 환자 데이터 보호</td>
+    </tr>
+    <tr>
+        <td><strong>솔루션</strong></td>
+        <td>환자 기록 접근을 위한 ABAC가 포함된 WIA-AC</td>
+    </tr>
+    <tr>
+        <td><strong>결과</strong></td>
+        <td>
+            <ul>
+                <li>구현 이후 PHI 침해 제로</li>
+                <li>모든 접근에 대한 완전한 감사 추적</li>
+                <li>자동화된 접근 검토</li>
+                <li>HIPAA 감사 통과 (지적 사항 없음)</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+<hr>
+
+<h2>8.7 향후 로드맵</h2>
+
+<h3>8.7.1 예정된 기능</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>기능</th>
+            <th>버전</th>
+            <th>목표</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Policy-as-Code (GitOps)</td>
+            <td>v1.2</td>
+            <td>2025년 2분기</td>
+        </tr>
+        <tr>
+            <td>AI 지원 정책 생성</td>
+            <td>v1.3</td>
+            <td>2025년 3분기</td>
+        </tr>
+        <tr>
+            <td>프라이버시를 위한 영지식 증명</td>
+            <td>v1.4</td>
+            <td>2025년 4분기</td>
+        </tr>
+        <tr>
+            <td>블록체인 기반 감사 추적</td>
+            <td>v2.0</td>
+            <td>2026년 1분기</td>
+        </tr>
+        <tr>
+            <td>분산 신원 지원</td>
+            <td>v2.0</td>
+            <td>2026년 1분기</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>8.7.2 커뮤니티 및 기여</h3>
+
+<ul>
+    <li><strong>GitHub:</strong> github.com/wia-standards/access-control</li>
+    <li><strong>Discord:</strong> discord.gg/wia-ac</li>
+    <li><strong>기여:</strong> 커넥터, SDK, 문서에 대한 PR 환영</li>
+    <li><strong>WIA 워킹 그룹:</strong> 월간 통화, 모두에게 개방</li>
+</ul>
+
+<hr>
+
+<h2>8.8 장 요약</h2>
+
+<p>[OK] <strong>핵심 내용:</strong></p>
+
+<ol>
+    <li><strong>시작하기:</strong> 명확한 사전 요구 사항 및 빠른 시작 가이드</li>
+    <li><strong>체크리스트:</strong> 4단계 구현 체크리스트</li>
+    <li><strong>샘플 코드:</strong> Docker Compose 및 정책 예시</li>
+    <li><strong>테스트:</strong> 단위, 통합, 부하 테스트 접근 방식</li>
+    <li><strong>인증:</strong> 브론즈에서 플래티넘까지 4개 레벨</li>
+    <li><strong>성공 사례:</strong> 산업 전반에 걸친 실제 구현</li>
+    <li><strong>로드맵:</strong> AI 및 블록체인을 포함한 흥미로운 미래 기능</li>
+</ol>
+
+<hr>
+
+<h2>8.9 복습 문제</h2>
+
+<ol>
+    <li>WIA-AC 배포를 위한 인프라 사전 요구 사항은 무엇입니까?</li>
+    <li>구현의 4단계를 설명하세요.</li>
+    <li>접근 제어 정책을 어떻게 테스트합니까?</li>
+    <li>다양한 인증 레벨과 요구 사항은 무엇입니까?</li>
+    <li>의료 사례 연구 조직이 달성한 이점은 무엇입니까?</li>
+    <li>WIA-AC 버전 2.0에 계획된 기능은 무엇입니까?</li>
+</ol>
+
+<hr>
+
+<h2>8.10 결론</h2>
+
+<blockquote>
+<p><strong>弘益人間 (홍익인간)</strong></p>
+<p>"널리 인간을 이롭게 하라"</p>
+<p>WIA 접근 제어 표준은 전 세계 조직에 개방적이고 상호 운용 가능하며 안전한 접근 관리를 제공함으로써 이 철학을 구현합니다. 이 표준을 구현함으로써 협업을 가능하게 하면서 신원을 보호하는 데 헌신하는 글로벌 커뮤니티에 합류하게 됩니다.</p>
+</blockquote>
+
+<p>이 전자책을 완료해 주셔서 감사합니다. 귀하의 접근 제어 여정에 귀중한 통찰력을 제공했기를 바랍니다.</p>
+</body>
+</html>

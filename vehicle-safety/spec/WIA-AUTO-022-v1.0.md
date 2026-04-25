@@ -1345,7 +1345,6 @@ Minimum thresholds for 5 stars:
 ### 11.2 Scientific References
 
 1. Mertz, H.J. (1993). "Anthropomorphic Test Devices"
-2. 선행 연구. "Development of Improved Injury Criteria"
 3. Viano, D.C. (2003). "Biomechanics of Brain and Spinal Injuries"
 4. Yoganandan, N. (2014). "Injury Biomechanics Research"
 5. Gabler, H.C. (2020). "The Future of Automotive Safety"

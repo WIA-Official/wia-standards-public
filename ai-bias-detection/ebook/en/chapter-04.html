@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Model Bias Analysis | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <a href="index.html" class="back-link">← Back to Table of Contents</a>
+            <div class="chapter-number">Chapter 4</div>
+            <h1>Model Bias Analysis</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            Once a model is trained, we must assess whether it exhibits bias in its predictions. This chapter covers
+            techniques for analyzing trained models to detect and quantify bias across demographic groups.
+        </p>
+
+        <h2>Introduction to Model Analysis</h2>
+        <p>
+            Even with clean data, models can learn and amplify biases through the training process. Systematic
+            model analysis is essential to ensure fair AI systems that benefit all users equally.
+        </p>
+
+        <h2>Disaggregated Performance Evaluation</h2>
+        <p>
+            The foundation of model bias detection is evaluating performance separately for each demographic group
+            rather than only looking at aggregate metrics.
+        </p>
+
+        <pre><code># Disaggregated Evaluation Framework
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+def disaggregated_evaluation(model, X_test, y_test, protected_attr):
+    """
+    Evaluate model performance separately for each group
+    """
+    groups = np.unique(protected_attr)
+    y_pred = model.predict(X_test)
+
+    print("DISAGGREGATED PERFORMANCE EVALUATION")
+    print("=" * 80)
+    print(f"{'Group':<15} {'Accuracy':<12} {'Precision':<12} {'Recall':<12} {'F1 Score':<12}")
+    print("-" * 80)
+
+    results = {}
+    for group in groups:
+        mask = protected_attr == group
+
+        acc = accuracy_score(y_test[mask], y_pred[mask])
+        prec = precision_score(y_test[mask], y_pred[mask], zero_division=0)
+        rec = recall_score(y_test[mask], y_pred[mask], zero_division=0)
+        f1 = f1_score(y_test[mask], y_pred[mask], zero_division=0)
+
+        results[group] = {'accuracy': acc, 'precision': prec, 'recall': rec, 'f1': f1}
+        print(f"{group:<15} {acc:<12.3f} {prec:<12.3f} {rec:<12.3f} {f1:<12.3f}")
+
+    # Calculate disparities
+    print("\n" + "=" * 80)
+    print("PERFORMANCE DISPARITIES")
+    print("-" * 80)
+
+    for metric in ['accuracy', 'precision', 'recall', 'f1']:
+        values = [r[metric] for r in results.values()]
+        disparity = max(values) - min(values)
+        status = "⚠️ HIGH" if disparity > 0.1 else "✓ OK"
+        print(f"{metric.capitalize():<15} Disparity: {disparity:.3f} {status}")
+
+    return results
+</code></pre>
+
+        <h2>Confusion Matrix Analysis by Group</h2>
+        <p>
+            Examining confusion matrices for each group reveals patterns in how errors are distributed.
+        </p>
+
+        <pre><code># Group-Specific Confusion Matrices
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+
+def confusion_matrix_by_group(y_true, y_pred, protected_attr):
+    """
+    Generate confusion matrices for each demographic group
+    """
+    groups = np.unique(protected_attr)
+
+    print("CONFUSION MATRICES BY GROUP")
+    print("=" * 60)
+
+    for group in groups:
+        mask = protected_attr == group
+        cm = confusion_matrix(y_true[mask], y_pred[mask])
+
+        tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
+
+        print(f"\n{group}:")
+        print(f"  True Negatives:  {tn:>6}  |  False Positives: {fp:>6}")
+        print(f"  False Negatives: {fn:>6}  |  True Positives:  {tp:>6}")
+
+        # Calculate rates
+        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+        tnr = tn / (tn + fp) if (tn + fp) > 0 else 0
+        fnr = fn / (fn + tp) if (fn + tp) > 0 else 0
+
+        print(f"  TPR: {tpr:.3f}  FPR: {fpr:.3f}  TNR: {tnr:.3f}  FNR: {fnr:.3f}")
+
+    return True
+</code></pre>
+
+        <h2>Decision Threshold Analysis</h2>
+        <p>
+            For probabilistic classifiers, the decision threshold can significantly impact fairness.
+            Different thresholds may be needed for different groups to achieve fairness criteria.
+        </p>
+
+        <pre><code># Threshold Optimization for Fairness
+def analyze_thresholds(model, X_test, y_test, protected_attr, metric='tpr'):
+    """
+    Analyze how different thresholds affect fairness
+    """
+    y_proba = model.predict_proba(X_test)[:, 1]
+    groups = np.unique(protected_attr)
+
+    thresholds = np.linspace(0, 1, 101)
+    results = {group: [] for group in groups}
+
+    for threshold in thresholds:
+        y_pred = (y_proba >= threshold).astype(int)
+
+        for group in groups:
+            mask = protected_attr == group
+
+            if metric == 'tpr':
+                tp = np.sum((y_test[mask] == 1) & (y_pred[mask] == 1))
+                fn = np.sum((y_test[mask] == 1) & (y_pred[mask] == 0))
+                value = tp / (tp + fn) if (tp + fn) > 0 else 0
+            elif metric == 'fpr':
+                fp = np.sum((y_test[mask] == 0) & (y_pred[mask] == 1))
+                tn = np.sum((y_test[mask] == 0) & (y_pred[mask] == 0))
+                value = fp / (fp + tn) if (fp + tn) > 0 else 0
+
+            results[group].append(value)
+
+    # Find optimal threshold for fairness
+    min_disparity = float('inf')
+    best_threshold = 0.5
+
+    for i, threshold in enumerate(thresholds):
+        values = [results[group][i] for group in groups]
+        disparity = max(values) - min(values)
+        if disparity < min_disparity:
+            min_disparity = disparity
+            best_threshold = threshold
+
+    print(f"Optimal threshold for {metric.upper()} parity: {best_threshold:.3f}")
+    print(f"Minimum disparity: {min_disparity:.3f}")
+
+    return best_threshold, results
+</code></pre>
+
+        <h2>Feature Importance and SHAP Analysis</h2>
+        <p>
+            Understanding which features drive predictions helps identify potential sources of bias.
+        </p>
+
+        <pre><code># Feature Importance Analysis
+def analyze_feature_importance_by_group(model, X_test, protected_attr, feature_names):
+    """
+    Analyze if feature importance differs across groups
+    """
+    from sklearn.inspection import permutation_importance
+
+    groups = np.unique(protected_attr)
+
+    print("FEATURE IMPORTANCE BY GROUP")
+    print("=" * 80)
+
+    for group in groups:
+        mask = protected_attr == group
+        X_group = X_test[mask]
+        y_group = y_test[mask]
+
+        # Calculate permutation importance
+        perm_importance = permutation_importance(
+            model, X_group, y_group, n_repeats=10, random_state=42
+        )
+
+        print(f"\n{group} - Top 5 Most Important Features:")
+        indices = perm_importance.importances_mean.argsort()[-5:][::-1]
+
+        for idx in indices:
+            importance = perm_importance.importances_mean[idx]
+            print(f"  {feature_names[idx]:<30} {importance:.4f}")
+
+    print("\n⚠️ Look for features that are important for one group but not others")
+    print("   This may indicate differential treatment")
+</code></pre>
+
+        <h2>Calibration Analysis</h2>
+        <p>
+            A well-calibrated model's probability predictions should match observed frequencies across all groups.
+        </p>
+
+        <pre><code># Calibration Analysis by Group
+from sklearn.calibration import calibration_curve
+
+def calibration_analysis(model, X_test, y_test, protected_attr, n_bins=10):
+    """
+    Assess calibration separately for each group
+    """
+    y_proba = model.predict_proba(X_test)[:, 1]
+    groups = np.unique(protected_attr)
+
+    print("CALIBRATION ANALYSIS")
+    print("=" * 80)
+
+    calibration_errors = {}
+
+    for group in groups:
+        mask = protected_attr == group
+
+        prob_true, prob_pred = calibration_curve(
+            y_test[mask],
+            y_proba[mask],
+            n_bins=n_bins,
+            strategy='quantile'
+        )
+
+        # Calculate calibration error (ECE - Expected Calibration Error)
+        calibration_error = np.mean(np.abs(prob_true - prob_pred))
+        calibration_errors[group] = calibration_error
+
+        print(f"\n{group}:")
+        print(f"  Expected Calibration Error: {calibration_error:.4f}")
+
+        print(f"  {'Predicted':<12} {'Actual':<12} {'Difference':<12}")
+        print(f"  {'-'*36}")
+        for pred, true in zip(prob_pred, prob_true):
+            diff = abs(pred - true)
+            print(f"  {pred:<12.3f} {true:<12.3f} {diff:<12.3f}")
+
+    # Check for calibration disparities
+    errors = list(calibration_errors.values())
+    disparity = max(errors) - min(errors)
+
+    print(f"\nCalibration error disparity: {disparity:.4f}")
+    if disparity > 0.05:
+        print("⚠️ Significant calibration disparity detected")
+
+    return calibration_errors
+</code></pre>
+
+        <h2>Subgroup Analysis</h2>
+        <p>
+            Examine performance on specific subgroups that may be particularly vulnerable to bias.
+        </p>
+
+        <pre><code># Subgroup Performance Analysis
+def subgroup_analysis(model, X_test, y_test, protected_attrs):
+    """
+    Analyze performance across intersectional subgroups
+    """
+    # Create subgroup identifiers
+    subgroups = X_test[protected_attrs].apply(
+        lambda x: '_'.join(x.astype(str)), axis=1
+    )
+
+    unique_subgroups = subgroups.unique()
+    y_pred = model.predict(X_test)
+
+    print("SUBGROUP ANALYSIS")
+    print("=" * 80)
+    print(f"{'Subgroup':<30} {'Count':<10} {'Accuracy':<12} {'Precision':<12} {'Recall':<12}")
+    print("-" * 80)
+
+    subgroup_results = []
+
+    for subgroup in unique_subgroups:
+        mask = subgroups == subgroup
+        count = mask.sum()
+
+        if count < 10:  # Skip very small subgroups
+            continue
+
+        acc = accuracy_score(y_test[mask], y_pred[mask])
+        prec = precision_score(y_test[mask], y_pred[mask], zero_division=0)
+        rec = recall_score(y_test[mask], y_pred[mask], zero_division=0)
+
+        subgroup_results.append({
+            'subgroup': subgroup,
+            'count': count,
+            'accuracy': acc,
+            'precision': prec,
+            'recall': rec
+        })
+
+        print(f"{subgroup:<30} {count:<10} {acc:<12.3f} {prec:<12.3f} {rec:<12.3f}")
+
+    # Identify worst-performing subgroups
+    sorted_results = sorted(subgroup_results, key=lambda x: x['accuracy'])
+
+    print("\n⚠️ Worst Performing Subgroups:")
+    for result in sorted_results[:3]:
+        print(f"  {result['subgroup']}: Accuracy = {result['accuracy']:.3f}")
+
+    return subgroup_results
+</code></pre>
+
+        <h2>Counterfactual Fairness Testing</h2>
+        <p>
+            Test whether changing protected attributes (while keeping other features constant) changes predictions.
+        </p>
+
+        <pre><code># Counterfactual Fairness Test
+def counterfactual_test(model, X_test, protected_attr_col, protected_attr_values):
+    """
+    Test if predictions change when only protected attribute changes
+    """
+    X_counterfactual = X_test.copy()
+
+    original_predictions = model.predict_proba(X_test)[:, 1]
+    counterfactual_predictions = {}
+
+    for value in protected_attr_values:
+        X_counterfactual[protected_attr_col] = value
+        counterfactual_predictions[value] = model.predict_proba(X_counterfactual)[:, 1]
+
+    # Calculate how often predictions change
+    changes = 0
+    total = len(X_test)
+
+    for i in range(total):
+        preds = [counterfactual_predictions[v][i] for v in protected_attr_values]
+        if max(preds) - min(preds) > 0.1:  # Significant change
+            changes += 1
+
+    change_rate = changes / total
+
+    print(f"Counterfactual change rate: {change_rate:.3f}")
+    if change_rate > 0.1:
+        print("⚠️ Model is sensitive to protected attribute")
+        print("   This suggests potential discrimination")
+
+    return change_rate
+</code></pre>
+
+        <h2>Bias Amplification Detection</h2>
+        <p>
+            Check if the model amplifies biases present in the training data.
+        </p>
+
+        <pre><code># Bias Amplification Analysis
+def detect_bias_amplification(train_data, model, X_test, protected_attr):
+    """
+    Compare bias in training data vs model predictions
+    """
+    # Measure bias in training data
+    train_positive_rates = {}
+    for group in train_data[protected_attr].unique():
+        mask = train_data[protected_attr] == group
+        train_positive_rates[group] = train_data[mask]['label'].mean()
+
+    # Measure bias in predictions
+    y_pred = model.predict(X_test)
+    test_protected = X_test[protected_attr]
+
+    pred_positive_rates = {}
+    for group in test_protected.unique():
+        mask = test_protected == group
+        pred_positive_rates[group] = y_pred[mask].mean()
+
+    print("BIAS AMPLIFICATION ANALYSIS")
+    print("=" * 80)
+    print(f"{'Group':<15} {'Training %':<15} {'Prediction %':<15} {'Change':<15}")
+    print("-" * 80)
+
+    for group in train_positive_rates.keys():
+        train_rate = train_positive_rates.get(group, 0) * 100
+        pred_rate = pred_positive_rates.get(group, 0) * 100
+        change = pred_rate - train_rate
+
+        status = "⚠️ AMPLIFIED" if abs(change) > 5 else "✓ OK"
+        print(f"{group:<15} {train_rate:<15.2f} {pred_rate:<15.2f} {change:+.2f}% {status}")
+
+    return train_positive_rates, pred_positive_rates
+</code></pre>
+
+        <h2>Comprehensive Model Audit</h2>
+
+        <pre><code># Complete Model Bias Audit
+def comprehensive_model_audit(model, X_train, y_train, X_test, y_test,
+                              protected_attrs, feature_names):
+    """
+    Perform complete bias audit of trained model
+    """
+    print("\n" + "=" * 80)
+    print("COMPREHENSIVE MODEL BIAS AUDIT")
+    print("=" * 80)
+
+    # 1. Disaggregated Performance
+    print("\n1. DISAGGREGATED PERFORMANCE")
+    print("-" * 80)
+    for attr in protected_attrs:
+        disaggregated_evaluation(model, X_test, y_test, X_test[attr])
+
+    # 2. Confusion Matrix Analysis
+    print("\n2. CONFUSION MATRIX ANALYSIS")
+    print("-" * 80)
+    for attr in protected_attrs:
+        confusion_matrix_by_group(y_test, model.predict(X_test), X_test[attr])
+
+    # 3. Calibration Check
+    print("\n3. CALIBRATION ANALYSIS")
+    print("-" * 80)
+    for attr in protected_attrs:
+        calibration_analysis(model, X_test, y_test, X_test[attr])
+
+    # 4. Subgroup Analysis
+    if len(protected_attrs) > 1:
+        print("\n4. INTERSECTIONAL SUBGROUP ANALYSIS")
+        print("-" * 80)
+        subgroup_analysis(model, X_test, y_test, protected_attrs)
+
+    # Final Recommendations
+    print("\n" + "=" * 80)
+    print("AUDIT SUMMARY AND RECOMMENDATIONS")
+    print("=" * 80)
+    print("1. Review all performance disparities greater than 10%")
+    print("2. Investigate groups with high error rates")
+    print("3. Check for bias amplification")
+    print("4. Consider threshold adjustments for fairness")
+    print("5. Implement mitigation techniques if necessary")
+    print("\n弘益人間 - Ensure your model serves all users fairly")
+    print("=" * 80)
+
+    return True
+</code></pre>
+
+        <div class="callout">
+            <h3>弘益人間 Model Analysis Principles</h3>
+            <ul>
+                <li>Always evaluate performance separately for each demographic group</li>
+                <li>Look beyond aggregate metrics to understand disparate impact</li>
+                <li>Consider both false positives and false negatives in context</li>
+                <li>Test for counterfactual fairness and bias amplification</li>
+                <li>Document all findings transparently</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">Chapter Summary</h2>
+            <ul>
+                <li>Disaggregated evaluation is fundamental—never rely solely on aggregate metrics</li>
+                <li>Confusion matrix analysis reveals patterns in how errors are distributed across groups</li>
+                <li>Decision threshold optimization can improve fairness for probabilistic classifiers</li>
+                <li>Feature importance analysis identifies which features drive predictions for each group</li>
+                <li>Calibration ensures probability predictions are meaningful across all groups</li>
+                <li>Subgroup analysis examines intersectional performance issues</li>
+                <li>Counterfactual testing reveals whether protected attributes directly influence predictions</li>
+                <li>Bias amplification detection compares model bias to training data bias</li>
+                <li>Comprehensive audits combine multiple analysis techniques for complete assessment</li>
+                <li>弘益人間 requires thorough, transparent model evaluation</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">Review Questions</h2>
+            <ol>
+                <li>Why is disaggregated evaluation more informative than aggregate metrics for fairness assessment?</li>
+                <li>What insights can confusion matrix analysis provide that accuracy alone cannot?</li>
+                <li>How can adjusting decision thresholds improve fairness? What are the tradeoffs?</li>
+                <li>What does it mean if feature importance differs significantly across demographic groups?</li>
+                <li>Explain how a model can be well-calibrated overall but poorly calibrated for specific groups.</li>
+                <li>Why is subgroup analysis important? What can it reveal that single-attribute analysis cannot?</li>
+                <li>What does counterfactual fairness testing measure? How is it different from other fairness metrics?</li>
+                <li>How can a model amplify bias beyond what exists in training data? Provide an example mechanism.</li>
+                <li>Design a model audit strategy for a criminal risk assessment system. What would you prioritize?</li>
+                <li>How does 弘益人間 philosophy inform decisions about acceptable performance disparities?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-button">← Previous Chapter</a>
+            <a href="chapter-05.html" class="nav-button">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

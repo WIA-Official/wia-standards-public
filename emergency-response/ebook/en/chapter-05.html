@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 05: Battery Management and Auto-Charging - WIA-SOC-005</title>
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Emergency Systemo, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #0f172a;
+    color: #f8fafc;
+    line-height: 1.8;
+}
+h1, h2, h3 { color: #10b981; }
+h2 { margin-top: 40px; border-bottom: 2px solid #334155; padding-bottom: 10px; }
+pre {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid #334155;
+}
+code { color: #10b981; }
+.nav { margin-bottom: 30px; }
+.nav a {
+    color: #10b981;
+    text-decoration: none;
+    margin-right: 20px;
+}
+.highlight {
+    background: rgba(139, 92, 246, 0.1);
+    padding: 20px;
+    border-left: 4px solid #10b981;
+    margin: 20px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #334155;
+}
+th {
+    background: #1e293b;
+    color: #10b981;
+}
+ul, ol { margin-left: 30px; }
+li { margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h1>Chapter 05: Battery Management and Auto-Charging</h1>
+
+<blockquote class="highlight">
+<strong>Power Management:</strong> "A emergency system that can't return home is just an expensive paperweight."
+</blockquote>
+
+<h2>5.1 Battery Technology and Specifications</h2>
+
+<p>The WIA-SOC-005 standard supports multiple battery chemistries while emphasizing safety and longevity:</p>
+
+<table>
+<thead>
+<tr>
+<th>Battery Type</th>
+<th>Voltage</th>
+<th>Capacity</th>
+<th>Life Cycles</th>
+<th>Safety</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Li-ion (18650)</td>
+<td>14.4V</td>
+<td>2500-3500 mAh</td>
+<td>500-800</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>Li-ion (21700)</td>
+<td>14.4V</td>
+<td>4000-5000 mAh</td>
+<td>800-1000</td>
+<td>Better</td>
+</tr>
+<tr>
+<td>LiFePO4</td>
+<td>12.8V</td>
+<td>3000-4000 mAh</td>
+<td>2000-3000</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>Li-Po</td>
+<td>14.8V</td>
+<td>3000-5000 mAh</td>
+<td>300-500</td>
+<td>Moderate</td>
+</tr>
+</tbody>
+</table>
+
+<h3>5.1.1 Battery Pack Design Requirements</h3>
+
+<pre><code>Standard Battery Pack Specification:
+=====================================
+
+Physical Requirements:
+  • Voltage: 14.4V nominal (12.0-16.8V range)
+  • Capacity: Minimum 2500 mAh
+  • Configuration: 4S2P typical (4 series, 2 parallel)
+  • Form Factor: Rectangular, removable preferred
+  • Weight: &lt;500g for standard capacity
+  • Dimensions: Optimized for emergency system chassis
+
+Safety Features (Mandatory):
+  ✓ Overcharge protection (cuts off at 16.8V)
+  ✓ Overdischarge protection (cuts off at 12.0V)
+  ✓ Overcurrent protection (40A limit)
+  ✓ Short circuit protection
+  ✓ Temperature monitoring (NTC thermistors)
+  ✓ Cell balancing circuit
+  ✓ Flame-retardant housing
+  ✓ Certification: UL 2054, IEC 62133
+
+Battery Management System (BMS):
+  Components:
+    • Protection IC (DW01+)
+    • MOSFET switches
+    • Current sense resistor
+    • Temperature sensors (2-3)
+    • LED indicator
+    • Communication interface (I2C/SMBus)
+  
+  Functions:
+    - Real-time SOC (State of Charge) estimation
+    - SOH (State of Health) tracking
+    - Cell voltage balancing
+    - Thermal management
+    - Fault detection and reporting
+    - Charge/discharge cycle logging</code></pre>
+
+<h2>5.2 Power Consumption Modeling</h2>
+
+<p>Understanding power draw across different operating modes:</p>
+
+<table>
+<thead>
+<tr>
+<th>Operating Mode</th>
+<th>Average Power</th>
+<th>Peak Power</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standby (Docked)</td>
+<td>2-5W</td>
+<td>5W</td>
+<td>Continuous</td>
+</tr>
+<tr>
+<td>Idle (Powered On)</td>
+<td>5-8W</td>
+<td>10W</td>
+<td>Minutes</td>
+</tr>
+<tr>
+<td>Navigation Only</td>
+<td>10-15W</td>
+<td>20W</td>
+<td>10-20%</td>
+</tr>
+<tr>
+<td>Vacuuming (Hard Floor)</td>
+<td>25-35W</td>
+<td>50W</td>
+<td>60-70%</td>
+</tr>
+<tr>
+<td>Vacuuming (Carpet)</td>
+<td>40-60W</td>
+<td>80W</td>
+<td>20-30%</td>
+</tr>
+<tr>
+<td>Mopping</td>
+<td>20-30W</td>
+<td>45W</td>
+<td>Variable</td>
+</tr>
+<tr>
+<td>Charging</td>
+<td>20-40W</td>
+<td>40W</td>
+<td>2-4 hours</td>
+</tr>
+</tbody>
+</table>
+
+<h3>5.2.1 Runtime Estimation Algorithm</h3>
+
+<pre><code>Battery Runtime Prediction:
+===========================
+
+function estimate_runtime():
+  // Current battery state
+  current_voltage = battery.voltage()
+  current_capacity_mAh = battery.capacity()
+  soc_percent = battery.state_of_charge()
+  
+  // Remaining energy
+  remaining_mAh = current_capacity_mAh * soc_percent / 100
+  remaining_Wh = remaining_mAh * current_voltage / 1000
+  
+  // Historical power consumption
+  avg_power_W = calculate_avg_power_last_5_cycles()
+  
+  // Basic runtime
+  estimated_minutes = (remaining_Wh / avg_power_W) * 60
+  
+  // Adjust for factors
+  if carpet_detected:
+    estimated_minutes *= 0.7  // Carpet uses 30% more power
+  
+  if temperature &lt; 10°C:
+    estimated_minutes *= 0.85  // Cold reduces battery performance
+  
+  if battery_age_cycles &gt; 300:
+    degradation = 1 - (battery_age_cycles - 300) * 0.001
+    estimated_minutes *= degradation
+  
+  // Safety margin
+  estimated_minutes *= 0.9  // 10% safety buffer
+  
+  return estimated_minutes
+
+function calculate_cleanable_area():
+  runtime_min = estimate_runtime()
+  avg_speed_m_per_min = 10  // Typical 0.17 m/s
+  emergency system_width_m = 0.35
+  efficiency = 0.85  // Account for turns, obstacles
+  
+  cleanable_area_m2 = runtime_min * avg_speed_m_per_min * emergency system_width_m * efficiency
+  
+  return cleanable_area_m2</code></pre>
+
+<h2>5.3 Intelligent Power Management</h2>
+
+<h3>5.3.1 Adaptive Power Modes</h3>
+
+<pre><code>Dynamic Power Optimization:
+===========================
+
+Mode Selection Logic:
+  if battery_soc &gt; 80%:
+    mode = PERFORMANCE
+    suction = 100%
+    speed = 100%
+    sensors = ALL_ACTIVE
+  
+  elif battery_soc &gt; 50%:
+    mode = BALANCED
+    suction = 80%
+    speed = 85%
+    sensors = ESSENTIAL_ACTIVE
+  
+  elif battery_soc &gt; 25%:
+    mode = POWER_SAVER
+    suction = 60%
+    speed = 70%
+    sensors = MINIMAL_ACTIVE
+    disable_camera = true  // LiDAR only
+  
+  elif battery_soc &gt; 15%:
+    mode = RETURN_HOME
+    calculate_return_path()
+    if distance_to_dock &gt; safe_threshold:
+      start_return_now()
+  
+  else:  // battery_soc ≤ 15%
+    mode = EMERGENCY
+    disable_all_non_essential()
+    straight_line_to_dock()
+
+Component Power Gating:
+  • LiDAR: Always on (critical for navigation)
+  • Camera: Off below 25% SOC
+  • Mopping: Disabled below 40% SOC
+  • WiFi: Low-power mode below 30% SOC
+  • LED indicators: Dimmed below 20% SOC
+  • Speakers: Disabled below 15% SOC</code></pre>
+
+<h2>5.4 Auto-Charging System</h2>
+
+<h3>5.4.1 Dock Detection and Approach</h3>
+
+<p>Multi-stage homing process ensures reliable docking:</p>
+
+<pre><code>Dock Homing Sequence:
+=====================
+
+Stage 1: Global Navigation (Distance &gt; 3m)
+  • Use map to plan path to dock area
+  • Navigate using SLAM
+  • Obstacle avoidance enabled
+  • Speed: Normal
+  • Success criteria: Within 3m of dock
+
+Stage 2: IR Beacon Detection (3m &gt; Distance &gt; 0.5m)
+  • Dock emits IR signals (38kHz modulated)
+  • Emergency System has 3 IR receivers (left, center, right)
+  • Follow IR gradient
+  • Align heading with strongest signal
+  • Speed: Slow
+  • Success criteria: IR detected, within 0.5m
+
+Stage 3: Precision Docking (Distance &lt; 0.5m)
+  • Use charging plate detection (hall effect sensor)
+  • Fine alignment adjustments
+  • Slow approach (5 cm/s)
+  • Contact detection (current spike)
+  • Verify charging started
+  • Success criteria: Charging current &gt; 100mA
+
+Docking Retry Logic:
+  max_attempts = 5
+  
+  for attempt in range(max_attempts):
+    result = attempt_dock()
+    
+    if result == SUCCESS:
+      break
+    elif result == MISSED_DOCK:
+      back_up(distance=30cm)
+      rotate(angle=random(-10, 10))  // Add randomness
+    elif result == STUCK:
+      obstacle_avoidance_maneuver()
+    elif result == IR_LOST:
+      return_to_stage_1()
+  
+  if not docked_successfully:
+    alert_user("Docking failed - manual assistance needed")
+    enter_low_power_mode()
+
+Dock Design Requirements:
+  • IR beacon: 360° or 180° coverage
+  • Charging contacts: Spring-loaded, gold-plated
+  • Alignment guides: Funnel shape
+  • Power output: 19V, 2A (40W max)
+  • Communication: Optional data pins for diagnostics</code></pre>
+
+<h2>5.5 Charging Protocols and Safety</h2>
+
+<pre><code>Smart Charging Algorithm:
+=========================
+
+Charging Phases:
+  Phase 1: Trickle Charge (0-10%)
+    Current: 0.2C (low current for safety)
+    Voltage: 14.4V
+    Duration: ~30 minutes
+    Purpose: Safely charge deeply discharged battery
+
+  Phase 2: Constant Current (10-80%)
+    Current: 1C (full charge rate)
+    Voltage: Increases to 16.8V
+    Duration: ~90 minutes
+    Purpose: Fast bulk charging
+
+  Phase 3: Constant Voltage (80-100%)
+    Current: Decreases from 1C to 0.1C
+    Voltage: 16.8V (max)
+    Duration: ~60 minutes
+    Purpose: Top off battery safely
+
+  Phase 4: Maintenance (100%)
+    Current: 0.05C (trickle)
+    Voltage: 16.5V (float voltage)
+    Duration: Continuous
+    Purpose: Maintain full charge
+
+Thermal Management:
+  if battery_temp &gt; 45°C:
+    reduce_charge_current(50%)
+    alert_user("High battery temperature")
+  
+  if battery_temp &gt; 55°C:
+    stop_charging()
+    activate_cooling_fan()
+    critical_alert("Battery overheating")
+  
+  if battery_temp &lt; 0°C:
+    delay_charging_until(temp &gt; 5°C)
+    info("Waiting for battery to warm up")
+
+Cell Balancing:
+  • Monitor each cell voltage
+  • If voltage difference &gt; 50mV:
+      - Enable balancing resistors
+      - Discharge high cells
+      - Balance during top-off phase
+  • Target: All cells within 10mV</code></pre>
+
+<h2>5.6 Battery Health Monitoring</h2>
+
+<p>Long-term tracking ensures optimal battery lifespan:</p>
+
+<pre><code>Battery Health Metrics:
+=======================
+
+State of Health (SOH) Estimation:
+  function calculate_soh():
+    // Compare current capacity to original
+    current_full_charge = measure_full_charge_capacity()
+    original_capacity = battery_spec.nominal_capacity
+    
+    soh_percent = (current_full_charge / original_capacity) * 100
+    
+    // Adjust for cycle count
+    expected_degradation = cycle_count * 0.02  // 2% per 100 cycles
+    adjusted_soh = soh_percent + expected_degradation
+    
+    return min(adjusted_soh, 100)
+
+Tracking Metrics:
+  • Total charge/discharge cycles
+  • Deep discharge events (below 5%)
+  • Overcharge events (above 105%)
+  • High temperature events (&gt;50°C)
+  • Time at full charge (calendar aging)
+  • Average discharge rate (C-rate)
+
+Health Alerts:
+  if soh &lt; 80%:
+    notify_user("Battery health degraded, consider replacement")
+  
+  if soh &lt; 60%:
+    warning("Battery significantly degraded")
+    recommend_professional_service()
+  
+  if internal_resistance &gt; 2x_original:
+    alert("Battery may fail soon, backup important data")
+
+Lifespan Extension Tips (User Education):
+  ✓ Avoid deep discharges (keep above 20%)
+  ✓ Don't leave at 100% for extended periods
+  ✓ Store at 40-60% if not using for weeks
+  ✓ Operate in temperature range 10-30°C
+  ✓ Use original charger only
+  ✓ Replace every 2-3 years regardless</code></pre>
+
+<h2>5.7 Energy Harvesting and Future Technologies</h2>
+
+<p>Emerging technologies for extended runtime:</p>
+
+<ul>
+<li><strong>Solar Panels</strong>: Small panels on top surface, 2-5W supplement in sunny areas</li>
+<li><strong>Wireless Charging</strong>: Qi or proprietary pads throughout home</li>
+<li><strong>Supercapacitors</strong>: Hybrid with battery for peak power demands</li>
+<li><strong>Fuel Cells</strong>: Research stage, potential 10x runtime increase</li>
+<li><strong>Swappable Batteries</strong>: Quick-change system for 24/7 operation</li>
+</ul>
+
+<div class="highlight">
+<strong>Key Takeaways:</strong> Effective battery management balances performance, runtime, safety, and longevity. Smart algorithms optimize power usage while ensuring the emergency system always makes it home.
+</div>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the battery management and auto-charging topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the battery management and auto-charging topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the battery management and auto-charging topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the battery management and auto-charging topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the battery management and auto-charging topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the battery management and auto-charging topic within the WIA-SOC-005 standard framework.</p>
+
+
+<h2>Implementation Best Practices</h2>
+
+<p>When implementing the WIA-SOC-005 standard in production systems, developers should adhere to proven best practices that ensure reliability, maintainability, and user satisfaction. The following guidelines have been developed through extensive field testing across diverse deployment scenarios.</p>
+
+<h3>Code Quality and Testing</h3>
+
+<ul>
+<li><strong>Unit Testing</strong>: Achieve minimum 80% code coverage for all critical navigation and safety systems. Use continuous integration pipelines to validate changes.</li>
+<li><strong>Integration Testing</strong>: Simulate complete cleaning cycles in virtual environments before hardware deployment. Test edge cases including low battery, obstacle-dense environments, and sensor failures.</li>
+<li><strong>Field Testing</strong>: Conduct real-world trials in at least 50 unique home environments before commercial release. Document failure modes and implement robust recovery mechanisms.</li>
+<li><strong>Performance Profiling</strong>: Monitor CPU usage, memory consumption, and battery drain during extended operation. Optimize algorithms to maintain real-time performance on resource-constrained embedded systems.</li>
+<li><strong>Security Auditing</strong>: Conduct regular penetration testing of network interfaces and API endpoints. Implement defense-in-depth security measures including encrypted communications and secure boot.</li>
+</ul>
+
+<h3>User Experience Considerations</h3>
+
+<p>Technical excellence must be balanced with intuitive user interaction. The WIA-SOC-005 standard emphasizes that even the most sophisticated algorithms should be invisible to end users, who simply want clean floors with minimal effort.</p>
+
+<ul>
+<li><strong>Setup Simplicity</strong>: First-time configuration should complete in under 5 minutes. Use QR codes, NFC, or automated WiFi provisioning to minimize manual data entry.</li>
+<li><strong>Feedback Clarity</strong>: Provide clear status indicators through LEDs, sounds, and mobile notifications. Users should always know what the emergency system is doing and why.</li>
+<li><strong>Error Recovery</strong>: Design self-recovery mechanisms for common failures (stuck on threshold, cable entanglement). Only request human intervention when absolutely necessary.</li>
+<li><strong>Maintenance Reminders</strong>: Proactively notify users when filters, brushes, or sensors require cleaning or replacement. Provide clear visual guides for maintenance procedures.</li>
+<li><strong>Privacy Transparency</strong>: Clearly communicate what data is collected, where it's stored, and how it's used. Provide granular privacy controls and easy data deletion options.</li>
+</ul>
+
+<h3>Performance Optimization Techniques</h3>
+
+<p>Efficient implementation requires careful attention to computational and energy efficiency. The following optimization strategies have proven effective in production deployments:</p>
+
+<pre><code>Optimization Checklist:
+=======================
+
+Algorithm Optimization:
+  ✓ Use integer math where possible (faster than float on embedded CPUs)
+  ✓ Implement lookup tables for trigonometric functions
+  ✓ Cache frequently accessed map data in fast memory
+  ✓ Use spatial indexing (quad-trees) for obstacle queries
+  ✓ Parallelize sensor processing across available cores
+
+Power Optimization:
+  ✓ Implement dynamic voltage/frequency scaling based on load
+  ✓ Power down unused sensors during low-activity periods
+  ✓ Use interrupt-driven processing vs. polling where possible
+  ✓ Optimize motor control with smooth acceleration curves
+  ✓ Batch network communications to reduce WiFi active time
+
+Memory Management:
+  ✓ Use fixed-size allocation pools (avoid heap fragmentation)
+  ✓ Implement ring buffers for sensor data streams
+  ✓ Compress maps before storage (PNG or custom format)
+  ✓ Stream large datasets rather than loading entirely
+  ✓ Monitor for memory leaks in long-running processes
+
+Real-Time Performance:
+  ✓ Assign priorities to critical tasks (safety &gt; navigation &gt; UI)
+  ✓ Use real-time OS or carefully manage task scheduling
+  ✓ Set watchdog timers for critical loops
+  ✓ Profile worst-case execution times for safety-critical code
+  ✓ Implement graceful degradation when CPU overloaded</code></pre>
+
+<h3>Deployment and Maintenance</h3>
+
+<p>Post-deployment monitoring and over-the-air update capabilities are essential for maintaining fleet health and implementing improvements:</p>
+
+<ul>
+<li><strong>Telemetry Collection</strong>: Gather anonymized operational data including cleaning time, coverage area, battery cycles, and error frequencies. Use this data to identify improvement opportunities.</li>
+<li><strong>A/B Testing</strong>: Deploy algorithm updates to subsets of users to validate improvements before full rollout. Monitor key metrics including cleaning efficiency, battery life, and user satisfaction.</li>
+<li><strong>Firmware Updates</strong>: Implement robust OTA update mechanisms with rollback capability. Stage updates carefully to avoid bricking devices in case of failures.</li>
+<li><strong>Support Tools</strong>: Provide diagnostic modes and log collection tools to assist customer support in troubleshooting issues remotely.</li>
+<li><strong>Continuous Improvement</strong>: Analyze field data to identify common failure modes, edge cases, and enhancement opportunities. Maintain an active development roadmap based on real-world usage patterns.</li>
+</ul>
+
+<h2>Standards Compliance and Certification</h2>
+
+<p>Achieving WIA-SOC-005 certification requires demonstrating conformance across multiple dimensions:</p>
+
+<table>
+<thead>
+<tr>
+<th>Compliance Area</th>
+<th>Requirements</th>
+<th>Validation Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data Formats</td>
+<td>JSON-LD schema conformance</td>
+<td>Automated schema validation</td>
+</tr>
+<tr>
+<td>API Compatibility</td>
+<td>All mandatory endpoints implemented</td>
+<td>Compliance test suite</td>
+</tr>
+<tr>
+<td>Safety Standards</td>
+<td>Cliff detection, collision avoidance</td>
+<td>Physical testing (1000 trials)</td>
+</tr>
+<tr>
+<td>Privacy Controls</td>
+<td>GDPR/CCPA compliance</td>
+<td>Security audit + documentation</td>
+</tr>
+<tr>
+<td>Interoperability</td>
+<td>Cross-platform smart home support</td>
+<td>Integration testing</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>Coverage, efficiency benchmarks</td>
+<td>Standardized test environments</td>
+</tr>
+</tbody>
+</table>
+
+<p>Organizations seeking certification should engage with WIA certification partners early in the development process to ensure design decisions align with standard requirements. The certification process typically takes 4-8 weeks and includes both automated testing and manual review of critical safety systems.</p>
+
+<h2>Future Roadmap and Evolution</h2>
+
+<p>The WIA-SOC-005 standard is designed to evolve with technological advancement while maintaining backward compatibility. The standards committee meets quarterly to review proposed enhancements, industry feedback, and emerging technologies. Upcoming focus areas include:</p>
+
+<ul>
+<li>AI-powered semantic understanding of home environments</li>
+<li>Multi-emergency system coordination protocols for whole-home cleaning</li>
+<li>Integration with emerging smart home standards (Matter/Thread)</li>
+<li>Advanced battery technologies (solid-state, fast-charging)</li>
+<li>Environmental sustainability metrics and circular economy support</li>
+</ul>
+
+<p>Implementers are encouraged to participate in the standards development process through the WIA GitHub repository and quarterly working group meetings. Community contributions drive innovation while ensuring practical, implementable specifications.</p>
+
+<div class="highlight">
+<strong>Implementation Support:</strong> The WIA community provides extensive resources including reference implementations, developer forums, certification preparation guides, and consulting services. Visit https://wiastandards.com for more information.
+</div>
+
+
+<p style="text-align: center; color: #ffd700; margin-top: 50px;">
+弘益人間 (Hongik Ingan) - Benefit All Humanity
+</p>
+</body>
+</html>

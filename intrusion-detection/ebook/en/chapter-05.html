@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Machine Learning in IDS - WIA Intrusion Detection Standard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e0e0e0; line-height: 1.8; min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+        .nav-header { background: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; margin-bottom: 30px; border-left: 5px solid #EF4444; }
+        .nav-header a { color: #EF4444; text-decoration: none; font-weight: bold; margin-right: 20px; }
+        h1 { font-size: 3em; color: #EF4444; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #EF4444; }
+        h2 { font-size: 2em; color: #EF4444; margin-top: 40px; margin-bottom: 20px; }
+        h3 { font-size: 1.5em; color: #f87171; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 15px; font-size: 1.1em; color: #d0d0d0; }
+        .highlight-box { background: rgba(239, 68, 68, 0.1); border-left: 5px solid #EF4444; padding: 25px; margin: 30px 0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th { background: #EF4444; color: white; padding: 15px; text-align: left; font-weight: bold; }
+        td { padding: 12px 15px; border-bottom: 1px solid #334155; }
+        tr:hover { background: rgba(239, 68, 68, 0.1); }
+        pre { background: #1e293b; border: 2px solid #EF4444; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 25px 0; font-size: 0.9em; }
+        code { color: #f87171; font-family: 'Courier New', monospace; }
+        .code-title { background: #EF4444; color: white; padding: 8px 15px; border-radius: 5px 5px 0 0; font-weight: bold; margin-bottom: -10px; display: inline-block; }
+        ul, ol { margin: 20px 0; padding-left: 30px; }
+        li { margin-bottom: 10px; color: #d0d0d0; }
+        .nav-footer { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 2px solid #334155; }
+        .nav-footer a { background: #EF4444; color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: all 0.3s ease; }
+        .nav-footer a:hover { background: #dc2626; transform: translateY(-2px); }
+        .review-questions { background: rgba(239, 68, 68, 0.05); border: 2px solid #EF4444; border-radius: 10px; padding: 30px; margin: 40px 0; }
+        .review-questions h3 { color: #EF4444; margin-top: 0; }
+        .review-questions ol { margin-top: 20px; }
+        .review-questions li { margin-bottom: 15px; font-weight: 500; }
+        footer { text-align: center; padding: 40px 20px; margin-top: 60px; border-top: 2px solid #334155; color: #888; }
+        .hongik { font-size: 1.5em; color: #EF4444; margin-bottom: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-header">
+            <a href="index.html">← Table of Contents</a>
+            <span style="color: #888;">Chapter 5 of 8</span>
+        </div>
+
+        <h1>Chapter 5: Machine Learning in IDS</h1>
+
+        <div class="highlight-box">
+            <h3>Chapter Overview</h3>
+            <p>This chapter explores the application of machine learning and artificial intelligence to intrusion detection. We'll examine supervised learning, unsupervised learning, deep learning architectures, feature engineering, model training and evaluation, and the challenges of ML-based detection including adversarial machine learning.</p>
+        </div>
+
+        <h2>5.1 Why Machine Learning for IDS?</h2>
+
+        <p>Traditional signature-based detection faces fundamental limitations in today's threat landscape:</p>
+
+        <ul>
+            <li><strong>Zero-Day Blindness:</strong> Cannot detect previously unknown attacks</li>
+            <li><strong>Signature Lag:</strong> 24-72 hour delay between vulnerability disclosure and signature availability</li>
+            <li><strong>Evasion Techniques:</strong> Polymorphic malware changes signatures with each execution</li>
+            <li><strong>Scale Challenges:</strong> 100,000+ signatures slow detection and complicate maintenance</li>
+            <li><strong>Insider Threats:</strong> Authorized user abuse has no signature</li>
+        </ul>
+
+        <p>Machine learning addresses these challenges by learning patterns from data rather than relying on predefined rules:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Capability</th>
+                    <th>Traditional IDS</th>
+                    <th>ML-Enhanced IDS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Zero-Day Detection</strong></td>
+                    <td>❌ No detection (no signature)</td>
+                    <td>✅ Detects behavioral anomalies</td>
+                </tr>
+                <tr>
+                    <td><strong>Polymorphic Malware</strong></td>
+                    <td>❌ Evades signature matching</td>
+                    <td>✅ Detects underlying behavior patterns</td>
+                </tr>
+                <tr>
+                    <td><strong>Insider Threats</strong></td>
+                    <td>⚠️ Limited to known attack patterns</td>
+                    <td>✅ Detects deviation from normal behavior</td>
+                </tr>
+                <tr>
+                    <td><strong>False Positive Rate</strong></td>
+                    <td>✅ Low (<1% when tuned)</td>
+                    <td>⚠️ Higher (5-15% initially)</td>
+                </tr>
+                <tr>
+                    <td><strong>Explainability</strong></td>
+                    <td>✅ Exact signature match explanation</td>
+                    <td>❌ "Black box" model decisions</td>
+                </tr>
+                <tr>
+                    <td><strong>Adaptation</strong></td>
+                    <td>❌ Requires new signatures</td>
+                    <td>✅ Continuous learning from data</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>5.2 Supervised Learning Approaches</h2>
+
+        <p>Supervised learning trains models on labeled datasets containing both benign and malicious traffic examples:</p>
+
+        <h3>Random Forest Classifier</h3>
+
+        <p>An ensemble method that combines multiple decision trees for robust classification:</p>
+
+        <div class="code-title">Example: Random Forest for Network Traffic Classification</div>
+<pre><code>import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Load and prepare dataset (e.g., NSL-KDD, CICIDS2017)
+data = pd.read_csv('network_traffic.csv')
+
+# Feature engineering
+features = [
+    'duration', 'protocol_type', 'src_bytes', 'dst_bytes',
+    'flag', 'land', 'wrong_fragment', 'urgent',
+    'count', 'srv_count', 'serror_rate', 'srv_serror_rate',
+    'rerror_rate', 'srv_rerror_rate', 'same_srv_rate',
+    'diff_srv_rate', 'srv_diff_host_rate'
+]
+
+X = data[features]
+y = data['label']  # 0=benign, 1=attack
+
+# Split data: 80% training, 20% testing
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Train Random Forest
+rf_classifier = RandomForestClassifier(
+    n_estimators=100,      # Number of trees
+    max_depth=20,          # Maximum tree depth
+    min_samples_split=5,   # Minimum samples to split node
+    class_weight='balanced', # Handle imbalanced dataset
+    n_jobs=-1,             # Use all CPU cores
+    random_state=42
+)
+
+rf_classifier.fit(X_train, y_train)
+
+# Evaluate model
+y_pred = rf_classifier.predict(X_test)
+
+print(classification_report(y_test, y_pred))
+# Output:
+#               precision    recall  f1-score   support
+#           0       0.98      0.99      0.98     19000
+#           1       0.96      0.93      0.95      6000
+#    accuracy                           0.97     25000
+
+# Feature importance analysis
+feature_importance = pd.DataFrame({
+    'feature': features,
+    'importance': rf_classifier.feature_importances_
+}).sort_values('importance', ascending=False)
+
+print("Top 5 most important features:")
+print(feature_importance.head())
+# Output:
+#          feature  importance
+# src_bytes           0.18
+# dst_bytes           0.15
+# serror_rate         0.12
+# srv_count           0.10
+# duration            0.09
+</code></pre>
+
+        <h3>Support Vector Machines (SVM)</h3>
+
+        <p>SVM finds optimal hyperplanes to separate attack and benign traffic in high-dimensional feature space:</p>
+
+        <div class="code-title">Example: SVM for Attack Classification</div>
+<pre><code>from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+# Create SVM pipeline with feature scaling
+svm_classifier = Pipeline([
+    ('scaler', StandardScaler()),  # Normalize features
+    ('svm', SVC(
+        kernel='rbf',       # Radial Basis Function kernel
+        C=1.0,              # Regularization parameter
+        gamma='scale',      # Kernel coefficient
+        class_weight='balanced',
+        probability=True    # Enable probability estimates
+    ))
+])
+
+# Train and evaluate
+svm_classifier.fit(X_train, y_train)
+y_pred = svm_classifier.predict(X_test)
+
+# Get prediction probabilities for threshold tuning
+y_prob = svm_classifier.predict_proba(X_test)[:, 1]
+
+# Adjust decision threshold to reduce false positives
+threshold = 0.7  # Require 70% confidence for attack classification
+y_pred_adjusted = (y_prob >= threshold).astype(int)
+
+# SVM Strengths:
+# ✓ Effective in high-dimensional spaces
+# ✓ Memory efficient (uses support vectors only)
+# ✓ Robust to outliers
+
+# SVM Weaknesses:
+# ✗ Slow training on large datasets (>100K samples)
+# ✗ Requires feature scaling
+# ✗ Difficult to interpret
+</code></pre>
+
+        <h3>Neural Networks</h3>
+
+        <p>Multi-layer perceptrons learn complex non-linear relationships in network traffic:</p>
+
+        <div class="code-title">Example: Deep Neural Network for IDS</div>
+<pre><code>import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
+# Build neural network architecture
+model = keras.Sequential([
+    # Input layer
+    layers.Input(shape=(41,)),  # 41 features from KDD dataset
+
+    # Hidden layers with dropout for regularization
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.3),
+    layers.BatchNormalization(),
+
+    layers.Dense(64, activation='relu'),
+    layers.Dropout(0.3),
+    layers.BatchNormalization(),
+
+    layers.Dense(32, activation='relu'),
+    layers.Dropout(0.2),
+
+    # Output layer (binary classification)
+    layers.Dense(1, activation='sigmoid')
+])
+
+# Compile model
+model.compile(
+    optimizer=keras.optimizers.Adam(learning_rate=0.001),
+    loss='binary_crossentropy',
+    metrics=['accuracy', 'precision', 'recall', 'AUC']
+)
+
+# Train with early stopping to prevent overfitting
+early_stopping = keras.callbacks.EarlyStopping(
+    monitor='val_loss',
+    patience=10,
+    restore_best_weights=True
+)
+
+history = model.fit(
+    X_train, y_train,
+    epochs=100,
+    batch_size=256,
+    validation_split=0.2,
+    callbacks=[early_stopping],
+    verbose=1
+)
+
+# Evaluate
+test_loss, test_acc, test_precision, test_recall, test_auc = model.evaluate(X_test, y_test)
+print(f"Test Accuracy: {test_acc:.4f}")
+print(f"Test Precision: {test_precision:.4f}")
+print(f"Test Recall: {test_recall:.4f}")
+print(f"Test AUC: {test_auc:.4f}")
+
+# Typical Results:
+# Accuracy:  0.9650
+# Precision: 0.9420
+# Recall:    0.9580
+# AUC:       0.9870
+</code></pre>
+
+        <h2>5.3 Unsupervised Learning Approaches</h2>
+
+        <p>Unsupervised learning detects anomalies without labeled training data, making it ideal for discovering novel attacks:</p>
+
+        <h3>K-Means Clustering</h3>
+
+        <div class="code-title">Example: Clustering-Based Anomaly Detection</div>
+<pre><code>from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+import numpy as np
+
+# Determine optimal number of clusters using elbow method
+inertias = []
+silhouette_scores = []
+K_range = range(2, 15)
+
+for k in K_range:
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X_train)
+    inertias.append(kmeans.inertia_)
+    silhouette_scores.append(silhouette_score(X_train, kmeans.labels_))
+
+# Optimal k=5 based on elbow/silhouette analysis
+kmeans_final = KMeans(n_clusters=5, random_state=42)
+kmeans_final.fit(X_train)
+
+# Calculate distance of each sample to nearest cluster center
+distances = kmeans_final.transform(X)
+min_distances = distances.min(axis=1)
+
+# Set anomaly threshold at 95th percentile
+threshold = np.percentile(min_distances, 95)
+
+# Classify samples beyond threshold as anomalies
+anomalies = min_distances > threshold
+anomaly_indices = np.where(anomalies)[0]
+
+print(f"Detected {len(anomaly_indices)} anomalies ({len(anomaly_indices)/len(X)*100:.2f}%)")
+
+# Analyze anomalies
+for idx in anomaly_indices[:10]:  # Show first 10
+    print(f"Anomaly {idx}: distance={min_distances[idx]:.2f}, features={X.iloc[idx].tolist()}")
+</code></pre>
+
+        <h3>Autoencoders for Anomaly Detection</h3>
+
+        <p>Autoencoders learn to compress and reconstruct normal traffic; high reconstruction error indicates anomalies:</p>
+
+        <div class="code-title">Example: Autoencoder-Based IDS</div>
+<pre><code>from tensorflow import keras
+from tensorflow.keras import layers
+import numpy as np
+
+# Build autoencoder architecture
+input_dim = X_train.shape[1]
+encoding_dim = 16  # Compressed representation size
+
+# Encoder
+encoder = keras.Sequential([
+    layers.Input(shape=(input_dim,)),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(32, activation='relu'),
+    layers.Dense(encoding_dim, activation='relu')
+])
+
+# Decoder
+decoder = keras.Sequential([
+    layers.Input(shape=(encoding_dim,)),
+    layers.Dense(32, activation='relu'),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(input_dim, activation='sigmoid')
+])
+
+# Complete autoencoder
+autoencoder = keras.Sequential([encoder, decoder])
+
+# Compile (MSE loss for reconstruction)
+autoencoder.compile(
+    optimizer='adam',
+    loss='mse',
+    metrics=['mae']
+)
+
+# Train on BENIGN traffic only
+X_train_benign = X_train[y_train == 0]
+
+autoencoder.fit(
+    X_train_benign, X_train_benign,  # Input = Output for autoencoders
+    epochs=50,
+    batch_size=256,
+    validation_split=0.2,
+    verbose=1
+)
+
+# Calculate reconstruction error on test data
+X_test_reconstructed = autoencoder.predict(X_test)
+reconstruction_error = np.mean(np.square(X_test - X_test_reconstructed), axis=1)
+
+# Set threshold at 95th percentile of benign traffic errors
+X_train_benign_reconstructed = autoencoder.predict(X_train_benign)
+benign_errors = np.mean(np.square(X_train_benign - X_train_benign_reconstructed), axis=1)
+threshold = np.percentile(benign_errors, 95)
+
+# Classify as anomaly if reconstruction error exceeds threshold
+y_pred_anomaly = (reconstruction_error > threshold).astype(int)
+
+# Evaluate
+from sklearn.metrics import confusion_matrix, classification_report
+print(confusion_matrix(y_test, y_pred_anomaly))
+print(classification_report(y_test, y_pred_anomaly))
+
+# Advantages of Autoencoders:
+# ✓ No labeled data required for training
+# ✓ Detects novel attack patterns
+# ✓ Learns feature representations automatically
+
+# Challenges:
+# ✗ Requires "clean" training data (only benign traffic)
+# ✗ Threshold tuning for false positive/negative balance
+# ✗ Computationally expensive for real-time inference
+</code></pre>
+
+        <h2>5.4 Feature Engineering for Network Traffic</h2>
+
+        <p>Effective ML requires meaningful features extracted from raw network data:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature Category</th>
+                    <th>Features</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Connection Features</strong></td>
+                    <td>Duration, bytes sent/received, packet count, flag types</td>
+                    <td>Detect volume-based attacks (DDoS, data exfiltration)</td>
+                </tr>
+                <tr>
+                    <td><strong>Time-Based</strong></td>
+                    <td>Connections per second, inter-arrival time, session duration</td>
+                    <td>Detect scanning, rapid connection attempts</td>
+                </tr>
+                <tr>
+                    <td><strong>Content Features</strong></td>
+                    <td>Payload entropy, n-gram frequencies, protocol fields</td>
+                    <td>Detect payload-based attacks (buffer overflow, injection)</td>
+                </tr>
+                <tr>
+                    <td><strong>Statistical</strong></td>
+                    <td>Mean, std dev, min, max over time windows</td>
+                    <td>Behavioral profiling, anomaly detection</td>
+                </tr>
+                <tr>
+                    <td><strong>Graph Features</strong></td>
+                    <td>Node centrality, clustering coefficient, betweenness</td>
+                    <td>Detect botnet C2, lateral movement</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-title">Example: Feature Engineering Pipeline</div>
+<pre><code>import pandas as pd
+import numpy as np
+from scipy.stats import entropy
+
+def extract_features(packet_capture):
+    features = {}
+
+    # Basic connection features
+    features['duration'] = packet_capture['timestamp'].max() - packet_capture['timestamp'].min()
+    features['src_bytes'] = packet_capture['src_bytes'].sum()
+    features['dst_bytes'] = packet_capture['dst_bytes'].sum()
+    features['packet_count'] = len(packet_capture)
+
+    # Statistical features
+    features['bytes_mean'] = packet_capture['packet_size'].mean()
+    features['bytes_std'] = packet_capture['packet_size'].std()
+    features['iat_mean'] = packet_capture['inter_arrival_time'].mean()  # Inter-arrival time
+
+    # Payload entropy (detect encryption/obfuscation)
+    payload = packet_capture['payload'].str.cat()
+    byte_freq = np.bincount(np.frombuffer(payload.encode(), dtype=np.uint8), minlength=256)
+    features['entropy'] = entropy(byte_freq / byte_freq.sum())
+
+    # Protocol distribution
+    protocol_counts = packet_capture['protocol'].value_counts(normalize=True)
+    features['tcp_ratio'] = protocol_counts.get('TCP', 0)
+    features['udp_ratio'] = protocol_counts.get('UDP', 0)
+
+    # Connection patterns (last 2 seconds)
+    features['conn_rate_2s'] = (packet_capture['timestamp'].diff() < 2).sum()
+
+    # Flag frequencies
+    flag_counts = packet_capture['flags'].value_counts(normalize=True)
+    features['syn_ratio'] = flag_counts.get('SYN', 0)
+    features['fin_ratio'] = flag_counts.get('FIN', 0)
+    features['rst_ratio'] = flag_counts.get('RST', 0)
+
+    return pd.Series(features)
+
+# Apply to dataset
+feature_vectors = network_data.groupby('connection_id').apply(extract_features)
+</code></pre>
+
+        <h2>5.5 Deep Learning Architectures</h2>
+
+        <h3>Convolutional Neural Networks (CNN)</h3>
+
+        <p>CNNs excel at detecting spatial patterns in packet payloads:</p>
+
+        <div class="code-title">Example: 1D CNN for Payload Inspection</div>
+<pre><code>from tensorflow.keras import layers, models
+
+# Convert packet payloads to fixed-length byte sequences
+max_payload_length = 1500  # MTU size
+
+# Build 1D CNN for payload analysis
+model = models.Sequential([
+    layers.Input(shape=(max_payload_length, 1)),
+
+    # Convolutional layers detect byte patterns
+    layers.Conv1D(filters=32, kernel_size=5, activation='relu'),
+    layers.MaxPooling1D(pool_size=2),
+
+    layers.Conv1D(filters=64, kernel_size=5, activation='relu'),
+    layers.MaxPooling1D(pool_size=2),
+
+    layers.Conv1D(filters=128, kernel_size=3, activation='relu'),
+    layers.GlobalMaxPooling1D(),
+
+    # Dense layers for classification
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(5, activation='softmax')  # Multi-class: Normal, DoS, Probe, R2L, U2R
+])
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# CNN detects patterns in raw bytes that signatures might miss
+# Useful for polymorphic malware and obfuscated payloads
+</code></pre>
+
+        <h3>Recurrent Neural Networks (RNN/LSTM)</h3>
+
+        <p>RNNs model sequential patterns in network traffic over time:</p>
+
+        <div class="code-title">Example: LSTM for Sequential Traffic Analysis</div>
+<pre><code>from tensorflow.keras.layers import LSTM, Bidirectional
+
+# Sequence of network flows (e.g., 10 consecutive flows)
+sequence_length = 10
+n_features = 20
+
+model = models.Sequential([
+    layers.Input(shape=(sequence_length, n_features)),
+
+    # Bidirectional LSTM learns forward and backward temporal patterns
+    Bidirectional(LSTM(64, return_sequences=True)),
+    layers.Dropout(0.3),
+
+    Bidirectional(LSTM(32)),
+    layers.Dropout(0.3),
+
+    layers.Dense(16, activation='relu'),
+    layers.Dense(1, activation='sigmoid')  # Binary: Attack or Benign
+])
+
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy', 'AUC']
+)
+
+# LSTM detects temporal attack patterns:
+# - Slow port scans over hours
+# - Multi-stage attacks (reconnaissance → exploitation → exfiltration)
+# - Beaconing behavior (C2 callbacks)
+</code></pre>
+
+        <h2>5.6 Model Evaluation Metrics</h2>
+
+        <p>Choosing the right evaluation metrics is critical for IDS effectiveness:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Formula</th>
+                    <th>When to Optimize</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Accuracy</strong></td>
+                    <td>(TP + TN) / (TP + TN + FP + FN)</td>
+                    <td>Balanced datasets only</td>
+                </tr>
+                <tr>
+                    <td><strong>Precision</strong></td>
+                    <td>TP / (TP + FP)</td>
+                    <td>Minimize false positives (IPS deployments)</td>
+                </tr>
+                <tr>
+                    <td><strong>Recall (TPR)</strong></td>
+                    <td>TP / (TP + FN)</td>
+                    <td>Minimize false negatives (critical systems)</td>
+                </tr>
+                <tr>
+                    <td><strong>F1-Score</strong></td>
+                    <td>2 × (Precision × Recall) / (Precision + Recall)</td>
+                    <td>Balance precision and recall</td>
+                </tr>
+                <tr>
+                    <td><strong>AUC-ROC</strong></td>
+                    <td>Area under ROC curve (TPR vs FPR)</td>
+                    <td>Overall model quality, threshold-independent</td>
+                </tr>
+                <tr>
+                    <td><strong>False Alarm Rate</strong></td>
+                    <td>FP / (FP + TN)</td>
+                    <td>Minimize analyst workload</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-title">Example: Comprehensive Model Evaluation</div>
+<pre><code>from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    roc_auc_score, roc_curve, confusion_matrix
+)
+import matplotlib.pyplot as plt
+
+# Get predictions
+y_pred = model.predict(X_test)
+y_pred_binary = (y_pred > 0.5).astype(int)
+
+# Calculate metrics
+metrics = {
+    'Accuracy': accuracy_score(y_test, y_pred_binary),
+    'Precision': precision_score(y_test, y_pred_binary),
+    'Recall': recall_score(y_test, y_pred_binary),
+    'F1-Score': f1_score(y_test, y_pred_binary),
+    'AUC-ROC': roc_auc_score(y_test, y_pred)
+}
+
+for metric, value in metrics.items():
+    print(f"{metric}: {value:.4f}")
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred_binary)
+print(f"\nConfusion Matrix:")
+print(f"TN: {cm[0,0]}, FP: {cm[0,1]}")
+print(f"FN: {cm[1,0]}, TP: {cm[1,1]}")
+
+# Calculate False Alarm Rate
+false_alarm_rate = cm[0,1] / (cm[0,1] + cm[0,0])
+print(f"False Alarm Rate: {false_alarm_rate:.4f}")
+
+# ROC Curve for threshold selection
+fpr, tpr, thresholds = roc_curve(y_test, y_pred)
+# Find optimal threshold (Youden's J statistic)
+optimal_idx = np.argmax(tpr - fpr)
+optimal_threshold = thresholds[optimal_idx]
+print(f"Optimal Threshold: {optimal_threshold:.4f}")
+</code></pre>
+
+        <h2>5.7 Adversarial Machine Learning</h2>
+
+        <p>Attackers can craft inputs to evade ML-based IDS:</p>
+
+        <h3>Evasion Attacks</h3>
+
+        <ul>
+            <li><strong>Feature Manipulation:</strong> Modify attack traffic to appear benign (e.g., adjust packet sizes, timing)</li>
+            <li><strong>Gradient-Based Attacks:</strong> Use model gradients to find minimal perturbations that cause misclassification</li>
+            <li><strong>Model Extraction:</strong> Query IDS to reverse-engineer model, then craft evasive attacks</li>
+            <li><strong>Poisoning Attacks:</strong> Inject malicious samples into training data to corrupt model</li>
+        </ul>
+
+        <h3>Defenses Against Adversarial Attacks</h3>
+
+        <ul>
+            <li><strong>Adversarial Training:</strong> Include adversarial examples in training data</li>
+            <li><strong>Ensemble Models:</strong> Combine multiple models to increase attack difficulty</li>
+            <li><strong>Input Validation:</strong> Detect and reject anomalous feature values</li>
+            <li><strong>Model Hardening:</strong> Add noise during training to increase robustness</li>
+            <li><strong>Hybrid Approach:</strong> Combine ML with signature-based detection</li>
+        </ul>
+
+        <h2>5.8 Challenges and Best Practices</h2>
+
+        <h3>Challenges</h3>
+        <ul>
+            <li><strong>Imbalanced Data:</strong> Attacks are <1% of traffic; models may ignore minority class</li>
+            <li><strong>Labeled Data Scarcity:</strong> Obtaining high-quality labeled attack data is difficult</li>
+            <li><strong>Concept Drift:</strong> Network behavior changes over time; models degrade</li>
+            <li><strong>Computational Cost:</strong> Deep learning models require GPU acceleration for real-time inference</li>
+            <li><strong>Explainability:</strong> Difficult to explain why model flagged specific traffic</li>
+        </ul>
+
+        <h3>Best Practices</h3>
+        <ol>
+            <li><strong>Start with Baseline Models:</strong> Random Forest before deep learning</li>
+            <li><strong>Use Stratified Sampling:</strong> Maintain class distribution in train/test splits</li>
+            <li><strong>Apply Class Balancing:</strong> SMOTE, class weights, or ensemble methods</li>
+            <li><strong>Continuous Retraining:</strong> Monthly model updates with recent data</li>
+            <li><strong>Hybrid Detection:</strong> ML for anomaly detection + signatures for known threats</li>
+            <li><strong>Threshold Tuning:</strong> Adjust decision thresholds for environment-specific FP/FN balance</li>
+            <li><strong>Explainable AI:</strong> Use SHAP or LIME for model interpretability</li>
+            <li><strong>A/B Testing:</strong> Deploy new models in shadow mode before production</li>
+        </ol>
+
+        <h2>5.9 Chapter Summary</h2>
+
+        <ul>
+            <li>Machine learning enables detection of zero-day attacks and behavioral anomalies</li>
+            <li>Supervised learning (Random Forest, SVM, Neural Networks) requires labeled training data</li>
+            <li>Unsupervised learning (K-Means, Autoencoders) detects anomalies without labels</li>
+            <li>Deep learning (CNN, LSTM) captures complex patterns in payloads and temporal sequences</li>
+            <li>Feature engineering is critical: connection, time-based, content, statistical, graph features</li>
+            <li>Evaluation requires precision, recall, F1-score, AUC-ROC, and false alarm rate metrics</li>
+            <li>Adversarial machine learning poses threats; defenses include ensemble models and adversarial training</li>
+            <li>Best practices: hybrid detection, continuous retraining, threshold tuning, explainability</li>
+        </ul>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Why can traditional signature-based IDS not detect zero-day attacks, and how does machine learning address this limitation?</li>
+                <li>Compare supervised and unsupervised learning for IDS. When would you choose each approach?</li>
+                <li>Explain how an autoencoder detects anomalies through reconstruction error.</li>
+                <li>Why is payload entropy a useful feature for detecting encrypted or obfuscated malware?</li>
+                <li>What is the imbalanced data problem in IDS, and how can SMOTE or class weights mitigate it?</li>
+                <li>Describe an adversarial evasion attack against an ML-based IDS and a defense strategy.</li>
+                <li>Why is AUC-ROC a better metric than accuracy for evaluating IDS models?</li>
+                <li>Design a hybrid IDS that combines signature-based detection with machine learning. How would they complement each other?</li>
+                <li>Explain how LSTM neural networks can detect multi-stage attacks or C2 beaconing patterns.</li>
+                <li>Calculate: An IDS model has 95% recall and 90% precision on a dataset with 1% attack rate. If it processes 1 million flows daily, how many false positives occur?</li>
+            </ol>
+        </div>
+
+        <div class="nav-footer">
+            <a href="chapter-04.html">← Chapter 4</a>
+            <a href="chapter-06.html">Next: Chapter 6 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

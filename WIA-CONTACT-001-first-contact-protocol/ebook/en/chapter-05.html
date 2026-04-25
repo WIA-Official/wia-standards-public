@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - API Interface | WIA-CONTACT-001</title>
+    <style>
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #8B5CF6; --text: #f1f5f9; --text-dim: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3rem; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Courier New', monospace; font-size: 0.85rem; color: var(--text); }
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        .callout { background: rgba(139, 92, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Phase 2 - API Interface</h1>
+
+        <p>The API Interface layer is the nervous system of the WIA-CONTACT-001 architecture, enabling real-time communication between observatories, analysis centers, verification networks, and coordination hubs across the globe. This chapter provides comprehensive documentation of the RESTful API endpoints, WebSocket streaming protocols, authentication mechanisms, error handling patterns, and SDK usage. Whether you are building a detection pipeline, verification service, or analysis tool, this chapter provides everything needed to achieve full interoperability with the WIA-CONTACT-001 network.</p>
+
+        <p>The API design follows modern best practices: REST principles for resource manipulation, WebSocket for real-time streaming, OAuth 2.0 for authentication, and JSON for data exchange. Rate limiting, pagination, and caching are built into the specification to ensure scalability and fair resource allocation across the global network of participating systems.</p>
+
+        <h2>5.1 API Design Philosophy</h2>
+
+        <p>The WIA-CONTACT-001 API is designed around several core principles that ensure consistency, predictability, and ease of use across all endpoints:</p>
+
+        <p><strong>Resource-Oriented Design:</strong> The API exposes resources (signals, verifications, analyses, facilities) through predictable URL patterns. Each resource has standard operations (create, read, update, delete) mapped to HTTP methods (POST, GET, PUT, DELETE). This predictability reduces learning curve and enables generic client implementations.</p>
+
+        <p><strong>Statelessness:</strong> Each request contains all information needed for processing. Servers maintain no session state between requests, enabling horizontal scaling across multiple server instances. This is critical for a global system that must handle sudden load spikes during detection events.</p>
+
+        <p><strong>Idempotency:</strong> Repeated identical requests produce the same result. This is essential for reliability in distributed systems where network failures may cause request duplication. PUT and DELETE operations are inherently idempotent; POST operations use client-generated request IDs to enable idempotency.</p>
+
+        <p><strong>Versioning:</strong> The API version is included in the URL path (/v1/...), enabling smooth evolution while maintaining backward compatibility. Deprecated features are announced with generous sunset periods, ensuring clients have time to migrate.</p>
+
+        <h2>5.2 RESTful Endpoints</h2>
+
+        <h3>5.2.1 Signal Detection Endpoints</h3>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 5.1: Signal Detection API Endpoints</caption>
+            <thead>
+                <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Auth Required</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>POST</td><td>/v1/signals</td><td>Submit a new signal detection</td><td>Yes (detector+)</td></tr>
+                <tr><td>GET</td><td>/v1/signals</td><td>List signal detections (paginated)</td><td>Yes (observer+)</td></tr>
+                <tr><td>GET</td><td>/v1/signals/{id}</td><td>Get specific signal details</td><td>Yes (observer+)</td></tr>
+                <tr><td>PUT</td><td>/v1/signals/{id}</td><td>Update signal record</td><td>Yes (owner only)</td></tr>
+                <tr><td>DELETE</td><td>/v1/signals/{id}</td><td>Retract signal detection</td><td>Yes (owner only)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>5.2.2 Submit Signal Detection</h3>
+        <pre>
+POST /v1/signals
+Content-Type: application/json
+Authorization: Bearer &lt;access_token&gt;
+X-Request-ID: req-unique-12345
+
+{
+  "signal": {
+    "frequency": {
+      "center": 1420405751.768,
+      "bandwidth": 0.5,
+      "unit": "Hz",
+      "driftRate": 0.0023
+    },
+    "power": { "snr": 15.7, "flux": 1.2e-26 },
+    "modulation": { "type": "narrowband" }
+  },
+  "source": {
+    "position": {
+      "ra": "19h25m12.34s",
+      "dec": "+21d45m32.1s",
+      "frame": "ICRS"
+    },
+    "uncertainty": { "ra": 0.5, "dec": 0.5, "unit": "arcsec" }
+  },
+  "temporal": {
+    "detected": "2025-12-29T14:25:33.123Z",
+    "duration": 72.5
+  }
+}
+
+Response: 201 Created
+Location: /v1/signals/sdr:2025-12-29-GBT-001
+{
+  "id": "sdr:2025-12-29-GBT-001",
+  "status": "unverified",
+  "created": "2025-12-29T14:30:00Z",
+  "links": {
+    "self": "/v1/signals/sdr:2025-12-29-GBT-001",
+    "verification": "/v1/signals/sdr:2025-12-29-GBT-001/verification",
+    "facility": "/v1/facilities/GBT"
+  }
+}
+        </pre>
+
+        <h3>5.2.3 Verification Endpoints</h3>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 5.2: Verification API Endpoints</caption>
+            <thead>
+                <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>POST</td><td>/v1/signals/{id}/verification</td><td>Request verification campaign</td></tr>
+                <tr><td>GET</td><td>/v1/signals/{id}/verification</td><td>Get verification status and history</td></tr>
+                <tr><td>POST</td><td>/v1/signals/{id}/verification/observations</td><td>Submit verification observation result</td></tr>
+                <tr><td>GET</td><td>/v1/verifications</td><td>List all verification requests (paginated)</td></tr>
+                <tr><td>GET</td><td>/v1/verifications/pending</td><td>List pending verification requests for facility</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.3 Authentication and Authorization</h2>
+
+        <p>The API uses OAuth 2.0 with JWT (JSON Web Tokens) for authentication. This industry-standard approach provides secure, stateless authentication suitable for distributed systems while supporting multiple client types from automated pipelines to interactive dashboards.</p>
+
+        <h3>5.3.1 Authentication Flow</h3>
+        <pre>
+# 1. Request access token using client credentials
+POST /v1/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&amp;
+client_id=gbt-detection-system&amp;
+client_secret=&lt;secret&gt;&amp;
+scope=signals:write verifications:read
+
+# 2. Response with JWT token
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "signals:write verifications:read",
+  "refresh_token": "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4..."
+}
+
+# 3. Use token in subsequent requests
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        </pre>
+
+        <h3>5.3.2 Role-Based Access Control</h3>
+        <p>Permissions are organized into roles that can be assigned to authenticated entities. Roles follow a hierarchy where higher roles include all permissions of lower roles:</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 5.3: API Roles and Permissions</caption>
+            <thead>
+                <tr><th>Role</th><th>Permissions</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>observer</td><td>signals:read, verifications:read</td><td>Read-only access to public signals</td></tr>
+                <tr><td>detector</td><td>+ signals:write</td><td>Submit and manage own detections</td></tr>
+                <tr><td>verifier</td><td>+ verifications:write</td><td>Participate in verification campaigns</td></tr>
+                <tr><td>analyst</td><td>+ analyses:*</td><td>Perform and publish signal analyses</td></tr>
+                <tr><td>coordinator</td><td>+ admin:*</td><td>Full system access, regional coordination</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.4 WebSocket Real-Time Streaming</h2>
+
+        <p>For time-critical operations, the API provides WebSocket connections for real-time event streaming. This is essential for rapid alert propagation during detection events, where minutes or even seconds can matter.</p>
+
+        <h3>5.4.1 Connection and Subscription</h3>
+        <pre>
+// Connect to alert stream
+const ws = new WebSocket('wss://api.wia-contact.org/v1/stream');
+
+// Authenticate immediately after connection
+ws.onopen = () =&gt; {
+  ws.send(JSON.stringify({
+    type: 'authenticate',
+    token: accessToken
+  }));
+};
+
+// Subscribe to relevant channels after authentication
+ws.send(JSON.stringify({
+  type: 'subscribe',
+  channels: ['alerts', 'verifications', 'facility:GBT']
+}));
+
+// Handle incoming events
+ws.onmessage = (event) =&gt; {
+  const data = JSON.parse(event.data);
+
+  switch(data.type) {
+    case 'new_detection':
+      console.log('New signal detected:', data.signal.id);
+      handleNewDetection(data.signal);
+      break;
+
+    case 'verification_requested':
+      console.log('Verification request:', data.verification);
+      scheduleVerificationObservation(data.verification);
+      break;
+
+    case 'status_change':
+      console.log('Signal status updated:', data.signalId, data.newStatus);
+      updateLocalDatabase(data);
+      break;
+  }
+};
+        </pre>
+
+        <h3>5.4.2 Event Types</h3>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 5.4: WebSocket Event Types</caption>
+            <thead>
+                <tr><th>Event</th><th>Channel</th><th>Description</th><th>Payload</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>new_detection</td><td>alerts</td><td>New signal detection submitted</td><td>Full SDR</td></tr>
+                <tr><td>verification_requested</td><td>verifications</td><td>Verification campaign initiated</td><td>Request details</td></tr>
+                <tr><td>verification_observation</td><td>verifications</td><td>New observation result</td><td>Observation data</td></tr>
+                <tr><td>status_change</td><td>alerts</td><td>Signal status updated</td><td>Signal ID, old/new status</td></tr>
+                <tr><td>threat_assessment</td><td>security</td><td>Threat level determined</td><td>Assessment report</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.5 Error Handling</h2>
+
+        <p>The API uses standard HTTP status codes with detailed error responses. Error responses include machine-readable codes for programmatic handling and human-readable messages for debugging:</p>
+
+        <pre>
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": [
+      {
+        "field": "signal.frequency.center",
+        "issue": "Value must be positive",
+        "received": -1420405751
+      },
+      {
+        "field": "source.position.dec",
+        "issue": "Invalid declination format",
+        "received": "91d00m00s"
+      }
+    ],
+    "requestId": "req-abc123def456",
+    "timestamp": "2025-12-29T14:30:00Z",
+    "documentation": "https://docs.wia-contact.org/errors/VALIDATION_ERROR"
+  }
+}
+        </pre>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 5.5: HTTP Status Codes</caption>
+            <thead>
+                <tr><th>Code</th><th>Meaning</th><th>Client Action</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>200</td><td>Success</td><td>Process response normally</td></tr>
+                <tr><td>201</td><td>Created</td><td>Resource created, check Location header</td></tr>
+                <tr><td>400</td><td>Bad Request</td><td>Fix request data per error details</td></tr>
+                <tr><td>401</td><td>Unauthorized</td><td>Refresh token or re-authenticate</td></tr>
+                <tr><td>403</td><td>Forbidden</td><td>Insufficient permissions for operation</td></tr>
+                <tr><td>404</td><td>Not Found</td><td>Resource doesn't exist, check ID</td></tr>
+                <tr><td>429</td><td>Too Many Requests</td><td>Rate limit exceeded, backoff and retry</td></tr>
+                <tr><td>500</td><td>Server Error</td><td>Report issue, retry with backoff</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.6 Rate Limiting and Quotas</h2>
+
+        <p>To ensure fair resource allocation across the global network, the API implements rate limiting. Limits vary by role and adjust dynamically based on system load:</p>
+
+        <ul>
+            <li><strong>Observer:</strong> 100 requests/minute, 10,000/day</li>
+            <li><strong>Detector:</strong> 1,000 requests/minute, 100,000/day</li>
+            <li><strong>Verifier:</strong> 500 requests/minute, 50,000/day</li>
+            <li><strong>Coordinator:</strong> 10,000 requests/minute, unlimited/day</li>
+        </ul>
+
+        <p>Rate limit information is returned in response headers:</p>
+        <pre>
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1703863860
+X-RateLimit-Policy: detector-standard
+        </pre>
+
+        <h2>5.7 SDK Overview</h2>
+
+        <h3>5.7.1 TypeScript SDK</h3>
+        <pre>
+import { WIAContactClient } from '@wia/contact-sdk';
+
+const client = new WIAContactClient({
+  apiKey: process.env.WIA_API_KEY,
+  facility: 'GBT',
+  environment: 'production'
+});
+
+// Submit detection
+const signal = await client.signals.create({
+  frequency: { center: 1420405751.768, bandwidth: 0.5 },
+  power: { snr: 15.7 },
+  source: { ra: '19h25m12.34s', dec: '+21d45m32.1s' },
+  detected: new Date()
+});
+
+console.log(`Signal submitted: ${signal.id}`);
+
+// Request verification
+const verification = await client.verifications.request(signal.id, {
+  priority: 'high',
+  targetObservatories: ['Parkes', 'Effelsberg', 'Arecibo']
+});
+
+// Subscribe to real-time updates
+client.stream.subscribe('alerts', (event) =&gt; {
+  console.log('Alert:', event.type, event.data);
+});
+        </pre>
+
+        <h3>5.7.2 Python SDK</h3>
+        <pre>
+from wia_contact import WIAContactClient
+import os
+
+client = WIAContactClient(
+    api_key=os.environ['WIA_API_KEY'],
+    facility='GBT'
+)
+
+# Submit detection
+signal = client.signals.create(
+    frequency={'center': 1420405751.768, 'bandwidth': 0.5},
+    power={'snr': 15.7},
+    source={'ra': '19h25m12.34s', 'dec': '+21d45m32.1s'},
+    detected=datetime.utcnow()
+)
+
+print(f"Signal submitted: {signal.id}")
+
+# Query signals by position
+nearby = client.signals.search(
+    ra=290.5, dec=21.7,
+    radius=1.0,
+    unit='deg',
+    status='verified'
+)
+
+for s in nearby:
+    print(f"  {s.id}: {s.frequency.center} Hz, SNR={s.power.snr}")
+        </pre>
+
+        <div class="callout">
+            <strong>Best Practice:</strong> Always use the official SDK rather than making raw HTTP requests. The SDK handles authentication refresh, rate limiting with automatic backoff, retry logic for transient failures, and error handling automatically. It also validates requests locally before submission, reducing API errors.
+        </div>
+
+        <div class="summary">
+            <h3>Chapter 5 Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li><strong>API Design:</strong> RESTful design with resource-oriented endpoints, stateless operation, and semantic versioning enables predictable, scalable interactions across the global network.</li>
+                <li><strong>Authentication:</strong> OAuth 2.0 with JWT provides secure, standards-based authentication. Role-based access control enables fine-grained permissions.</li>
+                <li><strong>Real-Time Communication:</strong> WebSocket connections enable real-time event streaming for time-critical alert propagation during detection events.</li>
+                <li><strong>Error Handling:</strong> Standardized error responses with codes, messages, and details enable effective debugging and programmatic error recovery.</li>
+                <li><strong>Rate Limiting:</strong> Fair resource allocation through role-based rate limits ensures system stability during peak loads.</li>
+                <li><strong>SDKs:</strong> Official SDKs for TypeScript and Python simplify integration and handle common concerns automatically.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain the RESTful design principles used in the WIA-CONTACT-001 API. Why is each principle important for a global distributed system?</li>
+                <li>Describe the OAuth 2.0 authentication flow. Why is token-based authentication preferred over session-based for this use case?</li>
+                <li>Compare REST API and WebSocket communication. Under what circumstances should each be used?</li>
+                <li>Design a client application that monitors for new detections and automatically requests verification. What API calls would it make?</li>
+                <li>How does rate limiting ensure fair resource allocation? What should a client do when limits are exceeded?</li>
+                <li>Write code using the SDK to submit a signal detection, request verification, and monitor for status updates.</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 6 will explore Phase 3: Protocol specifications. We will examine the operational procedures for detection, verification cascade, threat assessment, and response coordination that govern how the system responds to potential first contact scenarios.</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-04.html">← Previous Chapter</a>
+            <a href="chapter-06.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

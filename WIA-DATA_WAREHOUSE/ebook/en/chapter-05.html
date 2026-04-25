@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - ETL/ELT Implementation | WIA-DATA_WAREHOUSE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-cyan: #06B6D4;
+            --dark-cyan: #0891B2;
+            --light-cyan: #67E8F9;
+            --cyan-bg: #ECFEFF;
+            --text-dark: #0F172A;
+            --text-light: #64748B;
+            --border-color: #E2E8F0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: var(--text-dark);
+            background: linear-gradient(135deg, #ECFEFF 0%, #F0F9FF 100%);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--dark-cyan) 100%);
+            color: white;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .chapter-number {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .nav {
+            background: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav a {
+            color: var(--primary-cyan);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .nav a:hover {
+            background: var(--cyan-bg);
+            color: var(--dark-cyan);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .content-section {
+            background: white;
+            padding: 3rem;
+            margin-bottom: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: var(--primary-cyan);
+            font-size: 2rem;
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid var(--cyan-bg);
+        }
+
+        h3 {
+            color: var(--dark-cyan);
+            font-size: 1.5rem;
+            margin: 1.5rem 0 1rem 0;
+        }
+
+        p {
+            margin-bottom: 1.2rem;
+            line-height: 1.9;
+            color: var(--text-dark);
+        }
+
+        ul, ol {
+            margin: 1rem 0 1.5rem 2rem;
+            line-height: 1.9;
+        }
+
+        li {
+            margin-bottom: 0.8rem;
+            color: var(--text-dark);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--dark-cyan) 100%);
+            color: white;
+        }
+
+        th {
+            padding: 1.2rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+
+        td {
+            padding: 1.2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tbody tr:hover {
+            background: var(--cyan-bg);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--cyan-bg) 0%, white 100%);
+            padding: 2rem;
+            border-radius: 10px;
+            border-left: 5px solid var(--primary-cyan);
+            margin: 2rem 0;
+        }
+
+        .highlight-box h3 {
+            color: var(--dark-cyan);
+            margin-top: 0;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .key-takeaways {
+            background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--dark-cyan) 100%);
+            color: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            margin: 3rem 0;
+        }
+
+        .key-takeaways h3 {
+            color: white;
+            margin-top: 0;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .key-takeaways ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .key-takeaways li {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .key-takeaways li:before {
+            content: "✓ ";
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .review-questions {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            border: 2px solid var(--primary-cyan);
+            margin: 3rem 0;
+        }
+
+        .review-questions h3 {
+            color: var(--primary-cyan);
+            margin-top: 0;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .review-questions ol {
+            margin-left: 1.5rem;
+        }
+
+        .review-questions li {
+            margin-bottom: 1.2rem;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .footer {
+            background: var(--text-dark);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            margin-top: 3rem;
+        }
+
+        .footer p {
+            margin: 0.5rem 0;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .content-section {
+                padding: 1.5rem;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th, td {
+                padding: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="chapter-number">WIA-DATA_WAREHOUSE Standard - Chapter 5</div>
+        <h1>Phase 2: ETL/ELT Implementation</h1>
+    </header>
+
+    <div class="container">
+        <section class="content-section">
+            <h2>Introduction to Data Integration</h2>
+
+            <p>
+                Extract, Transform, Load (ETL) and Extract, Load, Transform (ELT) are the fundamental processes that
+                move data from source systems into data warehouses. These processes are the lifeblood of any data
+                warehouse, responsible for extracting data from disparate sources, transforming it to meet business
+                requirements, and loading it into dimensional models for analysis.
+            </p>
+
+            <p>
+                The choice between ETL and ELT represents a fundamental architectural decision with significant
+                implications for performance, cost, complexity, and maintainability. Understanding the strengths and
+                weaknesses of each approach enables architects to select the optimal strategy for their specific
+                requirements and constraints.
+            </p>
+
+            <h2>ETL vs. ELT: Understanding the Paradigm Shift</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>ETL (Traditional)</th>
+                        <th>ELT (Modern Cloud)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Transformation Location</strong></td>
+                        <td>External processing engine (Informatica, Talend)</td>
+                        <td>Within the data warehouse (SQL, dbt)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Flow</strong></td>
+                        <td>Extract → Transform → Load</td>
+                        <td>Extract → Load → Transform</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Processing Power</strong></td>
+                        <td>Limited by ETL server resources</td>
+                        <td>Leverages warehouse's MPP/distributed processing</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Raw Data</strong></td>
+                        <td>Not retained after transformation</td>
+                        <td>Preserved in staging/raw layer</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Flexibility</strong></td>
+                        <td>Re-transformation requires re-extraction</td>
+                        <td>Re-transformation uses persisted raw data</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Latency</strong></td>
+                        <td>Higher (transformation bottleneck)</td>
+                        <td>Lower (parallel transformation in warehouse)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cost Model</strong></td>
+                        <td>Expensive ETL tool licenses</td>
+                        <td>Pay for warehouse compute (elastic)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Best For</strong></td>
+                        <td>On-premises, complex transformations, limited warehouse capacity</td>
+                        <td>Cloud data warehouses, agile development, large-scale data</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>When to Choose ETL</h3>
+            <ul>
+                <li>Working with on-premises data warehouses with limited processing capacity</li>
+                <li>Highly complex transformations requiring specialized processing engines</li>
+                <li>Security/compliance requirements prevent raw data from entering the warehouse</li>
+                <li>Source systems have strict connection time windows</li>
+                <li>Existing investments in ETL tools and expertise</li>
+            </ul>
+
+            <h3>When to Choose ELT</h3>
+            <ul>
+                <li>Using cloud-native data warehouses (Snowflake, BigQuery, Redshift)</li>
+                <li>Need to preserve raw data for auditing and re-processing</li>
+                <li>Agile development requiring rapid iteration on transformations</li>
+                <li>Large data volumes requiring distributed processing</li>
+                <li>Preference for SQL-based transformations over proprietary tools</li>
+            </ul>
+
+            <h2>The Extraction Phase</h2>
+
+            <h3>Full Extraction</h3>
+            <p>
+                Full extraction reads the entire dataset from source systems. This approach is simple and ensures
+                completeness but can be resource-intensive and time-consuming for large datasets. Full extractions
+                are appropriate for small tables, dimension tables that don't change frequently, or initial loads.
+            </p>
+
+            <h3>Incremental Extraction</h3>
+            <p>
+                Incremental extraction identifies and extracts only changed or new records since the last extraction.
+                This dramatically reduces data volumes, extraction time, and resource consumption. Several strategies
+                enable incremental extraction:
+            </p>
+
+            <h4>1. Timestamp-Based Extraction</h4>
+            <p>
+                Source tables include updated_at or modified_at timestamps. The ETL process tracks the last successful
+                extraction timestamp and queries for records modified after that point.
+            </p>
+
+            <div class="code-block">
+-- Extract records modified since last successful load
+SELECT *
+FROM source_system.customers
+WHERE updated_at > '2025-01-07 23:00:00'
+  AND updated_at <= '2025-01-08 23:00:00'
+ORDER BY updated_at;
+
+-- Store high water mark for next extraction
+UPDATE etl_metadata
+SET last_extraction_timestamp = '2025-01-08 23:00:00'
+WHERE source_table = 'customers';
+            </div>
+
+            <h4>2. Change Data Capture (CDC)</h4>
+            <p>
+                CDC technologies capture database changes (inserts, updates, deletes) from transaction logs in real-time
+                or near-real-time. CDC provides comprehensive change tracking without impacting source system performance.
+                Popular CDC tools include Debezium, Oracle GoldenGate, AWS DMS, and Qlik Replicate.
+            </p>
+
+            <h4>3. Trigger-Based Extraction</h4>
+            <p>
+                Database triggers log changes to shadow tables that the ETL process reads. While effective, triggers
+                add overhead to source transactions and require careful management.
+            </p>
+
+            <h2>The Transformation Phase</h2>
+
+            <p>
+                Transformation is where raw source data becomes warehouse-ready dimensional data. Transformations
+                implement business logic, cleanse data quality issues, and structure data according to dimensional
+                models.
+            </p>
+
+            <h3>Common Transformation Types</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Transformation</th>
+                        <th>Purpose</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Cleansing</strong></td>
+                        <td>Fix data quality issues</td>
+                        <td>Standardize phone formats, correct misspellings, handle nulls</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Standardization</strong></td>
+                        <td>Ensure consistent formats</td>
+                        <td>Convert all dates to YYYY-MM-DD, uppercase state codes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Deduplication</strong></td>
+                        <td>Remove duplicate records</td>
+                        <td>Identify and merge duplicate customer records</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Derivation</strong></td>
+                        <td>Calculate new values</td>
+                        <td>profit = revenue - cost, age from birth_date</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Aggregation</strong></td>
+                        <td>Summarize detail data</td>
+                        <td>Daily totals from transaction records</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Splitting</strong></td>
+                        <td>Parse complex fields</td>
+                        <td>Split full_name into first_name, last_name</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Joining</strong></td>
+                        <td>Combine related data</td>
+                        <td>Enrich transactions with customer and product attributes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Filtering</strong></td>
+                        <td>Remove irrelevant data</td>
+                        <td>Exclude test accounts, deleted records, invalid dates</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Lookup</strong></td>
+                        <td>Replace codes with descriptions</td>
+                        <td>Convert product_code to product_name</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Slowly Changing Dimension (SCD) Processing</h3>
+
+            <p>
+                Implementing SCD Type 2 is one of the most common and important transformations in data warehousing.
+                This strategy maintains full historical context by creating new dimension records when attributes change.
+            </p>
+
+            <div class="code-block">
+-- SCD Type 2 Implementation for Customer Dimension
+-- Step 1: Identify new and changed records
+WITH source_data AS (
+    SELECT
+        customer_id,
+        customer_name,
+        email,
+        segment,
+        city,
+        state,
+        country
+    FROM staging.customers
+),
+existing_current AS (
+    SELECT *
+    FROM dim_customer
+    WHERE is_current = TRUE
+),
+changes AS (
+    SELECT
+        s.*,
+        e.customer_key as existing_key,
+        CASE
+            WHEN e.customer_key IS NULL THEN 'INSERT'  -- New customer
+            WHEN s.customer_name != e.customer_name
+              OR s.email != e.email
+              OR s.segment != e.segment
+              OR s.city != e.city
+              OR s.state != e.state
+              OR s.country != e.country THEN 'UPDATE'  -- Changed attributes
+            ELSE 'NOCHANGE'
+        END as change_type
+    FROM source_data s
+    LEFT JOIN existing_current e
+        ON s.customer_id = e.customer_id
+)
+
+-- Step 2: Expire old records for updated customers
+UPDATE dim_customer
+SET
+    is_current = FALSE,
+    expiration_date = CURRENT_TIMESTAMP,
+    updated_at = CURRENT_TIMESTAMP
+WHERE customer_key IN (
+    SELECT existing_key
+    FROM changes
+    WHERE change_type = 'UPDATE'
+)
+AND is_current = TRUE;
+
+-- Step 3: Insert new records (both new customers and updated versions)
+INSERT INTO dim_customer (
+    customer_id, customer_name, email, segment,
+    city, state, country,
+    effective_date, is_current
+)
+SELECT
+    customer_id, customer_name, email, segment,
+    city, state, country,
+    CURRENT_TIMESTAMP as effective_date,
+    TRUE as is_current
+FROM changes
+WHERE change_type IN ('INSERT', 'UPDATE');
+            </div>
+
+            <h2>The Loading Phase</h2>
+
+            <h3>Load Strategies</h3>
+
+            <h4>1. Full Refresh</h4>
+            <p>
+                Truncate the target table and load all data. Simple and ensures complete accuracy but requires
+                reprocessing all data. Suitable for small dimension tables or when source data is completely replaced.
+            </p>
+
+            <h4>2. Incremental Append</h4>
+            <p>
+                Add new records to existing data without modifying existing rows. Used for fact tables where each
+                row represents an immutable event (transactions, clicks, sensor readings).
+            </p>
+
+            <h4>3. Incremental Upsert (Merge)</h4>
+            <p>
+                Update existing records and insert new ones. Common for dimension tables and fact tables that require
+                updates (order status changes, invoice adjustments).
+            </p>
+
+            <div class="code-block">
+-- Modern SQL MERGE statement for upsert operations
+MERGE INTO dim_product AS target
+USING staging.products AS source
+ON target.product_id = source.product_id
+    AND target.is_current = TRUE
+
+-- Update existing records that have changed
+WHEN MATCHED AND (
+    target.product_name != source.product_name
+    OR target.category != source.category
+    OR target.list_price != source.list_price
+) THEN
+    UPDATE SET
+        is_current = FALSE,
+        expiration_date = CURRENT_TIMESTAMP
+
+-- Insert new records
+WHEN NOT MATCHED THEN
+    INSERT (product_id, product_name, category, list_price, effective_date, is_current)
+    VALUES (source.product_id, source.product_name, source.category,
+            source.list_price, CURRENT_TIMESTAMP, TRUE);
+            </div>
+
+            <h2>Error Handling and Data Quality</h2>
+
+            <p>
+                Robust ETL processes must gracefully handle errors and data quality issues. Poor error handling leads
+                to incomplete loads, data inconsistencies, and loss of trust in the warehouse.
+            </p>
+
+            <h3>Error Handling Strategies</h3>
+
+            <ul>
+                <li><strong>Reject and Continue:</strong> Log invalid records to an error table and continue processing valid records</li>
+                <li><strong>Abort on Error:</strong> Stop processing when errors exceed a threshold, preventing bad data from entering the warehouse</li>
+                <li><strong>Default Values:</strong> Apply business rules to substitute missing or invalid values with defaults</li>
+                <li><strong>Quarantine:</strong> Route suspicious records to a quarantine area for manual review and correction</li>
+            </ul>
+
+            <div class="highlight-box">
+                <h3>ETL Monitoring and Logging</h3>
+                <p>
+                    Every ETL job should log comprehensive metadata:
+                </p>
+                <ul>
+                    <li>Job execution start/end times and duration</li>
+                    <li>Records extracted, transformed, loaded, rejected</li>
+                    <li>Data quality metrics (completeness, accuracy, consistency)</li>
+                    <li>Error messages and stack traces</li>
+                    <li>Source system and warehouse snapshots (for auditing)</li>
+                    <li>Resource consumption (CPU, memory, I/O)</li>
+                </ul>
+                <p>
+                    This metadata enables troubleshooting, performance optimization, and compliance reporting.
+                </p>
+            </div>
+
+            <h2>Modern ELT with dbt (data build tool)</h2>
+
+            <p>
+                dbt has emerged as the leading tool for ELT transformations in modern cloud data warehouses. dbt enables
+                analytics engineers to transform data using SQL SELECT statements, applying software engineering best
+                practices like version control, testing, and documentation to analytics code.
+            </p>
+
+            <div class="code-block">
+-- dbt model: models/marts/fct_daily_sales.sql
+-- Transforms raw order data into daily sales facts
+
+{{ config(
+    materialized='incremental',
+    unique_key='sales_date_key'
+) }}
+
+WITH orders AS (
+    SELECT *
+    FROM {{ ref('stg_orders') }}
+    {% if is_incremental() %}
+    WHERE order_date >= (SELECT MAX(sales_date) FROM {{ this }})
+    {% endif %}
+),
+
+daily_aggregation AS (
+    SELECT
+        TO_CHAR(order_date, 'YYYYMMDD')::INTEGER AS sales_date_key,
+        COUNT(DISTINCT order_id) AS order_count,
+        COUNT(DISTINCT customer_id) AS customer_count,
+        SUM(order_amount) AS total_sales,
+        SUM(cost_amount) AS total_cost,
+        SUM(order_amount - cost_amount) AS total_profit,
+        AVG(order_amount) AS avg_order_value
+    FROM orders
+    GROUP BY order_date
+)
+
+SELECT * FROM daily_aggregation
+            </div>
+
+            <div class="key-takeaways">
+                <h3>Key Takeaways</h3>
+                <ul>
+                    <li>ETL (Extract-Transform-Load) transforms data before loading, using external processing engines. ELT (Extract-Load-Transform) loads raw data first and transforms within the warehouse, leveraging distributed processing power of modern cloud data warehouses.</li>
+                    <li>Incremental extraction strategies (timestamp-based, CDC, triggers) dramatically reduce data volumes and processing time compared to full extractions, enabling near-real-time data warehouses and minimizing source system impact.</li>
+                    <li>Transformation types include cleansing (fixing quality issues), standardization (consistent formats), derivation (calculated fields), aggregation (summarization), and SCD processing (historical tracking), each serving specific business and technical requirements.</li>
+                    <li>Load strategies vary by use case: full refresh for small dimensions, incremental append for immutable facts, and upsert/merge for dimensions and updatable facts. Modern SQL MERGE statements simplify complex upsert logic.</li>
+                    <li>Robust error handling, comprehensive logging, and data quality monitoring are essential for production ETL systems. Errors should be logged, invalid records quarantined, and metadata tracked for troubleshooting and compliance.</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h3>Review Questions</h3>
+                <ol>
+                    <li>Compare ETL and ELT architectures. In what scenarios would you choose ETL over ELT, and vice versa? How does the cloud vs. on-premises decision impact this choice?</li>
+                    <li>Explain the three main incremental extraction strategies (timestamp-based, CDC, triggers). What are the advantages and limitations of each approach?</li>
+                    <li>Describe the step-by-step process for implementing SCD Type 2 updates. Why is it important to expire old records before inserting new ones?</li>
+                    <li>What is the difference between full refresh, incremental append, and upsert load strategies? Provide examples of when you would use each approach.</li>
+                    <li>How should ETL processes handle data quality errors? Compare "reject and continue" vs. "abort on error" strategies and discuss when each is appropriate.</li>
+                    <li>What metadata should ETL jobs log for monitoring and troubleshooting? How does this metadata support data governance and compliance requirements?</li>
+                </ol>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Host-Based IDS - WIA Intrusion Detection Standard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e0e0e0; line-height: 1.8; min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+        .nav-header { background: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; margin-bottom: 30px; border-left: 5px solid #EF4444; }
+        .nav-header a { color: #EF4444; text-decoration: none; font-weight: bold; margin-right: 20px; }
+        h1 { font-size: 3em; color: #EF4444; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #EF4444; }
+        h2 { font-size: 2em; color: #EF4444; margin-top: 40px; margin-bottom: 20px; }
+        h3 { font-size: 1.5em; color: #f87171; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 15px; font-size: 1.1em; color: #d0d0d0; }
+        .highlight-box { background: rgba(239, 68, 68, 0.1); border-left: 5px solid #EF4444; padding: 25px; margin: 30px 0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th { background: #EF4444; color: white; padding: 15px; text-align: left; font-weight: bold; }
+        td { padding: 12px 15px; border-bottom: 1px solid #334155; }
+        tr:hover { background: rgba(239, 68, 68, 0.1); }
+        pre { background: #1e293b; border: 2px solid #EF4444; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 25px 0; font-size: 0.9em; }
+        code { color: #f87171; font-family: 'Courier New', monospace; }
+        .code-title { background: #EF4444; color: white; padding: 8px 15px; border-radius: 5px 5px 0 0; font-weight: bold; margin-bottom: -10px; display: inline-block; }
+        ul, ol { margin: 20px 0; padding-left: 30px; }
+        li { margin-bottom: 10px; color: #d0d0d0; }
+        .nav-footer { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 2px solid #334155; }
+        .nav-footer a { background: #EF4444; color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: all 0.3s ease; }
+        .nav-footer a:hover { background: #dc2626; transform: translateY(-2px); }
+        .review-questions { background: rgba(239, 68, 68, 0.05); border: 2px solid #EF4444; border-radius: 10px; padding: 30px; margin: 40px 0; }
+        .review-questions h3 { color: #EF4444; margin-top: 0; }
+        .review-questions ol { margin-top: 20px; }
+        .review-questions li { margin-bottom: 15px; font-weight: 500; }
+        footer { text-align: center; padding: 40px 20px; margin-top: 60px; border-top: 2px solid #334155; color: #888; }
+        .hongik { font-size: 1.5em; color: #EF4444; margin-bottom: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-header">
+            <a href="index.html">← Table of Contents</a>
+            <span style="color: #888;">Chapter 4 of 8</span>
+        </div>
+
+        <h1>Chapter 4: Host-Based IDS</h1>
+
+        <div class="highlight-box">
+            <h3>Chapter Overview</h3>
+            <p>This chapter examines Host-Based Intrusion Detection Systems (HIDS), which monitor individual systems for malicious activity. We'll explore file integrity monitoring, log analysis, process monitoring, rootkit detection, registry monitoring, and integration with endpoint security platforms.</p>
+        </div>
+
+        <h2>4.1 HIDS vs NIDS: Complementary Approaches</h2>
+
+        <p>While NIDS monitors network traffic, HIDS provides visibility into system-level activities that network monitoring cannot detect:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>NIDS</th>
+                    <th>HIDS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Deployment</strong></td>
+                    <td>Network chokepoints (perimeter, segments)</td>
+                    <td>Individual hosts (servers, workstations)</td>
+                </tr>
+                <tr>
+                    <td><strong>Visibility</strong></td>
+                    <td>Network traffic, connections, protocols</td>
+                    <td>File changes, processes, logs, registry</td>
+                </tr>
+                <tr>
+                    <td><strong>Encrypted Traffic</strong></td>
+                    <td>Cannot inspect encrypted payloads</td>
+                    <td>Sees traffic before encryption/after decryption</td>
+                </tr>
+                <tr>
+                    <td><strong>Local Attacks</strong></td>
+                    <td>Cannot detect (no network traffic)</td>
+                    <td>Detects local privilege escalation, malware</td>
+                </tr>
+                <tr>
+                    <td><strong>Resource Impact</strong></td>
+                    <td>Centralized, minimal per-host overhead</td>
+                    <td>Agent on each host consumes CPU/memory</td>
+                </tr>
+                <tr>
+                    <td><strong>Insider Threats</strong></td>
+                    <td>Limited detection of authorized activities</td>
+                    <td>Monitors all user actions, data access</td>
+                </tr>
+                <tr>
+                    <td><strong>Compliance</strong></td>
+                    <td>Network-level logging requirements</td>
+                    <td>System-level audit trails (PCI DSS, HIPAA)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.2 File Integrity Monitoring (FIM)</h2>
+
+        <p>FIM detects unauthorized changes to critical system files, configuration files, and application binaries by comparing current file states against known-good baselines:</p>
+
+        <h3>FIM Workflow</h3>
+
+        <ol>
+            <li><strong>Baseline Creation:</strong> Calculate cryptographic hashes (SHA-256) of all monitored files during known-clean state</li>
+            <li><strong>Periodic Scanning:</strong> Recalculate hashes at regular intervals (hourly, daily) or in real-time using filesystem hooks</li>
+            <li><strong>Change Detection:</strong> Compare current hashes against baseline; flag any discrepancies</li>
+            <li><strong>Alert Generation:</strong> Report file changes with details: filename, timestamp, old/new hash, user responsible</li>
+            <li><strong>Baseline Updates:</strong> After authorized changes, update baseline to reflect legitimate modifications</li>
+        </ol>
+
+        <h3>Critical Files to Monitor</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>File Categories</th>
+                    <th>Examples</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Linux</strong></td>
+                    <td>System binaries, configs, cron jobs, SSH keys</td>
+                    <td>/bin/, /sbin/, /etc/, /root/.ssh/, /var/spool/cron/</td>
+                </tr>
+                <tr>
+                    <td><strong>Windows</strong></td>
+                    <td>System32, drivers, registry hives, startup items</td>
+                    <td>C:\Windows\System32\, C:\Windows\SysWOW64\, Registry</td>
+                </tr>
+                <tr>
+                    <td><strong>Web Server</strong></td>
+                    <td>Web root, CGI scripts, server configs</td>
+                    <td>/var/www/, /etc/apache2/, IIS configuration</td>
+                </tr>
+                <tr>
+                    <td><strong>Database</strong></td>
+                    <td>Data files, configs, stored procedures</td>
+                    <td>MySQL data/, PostgreSQL conf/, MSSQL databases</td>
+                </tr>
+                <tr>
+                    <td><strong>Application</strong></td>
+                    <td>Binaries, libraries, config files</td>
+                    <td>/opt/app/, C:\Program Files\, .jar/.dll files</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-title">Example: AIDE (Advanced Intrusion Detection Environment) Configuration</div>
+<pre><code># /etc/aide/aide.conf
+
+# Define what to check for different file types
+Binaries = p+i+n+u+g+s+b+m+c+md5+sha256
+Logs = p+i+n+u+g+S
+Configs = p+i+n+u+g+s+m+c+md5+sha256
+
+# Monitor system binaries
+/bin Binaries
+/sbin Binaries
+/usr/bin Binaries
+/usr/sbin Binaries
+
+# Monitor configurations
+/etc Configs
+
+# Monitor SSH
+/root/.ssh Configs
+
+# Exclude volatile directories
+!/var/log
+!/tmp
+!/var/tmp
+
+# Initialize database
+# aide --init
+
+# Check for changes
+# aide --check
+
+# Output example:
+# Changed: /etc/passwd
+#   Mtime    : 2025-01-15 14:23:11  , 2025-01-15 16:45:22
+#   SHA256   : f3d8a21c...         , a9b2e14f...
+</code></pre>
+
+        <h3>Real-Time vs Scheduled FIM</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Approach</th>
+                    <th>Mechanism</th>
+                    <th>Pros</th>
+                    <th>Cons</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Real-Time</strong></td>
+                    <td>Filesystem hooks (inotify, FSEvents, NTFS USN)</td>
+                    <td>Immediate detection, no scan window</td>
+                    <td>Higher CPU usage, kernel module required</td>
+                </tr>
+                <tr>
+                    <td><strong>Scheduled</strong></td>
+                    <td>Periodic hash calculation (cron/Task Scheduler)</td>
+                    <td>Lower resource usage, simpler deployment</td>
+                    <td>Detection delay (hours), scan performance impact</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.3 Log Analysis and Correlation</h2>
+
+        <p>HIDS monitors system and application logs for security-relevant events, applying rules to detect attack patterns:</p>
+
+        <h3>Log Sources Monitored</h3>
+
+        <div class="code-title">Critical Log Files by Platform</div>
+<pre><code># Linux/Unix
+/var/log/auth.log          # Authentication events (SSH, sudo, login)
+/var/log/syslog            # System messages, daemon logs
+/var/log/secure            # Security/authentication (RHEL/CentOS)
+/var/log/audit/audit.log   # SELinux/AppArmor audit trail
+/var/log/apache2/access    # Web server access logs
+/var/log/mysql/error.log   # Database errors
+
+# Windows
+Security Event Log          # Event ID 4624 (login), 4625 (failed login)
+System Event Log            # Service start/stop, driver loading
+Application Event Log       # Application-specific events
+PowerShell Operational Log  # PowerShell command execution
+Sysmon Event Log           # Detailed process/network/file events
+
+# Network Devices
+/var/log/messages          # Cisco, Juniper syslog
+SNMP Traps                 # Device health, security alerts
+</code></pre>
+
+        <h3>Log Analysis Rules</h3>
+
+        <div class="code-title">Example: OSSEC Log Analysis Rules</div>
+<pre><code><!-- Detect SSH brute force attack -->
+<rule id="100001" level="10">
+  <if_matched_sid>5716</if_matched_sid>
+  <same_source_ip />
+  <description>Multiple SSH authentication failures.</description>
+  <frequency>5</frequency>
+  <timeframe>120</timeframe>
+  <alert_by_email>yes</alert_by_email>
+</rule>
+
+<!-- Detect privilege escalation via sudo -->
+<rule id="100002" level="8">
+  <decoded_as>sudo</decoded_as>
+  <match>session opened for user root</match>
+  <user>^(?!admin)</user>  <!-- Not admin user -->
+  <description>Non-admin user gained root privileges</description>
+</rule>
+
+<!-- Detect web shell upload -->
+<rule id="100003" level="12">
+  <if_sid>31108</if_sid>  <!-- Apache POST -->
+  <url>.php|.jsp|.asp</url>
+  <match>POST /uploads/</match>
+  <description>Potential web shell upload attempt</description>
+</rule>
+
+<!-- Windows: Detect Mimikatz execution -->
+<rule id="100004" level="15">
+  <if_sid>61603</if_sid>  <!-- Process execution -->
+  <field name="Image">\\mimikatz.exe</field>
+  <description>Mimikatz credential dumping tool detected</description>
+</rule>
+</code></pre>
+
+        <h3>Correlation Across Multiple Logs</h3>
+
+        <div class="code-title">Multi-Log Correlation Example</div>
+<pre><code># Detect Lateral Movement Attack
+
+Event 1: auth.log - SSH login from 10.1.50.25 to server-db-01
+Event 2: syslog - New process: /tmp/.hidden/scanner
+Event 3: auth.log - Password change for user "backup"
+Event 4: network.log - Large data transfer to external IP 185.x.x.x
+
+HIDS Correlation:
+Time Window: 15 minutes
+Same Source: 10.1.50.25
+Alert: "Lateral movement with privilege escalation and exfiltration"
+Severity: Critical
+Response: Isolate host, alert SOC, capture memory dump
+</code></pre>
+
+        <h2>4.4 Process and Behavior Monitoring</h2>
+
+        <p>HIDS monitors running processes for suspicious behavior patterns:</p>
+
+        <h3>Process Attributes Monitored</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Attribute</th>
+                    <th>Normal Behavior</th>
+                    <th>Suspicious Indicators</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Process Name</strong></td>
+                    <td>Known system/application processes</td>
+                    <td>Misspelled names (svch0st.exe vs svchost.exe)</td>
+                </tr>
+                <tr>
+                    <td><strong>Path</strong></td>
+                    <td>Standard locations (C:\Windows\System32\)</td>
+                    <td>Unexpected paths (C:\Temp\, user Downloads/)</td>
+                </tr>
+                <tr>
+                    <td><strong>Parent-Child</strong></td>
+                    <td>Expected relationships (explorer.exe → notepad.exe)</td>
+                    <td>Unusual spawning (cmd.exe → powershell.exe → WMI)</td>
+                </tr>
+                <tr>
+                    <td><strong>Command Line</strong></td>
+                    <td>Typical arguments for each process</td>
+                    <td>Encoded commands, obfuscation, suspicious flags</td>
+                </tr>
+                <tr>
+                    <td><strong>Network Activity</strong></td>
+                    <td>Expected connections (browser → Internet)</td>
+                    <td>Unexpected (calc.exe opening network connections)</td>
+                </tr>
+                <tr>
+                    <td><strong>Unsigned Code</strong></td>
+                    <td>Digitally signed binaries</td>
+                    <td>Unsigned or self-signed executables</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-title">Example: Sysmon Process Monitoring (Windows)</div>
+<pre><code><!-- Sysmon Event ID 1: Process Creation -->
+<Event>
+  <EventData>
+    <Image>C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Image>
+    <CommandLine>
+      powershell.exe -NoP -NonI -W Hidden -Enc JABzAD0ATgBlAHcALQBPAGIAagBlAGMAdAA...
+    </CommandLine>
+    <ParentImage>C:\Windows\System32\cmd.exe</ParentImage>
+    <ParentCommandLine>cmd.exe /c powershell...</ParentCommandLine>
+  </EventData>
+</Event>
+
+HIDS Alert Triggers:
+✗ PowerShell with -Encoded flag (Base64 obfuscation)
+✗ Hidden window (-W Hidden)
+✗ Non-interactive (-NonI)
+✗ Parent process is cmd.exe (not typical user launch)
+
+Classification: Code execution via encoded PowerShell (T1059.001 - MITRE ATT&CK)
+Action: Terminate process, quarantine host, alert SOC
+</code></pre>
+
+        <h3>Behavioral Baselines</h3>
+
+        <p>HIDS establishes baselines for normal system behavior to detect anomalies:</p>
+
+        <ul>
+            <li><strong>Process Execution Patterns:</strong> Which processes typically run, when, and by whom</li>
+            <li><strong>Resource Consumption:</strong> Normal CPU, memory, disk, network usage per process</li>
+            <li><strong>File Access Patterns:</strong> Which users/processes access which files</li>
+            <li><strong>Network Connections:</strong> Expected outbound destinations and ports</li>
+            <li><strong>User Behavior:</strong> Login times, accessed resources, typical activities</li>
+        </ul>
+
+        <h2>4.5 Rootkit Detection</h2>
+
+        <p>Rootkits hide malicious activity by manipulating system calls, kernel modules, or filesystem views. HIDS detects rootkits through cross-view analysis:</p>
+
+        <h3>Detection Techniques</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Technique</th>
+                    <th>Method</th>
+                    <th>What It Detects</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Signature Scanning</strong></td>
+                    <td>Compare binaries against known rootkit signatures</td>
+                    <td>Known rootkit families (Alureon, Rustock)</td>
+                </tr>
+                <tr>
+                    <td><strong>Integrity Checking</strong></td>
+                    <td>Verify system binaries match known-good hashes</td>
+                    <td>Modified system files (trojanized ls, ps, netstat)</td>
+                </tr>
+                <tr>
+                    <td><strong>Cross-View Analysis</strong></td>
+                    <td>Compare kernel-level vs user-space file listings</td>
+                    <td>Hidden files/processes visible to kernel but not users</td>
+                </tr>
+                <tr>
+                    <td><strong>Memory Analysis</strong></td>
+                    <td>Scan memory for hidden processes/modules</td>
+                    <td>Direct Kernel Object Manipulation (DKOM) rootkits</td>
+                </tr>
+                <tr>
+                    <td><strong>System Call Hooking</strong></td>
+                    <td>Detect modifications to syscall table</td>
+                    <td>Kernel-level API hooks used by rootkits</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-title">Example: chkrootkit Detection</div>
+<pre><code>#!/bin/bash
+# chkrootkit - Check for rootkit signatures
+
+# Check if common binaries are trojanized
+for binary in ls ps netstat ifconfig who; do
+    if [ -f /bin/$binary ]; then
+        strings /bin/$binary | grep -q "INFECTED_SIGNATURE"
+        if [ $? -eq 0 ]; then
+            echo "WARNING: $binary appears to be trojanized!"
+        fi
+    fi
+done
+
+# Check for hidden processes (cross-view)
+# Compare /proc listing with ps output
+proc_count=$(ls -1 /proc | grep -c "^[0-9]")
+ps_count=$(ps aux | wc -l)
+
+if [ $proc_count -gt $((ps_count + 10)) ]; then
+    echo "WARNING: Hidden processes detected (proc: $proc_count, ps: $ps_count)"
+fi
+
+# Check for kernel module rootkits
+lsmod | grep -E "hide|rootkit|backdoor" && echo "WARNING: Suspicious kernel module"
+
+# Verify system binaries integrity
+md5sum /bin/ls | grep -q "a1b2c3d4e5f6..."  # Known-good hash
+[ $? -ne 0 ] && echo "WARNING: /bin/ls has been modified"
+</code></pre>
+
+        <h2>4.6 Windows Registry Monitoring</h2>
+
+        <p>Windows registry contains critical security settings. HIDS monitors registry for malicious modifications:</p>
+
+        <h3>High-Value Registry Keys</h3>
+
+        <div class="code-title">Critical Registry Locations</div>
+<pre><code># Auto-Start Locations (Persistence)
+HKLM\Software\Microsoft\Windows\CurrentVersion\Run
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run
+
+# Service Installations
+HKLM\System\CurrentControlSet\Services
+
+# Browser Helper Objects (BHO)
+HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects
+
+# Firewall Rules
+HKLM\System\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy
+
+# Security Settings
+HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System
+HKLM\System\CurrentControlSet\Control\Lsa
+
+# Malware Detection Examples:
+# 1. New Run key: HKLM\...\Run\WindowsUpdate = "C:\Temp\update.exe"
+# 2. Service creation: HKLM\...\Services\WindowsHelper
+# 3. UAC bypass: DisableUAC = 1
+# 4. Password policy weakening: PasswordComplexity = 0
+</code></pre>
+
+        <h3>Registry Monitoring with OSSEC</h3>
+
+        <div class="code-title">ossec.conf - Registry Monitoring</div>
+<pre><code><syscheck>
+  <frequency>3600</frequency>  <!-- Check every hour -->
+
+  <!-- Windows Registry monitoring -->
+  <windows_registry>HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run</windows_registry>
+  <windows_registry>HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce</windows_registry>
+  <windows_registry>HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services</windows_registry>
+  <windows_registry>HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Lsa</windows_registry>
+
+  <!-- Alert on registry changes -->
+  <registry_ignore type="sregex">\Enum$</registry_ignore>  <!-- Ignore hardware enum keys -->
+
+  <alert_new_files>yes</alert_new_files>
+</syscheck>
+
+<!-- Alert Rule -->
+<rule id="550" level="7">
+  <category>ossec</category>
+  <decoded_as>syscheck_registry</decoded_as>
+  <match>HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run</match>
+  <description>Registry value modified in Run key (possible persistence)</description>
+</rule>
+</code></pre>
+
+        <h2>4.7 Popular HIDS Solutions</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Solution</th>
+                    <th>Type</th>
+                    <th>Key Features</th>
+                    <th>Best For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>OSSEC</strong></td>
+                    <td>Open Source</td>
+                    <td>FIM, log analysis, rootkit detection, agent-server architecture</td>
+                    <td>Multi-platform environments, compliance</td>
+                </tr>
+                <tr>
+                    <td><strong>Wazuh</strong></td>
+                    <td>Open Source</td>
+                    <td>OSSEC fork + SIEM, compliance (PCI DSS, GDPR), cloud monitoring</td>
+                    <td>Modern deployments, cloud-native</td>
+                </tr>
+                <tr>
+                    <td><strong>Tripwire</strong></td>
+                    <td>Commercial</td>
+                    <td>FIM, change management, compliance reporting</td>
+                    <td>Enterprise compliance (SOX, HIPAA)</td>
+                </tr>
+                <tr>
+                    <td><strong>AIDE</strong></td>
+                    <td>Open Source</td>
+                    <td>File and directory integrity checking, Linux/Unix focus</td>
+                    <td>Linux servers, lightweight deployments</td>
+                </tr>
+                <tr>
+                    <td><strong>Samhain</strong></td>
+                    <td>Open Source</td>
+                    <td>FIM, log monitoring, kernel integrity, stealth mode</td>
+                    <td>High-security environments</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.8 Deployment Architecture</h2>
+
+        <div class="code-title">Centralized HIDS Architecture</div>
+<pre><code>                [HIDS Management Server]
+                    |  (Receives alerts, manages agents)
+                    |
+      +-------------+-----------------+
+      |             |                 |
+   [Agent]       [Agent]           [Agent]
+  Web Server   DB Server      Workstation
+      |             |                 |
+   - FIM         - FIM             - FIM
+   - Logs        - Logs            - Logs
+   - Process     - Process         - Process
+   - Registry    - Registry        - Registry
+
+Communication:
+- Agents report to central server via TLS (port 1514)
+- Server aggregates alerts, applies correlation rules
+- Centralized signature/rule updates pushed to agents
+- Syslog export to SIEM for broader correlation
+
+Scalability:
+- Single server: 1,000-5,000 agents
+- Clustered: 10,000+ agents
+- Agent resource usage: 50-200MB RAM, <5% CPU
+</code></pre>
+
+        <h3>Agent Deployment Best Practices</h3>
+
+        <ul>
+            <li><strong>Prioritize Critical Systems:</strong> Deploy first on domain controllers, database servers, web servers</li>
+            <li><strong>Baseline in Production:</strong> Establish baseline during normal operations before alerting</li>
+            <li><strong>Tune for Environment:</strong> Disable checks not applicable (Windows rules on Linux)</li>
+            <li><strong>Centralize Log Collection:</strong> Prevent local log tampering by attackers</li>
+            <li><strong>Monitor Agent Health:</strong> Alert on agent disconnections or failures</li>
+            <li><strong>Secure Agent Communication:</strong> Use TLS and agent authentication</li>
+        </ul>
+
+        <h2>4.9 Integration with Endpoint Security</h2>
+
+        <p>Modern HIDS integrates with EDR (Endpoint Detection and Response) and XDR platforms:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Integration</th>
+                    <th>Benefit</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>EDR Platforms</strong></td>
+                    <td>Enhanced behavioral analysis and automated response</td>
+                    <td>CrowdStrike, Carbon Black, SentinelOne</td>
+                </tr>
+                <tr>
+                    <td><strong>SIEM</strong></td>
+                    <td>Correlation with network events and threat intel</td>
+                    <td>Splunk, Elastic, QRadar</td>
+                </tr>
+                <tr>
+                    <td><strong>SOAR</strong></td>
+                    <td>Automated incident response playbooks</td>
+                    <td>Phantom, Demisto, Swimlane</td>
+                </tr>
+                <tr>
+                    <td><strong>Threat Intelligence</strong></td>
+                    <td>Enrich alerts with IoC matching</td>
+                    <td>MISP, OTX, VirusTotal</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.10 Chapter Summary</h2>
+
+        <ul>
+            <li>HIDS provides system-level visibility that complements network-based detection</li>
+            <li>File Integrity Monitoring (FIM) detects unauthorized changes to critical files using cryptographic hashing</li>
+            <li>Log analysis monitors authentication, privilege escalation, and application security events</li>
+            <li>Process monitoring detects suspicious execution patterns and behavioral anomalies</li>
+            <li>Rootkit detection uses cross-view analysis and memory forensics to find hidden threats</li>
+            <li>Windows registry monitoring detects persistence mechanisms and policy changes</li>
+            <li>Popular platforms include OSSEC, Wazuh, Tripwire, and AIDE</li>
+            <li>Centralized architecture enables management of thousands of agents from single console</li>
+            <li>Integration with EDR, SIEM, and SOAR enhances detection and response capabilities</li>
+        </ul>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain why HIDS can detect insider threats and local attacks that NIDS cannot.</li>
+                <li>Describe the File Integrity Monitoring (FIM) workflow and why cryptographic hashing is essential.</li>
+                <li>What is the difference between real-time and scheduled FIM? When would you choose each approach?</li>
+                <li>How does cross-view analysis detect rootkits? Provide a specific example.</li>
+                <li>List five Windows Registry keys that malware commonly modifies for persistence, and explain why.</li>
+                <li>Design a log correlation rule to detect a Pass-the-Hash attack involving multiple failed login attempts followed by successful login from same source IP.</li>
+                <li>Why is parent-child process relationship monitoring effective for detecting code injection attacks?</li>
+                <li>Calculate: If a HIDS agent consumes 100MB RAM and 3% CPU, how many agents can run on a system with 16GB RAM and 8 cores (assuming 50% reserved for OS/apps)?</li>
+                <li>Compare OSSEC and Wazuh in terms of features, deployment complexity, and ideal use cases.</li>
+                <li>Design a HIDS deployment for an organization with 500 servers (200 Linux, 300 Windows). What components would you deploy and where?</li>
+            </ol>
+        </div>
+
+        <div class="nav-footer">
+            <a href="chapter-03.html">← Chapter 3</a>
+            <a href="chapter-05.html">Next: Chapter 5 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

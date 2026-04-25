@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Authorization Policies - WIA-ACCESS_CONTROL</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-success {
+            border-left-color: var(--success);
+        }
+        .highlight-warning {
+            border-left-color: var(--warning);
+        }
+        .highlight-error {
+            border-left-color: var(--error);
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Authorization Policies</h1>
+
+    <p>Authorization determines what authenticated subjects are permitted to do. This chapter explores the policy languages, permission models, and role structures that form the core of the WIA-ACCESS_CONTROL authorization framework. Effective authorization policies balance security requirements with operational needs while remaining manageable at scale.</p>
+
+    <h2>The Authorization Decision Process</h2>
+
+    <p>When an authenticated subject requests access to a resource, the authorization system must determine whether to permit or deny the request. This decision process involves evaluating the request against applicable policies, combining multiple policy results, and returning a final decision with any associated obligations.</p>
+
+    <pre>
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Authorization Decision Flow                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌─────────────────┐                                               │
+│   │  Access Request │                                               │
+│   │  Subject: Alice │                                               │
+│   │  Action: read   │                                               │
+│   │  Resource: /doc │                                               │
+│   └────────┬────────┘                                               │
+│            │                                                         │
+│            ▼                                                         │
+│   ┌─────────────────┐      ┌─────────────────┐                     │
+│   │  Context        │      │  Attribute      │                     │
+│   │  Collection     │◄────▶│  Retrieval      │                     │
+│   │  (PIP)          │      │  (PIP)          │                     │
+│   └────────┬────────┘      └─────────────────┘                     │
+│            │                                                         │
+│            ▼                                                         │
+│   ┌─────────────────┐      ┌─────────────────┐                     │
+│   │  Policy         │      │  Policy         │                     │
+│   │  Retrieval      │◄────▶│  Store          │                     │
+│   │  (PRP)          │      │                 │                     │
+│   └────────┬────────┘      └─────────────────┘                     │
+│            │                                                         │
+│            ▼                                                         │
+│   ┌─────────────────┐                                               │
+│   │  Policy         │  Evaluate each applicable policy              │
+│   │  Evaluation     │  Apply combining algorithms                   │
+│   │  (PDP)          │  Generate obligations                         │
+│   └────────┬────────┘                                               │
+│            │                                                         │
+│            ▼                                                         │
+│   ┌─────────────────┐                                               │
+│   │  Decision:      │                                               │
+│   │  PERMIT/DENY    │                                               │
+│   │  + Obligations  │                                               │
+│   └─────────────────┘                                               │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>WIA Policy Language (WPL)</h2>
+
+    <p>The WIA-ACCESS_CONTROL standard defines a policy language called WPL (WIA Policy Language) that enables precise expression of authorization rules. WPL supports conditions, obligations, and advice while remaining human-readable.</p>
+
+    <h3>Policy Structure</h3>
+
+    <pre>
+// WIA Policy Language (WPL) Structure
+interface WPLPolicy {
+    id: string;
+    version: string;
+    name: string;
+    description: string;
+
+    // Target: When does this policy apply?
+    target: {
+        subjects?: SubjectMatch[];
+        resources?: ResourceMatch[];
+        actions?: ActionMatch[];
+        environments?: EnvironmentMatch[];
+    };
+
+    // Rules: What decisions does the policy contain?
+    rules: WPLRule[];
+
+    // Combining Algorithm: How are rule results combined?
+    ruleCombining: CombiningAlgorithm;
+
+    // Obligations: What must happen if policy permits/denies?
+    obligations?: Obligation[];
+
+    // Advice: What should happen (non-mandatory)?
+    advice?: Advice[];
+}
+
+interface WPLRule {
+    id: string;
+    effect: 'Permit' | 'Deny';
+    description?: string;
+    condition?: Expression;
+    obligations?: Obligation[];
+}
+
+type CombiningAlgorithm =
+    | 'deny-overrides'      // Any Deny wins
+    | 'permit-overrides'    // Any Permit wins
+    | 'first-applicable'    // First matching rule wins
+    | 'only-one-applicable' // Error if multiple apply
+    | 'deny-unless-permit'  // Default Deny
+    | 'permit-unless-deny'; // Default Permit
+    </pre>
+
+    <h3>Policy Examples</h3>
+
+    <pre>
+// Example: Document Access Policy
+const documentAccessPolicy: WPLPolicy = {
+    id: 'pol-doc-access-001',
+    version: '1.0.0',
+    name: 'Document Access Control',
+    description: 'Controls access to organizational documents',
+
+    target: {
+        resources: [{ type: 'document' }]
+    },
+
+    ruleCombining: 'deny-overrides',
+
+    rules: [
+        // Rule 1: Owners have full access
+        {
+            id: 'rule-owner-full',
+            effect: 'Permit',
+            description: 'Document owners have full access',
+            condition: {
+                equals: [
+                    { attribute: 'subject.id' },
+                    { attribute: 'resource.owner' }
+                ]
+            }
+        },
+
+        // Rule 2: Department members can read
+        {
+            id: 'rule-dept-read',
+            effect: 'Permit',
+            description: 'Same department can read',
+            condition: {
+                and: [
+                    {
+                        equals: [
+                            { attribute: 'subject.department' },
+                            { attribute: 'resource.department' }
+                        ]
+                    },
+                    {
+                        in: [
+                            { attribute: 'action' },
+                            { value: ['read', 'list'] }
+                        ]
+                    }
+                ]
+            }
+        },
+
+        // Rule 3: Classified documents require clearance
+        {
+            id: 'rule-classified',
+            effect: 'Deny',
+            description: 'Deny if insufficient clearance',
+            condition: {
+                and: [
+                    {
+                        greaterThan: [
+                            { attribute: 'resource.classificationLevel' },
+                            { attribute: 'subject.clearanceLevel' }
+                        ]
+                    }
+                ]
+            }
+        }
+    ],
+
+    obligations: [
+        {
+            id: 'obl-audit',
+            fulfillOn: 'Permit',
+            action: 'log',
+            parameters: {
+                level: 'info',
+                includeAttributes: ['subject.id', 'resource.id', 'action']
+            }
+        }
+    ]
+};
+    </pre>
+
+    <h2>Permission Models</h2>
+
+    <p>Permissions define what actions subjects can perform on resources. The WIA-ACCESS_CONTROL standard supports multiple permission models to accommodate different organizational needs.</p>
+
+    <h3>Explicit Permission Model</h3>
+
+    <p>In the explicit model, permissions are directly assigned to subjects or roles. This model is straightforward but can become unwieldy with many subjects and resources.</p>
+
+    <pre>
+// Explicit Permission Assignment
+interface ExplicitPermission {
+    subject: string;
+    resource: string;
+    actions: string[];
+    constraints?: Constraint[];
+    validFrom?: Date;
+    validUntil?: Date;
+}
+
+const explicitPermissions: ExplicitPermission[] = [
+    {
+        subject: 'user:alice',
+        resource: 'document:budget-2025',
+        actions: ['read', 'write', 'delete'],
+        constraints: [
+            { type: 'time', startHour: 9, endHour: 17 }
+        ]
+    },
+    {
+        subject: 'role:finance-manager',
+        resource: 'database:financial-records',
+        actions: ['read', 'write'],
+        validFrom: new Date('2025-01-01'),
+        validUntil: new Date('2025-12-31')
+    }
+];
+    </pre>
+
+    <h3>Hierarchical Permission Model</h3>
+
+    <p>The hierarchical model organizes resources and permissions in a tree structure. Permissions on parent nodes cascade to children unless explicitly overridden.</p>
+
+    <div class="highlight">
+        <strong>Permission Inheritance:</strong> In a hierarchical model, granting read access to /projects automatically grants read access to /projects/alpha, /projects/beta, and all descendant resources. This simplifies administration but requires careful planning to avoid over-permissioning.
+    </div>
+
+    <pre>
+// Hierarchical Resource Permissions
+class HierarchicalPermissionEngine {
+    private resourceTree: ResourceTree;
+
+    async checkPermission(
+        subject: Subject,
+        resource: Resource,
+        action: Action
+    ): Promise&lt;PermissionResult&gt; {
+        // Get the resource path
+        const path = this.resourceTree.getPath(resource);
+
+        // Check permissions from root to leaf
+        let effectivePermission: Permission | null = null;
+
+        for (const node of path) {
+            const permission = await this.getPermissionAtNode(subject, node, action);
+
+            if (permission) {
+                if (permission.override === 'explicit') {
+                    // Explicit override stops inheritance
+                    return { permitted: permission.effect === 'allow' };
+                }
+                effectivePermission = permission;
+            }
+        }
+
+        // Check for deny-by-default
+        if (!effectivePermission) {
+            return { permitted: false, reason: 'No applicable permission found' };
+        }
+
+        return { permitted: effectivePermission.effect === 'allow' };
+    }
+}
+
+// Example resource hierarchy
+const resourceHierarchy = {
+    '/': {
+        permissions: [{ role: 'authenticated', actions: ['list'] }]
+    },
+    '/projects': {
+        permissions: [{ role: 'employee', actions: ['read', 'list'] }]
+    },
+    '/projects/alpha': {
+        permissions: [
+            { role: 'alpha-team', actions: ['read', 'write', 'delete'] },
+            { role: 'employee', actions: ['read'], override: 'explicit' }
+        ]
+    },
+    '/projects/alpha/confidential': {
+        permissions: [
+            { role: 'alpha-lead', actions: ['read', 'write'] }
+            // Employees cannot read even though they can read parent
+        ]
+    }
+};
+    </pre>
+
+    <h2>Role Design Patterns</h2>
+
+    <p>Effective role design is crucial for manageable access control. The WIA-ACCESS_CONTROL standard recommends several patterns for organizing roles.</p>
+
+    <h3>Job Function Roles</h3>
+
+    <p>Job function roles correspond to organizational positions. They group permissions needed to perform specific job duties.</p>
+
+    <table>
+        <tr>
+            <th>Role</th>
+            <th>Description</th>
+            <th>Key Permissions</th>
+        </tr>
+        <tr>
+            <td>software-engineer</td>
+            <td>Develops software</td>
+            <td>code.read, code.write, deploy.staging</td>
+        </tr>
+        <tr>
+            <td>qa-engineer</td>
+            <td>Tests software</td>
+            <td>code.read, tests.run, bugs.create</td>
+        </tr>
+        <tr>
+            <td>devops-engineer</td>
+            <td>Manages infrastructure</td>
+            <td>infra.manage, deploy.all, monitoring.admin</td>
+        </tr>
+        <tr>
+            <td>security-analyst</td>
+            <td>Security operations</td>
+            <td>logs.read, alerts.manage, audit.run</td>
+        </tr>
+    </table>
+
+    <h3>Privilege Level Roles</h3>
+
+    <p>Privilege level roles define escalating access levels, typically used with the principle of least privilege.</p>
+
+    <pre>
+// Privilege Level Role Hierarchy
+const privilegeLevels = {
+    'viewer': {
+        level: 1,
+        permissions: ['read', 'list'],
+        description: 'Read-only access'
+    },
+    'contributor': {
+        level: 2,
+        inherits: 'viewer',
+        permissions: ['create', 'update'],
+        description: 'Can create and modify own resources'
+    },
+    'editor': {
+        level: 3,
+        inherits: 'contributor',
+        permissions: ['update-any', 'delete-own'],
+        description: 'Can modify any resource'
+    },
+    'admin': {
+        level: 4,
+        inherits: 'editor',
+        permissions: ['delete-any', 'manage-permissions'],
+        description: 'Full administrative access'
+    },
+    'super-admin': {
+        level: 5,
+        inherits: 'admin',
+        permissions: ['system-config', 'user-management'],
+        description: 'System-wide administrative access'
+    }
+};
+    </pre>
+
+    <h3>Composite Roles</h3>
+
+    <p>Composite roles combine multiple base roles for users with cross-functional responsibilities.</p>
+
+    <div class="highlight highlight-success">
+        <strong>Best Practice:</strong> Keep base roles atomic and focused. Create composite roles by combining base roles rather than duplicating permissions. This reduces maintenance burden and ensures consistency.
+    </div>
+
+    <pre>
+// Composite Role Definition
+interface CompositeRole {
+    id: string;
+    name: string;
+    baseRoles: string[];
+    additionalPermissions?: Permission[];
+    constraints?: Constraint[];
+}
+
+const compositeRoles: CompositeRole[] = [
+    {
+        id: 'tech-lead',
+        name: 'Technical Lead',
+        baseRoles: ['senior-engineer', 'code-reviewer', 'team-mentor'],
+        additionalPermissions: [
+            { resource: 'hiring', actions: ['interview', 'recommend'] }
+        ]
+    },
+    {
+        id: 'devops-security',
+        name: 'DevSecOps Engineer',
+        baseRoles: ['devops-engineer', 'security-analyst'],
+        constraints: [
+            { type: 'sod', excludeRoles: ['compliance-auditor'] }
+        ]
+    }
+];
+    </pre>
+
+    <h2>Dynamic Authorization</h2>
+
+    <p>Static role assignments are insufficient for modern, dynamic environments. WIA-ACCESS_CONTROL supports dynamic authorization based on runtime context.</p>
+
+    <pre>
+// Dynamic Authorization Engine
+class DynamicAuthorizationEngine {
+    async authorize(request: AuthorizationRequest): Promise&lt;AuthorizationDecision&gt; {
+        // Gather dynamic context
+        const context = await this.gatherContext(request);
+
+        // Evaluate dynamic policies
+        const decisions = await Promise.all([
+            this.evaluateTimeBasedPolicies(request, context),
+            this.evaluateLocationBasedPolicies(request, context),
+            this.evaluateRiskBasedPolicies(request, context),
+            this.evaluateRelationshipBasedPolicies(request, context)
+        ]);
+
+        // Combine decisions
+        return this.combineDecisions(decisions);
+    }
+
+    private async evaluateRiskBasedPolicies(
+        request: AuthorizationRequest,
+        context: AuthorizationContext
+    ): Promise&lt;PolicyDecision&gt; {
+        const riskScore = await this.riskEngine.calculate({
+            subject: request.subject,
+            resource: request.resource,
+            action: request.action,
+            context: context
+        });
+
+        // High-risk actions require additional controls
+        if (riskScore > 0.7) {
+            if (!context.mfaVerified) {
+                return {
+                    effect: 'Deny',
+                    reason: 'High-risk action requires MFA verification'
+                };
+            }
+
+            if (request.action === 'delete' && !context.approvalPresent) {
+                return {
+                    effect: 'Deny',
+                    reason: 'High-risk deletion requires approval',
+                    obligations: [
+                        { action: 'request-approval', params: { approvers: 'managers' } }
+                    ]
+                };
+            }
+        }
+
+        return { effect: 'NotApplicable' };
+    }
+
+    private async evaluateRelationshipBasedPolicies(
+        request: AuthorizationRequest,
+        context: AuthorizationContext
+    ): Promise&lt;PolicyDecision&gt; {
+        // Check if subject has relationship to resource
+        const relationships = await this.relationshipService.getRelationships(
+            request.subject.id,
+            request.resource.id
+        );
+
+        for (const rel of relationships) {
+            if (rel.type === 'owner') {
+                return { effect: 'Permit', reason: 'Owner access' };
+            }
+            if (rel.type === 'team-member' && request.action === 'read') {
+                return { effect: 'Permit', reason: 'Team member read access' };
+            }
+        }
+
+        return { effect: 'NotApplicable' };
+    }
+}
+    </pre>
+
+    <h2>Policy Testing and Validation</h2>
+
+    <p>Authorization policies must be thoroughly tested before deployment. Errors in policies can lead to security breaches or operational disruptions.</p>
+
+    <div class="highlight highlight-warning">
+        <strong>Testing Imperative:</strong> Always test policies in a non-production environment with comprehensive test cases covering both permitted and denied scenarios. Policy errors can have severe consequences.
+    </div>
+
+    <pre>
+// Policy Testing Framework
+class PolicyTestSuite {
+    private policyEngine: PolicyEngine;
+
+    async runTests(policy: WPLPolicy, testCases: TestCase[]): Promise&lt;TestReport&gt; {
+        const results: TestResult[] = [];
+
+        for (const testCase of testCases) {
+            const actual = await this.policyEngine.evaluate({
+                subject: testCase.subject,
+                resource: testCase.resource,
+                action: testCase.action,
+                environment: testCase.environment
+            });
+
+            const passed = actual.effect === testCase.expectedEffect;
+
+            results.push({
+                testCase: testCase,
+                actual: actual,
+                passed: passed,
+                message: passed ? 'PASS' :
+                    `Expected ${testCase.expectedEffect}, got ${actual.effect}`
+            });
+        }
+
+        return this.generateReport(policy, results);
+    }
+}
+
+// Example test cases
+const testCases: TestCase[] = [
+    {
+        name: 'Owner can read own document',
+        subject: { id: 'user-1', roles: ['employee'] },
+        resource: { id: 'doc-1', type: 'document', owner: 'user-1' },
+        action: 'read',
+        expectedEffect: 'Permit'
+    },
+    {
+        name: 'Non-owner cannot delete document',
+        subject: { id: 'user-2', roles: ['employee'] },
+        resource: { id: 'doc-1', type: 'document', owner: 'user-1' },
+        action: 'delete',
+        expectedEffect: 'Deny'
+    },
+    {
+        name: 'Admin can delete any document',
+        subject: { id: 'admin-1', roles: ['admin'] },
+        resource: { id: 'doc-1', type: 'document', owner: 'user-1' },
+        action: 'delete',
+        expectedEffect: 'Permit'
+    }
+];
+    </pre>
+
+    <h2>Summary</h2>
+
+    <p>This chapter has explored the authorization policies and permission models defined by the WIA-ACCESS_CONTROL standard. We covered the WIA Policy Language for expressing complex authorization rules, examined different permission models, discussed role design patterns, and introduced dynamic authorization for context-aware decisions.</p>
+
+    <div class="highlight">
+        <strong>Key Takeaways:</strong>
+        <ul>
+            <li>Authorization policies determine what authenticated subjects can do</li>
+            <li>The WIA Policy Language enables precise expression of access rules</li>
+            <li>Permission models range from explicit to hierarchical inheritance</li>
+            <li>Role design should follow patterns appropriate to organizational structure</li>
+            <li>Dynamic authorization adapts to runtime context and risk</li>
+            <li>Thorough policy testing prevents security breaches and disruptions</li>
+        </ul>
+    </div>
+
+</body>
+</html>

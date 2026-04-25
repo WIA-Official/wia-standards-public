@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 완화 기법 | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="chapter-number">5장</div>
+            <h1>편향 완화 기법</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            편향이 탐지되면 이를 줄이기 위한 조치를 취해야 합니다. 이 장에서는 弘益人間 원칙에 따라
+            머신러닝 파이프라인의 다양한 단계에서 편향을 완화하는 실용적 기술을 다룹니다.
+        </p>
+
+        <h2>완화 전략 개요</h2>
+        <p>
+            편향 완화 기술은 일반적으로 ML 파이프라인에서 적용되는 시기에 따라 세 단계로 분류됩니다:
+            전처리(데이터), 처리 중(학습), 후처리(예측).
+        </p>
+
+        <h2>전처리 기법</h2>
+        <p>
+            전처리 방법은 모델 학습이 시작되기 전에 학습 데이터를 수정하여 편향을 줄입니다.
+        </p>
+
+        <h3>1. 재샘플링 및 재가중치</h3>
+        <p>
+            모든 그룹의 공정한 대표성을 보장하기 위해 데이터셋의 균형을 맞춥니다.
+        </p>
+
+        <pre><code># 공정성을 위한 재가중치
+import numpy as np
+from sklearn.utils.class_weight import compute_sample_weight
+
+def fair_reweighting(X, y, protected_attr):
+    """
+    보호 그룹 전체에 걸쳐 대표성과 레이블의 균형을 맞추기 위한
+    샘플 가중치 계산
+    """
+    groups = np.unique(protected_attr)
+    n_samples = len(X)
+    weights = np.ones(n_samples)
+
+    for group in groups:
+        group_mask = protected_attr == group
+        n_group = group_mask.sum()
+
+        for label in [0, 1]:
+            label_mask = y == label
+            intersection = group_mask & label_mask
+            n_intersection = intersection.sum()
+
+            if n_intersection > 0:
+                # 빈도에 반비례하여 가중치 부여
+                target_weight = n_samples / (len(groups) * 2 * n_intersection)
+                weights[intersection] = target_weight
+
+    # 가중치 정규화
+    weights = weights / weights.sum() * n_samples
+
+    print("샘플 가중치 통계:")
+    print(f"  평균: {weights.mean():.3f}")
+    print(f"  표준편차: {weights.std():.3f}")
+    print(f"  최소: {weights.min():.3f}")
+    print(f"  최대: {weights.max():.3f}")
+
+    return weights
+
+# 분류기와 함께 사용
+# weights = fair_reweighting(X_train, y_train, protected_attr)
+# model.fit(X_train, y_train, sample_weight=weights)
+</code></pre>
+
+        <h3>2. 불균형 영향 제거기</h3>
+        <p>
+            예측력을 유지하면서 보호 속성과의 상관관계를 제거하도록 피처를 변환합니다.
+        </p>
+
+        <pre><code># 불균형 영향 제거기
+from sklearn.preprocessing import StandardScaler
+
+def disparate_impact_remover(X, protected_attr, repair_level=1.0):
+    """
+    피처와 보호 속성 간의 상관관계 감소
+    repair_level: 0 = 수리 없음, 1 = 완전 수리
+    """
+    X_repaired = X.copy()
+    groups = np.unique(protected_attr)
+
+    for col in range(X.shape[1]):
+        feature = X[:, col]
+
+        # 그룹 평균 계산
+        group_means = {}
+        for group in groups:
+            mask = protected_attr == group
+            group_means[group] = feature[mask].mean()
+
+        # 전체 평균 계산
+        overall_mean = feature.mean()
+
+        # 각 그룹 수리
+        for group in groups:
+            mask = protected_attr == group
+            group_mean = group_means[group]
+
+            # 그룹을 전체 평균으로 이동
+            repair_amount = repair_level * (overall_mean - group_mean)
+            X_repaired[mask, col] = feature[mask] + repair_amount
+
+    print(f"불균형 영향 수리 적용됨 (수준={repair_level})")
+
+    return X_repaired
+</code></pre>
+
+        <h3>3. 합성 데이터 생성</h3>
+        <p>
+            SMOTE 또는 유사한 기술을 사용하여 과소 대표 그룹에 대한 합성 샘플을 생성합니다.
+        </p>
+
+        <pre><code># 공정한 SMOTE 구현
+from imblearn.over_sampling import SMOTE
+from collections import Counter
+
+def fair_smote(X, y, protected_attr, target_balance=0.5):
+    """
+    공정한 대표성을 달성하기 위해 별도로 SMOTE 적용
+    """
+    groups = np.unique(protected_attr)
+    X_balanced_list = []
+    y_balanced_list = []
+    protected_balanced_list = []
+
+    for group in groups:
+        mask = protected_attr == group
+        X_group = X[mask]
+        y_group = y[mask]
+
+        # 이 그룹에 SMOTE 적용
+        if len(np.unique(y_group)) > 1:
+            smote = SMOTE(sampling_strategy='auto', random_state=42)
+            X_resampled, y_resampled = smote.fit_resample(X_group, y_group)
+
+            X_balanced_list.append(X_resampled)
+            y_balanced_list.append(y_resampled)
+            protected_balanced_list.append(np.full(len(y_resampled), group))
+
+    # 모든 그룹 결합
+    X_balanced = np.vstack(X_balanced_list)
+    y_balanced = np.concatenate(y_balanced_list)
+    protected_balanced = np.concatenate(protected_balanced_list)
+
+    print("원래 분포:", Counter(zip(protected_attr, y)))
+    print("균형 잡힌 분포:", Counter(zip(protected_balanced, y_balanced)))
+
+    return X_balanced, y_balanced, protected_balanced
+</code></pre>
+
+        <h2>처리 중 기법</h2>
+        <p>
+            처리 중 방법은 모델 학습 프로세스에 공정성 제약 조건을 직접 통합합니다.
+        </p>
+
+        <h3>1. 공정성 제약 최적화</h3>
+        <p>
+            최적화 목표에 공정성 제약 조건을 추가합니다.
+        </p>
+
+        <pre><code># 공정성 제약 로지스틱 회귀
+from sklearn.linear_model import LogisticRegression
+import cvxpy as cp
+
+def fair_logistic_regression(X, y, protected_attr, fairness_penalty=1.0):
+    """
+    인구통계학적 균등성 제약 조건을 가진 로지스틱 회귀 학습
+    """
+    n_features = X.shape[1]
+
+    # 변수 정의
+    w = cp.Variable(n_features)
+    b = cp.Variable()
+
+    # 로지스틱 손실
+    logits = X @ w + b
+    log_likelihood = cp.sum(cp.multiply(y, logits) - cp.logistic(logits))
+
+    # 공정성 제약 조건: 인구통계학적 균등성
+    groups = np.unique(protected_attr)
+    positive_rates = []
+
+    for group in groups:
+        mask = protected_attr == group
+        X_group = X[mask]
+        group_logits = X_group @ w + b
+        positive_rate = cp.sum(cp.logistic(group_logits)) / mask.sum()
+        positive_rates.append(positive_rate)
+
+    # 긍정률의 차이 최소화
+    fairness_loss = cp.sum_squares(cp.hstack(positive_rates) - cp.mean(positive_rates))
+
+    # 결합된 목표
+    objective = cp.Maximize(log_likelihood - fairness_penalty * fairness_loss)
+
+    # 해결
+    problem = cp.Problem(objective)
+    problem.solve()
+
+    print(f"학습 완료. 공정성 페널티: {fairness_penalty}")
+    print(f"최종 공정성 손실: {fairness_loss.value:.4f}")
+
+    return w.value, b.value
+</code></pre>
+
+        <h3>2. 적대적 편향 제거</h3>
+        <p>
+            적대적 학습을 사용하여 보호 속성을 예측할 수 없는 표현을 학습합니다.
+        </p>
+
+        <pre><code># 신경망을 사용한 적대적 편향 제거
+import torch
+import torch.nn as nn
+
+class FairClassifier(nn.Module):
+    """
+    적대적 편향 제거를 가진 분류기
+    """
+    def __init__(self, input_dim, hidden_dim=64):
+        super().__init__()
+
+        # 주요 예측기
+        self.predictor = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid()
+        )
+
+        # 적대자 (보호 속성 예측 시도)
+        self.adversary = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # 중간 표현 얻기
+        h = self.predictor[:-2](x)  # 은닉 표현
+
+        # 주요 예측
+        y_pred = self.predictor[-2:](h)
+
+        # 적대적 예측
+        protected_pred = self.adversary(h.detach())  # 그래디언트 흐름 방지를 위해 분리
+
+        return y_pred, protected_pred
+
+def train_fair_classifier(model, X_train, y_train, protected_train,
+                          adversary_weight=1.0, epochs=100):
+    """
+    적대적 편향 제거를 사용하여 분류기 학습
+    """
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.BCELoss()
+
+    for epoch in range(epochs):
+        # 순전파
+        y_pred, protected_pred = model(X_train)
+
+        # 주요 작업 손실
+        main_loss = criterion(y_pred, y_train)
+
+        # 적대적 손실 (적대자가 실패하기를 원함)
+        adversary_loss = criterion(protected_pred, protected_train)
+
+        # 결합된 손실: 주요 작업 최대화, 적대자 성공 최소화
+        total_loss = main_loss - adversary_weight * adversary_loss
+
+        # 역전파
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
+
+        if (epoch + 1) % 20 == 0:
+            print(f"에포크 {epoch+1}: 주요 손실={main_loss:.4f}, "
+                  f"적대자 손실={adversary_loss:.4f}")
+
+    return model
+</code></pre>
+
+        <h2>후처리 기법</h2>
+        <p>
+            후처리 방법은 학습 후 모델 예측을 조정하여 공정성을 개선합니다.
+        </p>
+
+        <h3>1. 임계값 최적화</h3>
+        <p>
+            공정성 기준을 달성하기 위해 다른 그룹에 대해 다른 결정 임계값을 사용합니다.
+        </p>
+
+        <pre><code># 그룹별 임계값 최적화
+def optimize_group_thresholds(y_true, y_proba, protected_attr, fairness_metric='equal_opportunity'):
+    """
+    공정성 지표를 만족시키기 위해 각 그룹에 대한 최적 임계값 찾기
+    """
+    groups = np.unique(protected_attr)
+    thresholds = {}
+
+    if fairness_metric == 'equal_opportunity':
+        # 그룹 전체에 걸쳐 동등한 TPR을 위해 최적화
+        target_tpr = 0.8  # 원하는 TPR
+
+        for group in groups:
+            mask = protected_attr == group
+            y_true_group = y_true[mask]
+            y_proba_group = y_proba[mask]
+
+            # 목표 TPR을 달성하는 임계값 찾기
+            best_threshold = 0.5
+            best_diff = float('inf')
+
+            for threshold in np.linspace(0, 1, 101):
+                y_pred = (y_proba_group >= threshold).astype(int)
+
+                tp = np.sum((y_true_group == 1) & (y_pred == 1))
+                fn = np.sum((y_true_group == 1) & (y_pred == 0))
+                tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+
+                diff = abs(tpr - target_tpr)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_threshold = threshold
+
+            thresholds[group] = best_threshold
+            print(f"{group}: 임계값 = {best_threshold:.3f}")
+
+    return thresholds
+
+def apply_group_thresholds(y_proba, protected_attr, thresholds):
+    """
+    그룹별 임계값 적용
+    """
+    y_pred = np.zeros(len(y_proba))
+
+    for group, threshold in thresholds.items():
+        mask = protected_attr == group
+        y_pred[mask] = (y_proba[mask] >= threshold).astype(int)
+
+    return y_pred
+</code></pre>
+
+        <h3>2. 보정된 동등한 확률</h3>
+        <p>
+            보정을 유지하면서 동등한 확률을 만족시키도록 예측을 후처리합니다.
+        </p>
+
+        <h3>3. 거부 옵션 분류</h3>
+        <p>
+            결정 경계 근처의 예측에 플래그를 지정하여 사람의 검토를 받습니다.
+        </p>
+
+        <pre><code># 거부 옵션 분류
+def reject_option_classification(y_proba, protected_attr, reject_margin=0.2):
+    """
+    공정성을 개선하기 위해 불확실한 예측에 플래그 지정
+    """
+    groups = np.unique(protected_attr)
+
+    # 임계 영역 계산 (결정 경계 주변)
+    lower_bound = 0.5 - reject_margin
+    upper_bound = 0.5 + reject_margin
+
+    predictions = {
+        'confident_positive': [],
+        'confident_negative': [],
+        'review_needed': []
+    }
+
+    for i, (proba, group) in enumerate(zip(y_proba, protected_attr)):
+        if proba < lower_bound:
+            predictions['confident_negative'].append(i)
+        elif proba > upper_bound:
+            predictions['confident_positive'].append(i)
+        else:
+            predictions['review_needed'].append(i)
+
+    print(f"분류 결과:")
+    print(f"  확신 긍정: {len(predictions['confident_positive'])}")
+    print(f"  확신 부정: {len(predictions['confident_negative'])}")
+    print(f"  검토 필요: {len(predictions['review_needed'])}")
+    print(f"  검토율: {len(predictions['review_needed'])/len(y_proba)*100:.1f}%")
+
+    return predictions
+</code></pre>
+
+        <h2>올바른 완화 전략 선택</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>접근 방식</th>
+                    <th>장점</th>
+                    <th>단점</th>
+                    <th>최적 사용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>전처리</td>
+                    <td>모델 불가지론적, ML 파이프라인 유지</td>
+                    <td>정보 손실 가능, 제한된 유연성</td>
+                    <td>레거시 시스템, 데이터 수준 편향</td>
+                </tr>
+                <tr>
+                    <td>처리 중</td>
+                    <td>공정성 직접 최적화, 유연함</td>
+                    <td>사용자 정의 학습 필요, 복잡한 구현</td>
+                    <td>새 모델, 제어 가능한 절충안</td>
+                </tr>
+                <tr>
+                    <td>후처리</td>
+                    <td>구현 쉬움, 재학습 불필요</td>
+                    <td>모델 품질에 의해 제한됨, 정확도 감소 가능</td>
+                    <td>배포된 모델, 빠른 수정</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>완화 효과 평가</h2>
+
+        <pre><code># 완화 영향 평가
+def evaluate_mitigation(y_true, y_pred_before, y_pred_after, protected_attr):
+    """
+    완화 전후의 공정성과 성능 비교
+    """
+    from sklearn.metrics import accuracy_score
+
+    groups = np.unique(protected_attr)
+
+    print("완화 영향 평가")
+    print("=" * 80)
+    print(f"{'지표':<25} {'이전':<15} {'이후':<15} {'변화':<15}")
+    print("-" * 80)
+
+    # 전체 정확도
+    acc_before = accuracy_score(y_true, y_pred_before)
+    acc_after = accuracy_score(y_true, y_pred_after)
+    print(f"{'전체 정확도':<25} {acc_before:<15.3f} {acc_after:<15.3f} {acc_after-acc_before:+.3f}")
+
+    # 그룹별 정확도
+    for group in groups:
+        mask = protected_attr == group
+        acc_before_group = accuracy_score(y_true[mask], y_pred_before[mask])
+        acc_after_group = accuracy_score(y_true[mask], y_pred_after[mask])
+        print(f"{group + ' 정확도':<25} {acc_before_group:<15.3f} {acc_after_group:<15.3f} {acc_after_group-acc_before_group:+.3f}")
+
+    # 공정성 지표
+    # 이전 인구통계학적 균등성
+    rates_before = [np.mean(y_pred_before[protected_attr == g]) for g in groups]
+    dp_before = max(rates_before) - min(rates_before)
+
+    # 이후 인구통계학적 균등성
+    rates_after = [np.mean(y_pred_after[protected_attr == g]) for g in groups]
+    dp_after = max(rates_after) - min(rates_after)
+
+    print(f"{'인구통계학적 균등성 격차':<25} {dp_before:<15.3f} {dp_after:<15.3f} {dp_after-dp_before:+.3f}")
+
+    print("\n弘益人間 - 개선이 모든 그룹에 공평하게 이익이 되도록 보장하십시오")
+
+    return {
+        'accuracy_before': acc_before,
+        'accuracy_after': acc_after,
+        'fairness_before': dp_before,
+        'fairness_after': dp_after
+    }
+</code></pre>
+
+        <div class="callout">
+            <h3>弘益人間 완화 원칙</h3>
+            <ul>
+                <li>공정성 목표와 제약 조건에 맞는 완화 전략 선택</li>
+                <li>항상 공정성과 성능 영향 모두 평가</li>
+                <li>최상의 결과를 위해 여러 기술 결합 고려</li>
+                <li>모든 완화 노력을 투명하게 문서화</li>
+                <li>배포 후 효과를 지속적으로 모니터링</li>
+                <li>완화가 집계 지표뿐만 아니라 모든 그룹에 이익이 되도록 보장</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">장 요약</h2>
+            <ul>
+                <li>편향 완화는 전처리, 처리 중, 후처리의 세 단계에서 발생할 수 있음</li>
+                <li>재가중치 및 SMOTE와 같은 전처리 기술은 데이터 수준 편향을 해결함</li>
+                <li>처리 중 방법은 모델 학습에 직접 공정성 제약 조건을 통합함</li>
+                <li>적대적 편향 제거는 보호 속성을 예측할 수 없는 표현을 학습함</li>
+                <li>후처리 기술은 모델을 재학습하지 않고 예측을 조정함</li>
+                <li>임계값 최적화는 그룹별 결정 경계를 사용하여 공정성을 달성할 수 있음</li>
+                <li>각 접근 방식은 구현 용이성, 유연성, 효과 간에 절충안이 있음</li>
+                <li>항상 공정성과 성능 지표 모두에 대한 완화 영향을 평가해야 함</li>
+                <li>여러 기술을 결합하면 종종 최상의 결과를 얻음</li>
+                <li>弘益人間은 모든 그룹에 이익이 되는 투명하고 공평한 완화를 요구함</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">복습 질문</h2>
+            <ol>
+                <li>편향 완화 기술의 세 가지 주요 범주는 무엇입니까? 각각의 예를 제공하세요.</li>
+                <li>재가중치가 편향을 완화하는 데 어떻게 도움이 됩니까? 한계는 무엇입니까?</li>
+                <li>적대적 편향 제거가 어떻게 작동하는지 설명하세요. 그래디언트 분리가 왜 중요합니까?</li>
+                <li>인구통계학적 균등성 제약 조건과 동등한 확률 제약 조건의 차이점은 무엇입니까?</li>
+                <li>처리 중 완화보다 후처리 완화를 언제 선택하시겠습니까?</li>
+                <li>그룹별 임계값이 공정성을 어떻게 개선할 수 있습니까? 이것이 제기할 수 있는 윤리적 우려는 무엇입니까?</li>
+                <li>전처리 및 처리 중 기술을 결합하는 것이 유익할 시나리오를 설명하세요.</li>
+                <li>완화 효과를 평가할 때 추적해야 하는 지표는 무엇입니까?</li>
+                <li>거부 옵션 분류가 공정성을 어떻게 개선합니까? 운영상의 의미는 무엇입니까?</li>
+                <li>弘益人間 원칙에 따라 편향된 대출 모델에 대한 완화 전략을 설계하세요.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-04.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-06.html" class="nav-button">다음 장 →</a>
+        </div>
+    </div>
+</body>
+</html>

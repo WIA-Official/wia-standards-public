@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Root Cause Analysis | WIA-DATA-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        .nav a:hover { text-decoration: underline; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        .highlight-box strong { color: #10B981; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { background: none; padding: 0; }
+        .example { background: #0f1729; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; margin: 2rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+        blockquote { border-left: 4px solid #10B981; padding-left: 1.5rem; margin: 2rem 0; font-style: italic; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 5</div>
+            <h1>Root Cause Analysis</h1>
+        </header>
+
+        <p>When data quality issues emerge, the clock is ticking. Business decisions are being made on bad data, reports are showing incorrect numbers, and stakeholders are losing trust. Root cause analysis using data lineage helps you trace problems upstream to their source—fast.</p>
+
+        <h2>The Challenge of Data Quality Issues</h2>
+
+        <blockquote>"We discovered our revenue was underreported by $2.3M. It took us two weeks to find the root cause: a silent truncation in a string-to-number conversion five steps upstream." — Finance Director</blockquote>
+
+        <p>Without lineage, troubleshooting data issues is like debugging with no stack trace. You know something's wrong, but you have to manually investigate every transformation, join, and filter until you find the culprit.</p>
+
+        <div class="highlight-box">
+            <strong>Lineage-Powered Solution:</strong> Trace backward through the lineage graph, testing each upstream node until you isolate the exact transformation where the issue originated.
+        </div>
+
+        <h2>Root Cause Analysis Process</h2>
+
+        <h3>Step 1: Identify the Symptom</h3>
+        <p>Clearly define what's wrong:</p>
+        <ul>
+            <li><strong>Location:</strong> Where is the problem visible?</li>
+            <li><strong>Nature:</strong> What's incorrect? (values, counts, missing data)</li>
+            <li><strong>Scope:</strong> All records or specific subset?</li>
+            <li><strong>Timeline:</strong> When did it start?</li>
+        </ul>
+
+        <div class="example">
+            <div class="example-title">Example Symptom</div>
+            <pre><code>Issue Detected:
+  Table: analytics.monthly_revenue
+  Column: total_revenue
+  Problem: Values 30% lower than expected
+  Timeframe: Started December 19, 2025
+  Affected Records: All records since that date</code></pre>
+        </div>
+
+        <h3>Step 2: Query Upstream Lineage</h3>
+        <p>Get the full lineage path back to sources:</p>
+        <pre><code>-- Get upstream lineage for the affected asset
+WITH RECURSIVE lineage_path AS (
+  SELECT
+    table_name,
+    column_name,
+    upstream_table,
+    upstream_column,
+    transformation_logic,
+    1 as depth
+  FROM lineage_metadata
+  WHERE table_name = 'analytics.monthly_revenue'
+    AND column_name = 'total_revenue'
+
+  UNION ALL
+
+  SELECT
+    l.table_name,
+    l.column_name,
+    l.upstream_table,
+    l.upstream_column,
+    l.transformation_logic,
+    lp.depth + 1
+  FROM lineage_metadata l
+  JOIN lineage_path lp
+    ON l.table_name = lp.upstream_table
+  WHERE lp.depth < 10
+)
+SELECT * FROM lineage_path
+ORDER BY depth DESC;</code></pre>
+
+        <h3>Step 3: Binary Search Through Lineage</h3>
+        <p>Start in the middle of the lineage path and work backward:</p>
+
+        <div class="example">
+            <div class="example-title">Investigation Path</div>
+            <pre><code>Lineage Chain (depth 5 to depth 1):
+  ✓ analytics.monthly_revenue      [ISSUE HERE]
+  ? staging.aggregated_sales        [TEST THIS]
+  ? staging.cleaned_transactions
+  ? staging.raw_transactions
+  ? external.payment_api
+
+Testing staging.aggregated_sales:
+  SELECT SUM(revenue) FROM staging.aggregated_sales
+  WHERE date >= '2025-12-19';
+
+Result: Values look correct here
+Conclusion: Issue is in analytics.monthly_revenue generation
+
+Testing transformation logic:
+  Found: Filter condition added on Dec 19
+  WHERE transaction_status = 'completed'
+
+Root Cause Found:
+  New filter excludes 'pending' transactions
+  Pending transactions are ~30% of volume
+  This matches the observed discrepancy!</code></pre>
+        </div>
+
+        <h3>Step 4: Verify the Root Cause</h3>
+        <p>Confirm your hypothesis:</p>
+        <ul>
+            <li>Check transformation change history</li>
+            <li>Review git commits for that date</li>
+            <li>Compare data before/after the change</li>
+            <li>Validate against known-good baseline</li>
+        </ul>
+
+        <h3>Step 5: Assess Blast Radius</h3>
+        <p>Use forward lineage to find what else is affected:</p>
+        <pre><code>Downstream Impact:
+  ⚠ dashboards.executive_summary (incorrect revenue)
+  ⚠ reports.board_presentation (wrong numbers)
+  ⚠ ml_models.revenue_forecast (trained on bad data)
+  ⚠ finance.quarterly_report (compliance risk!)</code></pre>
+
+        <h2>Common Data Quality Patterns</h2>
+
+        <h3>Pattern 1: Silent Truncation</h3>
+        <p><strong>Symptom:</strong> Unexpectedly short strings or rounded numbers<br>
+        <strong>Cause:</strong> Data type mismatch in transformation<br>
+        <strong>Lineage Search:</strong> Look for type conversions (VARCHAR(50) → VARCHAR(20))</p>
+
+        <h3>Pattern 2: Missing Records</h3>
+        <p><strong>Symptom:</strong> Row counts lower than expected<br>
+        <strong>Cause:</strong> Overly restrictive filter or failed join<br>
+        <strong>Lineage Search:</strong> Check WHERE clauses and JOIN conditions</p>
+
+        <h3>Pattern 3: Duplicate Records</h3>
+        <p><strong>Symptom:</strong> Row counts higher than expected<br>
+        <strong>Cause:</strong> Missing DISTINCT or bad join<br>
+        <strong>Lineage Search:</strong> Look for many-to-many joins</p>
+
+        <h3>Pattern 4: Stale Data</h3>
+        <p><strong>Symptom:</strong> Data hasn't updated recently<br>
+        <strong>Cause:</strong> Upstream pipeline failure<br>
+        <strong>Lineage Search:</strong> Check job execution timestamps</p>
+
+        <h3>Pattern 5: Wrong Aggregation</h3>
+        <p><strong>Symptom:</strong> Totals don't match expected values<br>
+        <strong>Cause:</strong> Incorrect GROUP BY or SUM logic<br>
+        <strong>Lineage Search:</strong> Trace aggregation transformations</p>
+
+        <h2>Automated Root Cause Detection</h2>
+
+        <div class="example">
+            <div class="example-title">Automated RCA Tool</div>
+            <pre><code>import wia_lineage
+
+# Detect anomaly
+anomaly = {
+    'table': 'analytics.monthly_revenue',
+    'column': 'total_revenue',
+    'expected': 1000000,
+    'actual': 700000,
+    'date': '2025-12-19'
+}
+
+# Run automated root cause analysis
+rca = wia_lineage.analyze_root_cause(anomaly)
+
+# Results:
+print(rca.summary())
+"""
+Root Cause Analysis Results:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Confidence: 87%
+Root Cause: Filter condition change
+Location: etl/monthly_revenue.sql:45
+Changed: 2025-12-19 08:34:12
+Changed By: john.doe@company.com
+Git Commit: abc123
+
+Recommendation:
+  Remove WHERE transaction_status = 'completed'
+  OR include 'pending' transactions in revenue
+  Estimated fix time: 15 minutes
+  Backfill required: Yes (19 days)
+"""</code></pre>
+        </div>
+
+        <h2>Integration with Observability</h2>
+
+        <h3>Data Quality Checks + Lineage</h3>
+        <p>Combine automated data quality monitoring with lineage:</p>
+        <pre><code># Data quality test
+assert daily_revenue > 0.8 * expected_revenue
+
+# On failure:
+if test_failed:
+    lineage = get_upstream_lineage('analytics.daily_revenue')
+    for node in lineage:
+        run_validation(node)
+        if node.validation_failed:
+            alert(f"Root cause found: {node}")
+            break</code></pre>
+
+        <h3>Alerting with Context</h3>
+        <p>Include lineage in alerts:</p>
+        <pre><code>ALERT: Revenue data quality issue
+
+Table: analytics.monthly_revenue
+Issue: 30% lower than baseline
+Started: 2025-12-19
+
+Lineage Path:
+  analytics.monthly_revenue
+    ← staging.aggregated_sales
+      ← staging.cleaned_transactions
+        ← staging.raw_transactions ⚠ SUSPECT
+          ← external.payment_api
+
+Recommended Action:
+  Investigate staging.raw_transactions
+  Check for filter/join changes on 2025-12-19</code></pre>
+
+        <h2>Preventing Future Issues</h2>
+
+        <ol>
+            <li><strong>Pre-Deployment Testing:</strong> Use lineage to identify test coverage gaps</li>
+            <li><strong>Data Contracts:</strong> Define expectations at each transformation</li>
+            <li><strong>Change Review:</strong> Require lineage impact analysis for modifications</li>
+            <li><strong>Continuous Validation:</strong> Monitor data quality at every lineage node</li>
+            <li><strong>Automated Rollback:</strong> Revert changes when quality degrades</li>
+        </ol>
+
+        <h2>Case Study: E-commerce Platform</h2>
+
+        <div class="example">
+            <div class="example-title">Real-World RCA Success</div>
+            <p><strong>Problem:</strong> Customer churn predictions suddenly became unreliable (accuracy dropped from 87% to 62%)</p>
+            <p><strong>Traditional Investigation:</strong> Would take weeks, checking training data, features, model code, etc.</p>
+            <p><strong>Lineage-Powered RCA:</strong></p>
+            <ol>
+                <li>Query lineage of model training data</li>
+                <li>Find that feature_store.customer_lifetime_value changed on Dec 10</li>
+                <li>Trace upstream to find schema change in raw.purchase_history</li>
+                <li>Discovered: New mobile app version sends purchase amounts in cents (not dollars)</li>
+                <li>Previous values: $99.99, new values: 9999 (no decimal point)</li>
+                <li>Fix: Add unit conversion in ETL, retrain model</li>
+                <li><strong>Total time: 45 minutes</strong> (vs. weeks)</li>
+            </ol>
+        </div>
+
+        <h2>Best Practices</h2>
+
+        <ol>
+            <li><strong>Document Changes:</strong> Annotate transformations with change history</li>
+            <li><strong>Test at Each Node:</strong> Don't just test the final output</li>
+            <li><strong>Maintain Baselines:</strong> Keep known-good data for comparison</li>
+            <li><strong>Automate What You Can:</strong> But keep humans in the loop</li>
+            <li><strong>Share Findings:</strong> Build organizational knowledge</li>
+        </ol>
+
+        <div class="highlight-box">
+            <strong>Key Takeaway:</strong> Root cause analysis transforms hours or days of manual investigation into minutes of guided exploration. Data lineage is your debugging superpower.
+        </div>
+
+        </div>
+</body>
+</html>

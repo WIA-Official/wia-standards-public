@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 구현 사례 연구 - WIA 재생에너지 표준</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --case-study: #ec4899;
+            --case-study-light: #f472b6;
+            --case-study-dark: #db2777;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            font-size: 16px;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            padding: 1rem 2rem;
+        }
+
+        nav .nav-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        nav .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+        }
+
+        nav .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        nav .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        nav .nav-links a:hover {
+            color: var(--case-study);
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 8rem 2rem 4rem;
+        }
+
+        /* Chapter Header */
+        .chapter-header {
+            text-align: center;
+            margin-bottom: 4rem;
+            padding: 3rem;
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .chapter-number {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--case-study), var(--case-study-dark));
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            letter-spacing: 1px;
+        }
+
+        .chapter-header h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 1rem;
+            line-height: 1.3;
+        }
+
+        .chapter-header .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+        }
+
+        /* Section Styles */
+        section {
+            margin-bottom: 4rem;
+        }
+
+        h2 {
+            font-size: 2rem;
+            color: var(--case-study);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--case-study);
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            color: var(--case-study-light);
+            margin: 2rem 0 1rem;
+        }
+
+        h4 {
+            font-size: 1.2rem;
+            color: var(--text);
+            margin: 1.5rem 0 1rem;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            text-align: justify;
+        }
+
+        /* Case Study Card */
+        .case-study-card {
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            overflow: hidden;
+            margin: 2rem 0;
+            border: 1px solid var(--border);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .case-study-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--case-study);
+        }
+
+        .case-study-header {
+            background: linear-gradient(135deg, var(--case-study-dark), var(--case-study));
+            padding: 2rem;
+            color: white;
+        }
+
+        .case-study-header .case-number {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .case-study-header h3 {
+            color: white;
+            margin: 0 0 0.5rem 0;
+            font-size: 1.8rem;
+        }
+
+        .case-study-header .location {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        .case-study-body {
+            padding: 2rem;
+        }
+
+        .case-study-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .meta-item {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .meta-item .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .meta-item .value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--case-study);
+        }
+
+        /* Info Box */
+        .info-box {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--case-study);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .info-box.success {
+            border-left-color: var(--success);
+        }
+
+        .info-box.warning {
+            border-left-color: var(--warning);
+        }
+
+        .info-box h4 {
+            color: var(--case-study);
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-box.success h4 {
+            color: var(--success);
+        }
+
+        .info-box.warning h4 {
+            color: var(--warning);
+        }
+
+        /* Code Block */
+        .code-block {
+            background: #0d1117;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+
+        .code-block pre {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            color: #e6edf3;
+            line-height: 1.6;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-header span {
+            color: var(--case-study);
+            font-weight: 600;
+        }
+
+        .code-lang {
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Comment styling */
+        .comment { color: #8b949e; }
+        .keyword { color: #ff7b72; }
+        .string { color: #a5d6ff; }
+        .function { color: #d2a8ff; }
+        .number { color: #79c0ff; }
+        .property { color: #7ee787; }
+
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            margin: 2rem 0;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-secondary);
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            color: var(--case-study);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .metric-card {
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .metric-card .icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--case-study);
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-card .label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+            margin: 2rem 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--case-study);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 2rem;
+            padding-left: 1.5rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -2rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            background: var(--case-study);
+            border-radius: 50%;
+            border: 3px solid var(--bg);
+        }
+
+        .timeline-item .phase {
+            color: var(--case-study);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .timeline-item .title {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .timeline-item .details {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Lessons Card */
+        .lessons-card {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid var(--case-study);
+        }
+
+        .lessons-card h4 {
+            color: var(--case-study);
+            margin-top: 0;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .lessons-card ul {
+            color: var(--text-secondary);
+            padding-left: 1.2rem;
+        }
+
+        .lessons-card li {
+            margin-bottom: 0.75rem;
+        }
+
+        .lessons-card li strong {
+            color: var(--text);
+        }
+
+        /* Quote Box */
+        .quote-box {
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+            position: relative;
+        }
+
+        .quote-box::before {
+            content: '"';
+            font-size: 4rem;
+            color: var(--case-study);
+            opacity: 0.3;
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            line-height: 1;
+        }
+
+        .quote-box blockquote {
+            font-style: italic;
+            color: var(--text);
+            font-size: 1.1rem;
+            padding-left: 2rem;
+            margin: 0 0 1rem 0;
+        }
+
+        .quote-box .attribution {
+            color: var(--text-secondary);
+            padding-left: 2rem;
+            font-size: 0.9rem;
+        }
+
+        /* List Styles */
+        ul, ol {
+            color: var(--text-secondary);
+            padding-left: 1.5rem;
+            margin: 1rem 0 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.75rem;
+        }
+
+        li strong {
+            color: var(--text);
+        }
+
+        /* Technology Badge */
+        .tech-badge {
+            display: inline-block;
+            background: var(--bg-tertiary);
+            color: var(--case-study);
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            margin: 0.25rem;
+        }
+
+        /* Navigation Buttons */
+        .chapter-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .chapter-nav a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .chapter-nav a:hover {
+            background: var(--case-study);
+            border-color: var(--case-study);
+            color: white;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            margin-top: 4rem;
+        }
+
+        footer p {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .philosophy {
+            font-size: 1.2rem;
+            color: var(--case-study);
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .chapter-header h1 {
+                font-size: 2rem;
+            }
+
+            nav .nav-links {
+                display: none;
+            }
+
+            .case-study-meta {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="chapter-header">
+            <span class="chapter-number">제7장</span>
+            <h1>구현 사례 연구</h1>
+            <p class="subtitle">Implementation Case Studies</p>
+        </div>
+
+        <!-- Introduction -->
+        <section id="introduction">
+            <p>
+                이 장에서는 WIA 재생에너지 표준을 성공적으로 구현한 다양한 실제 사례를 분석합니다.
+                각 사례는 고유한 도전과 해결책을 보여주며, 다른 조직들이 참고할 수 있는 귀중한
+                교훈을 제공합니다. 대기업부터 중소기업, 공공기관까지 다양한 규모와 유형의
+                조직들의 재생에너지 전환 여정을 살펴봅니다.
+            </p>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="icon">📚</div>
+                    <div class="value">5</div>
+                    <div class="label">사례 연구</div>
+                </div>
+                <div class="metric-card">
+                    <div class="icon">🌍</div>
+                    <div class="value">4</div>
+                    <div class="label">국가/지역</div>
+                </div>
+                <div class="metric-card">
+                    <div class="icon">⚡</div>
+                    <div class="value">2.5GW</div>
+                    <div class="label">총 재생에너지 용량</div>
+                </div>
+                <div class="metric-card">
+                    <div class="icon">📉</div>
+                    <div class="value">85%</div>
+                    <div class="label">평균 탄소 감축</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Case Study 1 -->
+        <section id="case-study-1">
+            <div class="case-study-card">
+                <div class="case-study-header">
+                    <div class="case-number">사례 연구 #1</div>
+                    <h3>삼성 반도체 RE100 전환</h3>
+                    <div class="location">📍 대한민국 경기도 화성</div>
+                </div>
+                <div class="case-study-body">
+                    <div class="case-study-meta">
+                        <div class="meta-item">
+                            <div class="label">산업</div>
+                            <div class="value">반도체 제조</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">연간 전력 수요</div>
+                            <div class="value">25 TWh</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">RE100 목표</div>
+                            <div class="value">2050년</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">투자 규모</div>
+                            <div class="value">₩7조원</div>
+                        </div>
+                    </div>
+
+                    <h4>배경 및 도전</h4>
+                    <p>
+                        반도체 제조는 세계에서 가장 에너지 집약적인 산업 중 하나입니다. 삼성의 화성 캠퍼스는
+                        연간 25TWh 이상의 전력을 소비하며, 이는 중소 국가의 전체 전력 소비량에 맞먹습니다.
+                        한국의 재생에너지 인프라 한계와 토지 제약이 주요 도전 과제였습니다.
+                    </p>
+
+                    <h4>구현 전략</h4>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="phase">1단계: 2022-2025</div>
+                            <div class="title">에너지 효율 최적화</div>
+                            <div class="details">클린룸 공조 시스템 개선, AI 기반 전력 관리로 15% 에너지 절감</div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="phase">2단계: 2025-2030</div>
+                            <div class="title">자체 재생에너지 확보</div>
+                            <div class="details">옥상/주차장 태양광 500MW, 해상풍력 PPA 1GW 체결</div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="phase">3단계: 2030-2040</div>
+                            <div class="title">RE100 50% 달성</div>
+                            <div class="details">대규모 태양광 단지 투자, 국내외 녹색 요금제 활용</div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="phase">4단계: 2040-2050</div>
+                            <div class="title">RE100 완전 달성</div>
+                            <div class="details">잔여 수요 녹색수소 연료전지 및 고품질 REC로 충당</div>
+                        </div>
+                    </div>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>삼성 에너지 관리 시스템 구성</span>
+                            <span class="code-lang">TypeScript</span>
+                        </div>
+                        <pre><span class="keyword">interface</span> <span class="function">SamsungEnergySystem</span> {
+  <span class="property">facility</span>: {
+    <span class="property">name</span>: <span class="string">'화성 반도체 캠퍼스'</span>;
+    <span class="property">area</span>: <span class="number">3_600_000</span>; <span class="comment">// m² (약 110만평)</span>
+    <span class="property">cleanRooms</span>: <span class="number">12</span>;
+    <span class="property">baseLoad</span>: <span class="number">2_800</span>; <span class="comment">// MW</span>
+  };
+
+  <span class="property">renewableSources</span>: {
+    <span class="property">onSiteSolar</span>: {
+      <span class="property">rooftop</span>: <span class="number">200</span>; <span class="comment">// MW</span>
+      <span class="property">parkingCanopy</span>: <span class="number">150</span>; <span class="comment">// MW</span>
+      <span class="property">buildingIntegrated</span>: <span class="number">50</span>; <span class="comment">// MW</span>
+    };
+    <span class="property">offshoreWindPPA</span>: {
+      <span class="property">contract</span>: <span class="string">'20년 장기 PPA'</span>;
+      <span class="property">capacity</span>: <span class="number">1_000</span>; <span class="comment">// MW</span>
+      <span class="property">annualGeneration</span>: <span class="number">3_500_000</span>; <span class="comment">// MWh</span>
+    };
+    <span class="property">greenTariff</span>: {
+      <span class="property">provider</span>: <span class="string">'한국전력'</span>;
+      <span class="property">type</span>: <span class="string">'녹색프리미엄'</span>;
+      <span class="property">annualPurchase</span>: <span class="number">5_000_000</span>; <span class="comment">// MWh</span>
+    };
+  };
+
+  <span class="property">aiOptimization</span>: {
+    <span class="property">demandPrediction</span>: <span class="keyword">true</span>;
+    <span class="property">hvacOptimization</span>: <span class="keyword">true</span>;
+    <span class="property">peakShaving</span>: <span class="keyword">true</span>;
+    <span class="property">energySavings</span>: <span class="number">0.15</span>; <span class="comment">// 15% 절감</span>
+  };
+}</pre>
+                    </div>
+
+                    <div class="lessons-card">
+                        <h4>💡 핵심 교훈</h4>
+                        <ul>
+                            <li><strong>장기 계획 필수:</strong> 대규모 에너지 소비 기업은 10년 이상의 로드맵 필요</li>
+                            <li><strong>다각화 전략:</strong> 단일 재생에너지원 의존 위험, 포트폴리오 접근 필요</li>
+                            <li><strong>효율화 선행:</strong> 재생에너지 조달 전 에너지 효율 최적화로 수요 감소</li>
+                            <li><strong>정책 협력:</strong> 정부와 협력하여 녹색 요금제 등 제도 개선 추진</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Case Study 2 -->
+        <section id="case-study-2">
+            <div class="case-study-card">
+                <div class="case-study-header" style="background: linear-gradient(135deg, #2563eb, #3b82f6);">
+                    <div class="case-number">사례 연구 #2</div>
+                    <h3>덴마크 오르스테드 해상풍력 혁신</h3>
+                    <div class="location">📍 덴마크 에스비에르</div>
+                </div>
+                <div class="case-study-body">
+                    <div class="case-study-meta">
+                        <div class="meta-item">
+                            <div class="label">기업 유형</div>
+                            <div class="value">에너지 개발사</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">설치 용량</div>
+                            <div class="value">15.7 GW</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">LCOE 감소</div>
+                            <div class="value">-62%</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">탄소 감축</div>
+                            <div class="value">86%</div>
+                        </div>
+                    </div>
+
+                    <h4>전환 스토리</h4>
+                    <p>
+                        오르스테드(구 DONG Energy)는 세계에서 가장 성공적인 에너지 전환 사례입니다.
+                        2006년 발전량의 85%가 석탄과 가스였던 기업이 2023년 재생에너지 비율 90%를
+                        달성했습니다. 이 극적인 전환의 핵심은 해상풍력 기술 리더십이었습니다.
+                    </p>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>연도</th>
+                                    <th>재생에너지 비율</th>
+                                    <th>주요 이정표</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>2006</td>
+                                    <td>15%</td>
+                                    <td>최초 해상풍력 프로젝트 착수</td>
+                                </tr>
+                                <tr>
+                                    <td>2012</td>
+                                    <td>30%</td>
+                                    <td>석유/가스 사업부 매각 결정</td>
+                                </tr>
+                                <tr>
+                                    <td>2017</td>
+                                    <td>62%</td>
+                                    <td>오르스테드로 사명 변경, IPO</td>
+                                </tr>
+                                <tr>
+                                    <td>2020</td>
+                                    <td>82%</td>
+                                    <td>마지막 석탄발전소 폐쇄</td>
+                                </tr>
+                                <tr>
+                                    <td>2023</td>
+                                    <td>90%</td>
+                                    <td>글로벌 해상풍력 1위</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h4>기술 혁신 성과</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>오르스테드 기술 발전 추적</span>
+                            <span class="code-lang">TypeScript</span>
+                        </div>
+                        <pre><span class="keyword">const</span> <span class="property">orstedTechEvolution</span> = {
+  <span class="property">turbineCapacity</span>: [
+    { <span class="property">year</span>: <span class="number">2006</span>, <span class="property">mw</span>: <span class="number">2.3</span>, <span class="property">model</span>: <span class="string">'Siemens 2.3MW'</span> },
+    { <span class="property">year</span>: <span class="number">2012</span>, <span class="property">mw</span>: <span class="number">3.6</span>, <span class="property">model</span>: <span class="string">'Siemens SWT-3.6'</span> },
+    { <span class="property">year</span>: <span class="number">2018</span>, <span class="property">mw</span>: <span class="number">8.0</span>, <span class="property">model</span>: <span class="string">'Siemens Gamesa SG 8.0'</span> },
+    { <span class="property">year</span>: <span class="number">2023</span>, <span class="property">mw</span>: <span class="number">15.0</span>, <span class="property">model</span>: <span class="string">'Siemens Gamesa SG 14-236 DD'</span> },
+  ],
+
+  <span class="property">lcoeReduction</span>: [
+    { <span class="property">year</span>: <span class="number">2012</span>, <span class="property">eurPerMwh</span>: <span class="number">168</span> },
+    { <span class="property">year</span>: <span class="number">2017</span>, <span class="property">eurPerMwh</span>: <span class="number">95</span> },
+    { <span class="property">year</span>: <span class="number">2019</span>, <span class="property">eurPerMwh</span>: <span class="number">65</span> },
+    { <span class="property">year</span>: <span class="number">2023</span>, <span class="property">eurPerMwh</span>: <span class="number">48</span> },
+  ],
+
+  <span class="property">innovations</span>: [
+    <span class="string">'모노파일 기초 대형화 (12m 직경)'</span>,
+    <span class="string">'부유식 기초 개발 (50m+ 수심)'</span>,
+    <span class="string">'디지털 트윈 기반 O&M'</span>,
+    <span class="string">'그린수소 통합 (2025 목표)'</span>,
+  ],
+};</pre>
+                    </div>
+
+                    <div class="quote-box">
+                        <blockquote>
+                            "우리는 화석연료 회사에서 재생에너지 회사로 완전히 전환했습니다.
+                            이것은 비즈니스 결정이자 동시에 세상을 위한 올바른 일이었습니다."
+                        </blockquote>
+                        <div class="attribution">— 마즈 나퍼, 오르스테드 전 CEO</div>
+                    </div>
+
+                    <div class="lessons-card">
+                        <h4>💡 핵심 교훈</h4>
+                        <ul>
+                            <li><strong>대담한 비전:</strong> 점진적 변화가 아닌 완전한 비즈니스 모델 전환</li>
+                            <li><strong>기술 리더십:</strong> 규모의 경제를 통한 비용 혁신 선도</li>
+                            <li><strong>자산 재배치:</strong> 기존 화석연료 자산의 전략적 매각/전환</li>
+                            <li><strong>인재 전환:</strong> 기존 직원들의 재교육과 새로운 역량 확보</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Case Study 3 -->
+        <section id="case-study-3">
+            <div class="case-study-card">
+                <div class="case-study-header" style="background: linear-gradient(135deg, #059669, #10b981);">
+                    <div class="case-number">사례 연구 #3</div>
+                    <h3>제주도 탄소제로 섬 프로젝트</h3>
+                    <div class="location">📍 대한민국 제주특별자치도</div>
+                </div>
+                <div class="case-study-body">
+                    <div class="case-study-meta">
+                        <div class="meta-item">
+                            <div class="label">목표</div>
+                            <div class="value">탄소제로 섬</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">목표 연도</div>
+                            <div class="value">2030</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">재생에너지 용량</div>
+                            <div class="value">4.1 GW</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">전기차 보급</div>
+                            <div class="value">40만대</div>
+                        </div>
+                    </div>
+
+                    <h4>프로젝트 개요</h4>
+                    <p>
+                        제주도는 2012년 '탄소 없는 섬 제주(Carbon Free Island Jeju)' 비전을 선언하고,
+                        2030년까지 전력 100% 재생에너지 전환과 교통 부문 완전 전기화를 목표로 하고 있습니다.
+                        이는 섬이라는 독립적 전력 시스템의 특성을 활용한 야심찬 실험입니다.
+                    </p>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>제주 에너지 시스템 구성</span>
+                            <span class="code-lang">TypeScript</span>
+                        </div>
+                        <pre><span class="keyword">interface</span> <span class="function">JejuCarbonFreeIsland</span> {
+  <span class="property">energyMix2030</span>: {
+    <span class="property">wind</span>: {
+      <span class="property">onshore</span>: <span class="number">450</span>; <span class="comment">// MW</span>
+      <span class="property">offshore</span>: <span class="number">2_350</span>; <span class="comment">// MW</span>
+    };
+    <span class="property">solar</span>: {
+      <span class="property">groundMounted</span>: <span class="number">800</span>; <span class="comment">// MW</span>
+      <span class="property">rooftop</span>: <span class="number">500</span>; <span class="comment">// MW</span>
+    };
+    <span class="property">total</span>: <span class="number">4_100</span>; <span class="comment">// MW</span>
+    <span class="property">peakDemand</span>: <span class="number">1_200</span>; <span class="comment">// MW (현재)</span>
+  };
+
+  <span class="property">gridInfrastructure</span>: {
+    <span class="property">hvdcLinkToMainland</span>: {
+      <span class="property">capacity</span>: <span class="number">400</span>; <span class="comment">// MW (기존)</span>
+      <span class="property">plannedExpansion</span>: <span class="number">800</span>; <span class="comment">// MW (2025)</span>
+    };
+    <span class="property">batteryStorage</span>: {
+      <span class="property">capacity</span>: <span class="number">500</span>; <span class="comment">// MW</span>
+      <span class="property">duration</span>: <span class="number">4</span>; <span class="comment">// hours</span>
+    };
+    <span class="property">smartGrid</span>: {
+      <span class="property">amiDeployment</span>: <span class="number">100</span>; <span class="comment">// % 스마트미터</span>
+      <span class="property">demandResponse</span>: <span class="number">200</span>; <span class="comment">// MW 자원</span>
+    };
+  };
+
+  <span class="property">evTransition</span>: {
+    <span class="property">targetVehicles</span>: <span class="number">400_000</span>;
+    <span class="property">chargingStations</span>: <span class="number">15_000</span>;
+    <span class="property">v2gEnabled</span>: <span class="number">50_000</span>; <span class="comment">// V2G 지원 차량</span>
+    <span class="property">iceBanYear</span>: <span class="number">2030</span>;
+  };
+
+  <span class="property">hydrogenEconomy</span>: {
+    <span class="property">electrolyzerCapacity</span>: <span class="number">100</span>; <span class="comment">// MW</span>
+    <span class="property">hydrogenBuses</span>: <span class="number">500</span>;
+    <span class="property">fuelingStations</span>: <span class="number">30</span>;
+  };
+}</pre>
+                    </div>
+
+                    <h4>도전과 해결책</h4>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>도전 과제</th>
+                                    <th>해결 전략</th>
+                                    <th>현재 상태</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>출력 제한 (커튼먼트)</td>
+                                    <td>ESS 확대, 본토 연계 강화</td>
+                                    <td>2025년 해결 예정</td>
+                                </tr>
+                                <tr>
+                                    <td>토지 제약</td>
+                                    <td>해상풍력 중심 전략</td>
+                                    <td>2.35GW 해상풍력 추진중</td>
+                                </tr>
+                                <tr>
+                                    <td>주민 수용성</td>
+                                    <td>이익공유, 주민참여형 사업</td>
+                                    <td>협동조합 모델 확산</td>
+                                </tr>
+                                <tr>
+                                    <td>변동성 관리</td>
+                                    <td>수소 저장, V2G 활용</td>
+                                    <td>파일럿 진행중</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="lessons-card">
+                        <h4>💡 핵심 교훈</h4>
+                        <ul>
+                            <li><strong>섬 시스템 실험실:</strong> 독립 그리드의 장점을 활용한 혁신 테스트베드</li>
+                            <li><strong>섹터 커플링:</strong> 전력-교통-수소의 통합적 접근</li>
+                            <li><strong>주민 참여:</strong> 에너지 전환의 사회적 수용성 확보 필수</li>
+                            <li><strong>과잉 설비:</strong> 재생에너지 변동성 대응을 위한 충분한 용량 확보</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Case Study 4 -->
+        <section id="case-study-4">
+            <div class="case-study-card">
+                <div class="case-study-header" style="background: linear-gradient(135deg, #d97706, #f59e0b);">
+                    <div class="case-number">사례 연구 #4</div>
+                    <h3>애플 RE100 달성 사례</h3>
+                    <div class="location">📍 미국 캘리포니아 쿠퍼티노 (글로벌)</div>
+                </div>
+                <div class="case-study-body">
+                    <div class="case-study-meta">
+                        <div class="meta-item">
+                            <div class="label">RE100 달성</div>
+                            <div class="value">2018년</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">재생에너지 용량</div>
+                            <div class="value">1.5 GW</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">탄소중립 목표</div>
+                            <div class="value">2030년</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">공급망 참여</div>
+                            <div class="value">300+ 협력사</div>
+                        </div>
+                    </div>
+
+                    <h4>전략적 접근</h4>
+                    <p>
+                        애플은 2018년 전 세계 모든 시설에서 100% 재생에너지 전력을 달성한 최초의
+                        대형 기술 기업 중 하나입니다. 더 나아가 2030년까지 전체 공급망과 제품
+                        수명주기를 포함한 탄소중립을 목표로 하고 있습니다.
+                    </p>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>애플 재생에너지 포트폴리오</span>
+                            <span class="code-lang">TypeScript</span>
+                        </div>
+                        <pre><span class="keyword">interface</span> <span class="function">AppleRE100Strategy</span> {
+  <span class="property">ownedProjects</span>: {
+    <span class="property">solarFarms</span>: [
+      { <span class="property">name</span>: <span class="string">'캘리포니아 플랫츠'</span>, <span class="property">capacity</span>: <span class="number">280</span>, <span class="property">status</span>: <span class="string">'운영중'</span> },
+      { <span class="property">name</span>: <span class="string">'네바다 리노'</span>, <span class="property">capacity</span>: <span class="number">200</span>, <span class="property">status</span>: <span class="string">'운영중'</span> },
+      { <span class="property">name</span>: <span class="string">'덴마크 비보르'</span>, <span class="property">capacity</span>: <span class="number">30</span>, <span class="property">status</span>: <span class="string">'운영중'</span> },
+    ];
+    <span class="property">windFarms</span>: [
+      { <span class="property">name</span>: <span class="string">'오리건 몬터규'</span>, <span class="property">capacity</span>: <span class="number">200</span>, <span class="property">status</span>: <span class="string">'운영중'</span> },
+    ];
+  };
+
+  <span class="property">ppaContracts</span>: {
+    <span class="property">totalCapacity</span>: <span class="number">800</span>; <span class="comment">// MW</span>
+    <span class="property">avgDuration</span>: <span class="number">15</span>; <span class="comment">// years</span>
+    <span class="property">regions</span>: [<span class="string">'미국'</span>, <span class="string">'유럽'</span>, <span class="string">'중국'</span>, <span class="string">'일본'</span>];
+    <span class="property">additionalityCriteria</span>: <span class="keyword">true</span>;
+  };
+
+  <span class="property">supplyChainProgram</span>: {
+    <span class="property">name</span>: <span class="string">'Supplier Clean Energy Program'</span>;
+    <span class="property">participatingSuppliers</span>: <span class="number">300</span>;
+    <span class="property">commitedRenewableCapacity</span>: <span class="number">16_000_000</span>; <span class="comment">// MWh/year</span>
+    <span class="property">fund</span>: {
+      <span class="property">name</span>: <span class="string">'중국 청정에너지 펀드'</span>;
+      <span class="property">size</span>: <span class="number">300_000_000</span>; <span class="comment">// USD</span>
+      <span class="property">renewableCapacity</span>: <span class="number">1_000</span>; <span class="comment">// MW</span>
+    };
+  };
+
+  <span class="property">innovationProjects</span>: {
+    <span class="property">recycledAluminum</span>: <span class="keyword">true</span>;
+    <span class="property">carbonFreeManufacturing</span>: <span class="keyword">true</span>;
+    <span class="property">directAirCapture</span>: <span class="string">'투자중'</span>;
+    <span class="property">lowCarbonShipping</span>: <span class="string">'전환중'</span>;
+  };
+}</pre>
+                    </div>
+
+                    <h4>공급망 영향력 활용</h4>
+                    <p>
+                        애플의 가장 혁신적인 접근은 공급망 참여입니다. 전 세계 300개 이상의 주요 협력사가
+                        애플 제품 생산에 100% 재생에너지를 사용하겠다고 약속했습니다. 이는 연간
+                        1,600만 MWh 이상의 청정에너지를 의미합니다.
+                    </p>
+
+                    <div class="lessons-card">
+                        <h4>💡 핵심 교훈</h4>
+                        <ul>
+                            <li><strong>구매력 활용:</strong> 대기업의 공급망 영향력으로 산업 전체 변화 유도</li>
+                            <li><strong>직접 투자:</strong> PPA 외에 직접 프로젝트 소유로 안정성 확보</li>
+                            <li><strong>전 수명주기:</strong> Scope 1, 2를 넘어 Scope 3까지 목표 확대</li>
+                            <li><strong>혁신 투자:</strong> 탄소 제거 등 미래 기술에 대한 선제 투자</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Case Study 5 -->
+        <section id="case-study-5">
+            <div class="case-study-card">
+                <div class="case-study-header" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6);">
+                    <div class="case-number">사례 연구 #5</div>
+                    <h3>서울시 원전하나줄이기 시민운동</h3>
+                    <div class="location">📍 대한민국 서울특별시</div>
+                </div>
+                <div class="case-study-body">
+                    <div class="case-study-meta">
+                        <div class="meta-item">
+                            <div class="label">기간</div>
+                            <div class="value">2012-2020</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">에너지 절감</div>
+                            <div class="value">4.35 TOE</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">참여 가구</div>
+                            <div class="value">170만</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">경제적 효과</div>
+                            <div class="value">₩3.2조원</div>
+                        </div>
+                    </div>
+
+                    <h4>프로젝트 배경</h4>
+                    <p>
+                        2011년 후쿠시마 사고 이후, 서울시는 "원전 하나 줄이기" 정책을 발표했습니다.
+                        목표는 원전 1기 발전량(200만 TOE)에 해당하는 에너지를 절감하고 신재생에너지로
+                        대체하는 것이었습니다. 이는 시민 참여를 통한 에너지 전환의 대표적 사례입니다.
+                    </p>
+
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="phase">1단계: 2012-2014</div>
+                            <div class="title">200만 TOE 조기 달성</div>
+                            <div class="details">LED 교체, 에코마일리지, 미니태양광 보급</div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="phase">2단계: 2014-2017</div>
+                            <div class="title">400만 TOE 달성</div>
+                            <div class="details">건물 에너지 효율화, 신재생에너지 확대</div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="phase">3단계: 2017-2020</div>
+                            <div class="title">에너지 자립 도시</div>
+                            <div class="details">에너지 자립마을, 시민 발전소 확산</div>
+                        </div>
+                    </div>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>서울시 에너지 정책 성과</span>
+                            <span class="code-lang">TypeScript</span>
+                        </div>
+                        <pre><span class="keyword">const</span> <span class="property">seoulEnergyPolicy</span> = {
+  <span class="property">name</span>: <span class="string">'원전하나줄이기'</span>,
+  <span class="property">period</span>: <span class="string">'2012-2020'</span>,
+
+  <span class="property">achievements</span>: {
+    <span class="property">energySaved</span>: <span class="number">4_350_000</span>, <span class="comment">// TOE (석유환산톤)</span>
+    <span class="property">renewableProduced</span>: <span class="number">1_200_000</span>, <span class="comment">// TOE</span>
+    <span class="property">ghgReduced</span>: <span class="number">10_000_000</span>, <span class="comment">// tCO2e</span>
+    <span class="property">economicBenefit</span>: <span class="number">3_200_000_000_000</span>, <span class="comment">// KRW</span>
+  },
+
+  <span class="property">citizenParticipation</span>: {
+    <span class="property">ecoMileageMembers</span>: <span class="number">1_700_000</span>, <span class="comment">// 가구</span>
+    <span class="property">miniSolarHomes</span>: <span class="number">140_000</span>,
+    <span class="property">energySelfSufficientVillages</span>: <span class="number">100</span>,
+    <span class="property">citizenPowerPlants</span>: <span class="number">31</span>,
+  },
+
+  <span class="property">programs</span>: [
+    {
+      <span class="property">name</span>: <span class="string">'에코마일리지'</span>,
+      <span class="property">mechanism</span>: <span class="string">'전기/가스 절약시 인센티브 지급'</span>,
+      <span class="property">impact</span>: <span class="string">'가구당 평균 10% 에너지 절감'</span>,
+    },
+    {
+      <span class="property">name</span>: <span class="string">'미니태양광'</span>,
+      <span class="property">mechanism</span>: <span class="string">'베란다 태양광 보조금 지원'</span>,
+      <span class="property">impact</span>: <span class="string">'연간 가구당 30-50만원 절감'</span>,
+    },
+    {
+      <span class="property">name</span>: <span class="string">'에너지자립마을'</span>,
+      <span class="property">mechanism</span>: <span class="string">'마을 단위 에너지 계획 및 실행'</span>,
+      <span class="property">impact</span>: <span class="string">'커뮤니티 리더십 및 확산'</span>,
+    },
+    {
+      <span class="property">name</span>: <span class="string">'시민발전소'</span>,
+      <span class="property">mechanism</span>: <span class="string">'시민 출자 태양광/풍력 발전소'</span>,
+      <span class="property">impact</span>: <span class="string">'에너지 민주주의 실현'</span>,
+    },
+  ],
+};</pre>
+                    </div>
+
+                    <div class="info-box success">
+                        <h4>시민 참여의 힘</h4>
+                        <p>
+                            170만 가구가 참여한 에코마일리지 프로그램은 개인의 작은 실천이
+                            모여 도시 전체의 에너지 소비 패턴을 바꿀 수 있음을 증명했습니다.
+                            이는 기술적 솔루션만으로는 달성할 수 없는 사회적 전환의 모범 사례입니다.
+                        </p>
+                    </div>
+
+                    <div class="lessons-card">
+                        <h4>💡 핵심 교훈</h4>
+                        <ul>
+                            <li><strong>상향식 접근:</strong> 시민 참여 기반 에너지 전환의 실현 가능성 입증</li>
+                            <li><strong>인센티브 설계:</strong> 행동 변화를 유도하는 적절한 보상 체계</li>
+                            <li><strong>커뮤니티 리더:</strong> 에너지 자립마을을 통한 풀뿌리 리더 양성</li>
+                            <li><strong>정책 연속성:</strong> 장기적 비전과 일관된 정책 추진</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lessons Summary -->
+        <section id="lessons-summary">
+            <h2>7.6 사례 연구 종합 분석</h2>
+
+            <p>
+                다섯 가지 사례 연구에서 도출된 핵심 성공 요인을 종합하면 다음과 같습니다.
+                이러한 요인들은 규모나 산업에 관계없이 재생에너지 전환을 추진하는 모든
+                조직에 적용될 수 있습니다.
+            </p>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>성공 요인</th>
+                            <th>설명</th>
+                            <th>관련 사례</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>경영진 의지</strong></td>
+                            <td>최고 경영진의 명확한 비전과 지속적 지원</td>
+                            <td>오르스테드, 애플</td>
+                        </tr>
+                        <tr>
+                            <td><strong>장기 로드맵</strong></td>
+                            <td>10년 이상의 단계적 전환 계획</td>
+                            <td>삼성, 제주도</td>
+                        </tr>
+                        <tr>
+                            <td><strong>기술 혁신</strong></td>
+                            <td>지속적인 기술 개선과 비용 절감</td>
+                            <td>오르스테드</td>
+                        </tr>
+                        <tr>
+                            <td><strong>이해관계자 참여</strong></td>
+                            <td>직원, 공급망, 지역사회 참여</td>
+                            <td>애플, 서울시</td>
+                        </tr>
+                        <tr>
+                            <td><strong>정책 협력</strong></td>
+                            <td>정부 정책과의 연계 및 협력</td>
+                            <td>제주도, 서울시</td>
+                        </tr>
+                        <tr>
+                            <td><strong>투명한 보고</strong></td>
+                            <td>진행 상황의 정기적 공개</td>
+                            <td>모든 사례</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="info-box">
+                <h4>弘益人間 (홍익인간) 정신의 실현</h4>
+                <p>
+                    이 사례들은 모두 개별 조직의 이익을 넘어 사회 전체에 이로움을 추구합니다.
+                    삼성의 녹색 공급망, 오르스테드의 비용 혁신, 제주의 탄소제로 실험, 애플의 협력사 참여,
+                    서울의 시민 운동 모두 "널리 인간을 이롭게 한다"는 홍익인간의 정신을 현대적으로
+                    실현하고 있습니다.
+                </p>
+            </div>
+        </section>
+
+        <!-- Chapter Navigation -->
+        </main>
+</body>
+</html>

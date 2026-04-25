@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Impact Analysis | WIA-DATA-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        .nav a:hover { text-decoration: underline; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        .highlight-box strong { color: #10B981; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { background: none; padding: 0; }
+        .example { background: #0f1729; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; margin: 2rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 4</div>
+            <h1>Impact Analysis</h1>
+        </header>
+
+        <p>Impact analysis answers the critical question: "What will break if I make this change?" By leveraging data lineage, teams can proactively identify downstream dependencies and prevent catastrophic failures before they happen.</p>
+
+        <h2>What is Impact Analysis?</h2>
+
+        <p>Impact analysis uses lineage graphs to trace all downstream consumers of a data asset. When you plan to modify a table, column, or transformation, impact analysis shows you every report, dashboard, ML model, and data pipeline that depends on it.</p>
+
+        <div class="highlight-box">
+            <strong>Core Principle:</strong> Better to discover breaking changes during planning than during a production outage at 3am.
+        </div>
+
+        <h2>Types of Changes to Analyze</h2>
+
+        <h3>1. Schema Changes</h3>
+        <ul>
+            <li><strong>Column Rename:</strong> Updates all downstream references</li>
+            <li><strong>Column Drop:</strong> Identifies what will break</li>
+            <li><strong>Data Type Change:</strong> Finds incompatible usage</li>
+            <li><strong>Table Rename/Move:</strong> Updates all consumers</li>
+        </ul>
+
+        <h3>2. Business Logic Changes</h3>
+        <ul>
+            <li>Modifying SQL transformation logic</li>
+            <li>Changing aggregation methods</li>
+            <li>Updating calculation formulas</li>
+            <li>Altering filtering conditions</li>
+        </ul>
+
+        <h3>3. Infrastructure Changes</h3>
+        <ul>
+            <li>Data warehouse migration</li>
+            <li>Database engine upgrades</li>
+            <li>API version changes</li>
+            <li>Storage format conversions</li>
+        </ul>
+
+        <div class="example">
+            <div class="example-title">Real-World Scenario</div>
+            <p><strong>Situation:</strong> Your team wants to rename <code>customer_id</code> to <code>user_id</code> for consistency.</p>
+            <p><strong>Without Impact Analysis:</strong> Deploy the change → 47 dashboards break → 12 ETL jobs fail → ML model predictions stop → executive dashboard is down → emergency rollback → lost productivity and trust.</p>
+            <p><strong>With Impact Analysis:</strong> Run analysis → identify 47 downstream dependencies → create migration plan → update consumers in stages → deploy safely → zero downtime.</p>
+        </div>
+
+        <h2>Performing Impact Analysis</h2>
+
+        <h3>Step 1: Identify the Change</h3>
+        <pre><code>Target: warehouse.customers.email_address
+Change Type: Column rename
+New Name: contact_email
+Reason: Standardization</code></pre>
+
+        <h3>Step 2: Query Lineage Graph</h3>
+        <pre><code>SELECT DISTINCT
+    downstream_table,
+    downstream_column,
+    transformation_type,
+    owner
+FROM lineage_metadata
+WHERE upstream_table = 'warehouse.customers'
+  AND upstream_column = 'email_address'
+ORDER BY depth DESC;</code></pre>
+
+        <h3>Step 3: Analyze Results</h3>
+        <pre><code>Found 23 downstream dependencies:
+
+DIRECT DEPENDENCIES (Depth 1):
+  ✓ analytics.customer_summary.email
+  ✓ reports.marketing_list.contact_email
+  ✓ ml_features.customer_attributes.email_domain
+
+INDIRECT DEPENDENCIES (Depth 2):
+  ⚠ dashboards.executive_overview (via customer_summary)
+  ⚠ ml_models.churn_predictor (via customer_attributes)
+
+CRITICAL DEPENDENCIES:
+  ⛔ real_time_api.customer_lookup (SLA: <100ms)</code></pre>
+
+        <h3>Step 4: Risk Assessment</h3>
+        <ul>
+            <li><strong>High Risk:</strong> Real-time APIs, executive dashboards</li>
+            <li><strong>Medium Risk:</strong> Daily reports, ML models</li>
+            <li><strong>Low Risk:</strong> Archived datasets, exploratory notebooks</li>
+        </ul>
+
+        <h3>Step 5: Migration Planning</h3>
+        <ol>
+            <li>Add new column while keeping old (deprecation period)</li>
+            <li>Update non-critical consumers first</li>
+            <li>Update critical systems during maintenance window</li>
+            <li>Remove old column after validation period</li>
+        </ol>
+
+        <h2>Automated Impact Analysis</h2>
+
+        <div class="example">
+            <div class="example-title">Example: CI/CD Integration</div>
+            <pre><code># Pre-deployment impact check
+name: Impact Analysis
+on: pull_request
+
+jobs:
+  analyze-impact:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract schema changes
+        run: |
+          git diff main --name-only | grep "\.sql$" > changed_files.txt
+
+      - name: Run impact analysis
+        run: |
+          python scripts/analyze_impact.py \
+            --changes changed_files.txt \
+            --output impact_report.md
+
+      - name: Comment on PR
+        if: impact.high_risk_count > 0
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body-file impact_report.md</code></pre>
+        </div>
+
+        <h2>Impact Analysis Patterns</h2>
+
+        <h3>Forward Impact (Downstream)</h3>
+        <p>Most common: "What depends on this?"</p>
+        <ul>
+            <li>Traverse lineage graph forward</li>
+            <li>Find all consumers</li>
+            <li>Assess criticality</li>
+        </ul>
+
+        <h3>Backward Impact (Upstream)</h3>
+        <p>"What does this depend on?"</p>
+        <ul>
+            <li>Useful for deprecation decisions</li>
+            <li>Understanding data freshness requirements</li>
+            <li>Identifying single points of failure</li>
+        </ul>
+
+        <h3>Lateral Impact (Same Level)</h3>
+        <p>"What else uses the same source?"</p>
+        <ul>
+            <li>Find related datasets</li>
+            <li>Coordinate parallel changes</li>
+            <li>Identify consolidation opportunities</li>
+        </ul>
+
+        <h2>Impact Metrics</h2>
+
+        <p>Quantify the blast radius of changes:</p>
+        <ul>
+            <li><strong>Affected Assets:</strong> Count of downstream dependencies</li>
+            <li><strong>Affected Users:</strong> Number of people/teams impacted</li>
+            <li><strong>Criticality Score:</strong> Weighted importance of affected systems</li>
+            <li><strong>Depth:</strong> How many hops downstream</li>
+            <li><strong>Estimated Effort:</strong> Hours to update all consumers</li>
+        </ul>
+
+        <h2>Advanced Techniques</h2>
+
+        <h3>What-If Analysis</h3>
+        <p>Model hypothetical changes before making them:</p>
+        <pre><code>WHAT IF we delete staging.temp_customer_data?
+  → orphans: analytics.customer_360 (broken)
+  → requires: new source for customer_360
+  → estimated migration: 16 hours</code></pre>
+
+        <h3>Blast Radius Visualization</h3>
+        <p>Visual representation of impact scope:</p>
+        <ul>
+            <li>Concentric circles showing impact depth</li>
+            <li>Color-coded by risk level</li>
+            <li>Interactive drill-down</li>
+        </ul>
+
+        <h3>Time-Based Impact</h3>
+        <p>Consider when changes take effect:</p>
+        <ul>
+            <li>Batch jobs: impact at next run</li>
+            <li>Real-time: immediate impact</li>
+            <li>Cached data: delayed impact</li>
+        </ul>
+
+        <h2>Best Practices</h2>
+
+        <ol>
+            <li><strong>Run Impact Analysis Early:</strong> During design, not just before deployment</li>
+            <li><strong>Automate Where Possible:</strong> Integrate with CI/CD pipelines</li>
+            <li><strong>Set Thresholds:</strong> Define acceptable impact levels</li>
+            <li><strong>Require Sign-Off:</strong> High-impact changes need stakeholder approval</li>
+            <li><strong>Document Decisions:</strong> Record why changes were deemed acceptable</li>
+            <li><strong>Plan Rollback:</strong> Always have a way to undo changes</li>
+            <li><strong>Communicate Proactively:</strong> Notify affected teams in advance</li>
+        </ol>
+
+        <div class="highlight-box">
+            <strong>Key Takeaway:</strong> Impact analysis transforms data lineage from documentation into a proactive risk management tool. It's the difference between reactive firefighting and planned, coordinated changes.
+        </div>
+
+        </div>
+</body>
+</html>

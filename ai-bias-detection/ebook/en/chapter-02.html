@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Fairness Metrics | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        .back-link:hover { color: #059669; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        .callout h3 { margin-top: 0; }
+        .example { background: #0f172a; border: 2px solid #334155; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all 0.3s; }
+        .nav-button:hover { background: #059669; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { color: #cbd5e1; }
+        .formula { background: #0f172a; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; font-family: 'Courier New', monospace; color: #10B981; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <a href="index.html" class="back-link">← Back to Table of Contents</a>
+            <div class="chapter-number">Chapter 2</div>
+            <h1>Fairness Metrics</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            Measuring fairness is fundamental to detecting and mitigating bias in AI systems. This chapter explores
+            the mathematical foundations of fairness metrics, their applications, limitations, and practical implementation.
+        </p>
+
+        <h2>Introduction to Fairness Metrics</h2>
+
+        <p>
+            Before we can address bias, we must be able to measure it. Fairness metrics provide quantitative ways
+            to assess whether an AI system treats different groups equitably. However, fairness is not a single
+            monolithic concept—there are multiple, sometimes competing definitions of what constitutes fair treatment.
+        </p>
+
+        <div class="callout">
+            <h3>The Impossibility Theorem</h3>
+            <p>
+                Research has shown that except in trivial cases, it is mathematically impossible to satisfy all
+                fairness criteria simultaneously. This means practitioners must make informed choices about which
+                fairness definitions are most appropriate for their specific context and use case.
+            </p>
+        </div>
+
+        <h2>Group Fairness Metrics</h2>
+
+        <p>
+            Group fairness metrics compare outcomes across different demographic groups. These metrics typically
+            focus on ensuring statistical parity or equal treatment between groups defined by protected attributes.
+        </p>
+
+        <h3>1. Demographic Parity (Statistical Parity)</h3>
+
+        <p>
+            Demographic parity requires that the proportion of positive predictions is equal across all groups.
+            In other words, the decision should be independent of the protected attribute.
+        </p>
+
+        <div class="formula">
+            P(Ŷ = 1 | A = a) = P(Ŷ = 1 | A = b) for all groups a, b
+        </div>
+
+        <p>
+            Where Ŷ is the prediction and A is the protected attribute (e.g., race, gender).
+        </p>
+
+        <pre><code># Implementation of Demographic Parity
+import numpy as np
+
+def demographic_parity(y_pred, protected_attribute):
+    """
+    Calculate demographic parity metric
+    Returns ratio of minimum to maximum positive rate
+    """
+    groups = np.unique(protected_attribute)
+    positive_rates = {}
+
+    for group in groups:
+        mask = protected_attribute == group
+        positive_rate = np.mean(y_pred[mask])
+        positive_rates[group] = positive_rate
+        print(f"Group {group}: {positive_rate:.3f}")
+
+    rates = list(positive_rates.values())
+    parity_ratio = min(rates) / max(rates) if max(rates) > 0 else 1.0
+
+    print(f"\nDemographic Parity Ratio: {parity_ratio:.3f}")
+    print(f"Status: {'PASS' if parity_ratio >= 0.8 else 'FAIL'}")
+
+    return parity_ratio, positive_rates
+
+# Example usage
+y_pred = np.array([1, 1, 0, 1, 0, 1, 0, 0, 1, 1])
+protected = np.array(['A', 'A', 'A', 'A', 'A', 'B', 'B', 'B', 'B', 'B'])
+
+ratio, rates = demographic_parity(y_pred, protected)
+</code></pre>
+
+        <p><strong>Advantages:</strong></p>
+        <ul>
+            <li>Simple to understand and compute</li>
+            <li>Ensures equal opportunity in selection</li>
+            <li>Useful when base rates are similar across groups</li>
+        </ul>
+
+        <p><strong>Limitations:</strong></p>
+        <ul>
+            <li>May require different treatment to achieve equal outcomes</li>
+            <li>Can be problematic when true outcome rates differ between groups</li>
+            <li>May conflict with individual fairness</li>
+        </ul>
+
+        <h3>2. Equalized Odds</h3>
+
+        <p>
+            Equalized odds requires that both true positive rate (TPR) and false positive rate (FPR) are equal
+            across groups. This ensures that the model's errors are distributed equally.
+        </p>
+
+        <div class="formula">
+            P(Ŷ = 1 | Y = y, A = a) = P(Ŷ = 1 | Y = y, A = b)
+            <br>for y ∈ {0, 1} and all groups a, b
+        </div>
+
+        <pre><code># Implementation of Equalized Odds
+def equalized_odds(y_true, y_pred, protected_attribute):
+    """
+    Calculate True Positive Rate and False Positive Rate
+    for each group to assess equalized odds
+    """
+    groups = np.unique(protected_attribute)
+    results = {}
+
+    for group in groups:
+        mask = protected_attribute == group
+
+        # True Positive Rate
+        tp = np.sum((y_true[mask] == 1) & (y_pred[mask] == 1))
+        fn = np.sum((y_true[mask] == 1) & (y_pred[mask] == 0))
+        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+
+        # False Positive Rate
+        fp = np.sum((y_true[mask] == 0) & (y_pred[mask] == 1))
+        tn = np.sum((y_true[mask] == 0) & (y_pred[mask] == 0))
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+
+        results[group] = {'tpr': tpr, 'fpr': fpr}
+        print(f"Group {group}:")
+        print(f"  TPR: {tpr:.3f}, FPR: {fpr:.3f}")
+
+    # Check disparities
+    tprs = [r['tpr'] for r in results.values()]
+    fprs = [r['fpr'] for r in results.values()]
+
+    tpr_disparity = max(tprs) - min(tprs)
+    fpr_disparity = max(fprs) - min(fprs)
+
+    print(f"\nTPR Disparity: {tpr_disparity:.3f}")
+    print(f"FPR Disparity: {fpr_disparity:.3f}")
+    print(f"Status: {'PASS' if (tpr_disparity < 0.1 and fpr_disparity < 0.1) else 'FAIL'}")
+
+    return results
+
+# Example usage
+y_true = np.array([1, 1, 0, 1, 0, 0, 1, 0, 1, 0])
+y_pred = np.array([1, 1, 0, 1, 0, 1, 1, 0, 0, 0])
+protected = np.array(['A', 'A', 'A', 'A', 'A', 'B', 'B', 'B', 'B', 'B'])
+
+results = equalized_odds(y_true, y_pred, protected)
+</code></pre>
+
+        <p><strong>Advantages:</strong></p>
+        <ul>
+            <li>Considers both false positives and false negatives</li>
+            <li>Appropriate for high-stakes decisions (e.g., criminal justice)</li>
+            <li>Balances error rates across groups</li>
+        </ul>
+
+        <p><strong>Limitations:</strong></p>
+        <ul>
+            <li>More complex than demographic parity</li>
+            <li>May reduce overall accuracy</li>
+            <li>Requires access to true labels</li>
+        </ul>
+
+        <h3>3. Equal Opportunity</h3>
+
+        <p>
+            Equal opportunity is a relaxed version of equalized odds that only requires equal true positive rates
+            across groups. This is particularly relevant when false negatives are more harmful than false positives.
+        </p>
+
+        <div class="formula">
+            P(Ŷ = 1 | Y = 1, A = a) = P(Ŷ = 1 | Y = 1, A = b)
+        </div>
+
+        <pre><code># Implementation of Equal Opportunity
+def equal_opportunity(y_true, y_pred, protected_attribute):
+    """
+    Calculate True Positive Rate for each group
+    """
+    groups = np.unique(protected_attribute)
+    tprs = {}
+
+    for group in groups:
+        mask = protected_attribute == group
+        positives = y_true[mask] == 1
+
+        if positives.sum() == 0:
+            tprs[group] = None
+            print(f"Group {group}: No positive samples")
+            continue
+
+        tp = np.sum((y_true[mask] == 1) & (y_pred[mask] == 1))
+        tpr = tp / positives.sum()
+        tprs[group] = tpr
+        print(f"Group {group} TPR: {tpr:.3f}")
+
+    # Calculate disparity
+    valid_tprs = [t for t in tprs.values() if t is not None]
+    if len(valid_tprs) > 1:
+        disparity = max(valid_tprs) - min(valid_tprs)
+        print(f"\nTPR Disparity: {disparity:.3f}")
+        print(f"Status: {'PASS' if disparity < 0.1 else 'FAIL'}")
+
+    return tprs
+</code></pre>
+
+        <h3>4. Predictive Parity (Outcome Test)</h3>
+
+        <p>
+            Predictive parity requires that precision (positive predictive value) is equal across groups.
+            This ensures that a positive prediction has the same meaning regardless of group membership.
+        </p>
+
+        <div class="formula">
+            P(Y = 1 | Ŷ = 1, A = a) = P(Y = 1 | Ŷ = 1, A = b)
+        </div>
+
+        <pre><code># Implementation of Predictive Parity
+def predictive_parity(y_true, y_pred, protected_attribute):
+    """
+    Calculate Precision (PPV) for each group
+    """
+    groups = np.unique(protected_attribute)
+    precisions = {}
+
+    for group in groups:
+        mask = protected_attribute == group
+        predicted_positive = y_pred[mask] == 1
+
+        if predicted_positive.sum() == 0:
+            precisions[group] = None
+            continue
+
+        tp = np.sum((y_true[mask] == 1) & (y_pred[mask] == 1))
+        precision = tp / predicted_positive.sum()
+        precisions[group] = precision
+        print(f"Group {group} Precision: {precision:.3f}")
+
+    # Check disparity
+    valid_prec = [p for p in precisions.values() if p is not None]
+    if len(valid_prec) > 1:
+        disparity = max(valid_prec) - min(valid_prec)
+        print(f"\nPrecision Disparity: {disparity:.3f}")
+        print(f"Status: {'PASS' if disparity < 0.1 else 'FAIL'}")
+
+    return precisions
+</code></pre>
+
+        <h2>Individual Fairness</h2>
+
+        <p>
+            Individual fairness takes a different approach from group fairness. Instead of comparing groups,
+            it requires that similar individuals receive similar predictions.
+        </p>
+
+        <div class="callout">
+            <h3>Fairness Through Awareness</h3>
+            <p>
+                The principle of individual fairness states: "Similar individuals should be treated similarly."
+                The challenge lies in defining what constitutes "similarity" in a way that is both meaningful
+                and doesn't encode bias.
+            </p>
+        </div>
+
+        <pre><code># Example: Individual Fairness Check
+from sklearn.metrics.pairwise import cosine_similarity
+
+def check_individual_fairness(X, y_pred, threshold=0.9):
+    """
+    Check if similar individuals receive similar predictions
+    """
+    # Calculate pairwise similarity
+    similarities = cosine_similarity(X)
+
+    fairness_violations = 0
+    total_pairs = 0
+
+    for i in range(len(X)):
+        for j in range(i + 1, len(X)):
+            if similarities[i, j] > threshold:
+                total_pairs += 1
+                if y_pred[i] != y_pred[j]:
+                    fairness_violations += 1
+
+    violation_rate = fairness_violations / total_pairs if total_pairs > 0 else 0
+    print(f"Similar pairs: {total_pairs}")
+    print(f"Fairness violations: {fairness_violations}")
+    print(f"Violation rate: {violation_rate:.3f}")
+
+    return violation_rate
+</code></pre>
+
+        <h2>Disparate Impact Analysis</h2>
+
+        <p>
+            Disparate impact (also known as adverse impact) is a legal concept used to assess discrimination.
+            The "80% rule" or "four-fifths rule" is commonly used as a threshold.
+        </p>
+
+        <div class="formula">
+            Disparate Impact Ratio = (Selection Rate for Protected Group) / (Selection Rate for Reference Group)
+        </div>
+
+        <p>
+            A ratio below 0.8 (80%) is often considered evidence of disparate impact.
+        </p>
+
+        <pre><code># Disparate Impact Calculation
+def disparate_impact(y_pred, protected_attribute, reference_group):
+    """
+    Calculate disparate impact ratio
+    Reference group is typically the majority or advantaged group
+    """
+    groups = np.unique(protected_attribute)
+    selection_rates = {}
+
+    for group in groups:
+        mask = protected_attribute == group
+        selection_rate = np.mean(y_pred[mask])
+        selection_rates[group] = selection_rate
+
+    reference_rate = selection_rates[reference_group]
+
+    print("Selection Rates:")
+    for group, rate in selection_rates.items():
+        di_ratio = rate / reference_rate if reference_rate > 0 else 0
+        status = "PASS" if di_ratio >= 0.8 else "FAIL"
+
+        print(f"  {group}: {rate:.3f} (DI Ratio: {di_ratio:.3f}) [{status}]")
+
+    return selection_rates
+
+# Example
+y_pred = np.array([1, 1, 1, 1, 0, 1, 0, 0, 1, 0])
+protected = np.array(['majority', 'majority', 'majority', 'majority', 'majority',
+                      'protected', 'protected', 'protected', 'protected', 'protected'])
+
+rates = disparate_impact(y_pred, protected, 'majority')
+</code></pre>
+
+        <h2>Calibration and Score-Based Metrics</h2>
+
+        <p>
+            For models that output probability scores rather than hard classifications, calibration is an
+            important fairness consideration.
+        </p>
+
+        <h3>Calibration Across Groups</h3>
+
+        <p>
+            A model is calibrated if predictions reflect true probabilities. Group calibration requires
+            this to hold separately for each demographic group.
+        </p>
+
+        <pre><code># Check Calibration by Group
+def calibration_by_group(y_true, y_score, protected_attribute, n_bins=10):
+    """
+    Assess calibration separately for each group
+    """
+    from sklearn.calibration import calibration_curve
+    import matplotlib.pyplot as plt
+
+    groups = np.unique(protected_attribute)
+
+    for group in groups:
+        mask = protected_attribute == group
+
+        prob_true, prob_pred = calibration_curve(
+            y_true[mask],
+            y_score[mask],
+            n_bins=n_bins,
+            strategy='uniform'
+        )
+
+        print(f"\nGroup {group} Calibration:")
+        for i, (true_p, pred_p) in enumerate(zip(prob_true, prob_pred)):
+            print(f"  Bin {i+1}: Predicted={pred_p:.3f}, Actual={true_p:.3f}")
+
+    return True
+</code></pre>
+
+        <h2>Choosing the Right Metric</h2>
+
+        <p>
+            Selecting appropriate fairness metrics depends on your application domain, legal requirements,
+            and ethical considerations:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Application</th>
+                    <th>Recommended Metrics</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Criminal Justice</td>
+                    <td>Equalized Odds, Equal Opportunity</td>
+                    <td>Both false positives and false negatives have serious consequences</td>
+                </tr>
+                <tr>
+                    <td>Lending/Credit</td>
+                    <td>Disparate Impact, Demographic Parity</td>
+                    <td>Legal compliance (ECOA), equal access requirements</td>
+                </tr>
+                <tr>
+                    <td>Hiring</td>
+                    <td>Disparate Impact, Equal Opportunity</td>
+                    <td>Legal compliance (EEOC), focus on qualified candidates</td>
+                </tr>
+                <tr>
+                    <td>Healthcare</td>
+                    <td>Equal Opportunity, Calibration</td>
+                    <td>Minimize missed diagnoses, reliable risk scores</td>
+                </tr>
+                <tr>
+                    <td>Content Recommendation</td>
+                    <td>Demographic Parity, Individual Fairness</td>
+                    <td>Equal exposure, personalized treatment</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Comprehensive Fairness Assessment</h2>
+
+        <p>
+            In practice, you should evaluate multiple fairness metrics to get a complete picture:
+        </p>
+
+        <pre><code># Comprehensive Fairness Report
+def fairness_report(y_true, y_pred, protected_attribute):
+    """
+    Generate comprehensive fairness assessment
+    """
+    print("=" * 60)
+    print("FAIRNESS ASSESSMENT REPORT")
+    print("=" * 60)
+
+    # 1. Demographic Parity
+    print("\n1. DEMOGRAPHIC PARITY")
+    print("-" * 60)
+    dp_ratio, _ = demographic_parity(y_pred, protected_attribute)
+
+    # 2. Equalized Odds
+    print("\n2. EQUALIZED ODDS")
+    print("-" * 60)
+    eo_results = equalized_odds(y_true, y_pred, protected_attribute)
+
+    # 3. Equal Opportunity
+    print("\n3. EQUAL OPPORTUNITY")
+    print("-" * 60)
+    eop_results = equal_opportunity(y_true, y_pred, protected_attribute)
+
+    # 4. Predictive Parity
+    print("\n4. PREDICTIVE PARITY")
+    print("-" * 60)
+    pp_results = predictive_parity(y_true, y_pred, protected_attribute)
+
+    # Summary
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print("Review all metrics above to make informed fairness assessment.")
+    print("Remember: Different metrics may conflict. Choose based on your")
+    print("specific use case and stakeholder values.")
+    print("\n弘益人間 - Ensure your AI benefits all humanity equitably")
+    print("=" * 60)
+
+    return {
+        'demographic_parity': dp_ratio,
+        'equalized_odds': eo_results,
+        'equal_opportunity': eop_results,
+        'predictive_parity': pp_results
+    }
+</code></pre>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">Chapter Summary</h2>
+            <ul>
+                <li>Fairness metrics provide quantitative methods to assess bias in AI systems</li>
+                <li>Group fairness metrics include demographic parity, equalized odds, equal opportunity, and predictive parity</li>
+                <li>Individual fairness requires similar individuals to receive similar treatment</li>
+                <li>Disparate impact analysis uses the 80% rule to detect discrimination</li>
+                <li>Calibration ensures prediction probabilities are accurate across groups</li>
+                <li>Different fairness criteria can be mutually exclusive—tradeoffs are necessary</li>
+                <li>Metric selection should be informed by application domain, legal requirements, and stakeholder values</li>
+                <li>Comprehensive assessment involves evaluating multiple fairness metrics</li>
+                <li>Implementation requires careful measurement and statistical analysis</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">Review Questions</h2>
+            <ol>
+                <li>What is demographic parity and when is it an appropriate fairness metric? What are its limitations?</li>
+                <li>Explain the difference between equalized odds and equal opportunity. When would you choose one over the other?</li>
+                <li>Why is it mathematically impossible to satisfy all fairness criteria simultaneously? Provide an example.</li>
+                <li>What is the 80% rule in disparate impact analysis? What does it indicate when a system fails this test?</li>
+                <li>How does individual fairness differ from group fairness? What are the challenges in implementing individual fairness?</li>
+                <li>A lending model has equal precision across demographic groups but different false positive rates. Which fairness criteria does it satisfy and which does it violate?</li>
+                <li>Describe a scenario where optimizing for demographic parity could lead to unfair individual-level outcomes.</li>
+                <li>Why is calibration important for fairness? How can a model be well-calibrated overall but poorly calibrated for specific groups?</li>
+                <li>Design a fairness evaluation strategy for a healthcare diagnostic AI. Which metrics would you prioritize and why?</li>
+                <li>How does the 弘益人間 philosophy guide the selection and application of fairness metrics?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-01.html" class="nav-button">← Previous Chapter</a>
+            <a href="chapter-03.html" class="nav-button">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

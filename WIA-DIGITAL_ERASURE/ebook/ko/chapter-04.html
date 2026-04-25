@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04 - 한국 서비스 구현 사례</title>
+    <style>:root{--primary:#f59e0b;--primary-dark:#d97706}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:#475569;margin:25px 0 15px;font-size:1.3em}.content p{margin:15px 0}.content ul,.content ol{margin:15px 0 15px 30px;line-height:2}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:#fef3c7;border-left:5px solid #f59e0b;padding:20px;margin:25px 0;border-radius:8px}.success-box{background:#d1fae5;border-left:5px solid #10b981;padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin:25px 0;background:white;box-shadow:0 2px 8px rgba(0,0,0,.1)}th{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:15px;text-align:left;font-weight:600}td{padding:12px 15px;border-bottom:1px solid #e2e8f0}tr:hover{background:#f8fafc}pre{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}code{font-family:'Courier New',monospace;font-size:0.9em}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:background 0.3s}.nav-button:hover{background:var(--primary-dark)}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Chapter 04</h1>
+            <h2 style="font-size:1.8em;font-weight:400;margin-top:20px">한국 서비스 구현 사례</h2>
+            <p style="margin-top:15px;font-size:1.1em">Korean Service Implementation: Naver, Kakao, and More</p>
+        </div>
+
+        <div class="content">
+            <h2>1. 한국 주요 플랫폼의 개인정보 삭제 현황</h2>
+            <p>한국은 네이버, 카카오, 쿠팡, 배달의민족, 토스 등 세계적 수준의 플랫폼 기업들이 활발하게 활동하는 시장입니다. 이들 기업은 개인정보보호법 제21조를 준수하면서도, 각자의 비즈니스 모델과 기술 스택에 맞는 독특한 데이터 삭제 시스템을 구축했습니다. 이 장에서는 주요 서비스들의 실제 구현 사례를 심층 분석합니다.</p>
+
+            <div class="info-box">
+                <h4>📌 학습 목표</h4>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>네이버의 통합계정 시스템과 데이터 삭제 아키텍처</li>
+                    <li>카카오의 멀티서비스 환경에서의 데이터 관리</li>
+                    <li>이커머스 플랫폼(쿠팡, 배민)의 거래 데이터 삭제</li>
+                    <li>핀테크(토스, 카카오페이)의 금융 데이터 처리</li>
+                    <li>각 서비스의 UI/UX 디자인 비교</li>
+                    <li>API 설계 및 기술 스택 분석</li>
+                </ul>
+            </div>
+
+            <h2>2. 네이버 (NAVER): 통합계정 시스템</h2>
+
+            <h3>2.1 네이버 아이디 센터 아키텍처</h3>
+            <p>네이버는 단일 네이버 아이디로 메일, 블로그, 카페, 쇼핑, 클라우드 등 50개 이상의 서비스를 이용하는 통합계정 시스템입니다. 이러한 복잡한 생태계에서 사용자 탈퇴 요청 시 모든 서비스의 데이터를 일관되게 삭제하는 것은 기술적으로 큰 도전입니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>서비스 카테고리</th>
+                        <th>주요 서비스</th>
+                        <th>데이터 특성</th>
+                        <th>삭제 방식</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>커뮤니케이션</strong></td>
+                        <td>네이버 메일, 라인</td>
+                        <td>개인 메시지, 연락처</td>
+                        <td>즉시 삭제</td>
+                    </tr>
+                    <tr>
+                        <td><strong>콘텐츠</strong></td>
+                        <td>블로그, 카페, 포스트</td>
+                        <td>공개 게시물, 댓글</td>
+                        <td>즉시 삭제 (백업 30일)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쇼핑</strong></td>
+                        <td>스마트스토어, 네이버쇼핑</td>
+                        <td>구매내역, 리뷰</td>
+                        <td>5년 분리보관 후 삭제</td>
+                    </tr>
+                    <tr>
+                        <td><strong>클라우드</strong></td>
+                        <td>MYBOX, 네이버 클라우드</td>
+                        <td>업로드 파일, 사진</td>
+                        <td>즉시 삭제</td>
+                    </tr>
+                    <tr>
+                        <td><strong>금융</strong></td>
+                        <td>네이버페이</td>
+                        <td>결제정보, 거래내역</td>
+                        <td>5년 분리보관 후 삭제</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>2.2 네이버 탈퇴 프로세스 분석</h3>
+            <div class="success-box">
+                <h4>✅ 네이버 회원 탈퇴 단계별 프로세스</h4>
+                <ol style="margin:10px 0 0 20px;line-height:2.2">
+                    <li><strong>Step 1: 본인 인증</strong>
+                        <ul style="margin:5px 0 0 20px">
+                            <li>비밀번호 재입력 또는 2차 인증 (OTP, SMS)</li>
+                            <li>보안 등급에 따라 추가 인증 요구</li>
+                        </ul>
+                    </li>
+                    <li><strong>Step 2: 서비스 이용 현황 확인</strong>
+                        <ul style="margin:5px 0 0 20px">
+                            <li>현재 이용 중인 서비스 목록 표시</li>
+                            <li>네이버페이 잔액, 쿠폰, 포인트 확인</li>
+                            <li>진행 중인 주문/예약 확인</li>
+                        </ul>
+                    </li>
+                    <li><strong>Step 3: 데이터 삭제 안내</strong>
+                        <ul style="margin:5px 0 0 20px">
+                            <li>즉시 삭제 대상: 프로필, 블로그, 카페 게시물</li>
+                            <li>분리보관 대상: 구매내역 (5년), 결제정보 (5년)</li>
+                            <li>삭제 불가 대상: 타인 게시물에 단 댓글 (익명 처리)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Step 4: 최종 확인 및 탈퇴</strong>
+                        <ul style="margin:5px 0 0 20px">
+                            <li>"네이버 회원 탈퇴에 동의합니다" 체크</li>
+                            <li>탈퇴 사유 선택 (선택사항)</li>
+                            <li>확인 버튼 클릭</li>
+                        </ul>
+                    </li>
+                    <li><strong>Step 5: 삭제 실행 및 확인</strong>
+                        <ul style="margin:5px 0 0 20px">
+                            <li>즉시 로그아웃 처리</li>
+                            <li>탈퇴 완료 이메일 발송</li>
+                            <li>30일 내 재가입 불가 정책 안내</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <h3>2.3 네이버의 API 아키텍처</h3>
+            <pre><code>// 네이버 통합 계정 삭제 API 구조 (개념적 예시)
+
+// 1. 탈퇴 요청 API
+POST https://nid.naver.com/api/v2/account/withdrawal
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "userId": "user@naver.com",
+  "authMethod": "PASSWORD",
+  "password": "encrypted_password",
+  "reason": "PRIVACY_CONCERNS", // optional
+  "confirmDataDeletion": true
+}
+
+// 2. 서비스별 데이터 삭제 이벤트 발행
+// Event-Driven Architecture 사용
+{
+  "eventType": "ACCOUNT_WITHDRAWAL_REQUESTED",
+  "userId": "user-uuid",
+  "timestamp": "2025-01-07T15:30:00Z",
+  "services": [
+    {
+      "serviceId": "naver-mail",
+      "action": "DELETE_IMMEDIATELY",
+      "dataRetentionDays": 0
+    },
+    {
+      "serviceId": "naver-shopping",
+      "action": "SEPARATE_STORAGE",
+      "dataRetentionDays": 1825 // 5년
+    },
+    {
+      "serviceId": "naver-blog",
+      "action": "DELETE_WITH_BACKUP",
+      "dataRetentionDays": 30
+    }
+  ]
+}
+
+// 3. 각 마이크로서비스의 삭제 처리
+// 각 서비스는 독립적으로 이벤트를 수신하고 처리
+async function handleWithdrawalEvent(event) {
+  const { userId, action, dataRetentionDays } = event;
+
+  if (action === 'DELETE_IMMEDIATELY') {
+    await deleteUserData(userId);
+    await notifyDeletionComplete(userId);
+  } else if (action === 'SEPARATE_STORAGE') {
+    await moveToSeparateStorage(userId, dataRetentionDays);
+    await schedulePerformance(userId, dataRetentionDays);
+  }
+}
+
+// 4. 삭제 완료 확인
+GET https://nid.naver.com/api/v2/account/withdrawal/status/{requestId}
+
+Response:
+{
+  "requestId": "WD-2025-001234",
+  "status": "COMPLETED",
+  "completedServices": [
+    { "service": "naver-mail", "deletedAt": "2025-01-07T15:30:05Z" },
+    { "service": "naver-blog", "deletedAt": "2025-01-07T15:30:12Z" }
+  ],
+  "separatedStorageServices": [
+    { "service": "naver-shopping", "retentionUntil": "2030-01-07" }
+  ],
+  "verificationCode": "VRF-ABC123"
+}</code></pre>
+
+            <h2>3. 카카오 (Kakao): 멀티서비스 생태계</h2>
+
+            <h3>3.1 카카오계정 연동 구조</h3>
+            <p>카카오는 카카오톡을 중심으로 카카오페이, 카카오뱅크, 카카오택시, 카카오T, 멜론 등 100개 이상의 서비스가 연결된 복잡한 생태계를 구축했습니다. 사용자는 개별 서비스별로 탈퇴하거나, 카카오계정 전체를 탈퇴할 수 있습니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>삭제 범위</th>
+                        <th>대상 서비스</th>
+                        <th>삭제 방식</th>
+                        <th>예외 사항</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>카카오톡 탈퇴</strong></td>
+                        <td>카카오톡 메시지, 친구 목록</td>
+                        <td>즉시 삭제</td>
+                        <td>단체채팅 메시지는 다른 참가자에게 유지</td>
+                    </tr>
+                    <tr>
+                        <td><strong>카카오페이 해지</strong></td>
+                        <td>결제수단, 거래내역</td>
+                        <td>5년 분리보관</td>
+                        <td>전자금융거래법 준수</td>
+                    </tr>
+                    <tr>
+                        <td><strong>카카오뱅크 해지</strong></td>
+                        <td>계좌정보, 거래내역</td>
+                        <td>10년 분리보관</td>
+                        <td>금융실명법 준수</td>
+                    </tr>
+                    <tr>
+                        <td><strong>카카오계정 탈퇴</strong></td>
+                        <td>모든 연결 서비스</td>
+                        <td>통합 탈퇴 (각 서비스별 정책 적용)</td>
+                        <td>금융 서비스는 별도 해지 필요</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>3.2 카카오의 선택적 삭제 기능</h3>
+            <div class="success-box">
+                <h4>✅ 카카오 선택적 데이터 삭제</h4>
+                <p>카카오는 전체 탈퇴 외에도 세분화된 삭제 옵션을 제공합니다:</p>
+                <ul style="margin:10px 0 0 20px;line-height:2">
+                    <li><strong>카카오톡 대화 내용 삭제</strong>: 개별 대화방 또는 전체 대화 삭제</li>
+                    <li><strong>프로필 정보 삭제</strong>: 프로필 사진, 상태 메시지 등 부분 삭제</li>
+                    <li><strong>검색 기록 삭제</strong>: 카카오톡, 다음 검색 기록 개별 삭제</li>
+                    <li><strong>결제 수단 삭제</strong>: 등록된 카드 정보 개별 삭제</li>
+                    <li><strong>선물하기 주소 삭제</strong>: 배송지 정보 삭제</li>
+                    <li><strong>이용 기록 삭제</strong>: 택시 이용 내역, 음악 재생 기록 등</li>
+                </ul>
+            </div>
+
+            <h3>3.3 카카오 API 예시</h3>
+            <pre><code>// 카카오 계정 탈퇴 API (개념적 예시)
+
+// 1. 카카오계정 탈퇴 전 체크
+GET https://kapi.kakao.com/v2/user/me/withdrawal/check
+Authorization: Bearer {access_token}
+
+Response:
+{
+  "canWithdraw": true,
+  "blockers": [],
+  "warnings": [
+    {
+      "service": "kakaopay",
+      "message": "카카오페이 잔액 5,000원이 있습니다.",
+      "action": "USE_OR_REFUND"
+    },
+    {
+      "service": "kakaobank",
+      "message": "카카오뱅크 계좌는 별도 해지가 필요합니다.",
+      "action": "CLOSE_ACCOUNT_SEPARATELY"
+    }
+  ]
+}
+
+// 2. 카카오계정 탈퇴 실행
+DELETE https://kapi.kakao.com/v1/user/unlink
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+Response:
+{
+  "id": 1234567890,
+  "status": "UNLINKED",
+  "timestamp": "2025-01-07T15:30:00Z",
+  "deletionPolicy": {
+    "immediateDelete": ["profile", "kakaotalk_messages", "friends"],
+    "separateStorage": [
+      {
+        "type": "payment_history",
+        "retentionPeriod": "5_YEARS",
+        "legalBasis": "전자금융거래법"
+      }
+    ]
+  }
+}</code></pre>
+
+            <h2>4. 쿠팡 (Coupang): 이커머스 데이터 관리</h2>
+
+            <h3>4.1 쿠팡의 거래 데이터 처리</h3>
+            <p>쿠팡은 연간 10조 원 이상의 거래액을 기록하는 한국 최대 이커머스 플랫폼입니다. 방대한 구매 데이터, 배송 정보, 리뷰 등을 관리하면서도 사용자의 삭제 권리를 보장해야 하는 과제를 안고 있습니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>데이터 유형</th>
+                        <th>보존 기간</th>
+                        <th>법적 근거</th>
+                        <th>삭제 방식</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>계약/청약철회 기록</td>
+                        <td>5년</td>
+                        <td>전자상거래법 제6조</td>
+                        <td>암호화 후 분리 DB 보관</td>
+                    </tr>
+                    <tr>
+                        <td>대금결제/재화공급 기록</td>
+                        <td>5년</td>
+                        <td>전자상거래법 제6조</td>
+                        <td>익명화 후 분리 보관</td>
+                    </tr>
+                    <tr>
+                        <td>소비자 불만/분쟁 처리</td>
+                        <td>3년</td>
+                        <td>전자상거래법 제6조</td>
+                        <td>분리 DB 보관</td>
+                    </tr>
+                    <tr>
+                        <td>상품 리뷰</td>
+                        <td>회원 탈퇴 시</td>
+                        <td>-</td>
+                        <td>익명 처리 또는 삭제</td>
+                    </tr>
+                    <tr>
+                        <td>로켓와우 멤버십 정보</td>
+                        <td>해지 시</td>
+                        <td>-</td>
+                        <td>즉시 삭제</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>4.2 쿠팡의 데이터 익명화 전략</h3>
+            <div class="info-box">
+                <h4>🔒 쿠팡 익명화 기법</h4>
+                <p>쿠팡은 법정 보존 기간 동안 데이터를 보관할 때, 개인 식별을 불가능하게 하는 익명화 기법을 적용합니다:</p>
+                <ul style="margin:10px 0 0 20px;line-height:2">
+                    <li><strong>가명처리 (Pseudonymization)</strong>: 이름, 전화번호를 랜덤 ID로 대체</li>
+                    <li><strong>일반화 (Generalization)</strong>: 상세 주소를 시/도 단위로 축약</li>
+                    <li><strong>데이터 마스킹</strong>: 카드번호 일부만 표시 (**** **** **** 1234)</li>
+                    <li><strong>집계 (Aggregation)</strong>: 개별 거래가 아닌 통계 데이터로 변환</li>
+                    <li><strong>랜덤 노이즈 추가</strong>: 금액에 작은 오차 추가하여 역추적 방지</li>
+                </ul>
+            </div>
+
+            <h2>5. 토스 (Toss): 핀테크의 금융 데이터 삭제</h2>
+
+            <h3>5.1 금융 규제 환경에서의 데이터 관리</h3>
+            <p>토스는 금융위원회, 금융감독원의 엄격한 규제 하에 있는 핀테크 서비스입니다. 일반 IT 서비스보다 훨씬 긴 법정 보존 기간과 감사 요구사항을 충족해야 합니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>데이터 유형</th>
+                        <th>보존 기간</th>
+                        <th>법적 근거</th>
+                        <th>감독 기관</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>금융거래 기록</td>
+                        <td>5년</td>
+                        <td>금융실명법 제4조</td>
+                        <td>금융감독원</td>
+                    </tr>
+                    <tr>
+                        <td>본인확인 기록 (KYC)</td>
+                        <td>5년</td>
+                        <td>전자금융거래법 제22조</td>
+                        <td>금융위원회</td>
+                    </tr>
+                    <tr>
+                        <td>자금세탁 방지 기록</td>
+                        <td>5년</td>
+                        <td>특정금융정보법</td>
+                        <td>금융정보분석원 (FIU)</td>
+                    </tr>
+                    <tr>
+                        <td>보험계약 정보</td>
+                        <td>10년</td>
+                        <td>보험업법</td>
+                        <td>금융감독원</td>
+                    </tr>
+                    <tr>
+                        <td>증권 거래 기록</td>
+                        <td>10년</td>
+                        <td>자본시장법</td>
+                        <td>금융감독원</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 토스의 회원 탈퇴 프로세스</h3>
+            <div class="warning-box">
+                <h4>⚠️ 토스 탈퇴 시 주의사항</h4>
+                <ol style="margin:10px 0 0 20px;line-height:2">
+                    <li><strong>토스뱅크 계좌 해지</strong>: 반드시 선행 필요 (별도 앱에서 진행)</li>
+                    <li><strong>토스증권 계좌 해지</strong>: 주식, 코인 매도 후 출금 필요</li>
+                    <li><strong>토스페이먼츠 가맹점</strong>: 사업자는 별도 해지 절차</li>
+                    <li><strong>자동이체 해지</strong>: 모든 자동이체 사전 해지 필수</li>
+                    <li><strong>잔액 인출</strong>: 토스머니 잔액 0원 필요</li>
+                    <li><strong>보험 계약</strong>: 진행 중인 보험 계약 해지 필요</li>
+                </ol>
+                <p style="margin-top:15px">* 위 사항 미처리 시 탈퇴 불가하며, 처리 완료 후 탈퇴 가능</p>
+            </div>
+
+            <h2>6. 배달의민족: 리뷰와 주문 데이터</h2>
+
+            <h3>6.1 배민의 독특한 과제</h3>
+            <p>배달의민족은 음식 주문 플랫폼으로, 사용자의 주문 내역과 리뷰가 상호 연결되어 있습니다. 사용자 탈퇴 시 리뷰를 어떻게 처리할지, 사장님의 답글은 어떻게 할지 등 복잡한 이슈가 있습니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>콘텐츠 유형</th>
+                        <th>탈퇴 시 처리</th>
+                        <th>이유</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>주문 내역</td>
+                        <td>5년 분리보관</td>
+                        <td>전자상거래법 (결제 기록)</td>
+                    </tr>
+                    <tr>
+                        <td>작성한 리뷰</td>
+                        <td>익명 처리 또는 삭제 선택</td>
+                        <td>사용자 선택권 부여</td>
+                    </tr>
+                    <tr>
+                        <td>사장님 답글</td>
+                        <td>유지 (리뷰 삭제 시 함께 삭제)</td>
+                        <td>리뷰와 쌍으로 관리</td>
+                    </tr>
+                    <tr>
+                        <td>찜한 가게</td>
+                        <td>즉시 삭제</td>
+                        <td>개인 선호 정보</td>
+                    </tr>
+                    <tr>
+                        <td>배민페이 정보</td>
+                        <td>5년 분리보관</td>
+                        <td>전자금융거래법</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>7. 서비스 비교: 종합 분석</h2>
+
+            <h3>7.1 사용자 경험 (UX) 비교</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>서비스</th>
+                        <th>탈퇴 경로 복잡도</th>
+                        <th>소요 시간</th>
+                        <th>UX 평가</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>네이버</strong></td>
+                        <td>중간 (5단계)</td>
+                        <td>2-3분</td>
+                        <td>⭐⭐⭐⭐ 명확한 안내, 다소 긴 절차</td>
+                    </tr>
+                    <tr>
+                        <td><strong>카카오</strong></td>
+                        <td>낮음 (3단계)</td>
+                        <td>1-2분</td>
+                        <td>⭐⭐⭐⭐⭐ 매우 간단, 직관적</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쿠팡</strong></td>
+                        <td>중간 (4단계)</td>
+                        <td>2분</td>
+                        <td>⭐⭐⭐⭐ 명확한 정보 제공</td>
+                    </tr>
+                    <tr>
+                        <td><strong>토스</strong></td>
+                        <td>높음 (7단계 이상)</td>
+                        <td>5-10분</td>
+                        <td>⭐⭐⭐ 복잡하지만 금융 특성상 불가피</td>
+                    </tr>
+                    <tr>
+                        <td><strong>배민</strong></td>
+                        <td>낮음 (3단계)</td>
+                        <td>1분</td>
+                        <td>⭐⭐⭐⭐ 간단하지만 리뷰 처리 선택 필요</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>7.2 기술 스택 비교</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>서비스</th>
+                        <th>아키텍처</th>
+                        <th>삭제 방식</th>
+                        <th>특징</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>네이버</strong></td>
+                        <td>MSA (Microservices)</td>
+                        <td>Event-Driven</td>
+                        <td>각 서비스 독립적 처리</td>
+                    </tr>
+                    <tr>
+                        <td><strong>카카오</strong></td>
+                        <td>MSA + Federation</td>
+                        <td>Distributed Transaction</td>
+                        <td>멀티 서비스 동기화</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쿠팡</strong></td>
+                        <td>MSA + Data Lake</td>
+                        <td>Batch + Real-time</td>
+                        <td>대용량 데이터 처리</td>
+                    </tr>
+                    <tr>
+                        <td><strong>토스</strong></td>
+                        <td>Hybrid (Monolith + MSA)</td>
+                        <td>Transactional</td>
+                        <td>강한 일관성 보장</td>
+                    </tr>
+                    <tr>
+                        <td><strong>배민</strong></td>
+                        <td>MSA</td>
+                        <td>Event Sourcing</td>
+                        <td>이벤트 기반 추적</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8. 정리: 이 장에서 배운 내용</h2>
+
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점 정리</h3>
+                <ul style="line-height:2">
+                    <li><strong>네이버</strong>: 통합계정 시스템, Event-Driven 아키텍처로 50개 이상 서비스 관리</li>
+                    <li><strong>카카오</strong>: 선택적 삭제 옵션 제공, 사용자 편의성 최우선</li>
+                    <li><strong>쿠팡</strong>: 이커머스 특성상 5년 보존, 익명화 기법 활용</li>
+                    <li><strong>토스</strong>: 금융 규제 준수, 복잡한 선행 조건 (계좌 해지 등)</li>
+                    <li><strong>배민</strong>: 리뷰 익명화 옵션, 사용자 선택권 부여</li>
+                    <li><strong>공통점</strong>: 모두 개인정보보호법 제21조 준수, 법정 보존 정보 분리 보관</li>
+                    <li><strong>차이점</strong>: 비즈니스 모델과 규제 환경에 따라 삭제 정책 상이</li>
+                    <li><strong>기술 트렌드</strong>: MSA, Event-Driven, 익명화 기술 활용</li>
+                    <li><strong>弘益人間</strong>: 사용자 권리 보호와 서비스 연속성의 균형</li>
+                </ul>
+            </div>
+
+            <h2>9. 생각해 볼 질문</h2>
+
+            <div class="warning-box">
+                <h4>💭 Discussion Questions</h4>
+                <ol style="margin:10px 0 0 20px;line-height:2">
+                    <li>네이버처럼 50개 이상의 서비스를 통합 관리하는 플랫폼과, 단일 서비스 중 어느 쪽이 데이터 삭제를 더 효과적으로 구현할 수 있을까요?</li>
+                    <li>사용자가 작성한 리뷰를 탈퇴 시 어떻게 처리하는 것이 공정할까요? (완전 삭제 vs 익명화 vs 유지)</li>
+                    <li>금융 서비스의 10년 보존 기간은 개인의 삭제권과 충돌하지 않을까요?</li>
+                    <li>마이크로서비스 아키텍처에서 일부 서비스의 삭제가 실패하면 어떻게 처리해야 할까요?</li>
+                    <li>이커머스 플랫폼에서 익명화된 데이터를 통한 개인 재식별은 불가능할까요?</li>
+                </ol>
+            </div>
+
+            <h2>10. 다음 장 미리보기</h2>
+
+            <p>다음 장에서는 기술적 구현의 세부사항을 다룹니다. 데이터베이스 레벨의 삭제 기법, 백업 시스템에서의 데이터 파기, 클라우드 환경에서의 구현, 블록체인과 같은 불변 데이터 구조에서의 삭제 등 실무 개발자가 알아야 할 기술적 디테일을 심층 분석합니다.</p>
+
+            <div class="navigation">
+                <a href="chapter-03.html" class="nav-button">← 이전 장</a>
+                <a href="chapter-05.html" class="nav-button">다음 장: 기술적 구현 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

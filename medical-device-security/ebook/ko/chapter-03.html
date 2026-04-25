@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 인슐린 펌프 취약점 - WIA 의료기기 보안 표준</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { padding: 2rem 0; border-bottom: 2px solid #14B8A6; margin-bottom: 2rem; }
+        .chapter-number { font-size: 1rem; color: #14B8A6; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #f8fafc; margin-bottom: 1rem; }
+        h2 { color: #14B8A6; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(20, 184, 166, 0.3); }
+        h3 { color: #14B8A6; font-size: 1.3rem; margin: 2rem 0 1rem 0; }
+        p { margin-bottom: 1.2rem; color: #cbd5e1; }
+        .chapter-nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #334155; color: #14B8A6; text-decoration: none; border-radius: 6px; transition: all 0.3s ease; border: 1px solid #14B8A6; }
+        .nav-button:hover { background: #14B8A6; color: #0f172a; transform: translateY(-2px); }
+        .highlight-box { background: rgba(20, 184, 166, 0.1); border-left: 4px solid #14B8A6; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #14B8A6; color: #0f172a; font-weight: 600; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #334155; }
+        .code-block { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 2rem 0; overflow-x: auto; }
+        .code-header { color: #14B8A6; font-size: 0.9rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; }
+        pre { margin: 0; color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.9rem; line-height: 1.6; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+        .stat-card { background: #1e293b; padding: 1.5rem; border-radius: 8px; border: 1px solid #334155; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #14B8A6; margin-bottom: 0.5rem; }
+        .stat-label { color: #94a3b8; font-size: 0.9rem; }
+        footer { margin-top: 4rem; padding: 2rem 0; text-align: center; border-top: 2px solid #334155; color: #64748b; }
+        .footer-tagline { font-size: 1.1rem; color: #14B8A6; margin-bottom: 0.5rem; }
+        .warning-box { background: rgba(251, 191, 36, 0.1); border-left: 4px solid #fbbf24; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .info-box { background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .danger-box { background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        @media (max-width: 768px) { h1 { font-size: 2rem; } .container { padding: 1rem; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">3장</div>
+            <h1>인슐린 펌프 취약점</h1>
+        </header>
+
+        <div class="highlight-box">
+            <strong>장 개요:</strong> 이 장에서는 인슐린 펌프와 연속 혈당 모니터링(CGM) 시스템의 사이버 보안 취약점을 다룹니다. 당뇨병 환자의 생명을 유지하는 이 장비들은 점점 더 연결되고 자동화되면서 새로운 보안 도전 과제에 직면하고 있습니다. 실제 해킹 사례, 인공췌장 시스템의 보안, 그리고 효과적인 방어 전략을 살펴봅니다.
+        </div>
+
+        <h2>인슐린 펌프 시스템의 이해</h2>
+
+        <p>인슐린 펌프는 제1형 및 제2형 당뇨병 환자가 혈당을 조절하기 위해 사용하는 소형 의료기기입니다. 전통적인 인슐린 주사를 대체하여 24시간 지속적으로 인슐린을 주입하며, 식사 시 추가 용량(볼러스)을 투여할 수 있습니다.</p>
+
+        <h3>현대 인슐린 펌프의 구성 요소</h3>
+
+        <ul>
+            <li><strong>펌프 본체:</strong> 인슐린 저장소, 마이크로프로세서, 배터리, 디스플레이</li>
+            <li><strong>주입 세트:</strong> 펌프와 환자를 연결하는 카테터와 캐뉼라</li>
+            <li><strong>CGM 센서:</strong> 피하 조직에서 5분마다 혈당 측정</li>
+            <li><strong>무선 통신:</strong> Bluetooth, 무선 주파수로 스마트폰 및 CGM과 연결</li>
+            <li><strong>제어 앱:</strong> 스마트폰에서 펌프 모니터링 및 제어</li>
+        </ul>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">537M</div>
+                <div class="stat-label">전세계 당뇨병 환자</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">1.2M</div>
+                <div class="stat-label">인슐린 펌프 사용자 (미국)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">288</div>
+                <div class="stat-label">일일 혈당 측정 횟수 (CGM)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">24/7</div>
+                <div class="stat-label">연속 인슐린 주입</div>
+            </div>
+        </div>
+
+        <h3>인공췌장 시스템 (Automated Insulin Delivery, AID)</h3>
+
+        <p>가장 진보된 형태의 당뇨병 관리 시스템은 인공췌장으로도 알려진 AID 시스템입니다. 이는 CGM, 인슐린 펌프, 제어 알고리즘을 통합하여 자동으로 혈당을 조절합니다:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>시스템 유형</th>
+                    <th>자동화 수준</th>
+                    <th>사용자 개입</th>
+                    <th>보안 복잡도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>수동 펌프</strong></td>
+                    <td>없음</td>
+                    <td>모든 용량을 수동 입력</td>
+                    <td>낮음</td>
+                </tr>
+                <tr>
+                    <td><strong>저혈당 중단 (LGS)</strong></td>
+                    <td>기본</td>
+                    <td>저혈당 시 펌프 자동 중단</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td><strong>예측 저혈당 중단</strong></td>
+                    <td>중간</td>
+                    <td>저혈당 예측 시 선제적 중단</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td><strong>하이브리드 폐쇄 루프</strong></td>
+                    <td>높음</td>
+                    <td>식사 시만 수동 입력</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td><strong>완전 폐쇄 루프</strong></td>
+                    <td>완전</td>
+                    <td>개입 없음 (실험 단계)</td>
+                    <td>매우 높음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>인슐린 펌프 해킹의 역사</h2>
+
+        <h3>2011: Jay Radcliffe의 자가 해킹</h3>
+
+        <p>보안 연구자이자 제1형 당뇨병 환자인 Jay Radcliffe는 2011년 Black Hat 컨퍼런스에서 자신이 사용하는 인슐린 펌프를 해킹하는 시연을 했습니다. 그는 다음을 발견했습니다:</p>
+
+        <ul>
+            <li><strong>암호화 부재:</strong> 펌프와 원격 제어기 간 통신이 평문으로 전송됨</li>
+            <li><strong>인증 없음:</strong> 누구나 펌프에 명령을 보낼 수 있음</li>
+            <li><strong>재생 공격 가능:</strong> 캡처한 명령을 나중에 재전송 가능</li>
+            <li><strong>치명적 용량:</strong> 원격으로 치명적인 양의 인슐린 주입 가능</li>
+        </ul>
+
+        <div class="danger-box">
+            <strong>실제 위험:</strong> 인슐린 과다 투여는 심각한 저혈당(hypoglycemia)을 유발하여 의식 상실, 발작, 혼수상태, 심지어 사망에 이를 수 있습니다. 반대로 인슐린 투여 중단은 고혈당과 당뇨병성 케톤산증(DKA)을 일으킬 수 있으며, 이 역시 치명적입니다.
+        </div>
+
+        <h3>2016: FDA의 Animas OneTouch Ping 경고</h3>
+
+        <p>2016년, FDA는 Johnson & Johnson의 Animas OneTouch Ping 인슐린 펌프에 대한 사이버 보안 경고를 발표했습니다. 이는 FDA가 인슐린 펌프에 대해 발표한 최초의 공식 보안 권고였습니다.</p>
+
+        <p><strong>발견된 취약점:</strong></p>
+
+        <ul>
+            <li>원격 제어기와 펌프 간 암호화되지 않은 무선 통신</li>
+            <li>공격자가 25피트(약 7.6미터) 이내에서 볼러스 명령 전송 가능</li>
+            <li>환자가 부주의할 경우 승인되지 않은 인슐린 투여 발생 가능</li>
+        </ul>
+
+        <p><strong>FDA 권고 사항:</strong></p>
+
+        <ul>
+            <li>펌프의 볼러스 알림을 항상 활성화할 것</li>
+            <li>예상치 않은 인슐린 투여 알림 시 즉시 확인할 것</li>
+            <li>의심스러운 활동 발견 시 제조업체 및 의료진에게 즉시 보고</li>
+        </ul>
+
+        <h3>2018: Medtronic 펌프 대규모 리콜</h3>
+
+        <p>2018년, Medtronic은 다수의 인슐린 펌프 모델에서 사이버 보안 취약점이 발견되어 리콜을 실시했습니다. 이는 인슐린 펌프 역사상 가장 큰 규모의 보안 관련 리콜이었습니다.</p>
+
+        <div class="info-box">
+            <strong>영향받은 모델:</strong> MiniMed 508, MiniMed Paradigm series (512, 522, 712, 722), MiniMed Paradigm REAL-Time series 등 총 4,000대 이상의 펌프가 영향을 받았습니다.
+        </div>
+
+        <p>Medtronic은 해당 모델의 생산을 중단하고, 환자들을 더 안전한 신형 모델로 무료 교체해주었습니다. 신형 모델에는 암호화된 무선 통신, 상호 인증, 재생 공격 방지 기능이 포함되었습니다.</p>
+
+        <h2>인슐린 펌프 공격 시나리오</h2>
+
+        <h3>1. 원격 인슐린 주입 공격</h3>
+
+        <p>가장 치명적인 공격으로, 공격자가 환자 모르게 인슐린을 주입하는 시나리오입니다:</p>
+
+        <div class="code-block">
+            <div class="code-header">공격 시나리오: 원격 볼러스 주입</div>
+            <pre>
+# 공격자 프로파일
+- 위치: 환자로부터 10m 이내 (카페, 사무실, 대중교통)
+- 장비: SDR (소프트웨어 무선), 노트북, 안테나
+- 지식: 펌프 무선 프로토콜 리버스 엔지니어링
+
+# 공격 단계
+
+1단계: 타겟 스캔
+   - 402-405 MHz 주파수 대역 스캔
+   - 인슐린 펌프 신호 식별
+   - 펌프 시리얼 번호 및 모델 확인
+
+2단계: 트래픽 분석
+   - 정상 통신 패킷 캡처
+   - 볼러스 명령 구조 분석
+   - 프로토콜 리버스 엔지니어링
+
+3단계: 명령 주입
+   - 위조된 볼러스 명령 생성
+   - 15 유닛 인슐린 주입 명령 전송
+   - (일반 식사 용량의 3-5배)
+
+4단계: 효과
+   - 15-30분 후: 혈당 급격히 하락
+   - 30-60분 후: 저혈당 증상 (떨림, 혼란, 발한)
+   - 60-90분 후: 심각한 저혈당 (의식 저하)
+   - 응급 처치 없으면 생명 위험
+
+# 완화 조치
+- 볼러스 알림 필수 활성화
+- 예상치 않은 알림 시 즉시 펌프 확인
+- 최대 볼러스 제한 설정
+- 암호화된 통신 사용
+</pre>
+        </div>
+
+        <h3>2. 인슐린 중단 공격</h3>
+
+        <p>반대로 인슐린 주입을 중단하는 공격도 위험합니다:</p>
+
+        <ul>
+            <li><strong>기초 주입 중단:</strong> 24시간 지속되는 기초 인슐린을 중단</li>
+            <li><strong>영향:</strong> 몇 시간 내에 혈당이 위험 수준으로 상승</li>
+            <li><strong>결과:</strong> 당뇨병성 케톤산증(DKA), 입원 필요</li>
+            <li><strong>탐지의 어려움:</strong> 환자가 즉시 증상을 느끼지 못할 수 있음</li>
+        </ul>
+
+        <h3>3. CGM 데이터 조작</h3>
+
+        <p>연속 혈당 모니터링 시스템의 데이터를 조작하여 환자나 인공췌장 알고리즘을 속이는 공격:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>공격 유형</th>
+                    <th>조작 방법</th>
+                    <th>환자 반응</th>
+                    <th>결과</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>허위 고혈당</strong></td>
+                    <td>CGM 데이터를 높게 위조</td>
+                    <td>환자가 추가 인슐린 주입</td>
+                    <td>실제로는 저혈당 유발</td>
+                </tr>
+                <tr>
+                    <td><strong>허위 저혈당</strong></td>
+                    <td>CGM 데이터를 낮게 위조</td>
+                    <td>환자가 탄수화물 섭취</td>
+                    <td>실제로는 고혈당 유발</td>
+                </tr>
+                <tr>
+                    <td><strong>데이터 지연</strong></td>
+                    <td>오래된 데이터 반복 전송</td>
+                    <td>혈당 변화를 놓침</td>
+                    <td>부적절한 치료 결정</td>
+                </tr>
+                <tr>
+                    <td><strong>알림 차단</strong></td>
+                    <td>저/고혈당 경고 억제</td>
+                    <td>위험한 혈당 수준 인지 못함</td>
+                    <td>응급 상황 발생</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4. 모바일 앱 취약점</h3>
+
+        <p>현대 인슐린 펌프는 스마트폰 앱과 연동됩니다. 이 앱들도 공격 표면이 될 수 있습니다:</p>
+
+        <ul>
+            <li><strong>앱 리버스 엔지니어링:</strong> 디컴파일하여 통신 프로토콜 추출</li>
+            <li><strong>중간자 공격 (MITM):</strong> 앱과 펌프 간 통신 가로채기</li>
+            <li><strong>악성 앱 배포:</strong> 가짜 당뇨병 관리 앱으로 위장하여 자격 증명 탈취</li>
+            <li><strong>클라우드 API 공격:</strong> 제조업체 클라우드 서버 침입하여 여러 환자 데이터 탈취</li>
+        </ul>
+
+        <h2>인공췌장 시스템의 특수한 보안 도전</h2>
+
+        <p>자동화된 인슐린 투여 시스템은 편의성을 제공하지만 새로운 보안 위험도 도입합니다:</p>
+
+        <h3>1. 알고리즘 조작</h3>
+
+        <p>인공췌장의 제어 알고리즘은 CGM 데이터를 기반으로 인슐린 용량을 계산합니다. 공격자가 이 알고리즘을 조작하면:</p>
+
+        <ul>
+            <li>과도하게 공격적인 인슐린 투여 (저혈당 유발)</li>
+            <li>과도하게 보수적인 인슐린 투여 (고혈당 허용)</li>
+            <li>인슐린 감수성 계수 조작 (용량 계산 왜곡)</li>
+            <li>목표 혈당 범위 변경 (위험한 수준 허용)</li>
+        </ul>
+
+        <h3>2. DIY 인공췌장의 위험</h3>
+
+        <p>일부 당뇨병 커뮤니티는 오픈소스 인공췌장 시스템(OpenAPS, Loop, AndroidAPS)을 개발했습니다. 이들은 강력하지만 보안 위험도 있습니다:</p>
+
+        <div class="warning-box">
+            <strong>DIY 시스템의 보안 고려사항:</strong>
+            <ul style="margin-top: 1rem;">
+                <li><strong>규제 미승인:</strong> FDA나 CE 인증을 받지 않음</li>
+                <li><strong>사용자 책임:</strong> 모든 보안은 사용자가 직접 관리</li>
+                <li><strong>코드 검증:</strong> 오픈소스 코드의 보안 감사 필요</li>
+                <li><strong>업데이트 위험:</strong> 악의적인 코드가 포함된 업데이트 가능성</li>
+                <li><strong>지원 부재:</strong> 보안 사고 시 공식 지원 없음</li>
+            </ul>
+        </div>
+
+        <h2>인슐린 펌프 보안 방어 전략</h2>
+
+        <h3>1. 강력한 무선 보안</h3>
+
+        <p>현대 인슐린 펌프는 다음과 같은 무선 보안 메커니즘을 구현해야 합니다:</p>
+
+        <div class="code-block">
+            <div class="code-header">권장 무선 보안 구성</div>
+            <pre>
+# Bluetooth Low Energy (BLE) 보안
+
+암호화: AES-128-CCM (Counter with CBC-MAC)
+키 교환: LE Secure Connections with ECDH
+페어링: Numeric Comparison (6자리 숫자 확인)
+본딩: 장기 키 저장 (재페어링 불필요)
+
+# 페어링 프로세스
+
+1. 초기 페어링:
+   - 펌프와 스마트폰 모두에 동일한 6자리 숫자 표시
+   - 사용자가 두 숫자가 일치하는지 육안 확인
+   - 확인 후에만 페어링 완료
+
+2. 인증된 장치만 통신:
+   - 페어링된 장치의 MAC 주소 화이트리스트
+   - 미인증 장치의 연결 시도 거부
+   - 최대 3개 장치로 페어링 제한
+
+3. 재생 공격 방지:
+   - 각 명령에 순차 증가하는 카운터 포함
+   - 이전에 수신한 카운터 값 거부
+   - 타임스탬프 검증 (±5분 허용)
+
+4. 세션 타임아웃:
+   - 30분 사용 없으면 자동 연결 해제
+   - 재연결 시 재인증 필요
+</pre>
+        </div>
+
+        <h3>2. 다층 인증 및 승인</h3>
+
+        <p>중요한 작업에는 여러 단계의 확인이 필요합니다:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>작업</th>
+                    <th>인증 수준</th>
+                    <th>사용자 확인</th>
+                    <th>시간 제한</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>CGM 데이터 읽기</strong></td>
+                    <td>낮음</td>
+                    <td>불필요</td>
+                    <td>없음</td>
+                </tr>
+                <tr>
+                    <td><strong>기초 주입률 확인</strong></td>
+                    <td>낮음</td>
+                    <td>불필요</td>
+                    <td>없음</td>
+                </tr>
+                <tr>
+                    <td><strong>소량 볼러스 (<5 유닛)</strong></td>
+                    <td>중간</td>
+                    <td>펌프에서 확인 버튼</td>
+                    <td>60초</td>
+                </tr>
+                <tr>
+                    <td><strong>대량 볼러스 (≥5 유닛)</strong></td>
+                    <td>높음</td>
+                    <td>펌프 + 앱 양쪽 확인</td>
+                    <td>30초</td>
+                </tr>
+                <tr>
+                    <td><strong>설정 변경</strong></td>
+                    <td>높음</td>
+                    <td>PIN 코드 + 펌프 확인</td>
+                    <td>120초</td>
+                </tr>
+                <tr>
+                    <td><strong>펌웨어 업데이트</strong></td>
+                    <td>최고</td>
+                    <td>PIN + 생체인증</td>
+                    <td>300초</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3. 이상 탐지 및 안전 제한</h3>
+
+        <p>펌프에 내장된 안전 메커니즘으로 비정상적인 명령을 차단:</p>
+
+        <ul>
+            <li><strong>최대 볼러스 제한:</strong> 사용자가 설정한 최대값 이상 투여 불가</li>
+            <li><strong>일일 총 인슐린 제한:</strong> 평소 사용량의 150%를 초과하면 경고</li>
+            <li><strong>연속 볼러스 방지:</strong> 2시간 이내 3회 이상 볼러스 시 추가 확인 요구</li>
+            <li><strong>급격한 설정 변경 탐지:</strong> 기초 주입률이 50% 이상 변경 시 경고</li>
+            <li><strong>인슐린 온보드 (IOB) 추적:</strong> 아직 작용 중인 인슐린 양 계산하여 과다 투여 방지</li>
+        </ul>
+
+        <h3>4. 사용자 교육 및 인식</h3>
+
+        <p>기술적 보안만큼 중요한 것이 사용자의 보안 인식입니다:</p>
+
+        <div class="info-box">
+            <strong>환자를 위한 보안 가이드라인:</strong>
+            <ul style="margin-top: 1rem;">
+                <li><strong>알림 설정:</strong> 모든 볼러스 알림을 활성화하고 무음 모드 사용 금지</li>
+                <li><strong>즉시 확인:</strong> 예상치 않은 인슐린 투여 알림 시 즉시 펌프 확인</li>
+                <li><strong>페어링 관리:</strong> 신뢰할 수 있는 장치만 페어링, 정기적으로 목록 검토</li>
+                <li><strong>펌웨어 업데이트:</strong> 제조업체 공식 채널에서만 업데이트 받기</li>
+                <li><strong>물리적 보안:</strong> 펌프를 항상 몸에 착용, 분실 시 즉시 신고</li>
+                <li><strong>의심 보고:</strong> 이상한 동작 발견 시 의료진 및 제조업체에 보고</li>
+                <li><strong>백업 계획:</strong> 펌프 고장 시를 대비한 인슐린 펜 또는 주사기 준비</li>
+            </ul>
+        </div>
+
+        <h2>규제 및 표준</h2>
+
+        <p>인슐린 펌프 보안은 다음 규제 및 표준을 따릅니다:</p>
+
+        <ul>
+            <li><strong>FDA Guidance (2023):</strong> 의료기기 사이버 보안 시판 전후 관리</li>
+            <li><strong>IEC 60601-1:</strong> 의료 전기 기기 안전 일반 요구사항</li>
+            <li><strong>ISO 11608:</strong> 주사기, 펜, 인슐린 주입 시스템 요구사항</li>
+            <li><strong>UL 2900-2-1:</strong> 의료 및 건강 관리 시스템 사이버 보안</li>
+            <li><strong>AAMI TIR57:</strong> 의료기기 보안 원칙 및 실무</li>
+        </ul>
+
+        <h2>미래의 보안 기술</h2>
+
+        <h3>1. 인공지능 기반 이상 탐지</h3>
+
+        <p>머신러닝 알고리즘이 환자의 정상적인 인슐린 사용 패턴을 학습하고, 이상 행동을 자동으로 탐지:</p>
+
+        <ul>
+            <li>평소와 다른 시간대의 대량 볼러스 탐지</li>
+            <li>CGM 데이터와 인슐린 투여 간 불일치 발견</li>
+            <li>비정상적인 무선 통신 패턴 식별</li>
+        </ul>
+
+        <h3>2. 블록체인 기반 투여 기록</h3>
+
+        <p>모든 인슐린 투여 기록을 변조 불가능한 블록체인에 저장하여 무결성 보장:</p>
+
+        <ul>
+            <li>누가, 언제, 얼마나 인슐린을 투여했는지 영구 기록</li>
+            <li>의심스러운 투여 발견 시 감사 추적 가능</li>
+            <li>의료 과실 소송 시 객관적 증거 제공</li>
+        </ul>
+
+        <h3>3. 생체 인증 통합</h3>
+
+        <p>지문, 얼굴 인식 등 생체 인증을 펌프 제어에 통합:</p>
+
+        <ul>
+            <li>스마트폰 생체 인증 후에만 앱에서 펌프 제어 가능</li>
+            <li>펌프 자체에 지문 센서 통합 (차세대 모델)</li>
+            <li>환자의 고유한 심전도(ECG) 패턴으로 인증</li>
+        </ul>
+
+        <h2>결론</h2>
+
+        <p>인슐린 펌프와 CGM 시스템은 당뇨병 환자의 삶의 질을 크게 향상시켰지만, 연결성 증가는 새로운 보안 위험을 초래했습니다. 다행히 제조업체들은 과거의 취약점으로부터 교훈을 얻어 보안을 크게 강화했습니다.</p>
+
+        <p>환자들은 최신 보안 기능을 갖춘 펌프를 사용하고, 모든 알림을 활성화하며, 의심스러운 활동을 즉시 보고해야 합니다. 의료진은 환자에게 사이버 보안의 중요성을 교육하고, 정기적으로 기기 설정을 검토해야 합니다.</p>
+
+        <p>다음 장에서는 의료 네트워크 분할 전략과 제로 트러스트 아키텍처를 살펴보겠습니다.</p>
+
+        </div>
+</body>
+</html>

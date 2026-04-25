@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Orbit Prediction and Conjunction Assessment | WIA-SPACE-026</title>
+    <style>
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #8B5CF6; --primary-dark: #7C3AED; --text: #f1f5f9; --text-dim: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3rem; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        tr:nth-child(even) { background: rgba(139, 92, 246, 0.05); }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        .callout { background: rgba(139, 92, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        .questions ol { margin-left: 1.5rem; }
+        caption { caption-side: top; color: var(--text-dim); padding: 0.5rem; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Orbit Prediction and Conjunction Assessment</h1>
+
+        <p>Predicting orbital trajectories days to weeks into the future enables proactive collision avoidance—the primary operational application of space debris tracking. Conjunction assessment systematically identifies close approaches between objects, calculates collision probabilities, and supports maneuver decisions to protect valuable spacecraft. The WIA-SPACE-026 standard defines algorithms, data formats, and decision thresholds for operational conjunction assessment supporting satellite operators worldwide. This chapter explores orbital propagation techniques, conjunction screening methodologies, probability calculations, and the operational frameworks employed by organizations like NASA's Conjunction Assessment Risk Analysis (CARA) and ESA's Space Debris Office.</p>
+
+        <h2>Orbital Propagation and Perturbations</h2>
+
+        <p>Predicting future orbital positions requires modeling all forces acting on the spacecraft. In a perfectly spherical Earth with no atmosphere or external bodies, orbits would follow simple Keplerian ellipses indefinitely. Reality introduces numerous perturbing forces that cause orbits to evolve. The dominant perturbation for most satellites is Earth's non-spherical gravity field—the planet's equatorial bulge and higher-order shape irregularities create accelerations that vary with position, causing orbital precession and changes in orbital elements.</p>
+
+        <p>Atmospheric drag profoundly affects low Earth orbit objects, particularly below 600 kilometers altitude. Drag opposes the satellite's velocity, removing energy and causing orbital decay—gradual decrease in altitude and orbital period. Drag magnitude depends on atmospheric density (which varies with solar activity, geomagnetic conditions, and local time), the object's ballistic coefficient (mass-to-area ratio), and velocity. Predicting drag requires modeling the thermosphere's complex behavior, one of the largest uncertainty sources in LEO orbit propagation.</p>
+
+        <table>
+            <caption>Table 6.1: Primary Orbital Perturbations by Altitude Regime</caption>
+            <thead>
+                <tr>
+                    <th>Perturbation</th>
+                    <th>LEO (200-2000 km)</th>
+                    <th>MEO (2000-35,786 km)</th>
+                    <th>GEO (~35,786 km)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Earth Gravity Harmonics</td>
+                    <td>Dominant (J2 precession)</td>
+                    <td>Significant</td>
+                    <td>Moderate</td>
+                </tr>
+                <tr>
+                    <td>Atmospheric Drag</td>
+                    <td>Dominant below 600 km</td>
+                    <td>Negligible</td>
+                    <td>None</td>
+                </tr>
+                <tr>
+                    <td>Solar Radiation Pressure</td>
+                    <td>Minor (except high A/M)</td>
+                    <td>Moderate</td>
+                    <td>Significant</td>
+                </tr>
+                <tr>
+                    <td>Lunar Gravity</td>
+                    <td>Negligible</td>
+                    <td>Moderate (especially GPS)</td>
+                    <td>Significant</td>
+                </tr>
+                <tr>
+                    <td>Solar Gravity</td>
+                    <td>Negligible</td>
+                    <td>Moderate</td>
+                    <td>Dominant (longitude drift)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>Solar radiation pressure—the momentum transfer from sunlight impinging on the satellite—becomes significant for high-altitude objects and those with large area-to-mass ratios like defunct satellites with deployed solar panels. Third-body perturbations from the Moon and Sun create long-period variations in orbital elements, particularly affecting MEO navigation satellites and GEO spacecraft. Accurate prediction requires modeling all relevant perturbations appropriate to the object's orbit and physical characteristics.</p>
+
+        <h2>Atmospheric Density Models</h2>
+
+        <p>Atmospheric drag prediction accuracy depends critically on atmospheric density models. The thermosphere (above 90 km altitude) exhibits extreme variability: density at a given altitude can vary by factors of 10-100 depending on solar activity, geomagnetic storms, and seasonal effects. Standard models like NRLMSISE-00 and JB2008 incorporate solar activity proxies (F10.7 radio flux) and geomagnetic indices (Ap, Kp) to estimate density as functions of altitude, latitude, local time, and space weather conditions.</p>
+
+        <p>Despite sophisticated models, drag remains the dominant uncertainty source for LEO orbit prediction. Solar storms can increase atmospheric density unpredictably, substantially altering drag and thus orbits. Objects with unknown or uncertain area-to-mass ratios (most debris) compound prediction difficulty. The WIA-SPACE-026 standard specifies how drag uncertainty should propagate into orbit covariance estimates, ensuring realistic uncertainty quantification for conjunction assessment.</p>
+
+        <h2>Conjunction Screening Process</h2>
+
+        <p>Conjunction screening systematically identifies pairs of objects predicted to approach closely within specified time windows. The screening process begins with propagating all catalog objects forward using their latest orbit solutions and covariances. Pairwise distance calculations identify conjunctions—typically defined as predicted close approaches within 1-5 kilometers for LEO, with larger thresholds for higher altitudes where position uncertainties grow larger. Given 25,000+ tracked objects, screening all possible pairs (over 300 million combinations) requires efficient algorithms and substantial computation.</p>
+
+        <p>Screening produces a ranked list of conjunction events sorted by risk metrics. High-priority events—those involving operational satellites with high collision probabilities—trigger detailed analysis and potential notification to satellite operators. Lower-priority events (distant misses, debris-debris conjunctions not threatening operational assets) receive automated processing without human review. The International Space Station receives hundreds of conjunction warnings weekly, but only a few per year exceed thresholds requiring evasive maneuvers.</p>
+
+        <div class="callout">
+            <strong>Conjunction Data Message (CDM):</strong> The CCSDS Conjunction Data Message standard defines format and content for exchanging conjunction information between tracking organizations and satellite operators. CDMs specify the two objects involved, time of closest approach (TCA), miss distance, relative velocity, position covariance matrices, and collision probability. The WIA-SPACE-026 standard adopts CDM format for interoperability with international conjunction assessment services.
+        </div>
+
+        <h2>Probability of Collision Calculation</h2>
+
+        <p>Determining collision probability requires combining the predicted miss distance (closest separation at time of closest approach) with uncertainty estimates (covariance matrices) for both objects. The calculation projects position uncertainties onto the conjunction plane (perpendicular to relative velocity) and computes the probability that the combined uncertainty ellipse overlaps the collision cross-section defined by the objects' physical sizes.</p>
+
+        <p>Standard formulations assume Gaussian (normal) distribution of position errors and use analytical or numerical integration to calculate probability. For small probabilities (Pc < 10^-4), simple analytical approximations suffice. Higher probabilities require more sophisticated approaches accounting for non-linear effects and non-Gaussian tails of uncertainty distributions. A critical challenge is determining collision cross-section—most debris objects have unknown size and orientation, requiring assumptions that introduce additional uncertainty.</p>
+
+        <table>
+            <caption>Table 6.2: Collision Risk Assessment Thresholds (Typical Values)</caption>
+            <thead>
+                <tr>
+                    <th>Risk Level</th>
+                    <th>Probability of Collision (Pc)</th>
+                    <th>Miss Distance</th>
+                    <th>Typical Action</th>
+                    <th>ISS Threshold</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Negligible</td>
+                    <td>< 10^-6</td>
+                    <td>> 5 km</td>
+                    <td>No action, monitoring only</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>Low</td>
+                    <td>10^-6 to 10^-5</td>
+                    <td>1-5 km</td>
+                    <td>Enhanced tracking, operator notification</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>Medium</td>
+                    <td>10^-5 to 10^-4</td>
+                    <td>100 m - 1 km</td>
+                    <td>Maneuver analysis, decision preparation</td>
+                    <td>Notification</td>
+                </tr>
+                <tr>
+                    <td>High</td>
+                    <td>10^-4 to 10^-3</td>
+                    <td>10-100 m</td>
+                    <td>Likely maneuver, coordinate with other operators</td>
+                    <td>Maneuver planning</td>
+                </tr>
+                <tr>
+                    <td>Critical</td>
+                    <td>> 10^-3</td>
+                    <td>< 10 m</td>
+                    <td>Immediate maneuver (if time permits)</td>
+                    <td>Execute maneuver (Pc > 1/10,000)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Collision Avoidance Maneuvers</h2>
+
+        <p>When collision risk exceeds acceptable thresholds, satellite operators must decide whether to maneuver. Maneuver decisions balance collision risk against operational costs: fuel expenditure reducing spacecraft lifetime, service interruptions during maneuvers, potential introduction of new conjunction risks post-maneuver, and ground operations costs. The ISS, with crew safety paramount and ample propellant, employs conservative thresholds (Pc > 1 in 10,000), executing tens of debris avoidance maneuvers since operations began.</p>
+
+        <p>Commercial operators face tighter constraints. Constellation operators managing thousands of satellites must automate collision avoidance to scale operations. SpaceX's Starlink constellation performs thousands of maneuvers annually using autonomous systems that detect conjunctions, plan avoidance burns, and execute maneuvers without human intervention. This automation, enabled by precise orbit knowledge and maneuvering capability, represents the future of collision avoidance for mega-constellations.</p>
+
+        <h2>NASA CARA: Conjunction Assessment Risk Analysis</h2>
+
+        <p>NASA's Conjunction Assessment Risk Analysis (CARA) program provides collision risk assessment and support for US human spaceflight missions, robotic spacecraft, and partnering agencies. CARA receives daily conjunction screening reports from Space Command, performs independent analysis using NASA's high-fidelity propagation tools, calculates collision probabilities with validated uncertainty models, and provides recommendations to mission operations teams.</p>
+
+        <p>CARA pioneered advanced conjunction assessment methodologies including non-linear covariance propagation, improved uncertainty realism techniques, and multi-event screening that considers sequences of conjunctions. The program maintains extensive historical conjunction databases enabling statistical analysis of false alarm rates, missed events, and prediction accuracy—data informing continuous process improvements. CARA methodologies heavily influence the WIA-SPACE-026 standard's conjunction assessment specifications.</p>
+
+        <h2>ESA Space Debris Office Services</h2>
+
+        <p>The European Space Agency's Space Debris Office provides collision avoidance support for European satellite operators through its COSY (Collision Risk Assessment and Automated Mitigation) service. COSY receives conjunction warnings from multiple sources (US Space Command, commercial providers, European SST framework), performs independent risk assessment, and issues notifications to registered satellite operators with recommended mitigation strategies.</p>
+
+        <p>COSY demonstrates international cooperation in conjunction assessment: European operators receive combined information from US military tracking and European civilian sensors, improving detection coverage and prediction accuracy. The service employs standardized CDM formats enabling seamless integration of conjunction data from diverse sources—precisely the interoperability goal of WIA-SPACE-026.</p>
+
+        <h2>Launch Collision Avoidance (COLA)</h2>
+
+        <p>Launch windows must avoid trajectories that risk collision with existing space objects. Launch COLA analysis screens the proposed trajectory against all tracked objects, identifying conjunctions during ascent. Unlike on-orbit conjunctions where one or both objects can potentially maneuver, launch trajectories are largely fixed once launch begins, making pre-launch screening essential.</p>
+
+        <p>COLA requirements vary by launch range and national regulations. US launches require screening showing no collision probability above threshold levels (typically Pc < 10^-4) during ascent. If violations exist, the launch window shifts by seconds to minutes—enough to change the relative geometry and avoid the conjunction. High-traffic orbits like sun-synchronous LEO create significant COLA constraints, sometimes forcing launch delays when screening identifies unavoidable conjunctions during all available launch windows.</p>
+
+        <div class="callout">
+            <strong>弘益人間 in Collision Avoidance:</strong> Collision avoidance protects both maneuverable spacecraft and the passive debris environment itself. A collision between an active satellite and debris generates thousands of new fragments endangering all space users. By investing in tracking, screening, and maneuvering, operators protect the shared orbital environment—a direct application of 弘益人間 where individual actions serve collective benefit.
+        </div>
+
+        <div class="summary">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>Accurate orbit propagation requires modeling perturbations including Earth's gravity harmonics, atmospheric drag, solar radiation pressure, and third-body effects from Moon and Sun</li>
+                <li>Atmospheric drag creates the dominant LEO prediction uncertainty due to thermosphere variability with solar activity and unpredictable space weather events</li>
+                <li>Conjunction screening processes millions of object pairs daily to identify close approaches, with events prioritized by risk metrics for detailed analysis</li>
+                <li>Collision probability calculations combine predicted miss distance with orbit uncertainties, producing risk metrics that guide maneuver decisions</li>
+                <li>Operational thresholds vary by mission: ISS maneuvers at Pc > 1/10,000 while commercial operators balance risk against fuel costs and service interruptions</li>
+                <li>NASA CARA and ESA COSY provide expert conjunction assessment services demonstrating best practices in covariance realism and multi-source data fusion</li>
+                <li>Launch COLA analysis ensures ascending vehicles avoid tracked objects, with launch timing adjusted by seconds to minutes when conjunctions are predicted</li>
+            </ul>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain why atmospheric drag creates the largest uncertainty in LEO orbit prediction. How do solar activity and geomagnetic storms affect drag predictions?</li>
+                <li>Compare the relative importance of different perturbations (gravity harmonics, drag, SRP, third-body) across LEO, MEO, and GEO regimes. Why does the dominant perturbation change with altitude?</li>
+                <li>Describe the conjunction screening process. With over 25,000 tracked objects creating 300+ million possible pairs, how do systems efficiently identify high-risk events?</li>
+                <li>Explain the components of collision probability calculation. How do miss distance, uncertainty covariance, and object size combine to produce Pc?</li>
+                <li>Discuss the maneuver decision process for collision avoidance. What factors beyond collision probability influence whether an operator chooses to maneuver?</li>
+                <li>Why does the ISS employ more conservative collision avoidance thresholds than commercial satellites? What operational differences justify different risk tolerance?</li>
+                <li>How does launch COLA differ from on-orbit conjunction assessment? Why can't launch vehicles simply maneuver to avoid predicted conjunctions?</li>
+                <li>Explain the concept of covariance realism in conjunction assessment. What are the consequences of overly confident versus overly conservative uncertainty estimates?</li>
+            </ol>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-05.html">← Chapter 5: Data Processing</a>
+            <a href="chapter-07.html">Chapter 7: Tracking Networks & Data Sharing →</a>
+        </div>
+    </div>
+</body>
+</html>

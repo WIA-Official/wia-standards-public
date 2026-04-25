@@ -299,7 +299,6 @@ Certification body: [WIA Certification Authority](https://cert.wiastandards.com)
 2. European Commission. (2024). EU AI Act.
 3. FDA. (2021). AI/ML-Based Software as Medical Device Action Plan.
 4. IEEE. (2019). Ethically Aligned Design.
-5. 선행 연구. Dissecting racial bias in an algorithm used to manage the health of populations. Science, 366(6464), 447-453.
 6. Chouldechova, A. (2017). Fair prediction with disparate impact. Big Data, 5(2), 153-163.
 
 ## Contact

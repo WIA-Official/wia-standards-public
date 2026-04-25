@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: API 구현 가이드 | WIA-SOCIAL</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --primary: #EC4899;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --success: #10b981;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-secondary);
+            padding: 3rem;
+            border-radius: 10px;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { padding: 0; }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--text-secondary); }
+        .philosophy { color: var(--primary); font-size: 1.2rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">제4장</p>
+        <h1>API 구현 가이드</h1>
+
+        <p>
+            SDK(Software Development Kit)는 API에 대한 개발자 친화적인 인터페이스를 제공하며, HTTP 세부 사항을 추상화하고 언어별 관용구를 제공합니다. WIA-SOCIAL 표준은 TypeScript, Python, Java로 작성된 참조 SDK를 제공합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>SDK 모듈</th>
+                    <th>주요 기능</th>
+                    <th>핵심 메서드</th>
+                    <th>반환 타입</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Documents</strong></td>
+                    <td>CRUD 작업</td>
+                    <td>create(), get(), update(), delete(), list()</td>
+                    <td>Document, DocumentList</td>
+                </tr>
+                <tr>
+                    <td><strong>Verification</strong></td>
+                    <td>진위 확인</td>
+                    <td>verify(), checkSignature(), getStatus()</td>
+                    <td>VerificationResult</td>
+                </tr>
+                <tr>
+                    <td><strong>Search</strong></td>
+                    <td>쿼리 및 필터링</td>
+                    <td>search(), filter(), facet()</td>
+                    <td>SearchResults</td>
+                </tr>
+                <tr>
+                    <td><strong>Signatures</strong></td>
+                    <td>암호화 작업</td>
+                    <td>sign(), validateSignature(), getCertificate()</td>
+                    <td>Signature, Certificate</td>
+                </tr>
+                <tr>
+                    <td><strong>Templates</strong></td>
+                    <td>문서 생성</td>
+                    <td>getTemplate(), renderDocument()</td>
+                    <td>Template, RenderedDocument</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.1 TypeScript SDK 구현</h2>
+
+        <p>
+            TypeScript는 타입 안전성과 최신 JavaScript 기능을 제공하여 공공문서 API 클라이언트를 구현하기에 이상적인 언어입니다. 다음은 완전한 기능을 갖춘 WIA-SOCIAL TypeScript SDK 구현입니다.
+        </p>
+
+        <h3>클라이언트 초기화 및 인증</h3>
+
+        <pre><code>// src/client.ts
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import jwt_decode from 'jwt-decode';
+
+export interface WIAConfig {
+  baseURL: string;
+  apiKey?: string;
+  timeout?: number;
+}
+
+export interface JWTPayload {
+  sub: string;
+  name: string;
+  role: string;
+  permissions: string[];
+  exp: number;
+}
+
+export class WIAPublicDocumentClient {
+  private client: AxiosInstance;
+  private accessToken?: string;
+  private refreshToken?: string;
+
+  constructor(config: WIAConfig) {
+    this.client = axios.create({
+      baseURL: config.baseURL || 'https://api.wia-social.org/v1',
+      timeout: config.timeout || 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'WIA-SDK-TypeScript/1.0.0'
+      }
+    });
+
+    // Request interceptor: 토큰 자동 추가
+    this.client.interceptors.request.use((config) => {
+      if (this.accessToken) {
+        config.headers.Authorization = `Bearer ${this.accessToken}`;
+      }
+      return config;
+    });
+
+    // Response interceptor: 토큰 자동 갱신
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+
+          try {
+            await this.refreshAccessToken();
+            return this.client(originalRequest);
+          } catch (refreshError) {
+            return Promise.reject(refreshError);
+          }
+        }
+
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  async login(email: string, password: string): Promise<void> {
+    const response = await this.client.post('/auth/login', {
+      email,
+      password
+    });
+
+    this.accessToken = response.data.accessToken;
+    this.refreshToken = response.data.refreshToken;
+  }
+
+  async refreshAccessToken(): Promise<void> {
+    if (!this.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await this.client.post('/auth/refresh', {
+      refreshToken: this.refreshToken
+    });
+
+    this.accessToken = response.data.accessToken;
+  }
+
+  isTokenExpired(): boolean {
+    if (!this.accessToken) return true;
+
+    try {
+      const decoded = jwt_decode<JWTPayload>(this.accessToken);
+      return Date.now() >= decoded.exp * 1000;
+    } catch {
+      return true;
+    }
+  }
+}</code></pre>
+
+        <h3>문서 발급 구현</h3>
+
+        <pre><code>// src/documents.ts
+export interface BirthCertificateData {
+  fullName: string;
+  fullNameEn?: string;
+  dateOfBirth: string;
+  placeOfBirth: {
+    city: string;
+    country: string;
+    hospital?: string;
+  };
+  gender: 'M' | 'F' | 'X';
+  parents: Array<{
+    relation: 'FATHER' | 'MOTHER' | 'GUARDIAN';
+    fullName: string;
+    dateOfBirth: string;
+    nationalID?: string;
+  }>;
+  birthWeight?: number;
+  birthLength?: number;
+}
+
+export interface Document {
+  documentId: string;
+  documentType: string;
+  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+  issueDate: string;
+  expiryDate?: string;
+  data: any;
+}
+
+export class DocumentService {
+  constructor(private client: WIAPublicDocumentClient) {}
+
+  async createBirthCertificate(
+    data: BirthCertificateData
+  ): Promise<Document> {
+    const response = await this.client['client'].post(
+      '/documents/birth-certificates',
+      data
+    );
+    return response.data;
+  }
+
+  async getDocument(documentId: string): Promise<Document> {
+    const response = await this.client['client'].get(
+      `/documents/${documentId}`
+    );
+    return response.data;
+  }
+
+  async listDocuments(params?: {
+    type?: string;
+    status?: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<{
+    data: Document[];
+    pagination: {
+      nextCursor?: string;
+      prevCursor?: string;
+      hasMore: boolean;
+    };
+  }> {
+    const response = await this.client['client'].get('/documents', {
+      params
+    });
+    return response.data;
+  }
+
+  async downloadPDF(documentId: string): Promise<Blob> {
+    const response = await this.client['client'].get(
+      `/documents/${documentId}/pdf`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  }
+
+  async verifyDocument(documentId: string): Promise<{
+    valid: boolean;
+    details: {
+      signatureValid: boolean;
+      notExpired: boolean;
+      notRevoked: boolean;
+      issuerTrusted: boolean;
+    };
+  }> {
+    const response = await this.client['client'].post(
+      `/documents/${documentId}/verify`
+    );
+    return response.data;
+  }
+}
+
+// 사용 예시
+async function main() {
+  const client = new WIAPublicDocumentClient({
+    baseURL: 'https://api.wia-social.org/v1'
+  });
+
+  await client.login('officer@seoul.go.kr', 'secure_password');
+
+  const docService = new DocumentService(client);
+
+  // 출생증명서 발급
+  const birthCert = await docService.createBirthCertificate({
+    fullName: '홍길동',
+    fullNameEn: 'Hong Gildong',
+    dateOfBirth: '2025-01-10',
+    placeOfBirth: {
+      city: 'Seoul',
+      country: 'KR',
+      hospital: '서울대학교병원'
+    },
+    gender: 'M',
+    parents: [
+      {
+        relation: 'FATHER',
+        fullName: '홍만석',
+        dateOfBirth: '1990-05-20'
+      },
+      {
+        relation: 'MOTHER',
+        fullName: '김영희',
+        dateOfBirth: '1992-03-15'
+      }
+    ]
+  });
+
+  console.log('문서 발급 완료:', birthCert.documentId);
+
+  // PDF 다운로드
+  const pdfBlob = await docService.downloadPDF(birthCert.documentId);
+  // 파일로 저장...
+}
+</code></pre>
+
+        <h2>4.2 Python SDK 구현</h2>
+
+        <p>
+            Python은 정부 기관의 백엔드 시스템과 데이터 분석 작업에 널리 사용됩니다. 다음은 Python용 WIA-SOCIAL SDK 구현입니다.
+        </p>
+
+        <h3>Python 클라이언트</h3>
+
+        <pre><code>"""
+WIA-SOCIAL Public Document Python SDK
+"""
+import requests
+from typing import Optional, Dict, List, Any
+from datetime import datetime, timedelta
+import jwt
+from dataclasses import dataclass
+from enum import Enum
+
+class DocumentType(Enum):
+    BIRTH_CERTIFICATE = "BIRTH_CERTIFICATE"
+    DRIVERS_LICENSE = "DRIVERS_LICENSE"
+    PASSPORT = "PASSPORT"
+    MARRIAGE_CERTIFICATE = "MARRIAGE_CERTIFICATE"
+
+class DocumentStatus(Enum):
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+    EXPIRED = "EXPIRED"
+
+@dataclass
+class WIAConfig:
+    base_url: str = "https://api.wia-social.org/v1"
+    api_key: Optional[str] = None
+    timeout: int = 30
+
+class WIAPublicDocumentClient:
+    def __init__(self, config: WIAConfig):
+        self.config = config
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'User-Agent': 'WIA-SDK-Python/1.0.0'
+        })
+        self.access_token: Optional[str] = None
+        self.refresh_token: Optional[str] = None
+
+    def login(self, email: str, password: str) -> None:
+        """사용자 로그인 및 토큰 획득"""
+        response = self.session.post(
+            f"{self.config.base_url}/auth/login",
+            json={'email': email, 'password': password},
+            timeout=self.config.timeout
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        self.access_token = data['accessToken']
+        self.refresh_token = data['refreshToken']
+        self.session.headers['Authorization'] = f"Bearer {self.access_token}"
+
+    def _is_token_expired(self) -> bool:
+        """토큰 만료 여부 확인"""
+        if not self.access_token:
+            return True
+
+        try:
+            payload = jwt.decode(
+                self.access_token,
+                options={"verify_signature": False}
+            )
+            exp_timestamp = payload.get('exp', 0)
+            return datetime.now().timestamp() >= exp_timestamp
+        except:
+            return True
+
+    def _refresh_access_token(self) -> None:
+        """액세스 토큰 갱신"""
+        if not self.refresh_token:
+            raise ValueError("No refresh token available")
+
+        response = self.session.post(
+            f"{self.config.base_url}/auth/refresh",
+            json={'refreshToken': self.refresh_token},
+            timeout=self.config.timeout
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        self.access_token = data['accessToken']
+        self.session.headers['Authorization'] = f"Bearer {self.access_token}"
+
+    def create_birth_certificate(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """출생증명서 발급"""
+        if self._is_token_expired():
+            self._refresh_access_token()
+
+        response = self.session.post(
+            f"{self.config.base_url}/documents/birth-certificates",
+            json=data,
+            timeout=self.config.timeout
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_document(self, document_id: str) -> Dict[str, Any]:
+        """문서 조회"""
+        if self._is_token_expired():
+            self._refresh_access_token()
+
+        response = self.session.get(
+            f"{self.config.base_url}/documents/{document_id}",
+            timeout=self.config.timeout
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def list_documents(
+        self,
+        doc_type: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 20,
+        cursor: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """문서 목록 조회"""
+        if self._is_token_expired():
+            self._refresh_access_token()
+
+        params = {'limit': limit}
+        if doc_type:
+            params['type'] = doc_type
+        if status:
+            params['status'] = status
+        if cursor:
+            params['cursor'] = cursor
+
+        response = self.session.get(
+            f"{self.config.base_url}/documents",
+            params=params,
+            timeout=self.config.timeout
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def download_pdf(self, document_id: str) -> bytes:
+        """PDF 다운로드"""
+        if self._is_token_expired():
+            self._refresh_access_token()
+
+        response = self.session.get(
+            f"{self.config.base_url}/documents/{document_id}/pdf",
+            timeout=self.config.timeout
+        )
+        response.raise_for_status()
+        return response.content
+
+    def verify_document(self, document_id: str) -> Dict[str, Any]:
+        """문서 검증"""
+        response = self.session.post(
+            f"{self.config.base_url}/documents/{document_id}/verify",
+            timeout=self.config.timeout
+        )
+        response.raise_for_status()
+        return response.json()
+
+# 사용 예시
+if __name__ == "__main__":
+    # 클라이언트 초기화
+    config = WIAConfig(base_url="https://api.wia-social.org/v1")
+    client = WIAPublicDocumentClient(config)
+
+    # 로그인
+    client.login("officer@seoul.go.kr", "secure_password")
+
+    # 출생증명서 발급
+    birth_data = {
+        "fullName": "홍길동",
+        "fullNameEn": "Hong Gildong",
+        "dateOfBirth": "2025-01-10",
+        "placeOfBirth": {
+            "city": "Seoul",
+            "country": "KR",
+            "hospital": "서울대학교병원"
+        },
+        "gender": "M",
+        "parents": [
+            {
+                "relation": "FATHER",
+                "fullName": "홍만석",
+                "dateOfBirth": "1990-05-20"
+            },
+            {
+                "relation": "MOTHER",
+                "fullName": "김영희",
+                "dateOfBirth": "1992-03-15"
+            }
+        ]
+    }
+
+    document = client.create_birth_certificate(birth_data)
+    print(f"문서 발급 완료: {document['documentId']}")
+
+    # PDF 다운로드
+    pdf_bytes = client.download_pdf(document['documentId'])
+    with open(f"{document['documentId']}.pdf", "wb") as f:
+        f.write(pdf_bytes)
+
+    # 문서 검증
+    verification = client.verify_document(document['documentId'])
+    print(f"검증 결과: {verification['valid']}")
+</code></pre>
+
+        <h2>4.3 Java SDK 구현</h2>
+
+        <p>
+            Java는 대규모 정부 시스템의 백엔드 구현에 널리 사용됩니다. Spring Boot와 통합 가능한 WIA-SOCIAL Java SDK입니다.
+        </p>
+
+        <h3>Java 클라이언트 (OkHttp 사용)</h3>
+
+        <pre><code>package org.wia.social.client;
+
+import okhttp3.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+
+public class WIAPublicDocumentClient {
+    private final String baseUrl;
+    private final OkHttpClient httpClient;
+    private final ObjectMapper objectMapper;
+    private String accessToken;
+    private String refreshToken;
+
+    public WIAPublicDocumentClient(String baseUrl) {
+        this.baseUrl = baseUrl;
+        this.httpClient = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(this::addAuthHeader)
+            .authenticator(this::refreshTokenOnUnauthorized)
+            .build();
+        this.objectMapper = new ObjectMapper();
+    }
+
+    private Response addAuthHeader(Interceptor.Chain chain) throws IOException {
+        Request original = chain.request();
+
+        if (accessToken == null) {
+            return chain.proceed(original);
+        }
+
+        Request authorized = original.newBuilder()
+            .header("Authorization", "Bearer " + accessToken)
+            .header("User-Agent", "WIA-SDK-Java/1.0.0")
+            .build();
+
+        return chain.proceed(authorized);
+    }
+
+    private Request refreshTokenOnUnauthorized(
+        Route route,
+        Response response
+    ) throws IOException {
+        if (response.code() != 401 || refreshToken == null) {
+            return null;
+        }
+
+        synchronized (this) {
+            // 토큰 갱신
+            refreshAccessToken();
+
+            // 원래 요청 재시도
+            return response.request().newBuilder()
+                .header("Authorization", "Bearer " + accessToken)
+                .build();
+        }
+    }
+
+    public void login(String email, String password) throws IOException {
+        JsonNode credentials = objectMapper.createObjectNode()
+            .put("email", email)
+            .put("password", password);
+
+        RequestBody body = RequestBody.create(
+            credentials.toString(),
+            MediaType.parse("application/json")
+        );
+
+        Request request = new Request.Builder()
+            .url(baseUrl + "/auth/login")
+            .post(body)
+            .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Login failed: " + response);
+            }
+
+            JsonNode data = objectMapper.readTree(response.body().string());
+            this.accessToken = data.get("accessToken").asText();
+            this.refreshToken = data.get("refreshToken").asText();
+        }
+    }
+
+    private void refreshAccessToken() throws IOException {
+        JsonNode body = objectMapper.createObjectNode()
+            .put("refreshToken", refreshToken);
+
+        RequestBody requestBody = RequestBody.create(
+            body.toString(),
+            MediaType.parse("application/json")
+        );
+
+        Request request = new Request.Builder()
+            .url(baseUrl + "/auth/refresh")
+            .post(requestBody)
+            .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Token refresh failed");
+            }
+
+            JsonNode data = objectMapper.readTree(response.body().string());
+            this.accessToken = data.get("accessToken").asText();
+        }
+    }
+
+    public JsonNode createBirthCertificate(JsonNode data) throws IOException {
+        RequestBody body = RequestBody.create(
+            data.toString(),
+            MediaType.parse("application/json")
+        );
+
+        Request request = new Request.Builder()
+            .url(baseUrl + "/documents/birth-certificates")
+            .post(body)
+            .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Failed to create document: " + response);
+            }
+
+            return objectMapper.readTree(response.body().string());
+        }
+    }
+
+    public JsonNode getDocument(String documentId) throws IOException {
+        Request request = new Request.Builder()
+            .url(baseUrl + "/documents/" + documentId)
+            .get()
+            .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Failed to get document: " + response);
+            }
+
+            return objectMapper.readTree(response.body().string());
+        }
+    }
+
+    public byte[] downloadPDF(String documentId) throws IOException {
+        Request request = new Request.Builder()
+            .url(baseUrl + "/documents/" + documentId + "/pdf")
+            .get()
+            .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Failed to download PDF: " + response);
+            }
+
+            return response.body().bytes();
+        }
+    }
+}
+
+// 사용 예시
+public class Main {
+    public static void main(String[] args) throws IOException {
+        WIAPublicDocumentClient client = new WIAPublicDocumentClient(
+            "https://api.wia-social.org/v1"
+        );
+
+        client.login("officer@seoul.go.kr", "secure_password");
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode birthData = mapper.createObjectNode()
+            .put("fullName", "홍길동")
+            .put("fullNameEn", "Hong Gildong")
+            .put("dateOfBirth", "2025-01-10")
+            .put("gender", "M");
+
+        JsonNode document = client.createBirthCertificate(birthData);
+        System.out.println("문서 발급 완료: " +
+            document.get("documentId").asText());
+    }
+}
+</code></pre>
+
+        <h2>4.4 통합 패턴 및 모범 사례</h2>
+
+        <h3>HTTP 상태 코드 및 재시도 전략</h3>
+
+        <p>
+            견고한 애플리케이션은 다양한 오류 상황을 우아하게 처리해야 합니다. 네트워크 실패, 속도 제한, 일시적인 서비스 불가 등 모두 적절한 처리 전략이 필요합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>HTTP 상태 코드</th>
+                    <th>의미</th>
+                    <th>재시도 전략</th>
+                    <th>필요한 조치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>400 Bad Request</strong></td>
+                    <td>잘못된 요청 형식</td>
+                    <td>재시도 안함</td>
+                    <td>요청 매개변수 수정</td>
+                </tr>
+                <tr>
+                    <td><strong>401 Unauthorized</strong></td>
+                    <td>인증 실패</td>
+                    <td>재시도 안함</td>
+                    <td>액세스 토큰 갱신, 재인증</td>
+                </tr>
+                <tr>
+                    <td><strong>403 Forbidden</strong></td>
+                    <td>권한 부족</td>
+                    <td>재시도 안함</td>
+                    <td>적절한 권한 요청</td>
+                </tr>
+                <tr>
+                    <td><strong>404 Not Found</strong></td>
+                    <td>리소스가 존재하지 않음</td>
+                    <td>재시도 안함</td>
+                    <td>문서 ID 또는 엔드포인트 확인</td>
+                </tr>
+                <tr>
+                    <td><strong>429 Too Many Requests</strong></td>
+                    <td>속도 제한 초과</td>
+                    <td>백오프로 재시도</td>
+                    <td>Retry-After 헤더 준수</td>
+                </tr>
+                <tr>
+                    <td><strong>500 Internal Server Error</strong></td>
+                    <td>서버 오류</td>
+                    <td>백오프로 재시도</td>
+                    <td>지속되면 보고</td>
+                </tr>
+                <tr>
+                    <td><strong>503 Service Unavailable</strong></td>
+                    <td>일시적 불가</td>
+                    <td>백오프로 재시도</td>
+                    <td>서킷 브레이커 구현</td>
+                </tr>
+                <tr>
+                    <td><strong>504 Gateway Timeout</strong></td>
+                    <td>업스트림 타임아웃</td>
+                    <td>백오프로 재시도</td>
+                    <td>클라이언트 타임아웃 증가 고려</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>통합 패턴</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>패턴</th>
+                    <th>설명</th>
+                    <th>사용 시나리오</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Retry with Exponential Backoff</td>
+                    <td>실패 시 지수적으로 증가하는 간격으로 재시도</td>
+                    <td>일시적 네트워크 오류, 서버 과부하</td>
+                </tr>
+                <tr>
+                    <td>Circuit Breaker</td>
+                    <td>연속 실패 시 요청 차단, 일정 시간 후 재시도</td>
+                    <td>외부 서비스 장애 시 빠른 실패</td>
+                </tr>
+                <tr>
+                    <td>Request Caching</td>
+                    <td>동일 요청의 결과를 캐싱하여 재사용</td>
+                    <td>자주 조회되는 공개 문서</td>
+                </tr>
+                <tr>
+                    <td>Batch Operations</td>
+                    <td>여러 작업을 하나의 요청으로 묶음</td>
+                    <td>대량 문서 발급, 검증</td>
+                </tr>
+                <tr>
+                    <td>Webhook Integration</td>
+                    <td>이벤트 발생 시 자동 알림</td>
+                    <td>문서 발급 완료, 만료 임박</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>요약</h2>
+
+        <p>
+            이 장에서는 TypeScript, Python, Java로 WIA-SOCIAL API를 구현하는 방법을 살펴보았습니다. 각 SDK는 인증, 토큰 관리, 오류 처리, 재시도 로직 등을 포함하여 프로덕션 환경에서 사용 가능한 수준의 구현을 제공합니다. 다음 장에서는 문서 교환을 위한 프로토콜 사양을 다룹니다.
+        </p>
+
+        <div class="info-box">
+            <h3>🤔 복습 질문</h3>
+            <ol>
+                <li>JWT 토큰 갱신 메커니즘이 각 언어의 SDK에서 어떻게 구현되는지 비교하세요.</li>
+                <li>Circuit Breaker 패턴이 필요한 이유와 구현 방법을 설명하세요.</li>
+                <li>TypeScript의 Axios Interceptor가 어떤 문제를 해결하는지 설명하세요.</li>
+                <li>대량의 문서를 한 번에 발급해야 할 때 어떤 최적화 전략을 사용할 수 있나요?</li>
+                <li>SDK에서 오류 처리를 일관되게 수행하는 것이 왜 중요한가요?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

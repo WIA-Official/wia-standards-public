@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 양자 오류 정정 - WIA-QUANTUM-CHIP</title>
+    <style>
+        :root { --quantum-primary: #6366f1; --quantum-secondary: #8b5cf6; --quantum-accent: #06b6d4; --quantum-dark: #0f172a; --quantum-darker: #020617; --quantum-light: #f8fafc; --quantum-muted: #94a3b8; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif; background: var(--quantum-darker); color: var(--quantum-light); line-height: 1.9; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { text-align: center; padding: 50px 0; border-bottom: 2px solid var(--quantum-primary); margin-bottom: 40px; }
+        .chapter-label { color: var(--quantum-accent); text-transform: uppercase; letter-spacing: 3px; font-size: 0.9rem; }
+        h1 { font-size: 2.5rem; margin: 15px 0; background: linear-gradient(135deg, var(--quantum-primary), var(--quantum-accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        h2 { color: var(--quantum-primary); font-size: 1.8rem; margin: 45px 0 20px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); padding-bottom: 10px; }
+        h3 { color: var(--quantum-accent); font-size: 1.4rem; margin: 35px 0 15px; }
+        h4 { color: var(--quantum-secondary); font-size: 1.2rem; margin: 25px 0 12px; }
+        p { color: var(--quantum-muted); margin-bottom: 20px; font-size: 1.05rem; text-align: justify; }
+        .info-card { background: var(--quantum-dark); padding: 30px; border-radius: 15px; margin: 30px 0; border-left: 4px solid var(--quantum-primary); }
+        .info-card h4 { color: var(--quantum-primary); margin-top: 0; margin-bottom: 15px; }
+        .highlight-box { background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(6, 182, 212, 0.1)); border: 1px solid var(--quantum-primary); border-radius: 12px; padding: 25px; margin: 30px 0; }
+        .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 30px 0; }
+        .tech-card { background: var(--quantum-dark); padding: 25px; border-radius: 12px; border: 1px solid rgba(139, 92, 246, 0.3); }
+        .tech-card h5 { color: var(--quantum-secondary); margin-bottom: 12px; font-size: 1.1rem; }
+        .component-list { list-style: none; padding: 0; }
+        .component-list li { padding: 15px 20px; margin: 10px 0; background: var(--quantum-dark); border-radius: 8px; border-left: 3px solid var(--quantum-accent); color: var(--quantum-muted); }
+        .equation-box { background: var(--quantum-dark); padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center; font-family: 'Times New Roman', serif; font-size: 1.2rem; color: var(--quantum-accent); border: 1px solid rgba(6, 182, 212, 0.3); }
+        table { width: 100%; border-collapse: collapse; margin: 30px 0; background: var(--quantum-dark); border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(99, 102, 241, 0.1); }
+        th { background: rgba(99, 102, 241, 0.2); color: var(--quantum-primary); }
+        td { color: var(--quantum-muted); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 25px 0; }
+        .stat-item { background: var(--quantum-dark); padding: 20px; border-radius: 10px; text-align: center; border: 1px solid rgba(99, 102, 241, 0.2); }
+        .stat-value { font-size: 1.4rem; font-weight: bold; color: var(--quantum-accent); }
+        .stat-label { color: var(--quantum-muted); font-size: 0.85rem; margin-top: 5px; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 1px solid rgba(99, 102, 241, 0.2); }
+        .nav-btn { padding: 12px 25px; background: var(--quantum-dark); color: var(--quantum-primary); text-decoration: none; border-radius: 8px; border: 1px solid var(--quantum-primary); transition: all 0.3s; }
+        .nav-btn:hover { background: var(--quantum-primary); color: white; }
+        footer { text-align: center; padding: 40px 0; margin-top: 60px; border-top: 1px solid rgba(99, 102, 241, 0.2); color: var(--quantum-muted); }
+        .diagram { background: var(--quantum-dark); padding: 30px; border-radius: 15px; margin: 25px 0; text-align: center; border: 1px solid rgba(99, 102, 241, 0.2); }
+        .diagram-title { color: var(--quantum-primary); margin-bottom: 15px; font-weight: bold; }
+        .diagram-content { font-family: monospace; color: var(--quantum-accent); line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-label">제6장</div>
+            <h1>🛡️ 양자 오류 정정</h1>
+            <p>임계값 정리, 표면 코드, Google Willow 성과, 디코딩</p>
+        </header>
+
+        <section>
+            <h2>6.1 양자 오류 정정의 필요성</h2>
+            <p>
+                양자 컴퓨터는 본질적으로 노이즈에 취약합니다. 큐비트는 환경과 상호작용하여 결맞음을 잃고, 게이트 연산은 완벽하지 않으며, 측정에도 오류가 있습니다. 실용적인 양자 알고리즘(예: 쇼어의 인수분해, 분자 시뮬레이션)은 수백만 개의 게이트를 필요로 하며, 현재 물리적 오류율로는 의미 있는 결과를 얻을 수 없습니다.
+            </p>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">10⁻³ - 10⁻²</div>
+                    <div class="stat-label">현재 물리 오류율</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">10⁻¹⁵</div>
+                    <div class="stat-label">쇼어 알고리즘 요구</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">~1%</div>
+                    <div class="stat-label">표면 코드 임계값</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">1000:1</div>
+                    <div class="stat-label">일반적 오버헤드</div>
+                </div>
+            </div>
+
+            <p>
+                양자 오류 정정(Quantum Error Correction, QEC)은 여러 물리적 큐비트를 사용하여 하나의 "논리적 큐비트"를 인코딩함으로써 이 문제를 해결합니다. 오류가 발생해도 감지하고 수정할 수 있어, 이론적으로 임의로 낮은 논리적 오류율을 달성할 수 있습니다.
+            </p>
+
+            <div class="info-card">
+                <h4>⚠️ 양자 오류 정정의 고유한 도전</h4>
+                <p><strong>복제 불가 정리:</strong> 양자 상태는 복사할 수 없어 고전적 반복 코드를 직접 사용 불가</p>
+                <p><strong>연속적 오류:</strong> 비트 플립뿐 아니라 연속적인 위상 오류도 존재</p>
+                <p><strong>측정의 파괴성:</strong> 측정이 양자 상태를 붕괴시키므로 간접 측정 필요</p>
+                <p><strong>오류 유형:</strong> 비트 플립(X), 위상 플립(Z), 두 가지 조합(Y) 오류</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>6.2 양자 오류의 유형</h2>
+
+            <h3>6.2.1 파울리 오류</h3>
+            <p>
+                모든 단일 큐비트 오류는 세 가지 파울리 행렬의 조합으로 표현할 수 있습니다. 이 이산화는 양자 오류 정정을 가능하게 하는 핵심 통찰입니다.
+            </p>
+
+            <div class="equation-box">
+                X = |0⟩⟨1| + |1⟩⟨0| (비트 플립)<br><br>
+                Z = |0⟩⟨0| - |1⟩⟨1| (위상 플립)<br><br>
+                Y = iXZ (비트 + 위상 플립)
+            </div>
+
+            <h3>6.2.2 결맞음 손실 (Decoherence)</h3>
+            <p>
+                결맞음 손실은 양자 상태가 환경과 상호작용하여 중첩이 파괴되는 과정입니다. 두 가지 시간 척도로 특성화됩니다:
+            </p>
+
+            <ul class="component-list">
+                <li><strong>T1 (에너지 이완):</strong> |1⟩ 상태가 |0⟩으로 붕괴하는 시간. 광자 방출과 관련.</li>
+                <li><strong>T2 (위상 결맞음):</strong> 중첩 상태의 위상 정보가 손실되는 시간. T2 ≤ 2T1.</li>
+                <li><strong>T2* (자유 유도 감쇠):</strong> 에코 없이 측정한 결맞음 시간. 저주파 노이즈 포함.</li>
+            </ul>
+
+            <h3>6.2.3 게이트 오류</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>오류 유형</th>
+                        <th>원인</th>
+                        <th>전형적 오류율</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>과회전/저회전</td>
+                        <td>펄스 보정 오류</td>
+                        <td>10⁻⁴ - 10⁻³</td>
+                    </tr>
+                    <tr>
+                        <td>누화</td>
+                        <td>인접 큐비트 영향</td>
+                        <td>10⁻³ - 10⁻²</td>
+                    </tr>
+                    <tr>
+                        <td>누설</td>
+                        <td>계산 공간 외부로 전이</td>
+                        <td>10⁻³</td>
+                    </tr>
+                    <tr>
+                        <td>측정 오류</td>
+                        <td>상태 판별 실패</td>
+                        <td>10⁻² - 10⁻¹</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>6.3 안정자 코드</h2>
+
+            <p>
+                안정자 코드(Stabilizer Code)는 양자 오류 정정 코드의 가장 중요한 클래스입니다. 파울리 연산자의 부분집합(안정자 그룹)을 사용하여 코드 공간을 정의합니다.
+            </p>
+
+            <h3>6.3.1 안정자의 개념</h3>
+            <p>
+                안정자는 코드 공간의 모든 상태에 대해 고유값 +1을 갖는 연산자입니다. n개의 물리 큐비트에서 n-k개의 독립적인 안정자는 2^k 차원의 코드 공간을 정의하며, 여기에 k개의 논리 큐비트가 인코딩됩니다.
+            </p>
+
+            <div class="equation-box">
+                S|ψ_L⟩ = |ψ_L⟩ &nbsp;&nbsp; 모든 안정자 S ∈ S에 대해
+            </div>
+
+            <h3>6.3.2 신드롬 측정</h3>
+            <p>
+                오류가 발생하면 일부 안정자의 고유값이 +1에서 -1로 변합니다. 이 정보를 "신드롬"이라 하며, 보조 큐비트(앤실라)를 사용해 측정합니다. 중요한 점은 데이터 큐비트의 양자 상태를 직접 측정하지 않으므로 양자 정보가 보존된다는 것입니다.
+            </p>
+
+            <div class="diagram">
+                <div class="diagram-title">신드롬 측정 회로</div>
+                <div class="diagram-content">
+                    데이터 큐비트:  ───●───●───●───●───<br>
+                                     │   │   │   │<br>
+                    앤실라:     |0⟩─H─●───●───●───●─H─M<br>
+                                     │   │   │   │<br>
+                                 (안정자의 각 큐비트와 CNOT)<br>
+                    <br>
+                    M = 0: 오류 없음 또는 짝수 오류<br>
+                    M = 1: 홀수 오류 발생
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>6.4 표면 코드</h2>
+
+            <p>
+                표면 코드(Surface Code)는 현재 가장 유망한 양자 오류 정정 코드입니다. 2차원 격자 위에 큐비트를 배열하고, 인접한 큐비트끼리만 상호작용하므로 물리적으로 구현하기 쉽습니다. 또한 ~1%의 높은 오류 임계값을 가집니다.
+            </p>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">~1%</div>
+                    <div class="stat-label">오류 임계값</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">인접</div>
+                    <div class="stat-label">연결성 요구</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">d²</div>
+                    <div class="stat-label">물리 큐비트 수</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">O(d)</div>
+                    <div class="stat-label">거리 (오류 수정 능력)</div>
+                </div>
+            </div>
+
+            <h3>6.4.1 표면 코드 구조</h3>
+            <div class="diagram">
+                <div class="diagram-title">표면 코드 격자 (거리 d=3)</div>
+                <div class="diagram-content">
+                    ○─────●─────○─────●─────○<br>
+                    │  X  │  Z  │  X  │  Z  │<br>
+                    ●─────○─────●─────○─────●<br>
+                    │  Z  │  X  │  Z  │  X  │<br>
+                    ○─────●─────○─────●─────○<br>
+                    │  X  │  Z  │  X  │  Z  │<br>
+                    ●─────○─────●─────○─────●<br>
+                    <br>
+                    ● = 데이터 큐비트, ○ = 측정 큐비트<br>
+                    X = X-안정자 (별 모양), Z = Z-안정자 (플라켓)
+                </div>
+            </div>
+
+            <p>
+                표면 코드에서 데이터 큐비트는 격자의 모서리에, 측정 큐비트(앤실라)는 면의 중심에 위치합니다. X-안정자는 인접한 4개의 데이터 큐비트에 X 연산자를 적용하고, Z-안정자는 Z 연산자를 적용합니다.
+            </p>
+
+            <h3>6.4.2 오류 정정 메커니즘</h3>
+            <p>
+                표면 코드의 오류 정정은 다음과 같이 작동합니다:
+            </p>
+
+            <ul class="component-list">
+                <li><strong>1. 신드롬 측정:</strong> 모든 안정자를 병렬로 측정 (한 라운드)</li>
+                <li><strong>2. 신드롬 수집:</strong> 여러 라운드의 신드롬 수집 (측정 오류 보정)</li>
+                <li><strong>3. 디코딩:</strong> 신드롬 패턴에서 오류 위치 추론</li>
+                <li><strong>4. 정정:</strong> 추론된 오류에 대응하는 정정 연산 적용 (또는 추적)</li>
+            </ul>
+
+            <h3>6.4.3 코드 거리와 논리 오류율</h3>
+            <p>
+                표면 코드의 "거리" d는 코드가 정정할 수 있는 오류의 수를 결정합니다. 거리-d 코드는 최대 (d-1)/2개의 오류를 정정할 수 있습니다. 물리 오류율 p가 임계값 p_th 아래이면, 거리를 늘릴수록 논리 오류율이 지수적으로 감소합니다.
+            </p>
+
+            <div class="equation-box">
+                p_L ∝ (p/p_th)^((d+1)/2)
+            </div>
+
+            <div class="info-card">
+                <h4>📊 임계값 이하 동작</h4>
+                <p>물리 오류율 p = 0.3%, 임계값 p_th = 1%라면:</p>
+                <p>• 거리 3: p_L ~ (0.3)² = 0.09</p>
+                <p>• 거리 5: p_L ~ (0.3)³ = 0.027</p>
+                <p>• 거리 7: p_L ~ (0.3)⁴ = 0.0081</p>
+                <p>거리를 2 증가시킬 때마다 논리 오류율이 ~3배 감소 (오류 억제 인자 Λ = p_th/p ≈ 3.3)</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>6.5 임계값 정리</h2>
+
+            <p>
+                임계값 정리(Threshold Theorem)는 양자 오류 정정의 기초가 되는 중요한 결과입니다. 물리적 오류율이 특정 임계값 아래이면, 충분한 물리 큐비트로 임의로 낮은 논리 오류율을 달성할 수 있음을 보장합니다.
+            </p>
+
+            <div class="highlight-box">
+                <h4>📜 임계값 정리 (1996-1998)</h4>
+                <p>물리적 게이트 오류율 p가 임계값 p_th보다 작으면, 적절한 양자 오류 정정 코드를 사용하여 논리적 오류율을 임의로 작게 만들 수 있다.</p>
+                <p><strong>증명자:</strong> Aharonov, Ben-Or, Knill, Laflamme, Zurek 등</p>
+                <p><strong>의의:</strong> 내결함성 양자 컴퓨팅이 원리적으로 가능함을 보장</p>
+            </div>
+
+            <h3>6.5.1 임계값에 영향을 주는 요소</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>요소</th>
+                        <th>영향</th>
+                        <th>전형적 값</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>오류 정정 코드</td>
+                        <td>코드에 따라 임계값 다름</td>
+                        <td>표면 코드 ~1%</td>
+                    </tr>
+                    <tr>
+                        <td>노이즈 모델</td>
+                        <td>상관 오류가 임계값 낮춤</td>
+                        <td>탈분극: 0.75%</td>
+                    </tr>
+                    <tr>
+                        <td>게이트 세트</td>
+                        <td>비클리포드 게이트가 더 어려움</td>
+                        <td>T 게이트: 매직 상태</td>
+                    </tr>
+                    <tr>
+                        <td>측정 오류</td>
+                        <td>높은 측정 오류가 임계값 낮춤</td>
+                        <td>측정: &lt;1%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>6.6 Google Willow의 성과</h2>
+
+            <p>
+                2024년 12월, Google은 Willow 프로세서로 양자 오류 정정의 역사적 이정표를 달성했습니다: 임계값 이하 동작을 실험적으로 시연한 것입니다. 표면 코드의 거리를 늘릴수록 논리 오류율이 감소함을 처음으로 보였습니다.
+            </p>
+
+            <div class="info-card">
+                <h4>🏆 Willow의 주요 성과</h4>
+                <p><strong>임계값 이하 QEC:</strong> 거리 3→5→7로 증가할 때 논리 오류율 ~2배씩 감소</p>
+                <p><strong>오류 억제 인자:</strong> Λ = 2.14 ± 0.02 (물리 오류율/논리 오류율 비)</p>
+                <p><strong>T1 결맞음:</strong> 평균 68 μs, 최대 100 μs</p>
+                <p><strong>큐비트 수:</strong> 105개 초전도 큐비트</p>
+                <p><strong>의의:</strong> 양자 컴퓨팅이 확장 가능한 경로에 있음을 증명</p>
+            </div>
+
+            <h3>6.6.1 실험 세부사항</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>코드 거리</th>
+                        <th>물리 큐비트</th>
+                        <th>논리 오류율/라운드</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>d = 3</td>
+                        <td>17</td>
+                        <td>3.028% ± 0.023%</td>
+                    </tr>
+                    <tr>
+                        <td>d = 5</td>
+                        <td>49</td>
+                        <td>1.416% ± 0.019%</td>
+                    </tr>
+                    <tr>
+                        <td>d = 7</td>
+                        <td>97</td>
+                        <td>0.666% ± 0.011%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>6.6.2 RCS 벤치마크</h3>
+            <p>
+                Google은 또한 랜덤 회로 샘플링(RCS) 벤치마크에서 Willow의 성능을 시연했습니다. 67 큐비트에서 특정 RCS 태스크를 5분 이내에 완료했으며, 이는 세계 최고의 슈퍼컴퓨터로 10²⁵년(10억 × 우주 나이)이 걸릴 계산입니다.
+            </p>
+
+            <div class="highlight-box">
+                <h4>⚡ 양자 우위의 재확인</h4>
+                <p>• 2019년 Sycamore: 53 큐비트, 10,000년 vs 200초</p>
+                <p>• 2024년 Willow: 67 큐비트, 10²⁵년 vs 5분</p>
+                <p>• 핵심 차이: Willow는 더 낮은 오류율과 더 긴 결맞음 시간</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>6.7 디코딩 알고리즘</h2>
+
+            <p>
+                디코딩은 신드롬 측정 결과에서 실제 오류 위치를 추론하는 과정입니다. 좋은 디코더는 높은 정확도와 빠른 실행 속도를 모두 가져야 합니다. 실시간 오류 정정을 위해서는 신드롬 측정 속도(~μs)보다 빠르게 디코딩해야 합니다.
+            </p>
+
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h5">🔍 최소 가중치 완전 매칭 (MWPM)</h5>
+                    <p>표면 코드의 표준 디코더입니다. 신드롬 패턴을 그래프로 매핑하고, 최소 가중치 매칭을 찾습니다. 정확도 높지만 O(n³) 복잡도로 대규모에서 느립니다.</p>
+                </div>
+                <div class="tech-card">
+                    <h5">🔗 유니온-파인드 (Union-Find)</h5>
+                    <p>거의 선형 시간 O(n α(n)) 복잡도의 빠른 디코더입니다. MWPM보다 약간 낮은 정확도지만, 실시간 디코딩에 적합합니다. 많은 실험에서 사용됩니다.</p>
+                </div>
+                <div class="tech-card">
+                    <h5">🧠 신경망 디코더</h5>
+                    <p>기계학습으로 신드롬-오류 매핑을 학습합니다. 특정 노이즈 모델에 적응할 수 있습니다. 훈련 시간이 필요하지만, 추론은 빠를 수 있습니다.</p>
+                </div>
+                <div class="tech-card">
+                    <h5">📊 텐서 네트워크 디코더</h5>
+                    <p>신드롬의 확률 분포를 텐서 네트워크로 정확하게 계산합니다. 최고 정확도를 달성하지만 계산 비용이 높습니다. 벤치마킹에 사용됩니다.</p>
+                </div>
+            </div>
+
+            <h3>6.7.1 실시간 디코딩의 중요성</h3>
+            <p>
+                내결함성 양자 컴퓨팅에서 디코딩은 실시간으로 수행되어야 합니다. 측정 결과를 기다리는 동안 새로운 오류가 누적되기 때문입니다. 이는 "백로그 문제"로 알려져 있습니다.
+            </p>
+
+            <ul class="component-list">
+                <li><strong>디코딩 지연:</strong> 신드롬 측정 주기(~1 μs)보다 짧아야 함</li>
+                <li><strong>하드웨어 가속:</strong> FPGA 또는 ASIC으로 디코더 구현</li>
+                <li><strong>윈도우 디코딩:</strong> 전체 신드롬 기록 대신 최근 윈도우만 처리</li>
+                <li><strong>병렬화:</strong> 독립적인 지역을 병렬로 디코딩</li>
+            </ul>
+
+            <h3>6.7.2 Google의 실시간 디코딩</h3>
+            <p>
+                Google Willow 실험에서는 커스텀 디코더를 사용하여 실시간 오류 정정을 시연했습니다. 신드롬 데이터를 스트리밍하면서 디코딩하여 백로그 없이 장시간 실험을 수행했습니다.
+            </p>
+        </section>
+
+        <section>
+            <h2>6.8 논리 게이트 구현</h2>
+
+            <h3>6.8.1 클리포드 게이트</h3>
+            <p>
+                표면 코드에서 클리포드 게이트(H, S, CNOT)는 코드 변형 또는 격자 수술(lattice surgery)로 구현됩니다. 격자 수술은 두 표면 코드 패치의 경계를 병합하고 분리하여 얽힘 연산을 수행합니다.
+            </p>
+
+            <h3>6.8.2 비클리포드 게이트와 매직 상태</h3>
+            <p>
+                범용 양자 컴퓨팅에는 T 게이트(π/8 회전)와 같은 비클리포드 게이트가 필요합니다. 이는 "매직 상태"를 사용한 게이트 텔레포테이션으로 구현됩니다.
+            </p>
+
+            <div class="info-card">
+                <h4">✨ 매직 상태 증류</h4>
+                <p><strong>과정:</strong> 많은 노이즈가 있는 매직 상태를 결합하여 적은 수의 고품질 매직 상태 생성</p>
+                <p><strong>오버헤드:</strong> 하나의 고품질 매직 상태에 수십-수백 개의 저품질 상태 필요</p>
+                <p><strong>자원 지배:</strong> 내결함성 양자 컴퓨팅 자원의 대부분이 T 게이트에 사용</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>6.9 장 요약</h2>
+            <div class="highlight-box">
+                <h4">📋 핵심 요점</h4>
+                <p>• 양자 오류 정정: 노이즈 있는 물리 큐비트로 신뢰할 수 있는 논리 큐비트 구현</p>
+                <p>• 안정자 코드: 파울리 연산자로 코드 공간 정의, 간접 측정으로 오류 감지</p>
+                <p>• 표면 코드: 2D 격자, 인접 연결만 필요, ~1% 높은 임계값</p>
+                <p>• 임계값 정리: 물리 오류율 &lt; 임계값이면 확장 가능한 양자 컴퓨팅 가능</p>
+                <p>• Google Willow: 임계값 이하 동작 최초 시연, Λ = 2.14 오류 억제</p>
+                <p>• 디코딩: MWPM, 유니온-파인드, 신경망 등; 실시간 디코딩이 핵심</p>
+                <p>• 논리 게이트: 격자 수술(클리포드), 매직 상태 증류(T 게이트)</p>
+            </div>
+        </section>
+
+        </div>
+</body>
+</html>

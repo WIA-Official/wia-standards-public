@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 05: 데이터 마트 설계 - WIA-DATA_WAREHOUSE</title>
+    <style>:root{--primary:#6366f1;--primary-dark:#4f46e5;--primary-light:#818cf8;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--dark:#1e293b;--light:#f8fafc;--border:#e2e8f0;--text:#334155;--text-light:#64748b}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.6;color:var(--text);background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,.2)}.header p{font-size:1.2em;opacity:.95}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:var(--primary);margin:25px 0 15px}.content p{margin:15px 0;text-align:justify}.content ul,.content ol{margin:15px 0 15px 30px}.content li{margin:8px 0}.info-box{background:linear-gradient(135deg,#e0e7ff,#e0f2fe);border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:linear-gradient(135deg,#fef3c7,#fed7aa);border-left:5px solid var(--warning);padding:20px;margin:25px 0;border-radius:8px}.success-box{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-left:5px solid var(--success);padding:20px;margin:25px 0;border-radius:8px}.code-block{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border-left:4px solid var(--primary)}.code-block code{font-family:"Courier New",monospace;font-size:.9em;line-height:1.5}table{width:100%;border-collapse:collapse;margin:20px 0;box-shadow:0 2px 8px rgba(0,0,0,.1)}table th{background:var(--primary);color:white;padding:15px;text-align:left;font-weight:600}table td{padding:12px 15px;border-bottom:1px solid var(--border)}table tr:hover{background:var(--light)}.review-section{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--warning)}.review-section h3{color:#92400e;margin-bottom:20px}.review-section ol{margin-left:25px}.review-section li{margin:12px 0;color:#78350f}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--success)}.key-takeaways h3{color:#065f46;margin-bottom:20px}.key-takeaways ul{margin-left:25px}.key-takeaways li{margin:12px 0;color:#064e3b}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid var(--border)}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:all .3s;display:inline-block}.nav-button:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 12px rgba(99,102,241,.4)}.footer{background:var(--dark);color:white;text-align:center;padding:30px;font-size:.9em}.footer p{margin:5px 0}.diagram{background:white;border:2px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;text-align:center}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Chapter 05</h1>
+            <p>데이터 마트 설계: 부서별 분석 환경 구축</p>
+        </div>
+
+        <div class="content">
+            <h2>1. 데이터 마트란?</h2>
+            <p>
+                데이터 마트(Data Mart)는 <strong>특정 부서나 비즈니스 영역</strong>에 최적화된 데이터의 부분집합입니다.
+                전사적 데이터 웨어하우스(EDW)가 "백화점"이라면, 데이터 마트는 "전문 매장"입니다.
+            </p>
+
+            <div class="info-box">
+                <h3>🎯 데이터 마트의 특징</h3>
+                <ul>
+                    <li><strong>부서 중심</strong>: 마케팅, 재무, 영업 등 특정 도메인에 집중</li>
+                    <li><strong>빠른 구축</strong>: 전사 DW보다 2-3개월로 단축</li>
+                    <li><strong>빠른 쿼리</strong>: 필요한 데이터만 포함하여 성능 최적화</li>
+                    <li><strong>사용자 친화적</strong>: 해당 부서의 비즈니스 용어 사용</li>
+                    <li><strong>낮은 비용</strong>: 전체 DW보다 저렴한 구축/운영 비용</li>
+                </ul>
+            </div>
+
+            <h3>1.1 EDW vs 데이터 마트</h3>
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.8em;text-align:left;line-height:1.3;">
+    ┌─────────────────────────────────────────────────┐
+    │   Enterprise Data Warehouse (EDW)               │
+    │   - 전사 통합 데이터                            │
+    │   - 모든 비즈니스 프로세스                      │
+    │   - Normalized (3NF) or Dimensional             │
+    └────────────┬────────────────────┬────────────────┘
+                 │                    │
+    ┌────────────▼────────┐  ┌────────▼────────┐  ┌──────────────┐
+    │  Marketing Mart     │  │  Finance Mart   │  │  Sales Mart  │
+    │  ─────────────      │  │  ────────────   │  │  ──────────  │
+    │  - 고객 세그먼트    │  │  - 손익계산서   │  │  - 판매 실적 │
+    │  - 캠페인 ROI       │  │  - 예산 vs 실적 │  │  - 파이프라인│
+    │  - 이탈 분석        │  │  - 현금 흐름    │  │  - 할당량    │
+    └─────────────────────┘  └─────────────────┘  └──────────────┘
+                </pre>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>항목</th>
+                        <th>Enterprise DW</th>
+                        <th>Data Mart</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>범위</strong></td>
+                        <td>전사적 (Enterprise-wide)</td>
+                        <td>부서별 (Departmental)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>데이터량</strong></td>
+                        <td>TB ~ PB급</td>
+                        <td>GB ~ TB급</td>
+                    </tr>
+                    <tr>
+                        <td><strong>구축 기간</strong></td>
+                        <td>12-24개월</td>
+                        <td>2-3개월</td>
+                    </tr>
+                    <tr>
+                        <td><strong>사용자</strong></td>
+                        <td>전사 (수백~수천명)</td>
+                        <td>특정 부서 (수십명)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>데이터 소스</strong></td>
+                        <td>모든 원천 시스템</td>
+                        <td>EDW 또는 특정 시스템</td>
+                    </tr>
+                    <tr>
+                        <td><strong>복잡도</strong></td>
+                        <td>높음 (통합 과제)</td>
+                        <td>중간 (단일 도메인)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>비용</strong></td>
+                        <td>$$$$</td>
+                        <td>$$</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>2. Dependent vs Independent 데이터 마트</h2>
+            <p>
+                데이터 마트는 <strong>데이터 소스</strong>에 따라 두 가지 유형으로 나뉩니다.
+            </p>
+
+            <h3>2.1 Dependent Data Mart (종속형)</h3>
+            <p>
+                EDW에서 데이터를 추출하여 생성합니다. <strong>Kimball의 접근 방식</strong>입니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.8em;text-align:left;">
+원천 시스템 → ETL → EDW → ETL → Dependent Mart
+(CRM, ERP)         (통합)      (부서별 뷰)
+                </pre>
+            </div>
+
+            <div class="success-box">
+                <h3>✅ Dependent Mart 장점</h3>
+                <ul>
+                    <li><strong>일관성</strong>: 모든 마트가 같은 정의 사용 (Single Source of Truth)</li>
+                    <li><strong>재사용</strong>: EDW의 Conformed Dimensions 활용</li>
+                    <li><strong>거버넌스</strong>: 중앙 집중식 데이터 품질 관리</li>
+                    <li><strong>확장성</strong>: 새 마트 추가가 쉬움</li>
+                </ul>
+            </div>
+
+            <h3>2.2 Independent Data Mart (독립형)</h3>
+            <p>
+                원천 시스템에서 직접 데이터를 추출합니다. EDW 없이 구축 가능합니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.8em;text-align:left;">
+원천 시스템 → ETL → Independent Mart (Marketing)
+(CRM)
+
+원천 시스템 → ETL → Independent Mart (Finance)
+(ERP)
+                </pre>
+            </div>
+
+            <div class="warning-box">
+                <h3>⚠️ Independent Mart 단점</h3>
+                <ul>
+                    <li><strong>데이터 사일로</strong>: 마트 간 정의 불일치 ("고객"의 정의가 다름)</li>
+                    <li><strong>중복 노력</strong>: 각 마트마다 ETL 재구현</li>
+                    <li><strong>통합 어려움</strong>: 크로스 부서 분석 불가</li>
+                    <li><strong>유지보수 비용</strong>: N개 마트 = N배 관리</li>
+                </ul>
+                <p><strong>결론</strong>: 장기적으로는 Dependent Mart 권장!</p>
+            </div>
+
+            <h2>3. Aggregate Tables (집계 테이블)</h2>
+            <p>
+                Aggregate Tables은 <strong>미리 계산된 요약 데이터</strong>를 저장하여 쿼리 성능을 극적으로 향상시킵니다.
+                "쿼리 시간을 100배 단축"하는 마법의 기술입니다.
+            </p>
+
+            <h3>3.1 왜 Aggregate Tables이 필요한가?</h3>
+            <p>
+                팩트 테이블이 10억 행이라면, "2024년 월별 매출"을 계산하려면 10억 행을 스캔해야 합니다.
+                하지만 월별 집계 테이블이 있다면? 단 12행만 읽으면 됩니다!
+            </p>
+
+            <div class="code-block">
+<code>-- 원본 팩트 테이블 (10억 행)
+CREATE TABLE fact_sales (
+    sale_key BIGINT,
+    date_key INT,
+    customer_key INT,
+    product_key INT,
+    quantity INT,
+    total_amount DECIMAL(10,2)
+);
+-- 쿼리: SELECT SUM(total_amount) FROM fact_sales WHERE year = 2024
+-- → 10억 행 스캔, 30초 소요
+
+-- Aggregate 테이블: 월별 집계 (12행)
+CREATE TABLE agg_sales_monthly (
+    year_month DATE,
+    product_category VARCHAR(100),
+    region VARCHAR(100),
+    total_quantity BIGINT,
+    total_amount DECIMAL(18,2),
+    order_count INT,
+    unique_customers INT
+);
+-- 쿼리: SELECT SUM(total_amount) FROM agg_sales_monthly WHERE YEAR(year_month) = 2024
+-- → 12행 스캔, 0.1초 소요! 300배 빠름!</code>
+            </div>
+
+            <h3>3.2 Aggregate Navigation</h3>
+            <p>
+                BI 도구는 자동으로 적절한 Aggregate 테이블을 선택합니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.75em;text-align:left;">
+사용자 쿼리: "2024년 Q1 카테고리별 매출"
+
+┌─────────────────────────────────────────┐
+│  BI Tool (Tableau, Power BI)            │
+│  Query Optimizer                        │
+└──────────────┬──────────────────────────┘
+               │
+               ▼ Aggregate Navigation
+    ┌──────────┴──────────┐
+    │  적절한 테이블 선택  │
+    └──────────┬──────────┘
+               │
+    ┌──────────┼──────────┐
+    │          │          │
+    ▼          ▼          ▼
+fact_sales  agg_monthly  agg_quarterly
+(10억행)    (1000행)    (100행)
+            ✓ 선택!
+
+결과: agg_monthly 사용 → 100배 빠름
+                </pre>
+            </div>
+
+            <h3>3.3 Aggregate 테이블 설계 예시</h3>
+            <div class="code-block">
+<code>-- 1. 일별 집계 (Daily Aggregate)
+CREATE TABLE agg_sales_daily AS
+SELECT
+    d.full_date,
+    d.year,
+    d.month,
+    p.category,
+    p.brand,
+    s.region,
+    s.city,
+    COUNT(DISTINCT f.customer_key) AS unique_customers,
+    COUNT(*) AS order_count,
+    SUM(f.quantity) AS total_quantity,
+    SUM(f.total_amount) AS total_sales,
+    SUM(f.profit_amount) AS total_profit,
+    AVG(f.total_amount) AS avg_order_value
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_store s ON f.store_key = s.store_key
+GROUP BY d.full_date, d.year, d.month, p.category, p.brand, s.region, s.city;
+
+-- 2. 월별 집계 (Monthly Aggregate)
+CREATE TABLE agg_sales_monthly AS
+SELECT
+    year_month,
+    category,
+    region,
+    SUM(unique_customers) AS total_unique_customers,
+    SUM(order_count) AS total_orders,
+    SUM(total_quantity) AS total_quantity,
+    SUM(total_sales) AS total_sales,
+    SUM(total_profit) AS total_profit
+FROM agg_sales_daily
+GROUP BY year_month, category, region;
+
+-- 3. 연도별 집계 (Yearly Aggregate)
+CREATE TABLE agg_sales_yearly AS
+SELECT
+    year,
+    category,
+    SUM(total_orders) AS total_orders,
+    SUM(total_sales) AS total_sales,
+    SUM(total_profit) AS total_profit
+FROM agg_sales_monthly
+GROUP BY year, category;</code>
+            </div>
+
+            <div class="info-box">
+                <h3>🎯 Aggregate 설계 원칙</h3>
+                <ol>
+                    <li><strong>80/20 법칙</strong>: 80% 쿼리가 사용하는 집계 수준 식별</li>
+                    <li><strong>계층 구조</strong>: 일 → 월 → 분기 → 연도 순으로 구축</li>
+                    <li><strong>선택적 생성</strong>: 모든 조합이 아닌 자주 사용되는 것만</li>
+                    <li><strong>유지보수 자동화</strong>: dbt, Airflow로 자동 갱신</li>
+                    <li><strong>투명성</strong>: 사용자는 Aggregate 존재를 몰라도 됨 (BI 도구가 처리)</li>
+                </ol>
+            </div>
+
+            <h2>4. Bridge Tables (브릿지 테이블)</h2>
+            <p>
+                차원 모델링에서 <strong>다대다(Many-to-Many) 관계</strong>를 처리하기 위한 테이블입니다.
+                예: 한 환자가 여러 진단을 받고, 한 진단은 여러 환자에게 해당
+            </p>
+
+            <h3>4.1 문제 상황: 다대다 관계</h3>
+            <div class="code-block">
+<code>-- 문제: 환자 한 명이 여러 질병 진단을 받음
+-- Patient #123: 당뇨병, 고혈압, 고지혈증
+
+-- 잘못된 설계 1: 팩트에 진단을 직접 저장 ❌
+CREATE TABLE fact_patient_visit_wrong (
+    visit_key INT,
+    patient_key INT,
+    diagnosis VARCHAR(200),  -- "당뇨병, 고혈압, 고지혈증" (파싱 어려움!)
+    total_cost DECIMAL(10,2)
+);
+
+-- 잘못된 설계 2: 각 진단마다 행 생성 ❌
+-- 문제: SUM(total_cost)하면 중복 집계!
+visit_key | patient_key | diagnosis_key | total_cost
+1         | 123         | 당뇨병        | 500000
+1         | 123         | 고혈압        | 500000   (중복!)
+1         | 123         | 고지혈증      | 500000   (중복!)
+-- SUM(total_cost) = 1,500,000 (실제는 500,000)</code>
+            </div>
+
+            <h3>4.2 해결책: Bridge Table</h3>
+            <div class="code-block">
+<code>-- 1. 팩트 테이블 (진단 없이)
+CREATE TABLE fact_patient_visit (
+    visit_key INT PRIMARY KEY,
+    patient_key INT,
+    date_key INT,
+    hospital_key INT,
+    total_cost DECIMAL(10,2),
+    -- diagnosis는 여기에 없음!
+);
+
+-- 2. Bridge Table (다대다 관계 연결)
+CREATE TABLE bridge_visit_diagnosis (
+    visit_key INT,
+    diagnosis_key INT,
+    diagnosis_weight DECIMAL(5,4),  -- 각 진단의 가중치 (합=1.0)
+    PRIMARY KEY (visit_key, diagnosis_key)
+);
+
+-- 3. 차원 테이블 (진단 마스터)
+CREATE TABLE dim_diagnosis (
+    diagnosis_key INT PRIMARY KEY,
+    diagnosis_code VARCHAR(20),
+    diagnosis_name VARCHAR(200),
+    category VARCHAR(100)
+);
+
+-- 데이터 예시:
+-- fact_patient_visit:
+-- visit_key | patient_key | total_cost
+-- 1         | 123         | 500000
+
+-- bridge_visit_diagnosis:
+-- visit_key | diagnosis_key | diagnosis_weight
+-- 1         | D001 (당뇨)   | 0.333  (1/3)
+-- 1         | D002 (고혈압) | 0.333
+-- 1         | D003 (고지혈) | 0.334
+
+-- 올바른 쿼리:
+SELECT
+    diag.diagnosis_name,
+    SUM(f.total_cost * b.diagnosis_weight) AS weighted_cost  -- 가중치 곱하기!
+FROM fact_patient_visit f
+JOIN bridge_visit_diagnosis b ON f.visit_key = b.visit_key
+JOIN dim_diagnosis diag ON b.diagnosis_key = diag.diagnosis_key
+WHERE f.patient_key = 123
+GROUP BY diag.diagnosis_name;
+
+-- 결과:
+-- diagnosis_name | weighted_cost
+-- 당뇨병         | 166,667  (500000 * 0.333)
+-- 고혈압         | 166,667
+-- 고지혈증       | 166,666
+-- 합계:            500,000 ✓ 정확!</code>
+            </div>
+
+            <div class="success-box">
+                <h3>✅ Bridge Table 활용 사례</h3>
+                <ul>
+                    <li><strong>의료</strong>: 환자 ↔ 진단, 환자 ↔ 처방</li>
+                    <li><strong>교육</strong>: 학생 ↔ 수강 과목</li>
+                    <li><strong>은행</strong>: 계좌 ↔ 공동 소유자</li>
+                    <li><strong>소매</strong>: 주문 ↔ 프로모션 (여러 프로모션 동시 적용)</li>
+                    <li><strong>보험</strong>: 보험 청구 ↔ 관련 사고</li>
+                </ul>
+            </div>
+
+            <h2>5. Junk Dimensions (잡동사니 차원)</h2>
+            <p>
+                <strong>저카디널리티 플래그</strong>들을 하나의 차원 테이블로 묶은 것입니다.
+                팩트 테이블의 외래 키 개수를 줄이고, 차원 폭발(Dimension Explosion)을 방지합니다.
+            </p>
+
+            <h3>5.1 문제 상황: 플래그 남용</h3>
+            <div class="code-block">
+<code>-- 잘못된 설계: 팩트에 플래그 직접 저장 ❌
+CREATE TABLE fact_sales_bad (
+    sale_key BIGINT,
+    date_key INT,
+    customer_key INT,
+    product_key INT,
+
+    -- 수많은 플래그들...
+    is_weekend BOOLEAN,           -- 2가지
+    is_holiday BOOLEAN,           -- 2가지
+    is_promotion BOOLEAN,         -- 2가지
+    payment_method VARCHAR(20),   -- 5가지 (신용카드, 체크카드...)
+    delivery_type VARCHAR(20),    -- 3가지 (일반, 빠른, 익일)
+    gift_wrap BOOLEAN,            -- 2가지
+
+    total_amount DECIMAL(10,2)
+);
+
+-- 문제점:
+-- 1. 팩트 테이블이 너무 넓어짐 (80+ 컬럼)
+-- 2. 플래그별 차원 테이블 만들기엔 너무 작음
+-- 3. 쿼리 가독성 저하</code>
+            </div>
+
+            <h3>5.2 해결책: Junk Dimension</h3>
+            <div class="code-block">
+<code>-- Junk Dimension: 플래그 조합을 하나의 차원으로
+CREATE TABLE dim_transaction_junk (
+    junk_key INT PRIMARY KEY,
+
+    -- 플래그 조합
+    is_weekend BOOLEAN,
+    is_holiday BOOLEAN,
+    is_promotion BOOLEAN,
+    payment_method VARCHAR(20),
+    delivery_type VARCHAR(20),
+    gift_wrap BOOLEAN,
+
+    -- 편의를 위한 계산 컬럼
+    transaction_type_desc VARCHAR(100)  -- "Weekend + Holiday + Promotion + ..."
+);
+
+-- 모든 조합을 미리 생성 (2 * 2 * 2 * 5 * 3 * 2 = 240개 행)
+INSERT INTO dim_transaction_junk VALUES
+(1, FALSE, FALSE, FALSE, 'Credit', 'Standard', FALSE, 'Weekday Standard Credit'),
+(2, FALSE, FALSE, FALSE, 'Credit', 'Standard', TRUE, 'Weekday Standard Credit + Gift'),
+(3, FALSE, FALSE, FALSE, 'Credit', 'Express', FALSE, 'Weekday Express Credit'),
+-- ... 240개 조합
+
+-- 개선된 팩트 테이블
+CREATE TABLE fact_sales (
+    sale_key BIGINT,
+    date_key INT,
+    customer_key INT,
+    product_key INT,
+    junk_key INT,  -- 6개 플래그를 1개 FK로 압축!
+
+    total_amount DECIMAL(10,2)
+);
+
+-- 쿼리 예시:
+SELECT
+    j.payment_method,
+    j.delivery_type,
+    SUM(f.total_amount) AS total_sales
+FROM fact_sales f
+JOIN dim_transaction_junk j ON f.junk_key = j.junk_key
+WHERE j.is_promotion = TRUE
+  AND j.is_weekend = FALSE
+GROUP BY j.payment_method, j.delivery_type;</code>
+            </div>
+
+            <div class="info-box">
+                <h3>🎯 Junk Dimension 설계 원칙</h3>
+                <ul>
+                    <li><strong>저카디널리티만</strong>: 각 플래그가 2-10개 정도 값</li>
+                    <li><strong>조합 수 제한</strong>: 총 조합이 10,000개 이하 (일반적으로 100-1000개)</li>
+                    <li><strong>비즈니스 관련성</strong>: 서로 관련된 플래그끼리 묶기</li>
+                    <li><strong>미리 생성</strong>: 모든 조합을 ETL 시 사전 생성</li>
+                    <li><strong>설명 컬럼 추가</strong>: transaction_type_desc로 가독성 향상</li>
+                </ul>
+            </div>
+
+            <h2>6. Degenerate Dimensions (퇴화 차원)</h2>
+            <p>
+                <strong>차원 테이블 없이</strong> 팩트 테이블에 직접 저장되는 차원 속성입니다.
+                주로 트랜잭션 번호, 영수증 번호 등 <strong>비즈니스 키</strong>가 해당됩니다.
+            </p>
+
+            <h3>6.1 왜 Degenerate Dimension인가?</h3>
+            <div class="code-block">
+<code>-- 예: 주문 번호 (Order Number)
+
+-- 잘못된 설계: 주문 번호만 있는 차원 테이블 ❌
+CREATE TABLE dim_order (
+    order_key INT PRIMARY KEY,
+    order_number VARCHAR(50) UNIQUE
+    -- 다른 속성이 없음! (날짜, 고객 등은 별도 차원)
+);
+-- 문제: 불필요한 조인, 저장 공간 낭비
+
+-- 올바른 설계: 팩트에 직접 저장 ✅
+CREATE TABLE fact_order_line (
+    order_line_key BIGINT PRIMARY KEY,
+
+    -- 차원 FK
+    order_date_key INT,
+    customer_key INT,
+    product_key INT,
+
+    -- Degenerate Dimension (차원 테이블 없음!)
+    order_number VARCHAR(50),      -- DD
+    invoice_number VARCHAR(50),    -- DD
+    tracking_number VARCHAR(100),  -- DD
+
+    -- 측정값
+    quantity INT,
+    total_amount DECIMAL(10,2)
+);
+
+-- 사용 예시:
+SELECT
+    f.order_number,
+    c.customer_name,
+    SUM(f.total_amount) AS order_total
+FROM fact_order_line f
+JOIN dim_customer c ON f.customer_key = c.customer_key
+WHERE f.order_number = 'ORD-2024-123456'
+GROUP BY f.order_number, c.customer_name;</code>
+            </div>
+
+            <div class="success-box">
+                <h3>✅ Degenerate Dimension 활용 사례</h3>
+                <ul>
+                    <li><strong>주문 번호</strong> (Order Number)</li>
+                    <li><strong>송장 번호</strong> (Invoice Number)</li>
+                    <li><strong>티켓 번호</strong> (Ticket Number)</li>
+                    <li><strong>배송 추적 번호</strong> (Tracking Number)</li>
+                    <li><strong>POS 영수증 번호</strong> (Receipt Number)</li>
+                    <li><strong>거래 ID</strong> (Transaction ID)</li>
+                </ul>
+            </div>
+
+            <h2>7. 실전 데이터 마트 예시: 마케팅 마트</h2>
+            <div class="code-block">
+<code>-- 마케팅 마트: 캠페인 효과 분석
+CREATE TABLE mart_marketing_campaign AS
+SELECT
+    -- 차원
+    d.full_date,
+    d.year,
+    d.quarter,
+    d.month,
+    c.customer_segment,  -- 'VIP', 'Regular', 'New'
+    c.age_group,
+    c.region,
+    camp.campaign_name,
+    camp.campaign_type,  -- 'Email', 'SMS', 'Push', 'Display'
+    camp.campaign_budget,
+
+    -- 측정값
+    COUNT(DISTINCT f.customer_key) AS reached_customers,
+    COUNT(DISTINCT CASE WHEN f.clicked = TRUE THEN f.customer_key END) AS clicked_customers,
+    COUNT(DISTINCT CASE WHEN f.converted = TRUE THEN f.customer_key END) AS converted_customers,
+
+    -- KPI 계산
+    COUNT(DISTINCT CASE WHEN f.clicked = TRUE THEN f.customer_key END) * 1.0 /
+        NULLIF(COUNT(DISTINCT f.customer_key), 0) AS click_through_rate,
+
+    COUNT(DISTINCT CASE WHEN f.converted = TRUE THEN f.customer_key END) * 1.0 /
+        NULLIF(COUNT(DISTINCT CASE WHEN f.clicked = TRUE THEN f.customer_key END), 0) AS conversion_rate,
+
+    SUM(f.revenue) AS total_revenue,
+    SUM(f.revenue) - camp.campaign_budget AS roi_amount,
+    (SUM(f.revenue) - camp.campaign_budget) / NULLIF(camp.campaign_budget, 0) AS roi_percentage
+
+FROM fact_campaign_interaction f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_customer c ON f.customer_key = c.customer_key
+JOIN dim_campaign camp ON f.campaign_key = camp.campaign_key
+GROUP BY
+    d.full_date, d.year, d.quarter, d.month,
+    c.customer_segment, c.age_group, c.region,
+    camp.campaign_name, camp.campaign_type, camp.campaign_budget;
+
+-- 마케터의 질문에 즉시 답변:
+-- "2024년 Q1에 VIP 고객 대상 이메일 캠페인의 ROI는?"
+SELECT
+    campaign_name,
+    reached_customers,
+    converted_customers,
+    conversion_rate,
+    roi_percentage
+FROM mart_marketing_campaign
+WHERE year = 2024
+  AND quarter = 1
+  AND customer_segment = 'VIP'
+  AND campaign_type = 'Email'
+ORDER BY roi_percentage DESC;</code>
+            </div>
+
+            <h2>8. 데이터 마트 유지보수</h2>
+            <p>
+                데이터 마트는 <strong>자동화된 갱신</strong>이 필수입니다.
+            </p>
+
+            <div class="code-block">
+<code>-- dbt로 마트 자동 갱신
+-- models/marts/marketing/mart_campaign.sql
+{{
+    config(
+        materialized='incremental',
+        unique_key='mart_key',
+        on_schema_change='sync_all_columns',
+        tags=['mart', 'marketing', 'daily']
+    )
+}}
+
+WITH campaign_stats AS (
+    SELECT
+        {{ dbt_utils.surrogate_key(['date_key', 'campaign_key', 'customer_segment']) }} AS mart_key,
+        -- ... (위의 쿼리와 동일)
+    FROM {{ ref('fact_campaign_interaction') }}
+
+    {% if is_incremental() %}
+    WHERE date_key > (SELECT MAX(date_key) FROM {{ this }})
+    {% endif %}
+)
+
+SELECT * FROM campaign_stats
+
+-- Airflow DAG로 스케줄링
+# dags/marketing_mart_refresh.py
+refresh_marketing_mart = BashOperator(
+    task_id='refresh_marketing_mart',
+    bash_command='dbt run --models tag:marketing',
+    schedule_interval='0 3 * * *',  # 매일 새벽 3시
+)</code>
+            </div>
+
+            <div class="review-section">
+                <h3>📝 복습 질문</h3>
+                <ol>
+                    <li>데이터 마트와 EDW의 차이점을 5가지 이상 설명하세요.</li>
+                    <li>Dependent Data Mart와 Independent Data Mart 중 어느 것을 추천하며, 그 이유는?</li>
+                    <li>Aggregate Tables가 쿼리 성능을 향상시키는 원리를 설명하세요.</li>
+                    <li>Bridge Table은 언제 사용하며, diagnosis_weight의 역할은 무엇인가요?</li>
+                    <li>Junk Dimension에 포함시킬 플래그의 조건은 무엇인가요?</li>
+                    <li>Degenerate Dimension의 예시를 3가지 들고, 왜 별도 차원 테이블을 만들지 않는지 설명하세요.</li>
+                    <li>Aggregate Navigation이란 무엇이며, 어떻게 작동하나요?</li>
+                    <li>마케팅 마트에서 ROI를 계산하는 공식을 SQL로 작성하세요.</li>
+                    <li>"Independent Mart는 데이터 사일로를 만든다"는 말의 의미는?</li>
+                    <li>데이터 마트를 dbt로 관리하는 것의 장점은 무엇인가요?</li>
+                </ol>
+            </div>
+
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>데이터 마트 = 부서별 전문 매장</strong>: 빠른 구축, 빠른 쿼리, 낮은 비용</li>
+                    <li><strong>Dependent Mart 권장</strong>: EDW 기반, 일관성 보장, 확장 용이</li>
+                    <li><strong>Aggregate Tables로 100배 빠른 쿼리</strong>: 미리 계산된 요약 데이터</li>
+                    <li><strong>Bridge Table로 다대다 해결</strong>: diagnosis_weight로 중복 집계 방지</li>
+                    <li><strong>Junk Dimension으로 팩트 간소화</strong>: 저카디널리티 플래그 묶기</li>
+                    <li><strong>Degenerate Dimension</strong>: 차원 테이블 없이 팩트에 직접 저장 (주문번호 등)</li>
+                    <li><strong>Aggregate Navigation</strong>: BI 도구가 자동으로 최적 집계 테이블 선택</li>
+                    <li><strong>마트 자동화</strong>: dbt + Airflow로 일일 갱신</li>
+                    <li><strong>80/20 법칙</strong>: 80% 쿼리를 지원하는 집계만 생성</li>
+                    <li>弘益人間: 부서별 최적화된 데이터로 빠른 의사결정 지원 🌍</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-04.html" class="nav-button">← 04. OLAP 및 큐브</a>
+                <a href="chapter-06.html" class="nav-button">06. 성능 최적화 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

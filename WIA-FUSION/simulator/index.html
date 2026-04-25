@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-FUSION Simulator | Nuclear Fusion Energy</title>
+    <style>
+        :root { --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-secondary: #cbd5e1; --primary: #06B6D4; --primary-dark: #0891B2; --accent: #22D3EE; --border: #334155; --success: #10b981; --error: #ef4444; --warning: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: var(--bg-card); border-bottom: 2px solid var(--primary); padding: 15px 20px; position: sticky; top: 0; z-index: 1000; }
+        .header-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; }
+        .logo h1 { font-size: 22px; color: var(--primary); }
+        .header-controls { display: flex; gap: 15px; align-items: center; }
+        .lang-select { background: var(--bg); border: 2px solid var(--primary); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 14px; min-width: 150px; }
+        .back-btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 600; text-decoration: none; }
+        .tabs { display: flex; background: var(--bg-card); border-radius: 12px 12px 0 0; overflow-x: auto; margin-top: 20px; }
+        .tab { padding: 16px 28px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 15px; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.3s ease; white-space: nowrap; }
+        .tab:hover { color: var(--primary); background: rgba(6, 182, 212, 0.1); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(6, 182, 212, 0.15); }
+        .tab-content { display: none; background: var(--bg-card); border-radius: 0 0 12px 12px; padding: 25px; border: 1px solid var(--border); border-top: none; }
+        .tab-content.active { display: block; }
+        .section-title { color: var(--primary); font-size: 22px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; }
+        .card { background: var(--bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+        .card-title { color: var(--primary); font-size: 16px; margin-bottom: 15px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 600; font-size: 14px; }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 10px; background: var(--bg-card); border: 2px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+        .input-group input:focus, .input-group select:focus { outline: none; border-color: var(--primary); }
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.3s ease; border: none; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(6, 182, 212, 0.4); }
+        .output-area { background: var(--bg-card); border: 2px solid var(--border); border-radius: 8px; padding: 15px; font-family: 'Consolas', monospace; font-size: 13px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+        .status { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .status-error { background: rgba(239, 68, 68, 0.2); color: var(--error); }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 4px; transition: width 0.5s ease; }
+        .plasma-viz { height: 200px; background: radial-gradient(ellipse at center, rgba(6, 182, 212, 0.3) 0%, rgba(6, 182, 212, 0.1) 50%, transparent 70%); border-radius: 50%; margin: 20px auto; animation: plasma-pulse 2s ease-in-out infinite; position: relative; }
+        .plasma-viz::after { content: 'Plasma'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--primary); font-weight: bold; }
+        @keyframes plasma-pulse { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 15px 0; }
+        .metric { background: var(--bg-card); padding: 15px; border-radius: 8px; text-align: center; }
+        .metric-value { font-size: 24px; color: var(--primary); font-weight: bold; }
+        .metric-label { font-size: 12px; color: var(--text-secondary); }
+        footer { text-align: center; padding: 25px; color: var(--text-secondary); }
+        .philosophy { color: var(--primary); font-size: 18px; letter-spacing: 4px; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Fusion</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <header>
+        <div class="header-content">
+            <div class="logo"><h1>WIA-FUSION Simulator</h1></div>
+            <div class="header-controls">
+                <select class="lang-select" id="langSelect">
+                    <option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="zh">中文</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="ru">Русский</option><option value="ar">العربية</option><option value="hi">हिन्दी</option><option value="vi">Tiếng Việt</option><option value="th">ไทย</option><option value="id">Bahasa Indonesia</option><option value="ms">Bahasa Melayu</option><option value="tl">Filipino</option><option value="bn">বাংলা</option><option value="ta">தமிழ்</option><option value="te">తెలుగు</option><option value="mr">मराठी</option><option value="gu">ગુજરાતી</option><option value="kn">ಕನ್ನಡ</option><option value="ml">മലയാളം</option><option value="pa">ਪੰਜਾਬੀ</option><option value="ur">اردو</option><option value="fa">فارسی</option><option value="tr">Türkçe</option><option value="pl">Polski</option><option value="uk">Українська</option><option value="nl">Nederlands</option><option value="it">Italiano</option><option value="el">Ελληνικά</option><option value="cs">Čeština</option><option value="sv">Svenska</option><option value="da">Dansk</option><option value="fi">Suomi</option><option value="no">Norsk</option><option value="hu">Magyar</option><option value="ro">Română</option><option value="sk">Slovenčina</option><option value="bg">Български</option><option value="hr">Hrvatski</option><option value="sr">Српски</option><option value="sl">Slovenščina</option><option value="lt">Lietuvių</option><option value="lv">Latviešu</option><option value="et">Eesti</option><option value="he">עברית</option><option value="sw">Kiswahili</option><option value="am">አማርኛ</option><option value="yo">Yorùbá</option><option value="ig">Igbo</option><option value="zu">isiZulu</option><option value="xh">isiXhosa</option><option value="af">Afrikaans</option><option value="ne">नेपाली</option><option value="si">සිංහල</option><option value="km">ភាសាខ្មែរ</option><option value="lo">ລາວ</option><option value="my">မြန်မာ</option><option value="ka">ქართული</option><option value="hy">Հայերdelays</option><option value="az">Azərbaycan</option><option value="uz">O'zbek</option><option value="kk">Қазақ</option><option value="ky">Кыргыз</option><option value="tg">Тоҷикӣ</option><option value="tk">Türkmen</option><option value="mn">Монгол</option><option value="ps">پښتو</option><option value="ku">Kurdî</option><option value="sd">سنڌي</option><option value="ug">ئۇيغۇرچە</option><option value="bo">བོད་སྐད</option><option value="dz">རྫོང་ཁ</option><option value="mt">Malti</option><option value="ga">Gaeilge</option><option value="cy">Cymraeg</option><option value="gd">Gàidhlig</option><option value="eu">Euskara</option><option value="ca">Català</option><option value="gl">Galego</option><option value="is">Íslenska</option><option value="lb">Lëtzebuergesch</option><option value="mk">Македонски</option><option value="sq">Shqip</option><option value="bs">Bosanski</option><option value="me">Crnogorski</option><option value="be">Беларуская</option><option value="eo">Esperanto</option><option value="la">Latina</option><option value="haw">ʻŌlelo Hawaiʻi</option><option value="mi">Te Reo Māori</option><option value="sm">Gagana Samoa</option><option value="to">Lea Fakatonga</option><option value="fj">Vosa Vakaviti</option><option value="ht">Kreyòl Ayisyen</option><option value="mg">Malagasy</option><option value="rw">Kinyarwanda</option><option value="so">Soomaali</option><option value="ti">ትግርኛ</option>
+                </select>
+                <a href="../" class="back-btn">← Back</a>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('data-format')">📊 Data Format</button>
+            <button class="tab" onclick="showTab('algorithms')">🔢 Algorithms</button>
+            <button class="tab" onclick="showTab('protocol')">📡 Protocol</button>
+            <button class="tab" onclick="showTab('integration')">🔗 Integration</button>
+            <button class="tab" onclick="showTab('test')">🧪 Test</button>
+        </div>
+
+        <div id="data-format" class="tab-content active">
+            <h2 class="section-title">📊 Plasma State Data Format</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">Plasma Parameters</h3>
+                    <div class="input-row">
+                        <div class="input-group"><label>Ion Temperature (keV)</label><input type="number" id="ionTemp" value="10" step="0.1"></div>
+                        <div class="input-group"><label>Electron Temperature (keV)</label><input type="number" id="electronTemp" value="10" step="0.1"></div>
+                    </div>
+                    <div class="input-row">
+                        <div class="input-group"><label>Density (10²⁰/m³)</label><input type="number" id="density" value="1.0" step="0.1"></div>
+                        <div class="input-group"><label>Confinement Time (s)</label><input type="number" id="confinement" value="3.0" step="0.1"></div>
+                    </div>
+                    <div class="input-group"><label>Reactor Type</label><select id="reactorType"><option value="ITER">ITER</option><option value="KSTAR">KSTAR</option><option value="JET">JET</option><option value="SPARC">SPARC</option><option value="custom">Custom</option></select></div>
+                    <button class="btn btn-primary" onclick="generatePlasmaJSON()">Generate Plasma State JSON</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Generated JSON Schema</h3>
+                    <div class="output-area" id="plasmaOutput">// Plasma state JSON will appear here</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="algorithms" class="tab-content">
+            <h2 class="section-title">🔢 Fusion Algorithms</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">Triple Product & Q Factor Calculator</h3>
+                    <div class="input-row">
+                        <div class="input-group"><label>Temperature T (keV)</label><input type="number" id="calcTemp" value="10" step="0.1"></div>
+                        <div class="input-group"><label>Density n (10²⁰/m³)</label><input type="number" id="calcDensity" value="1.0" step="0.1"></div>
+                    </div>
+                    <div class="input-row">
+                        <div class="input-group"><label>Confinement τ (s)</label><input type="number" id="calcTau" value="3.0" step="0.1"></div>
+                        <div class="input-group"><label>Input Power (MW)</label><input type="number" id="inputPower" value="50" step="1"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="calculateFusion()">Calculate</button>
+                    <div class="metric-grid" style="margin-top:20px">
+                        <div class="metric"><div class="metric-value" id="tripleProduct">-</div><div class="metric-label">Triple Product (keV·s·10²⁰/m³)</div></div>
+                        <div class="metric"><div class="metric-value" id="qFactor">-</div><div class="metric-label">Q Factor</div></div>
+                        <div class="metric"><div class="metric-value" id="fusionPower">-</div><div class="metric-label">Fusion Power (MW)</div></div>
+                        <div class="metric"><div class="metric-value" id="ignitionStatus">-</div><div class="metric-label">Status</div></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Algorithm Output</h3>
+                    <div class="output-area" id="algoOutput">// Calculation results will appear here</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="protocol" class="tab-content">
+            <h2 class="section-title">📡 Operation Protocol</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">Operation Sequence</h3>
+                    <div class="input-group"><label>Protocol Type</label><select id="protocolType"><option value="startup">Plasma Startup</option><option value="steady">Steady-State Operation</option><option value="shutdown">Soft Landing Shutdown</option><option value="emergency">Emergency Shutdown</option></select></div>
+                    <button class="btn btn-primary" onclick="runProtocol()">Execute Protocol</button>
+                    <div class="plasma-viz" id="plasmaViz"></div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Protocol Log</h3>
+                    <div class="output-area" id="protocolOutput">// Protocol execution log will appear here</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="integration" class="tab-content">
+            <h2 class="section-title">🔗 Grid Integration</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">Power Plant Configuration</h3>
+                    <div class="input-row">
+                        <div class="input-group"><label>Gross Fusion Power (MW)</label><input type="number" id="grossPower" value="500" step="10"></div>
+                        <div class="input-group"><label>Plant Efficiency (%)</label><input type="number" id="efficiency" value="33" step="1"></div>
+                    </div>
+                    <div class="input-row">
+                        <div class="input-group"><label>Availability Factor</label><input type="number" id="availability" value="0.85" step="0.01" max="1"></div>
+                        <div class="input-group"><label>Tritium Breeding Ratio</label><input type="number" id="tbr" value="1.1" step="0.01"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="calculateEconomics()">Calculate Economics</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Integration Status</h3>
+                    <div style="margin-bottom:15px"><span class="status status-success">✓ Grid Connected</span></div>
+                    <div style="margin-bottom:15px"><span class="status status-success">✓ Tritium Supply Stable</span></div>
+                    <div style="margin-bottom:15px"><span class="status status-warning">⚠ Thermal Storage Charging</span></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width:78%"></div></div>
+                    <p style="margin-top:10px;color:var(--text-secondary)">Grid Capacity: 78%</p>
+                    <div class="output-area" id="economicsOutput" style="margin-top:15px">// Economics analysis will appear here</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="test" class="tab-content">
+            <h2 class="section-title">🧪 Disruption Test & AI Control</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">Disruption Prediction</h3>
+                    <div class="input-group"><label>MHD Activity Level</label><input type="range" id="mhdLevel" min="0" max="100" value="30" oninput="updateMHD()"><span id="mhdValue">30%</span></div>
+                    <div class="input-group"><label>ELM Frequency (Hz)</label><input type="number" id="elmFreq" value="50" step="5"></div>
+                    <div class="input-group"><label>Beta Value (%)</label><input type="number" id="betaValue" value="2.5" step="0.1"></div>
+                    <button class="btn btn-primary" onclick="predictDisruption()">Run AI Prediction</button>
+                    <div class="metric-grid" style="margin-top:20px">
+                        <div class="metric"><div class="metric-value" id="disruptionRisk">-</div><div class="metric-label">Disruption Risk</div></div>
+                        <div class="metric"><div class="metric-value" id="timeToDisrupt">-</div><div class="metric-label">Time to Disruption</div></div>
+                        <div class="metric"><div class="metric-value" id="recommendation">-</div><div class="metric-label">AI Recommendation</div></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Test Results</h3>
+                    <div class="output-area" id="testOutput">// Test results will appear here</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <div class="philosophy">弘益人間</div>
+        <p>© 2025 WIA - World Certification Industry Association. MIT License.</p>
+    </footer>
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+        function generatePlasmaJSON() {
+            const data = {
+                "$schema": "https://wia.live/schemas/fusion/v1.0.0",
+                plasma_state: {
+                    shot_id: "SHOT-" + Date.now(),
+                    timestamp: new Date().toISOString(),
+                    reactor: document.getElementById('reactorType').value,
+                    core_parameters: {
+                        temperature_keV: { ion: parseFloat(document.getElementById('ionTemp').value), electron: parseFloat(document.getElementById('electronTemp').value) },
+                        density_m3: { value: parseFloat(document.getElementById('density').value), unit: "1e20/m3" },
+                        confinement_time_s: parseFloat(document.getElementById('confinement').value),
+                        triple_product: { value: (parseFloat(document.getElementById('ionTemp').value) * parseFloat(document.getElementById('density').value) * parseFloat(document.getElementById('confinement').value)).toFixed(2), unit: "keV·s·1e20/m3" }
+                    },
+                    performance: { q_factor: 0, fusion_power_mw: 0, plasma_current_ma: 15, beta_percent: 2.5 },
+                    stability: { disruption_risk: 0.15, elm_frequency_hz: 50, mhd_activity: ["m=2,n=1"] },
+                    control: { heating_power_mw: { ohmic: 1, nbi: 33, icrh: 10, ecrh: 6 }, magnetic_field_t: 5.3, divertor_heat_mw_m2: 10 }
+                }
+            };
+            document.getElementById('plasmaOutput').textContent = JSON.stringify(data, null, 2);
+        }
+        function calculateFusion() {
+            const T = parseFloat(document.getElementById('calcTemp').value);
+            const n = parseFloat(document.getElementById('calcDensity').value);
+            const tau = parseFloat(document.getElementById('calcTau').value);
+            const Pin = parseFloat(document.getElementById('inputPower').value);
+            const tripleProduct = T * n * tau;
+            const lawsonCriterion = 3e21; // keV·s/m³ for ignition
+            const Pfusion = tripleProduct * 0.5 * Pin / 10; // Simplified model
+            const Q = Pfusion / Pin;
+            document.getElementById('tripleProduct').textContent = tripleProduct.toFixed(2);
+            document.getElementById('qFactor').textContent = Q.toFixed(2);
+            document.getElementById('fusionPower').textContent = Pfusion.toFixed(1);
+            let status = Q >= 10 ? "Commercial" : Q >= 1 ? "Breakeven" : Q >= 0.5 ? "Near Breakeven" : "Sub-Breakeven";
+            document.getElementById('ignitionStatus').textContent = status;
+            document.getElementById('algoOutput').textContent = `Triple Product Calculation:
+n × T × τ = ${n} × ${T} × ${tau} = ${tripleProduct.toFixed(2)} keV·s·10²⁰/m³
+
+Lawson Criterion Target: 3.0 keV·s·10²⁰/m³
+Current: ${tripleProduct.toFixed(2)} (${(tripleProduct/3*100).toFixed(1)}% of target)
+
+Q Factor: P_fusion / P_input = ${Pfusion.toFixed(1)} / ${Pin} = ${Q.toFixed(2)}
+
+Status: ${status}
+${Q >= 1 ? "✓ Scientific breakeven achieved!" : "○ Below breakeven"}
+${Q >= 10 ? "✓ Commercial viability achieved!" : "○ Not yet commercial"}`;
+        }
+        function runProtocol() {
+            const type = document.getElementById('protocolType').value;
+            const protocols = {
+                startup: `[STARTUP SEQUENCE]
+T+0.0s: Vacuum pump activation
+T+0.5s: Magnetic field ramp-up (0→5.3T)
+T+2.0s: Gas puffing (D-T mixture)
+T+3.0s: Ohmic heating initiation
+T+5.0s: Plasma breakdown achieved
+T+6.0s: Current ramp-up (0→15MA)
+T+10.0s: NBI heating activation
+T+15.0s: ECRH/ICRH auxiliary heating
+T+20.0s: Steady-state achieved
+Status: ✓ STARTUP COMPLETE`,
+                steady: `[STEADY-STATE OPERATION]
+• Plasma current: 15 MA (stable)
+• Ion temperature: 10 keV
+• Confinement time: 3.0s
+• Q factor: 10.2
+• Fusion power: 500 MW
+• AI Control: ACTIVE
+  - Real-time MHD monitoring
+  - Automatic heating adjustment
+  - Disruption avoidance: ARMED
+Status: ✓ STEADY-STATE MAINTAINED`,
+                shutdown: `[SOFT LANDING SEQUENCE]
+T+0.0s: Heating power reduction (50%/min)
+T+30.0s: Plasma current ramp-down
+T+45.0s: Fuel injection stopped
+T+60.0s: Magnetic field reduction
+T+90.0s: Plasma termination
+T+120.0s: Post-shot analysis
+Status: ✓ SOFT LANDING COMPLETE`,
+                emergency: `[EMERGENCY SHUTDOWN - CODE RED]
+T+0.0s: ⚠ DISRUPTION WARNING DETECTED
+T+0.1s: Massive gas injection (MGI) triggered
+T+0.2s: Runaway electron mitigation
+T+0.5s: Plasma terminated
+T+1.0s: Magnetic field dump
+T+5.0s: Safety systems check
+T+10.0s: Damage assessment initiated
+Status: ⚠ EMERGENCY SHUTDOWN COMPLETE`
+            };
+            document.getElementById('protocolOutput').textContent = protocols[type];
+        }
+        function calculateEconomics() {
+            const gross = parseFloat(document.getElementById('grossPower').value);
+            const eff = parseFloat(document.getElementById('efficiency').value) / 100;
+            const avail = parseFloat(document.getElementById('availability').value);
+            const tbr = parseFloat(document.getElementById('tbr').value);
+            const netElectric = gross * eff;
+            const annualEnergy = netElectric * avail * 8760;
+            const lcoe = (5000 / annualEnergy * 1e6).toFixed(1);
+            document.getElementById('economicsOutput').textContent = `[ECONOMICS ANALYSIS]
+Gross Fusion Power: ${gross} MW
+Net Electric Power: ${netElectric.toFixed(1)} MW
+Annual Energy: ${(annualEnergy/1000).toFixed(1)} GWh
+Capacity Factor: ${(avail*100).toFixed(1)}%
+Tritium Breeding: ${tbr} (${tbr >= 1.05 ? "✓ Self-sufficient" : "⚠ External supply needed"})
+
+Estimated LCOE: $${lcoe}/MWh
+Comparison:
+  - Coal: $65-150/MWh
+  - Natural Gas: $40-80/MWh
+  - Solar: $30-50/MWh
+  - Fusion: $${lcoe}/MWh ${parseFloat(lcoe) < 60 ? "✓ Competitive" : "○ Premium"}`;
+        }
+        function updateMHD() { document.getElementById('mhdValue').textContent = document.getElementById('mhdLevel').value + '%'; }
+        function predictDisruption() {
+            const mhd = parseInt(document.getElementById('mhdLevel').value);
+            const elm = parseFloat(document.getElementById('elmFreq').value);
+            const beta = parseFloat(document.getElementById('betaValue').value);
+            const risk = Math.min(100, mhd * 0.5 + (elm > 100 ? 20 : 0) + (beta > 3.5 ? 30 : 0));
+            const time = risk > 70 ? "<1s" : risk > 50 ? "2-5s" : risk > 30 ? "10-30s" : ">60s";
+            const rec = risk > 70 ? "MGI NOW" : risk > 50 ? "Reduce Power" : risk > 30 ? "Monitor" : "Stable";
+            document.getElementById('disruptionRisk').textContent = risk.toFixed(0) + "%";
+            document.getElementById('disruptionRisk').style.color = risk > 70 ? "#ef4444" : risk > 50 ? "#f59e0b" : "#10b981";
+            document.getElementById('timeToDisrupt').textContent = time;
+            document.getElementById('recommendation').textContent = rec;
+            document.getElementById('testOutput').textContent = `[AI DISRUPTION PREDICTION]
+Input Parameters:
+  - MHD Activity: ${mhd}%
+  - ELM Frequency: ${elm} Hz
+  - Beta Value: ${beta}%
+
+Neural Network Analysis:
+  Layer 1: Feature extraction... ✓
+  Layer 2: Pattern matching... ✓
+  Layer 3: Risk assessment... ✓
+
+Results:
+  Disruption Probability: ${risk.toFixed(1)}%
+  Estimated Time to Event: ${time}
+  Confidence Level: ${(95 - risk*0.2).toFixed(1)}%
+
+AI Recommendation: ${rec}
+${risk > 50 ? "⚠ WARNING: Immediate action required!" : "✓ System stable - continue monitoring"}`;
+        }
+    </script>
+</body>
+</html>

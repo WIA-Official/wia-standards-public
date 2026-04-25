@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <title>WIA-AMR Standard - Interactive Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { background: rgba(139, 92, 246, 0.1); border: 2px solid #8B5CF6; border-radius: 16px;
+            padding: 30px; margin-bottom: 30px; text-align: center; position: relative; }
+        h1 { color: #8B5CF6; font-size: 2.2em; margin-bottom: 10px; }
+        .tagline { color: #cbd5e1; font-size: 1.1em; margin: 10px 0; }
+        .philosophy { display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+            color: white; padding: 10px 25px; border-radius: 20px; font-weight: bold; margin-top: 10px; }
+        .lang-selector { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; align-items: center; }
+        .lang-btn { background: rgba(139, 92, 246, 0.2); border: 1px solid #8B5CF6; color: #e2e8f0;
+            padding: 8px 20px; border-radius: 8px; cursor: pointer; transition: all 0.3s; font-size: 14px; }
+        .lang-btn:hover { background: rgba(139, 92, 246, 0.4); }
+        .lang-btn.active { background: #8B5CF6; color: white; }
+        .lang-dropdown { background: #1e293b; border: 1px solid #8B5CF6; color: #e2e8f0; padding: 8px 15px;
+            border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(139, 92, 246, 0.3); padding: 15px 30px;
+            border-radius: 10px; cursor: pointer; transition: all 0.3s; text-align: center; flex: 1; min-width: 150px; }
+        .tab:hover { background: rgba(139, 92, 246, 0.2); border-color: #8B5CF6; }
+        .tab.active { background: #8B5CF6; border-color: #8B5CF6; color: white; font-weight: bold; }
+        .panel { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px; padding: 30px; display: none; min-height: 500px; }
+        .panel.active { display: block; }
+        .control-group { margin: 20px 0; }
+        .control-group label { display: block; color: #8B5CF6; font-weight: bold; margin-bottom: 8px; }
+        .control-group input, .control-group select, .control-group textarea {
+            width: 100%; max-width: 500px; padding: 10px;
+            background: #1e293b; border: 1px solid #8B5CF6; border-radius: 8px; color: #e2e8f0; }
+        .control-group textarea { min-height: 100px; font-family: monospace; }
+        .btn-center { text-align: center; margin: 20px 0; }
+        .btn { background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); color: white;
+            padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 1em;
+            font-weight: bold; transition: all 0.3s; margin: 5px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3); }
+        .btn-secondary { background: linear-gradient(135deg, #475569 0%, #64748b 100%); }
+        .output { background: #1e293b; border: 1px solid #8B5CF6; border-radius: 8px; padding: 20px;
+            margin-top: 20px; font-family: 'Courier New', monospace; color: #A78BFA; min-height: 150px;
+            max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+        .card { background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 10px; padding: 20px; }
+        .card h3 { color: #8B5CF6; margin-bottom: 10px; font-size: 1.1em; }
+        .metric { font-size: 2em; color: #8B5CF6; font-weight: bold; margin: 10px 0; }
+        footer { text-align: center; padding: 40px 20px; margin-top: 60px;
+            border-top: 1px solid rgba(139, 92, 246, 0.3); color: #94a3b8; }
+        @media (max-width: 768px) {
+            header { padding: 20px; }
+            .lang-selector { position: static; justify-content: center; margin-top: 15px; }
+            h1 { font-size: 1.5em; }
+            .tabs { flex-direction: column; }
+            .tab { min-width: 100%; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Amr</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <div class="lang-selector">
+                <button class="lang-btn active" onclick="switchLang('en')">EN</button>
+                <button class="lang-btn" onclick="switchLang('ko')">KO</button>
+                                                <select class="lang-dropdown" onchange="selectLanguage(this.value)">
+                    <!-- 99 Languages for Global Accessibility -->
+                    <option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="zh">中文</option><option value="es">Español</option>
+                    <option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="pt">Português</option><option value="ru">Русский</option>
+                    <option value="ar">العربية</option><option value="hi">हिन्दी</option><option value="bn">বাংলা</option><option value="th">ไทย</option><option value="vi">Tiếng Việt</option>
+                    <option value="tr">Türkçe</option><option value="pl">Polski</option><option value="nl">Nederlands</option><option value="sv">Svenska</option><option value="no">Norsk</option>
+                    <option value="da">Dansk</option><option value="fi">Suomi</option><option value="cs">Čeština</option><option value="hu">Magyar</option><option value="ro">Română</option>
+                    <option value="uk">Українська</option><option value="el">Ελληνικά</option><option value="he">עברית</option><option value="fa">فارسی</option><option value="ur">اردو</option>
+                    <option value="id">Bahasa Indonesia</option><option value="ms">Bahasa Melayu</option><option value="tl">Tagalog</option><option value="sw">Swahili</option><option value="af">Afrikaans</option>
+                    <option value="zu">Zulu</option><option value="xh">Xhosa</option><option value="ha">Hausa</option><option value="yo">Yoruba</option><option value="ig">Igbo</option>
+                    <option value="am">አማርኛ</option><option value="so">Somali</option><option value="mg">Malagasy</option><option value="rw">Kinyarwanda</option><option value="sn">Shona</option>
+                    <option value="st">Sesotho</option><option value="tn">Setswana</option><option value="ny">Chichewa</option><option value="lg">Luganda</option><option value="sk">Slovenčina</option>
+                    <option value="hr">Hrvatski</option><option value="sr">Српски</option><option value="bs">Bosanski</option><option value="mk">Македонски</option><option value="sq">Shqip</option>
+                    <option value="et">Eesti</option><option value="lv">Latviešu</option><option value="lt">Lietuvių</option><option value="kk">Қазақ</option><option value="uz">O'zbek</option>
+                    <option value="tg">Тоҷикӣ</option><option value="ky">Кыргыз</option><option value="mn">Монгол</option><option value="my">မြန်မာ</option><option value="km">ខ្មែរ</option>
+                    <option value="lo">ລາວ</option><option value="ne">नेपाली</option><option value="si">සිංහල</option><option value="ta">தமிழ்</option><option value="te">తెలుగు</option>
+                    <option value="kn">ಕನ್ನಡ</option><option value="ml">മലയാളം</option><option value="mr">मराठी</option><option value="gu">ગુજરાતી</option><option value="pa">ਪੰਜਾਬੀ</option>
+                    <option value="ps">پښتو</option><option value="prs">دری</option><option value="ku">کوردی</option><option value="az">Azərbaycan</option><option value="ka">ქართული</option>
+                    <option value="hy">Հայերեն</option><option value="tk">Türkmen</option><option value="be">Беларуская</option><option value="sl">Slovenščina</option><option value="bg">Български</option>
+                    <option value="ca">Català</option><option value="gl">Galego</option><option value="eu">Euskara</option><option value="cy">Cymraeg</option><option value="ga">Gaeilge</option>
+                    <option value="gd">Gàidhlig</option><option value="is">Íslenska</option><option value="lb">Lëtzebuergesch</option><option value="mt">Malti</option><option value="fo">Føroyskt</option>
+                    <option value="fy">Frysk</option><option value="br">Brezhoneg</option><option value="oc">Occitan</option><option value="co">Corsu</option>
+                </select>
+            </div>
+            <div style="font-size: 3em;">🤖</div>
+            <h1>WIA-AMR Standard Simulator</h1>
+            <p class="tagline">Interactive Simulator for Autonomous Mobile Robots</p>
+            <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(0)">📊 Data Format</div>
+            <div class="tab" onclick="switchTab(1)">🔢 Algorithms</div>
+            <div class="tab" onclick="switchTab(2)">📡 Protocol</div>
+            <div class="tab" onclick="switchTab(3)">🔗 Integration</div>
+            <div class="tab" onclick="switchTab(4)">🧪 Test</div>
+        </div>
+
+        <!-- Panel 0: Data Format -->
+        <div class="panel active" id="panel-0">
+            <h2 style="color: #8B5CF6; margin-bottom: 20px;">📊 AMR Telemetry Data Format</h2>
+            <p style="margin-bottom: 20px;">Generate standardized JSON telemetry messages for autonomous mobile robots following WIA Phase 1 specifications.</p>
+
+            <div class="control-group">
+                <label>Robot ID:</label>
+                <input type="text" id="robotId" value="AMR-001" placeholder="Enter robot identifier">
+            </div>
+            <div class="control-group">
+                <label>Position (X, Y, Theta):</label>
+                <input type="text" id="position" value="15.5, 22.3, 1.57" placeholder="x, y, theta (radians)">
+            </div>
+            <div class="control-group">
+                <label>Battery Level (%):</label>
+                <input type="number" id="battery" value="85" min="0" max="100">
+            </div>
+            <div class="control-group">
+                <label>Navigation Status:</label>
+                <select id="navStatus">
+                    <option value="idle">Idle</option>
+                    <option value="navigating" selected>Navigating</option>
+                    <option value="docking">Docking</option>
+                    <option value="charging">Charging</option>
+                    <option value="error">Error</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Payload (kg):</label>
+                <input type="number" id="payload" value="50" min="0" max="1000">
+            </div>
+            <div class="btn-center">
+                <button class="btn" onclick="generateTelemetry()">Generate Telemetry</button>
+                <button class="btn btn-secondary" onclick="clearOutput(0)">Clear</button>
+            </div>
+            <div class="output" id="output-0">Ready to generate AMR telemetry data...</div>
+        </div>
+
+        <!-- Panel 1: Algorithms -->
+        <div class="panel" id="panel-1">
+            <h2 style="color: #8B5CF6; margin-bottom: 20px;">🔢 SLAM & Path Planning Algorithms</h2>
+            <p style="margin-bottom: 20px;">Simulate SLAM (Simultaneous Localization and Mapping) and path planning algorithms for AMR navigation.</p>
+
+            <div class="control-group">
+                <label>SLAM Algorithm:</label>
+                <select id="slamAlgo">
+                    <option value="gmapping">GMapping (Grid-based FastSLAM)</option>
+                    <option value="cartographer">Google Cartographer</option>
+                    <option value="orbslam">ORB-SLAM3</option>
+                    <option value="lidarslam">LiDAR-SLAM</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Path Planning Algorithm:</label>
+                <select id="pathAlgo">
+                    <option value="astar">A* Search</option>
+                    <option value="dijkstra">Dijkstra</option>
+                    <option value="rrt">RRT (Rapidly-exploring Random Tree)</option>
+                    <option value="dwa">DWA (Dynamic Window Approach)</option>
+                    <option value="teb">TEB (Timed Elastic Band)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Map Resolution (m/pixel):</label>
+                <input type="number" id="mapRes" value="0.05" min="0.01" max="1" step="0.01">
+            </div>
+            <div class="control-group">
+                <label>Start Position (X, Y):</label>
+                <input type="text" id="startPos" value="0, 0" placeholder="x, y coordinates">
+            </div>
+            <div class="control-group">
+                <label>Goal Position (X, Y):</label>
+                <input type="text" id="goalPos" value="25, 15" placeholder="x, y coordinates">
+            </div>
+            <div class="btn-center">
+                <button class="btn" onclick="runSLAM()">Run SLAM Simulation</button>
+                <button class="btn" onclick="planPath()">Plan Path</button>
+                <button class="btn btn-secondary" onclick="clearOutput(1)">Clear</button>
+            </div>
+            <div class="output" id="output-1">Click to simulate SLAM and path planning algorithms...</div>
+        </div>
+
+        <!-- Panel 2: Protocol -->
+        <div class="panel" id="panel-2">
+            <h2 style="color: #8B5CF6; margin-bottom: 20px;">📡 VDA 5050 Communication Protocol</h2>
+            <p style="margin-bottom: 20px;">Test VDA 5050 message exchange between fleet management system and AMRs.</p>
+
+            <div class="control-group">
+                <label>Message Type:</label>
+                <select id="msgType">
+                    <option value="order">Order (FMS → AMR)</option>
+                    <option value="state">State (AMR → FMS)</option>
+                    <option value="visualization">Visualization</option>
+                    <option value="instantAction">Instant Action</option>
+                    <option value="connection">Connection</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Source Node:</label>
+                <input type="text" id="srcNode" value="DOCK-01" placeholder="e.g., DOCK-01">
+            </div>
+            <div class="control-group">
+                <label>Destination Node:</label>
+                <input type="text" id="dstNode" value="PICK-15" placeholder="e.g., PICK-15">
+            </div>
+            <div class="control-group">
+                <label>Action Type:</label>
+                <select id="actionType">
+                    <option value="pick">Pick</option>
+                    <option value="drop">Drop</option>
+                    <option value="charge">Charge</option>
+                    <option value="wait">Wait</option>
+                </select>
+            </div>
+            <div class="btn-center">
+                <button class="btn" onclick="generateVDAMessage()">Generate VDA 5050 Message</button>
+                <button class="btn btn-secondary" onclick="clearOutput(2)">Clear</button>
+            </div>
+            <div class="output" id="output-2">Ready to generate VDA 5050 protocol messages...</div>
+        </div>
+
+        <!-- Panel 3: Integration -->
+        <div class="panel" id="panel-3">
+            <h2 style="color: #8B5CF6; margin-bottom: 20px;">🔗 WMS & Fleet Management Integration</h2>
+            <p style="margin-bottom: 20px;">Simulate integration with Warehouse Management Systems and Fleet Management platforms.</p>
+
+            <div class="control-group">
+                <label>WMS Platform:</label>
+                <select id="wmsPlatform">
+                    <option value="manhattan">Manhattan Associates</option>
+                    <option value="blueyonder">Blue Yonder</option>
+                    <option value="sap">SAP EWM</option>
+                    <option value="oracle">Oracle WMS</option>
+                    <option value="custom">Custom WMS</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Fleet Size:</label>
+                <input type="number" id="fleetSize" value="25" min="1" max="500">
+            </div>
+            <div class="control-group">
+                <label>Task Type:</label>
+                <select id="taskType">
+                    <option value="picking">Order Picking</option>
+                    <option value="putaway">Putaway</option>
+                    <option value="replenishment">Replenishment</option>
+                    <option value="transport">Transport</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Order ID:</label>
+                <input type="text" id="orderId" value="ORD-2025-00001" placeholder="Order identifier">
+            </div>
+            <div class="btn-center">
+                <button class="btn" onclick="simulateWMSIntegration()">Simulate WMS Integration</button>
+                <button class="btn" onclick="simulateFleetStatus()">Get Fleet Status</button>
+                <button class="btn btn-secondary" onclick="clearOutput(3)">Clear</button>
+            </div>
+            <div class="output" id="output-3">Click to simulate WMS/Fleet integration...</div>
+        </div>
+
+        <!-- Panel 4: Test -->
+        <div class="panel" id="panel-4">
+            <h2 style="color: #8B5CF6; margin-bottom: 20px;">🧪 QR Code & Verifiable Credentials</h2>
+            <p style="margin-bottom: 20px;">Generate QR codes for robot identification and create verifiable credentials for WIA certification.</p>
+
+            <div class="control-group">
+                <label>Certification Level:</label>
+                <select id="certLevel">
+                    <option value="level1">Level 1: Data Format</option>
+                    <option value="level2">Level 2: Full API</option>
+                    <option value="level3">Level 3: Complete Integration</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Robot Manufacturer:</label>
+                <input type="text" id="manufacturer" value="MiR (Mobile Industrial Robots)" placeholder="Manufacturer name">
+            </div>
+            <div class="control-group">
+                <label>Model:</label>
+                <input type="text" id="model" value="MiR250" placeholder="Robot model">
+            </div>
+            <div class="control-group">
+                <label>Certification Date:</label>
+                <input type="date" id="certDate" value="2025-01-15">
+            </div>
+            <div class="btn-center">
+                <button class="btn" onclick="generateQRCode()">Generate QR Code</button>
+                <button class="btn" onclick="generateVC()">Generate Verifiable Credential</button>
+                <button class="btn" onclick="validateRobot()">Validate Robot</button>
+                <button class="btn btn-secondary" onclick="clearOutput(4)">Clear</button>
+            </div>
+            <div class="output" id="output-4">Ready to generate QR codes and verifiable credentials...</div>
+        </div>
+
+        <footer>
+            <p><strong>WIA-AMR Standard - Interactive Simulator</strong></p>
+            <p style="margin: 15px 0; color: #ffd700; font-weight: bold;">弘益人間 (홍익인간) · Benefit All Humanity</p>
+            <p>World Certification Industry Association (WIA)</p>
+            <p>&copy; 2025 SmileStory Inc. / WIA - MIT License</p>
+            <p style="margin-top: 20px;">
+                <a href="https://wiastandards.com" target="_blank" style="color: #8B5CF6; text-decoration: none; margin: 0 10px;">wiastandards.com</a> |
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank" style="color: #8B5CF6; text-decoration: none; margin: 0 10px;">GitHub</a> |
+                <a href="https://cert.wiastandards.com" target="_blank" style="color: #8B5CF6; text-decoration: none; margin: 0 10px;">Get Certified</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function switchLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            console.log('Language switched to:', lang);
+        }
+
+        function selectLanguage(lang) {
+            currentLang = lang;
+            console.log('Language selected:', lang);
+        }
+
+        function switchTab(index) {
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateTelemetry() {
+            const robotId = document.getElementById('robotId').value;
+            const position = document.getElementById('position').value.split(',').map(v => parseFloat(v.trim()));
+            const battery = document.getElementById('battery').value;
+            const navStatus = document.getElementById('navStatus').value;
+            const payload = document.getElementById('payload').value;
+
+            const telemetry = {
+                format: "WIA-AMR-v1.0",
+                robotId: robotId,
+                timestamp: new Date().toISOString(),
+                pose: {
+                    position: { x: position[0] || 0, y: position[1] || 0, z: 0 },
+                    orientation: { theta: position[2] || 0 },
+                    frame: "map",
+                    confidence: 0.98
+                },
+                velocity: {
+                    linear: navStatus === 'navigating' ? { x: 0.8, y: 0 } : { x: 0, y: 0 },
+                    angular: 0.05
+                },
+                battery: {
+                    stateOfCharge: parseInt(battery),
+                    voltage: 48.0,
+                    current: navStatus === 'charging' ? -15.0 : 8.5,
+                    temperature: 35.2,
+                    estimatedRuntime: Math.round(parseInt(battery) * 0.9)
+                },
+                navigation: {
+                    status: navStatus,
+                    currentGoal: navStatus === 'navigating' ? { x: 25.0, y: 15.0 } : null,
+                    distanceToGoal: navStatus === 'navigating' ? 12.5 : 0,
+                    estimatedTimeOfArrival: navStatus === 'navigating' ?
+                        new Date(Date.now() + 45000).toISOString() : null
+                },
+                payload: {
+                    weight: parseFloat(payload),
+                    maxCapacity: 200,
+                    loaded: parseFloat(payload) > 0
+                },
+                sensors: {
+                    lidar: { status: "operational", points: 3600 },
+                    camera: { status: "operational", fps: 30 },
+                    odometry: { status: "operational" },
+                    imu: { status: "operational" }
+                },
+                safety: {
+                    emergencyStop: false,
+                    obstacleDetected: false,
+                    safetyZone: "normal"
+                }
+            };
+
+            document.getElementById('output-0').textContent = JSON.stringify(telemetry, null, 2);
+        }
+
+        function runSLAM() {
+            const slamAlgo = document.getElementById('slamAlgo').value;
+            const mapRes = document.getElementById('mapRes').value;
+
+            const result = `
+🗺️ SLAM Simulation Results
+===========================
+Algorithm: ${slamAlgo}
+Map Resolution: ${mapRes} m/pixel
+
+Initialization Phase:
+✓ LiDAR sensor initialized (3600 points/scan)
+✓ Odometry calibrated
+✓ IMU fusion enabled
+
+Mapping Progress:
+✓ Scan matching: 98.5% accuracy
+✓ Loop closure detected: 3 times
+✓ Map size: 50m x 30m (${Math.round(50/mapRes)} x ${Math.round(30/mapRes)} pixels)
+
+Localization Quality:
+- Position uncertainty: ±0.05m
+- Orientation uncertainty: ±0.5°
+- Relocalization time: 0.3s
+
+Generated Map Statistics:
+- Total area: 1,500 m²
+- Occupied cells: 12%
+- Free space: 85%
+- Unknown: 3%
+
+弘益人間 - Accurate mapping for safe navigation
+`;
+            document.getElementById('output-1').textContent = result;
+        }
+
+        function planPath() {
+            const pathAlgo = document.getElementById('pathAlgo').value;
+            const start = document.getElementById('startPos').value.split(',').map(v => parseFloat(v.trim()));
+            const goal = document.getElementById('goalPos').value.split(',').map(v => parseFloat(v.trim()));
+
+            const distance = Math.sqrt(Math.pow(goal[0] - start[0], 2) + Math.pow(goal[1] - start[1], 2));
+            const numWaypoints = Math.max(5, Math.round(distance / 2));
+
+            const result = `
+🛣️ Path Planning Results
+=========================
+Algorithm: ${pathAlgo}
+Start: (${start[0]}, ${start[1]})
+Goal: (${goal[0]}, ${goal[1]})
+
+Path Computed:
+✓ Total distance: ${distance.toFixed(2)} meters
+✓ Waypoints: ${numWaypoints}
+✓ Estimated time: ${(distance / 0.8).toFixed(1)} seconds @ 0.8 m/s
+✓ Collision-free: Yes
+
+Path Quality Metrics:
+- Smoothness: 0.92 (0-1 scale)
+- Safety margin: 0.5m from obstacles
+- Path length efficiency: 95%
+
+Waypoint Coordinates:
+${Array.from({length: Math.min(numWaypoints, 8)}, (_, i) => {
+    const t = (i + 1) / numWaypoints;
+    const x = (start[0] + t * (goal[0] - start[0])).toFixed(2);
+    const y = (start[1] + t * (goal[1] - start[1])).toFixed(2);
+    return `  [${i+1}] (${x}, ${y})`;
+}).join('\n')}
+
+Velocity Profile:
+- Acceleration phase: 0.8s
+- Cruise velocity: 0.8 m/s
+- Deceleration phase: 0.5s
+
+弘益人間 - Optimal paths for efficient operations
+`;
+            document.getElementById('output-1').textContent = result;
+        }
+
+        function generateVDAMessage() {
+            const msgType = document.getElementById('msgType').value;
+            const srcNode = document.getElementById('srcNode').value;
+            const dstNode = document.getElementById('dstNode').value;
+            const actionType = document.getElementById('actionType').value;
+
+            let message = {};
+
+            if (msgType === 'order') {
+                message = {
+                    headerId: Math.floor(Math.random() * 10000),
+                    timestamp: new Date().toISOString(),
+                    version: "2.0.0",
+                    manufacturer: "WIA-Compliant-FMS",
+                    serialNumber: "AMR-001",
+                    orderId: "ORDER-" + Date.now(),
+                    orderUpdateId: 1,
+                    nodes: [
+                        {
+                            nodeId: srcNode,
+                            sequenceId: 0,
+                            released: true,
+                            nodePosition: { x: 0, y: 0, mapId: "warehouse-main" },
+                            actions: []
+                        },
+                        {
+                            nodeId: dstNode,
+                            sequenceId: 2,
+                            released: true,
+                            nodePosition: { x: 25, y: 15, mapId: "warehouse-main" },
+                            actions: [{
+                                actionType: actionType,
+                                actionId: `${actionType}-${Date.now()}`,
+                                blockingType: "HARD"
+                            }]
+                        }
+                    ],
+                    edges: [
+                        {
+                            edgeId: `${srcNode}-${dstNode}`,
+                            sequenceId: 1,
+                            startNodeId: srcNode,
+                            endNodeId: dstNode,
+                            released: true,
+                            maxSpeed: 1.0
+                        }
+                    ]
+                };
+            } else if (msgType === 'state') {
+                message = {
+                    headerId: Math.floor(Math.random() * 10000),
+                    timestamp: new Date().toISOString(),
+                    version: "2.0.0",
+                    manufacturer: "WIA-AMR",
+                    serialNumber: "AMR-001",
+                    orderId: "ORDER-12345",
+                    orderUpdateId: 1,
+                    lastNodeId: srcNode,
+                    lastNodeSequenceId: 0,
+                    driving: true,
+                    paused: false,
+                    newBaseRequest: false,
+                    distanceSinceLastNode: 8.5,
+                    agvPosition: {
+                        x: 12.5,
+                        y: 8.3,
+                        theta: 1.57,
+                        mapId: "warehouse-main",
+                        positionInitialized: true,
+                        localizationScore: 0.98
+                    },
+                    velocity: { vx: 0.8, vy: 0, omega: 0.02 },
+                    loads: [{ loadId: "PALLET-001", loadType: "PALLET", weight: 50 }],
+                    batteryState: {
+                        batteryCharge: 85,
+                        batteryVoltage: 48.0,
+                        charging: false,
+                        batteryHealth: 95
+                    },
+                    operatingMode: "AUTOMATIC",
+                    errors: [],
+                    safetyState: {
+                        eStop: false,
+                        fieldViolation: false
+                    }
+                };
+            } else if (msgType === 'instantAction') {
+                message = {
+                    headerId: Math.floor(Math.random() * 10000),
+                    timestamp: new Date().toISOString(),
+                    version: "2.0.0",
+                    manufacturer: "WIA-Compliant-FMS",
+                    serialNumber: "AMR-001",
+                    instantActions: [
+                        {
+                            actionType: "stopPause",
+                            actionId: `stop-${Date.now()}`,
+                            blockingType: "HARD"
+                        }
+                    ]
+                };
+            }
+
+            document.getElementById('output-2').textContent = 'VDA 5050 Message (' + msgType + '):\n\n' + JSON.stringify(message, null, 2);
+        }
+
+        function simulateWMSIntegration() {
+            const platform = document.getElementById('wmsPlatform').value;
+            const fleetSize = document.getElementById('fleetSize').value;
+            const taskType = document.getElementById('taskType').value;
+            const orderId = document.getElementById('orderId').value;
+
+            const result = `
+🔗 WMS Integration Simulation
+=============================
+Platform: ${platform}
+Fleet Size: ${fleetSize} AMRs
+Task Type: ${taskType}
+Order ID: ${orderId}
+
+Phase 1: Connection
+✓ OAuth 2.0 authentication successful
+✓ API endpoint: https://${platform}.example.com/api/v2/
+✓ WebSocket connection established
+✓ Latency: 12ms
+
+Phase 2: Order Retrieval
+✓ Order ${orderId} retrieved
+✓ Items: 8 line items
+✓ Priority: HIGH
+✓ Due time: ${new Date(Date.now() + 3600000).toISOString()}
+
+Phase 3: Task Assignment
+✓ Optimal AMR selected: AMR-007
+✓ Current location: DOCK-02
+✓ Battery: 92%
+✓ Distance to first pick: 15m
+
+Phase 4: Execution
+✓ Route planned: 8 picks, 145m total
+✓ Estimated completion: 12 minutes
+✓ Real-time tracking: Enabled
+
+Fleet Analytics:
+- Active AMRs: ${fleetSize}
+- Available: ${Math.round(fleetSize * 0.7)}
+- Charging: ${Math.round(fleetSize * 0.15)}
+- Maintenance: ${Math.round(fleetSize * 0.15)}
+- Fleet utilization: 78%
+
+弘益人間 - Seamless WMS integration
+`;
+            document.getElementById('output-3').textContent = result;
+        }
+
+        function simulateFleetStatus() {
+            const fleetSize = parseInt(document.getElementById('fleetSize').value);
+
+            const robots = Array.from({length: Math.min(fleetSize, 10)}, (_, i) => ({
+                id: `AMR-${String(i + 1).padStart(3, '0')}`,
+                status: ['navigating', 'idle', 'charging', 'picking'][Math.floor(Math.random() * 4)],
+                battery: Math.round(50 + Math.random() * 50),
+                position: { x: Math.round(Math.random() * 50), y: Math.round(Math.random() * 30) },
+                currentTask: Math.random() > 0.3 ? `TASK-${Math.floor(Math.random() * 1000)}` : null
+            }));
+
+            const result = `
+📊 Fleet Status Dashboard
+==========================
+Total Fleet: ${fleetSize} AMRs
+Timestamp: ${new Date().toISOString()}
+
+Robot Status Summary:
+- Navigating: ${robots.filter(r => r.status === 'navigating').length}
+- Idle: ${robots.filter(r => r.status === 'idle').length}
+- Charging: ${robots.filter(r => r.status === 'charging').length}
+- Picking: ${robots.filter(r => r.status === 'picking').length}
+
+Individual Robot Status:
+${robots.map(r => `
+[${r.id}]
+  Status: ${r.status.toUpperCase()}
+  Battery: ${r.battery}%
+  Position: (${r.position.x}, ${r.position.y})
+  Task: ${r.currentTask || 'None'}`).join('\n')}
+
+Performance Metrics:
+- Avg. picks/hour: ${Math.round(45 + Math.random() * 15)}
+- Fleet uptime: ${(98 + Math.random() * 2).toFixed(1)}%
+- Task completion rate: ${(99 + Math.random()).toFixed(1)}%
+
+弘益人間 - Optimized fleet operations
+`;
+            document.getElementById('output-3').textContent = result;
+        }
+
+        function generateQRCode() {
+            const certLevel = document.getElementById('certLevel').value;
+            const manufacturer = document.getElementById('manufacturer').value;
+            const model = document.getElementById('model').value;
+            const certDate = document.getElementById('certDate').value;
+
+            const qrData = {
+                standard: "WIA-AMR-v1.0",
+                certificationLevel: certLevel,
+                manufacturer: manufacturer,
+                model: model,
+                certificationDate: certDate,
+                certificationId: "WIA-AMR-CERT-" + Date.now(),
+                verificationURL: `https://cert.wiastandards.com/verify/amr/${Date.now()}`
+            };
+
+            const result = `
+📱 QR Code Generated
+====================
+
+QR Code Data (JSON):
+${JSON.stringify(qrData, null, 2)}
+
+QR Code ASCII Art:
+█████████████████████████████
+██ ▄▄▄▄▄ █▀▄ █▀▄█ ▄▄▄▄▄ ██
+██ █   █ █ ▀█  ▀█ █   █ ██
+██ █▄▄▄█ █▄█ ███ █ █▄▄▄█ ██
+██▄▄▄▄▄▄▄█ ▀▄▀ ▀ █▄▄▄▄▄▄▄██
+██▄ ▄ ▀▄▄ ▀▄▀ ▀█ ▀▀  ▀▄▀██
+██ ▀█▀▀▄▄▀▄███ ▀ ▀ █▄▀ ▄██
+██▄██▄███▄▄   █▄▄▄█▀ ▄▀███
+██ ▄▄▄▄▄ █ ▄ █  ▀█ ▀▀  ███
+██ █   █ █ ▀▀█ █▄▄█▄█▀▄ ██
+██ █▄▄▄█ █  ▄█▀  █ ▄▀▀▀███
+█████████████████████████████
+
+Scan to verify WIA-AMR certification
+URL: ${qrData.verificationURL}
+
+弘益人間 - Certified for universal interoperability
+`;
+            document.getElementById('output-4').textContent = result;
+        }
+
+        function generateVC() {
+            const certLevel = document.getElementById('certLevel').value;
+            const manufacturer = document.getElementById('manufacturer').value;
+            const model = document.getElementById('model').value;
+            const certDate = document.getElementById('certDate').value;
+
+            const vc = {
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://wiastandards.com/credentials/amr/v1"
+                ],
+                "id": `urn:uuid:${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
+                "type": ["VerifiableCredential", "WIAAMRCertification"],
+                "issuer": {
+                    "id": "did:wia:certification-authority",
+                    "name": "WIA Certification Authority"
+                },
+                "issuanceDate": new Date().toISOString(),
+                "expirationDate": new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                "credentialSubject": {
+                    "id": `did:wia:amr:${Date.now()}`,
+                    "type": "AutonomousMobileRobot",
+                    "standard": "WIA-AMR-v1.0",
+                    "certificationLevel": certLevel,
+                    "manufacturer": manufacturer,
+                    "model": model,
+                    "certificationDate": certDate,
+                    "capabilities": {
+                        "navigation": ["SLAM", "pathPlanning", "obstacleAvoidance"],
+                        "communication": ["VDA5050", "MQTT", "REST"],
+                        "safety": ["emergencyStop", "safetyZones", "collisionAvoidance"]
+                    },
+                    "compliance": {
+                        "dataFormat": true,
+                        "apiInterface": certLevel !== 'level1',
+                        "protocol": certLevel === 'level3',
+                        "integration": certLevel === 'level3'
+                    }
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": new Date().toISOString(),
+                    "verificationMethod": "did:wia:certification-authority#key-1",
+                    "proofPurpose": "assertionMethod",
+                    "proofValue": "z" + Array.from({length: 64}, () =>
+                        '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')
+                }
+            };
+
+            document.getElementById('output-4').textContent =
+                'Verifiable Credential (W3C Standard):\n\n' + JSON.stringify(vc, null, 2);
+        }
+
+        function validateRobot() {
+            const manufacturer = document.getElementById('manufacturer').value;
+            const model = document.getElementById('model').value;
+            const certLevel = document.getElementById('certLevel').value;
+
+            const result = `
+🔍 Robot Validation Report
+===========================
+Manufacturer: ${manufacturer}
+Model: ${model}
+Certification Level: ${certLevel}
+
+Validation Results:
+✓ Manufacturer registered: Yes
+✓ Model certified: Yes
+✓ Certification valid: Yes (expires 2026-01-15)
+
+Compliance Check:
+✓ Data Format (Phase 1): PASS
+  - Telemetry format: Compliant
+  - Sensor data schema: Compliant
+  - Navigation data: Compliant
+
+${certLevel !== 'level1' ? `✓ API Interface (Phase 2): PASS
+  - REST endpoints: 100% implemented
+  - Authentication: OAuth 2.0 compliant
+  - Error handling: Standard compliant
+` : '○ API Interface (Phase 2): Not certified'}
+
+${certLevel === 'level3' ? `✓ Protocol (Phase 3): PASS
+  - VDA 5050: Fully compliant
+  - MQTT transport: Verified
+  - Real-time updates: <50ms latency
+
+✓ Integration (Phase 4): PASS
+  - WMS integration: Tested
+  - Fleet management: Verified
+  - Analytics API: Compliant
+` : '○ Protocol (Phase 3): Not certified\n○ Integration (Phase 4): Not certified'}
+
+Safety Certification:
+✓ ISO 3691-4 Compliant
+✓ Emergency stop: Functional
+✓ Safety zones: Configured
+✓ Collision avoidance: Active
+
+弘益人間 - Validated for safe, interoperable operations
+`;
+            document.getElementById('output-4').textContent = result;
+        }
+
+        function clearOutput(panelIndex) {
+            document.getElementById('output-' + panelIndex).textContent = 'Output cleared. Ready for new simulation...';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('WIA-AMR Simulator loaded');
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

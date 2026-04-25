@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-ROB-006: Surgical Robot - Interactive Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: rgba(16, 185, 129, 0.1); border: 1px solid #10B981; border-radius: 16px;
+            padding: 30px; margin-bottom: 30px; text-align: center; position: relative; }
+        h1 { color: #10B981; font-size: 2.2em; margin-bottom: 10px; }
+        .tagline { color: #cbd5e1; font-size: 1.1em; }
+        .philosophy { display: inline-block; background: linear-gradient(135deg, #10B981 0%, #34d399 100%);
+            color: white; padding: 10px 25px; border-radius: 20px; font-weight: bold; margin-top: 10px; }
+        .lang-selector { position: absolute; top: 20px; right: 20px; }
+        .lang-btn { background: rgba(16, 185, 129, 0.2); border: 1px solid #10B981; color: #e2e8f0;
+            padding: 8px 20px; border-radius: 8px; cursor: pointer; margin-left: 5px; transition: all 0.3s; }
+        .lang-btn:hover { background: rgba(16, 185, 129, 0.4); }
+        .lang-btn.active { background: #10B981; color: white; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); padding: 15px 30px;
+            border-radius: 10px; cursor: pointer; transition: all 0.3s; }
+        .tab:hover { background: rgba(16, 185, 129, 0.2); border-color: #10B981; }
+        .tab.active { background: #10B981; border-color: #10B981; color: white; }
+        .panel { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px; padding: 30px; display: none; }
+        .panel.active { display: block; }
+        .control-group { margin: 20px 0; }
+        .control-group label { display: block; color: #10B981; font-weight: bold; margin-bottom: 8px; }
+        .control-group input, .control-group select { width: 100%; max-width: 400px; padding: 10px;
+            background: #1e293b; border: 1px solid #10B981; border-radius: 8px; color: #e2e8f0; }
+        .btn { background: linear-gradient(135deg, #10B981 0%, #34d399 100%); color: white;
+            padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 1em;
+            font-weight: bold; transition: all 0.3s; margin: 10px 10px 10px 0; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #f87171 100%); }
+        .output { background: #1e293b; border: 1px solid #10B981; border-radius: 8px; padding: 20px;
+            margin-top: 20px; font-family: 'Courier New', monospace; color: #34d399; min-height: 150px;
+            max-height: 400px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+        .card { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px; padding: 20px; }
+        .card h3 { color: #10B981; margin-bottom: 10px; }
+        .metric { font-size: 2em; color: #10B981; font-weight: bold; }
+        .lang-content { display: none; }
+        .lang-content.active { display: block; }
+        .instrument-control { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 10px; padding: 20px; margin: 15px 0; }
+        .instrument-control h4 { color: #10B981; margin-bottom: 15px; }
+        .slider-control { margin: 15px 0; }
+        .slider-control input[type="range"] { width: 100%; height: 8px; border-radius: 5px; background: #1e293b;
+            outline: none; -webkit-appearance: none; }
+        .slider-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+            width: 20px; height: 20px; border-radius: 50%; background: #10B981; cursor: pointer; }
+        .slider-value { color: #10B981; font-weight: bold; float: right; }
+        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .status-active { background: #10B981; box-shadow: 0 0 10px #10B981; }
+        .status-inactive { background: #6b7280; }
+        .status-error { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        footer { text-align: center; padding: 40px 20px; margin-top: 60px;
+            border-top: 1px solid rgba(16, 185, 129, 0.3); color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Surgical Robot</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <div class="lang-selector">
+                <button class="lang-btn active" onclick="switchLang('en')">EN</button>
+                <button class="lang-btn" onclick="switchLang('ko')">KO</button>
+                <select id="allLangs" onchange="handleLangChange()" style="margin-left: 10px; padding: 8px; background: #1e293b; border: 1px solid #10B981; color: #e2e8f0; border-radius: 8px;">
+                    <option>English</option><option>한국어</option><option>日本語</option><option>中文</option><option>Español</option>
+                    <option>Français</option><option>Deutsch</option><option>Italiano</option><option>Português</option><option>Русский</option>
+                    <option>العربية</option><option>हिन्दी</option><option>বাংলা</option><option>ไทย</option><option>Tiếng Việt</option>
+                    <option>Türkçe</option><option>Polski</option><option>Nederlands</option><option>Svenska</option><option>Norsk</option>
+                    <option>Dansk</option><option>Suomi</option><option>Čeština</option><option>Magyar</option><option>Română</option>
+                    <option>Українська</option><option>Ελληνικά</option><option>עברית</option><option>فارسی</option><option>اردو</option>
+                    <option>Bahasa Indonesia</option><option>Bahasa Melayu</option><option>Tagalog</option><option>Swahili</option><option>Afrikaans</option>
+                    <option>Zulu</option><option>Xhosa</option><option>Hausa</option><option>Yoruba</option><option>Igbo</option>
+                    <option>Amharic</option><option>Somali</option><option>Malagasy</option><option>Kinyarwanda</option><option>Shona</option>
+                    <option>Sesotho</option><option>Setswana</option><option>IsiZulu</option><option>IsiXhosa</option><option>Slovenčina</option>
+                    <option>Hrvatski</option><option>Srpski</option><option>Bosanski</option><option>Македонски</option><option>Shqip</option>
+                    <option>Eesti</option><option>Latviešu</option><option>Lietuvių</option><option>Қазақ</option><option>O'zbek</option>
+                    <option>Тоҷикӣ</option><option>Кыргыз</option><option>Монгол</option><option>မြန်မာ</option><option>ខ្មែរ</option>
+                    <option>ລາວ</option><option>नेपाली</option><option>සිංහල</option><option>தமிழ்</option><option>తెలుగు</option>
+                    <option>ಕನ್ನಡ</option><option>മലയാളം</option><option>मराठी</option><option>ગુજરાતી</option><option>ਪੰਜਾਬੀ</option>
+                    <option>پښتو</option><option>دری</option><option>کوردی</option><option>Azərbaycan</option><option>Татар</option>
+                    <option>Башҡорт</option><option>Чувашла</option><option>Саха</option><option>Тыва</option><option>Хакас</option>
+                    <option>Алтай</option><option>Бурят</option><option>Калмыцкий</option><option>Ингуш</option><option>Чеченский</option>
+                    <option>Аварский</option><option>Лезгинский</option><option>Даргинский</option><option>Табасаранский</option><option>Лакский</option>
+                    <option>Кумыкский</option><option>Ногайский</option><option>Карачаевский</option><option>Балкарский</option>
+                </select>
+            </div>
+            <div class="logo" style="font-size: 3em;">🤖⚕️</div>
+            <h1>WIA-ROB-006</h1>
+            <p class="tagline">Surgical Robot Interactive Simulator</p>
+            <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+        </header>
+
+        <div id="en" class="lang-content active">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab(0)">System Dashboard</div>
+                <div class="tab" onclick="switchTab(1)">Instrument Control</div>
+                <div class="tab" onclick="switchTab(2)">Surgical Workflow</div>
+                <div class="tab" onclick="switchTab(3)">Safety & Monitoring</div>
+                <div class="tab" onclick="switchTab(4)">Data Analytics</div>
+            </div>
+
+            <!-- Panel 0: System Dashboard -->
+            <div class="panel active" id="panel0">
+                <h2 style="color: #10B981; margin-bottom: 20px;">Surgical Robot System Dashboard</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3><span class="status-indicator status-active"></span>Robot Status</h3>
+                        <div class="metric" id="robotStatus">STANDBY</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">All systems operational</p>
+                    </div>
+                    <div class="card">
+                        <h3>Active Instruments</h3>
+                        <div class="metric" id="activeInstruments">4 / 4</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">All arms installed</p>
+                    </div>
+                    <div class="card">
+                        <h3>Precision Level</h3>
+                        <div class="metric">0.1mm</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">Sub-millimeter accuracy</p>
+                    </div>
+                    <div class="card">
+                        <h3>System Uptime</h3>
+                        <div class="metric" id="uptime">00:00:00</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">Current session time</p>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>System Mode:</label>
+                    <select id="systemMode" onchange="changeSystemMode()">
+                        <option value="standby">Standby</option>
+                        <option value="setup">Setup</option>
+                        <option value="active">Active Surgery</option>
+                        <option value="maintenance">Maintenance</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="initializeSystem()">Initialize System</button>
+                <button class="btn btn-danger" onclick="emergencyStop()">EMERGENCY STOP</button>
+                <div class="output" id="dashOutput">System ready. Awaiting initialization.<br>弘益人間 - Advancing surgical care for all humanity.</div>
+            </div>
+
+            <!-- Panel 1: Instrument Control -->
+            <div class="panel" id="panel1">
+                <h2 style="color: #10B981; margin-bottom: 20px;">Surgical Instrument Control</h2>
+                
+                <div class="instrument-control">
+                    <h4>Instrument Arm 1 - Grasper (Right)</h4>
+                    <div class="slider-control">
+                        <label>X Position (mm): <span class="slider-value" id="arm1-x-val">0</span></label>
+                        <input type="range" min="-100" max="100" value="0" id="arm1-x" oninput="updateInstrument('arm1','x')">
+                    </div>
+                    <div class="slider-control">
+                        <label>Y Position (mm): <span class="slider-value" id="arm1-y-val">0</span></label>
+                        <input type="range" min="-100" max="100" value="0" id="arm1-y" oninput="updateInstrument('arm1','y')">
+                    </div>
+                    <div class="slider-control">
+                        <label>Z Position (mm): <span class="slider-value" id="arm1-z-val">0</span></label>
+                        <input type="range" min="-100" max="100" value="0" id="arm1-z" oninput="updateInstrument('arm1','z')">
+                    </div>
+                    <div class="slider-control">
+                        <label>Grip Force (N): <span class="slider-value" id="arm1-force-val">0.0</span></label>
+                        <input type="range" min="0" max="10" step="0.1" value="0" id="arm1-force" oninput="updateForce('arm1')">
+                    </div>
+                    <p style="color: #10B981; margin-top: 10px;"><span class="status-indicator status-active"></span>Arm 1: Active - Position (0, 0, 0)</p>
+                </div>
+
+                <div class="instrument-control">
+                    <h4>Instrument Arm 2 - Scissors (Left)</h4>
+                    <div class="slider-control">
+                        <label>X Position (mm): <span class="slider-value" id="arm2-x-val">0</span></label>
+                        <input type="range" min="-100" max="100" value="0" id="arm2-x" oninput="updateInstrument('arm2','x')">
+                    </div>
+                    <div class="slider-control">
+                        <label>Scissors Opening (%): <span class="slider-value" id="arm2-open-val">0</span></label>
+                        <input type="range" min="0" max="100" value="0" id="arm2-open" oninput="updateScissors()">
+                    </div>
+                    <p style="color: #10B981; margin-top: 10px;"><span class="status-indicator status-active"></span>Arm 2: Active - Scissors Closed</p>
+                </div>
+
+                <div class="control-group">
+                    <label>Motion Scaling:</label>
+                    <select id="motionScaling">
+                        <option value="5">5:1 (Fine control)</option>
+                        <option value="10" selected>10:1 (Standard)</option>
+                        <option value="20">20:1 (Precision)</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="resetInstruments()">Reset All Instruments</button>
+                <button class="btn" onclick="calibrateInstruments()">Calibrate</button>
+                <div class="output" id="instrumentOutput">Instrument control ready. Motion scaling: 10:1</div>
+            </div>
+
+            <!-- Panel 2: Surgical Workflow -->
+            <div class="panel" id="panel2">
+                <h2 style="color: #10B981; margin-bottom: 20px;">Surgical Workflow Management</h2>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3>Current State</h3>
+                        <div class="metric" id="workflowState">SETUP</div>
+                    </div>
+                    <div class="card">
+                        <h3>Procedure Time</h3>
+                        <div class="metric" id="procedureTime">00:00:00</div>
+                    </div>
+                    <div class="card">
+                        <h3>Next State</h3>
+                        <div class="metric" style="font-size: 1.2em;" id="nextState">INSTRUMENT_INSTALL</div>
+                    </div>
+                    <div class="card">
+                        <h3>Checklist Complete</h3>
+                        <div class="metric" id="checklistPercent">0%</div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Workflow Actions:</label>
+                    <button class="btn" onclick="advanceWorkflow('SETUP')">Complete Setup</button>
+                    <button class="btn" onclick="advanceWorkflow('INSTRUMENT_INSTALL')">Install Instruments</button>
+                    <button class="btn" onclick="advanceWorkflow('SYSTEM_CHECK')">System Check</button>
+                    <button class="btn" onclick="advanceWorkflow('TIMEOUT')">Surgical Timeout</button>
+                    <button class="btn" onclick="advanceWorkflow('ACTIVE')">Begin Surgery</button>
+                    <button class="btn" onclick="advanceWorkflow('CLOSURE')">Begin Closure</button>
+                </div>
+
+                <div class="control-group" style="margin-top: 30px;">
+                    <h3 style="color: #10B981; margin-bottom: 15px;">WHO Surgical Safety Checklist</h3>
+                    <label><input type="checkbox" onchange="updateChecklist()"> Patient identity confirmed</label><br>
+                    <label><input type="checkbox" onchange="updateChecklist()"> Procedure site marked</label><br>
+                    <label><input type="checkbox" onchange="updateChecklist()"> Consent obtained</label><br>
+                    <label><input type="checkbox" onchange="updateChecklist()"> Robot system operational</label><br>
+                    <label><input type="checkbox" onchange="updateChecklist()"> Emergency equipment available</label><br>
+                    <label><input type="checkbox" onchange="updateChecklist()"> Team introductions complete</label><br>
+                    <label><input type="checkbox" onchange="updateChecklist()"> Instrument count verified</label><br>
+                </div>
+
+                <div class="output" id="workflowOutput">Workflow: SETUP state. Complete checklist before advancing.</div>
+            </div>
+
+            <!-- Panel 3: Safety & Monitoring -->
+            <div class="panel" id="panel3">
+                <h2 style="color: #10B981; margin-bottom: 20px;">Safety Systems & Real-Time Monitoring</h2>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3><span class="status-indicator status-active"></span>E-Stop Status</h3>
+                        <div class="metric" style="font-size: 1.5em;" id="estopStatus">READY</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">Response time: < 100ms</p>
+                    </div>
+                    <div class="card">
+                        <h3>Collision Avoidance</h3>
+                        <div class="metric" style="font-size: 1.5em;" id="collisionStatus">ACTIVE</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">Minimum clearance: 50mm</p>
+                    </div>
+                    <div class="card">
+                        <h3>Force Monitoring</h3>
+                        <div class="metric" id="maxForce">0.0 N</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">Limit: 10.0 N</p>
+                    </div>
+                    <div class="card">
+                        <h3>Communication</h3>
+                        <div class="metric" style="font-size: 1.5em;" id="commStatus">STABLE</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">Latency: 35ms</p>
+                    </div>
+                </div>
+
+                <h3 style="color: #10B981; margin: 30px 0 15px;">Patient Vital Signs (from anesthesia monitor)</h3>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Heart Rate</h3>
+                        <div class="metric" id="heartRate">72 bpm</div>
+                    </div>
+                    <div class="card">
+                        <h3>Blood Pressure</h3>
+                        <div class="metric" id="bloodPressure">120/80</div>
+                    </div>
+                    <div class="card">
+                        <h3>SpO2</h3>
+                        <div class="metric" id="spo2">98%</div>
+                    </div>
+                    <div class="card">
+                        <h3>EtCO2</h3>
+                        <div class="metric" id="etco2">38 mmHg</div>
+                    </div>
+                </div>
+
+                <button class="btn" onclick="testEmergencyStop()">Test E-Stop</button>
+                <button class="btn" onclick="testCollisionAvoidance()">Test Collision Avoidance</button>
+                <button class="btn" onclick="updateVitals()">Update Vital Signs</button>
+
+                <div class="output" id="safetyOutput">All safety systems operational. No alerts.</div>
+            </div>
+
+            <!-- Panel 4: Data Analytics -->
+            <div class="panel" id="panel4">
+                <h2 style="color: #10B981; margin-bottom: 20px;">Surgical Data Analytics & Integration</h2>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3>Data Points Collected</h3>
+                        <div class="metric" id="dataPoints">0</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">Real-time telemetry @ 60 Hz</p>
+                    </div>
+                    <div class="card">
+                        <h3>Video Recording</h3>
+                        <div class="metric" style="font-size: 1.5em;" id="videoStatus">STOPPED</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">4K @ 60fps, H.265</p>
+                    </div>
+                    <div class="card">
+                        <h3>EMR Integration</h3>
+                        <div class="metric" style="font-size: 1.5em;" id="emrStatus">CONNECTED</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">HL7 FHIR compliant</p>
+                    </div>
+                    <div class="card">
+                        <h3>PACS Connection</h3>
+                        <div class="metric" style="font-size: 1.5em;" id="pacsStatus">READY</div>
+                        <p style="color: #94a3b8; margin-top: 10px;">DICOM archival ready</p>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Analysis Type:</label>
+                    <select id="analysisType">
+                        <option>Instrument motion analysis</option>
+                        <option>Force application patterns</option>
+                        <option>Surgical workflow efficiency</option>
+                        <option>Complication risk assessment</option>
+                        <option>Skill assessment metrics</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="startRecording()">Start Video Recording</button>
+                <button class="btn" onclick="exportData()">Export Telemetry Data</button>
+                <button class="btn" onclick="runAnalytics()">Run Analysis</button>
+                <button class="btn" onclick="sendToEMR()">Send to EMR</button>
+
+                <div class="output" id="analyticsOutput">Analytics engine ready. Select analysis type and run.<br>Data format: WIA-ROB-006 compliant JSON</div>
+            </div>
+        </div>
+
+        <!-- Korean Content -->
+        <div id="ko" class="lang-content">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab(0)">시스템 대시보드</div>
+                <div class="tab" onclick="switchTab(1)">기기 제어</div>
+                <div class="tab" onclick="switchTab(2)">수술 워크플로</div>
+                <div class="tab" onclick="switchTab(3)">안전 및 모니터링</div>
+                <div class="tab" onclick="switchTab(4)">데이터 분석</div>
+            </div>
+
+            <div class="panel active">
+                <h2 style="color: #10B981; margin-bottom: 20px;">수술 로봇 시스템 대시보드</h2>
+                <div class="grid">
+                    <div class="card"><h3><span class="status-indicator status-active"></span>로봇 상태</h3><div class="metric">대기중</div></div>
+                    <div class="card"><h3>활성 기기</h3><div class="metric">4 / 4</div></div>
+                    <div class="card"><h3>정밀도</h3><div class="metric">0.1mm</div></div>
+                    <div class="card"><h3>가동 시간</h3><div class="metric">00:00:00</div></div>
+                </div>
+                <button class="btn">시스템 초기화</button>
+                <button class="btn btn-danger">비상 정지</button>
+                <div class="output">시스템 준비 완료.<br>弘益人間 - 모든 인류를 위한 수술 치료 발전</div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2025 WIA (World Certification Industry Association)</p>
+            <p style="margin-top: 10px; font-size: 1.1em; color: #10B981;">弘益人間 (홍익인간) · Benefit All Humanity</p>
+            <p style="margin-top: 15px; color: #94a3b8;">
+                This simulator demonstrates WIA-ROB-006 standardized interfaces for surgical robotics.<br>
+                For production systems, see full technical specification and certification requirements.
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        let currentTab = 0;
+        let currentLang = 'en';
+        let systemInitialized = false;
+        let workflowState = 'SETUP';
+        let procedureStartTime = null;
+        let systemStartTime = Date.now();
+        let dataPointsCollected = 0;
+        let isRecording = false;
+        
+        // Update uptime counter
+        setInterval(() => {
+            if (systemInitialized) {
+                const elapsed = Math.floor((Date.now() - systemStartTime) / 1000);
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('uptime').textContent = 
+                    `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+            }
+        }, 1000);
+
+        // Simulate data collection
+        setInterval(() => {
+            if (systemInitialized && isRecording) {
+                dataPointsCollected += 60; // 60 Hz
+                if (document.getElementById('dataPoints')) {
+                    document.getElementById('dataPoints').textContent = dataPointsCollected.toLocaleString();
+                }
+            }
+        }, 1000);
+        
+        function switchTab(index) {
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.panel').forEach((p, i) => {
+                p.classList.toggle('active', i === index);
+            });
+            currentTab = index;
+        }
+        
+        function switchLang(lang) {
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            document.querySelectorAll('.lang-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(lang).classList.add('active');
+            currentLang = lang;
+        }
+        
+        function handleLangChange() {
+            const select = document.getElementById('allLangs');
+            log(`Language changed to: ${select.value}`);
+        }
+        
+        function log(message) {
+            const outputs = ['dashOutput', 'instrumentOutput', 'workflowOutput', 'safetyOutput', 'analyticsOutput'];
+            const outputId = outputs[currentTab];
+            const output = document.getElementById(outputId);
+            if (output) {
+                const timestamp = new Date().toLocaleTimeString();
+                output.innerHTML = `[${timestamp}] ${message}<br>` + output.innerHTML;
+            }
+        }
+        
+        function initializeSystem() {
+            systemInitialized = true;
+            systemStartTime = Date.now();
+            document.getElementById('robotStatus').textContent = 'ACTIVE';
+            log('System initialized successfully. All instruments calibrated. Ready for operation.');
+            log('WIA-ROB-006 compliance verified. Safety systems active.');
+        }
+        
+        function emergencyStop() {
+            document.getElementById('robotStatus').textContent = 'E-STOPPED';
+            document.getElementById('estopStatus').textContent = 'ACTIVATED';
+            log('⚠️ EMERGENCY STOP ACTIVATED ⚠️');
+            log('All motors halted. Mechanical brakes engaged. Position held.');
+            log('Response time: 87ms (within 100ms requirement)');
+            setTimeout(() => {
+                if (confirm('Emergency stop activated. Reset system?')) {
+                    document.getElementById('robotStatus').textContent = 'STANDBY';
+                    document.getElementById('estopStatus').textContent = 'READY';
+                    log('System reset. E-stop cleared. Awaiting re-initialization.');
+                }
+            }, 1000);
+        }
+        
+        function changeSystemMode() {
+            const mode = document.getElementById('systemMode').value;
+            log(`System mode changed to: ${mode.toUpperCase()}`);
+        }
+        
+        function updateInstrument(arm, axis) {
+            const value = document.getElementById(`${arm}-${axis}`).value;
+            document.getElementById(`${arm}-${axis}-val`).textContent = value;
+            log(`Instrument ${arm.toUpperCase()} - ${axis.toUpperCase()} position: ${value}mm`);
+        }
+        
+        function updateForce(arm) {
+            const value = document.getElementById(`${arm}-force`).value;
+            document.getElementById(`${arm}-force-val`).textContent = parseFloat(value).toFixed(1);
+            document.getElementById('maxForce').textContent = `${value} N`;
+            if (parseFloat(value) > 10) {
+                log(`⚠️ WARNING: Force limit exceeded on ${arm.toUpperCase()}! Torque limited to 10N.`);
+            }
+        }
+        
+        function updateScissors() {
+            const value = document.getElementById('arm2-open').value;
+            document.getElementById('arm2-open-val').textContent = value;
+            log(`Scissors opening: ${value}%`);
+        }
+        
+        function resetInstruments() {
+            ['arm1', 'arm2'].forEach(arm => {
+                ['x', 'y', 'z'].forEach(axis => {
+                    const elem = document.getElementById(`${arm}-${axis}`);
+                    if (elem) {
+                        elem.value = 0;
+                        document.getElementById(`${arm}-${axis}-val`).textContent = '0';
+                    }
+                });
+            });
+            log('All instruments reset to home position (0, 0, 0)');
+        }
+        
+        function calibrateInstruments() {
+            log('Starting instrument calibration...');
+            setTimeout(() => log('Calibration complete. Position accuracy: ±1.0mm'), 1500);
+        }
+        
+        function advanceWorkflow(state) {
+            workflowState = state;
+            document.getElementById('workflowState').textContent = state;
+            if (state === 'ACTIVE') {
+                procedureStartTime = Date.now();
+                log(`Workflow advanced to: ${state}. Surgery commenced.`);
+                startProcedureTimer();
+            } else {
+                log(`Workflow advanced to: ${state}`);
+            }
+        }
+        
+        function startProcedureTimer() {
+            setInterval(() => {
+                if (procedureStartTime && workflowState === 'ACTIVE') {
+                    const elapsed = Math.floor((Date.now() - procedureStartTime) / 1000);
+                    const hours = Math.floor(elapsed / 3600);
+                    const minutes = Math.floor((elapsed % 3600) / 60);
+                    const seconds = elapsed % 60;
+                    if (document.getElementById('procedureTime')) {
+                        document.getElementById('procedureTime').textContent = 
+                            `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+                    }
+                }
+            }, 1000);
+        }
+        
+        function updateChecklist() {
+            const checkboxes = document.querySelectorAll('.control-group input[type="checkbox"]');
+            const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+            const percent = Math.round((checked / checkboxes.length) * 100);
+            if (document.getElementById('checklistPercent')) {
+                document.getElementById('checklistPercent').textContent = `${percent}%`;
+            }
+            if (percent === 100) {
+                log('✓ WHO Surgical Safety Checklist complete. Ready to proceed.');
+            }
+        }
+        
+        function testEmergencyStop() {
+            log('Testing emergency stop system...');
+            setTimeout(() => {
+                log('✓ E-stop test passed. Response time: 89ms (< 100ms requirement)');
+                log('✓ All mechanical brakes engaged successfully');
+                log('✓ Position hold verified');
+            }, 1000);
+        }
+        
+        function testCollisionAvoidance() {
+            log('Testing collision avoidance system...');
+            setTimeout(() => {
+                log('⚠️ Simulated collision scenario: Arms approaching within 50mm');
+                log('✓ Collision detected. Motion halted at 52mm separation.');
+                log('✓ Collision avoidance test passed.');
+            }, 1200);
+        }
+        
+        function updateVitals() {
+            document.getElementById('heartRate').textContent = (70 + Math.floor(Math.random() * 10)) + ' bpm';
+            document.getElementById('bloodPressure').textContent = (115 + Math.floor(Math.random() * 15)) + '/80';
+            document.getElementById('spo2').textContent = (97 + Math.floor(Math.random() * 3)) + '%';
+            document.getElementById('etco2').textContent = (36 + Math.floor(Math.random() * 6)) + ' mmHg';
+            log('Vital signs updated from anesthesia monitor (IEEE 11073 protocol)');
+        }
+        
+        function startRecording() {
+            isRecording = !isRecording;
+            document.getElementById('videoStatus').textContent = isRecording ? 'RECORDING' : 'STOPPED';
+            if (isRecording) {
+                dataPointsCollected = 0;
+                log('Video recording started: 4K @ 60fps, H.265 encoding');
+                log('Telemetry data collection started: 60 Hz, JSON format');
+            } else {
+                log(`Recording stopped. Total data points: ${dataPointsCollected.toLocaleString()}`);
+                log('Video saved in WIA-ROB-006 compliant format');
+            }
+        }
+        
+        function exportData() {
+            log('Exporting telemetry data...');
+            setTimeout(() => {
+                log(`✓ Exported ${dataPointsCollected.toLocaleString()} data points`);
+                log('Format: WIA-ROB-006 JSON with ISO 8601 timestamps');
+                log('File size: ~' + Math.round(dataPointsCollected * 0.5 / 1024) + ' MB');
+            }, 800);
+        }
+        
+        function runAnalytics() {
+            const analysisType = document.getElementById('analysisType').value;
+            log(`Running analysis: ${analysisType}`);
+            setTimeout(() => {
+                log('✓ Analysis complete. Results:');
+                log('  - Instrument motion smoothness: 94%');
+                log('  - Average force application: 2.3 N');
+                log('  - Workflow efficiency score: 88/100');
+                log('  - Estimated complication risk: Low (12%)');
+            }, 2000);
+        }
+        
+        function sendToEMR() {
+            log('Sending procedure data to EMR system...');
+            setTimeout(() => {
+                log('✓ Connected to EMR via HL7 FHIR');
+                log('✓ Procedure resource created');
+                log('✓ Observations uploaded (vital signs, telemetry)');
+                log('✓ Operative note auto-generated');
+                log('EMR integration complete. Patient record updated.');
+            }, 1500);
+        }
+        
+        // Initialize on load
+        window.onload = function() {
+            log('WIA-ROB-006 Surgical Robot Simulator loaded.');
+            log('This simulator demonstrates standardized interfaces for surgical robotics.');
+            log('弘益人間 - Advancing surgical technology for the benefit of all humanity.');
+        };
+    </script>
+</body>
+</html>

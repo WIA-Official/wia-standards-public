@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 4: Hardware-Software Interface Layer | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .chapter-header { border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin: 10px 0 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; padding-top: 20px; }
+        h3 { color: #34d399; font-size: 1.3em; margin: 30px 0 15px 0; }
+        h4 { color: #6ee7b7; font-size: 1.1em; margin: 25px 0 12px 0; }
+        p { margin: 15px 0; text-align: justify; color: #cbd5e1; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        code { font-family: 'Courier New', monospace; font-size: 0.9em; }
+        ul, ol { margin: 15px 0 15px 30px; color: #cbd5e1; }
+        li { margin: 10px 0; }
+        .summary { background: #065f46; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #10B981; }
+        .summary h2 { color: #6ee7b7; margin-top: 0; }
+        .summary ul { color: #d1fae5; }
+        .review-questions { background: #78350f; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #fbbf24; margin-top: 0; }
+        .review-questions ol { color: #fde68a; }
+        .note { background: #1e3a8a; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6; }
+        .note strong { color: #60a5fa; }
+        .warning { background: #7c2d12; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f97316; }
+        .warning strong { color: #fb923c; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #334155; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        .nav a:hover { color: #34d399; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #0f172a; color: #10B981; }
+        td { color: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div style="color: #10B981; font-weight: bold;">Chapter 4</div>
+            <h1>Hardware-Software Interface Layer</h1>
+            <p style="color: #94a3b8; margin-top: 10px;">Building the Bridge Between Silicon and Software</p>
+        </div>
+
+        <p>The Hardware-Software Interface Layer (HSIL) serves as the critical bridge between AI accelerator hardware and the software stack that drives it. This layer abstracts hardware complexity while exposing performance-critical features, enabling developers to harness the full power of AI chips without requiring deep hardware expertise. Understanding the HSIL is fundamental to building efficient, reliable, and portable AI applications.</p>
+
+        <h2>4.1 Interface Layer Architecture Overview</h2>
+        <p>The WIA-AI-011 Hardware-Software Interface Layer follows a hierarchical architecture that separates concerns while maintaining high performance. At its foundation lies the Hardware Abstraction Layer (HAL), which provides direct access to chip registers, memory spaces, and control mechanisms. Above the HAL sits the driver layer, which implements resource management, scheduling, and virtualization. At the top, the runtime API presents a clean, vendor-neutral interface to applications.</p>
+
+        <h3>4.1.1 Architectural Layers</h3>
+        <p>The interface architecture consists of four primary layers, each with distinct responsibilities:</p>
+
+        <table>
+            <tr>
+                <th>Layer</th>
+                <th>Responsibility</th>
+                <th>Key Components</th>
+            </tr>
+            <tr>
+                <td>Application API</td>
+                <td>High-level programming interface</td>
+                <td>Tensor ops, model loading, inference</td>
+            </tr>
+            <tr>
+                <td>Runtime Layer</td>
+                <td>Resource management & scheduling</td>
+                <td>Memory allocator, scheduler, graph executor</td>
+            </tr>
+            <tr>
+                <td>Driver Layer</td>
+                <td>Hardware control & virtualization</td>
+                <td>Device driver, command processor, interrupt handler</td>
+            </tr>
+            <tr>
+                <td>Hardware Layer</td>
+                <td>Physical chip interface</td>
+                <td>Registers, DMA, compute units, memory controllers</td>
+            </tr>
+        </table>
+
+        <h3>4.1.2 Design Principles</h3>
+        <p>The WIA-AI-011 HSIL adheres to several core design principles that ensure robustness, performance, and portability:</p>
+
+        <ul>
+            <li><strong>Abstraction without Overhead:</strong> Hardware details are hidden behind clean APIs, but performance-critical paths avoid unnecessary indirection.</li>
+            <li><strong>Zero-Copy Operations:</strong> Data remains in place whenever possible, minimizing memory transfers and copies.</li>
+            <li><strong>Asynchronous by Default:</strong> All operations are non-blocking, enabling efficient pipelining and concurrency.</li>
+            <li><strong>Vendor Neutrality:</strong> The interface works across different AI accelerator architectures without code changes.</li>
+            <li><strong>Security First:</strong> All hardware access is validated and sandboxed to prevent malicious or erroneous operations.</li>
+        </ul>
+
+        <pre>// Example: Complete HSIL stack initialization
+#include &lt;wia/ai011.h&gt;
+
+// Initialize the interface layer
+wia_status_t init_ai_chip_interface(void) {
+    wia_init_config_t config = {
+        .api_version = WIA_AI011_VERSION,
+        .flags = WIA_INIT_ASYNC | WIA_INIT_MULTI_DEVICE,
+        .log_level = WIA_LOG_INFO
+    };
+
+    // Initialize HAL layer
+    wia_status_t status = wia_init(&config);
+    if (status != WIA_SUCCESS) {
+        return status;
+    }
+
+    // Enumerate available devices
+    uint32_t device_count;
+    wia_get_device_count(&device_count);
+
+    printf("Found %u AI accelerator(s)\n", device_count);
+
+    // Initialize each device
+    for (uint32_t i = 0; i < device_count; i++) {
+        wia_device_t device;
+        wia_device_create(i, &device);
+
+        wia_device_properties_t props;
+        wia_device_get_properties(device, &props);
+
+        printf("Device %u: %s (%s)\n", i, props.name, props.vendor);
+        printf("  Compute Units: %u\n", props.compute_units);
+        printf("  Memory: %zu MB\n", props.global_memory_size / (1024*1024));
+        printf("  Clock: %u MHz\n", props.max_clock_frequency);
+    }
+
+    return WIA_SUCCESS;
+}</pre>
+
+        <h2>4.2 Driver Architecture and Components</h2>
+        <p>The driver layer sits at the heart of the Hardware-Software Interface, managing all direct interactions with the AI accelerator hardware. WIA-AI-011 drivers are designed as modular, loadable kernel modules that support hot-plugging, power management, and multi-device configurations. The driver architecture separates policy from mechanism, allowing flexible scheduling and resource allocation strategies.</p>
+
+        <h3>4.2.1 Kernel Driver Structure</h3>
+        <p>The WIA-AI-011 kernel driver implements a standard Linux character device interface, exposing device nodes in /dev/wia-ai*. The driver consists of several subsystems:</p>
+
+        <ul>
+            <li><strong>Device Initialization:</strong> PCI/PCIe enumeration, BAR mapping, firmware loading</li>
+            <li><strong>Command Submission:</strong> Ring buffer management, command validation, submission queues</li>
+            <li><strong>Interrupt Handling:</strong> MSI-X vectors, completion notification, error handling</li>
+            <li><strong>Memory Management:</strong> IOMMU integration, page table management, memory mapping</li>
+            <li><strong>Power Management:</strong> Runtime PM, suspend/resume, dynamic frequency scaling</li>
+            <li><strong>Telemetry:</strong> Performance counters, temperature monitoring, error logging</li>
+        </ul>
+
+        <pre>// Kernel driver structure (simplified)
+struct wia_ai_device {
+    struct pci_dev *pdev;              // PCI device
+    void __iomem *bar0;                // Control registers
+    void __iomem *bar2;                // Memory-mapped I/O
+
+    // Command submission
+    struct wia_command_queue *cmd_queue;
+    spinlock_t queue_lock;
+
+    // Interrupt handling
+    struct msix_entry *msix_entries;
+    int num_irqs;
+
+    // Memory management
+    struct wia_memory_manager *mm;
+    struct iommu_domain *domain;
+
+    // Power management
+    struct wia_power_state power;
+    struct workqueue_struct *pm_wq;
+
+    // Device state
+    atomic_t refcount;
+    enum wia_device_state state;
+    struct mutex device_lock;
+};
+
+// Driver initialization
+static int wia_ai_probe(struct pci_dev *pdev,
+                        const struct pci_device_id *id) {
+    struct wia_ai_device *wdev;
+    int ret;
+
+    // Allocate device structure
+    wdev = kzalloc(sizeof(*wdev), GFP_KERNEL);
+    if (!wdev)
+        return -ENOMEM;
+
+    wdev->pdev = pdev;
+    pci_set_drvdata(pdev, wdev);
+
+    // Enable PCI device
+    ret = pci_enable_device(pdev);
+    if (ret)
+        goto err_free;
+
+    // Request memory regions
+    ret = pci_request_regions(pdev, "wia-ai");
+    if (ret)
+        goto err_disable;
+
+    // Map BARs
+    wdev->bar0 = pci_iomap(pdev, 0, 0);
+    wdev->bar2 = pci_iomap(pdev, 2, 0);
+    if (!wdev->bar0 || !wdev->bar2) {
+        ret = -ENOMEM;
+        goto err_release;
+    }
+
+    // Enable DMA
+    ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+    if (ret)
+        goto err_unmap;
+
+    // Initialize subsystems
+    ret = wia_init_command_queue(wdev);
+    if (ret)
+        goto err_unmap;
+
+    ret = wia_init_interrupts(wdev);
+    if (ret)
+        goto err_queue;
+
+    ret = wia_init_memory_manager(wdev);
+    if (ret)
+        goto err_irq;
+
+    // Load firmware
+    ret = wia_load_firmware(wdev);
+    if (ret)
+        goto err_mm;
+
+    // Create device node
+    ret = wia_create_device_node(wdev);
+    if (ret)
+        goto err_fw;
+
+    dev_info(&pdev->dev, "WIA-AI-011 device initialized\n");
+    return 0;
+
+err_fw:
+    wia_unload_firmware(wdev);
+err_mm:
+    wia_cleanup_memory_manager(wdev);
+err_irq:
+    wia_cleanup_interrupts(wdev);
+err_queue:
+    wia_cleanup_command_queue(wdev);
+err_unmap:
+    pci_iounmap(pdev, wdev->bar0);
+    pci_iounmap(pdev, wdev->bar2);
+err_release:
+    pci_release_regions(pdev);
+err_disable:
+    pci_disable_device(pdev);
+err_free:
+    kfree(wdev);
+    return ret;
+}</pre>
+
+        <h3>4.2.2 User-Space Driver Components</h3>
+        <p>While the kernel driver handles hardware access, much of the driver logic runs in user space for better stability and debuggability. The user-space driver implements command formatting, shader compilation, graph optimization, and high-level resource management.</p>
+
+        <pre>// User-space driver library
+typedef struct wia_udriver {
+    int device_fd;                  // File descriptor to kernel driver
+    struct wia_device_info info;   // Device capabilities
+    struct wia_command_buffer *cb; // Command buffer pool
+    struct wia_shader_cache *sc;   // Compiled shader cache
+    struct wia_graph_executor *ge; // Computation graph executor
+} wia_udriver_t;
+
+// Open device and initialize user-space driver
+wia_status_t wia_udriver_open(int device_id, wia_udriver_t **driver) {
+    wia_udriver_t *drv = calloc(1, sizeof(*drv));
+    if (!drv)
+        return WIA_ERROR_OUT_OF_MEMORY;
+
+    // Open kernel device
+    char devpath[64];
+    snprintf(devpath, sizeof(devpath), "/dev/wia-ai%d", device_id);
+    drv->device_fd = open(devpath, O_RDWR | O_CLOEXEC);
+    if (drv->device_fd < 0) {
+        free(drv);
+        return WIA_ERROR_DEVICE_NOT_FOUND;
+    }
+
+    // Query device info via ioctl
+    if (ioctl(drv->device_fd, WIA_IOCTL_GET_INFO, &drv->info) < 0) {
+        close(drv->device_fd);
+        free(drv);
+        return WIA_ERROR_IOCTL_FAILED;
+    }
+
+    // Initialize command buffers
+    drv->cb = wia_command_buffer_pool_create(16);
+
+    // Initialize shader cache
+    drv->sc = wia_shader_cache_create(drv->info.isa_version);
+
+    // Initialize graph executor
+    drv->ge = wia_graph_executor_create(&drv->info);
+
+    *driver = drv;
+    return WIA_SUCCESS;
+}</pre>
+
+        <h2>4.3 Memory Mapping and Address Translation</h2>
+        <p>Efficient memory access is critical for AI accelerator performance. The WIA-AI-011 interface supports multiple memory mapping modes, each optimized for different access patterns. The interface layer manages both virtual-to-physical address translation and device-specific memory attributes such as cacheability, coherency, and access permissions.</p>
+
+        <h3>4.3.1 Memory Mapping Modes</h3>
+        <p>WIA-AI-011 defines four primary memory mapping modes:</p>
+
+        <ul>
+            <li><strong>Device Local:</strong> Memory physically located on the accelerator, highest bandwidth, not CPU-accessible</li>
+            <li><strong>Host Pinned:</strong> System memory locked in physical RAM, DMA-capable, CPU and device accessible</li>
+            <li><strong>Unified Memory:</strong> Single address space, automatically migrated between host and device</li>
+            <li><strong>Mapped Host:</strong> System memory mapped into device address space, cache-coherent</li>
+        </ul>
+
+        <pre>// Memory mapping example
+wia_status_t map_model_weights(wia_device_t device,
+                               const float *weights,
+                               size_t size,
+                               wia_buffer_t *gpu_buffer) {
+    // Allocate device-local memory for performance
+    wia_buffer_desc_t desc = {
+        .size = size,
+        .type = WIA_BUFFER_DEVICE_LOCAL,
+        .usage = WIA_BUFFER_USAGE_TRANSFER_DST | WIA_BUFFER_USAGE_UNIFORM,
+        .flags = WIA_BUFFER_FLAG_PERSISTENT
+    };
+
+    wia_status_t status = wia_create_buffer(device, &desc, gpu_buffer);
+    if (status != WIA_SUCCESS)
+        return status;
+
+    // Create staging buffer in host-pinned memory
+    desc.type = WIA_BUFFER_HOST_PINNED;
+    desc.usage = WIA_BUFFER_USAGE_TRANSFER_SRC;
+    wia_buffer_t staging;
+    status = wia_create_buffer(device, &desc, &staging);
+    if (status != WIA_SUCCESS) {
+        wia_destroy_buffer(*gpu_buffer);
+        return status;
+    }
+
+    // Map staging buffer to CPU
+    void *mapped;
+    status = wia_map_buffer(staging, WIA_MAP_WRITE, &mapped);
+    if (status != WIA_SUCCESS) {
+        wia_destroy_buffer(staging);
+        wia_destroy_buffer(*gpu_buffer);
+        return status;
+    }
+
+    // Copy weights to staging buffer
+    memcpy(mapped, weights, size);
+    wia_unmap_buffer(staging);
+
+    // Create transfer command
+    wia_command_buffer_t cmd;
+    wia_create_command_buffer(device, &cmd);
+    wia_cmd_copy_buffer(cmd, staging, *gpu_buffer, 0, 0, size);
+
+    // Submit and wait
+    wia_queue_t queue;
+    wia_get_device_queue(device, WIA_QUEUE_TRANSFER, &queue);
+    wia_submit_command_buffer(queue, cmd);
+    wia_queue_wait_idle(queue);
+
+    // Cleanup staging resources
+    wia_destroy_command_buffer(cmd);
+    wia_destroy_buffer(staging);
+
+    return WIA_SUCCESS;
+}</pre>
+
+        <h3>4.3.2 IOMMU Integration</h3>
+        <p>The Input-Output Memory Management Unit (IOMMU) provides address translation and memory protection for DMA operations. WIA-AI-011 leverages the IOMMU to enable safe, efficient memory sharing between CPU and AI accelerator. The IOMMU also supports large page mappings (2MB/1GB) to reduce TLB pressure for large tensor operations.</p>
+
+        <div class="note">
+            <strong>Note:</strong> IOMMU usage is optional but highly recommended. Without IOMMU, the driver uses SWIOTLB for bounce buffering on systems where the device cannot access all physical memory directly, which significantly impacts performance.
+        </div>
+
+        <h2>4.4 Interrupt Handling and Completion Notification</h2>
+        <p>AI accelerators generate interrupts to signal command completion, error conditions, and performance events. Efficient interrupt handling is crucial for low-latency operation. WIA-AI-011 uses MSI-X (Message Signaled Interrupts Extended) for scalable, high-performance interrupt delivery, with dedicated vectors for different interrupt sources.</p>
+
+        <h3>4.4.1 Interrupt Vector Assignment</h3>
+        <p>The WIA-AI-011 driver allocates MSI-X vectors for different purposes:</p>
+
+        <table>
+            <tr>
+                <th>Vector</th>
+                <th>Purpose</th>
+                <th>Priority</th>
+            </tr>
+            <tr>
+                <td>0</td>
+                <td>Compute queue completion</td>
+                <td>High</td>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td>Transfer queue completion</td>
+                <td>High</td>
+            </tr>
+            <tr>
+                <td>2-7</td>
+                <td>Additional compute queues</td>
+                <td>High</td>
+            </tr>
+            <tr>
+                <td>8</td>
+                <td>Error and exception events</td>
+                <td>Critical</td>
+            </tr>
+            <tr>
+                <td>9</td>
+                <td>Performance counter overflow</td>
+                <td>Low</td>
+            </tr>
+            <tr>
+                <td>10</td>
+                <td>Power/thermal events</td>
+                <td>Medium</td>
+            </tr>
+        </table>
+
+        <pre>// Interrupt handler implementation
+static irqreturn_t wia_ai_compute_irq(int irq, void *data) {
+    struct wia_ai_device *wdev = data;
+    struct wia_command_queue *queue = &wdev->compute_queue;
+    uint32_t status;
+
+    // Read interrupt status register
+    status = wia_read_reg32(wdev, WIA_REG_IRQ_STATUS);
+
+    if (!(status & WIA_IRQ_COMPUTE_COMPLETE))
+        return IRQ_NONE;
+
+    // Clear interrupt
+    wia_write_reg32(wdev, WIA_REG_IRQ_CLEAR, WIA_IRQ_COMPUTE_COMPLETE);
+
+    // Process completions
+    while (queue->head != queue->tail) {
+        struct wia_command *cmd = &queue->commands[queue->head];
+
+        // Check if command completed
+        if (!wia_check_completion(wdev, cmd))
+            break;
+
+        // Invoke completion callback
+        if (cmd->callback)
+            cmd->callback(cmd->user_data);
+
+        // Release command slot
+        queue->head = (queue->head + 1) % queue->size;
+        atomic_inc(&queue->available);
+    }
+
+    // Wake up waiting threads
+    wake_up_interruptible(&queue->wait_queue);
+
+    return IRQ_HANDLED;
+}
+
+// Error interrupt handler
+static irqreturn_t wia_ai_error_irq(int irq, void *data) {
+    struct wia_ai_device *wdev = data;
+    uint32_t error_status;
+
+    error_status = wia_read_reg32(wdev, WIA_REG_ERROR_STATUS);
+
+    if (error_status & WIA_ERROR_COMMAND_FAULT) {
+        dev_err(&wdev->pdev->dev, "Command fault detected\n");
+        wia_dump_command_queue(wdev);
+    }
+
+    if (error_status & WIA_ERROR_MEMORY_VIOLATION) {
+        dev_err(&wdev->pdev->dev, "Memory access violation\n");
+        wia_dump_page_tables(wdev);
+    }
+
+    if (error_status & WIA_ERROR_TIMEOUT) {
+        dev_err(&wdev->pdev->dev, "Command timeout\n");
+        wia_reset_device(wdev);
+    }
+
+    // Clear error status
+    wia_write_reg32(wdev, WIA_REG_ERROR_CLEAR, error_status);
+
+    return IRQ_HANDLED;
+}</pre>
+
+        <h3>4.4.2 Completion Polling vs. Interrupts</h3>
+        <p>While interrupts provide low-latency notification, they introduce overhead from context switching and interrupt processing. For high-throughput workloads, polling the completion queue can be more efficient. WIA-AI-011 supports both modes and allows dynamic switching based on load characteristics.</p>
+
+        <pre>// Hybrid polling/interrupt approach
+wia_status_t wia_wait_for_completion(wia_command_buffer_t cmd,
+                                     uint64_t timeout_ns) {
+    uint64_t start = wia_get_time_ns();
+    uint64_t poll_deadline = start + 1000; // Poll for 1μs
+
+    // First, poll briefly
+    while (wia_get_time_ns() < poll_deadline) {
+        if (wia_command_completed(cmd))
+            return WIA_SUCCESS;
+        cpu_relax();
+    }
+
+    // If still not done, wait on interrupt
+    uint64_t remaining = timeout_ns - (wia_get_time_ns() - start);
+    return wia_wait_interrupt(cmd, remaining);
+}</pre>
+
+        <h2>4.5 DMA Operations and Data Transfer</h2>
+        <p>Direct Memory Access (DMA) enables the AI accelerator to transfer data to and from system memory without CPU intervention, freeing CPU cycles for other work. WIA-AI-011 provides a sophisticated DMA engine with support for scatter-gather operations, chained transfers, and automatic cache management.</p>
+
+        <h3>4.5.1 DMA Engine Architecture</h3>
+        <p>The WIA-AI-011 DMA engine supports multiple concurrent channels, each capable of independent transfers. The engine handles address translation via IOMMU, cache coherency operations, and transfer ordering. Transfers can be chained to create complex data movement patterns without CPU intervention.</p>
+
+        <pre>// DMA transfer descriptor
+struct wia_dma_descriptor {
+    uint64_t src_addr;        // Source address (physical or IOVA)
+    uint64_t dst_addr;        // Destination address
+    uint32_t length;          // Transfer length in bytes
+    uint32_t flags;           // Control flags
+    uint64_t next_desc;       // Next descriptor (for chaining)
+};
+
+// Flags
+#define WIA_DMA_FLAG_INTERRUPT  0x0001  // Generate interrupt on completion
+#define WIA_DMA_FLAG_BARRIER    0x0002  // Memory barrier after transfer
+#define WIA_DMA_FLAG_COHERENT   0x0004  // Maintain cache coherency
+#define WIA_DMA_FLAG_LAST       0x8000  // Last descriptor in chain
+
+// Example: Scatter-gather DMA transfer
+wia_status_t dma_scatter_gather_transfer(wia_device_t device,
+                                         struct iovec *src_iov,
+                                         size_t src_count,
+                                         wia_buffer_t dst_buffer) {
+    wia_dma_channel_t channel;
+    wia_status_t status;
+
+    // Allocate DMA channel
+    status = wia_alloc_dma_channel(device, &channel);
+    if (status != WIA_SUCCESS)
+        return status;
+
+    // Build descriptor chain
+    struct wia_dma_descriptor *descs;
+    size_t desc_count = src_count;
+    descs = calloc(desc_count, sizeof(*descs));
+
+    uint64_t dst_offset = 0;
+    for (size_t i = 0; i < src_count; i++) {
+        // Get physical address via IOMMU
+        uint64_t src_phys = wia_get_iova(src_iov[i].iov_base);
+        uint64_t dst_phys = wia_get_buffer_address(dst_buffer) + dst_offset;
+
+        descs[i].src_addr = src_phys;
+        descs[i].dst_addr = dst_phys;
+        descs[i].length = src_iov[i].iov_len;
+        descs[i].flags = WIA_DMA_FLAG_COHERENT;
+
+        // Chain to next descriptor
+        if (i < src_count - 1) {
+            descs[i].next_desc = wia_get_iova(&descs[i + 1]);
+        } else {
+            descs[i].flags |= WIA_DMA_FLAG_LAST | WIA_DMA_FLAG_INTERRUPT;
+            descs[i].next_desc = 0;
+        }
+
+        dst_offset += src_iov[i].iov_len;
+    }
+
+    // Submit DMA operation
+    status = wia_submit_dma_chain(channel, descs);
+    if (status != WIA_SUCCESS) {
+        free(descs);
+        wia_free_dma_channel(channel);
+        return status;
+    }
+
+    // Wait for completion
+    status = wia_wait_dma_completion(channel, WIA_TIMEOUT_INFINITE);
+
+    free(descs);
+    wia_free_dma_channel(channel);
+
+    return status;
+}</pre>
+
+        <h3>4.5.2 Zero-Copy DMA</h3>
+        <p>Zero-copy DMA allows the accelerator to directly access user-space buffers without intermediate copying. This requires careful management of memory permissions and synchronization but provides optimal performance for large data transfers.</p>
+
+        <div class="warning">
+            <strong>Warning:</strong> Zero-copy DMA requires that user buffers remain valid and pinned in memory for the duration of the DMA transfer. Accessing or freeing the buffer before DMA completes causes undefined behavior and potential system instability.
+        </div>
+
+        <h2>4.6 Power Management APIs</h2>
+        <p>Power efficiency is critical for AI accelerators deployed in data centers and edge devices. WIA-AI-011 provides comprehensive power management capabilities including dynamic voltage and frequency scaling (DVFS), power gating, and runtime power management. The interface allows applications to balance performance and power consumption based on workload requirements.</p>
+
+        <h3>4.6.1 Power States and Transitions</h3>
+        <p>AI accelerators support multiple power states, from fully active to deep sleep. Transitions between states have associated latency and energy costs that must be considered when optimizing for power efficiency.</p>
+
+        <table>
+            <tr>
+                <th>State</th>
+                <th>Description</th>
+                <th>Wake Latency</th>
+                <th>Power</th>
+            </tr>
+            <tr>
+                <td>P0 (Active)</td>
+                <td>Full performance, all units powered</td>
+                <td>0 μs</td>
+                <td>100%</td>
+            </tr>
+            <tr>
+                <td>P1 (Reduced)</td>
+                <td>Lower frequency, reduced voltage</td>
+                <td>50 μs</td>
+                <td>60%</td>
+            </tr>
+            <tr>
+                <td>P2 (Idle)</td>
+                <td>Clock gating, voltage retained</td>
+                <td>200 μs</td>
+                <td>20%</td>
+            </tr>
+            <tr>
+                <td>P3 (Standby)</td>
+                <td>Power gating, state saved</td>
+                <td>5 ms</td>
+                <td>5%</td>
+            </tr>
+            <tr>
+                <td>P4 (Off)</td>
+                <td>Completely powered off</td>
+                <td>100 ms</td>
+                <td>0.1%</td>
+            </tr>
+        </table>
+
+        <pre>// Power management API
+typedef enum {
+    WIA_POWER_POLICY_PERFORMANCE,    // Maximum performance, high power
+    WIA_POWER_POLICY_BALANCED,       // Balance performance and power
+    WIA_POWER_POLICY_POWER_SAVER,    // Minimize power consumption
+    WIA_POWER_POLICY_CUSTOM          // User-defined policy
+} wia_power_policy_t;
+
+// Set power policy
+wia_status_t wia_set_power_policy(wia_device_t device,
+                                  wia_power_policy_t policy) {
+    struct wia_power_params params;
+
+    switch (policy) {
+    case WIA_POWER_POLICY_PERFORMANCE:
+        params.min_freq = params.max_freq = device->max_frequency;
+        params.idle_timeout_ms = 1000;     // 1s before idle
+        params.deep_sleep_timeout_ms = 0;  // Never deep sleep
+        break;
+
+    case WIA_POWER_POLICY_BALANCED:
+        params.min_freq = device->max_frequency / 2;
+        params.max_freq = device->max_frequency;
+        params.idle_timeout_ms = 100;      // 100ms before idle
+        params.deep_sleep_timeout_ms = 5000; // 5s before deep sleep
+        break;
+
+    case WIA_POWER_POLICY_POWER_SAVER:
+        params.min_freq = device->min_frequency;
+        params.max_freq = device->max_frequency / 2;
+        params.idle_timeout_ms = 10;       // 10ms before idle
+        params.deep_sleep_timeout_ms = 1000; // 1s before deep sleep
+        break;
+
+    default:
+        return WIA_ERROR_INVALID_PARAMETER;
+    }
+
+    return wia_apply_power_params(device, &params);
+}
+
+// Dynamic frequency scaling
+wia_status_t wia_set_frequency(wia_device_t device, uint32_t freq_mhz) {
+    if (freq_mhz < device->min_frequency || freq_mhz > device->max_frequency)
+        return WIA_ERROR_OUT_OF_RANGE;
+
+    // Calculate required voltage for frequency
+    uint32_t voltage_mv = wia_freq_to_voltage(device, freq_mhz);
+
+    // Voltage scaling sequence
+    if (voltage_mv > device->current_voltage) {
+        // Increase voltage first
+        wia_set_voltage(device, voltage_mv);
+        usleep(100); // Voltage settling time
+        wia_set_clock(device, freq_mhz);
+    } else {
+        // Decrease frequency first
+        wia_set_clock(device, freq_mhz);
+        wia_set_voltage(device, voltage_mv);
+    }
+
+    device->current_frequency = freq_mhz;
+    device->current_voltage = voltage_mv;
+
+    return WIA_SUCCESS;
+}</pre>
+
+        <h3>4.6.2 Runtime Power Management</h3>
+        <p>Runtime PM automatically transitions the device to low-power states when idle and wakes it when needed. The Linux kernel's runtime PM framework integrates with the WIA-AI-011 driver to provide transparent power management.</p>
+
+        <pre>// Runtime PM callbacks
+static int wia_ai_runtime_suspend(struct device *dev) {
+    struct wia_ai_device *wdev = dev_get_drvdata(dev);
+
+    // Save device state
+    wia_save_device_state(wdev);
+
+    // Enter low-power state
+    wia_write_reg32(wdev, WIA_REG_POWER_CTRL, WIA_POWER_STATE_P2);
+
+    dev_info(dev, "Entered runtime suspend\n");
+    return 0;
+}
+
+static int wia_ai_runtime_resume(struct device *dev) {
+    struct wia_ai_device *wdev = dev_get_drvdata(dev);
+
+    // Wake device
+    wia_write_reg32(wdev, WIA_REG_POWER_CTRL, WIA_POWER_STATE_P0);
+
+    // Wait for wake
+    usleep_range(100, 200);
+
+    // Restore device state
+    wia_restore_device_state(wdev);
+
+    dev_info(dev, "Exited runtime suspend\n");
+    return 0;
+}
+
+static const struct dev_pm_ops wia_ai_pm_ops = {
+    SET_RUNTIME_PM_OPS(wia_ai_runtime_suspend,
+                       wia_ai_runtime_resume,
+                       NULL)
+    SET_SYSTEM_SLEEP_PM_OPS(wia_ai_suspend, wia_ai_resume)
+};</pre>
+
+        <h2>4.7 Debugging Interfaces and Diagnostics</h2>
+        <p>Debugging AI accelerator issues requires visibility into hardware state, command execution, and performance characteristics. WIA-AI-011 provides rich debugging interfaces including register dumps, command tracing, performance counters, and error injection capabilities.</p>
+
+        <h3>4.7.1 Register Access and Dumps</h3>
+        <p>Direct register access enables low-level debugging and hardware verification. The WIA-AI-011 interface provides safe, validated register read/write operations with proper error checking.</p>
+
+        <pre>// Debug register access
+typedef struct {
+    uint32_t offset;      // Register offset
+    uint32_t value;       // Register value
+    const char *name;     // Register name
+} wia_register_t;
+
+// Dump device registers
+void wia_dump_registers(wia_device_t device) {
+    static const wia_register_t regs[] = {
+        { 0x0000, 0, "DEVICE_ID" },
+        { 0x0004, 0, "VERSION" },
+        { 0x0008, 0, "STATUS" },
+        { 0x000C, 0, "CONTROL" },
+        { 0x0010, 0, "IRQ_STATUS" },
+        { 0x0014, 0, "IRQ_MASK" },
+        { 0x0020, 0, "CMD_QUEUE_HEAD" },
+        { 0x0024, 0, "CMD_QUEUE_TAIL" },
+        { 0x0100, 0, "POWER_STATE" },
+        { 0x0104, 0, "CLOCK_FREQ" },
+        { 0x0200, 0, "ERROR_STATUS" },
+        { 0x0204, 0, "ERROR_ADDR" },
+    };
+
+    printf("=== WIA-AI-011 Register Dump ===\n");
+    for (size_t i = 0; i < ARRAY_SIZE(regs); i++) {
+        uint32_t value;
+        wia_read_register(device, regs[i].offset, &value);
+        printf("0x%04X %-20s : 0x%08X\n",
+               regs[i].offset, regs[i].name, value);
+    }
+    printf("================================\n");
+}</pre>
+
+        <h3>4.7.2 Command Tracing</h3>
+        <p>Command tracing records all commands submitted to the accelerator along with timing information, enabling performance analysis and debugging of execution order issues.</p>
+
+        <pre>// Command tracing
+#define WIA_TRACE_FLAG_TIMESTAMP   0x01
+#define WIA_TRACE_FLAG_ARGUMENTS   0x02
+#define WIA_TRACE_FLAG_COMPLETION  0x04
+
+typedef struct {
+    uint64_t submit_time;
+    uint64_t start_time;
+    uint64_t end_time;
+    uint32_t command_id;
+    uint16_t command_type;
+    uint16_t flags;
+    void *args;
+} wia_trace_entry_t;
+
+wia_status_t wia_enable_tracing(wia_device_t device, uint32_t flags) {
+    device->trace_flags = flags;
+    device->trace_buffer = wia_create_ring_buffer(1024 * 1024);
+    return WIA_SUCCESS;
+}
+
+void wia_trace_command(wia_device_t device, wia_command_t *cmd) {
+    if (!(device->trace_flags & WIA_TRACE_FLAG_TIMESTAMP))
+        return;
+
+    wia_trace_entry_t entry = {
+        .submit_time = wia_get_time_ns(),
+        .command_id = cmd->id,
+        .command_type = cmd->type,
+        .flags = device->trace_flags
+    };
+
+    if (device->trace_flags & WIA_TRACE_FLAG_ARGUMENTS) {
+        entry.args = malloc(cmd->args_size);
+        memcpy(entry.args, cmd->args, cmd->args_size);
+    }
+
+    wia_ring_buffer_write(device->trace_buffer, &entry, sizeof(entry));
+}
+
+// Export trace to file
+wia_status_t wia_export_trace(wia_device_t device, const char *filename) {
+    FILE *f = fopen(filename, "w");
+    if (!f)
+        return WIA_ERROR_FILE_IO;
+
+    fprintf(f, "timestamp_ns,command_id,type,duration_us\n");
+
+    wia_trace_entry_t entry;
+    while (wia_ring_buffer_read(device->trace_buffer, &entry, sizeof(entry))) {
+        uint64_t duration = (entry.end_time - entry.start_time) / 1000;
+        fprintf(f, "%lu,%u,%u,%lu\n",
+                entry.submit_time, entry.command_id, entry.command_type, duration);
+    }
+
+    fclose(f);
+    return WIA_SUCCESS;
+}</pre>
+
+        <h3>4.7.3 Performance Counters</h3>
+        <p>Hardware performance counters provide insight into accelerator utilization, memory bandwidth, cache hit rates, and other critical metrics. WIA-AI-011 exposes these counters through a standardized interface.</p>
+
+        <pre>// Performance counter types
+typedef enum {
+    WIA_COUNTER_CYCLES,              // Total clock cycles
+    WIA_COUNTER_COMPUTE_ACTIVE,      // Cycles with compute active
+    WIA_COUNTER_MEMORY_READ_BYTES,   // Bytes read from memory
+    WIA_COUNTER_MEMORY_WRITE_BYTES,  // Bytes written to memory
+    WIA_COUNTER_CACHE_HITS,          // Cache hits
+    WIA_COUNTER_CACHE_MISSES,        // Cache misses
+    WIA_COUNTER_COMMANDS_EXECUTED,   // Commands completed
+    WIA_COUNTER_DMA_TRANSFERS,       // DMA transfers completed
+} wia_counter_type_t;
+
+// Read performance counters
+typedef struct {
+    uint64_t cycles;
+    uint64_t compute_active_cycles;
+    uint64_t memory_read_bytes;
+    uint64_t memory_write_bytes;
+    uint64_t cache_hits;
+    uint64_t cache_misses;
+    uint64_t commands_executed;
+    uint64_t dma_transfers;
+} wia_performance_counters_t;
+
+wia_status_t wia_read_counters(wia_device_t device,
+                               wia_performance_counters_t *counters) {
+    counters->cycles = wia_read_counter(device, WIA_COUNTER_CYCLES);
+    counters->compute_active_cycles = wia_read_counter(device, WIA_COUNTER_COMPUTE_ACTIVE);
+    counters->memory_read_bytes = wia_read_counter(device, WIA_COUNTER_MEMORY_READ_BYTES);
+    counters->memory_write_bytes = wia_read_counter(device, WIA_COUNTER_MEMORY_WRITE_BYTES);
+    counters->cache_hits = wia_read_counter(device, WIA_COUNTER_CACHE_HITS);
+    counters->cache_misses = wia_read_counter(device, WIA_COUNTER_CACHE_MISSES);
+    counters->commands_executed = wia_read_counter(device, WIA_COUNTER_COMMANDS_EXECUTED);
+    counters->dma_transfers = wia_read_counter(device, WIA_COUNTER_DMA_TRANSFERS);
+
+    return WIA_SUCCESS;
+}
+
+// Calculate derived metrics
+void wia_print_performance_metrics(const wia_performance_counters_t *c,
+                                   uint32_t freq_mhz) {
+    double utilization = 100.0 * c->compute_active_cycles / c->cycles;
+    double cache_hit_rate = 100.0 * c->cache_hits / (c->cache_hits + c->cache_misses);
+    double memory_bw_gb = (c->memory_read_bytes + c->memory_write_bytes) / 1e9;
+    double runtime_sec = c->cycles / (freq_mhz * 1e6);
+    double avg_bw_gbs = memory_bw_gb / runtime_sec;
+
+    printf("Performance Metrics:\n");
+    printf("  Utilization:       %.2f%%\n", utilization);
+    printf("  Cache Hit Rate:    %.2f%%\n", cache_hit_rate);
+    printf("  Memory Bandwidth:  %.2f GB/s\n", avg_bw_gbs);
+    printf("  Commands/sec:      %.0f\n", c->commands_executed / runtime_sec);
+    printf("  Runtime:           %.3f seconds\n", runtime_sec);
+}</pre>
+
+        <h2>4.8 Synchronization Primitives</h2>
+        <p>Coordinating execution between CPU and AI accelerator requires robust synchronization primitives. WIA-AI-011 provides fences, semaphores, and barriers for fine-grained control over execution order and data dependencies.</p>
+
+        <h3>4.8.1 Fences and Timeline Semaphores</h3>
+        <p>Fences enable CPU-GPU synchronization, while timeline semaphores support complex dependency graphs spanning multiple devices and queues.</p>
+
+        <pre>// Fence-based synchronization
+wia_status_t run_inference_with_fence(wia_device_t device,
+                                      wia_model_t model,
+                                      wia_tensor_t input,
+                                      wia_tensor_t output) {
+    wia_command_buffer_t cmd;
+    wia_fence_t fence;
+
+    // Create fence
+    wia_create_fence(device, 0, &fence);
+
+    // Record inference commands
+    wia_create_command_buffer(device, &cmd);
+    wia_cmd_run_model(cmd, model, &input, 1, &output, 1);
+
+    // Submit with fence
+    wia_queue_t queue;
+    wia_get_device_queue(device, WIA_QUEUE_COMPUTE, &queue);
+    wia_submit_command_buffer_with_fence(queue, cmd, fence);
+
+    // Do other work on CPU
+    preprocess_next_batch();
+
+    // Wait for GPU completion
+    wia_status_t status = wia_wait_for_fence(fence, 1000000000); // 1 second timeout
+
+    if (status == WIA_SUCCESS) {
+        postprocess_results(output);
+    }
+
+    wia_destroy_fence(fence);
+    wia_destroy_command_buffer(cmd);
+
+    return status;
+}
+
+// Timeline semaphore for multi-device coordination
+wia_status_t multi_device_pipeline(wia_device_t *devices, int num_devices) {
+    wia_timeline_semaphore_t timeline;
+    wia_create_timeline_semaphore(devices[0], 0, &timeline);
+
+    for (int i = 0; i < num_devices; i++) {
+        wia_command_buffer_t cmd;
+        wia_create_command_buffer(devices[i], &cmd);
+
+        // Wait for previous stage
+        if (i > 0) {
+            wia_cmd_wait_semaphore(cmd, timeline, i);
+        }
+
+        // Execute stage work
+        wia_cmd_execute_stage(cmd, i);
+
+        // Signal completion
+        wia_cmd_signal_semaphore(cmd, timeline, i + 1);
+
+        wia_queue_t queue;
+        wia_get_device_queue(devices[i], WIA_QUEUE_COMPUTE, &queue);
+        wia_submit_command_buffer(queue, cmd);
+    }
+
+    // Wait for entire pipeline
+    wia_wait_timeline_semaphore(timeline, num_devices, WIA_TIMEOUT_INFINITE);
+
+    wia_destroy_timeline_semaphore(timeline);
+    return WIA_SUCCESS;
+}</pre>
+
+        <h2>4.9 Error Handling and Recovery</h2>
+        <p>Robust error handling is essential for production AI systems. WIA-AI-011 defines comprehensive error reporting, automatic recovery mechanisms, and failure isolation to prevent cascading failures.</p>
+
+        <h3>4.9.1 Error Classification</h3>
+        <p>Errors are classified by severity and recoverability:</p>
+
+        <ul>
+            <li><strong>Transient Errors:</strong> Temporary failures (e.g., timeout, resource busy) that may succeed on retry</li>
+            <li><strong>Recoverable Errors:</strong> Failures that require corrective action (e.g., out of memory, invalid parameter)</li>
+            <li><strong>Fatal Errors:</strong> Unrecoverable hardware or driver failures requiring device reset</li>
+            <li><strong>Critical Errors:</strong> System-level failures (e.g., PCIe link failure) requiring reboot</li>
+        </ul>
+
+        <pre>// Error handling framework
+typedef enum {
+    WIA_ERROR_CLASS_TRANSIENT,
+    WIA_ERROR_CLASS_RECOVERABLE,
+    WIA_ERROR_CLASS_FATAL,
+    WIA_ERROR_CLASS_CRITICAL
+} wia_error_class_t;
+
+typedef struct {
+    wia_status_t code;
+    wia_error_class_t class;
+    const char *message;
+    uint32_t recovery_action;
+} wia_error_info_t;
+
+wia_status_t wia_handle_error(wia_device_t device, wia_status_t error) {
+    wia_error_info_t info;
+    wia_get_error_info(error, &info);
+
+    fprintf(stderr, "Error: %s (code=%d, class=%d)\n",
+            info.message, info.code, info.class);
+
+    switch (info.class) {
+    case WIA_ERROR_CLASS_TRANSIENT:
+        // Retry operation
+        usleep(1000);
+        return WIA_RECOVERY_RETRY;
+
+    case WIA_ERROR_CLASS_RECOVERABLE:
+        // Perform recovery action
+        if (info.recovery_action & WIA_RECOVERY_FREE_MEMORY) {
+            wia_garbage_collect(device);
+        }
+        if (info.recovery_action & WIA_RECOVERY_RESET_QUEUE) {
+            wia_reset_command_queue(device);
+        }
+        return WIA_RECOVERY_CONTINUE;
+
+    case WIA_ERROR_CLASS_FATAL:
+        // Reset device
+        fprintf(stderr, "Fatal error, resetting device\n");
+        wia_reset_device(device);
+        return WIA_RECOVERY_DEVICE_RESET;
+
+    case WIA_ERROR_CLASS_CRITICAL:
+        // Cannot recover
+        fprintf(stderr, "Critical error, system reboot required\n");
+        return WIA_RECOVERY_SYSTEM_REBOOT;
+    }
+
+    return WIA_ERROR_UNKNOWN;
+}</pre>
+
+        <h3>4.9.2 Watchdog and Timeout Handling</h3>
+        <p>A watchdog timer detects hung commands and triggers automatic recovery. This prevents system freezes from runaway operations.</p>
+
+        <pre>// Watchdog implementation
+struct wia_watchdog {
+    struct timer_list timer;
+    struct wia_ai_device *device;
+    uint32_t timeout_ms;
+    atomic_t active_commands;
+};
+
+static void wia_watchdog_timeout(struct timer_list *t) {
+    struct wia_watchdog *wd = from_timer(wd, t, timer);
+    struct wia_ai_device *wdev = wd->device;
+
+    if (atomic_read(&wd->active_commands) > 0) {
+        dev_err(&wdev->pdev->dev, "Watchdog timeout, resetting device\n");
+
+        // Dump state for debugging
+        wia_dump_device_state(wdev);
+
+        // Reset device
+        wia_hard_reset(wdev);
+
+        // Notify user space
+        wia_send_error_event(wdev, WIA_EVENT_WATCHDOG_TIMEOUT);
+    }
+}
+
+void wia_watchdog_kick(struct wia_watchdog *wd) {
+    mod_timer(&wd->timer, jiffies + msecs_to_jiffies(wd->timeout_ms));
+}</pre>
+
+        <h2>4.10 Security and Isolation</h2>
+        <p>Multi-tenant AI systems require strong security and isolation guarantees. WIA-AI-011 implements hardware-backed memory protection, command validation, and resource quotas to prevent malicious or buggy code from compromising the system.</p>
+
+        <h3>4.10.1 Memory Protection and Sandboxing</h3>
+        <p>Each application context operates in an isolated address space enforced by the IOMMU. Attempts to access unauthorized memory regions trigger immediate faults and termination.</p>
+
+        <pre>// Security context creation
+typedef struct {
+    uint32_t uid;                    // User ID
+    uint32_t gid;                    // Group ID
+    uint64_t memory_limit;           // Maximum memory allocation
+    uint32_t compute_quota;          // Maximum compute units
+    uint32_t priority;               // Scheduling priority
+    uint32_t security_flags;         // Security restrictions
+} wia_security_policy_t;
+
+#define WIA_SECURITY_NO_DEBUG       0x0001  // Disable debug features
+#define WIA_SECURITY_NO_RAW_ACCESS  0x0002  // Disable raw memory access
+#define WIA_SECURITY_AUDIT_ALL      0x0004  // Log all operations
+
+wia_status_t wia_create_secure_context(wia_device_t device,
+                                       const wia_security_policy_t *policy,
+                                       wia_context_t *context) {
+    // Verify caller permissions
+    if (!wia_check_permissions(policy->uid, policy->gid))
+        return WIA_ERROR_PERMISSION_DENIED;
+
+    // Allocate isolated IOMMU domain
+    struct iommu_domain *domain = iommu_domain_alloc(&pci_bus_type);
+    if (!domain)
+        return WIA_ERROR_OUT_OF_MEMORY;
+
+    // Create context
+    struct wia_context_impl *ctx = calloc(1, sizeof(*ctx));
+    ctx->device = device;
+    ctx->iommu_domain = domain;
+    ctx->security_policy = *policy;
+    ctx->allocated_memory = 0;
+    ctx->allocated_compute = 0;
+
+    // Initialize resource tracking
+    mutex_init(&ctx->resource_lock);
+    INIT_LIST_HEAD(&ctx->buffer_list);
+    INIT_LIST_HEAD(&ctx->command_list);
+
+    *context = (wia_context_t)ctx;
+    return WIA_SUCCESS;
+}
+
+// Validate command before execution
+wia_status_t wia_validate_command(wia_context_t context,
+                                  wia_command_buffer_t cmd) {
+    struct wia_context_impl *ctx = (struct wia_context_impl *)context;
+
+    // Check all buffer accesses
+    for (int i = 0; i < cmd->num_buffers; i++) {
+        wia_buffer_t buf = cmd->buffers[i];
+
+        // Verify buffer belongs to this context
+        if (!wia_buffer_owned_by_context(buf, context))
+            return WIA_ERROR_INVALID_BUFFER;
+
+        // Verify access permissions
+        if ((cmd->buffer_access[i] & WIA_ACCESS_WRITE) &&
+            !(buf->flags & WIA_BUFFER_FLAG_WRITABLE))
+            return WIA_ERROR_ACCESS_DENIED;
+    }
+
+    // Verify resource limits
+    if (cmd->compute_units > ctx->security_policy.compute_quota)
+        return WIA_ERROR_QUOTA_EXCEEDED;
+
+    // Audit if required
+    if (ctx->security_policy.security_flags & WIA_SECURITY_AUDIT_ALL) {
+        wia_audit_log("UID %u executing command %u",
+                     ctx->security_policy.uid, cmd->id);
+    }
+
+    return WIA_SUCCESS;
+}</pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <p>The Hardware-Software Interface Layer is the critical bridge connecting AI accelerator silicon to the applications that run on it. This chapter covered the essential components and concepts:</p>
+            <ul>
+                <li><strong>Interface Architecture:</strong> Four-layer design separating application API, runtime, driver, and hardware layers with clean abstraction boundaries</li>
+                <li><strong>Driver Architecture:</strong> Modular kernel driver with PCI/PCIe support, command submission, and comprehensive device management</li>
+                <li><strong>Memory Mapping:</strong> Multiple memory types (device local, host pinned, unified, mapped) with IOMMU integration for safe, efficient access</li>
+                <li><strong>Interrupt Handling:</strong> MSI-X based interrupt delivery with dedicated vectors for compute, transfer, errors, and events</li>
+                <li><strong>DMA Operations:</strong> Scatter-gather DMA engine with chaining, cache coherency, and zero-copy capabilities for efficient data movement</li>
+                <li><strong>Power Management:</strong> Dynamic voltage/frequency scaling, multiple power states (P0-P4), and runtime power management for energy efficiency</li>
+                <li><strong>Debugging Interfaces:</strong> Register dumps, command tracing, performance counters, and diagnostic tools for troubleshooting and optimization</li>
+                <li><strong>Synchronization:</strong> Fences, timeline semaphores, and barriers for coordinating execution across CPU, GPU, and multiple devices</li>
+                <li><strong>Error Handling:</strong> Comprehensive error classification, automatic recovery, watchdog timers, and graceful degradation</li>
+                <li><strong>Security:</strong> IOMMU-backed memory isolation, command validation, resource quotas, and audit logging for multi-tenant safety</li>
+            </ul>
+            <p>The WIA-AI-011 interface layer balances abstraction with performance, providing a vendor-neutral API that exposes hardware capabilities while hiding implementation complexity. Understanding these interface mechanisms is essential for building efficient, reliable, and secure AI applications.</p>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Describe the four-layer architecture of the WIA-AI-011 Hardware-Software Interface. What are the responsibilities of each layer?</li>
+                <li>Explain the purpose of the IOMMU in AI accelerator systems. How does it improve both performance and security?</li>
+                <li>Compare and contrast the four memory mapping modes (device local, host pinned, unified, mapped host). When would you use each?</li>
+                <li>Why does WIA-AI-011 use MSI-X interrupts instead of traditional line-based interrupts? What advantages does this provide?</li>
+                <li>Describe the trade-offs between polling and interrupt-driven completion notification. When is each approach more appropriate?</li>
+                <li>How does the DMA scatter-gather mechanism improve performance compared to multiple individual DMA transfers?</li>
+                <li>Explain the five power states (P0-P4) and their associated latencies. How does runtime power management decide when to transition between states?</li>
+                <li>What debugging tools does WIA-AI-011 provide? How would you use performance counters and command tracing to optimize an inference workload?</li>
+                <li>Describe the four error classes (transient, recoverable, fatal, critical) and appropriate recovery strategies for each.</li>
+                <li>How does WIA-AI-011 enforce memory isolation between different application contexts? What happens if a command attempts to access unauthorized memory?</li>
+                <li>Explain timeline semaphores and how they enable complex multi-device synchronization patterns.</li>
+                <li>What is zero-copy DMA and why is it important for large data transfers? What are the safety considerations?</li>
+                <li>Design a complete error handling strategy for a production inference server using WIA-AI-011 accelerators.</li>
+                <li>How would you implement a custom power policy that maximizes throughput while staying under a 150W power budget?</li>
+                <li>Describe how you would debug a scenario where commands are submitted but never complete. What diagnostic tools would you use?</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #334155; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · Benefit All Humanity</strong><br>
+            <span style="color: #64748b; font-size: 0.9em; margin-top: 10px; display: block;">
+                WIA-AI-011: Building interfaces that empower developers worldwide to harness the full potential of AI acceleration,
+                making advanced AI accessible to all and benefiting humanity through democratized artificial intelligence.
+            </span>
+        </div>
+    </div>
+</body>
+</html>

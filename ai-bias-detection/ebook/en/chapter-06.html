@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Monitoring and Auditing | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <a href="index.html" class="back-link">← Back to Table of Contents</a>
+            <div class="chapter-number">Chapter 6</div>
+            <h1>Monitoring and Auditing</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            Fairness is not a one-time achievement—it requires continuous monitoring and regular audits. This chapter
+            covers systems and practices for maintaining fair AI in production, following 弘益人間 principles.
+        </p>
+
+        <h2>Why Continuous Monitoring Matters</h2>
+        <p>
+            AI systems can drift over time as data distributions change, user populations evolve, and societal norms
+            shift. Without ongoing monitoring, a system that was fair at deployment can become biased over time.
+        </p>
+
+        <h2>Setting Up Monitoring Infrastructure</h2>
+
+        <h3>1. Real-Time Fairness Metrics</h3>
+        <p>
+            Track fairness metrics continuously alongside traditional performance metrics.
+        </p>
+
+        <pre><code># Fairness Monitoring Dashboard
+import numpy as np
+from datetime import datetime, timedelta
+
+class FairnessMonitor:
+    """
+    Real-time fairness monitoring system
+    """
+    def __init__(self, protected_attributes, fairness_thresholds):
+        self.protected_attributes = protected_attributes
+        self.fairness_thresholds = fairness_thresholds
+        self.metrics_history = []
+        self.alerts = []
+
+    def log_prediction(self, features, prediction, true_label=None, timestamp=None):
+        """
+        Log individual prediction for monitoring
+        """
+        if timestamp is None:
+            timestamp = datetime.now()
+
+        record = {
+            'timestamp': timestamp,
+            'features': features,
+            'prediction': prediction,
+            'true_label': true_label,
+            'protected_attrs': {
+                attr: features.get(attr) for attr in self.protected_attributes
+            }
+        }
+
+        self.metrics_history.append(record)
+
+    def compute_realtime_metrics(self, window_hours=24):
+        """
+        Compute fairness metrics for recent predictions
+        """
+        cutoff_time = datetime.now() - timedelta(hours=window_hours)
+        recent_records = [r for r in self.metrics_history
+                         if r['timestamp'] > cutoff_time]
+
+        if not recent_records:
+            return {}
+
+        # Extract data
+        predictions = np.array([r['prediction'] for r in recent_records])
+
+        metrics = {}
+        for attr in self.protected_attributes:
+            groups = {}
+            for record in recent_records:
+                group = record['protected_attrs'][attr]
+                if group not in groups:
+                    groups[group] = []
+                groups[group].append(record['prediction'])
+
+            # Calculate demographic parity
+            positive_rates = {}
+            for group, preds in groups.items():
+                positive_rates[group] = np.mean(preds)
+
+            if len(positive_rates) > 1:
+                max_rate = max(positive_rates.values())
+                min_rate = min(positive_rates.values())
+                disparity = max_rate - min_rate
+
+                metrics[attr] = {
+                    'positive_rates': positive_rates,
+                    'disparity': disparity,
+                    'status': 'OK' if disparity < self.fairness_thresholds.get(attr, 0.1) else 'ALERT'
+                }
+
+                if disparity >= self.fairness_thresholds.get(attr, 0.1):
+                    self.raise_alert(attr, disparity, positive_rates)
+
+        return metrics
+
+    def raise_alert(self, attribute, disparity, rates):
+        """
+        Raise fairness alert
+        """
+        alert = {
+            'timestamp': datetime.now(),
+            'attribute': attribute,
+            'disparity': disparity,
+            'rates': rates,
+            'severity': 'HIGH' if disparity > 0.2 else 'MEDIUM'
+        }
+        self.alerts.append(alert)
+        print(f"⚠️ FAIRNESS ALERT: {attribute} disparity = {disparity:.3f}")
+
+    def generate_report(self):
+        """
+        Generate monitoring report
+        """
+        print("FAIRNESS MONITORING REPORT")
+        print("=" * 70)
+        print(f"Report Time: {datetime.now()}")
+        print(f"Total Predictions Logged: {len(self.metrics_history)}")
+        print(f"Active Alerts: {len([a for a in self.alerts if (datetime.now() - a['timestamp']).hours < 24])}")
+
+        current_metrics = self.compute_realtime_metrics()
+
+        print("\nCURRENT FAIRNESS STATUS:")
+        print("-" * 70)
+        for attr, data in current_metrics.items():
+            print(f"\n{attr}:")
+            print(f"  Disparity: {data['disparity']:.3f} [{data['status']}]")
+            for group, rate in data['positive_rates'].items():
+                print(f"    {group}: {rate:.3f}")
+
+        print("\n弘益人間 - Maintaining fairness for all users")
+        print("=" * 70)
+
+# Usage
+monitor = FairnessMonitor(
+    protected_attributes=['gender', 'race'],
+    fairness_thresholds={'gender': 0.1, 'race': 0.1}
+)
+</code></pre>
+
+        <h3>2. Drift Detection</h3>
+        <p>
+            Detect when data distributions or model behavior changes significantly.
+        </p>
+
+        <pre><code># Distribution Drift Detection
+from scipy import stats
+
+class DriftDetector:
+    """
+    Detect distribution drift in features and predictions
+    """
+    def __init__(self, reference_data, significance_level=0.05):
+        self.reference_data = reference_data
+        self.significance_level = significance_level
+
+    def detect_feature_drift(self, current_data, feature_name):
+        """
+        Use Kolmogorov-Smirnov test to detect feature drift
+        """
+        reference_values = self.reference_data[feature_name]
+        current_values = current_data[feature_name]
+
+        # KS test
+        statistic, p_value = stats.ks_2samp(reference_values, current_values)
+
+        drift_detected = p_value < self.significance_level
+
+        result = {
+            'feature': feature_name,
+            'statistic': statistic,
+            'p_value': p_value,
+            'drift_detected': drift_detected
+        }
+
+        if drift_detected:
+            print(f"⚠️ DRIFT DETECTED in {feature_name}")
+            print(f"   KS Statistic: {statistic:.4f}, p-value: {p_value:.4f}")
+
+        return result
+
+    def detect_prediction_drift(self, current_predictions):
+        """
+        Detect drift in prediction distribution
+        """
+        reference_predictions = self.reference_data['predictions']
+
+        # Compare distributions
+        ref_mean = reference_predictions.mean()
+        curr_mean = current_predictions.mean()
+
+        ref_std = reference_predictions.std()
+        curr_std = current_predictions.std()
+
+        # Z-test for mean difference
+        z_score = (curr_mean - ref_mean) / (ref_std / np.sqrt(len(current_predictions)))
+        p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
+
+        drift_detected = p_value < self.significance_level
+
+        print(f"Prediction Drift Analysis:")
+        print(f"  Reference mean: {ref_mean:.3f}")
+        print(f"  Current mean: {curr_mean:.3f}")
+        print(f"  Z-score: {z_score:.3f}")
+        print(f"  Drift detected: {drift_detected}")
+
+        return drift_detected
+
+    def comprehensive_drift_check(self, current_data, protected_attrs):
+        """
+        Check for drift across all features and groups
+        """
+        print("\nCOMPREHENSIVE DRIFT CHECK")
+        print("=" * 70)
+
+        drift_report = {'features': {}, 'groups': {}}
+
+        # Check each feature
+        for feature in current_data.columns:
+            if feature in protected_attrs:
+                continue
+            result = self.detect_feature_drift(current_data, feature)
+            drift_report['features'][feature] = result
+
+        # Check group-specific drift
+        for attr in protected_attrs:
+            for group in current_data[attr].unique():
+                mask = current_data[attr] == group
+                group_predictions = current_data[mask]['predictions']
+
+                ref_mask = self.reference_data[attr] == group
+                ref_group_predictions = self.reference_data[ref_mask]['predictions']
+
+                # Compare group distributions
+                statistic, p_value = stats.ks_2samp(ref_group_predictions, group_predictions)
+
+                drift_report['groups'][f"{attr}_{group}"] = {
+                    'statistic': statistic,
+                    'p_value': p_value,
+                    'drift_detected': p_value < self.significance_level
+                }
+
+        return drift_report
+</code></pre>
+
+        <h2>Automated Auditing Systems</h2>
+
+        <h3>Scheduled Fairness Audits</h3>
+        <p>
+            Run comprehensive fairness audits on a regular schedule.
+        </p>
+
+        <pre><code># Automated Audit Scheduler
+import schedule
+import time
+from datetime import datetime
+
+class AutomatedAuditor:
+    """
+    Automated fairness auditing system
+    """
+    def __init__(self, model, data_source, protected_attrs):
+        self.model = model
+        self.data_source = data_source
+        self.protected_attrs = protected_attrs
+        self.audit_history = []
+
+    def run_audit(self):
+        """
+        Execute comprehensive fairness audit
+        """
+        print(f"\n{'='*70}")
+        print(f"AUTOMATED FAIRNESS AUDIT - {datetime.now()}")
+        print(f"{'='*70}")
+
+        # Fetch recent data
+        data = self.data_source.get_recent_data()
+        X = data[self.model.feature_names]
+        y_true = data['label']
+
+        # Generate predictions
+        y_pred = self.model.predict(X)
+
+        audit_results = {
+            'timestamp': datetime.now(),
+            'sample_size': len(data),
+            'overall_accuracy': np.mean(y_true == y_pred),
+            'group_metrics': {},
+            'alerts': []
+        }
+
+        # Evaluate fairness for each protected attribute
+        for attr in self.protected_attrs:
+            groups = data[attr].unique()
+
+            group_metrics = {}
+            for group in groups:
+                mask = data[attr] == group
+
+                accuracy = np.mean(y_true[mask] == y_pred[mask])
+                positive_rate = np.mean(y_pred[mask])
+
+                group_metrics[group] = {
+                    'accuracy': accuracy,
+                    'positive_rate': positive_rate,
+                    'sample_size': mask.sum()
+                }
+
+            # Check for disparities
+            accuracies = [m['accuracy'] for m in group_metrics.values()]
+            acc_disparity = max(accuracies) - min(accuracies)
+
+            rates = [m['positive_rate'] for m in group_metrics.values()]
+            rate_disparity = max(rates) - min(rates)
+
+            audit_results['group_metrics'][attr] = {
+                'metrics': group_metrics,
+                'accuracy_disparity': acc_disparity,
+                'rate_disparity': rate_disparity
+            }
+
+            # Generate alerts
+            if acc_disparity > 0.1:
+                audit_results['alerts'].append({
+                    'type': 'accuracy_disparity',
+                    'attribute': attr,
+                    'severity': 'HIGH',
+                    'value': acc_disparity
+                })
+
+            if rate_disparity > 0.1:
+                audit_results['alerts'].append({
+                    'type': 'demographic_parity',
+                    'attribute': attr,
+                    'severity': 'MEDIUM',
+                    'value': rate_disparity
+                })
+
+        # Store audit results
+        self.audit_history.append(audit_results)
+
+        # Print summary
+        self.print_audit_summary(audit_results)
+
+        # Send alerts if necessary
+        if audit_results['alerts']:
+            self.send_alerts(audit_results['alerts'])
+
+        return audit_results
+
+    def print_audit_summary(self, results):
+        """
+        Print audit results summary
+        """
+        print(f"\nAudit Summary:")
+        print(f"  Sample Size: {results['sample_size']}")
+        print(f"  Overall Accuracy: {results['overall_accuracy']:.3f}")
+        print(f"  Alerts Generated: {len(results['alerts'])}")
+
+        for attr, data in results['group_metrics'].items():
+            print(f"\n{attr}:")
+            print(f"  Accuracy Disparity: {data['accuracy_disparity']:.3f}")
+            print(f"  Rate Disparity: {data['rate_disparity']:.3f}")
+
+        print("\n弘益人間 - Regular audits ensure continued fairness")
+
+    def send_alerts(self, alerts):
+        """
+        Send alerts to stakeholders
+        """
+        for alert in alerts:
+            print(f"\n🚨 ALERT: {alert['type']} - {alert['severity']}")
+            print(f"   Attribute: {alert['attribute']}")
+            print(f"   Value: {alert['value']:.3f}")
+
+    def schedule_audits(self, frequency='daily'):
+        """
+        Schedule regular audits
+        """
+        if frequency == 'daily':
+            schedule.every().day.at("02:00").do(self.run_audit)
+        elif frequency == 'weekly':
+            schedule.every().monday.at("02:00").do(self.run_audit)
+        elif frequency == 'hourly':
+            schedule.every().hour.do(self.run_audit)
+
+        print(f"Automated audits scheduled: {frequency}")
+
+        # Run scheduler
+        while True:
+            schedule.run_pending()
+            time.sleep(60)
+
+# Usage
+# auditor = AutomatedAuditor(model, data_source, ['gender', 'race'])
+# auditor.schedule_audits('daily')
+</code></pre>
+
+        <h2>Performance Degradation Detection</h2>
+
+        <pre><code># Performance Degradation Monitor
+class PerformanceDegradationDetector:
+    """
+    Detect gradual performance degradation over time
+    """
+    def __init__(self, baseline_metrics, degradation_threshold=0.05):
+        self.baseline_metrics = baseline_metrics
+        self.degradation_threshold = degradation_threshold
+        self.metric_history = []
+
+    def check_degradation(self, current_metrics):
+        """
+        Compare current metrics against baseline
+        """
+        degradations = {}
+
+        for metric_name, baseline_value in self.baseline_metrics.items():
+            current_value = current_metrics.get(metric_name)
+
+            if current_value is None:
+                continue
+
+            degradation = baseline_value - current_value
+            degradation_pct = (degradation / baseline_value) * 100
+
+            degradations[metric_name] = {
+                'baseline': baseline_value,
+                'current': current_value,
+                'degradation': degradation,
+                'degradation_pct': degradation_pct,
+                'threshold_exceeded': degradation > self.degradation_threshold
+            }
+
+        # Log metrics
+        self.metric_history.append({
+            'timestamp': datetime.now(),
+            'metrics': current_metrics,
+            'degradations': degradations
+        })
+
+        # Report significant degradations
+        significant_degradations = {
+            k: v for k, v in degradations.items()
+            if v['threshold_exceeded']
+        }
+
+        if significant_degradations:
+            print("⚠️ PERFORMANCE DEGRADATION DETECTED")
+            for metric, data in significant_degradations.items():
+                print(f"  {metric}: {data['baseline']:.3f} → {data['current']:.3f} "
+                      f"({data['degradation_pct']:+.1f}%)")
+
+        return degradations
+
+    def analyze_trends(self, window_size=30):
+        """
+        Analyze performance trends over time
+        """
+        if len(self.metric_history) < window_size:
+            print("Insufficient history for trend analysis")
+            return
+
+        recent_history = self.metric_history[-window_size:]
+
+        print("\nPERFORMANCE TREND ANALYSIS")
+        print("=" * 70)
+
+        for metric_name in self.baseline_metrics.keys():
+            values = [h['metrics'].get(metric_name, 0) for h in recent_history]
+
+            # Linear regression to detect trends
+            x = np.arange(len(values))
+            slope, intercept = np.polyfit(x, values, 1)
+
+            trend = "improving" if slope > 0 else "degrading"
+            trend_strength = abs(slope) * window_size
+
+            print(f"\n{metric_name}:")
+            print(f"  Trend: {trend}")
+            print(f"  Slope: {slope:.6f}")
+            print(f"  Projected change over {window_size} periods: {trend_strength:.3f}")
+
+            if slope < -0.001:
+                print(f"  ⚠️ Degrading trend detected")
+
+        return True
+</code></pre>
+
+        <h2>Stakeholder Reporting</h2>
+
+        <pre><code># Stakeholder Report Generator
+class StakeholderReportGenerator:
+    """
+    Generate comprehensive fairness reports for stakeholders
+    """
+    def __init__(self, monitor, auditor):
+        self.monitor = monitor
+        self.auditor = auditor
+
+    def generate_executive_summary(self):
+        """
+        Create executive summary of fairness status
+        """
+        print("\n" + "=" * 70)
+        print("EXECUTIVE SUMMARY - AI FAIRNESS STATUS")
+        print("=" * 70)
+        print(f"Report Date: {datetime.now().strftime('%Y-%m-%d')}")
+
+        # Get latest audit
+        if self.auditor.audit_history:
+            latest_audit = self.auditor.audit_history[-1]
+
+            print(f"\nOverall Status: ", end="")
+            if not latest_audit['alerts']:
+                print("✓ COMPLIANT")
+            else:
+                high_alerts = [a for a in latest_audit['alerts'] if a['severity'] == 'HIGH']
+                if high_alerts:
+                    print("✗ CRITICAL ISSUES")
+                else:
+                    print("⚠ ATTENTION NEEDED")
+
+            print(f"\nKey Metrics:")
+            print(f"  Total Predictions: {latest_audit['sample_size']:,}")
+            print(f"  Overall Accuracy: {latest_audit['overall_accuracy']:.1%}")
+            print(f"  Active Alerts: {len(latest_audit['alerts'])}")
+
+            print(f"\nFairness Assessment by Protected Attribute:")
+            for attr, data in latest_audit['group_metrics'].items():
+                print(f"\n{attr}:")
+                print(f"  Max Accuracy Disparity: {data['accuracy_disparity']:.1%}")
+                print(f"  Max Rate Disparity: {data['rate_disparity']:.1%}")
+
+                status = "✓" if (data['accuracy_disparity'] < 0.1 and
+                               data['rate_disparity'] < 0.1) else "⚠"
+                print(f"  Status: {status}")
+
+        print("\n" + "=" * 70)
+        print("弘益人間 - Commitment to serving all users fairly")
+        print("=" * 70)
+
+    def generate_detailed_report(self, output_file):
+        """
+        Generate detailed report with visualizations
+        """
+        # In production, this would create charts, tables, etc.
+        with open(output_file, 'w') as f:
+            f.write("DETAILED FAIRNESS AUDIT REPORT\n")
+            f.write("=" * 70 + "\n\n")
+
+            # Include all audit data
+            for audit in self.auditor.audit_history[-10:]:  # Last 10 audits
+                f.write(f"\nAudit Date: {audit['timestamp']}\n")
+                f.write(f"Accuracy: {audit['overall_accuracy']:.3f}\n")
+                f.write(f"Alerts: {len(audit['alerts'])}\n")
+                f.write("-" * 70 + "\n")
+
+        print(f"Detailed report saved to: {output_file}")
+
+# Usage
+# report_gen = StakeholderReportGenerator(monitor, auditor)
+# report_gen.generate_executive_summary()
+</code></pre>
+
+        <h2>Best Practices for Ongoing Monitoring</h2>
+
+        <div class="callout">
+            <h3>弘익人間 Monitoring Principles</h3>
+            <ul>
+                <li><strong>Continuous Vigilance:</strong> Monitor fairness metrics in real-time alongside performance metrics</li>
+                <li><strong>Proactive Alerts:</strong> Set up automated alerts for fairness violations</li>
+                <li><strong>Regular Audits:</strong> Conduct comprehensive audits on a fixed schedule</li>
+                <li><strong>Drift Detection:</strong> Monitor for data and prediction drift that could indicate emerging bias</li>
+                <li><strong>Transparent Reporting:</strong> Provide clear, accessible fairness reports to stakeholders</li>
+                <li><strong>Rapid Response:</strong> Have processes in place to quickly address detected issues</li>
+                <li><strong>Documentation:</strong> Maintain detailed records of all monitoring activities</li>
+                <li><strong>Stakeholder Engagement:</strong> Involve affected communities in defining fairness requirements</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">Chapter Summary</h2>
+            <ul>
+                <li>Continuous monitoring is essential—fairness is not a one-time achievement</li>
+                <li>Real-time fairness metrics should be tracked alongside traditional performance metrics</li>
+                <li>Drift detection identifies when data distributions or model behavior changes</li>
+                <li>Automated auditing systems enable regular, comprehensive fairness assessments</li>
+                <li>Performance degradation detection catches gradual decline in fairness or accuracy</li>
+                <li>Stakeholder reporting ensures transparency and accountability</li>
+                <li>Alert systems enable rapid response to emerging fairness issues</li>
+                <li>Trend analysis helps identify systemic problems before they become critical</li>
+                <li>Best practices include continuous vigilance, proactive alerts, and transparent reporting</li>
+                <li>弘益人間 requires ongoing commitment to fairness for all users</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">Review Questions</h2>
+            <ol>
+                <li>Why is continuous monitoring necessary even for systems that were fair at deployment?</li>
+                <li>What fairness metrics should be tracked in real-time? How do they differ from batch evaluation?</li>
+                <li>Explain how drift detection works. What types of drift are most concerning for fairness?</li>
+                <li>Design an alerting strategy for a production AI system. What thresholds would you set?</li>
+                <li>How often should comprehensive fairness audits be conducted? What factors influence this decision?</li>
+                <li>What information should be included in an executive summary for stakeholders?</li>
+                <li>How can trend analysis help prevent fairness issues before they become critical?</li>
+                <li>What processes should be in place to respond to fairness alerts?</li>
+                <li>How would you balance the cost of monitoring with the need for thorough fairness assessment?</li>
+                <li>Design a monitoring system for a hiring AI following 弘익인간 principles. What would you prioritize?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-05.html" class="nav-button">← Previous Chapter</a>
+            <a href="chapter-07.html" class="nav-button">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

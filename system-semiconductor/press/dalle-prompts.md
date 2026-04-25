@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-SEMI-001 Press Materials
+
+## Prompt 1: Hero Image - System Semiconductor Integration
+A detailed technical visualization of modern System-on-Chip (SoC) architecture: CPU cores, GPU accelerators, AI neural processing units, memory controllers, and I/O interfaces all integrated on single chip die. Holographic overlays show standardized WIA-SEMI-001 data formats enabling cross-vendor compatibility, unified API interfaces for seamless control, and inter-chip communication protocols. Microscopic view showing billions of transistors at 3nm process node. High-tech semiconductor photography, clean room aesthetic with professional technical documentation.
+
+## Prompt 2: Problem Scenario - Semiconductor Integration Chaos
+A frustrated engineering team struggling with semiconductor integration problems: proprietary incompatible chip specifications from different vendors preventing comparison, inconsistent APIs requiring custom drivers for each chip, lack of standardized communication protocols forcing expensive custom integration work, and fragmented ecosystem wasting 40% of development time and budget on compatibility issues. Show stressed engineers, failed integration attempts, budget overruns. Documentary technology photography emphasizing pain and inefficiency of current semiconductor industry fragmentation.
+
+## Prompt 3: Solution Visualization - Unified Semiconductor Ecosystem
+A seamless semiconductor development environment enabled by WIA-SEMI-001: engineers rapidly comparing chips from multiple vendors using standardized JSON specifications, universal API enabling instant integration with any compliant SoC, chip-to-chip communication working flawlessly across brands, and system integration completed 40% faster with 30% cost reduction. Mobile devices, data centers, automotive systems, and IoT devices all benefiting from standardization. Dashboard shows Bronze/Silver/Gold/Platinum certification levels ensuring compatibility. Clean, efficient, interoperable semiconductor future. Modern technology photography celebrating industry collaboration and innovation acceleration.

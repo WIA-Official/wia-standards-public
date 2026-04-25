@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>2장: 텐서 데이터 포맷 및 메모리 레이아웃 | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { font-size: 2.5em; color: #1c1917; margin: 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        .summary, .review-questions { padding: 30px; border-radius: 8px; margin: 40px 0; }
+        .summary { background: #f0fdf4; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        .code-comment { color: #94a3b8; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #10B981; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="color: #10B981; font-weight: bold; border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px;">
+            <div>2장</div>
+            <h1>텐서 데이터 포맷 및 메모리 레이아웃</h1>
+        </div>
+
+        <h2>2.1 텐서 표현의 기초</h2>
+        <p>모든 딥러닝 계산의 핵심에는 텐서(다차원 숫자 배열)가 있습니다. 개념적으로는 단순하지만 메모리에서 텐서의 물리적 표현은 성능, 이식성 및 정확성에 깊은 영향을 미칩니다. WIA-AI-011 1단계는 변환 오버헤드나 수치적 저하 없이 다양한 가속기 간에 텐서를 원활하게 공유할 수 있도록 텐서 데이터 포맷에 대한 포괄적인 표준을 확립합니다.</p>
+
+        <p>텐서는 다음과 같은 핵심 속성으로 정의됩니다:</p>
+        <ul>
+            <li><strong>형상(Shape):</strong> 각 차원의 크기를 나타내는 정수 배열 (예: [32, 3, 224, 224])</li>
+            <li><strong>데이터 타입(DType):</strong> 요소의 수치 표현 (예: FLOAT32, INT8, BFLOAT16)</li>
+            <li><strong>메모리 레이아웃(Layout):</strong> 다차원 인덱스가 선형 메모리 주소로 매핑되는 방식</li>
+            <li><strong>스트라이드(Strides):</strong> 각 차원을 따라 이동할 때 건너뛰는 바이트 수</li>
+            <li><strong>오프셋(Offset):</strong> 버퍼 시작 지점으로부터의 바이트 오프셋</li>
+        </ul>
+
+        <pre>// 텐서 기본 속성 예제
+{
+  "shape": [32, 3, 224, 224],      // 배치 크기 32, RGB 채널, 224x224 이미지
+  "dtype": "FLOAT32",               // 32비트 부동소수점
+  "layout": "NCHW",                 // 배치-채널-높이-너비 순서
+  "total_elements": 4816896,        // 32 × 3 × 224 × 224
+  "total_bytes": 19267584          // 4816896 × 4 bytes
+}</pre>
+
+        <h2>2.2 메모리 레이아웃 규칙</h2>
+        <p>서로 다른 프레임워크와 하드웨어 벤더는 역사적으로 메모리에서 다차원 데이터를 구성하기 위해 서로 다른 규칙을 채택했습니다. 이러한 차이는 프레임워크 간 모델 공유와 하드웨어 간 이식성에 큰 장애물이 되었습니다.</p>
+
+        <h3>2.2.1 NCHW 레이아웃 (배치, 채널, 높이, 너비)</h3>
+        <p>채널 우선이라고도 하는 NCHW 레이아웃은 각 공간 위치의 모든 채널을 함께 저장합니다. 이 레이아웃은 NVIDIA의 cuDNN 라이브러리와 PyTorch(GPU에서)가 효율적인 컨볼루션 구현을 가능하게 하기 때문에 선호합니다.</p>
+
+        <pre>// NCHW 메모리 레이아웃 예제
+// 형상: [2, 3, 2, 2] - 2개 이미지, 3채널(RGB), 2x2 픽셀
+메모리 순서:
+이미지0-R채널[0,0], 이미지0-R채널[0,1], 이미지0-R채널[1,0], 이미지0-R채널[1,1],
+이미지0-G채널[0,0], 이미지0-G채널[0,1], 이미지0-G채널[1,0], 이미지0-G채널[1,1],
+이미지0-B채널[0,0], 이미지0-B채널[0,1], 이미지0-B채널[1,0], 이미지0-B채널[1,1],
+이미지1-R채널[0,0], ...
+
+인덱스 [n, c, h, w] → 메모리 주소:
+offset = n × (C×H×W) + c × (H×W) + h × W + w</pre>
+
+        <h3>2.2.2 NHWC 레이아웃</h3>
+        <p>채널 마지막 레이아웃은 각 픽셀의 모든 채널을 함께 저장합니다. 이 레이아웃은 TensorFlow, ARM 프로세서 및 많은 모바일 NPU가 특정 작업에 대해 더 나은 캐시 지역성을 나타내기 때문에 선호합니다.</p>
+
+        <pre>// NHWC 메모리 레이아웃 예제
+// 형상: [2, 3, 2, 2] - 2개 이미지, 3채널(RGB), 2x2 픽셀
+메모리 순서:
+이미지0[0,0]-R, 이미지0[0,0]-G, 이미지0[0,0]-B,
+이미지0[0,1]-R, 이미지0[0,1]-G, 이미지0[0,1]-B,
+이미지0[1,0]-R, 이미지0[1,0]-G, 이미지0[1,0]-B,
+이미지0[1,1]-R, 이미지0[1,1]-G, 이미지0[1,1]-B,
+이미지1[0,0]-R, ...
+
+인덱스 [n, h, w, c] → 메모리 주소:
+offset = n × (H×W×C) + h × (W×C) + w × C + c</pre>
+
+        <h3>2.2.3 스트라이드 기반 표현</h3>
+        <p>WIA-AI-011은 블록 및 패딩 포맷을 포함한 임의의 레이아웃을 설명할 수 있는 스트라이드 기반 표현을 정의합니다. 스트라이드는 각 차원을 따라 한 요소에서 다음 요소로 이동할 때 건너뛰는 바이트 수를 지정합니다.</p>
+
+        <pre>// 스트라이드 기반 텐서 디스크립터
+{
+  "shape": [32, 3, 224, 224],
+  "layout": "NCHW",
+  "strides": [150528, 50176, 224, 1],  // 각 차원의 바이트 스트라이드
+  "offset": 0,
+  "element_size_bytes": 4,              // FLOAT32 = 4 bytes
+
+  // 스트라이드 계산 방법:
+  // stride[3] = 1 (가장 안쪽 차원)
+  // stride[2] = stride[3] × shape[3] = 1 × 224 = 224
+  // stride[1] = stride[2] × shape[2] = 224 × 224 = 50176
+  // stride[0] = stride[1] × shape[1] = 50176 × 3 = 150528
+}</pre>
+
+        <h2>2.3 데이터 타입 및 정밀도</h2>
+        <p>신경망은 다양한 수치 정밀도에서 작동할 수 있으며 정확도를 성능 및 에너지 효율성과 교환합니다. WIA-AI-011은 현대 AI 가속기에서 사용되는 전체 정밀도 포맷 스펙트럼을 포괄하는 포괄적인 타입 시스템을 정의합니다.</p>
+
+        <h3>2.3.1 부동 소수점 포맷</h3>
+        <p>표준 IEEE 754 부동 소수점 포맷은 친숙하고 잘 정의된 수치 동작을 제공하지만 상당한 메모리와 대역폭을 소비합니다:</p>
+
+        <table>
+            <tr>
+                <th>타입</th>
+                <th>비트 수</th>
+                <th>지수</th>
+                <th>가수</th>
+                <th>범위</th>
+                <th>용도</th>
+            </tr>
+            <tr>
+                <td>FLOAT64</td>
+                <td>64</td>
+                <td>11</td>
+                <td>52</td>
+                <td>±10^308</td>
+                <td>과학 컴퓨팅, 수치 안정성 필요 시</td>
+            </tr>
+            <tr>
+                <td>FLOAT32</td>
+                <td>32</td>
+                <td>8</td>
+                <td>23</td>
+                <td>±10^38</td>
+                <td>기본 훈련, 일반적인 추론</td>
+            </tr>
+            <tr>
+                <td>FLOAT16</td>
+                <td>16</td>
+                <td>5</td>
+                <td>10</td>
+                <td>±65504</td>
+                <td>혼합 정밀도 훈련, 추론</td>
+            </tr>
+            <tr>
+                <td>BFLOAT16</td>
+                <td>16</td>
+                <td>8</td>
+                <td>7</td>
+                <td>±10^38</td>
+                <td>TPU, 현대 훈련 (FLOAT32와 동일 범위)</td>
+            </tr>
+        </table>
+
+        <pre>// 부동소수점 타입 비교 예제
+// BFLOAT16의 장점: FLOAT32와 동일한 범위, 단순한 변환
+
+// FLOAT32 → BFLOAT16 변환 (상위 16비트만 유지)
+uint32_t float32_bits = 0x3F800000;  // 1.0f
+uint16_t bfloat16_bits = (uint16_t)(float32_bits >> 16);  // 0x3F80
+
+// FLOAT16은 더 높은 정밀도, 하지만 제한된 범위
+// 최대값: FLOAT16 = 65504, BFLOAT16/FLOAT32 = 3.4×10^38</pre>
+
+        <h3>2.3.2 정수 및 고정 소수점 포맷</h3>
+        <p>특히 INT8 정수 포맷은 효율적인 추론에 필수적이 되었습니다. 양자화를 통한 신중한 보정이 필요하지만 4배의 메모리 절약과 상당한 계산 속도 향상을 제공합니다.</p>
+
+        <pre>// 양자화 매개변수를 포함한 INT8 표현
+{
+  "dtype": "INT8",
+  "quantization": {
+    "scheme": "symmetric",        // 또는 "asymmetric"
+    "scale": 0.003921568,         // 1/255 (8비트 범위)
+    "zero_point": 0,              // symmetric의 경우 0
+    "min_value": -128,            // INT8 최소값
+    "max_value": 127              // INT8 최대값
+  }
+}
+
+// 양자화 공식
+// symmetric: quantized = round(real_value / scale)
+// asymmetric: quantized = round(real_value / scale) + zero_point
+
+// 역양자화 공식
+// symmetric: real_value = quantized × scale
+// asymmetric: real_value = (quantized - zero_point) × scale</pre>
+
+        <h2>2.4 텐서 디스크립터 포맷</h2>
+        <p>WIA-AI-011 텐서 디스크립터는 텐서의 속성을 완전히 지정하는 포괄적인 메타데이터 구조입니다. 이를 통해 다양한 시스템 간에 텐서를 명확하게 교환할 수 있습니다.</p>
+
+        <pre>// 완전한 WIA-AI-011 텐서 디스크립터
+{
+  "version": "WIA-AI-011-v1.0",
+  "tensor_id": "uuid-4f3a8b2c-1d5e-4a9f-b8c3-7e2d1f5a8c4b",
+
+  // 형상 정보
+  "shape": {
+    "dimensions": [32, 3, 224, 224],
+    "layout": "NCHW",
+    "is_dynamic": false,            // 정적 형상
+    "symbolic_dims": []             // 동적 형상용
+  },
+
+  // 데이터 타입 정보
+  "dtype": {
+    "base_type": "FLOAT16",
+    "quantization": null,           // 양자화 없음
+    "custom_format": null           // 사용자 정의 포맷 없음
+  },
+
+  // 메모리 레이아웃 정보
+  "memory": {
+    "strides": [150528, 50176, 224, 1],
+    "offset": 0,
+    "total_bytes": 9633792,         // 32×3×224×224×2
+    "alignment": 256,               // 256바이트 정렬
+    "is_contiguous": true,          // 연속 메모리
+    "padding": null                 // 패딩 없음
+  },
+
+  // 디바이스 정보
+  "device": {
+    "type": "GPU",
+    "id": 0,
+    "memory_type": "DEVICE",        // 디바이스 메모리
+    "is_pinned": false              // 고정 메모리 아님
+  },
+
+  // 메타데이터
+  "metadata": {
+    "name": "input_image_batch",
+    "semantic_type": "IMAGE_RGB",
+    "creation_time": "2025-12-25T10:30:00Z",
+    "checksum": "sha256:a3b2c1..."
+  }
+}</pre>
+
+        <h2>2.5 메모리 정렬 및 패딩</h2>
+        <p>현대 가속기는 최적의 성능을 위해 메모리 할당에 정렬 요구 사항을 부과합니다. WIA-AI-011은 모든 텐서 할당에 대해 최소 64바이트 정렬을 의무화하며, 많은 가속기는 256바이트 또는 그 이상을 권장합니다.</p>
+
+        <pre>// 메모리 정렬 예제
+// 정렬되지 않은 할당 (비효율적)
+uint8_t* buffer_unaligned = (uint8_t*)malloc(size);
+
+// 정렬된 할당 (효율적)
+uint8_t* buffer_aligned;
+size_t alignment = 256;  // WIA-AI-011 권장
+posix_memalign((void**)&buffer_aligned, alignment, size);
+
+// 정렬 확인
+assert((uintptr_t)buffer_aligned % alignment == 0);
+
+// 패딩을 포함한 실제 할당 크기 계산
+size_t padded_size = (size + alignment - 1) / alignment * alignment;</pre>
+
+        <p>정렬이 중요한 이유:</p>
+        <ul>
+            <li><strong>DMA 효율성:</strong> 많은 DMA 엔진이 정렬된 주소에서 더 빠르게 작동</li>
+            <li><strong>벡터화:</strong> SIMD 명령어는 정렬된 데이터에서 최적 성능 발휘</li>
+            <li><strong>캐시 라인:</strong> 정렬된 액세스는 캐시 라인 경계를 효율적으로 활용</li>
+            <li><strong>원자적 작업:</strong> 일부 원자적 작업은 정렬을 요구</li>
+        </ul>
+
+        <h2>2.6 제로카피 데이터 공유</h2>
+        <p>WIA-AI-011의 가장 중요한 성능 최적화 중 하나는 제로카피 데이터 공유입니다. 전통적인 접근 방식은 디바이스 간 또는 프레임워크 경계를 이동할 때 데이터 복사가 필요합니다. 제로카피 메커니즘은 기본 메모리 버퍼를 공유하여 이러한 복사를 제거합니다.</p>
+
+        <pre>// 제로카피 데이터 공유 예제
+
+// 1. 공유 메모리 할당
+wia_tensor_t* tensor = wia_create_tensor_shared(
+    shape, dtype, WIA_MEMORY_SHARED
+);
+
+// 2. 여러 디바이스에서 동일한 버퍼 참조
+wia_tensor_t* gpu0_view = wia_tensor_view(tensor, device0);
+wia_tensor_t* gpu1_view = wia_tensor_view(tensor, device1);
+
+// 3. 복사 없이 데이터 접근
+// GPU 0에서 계산
+wia_compute_on_device(gpu0_view, operation);
+
+// GPU 1에서 같은 데이터 사용 (복사 없음)
+wia_compute_on_device(gpu1_view, another_operation);
+
+// 4. 참조 카운팅으로 자동 메모리 관리
+wia_release_tensor(gpu0_view);  // 참조 카운트 감소
+wia_release_tensor(gpu1_view);  // 마지막 참조 해제 시 메모리 반환</pre>
+
+        <h2>2.7 동적 형상 처리</h2>
+        <p>많은 현대 신경망은 입력에 따라 달라지는 동적 형상을 가지고 있습니다. WIA-AI-011은 기호 차원을 통해 동적 형상을 지원합니다.</p>
+
+        <pre>// 동적 형상 예제 - 가변 배치 크기, 가변 시퀀스 길이
+{
+  "shape": {
+    "dimensions": ["batch_size", "seq_len", 768],
+    "symbolic_dims": {
+      "batch_size": {
+        "min": 1,
+        "max": 128,
+        "preferred": 32
+      },
+      "seq_len": {
+        "min": 1,
+        "max": 512,
+        "preferred": 128
+      }
+    },
+    "layout": "BSE"  // Batch, Sequence, Embedding
+  }
+}
+
+// 런타임에 실제 형상 바인딩
+wia_bind_symbolic_dim(tensor, "batch_size", 16);
+wia_bind_symbolic_dim(tensor, "seq_len", 256);
+
+// 바인딩 후 실제 형상: [16, 256, 768]</pre>
+
+        <h2>2.8 엔디안 및 크로스 플랫폼 호환성</h2>
+        <p>대부분의 현대 시스템이 리틀 엔디안 바이트 순서를 사용하지만 크로스 플랫폼 호환성을 보장하려면 명시적 사양이 필요합니다.</p>
+
+        <pre>// 엔디안 처리 예제
+{
+  "endianness": "little",  // 또는 "big"
+  "byte_order": [0, 1, 2, 3]  // 리틀 엔디안 FLOAT32
+}
+
+// 엔디안 변환 함수
+uint32_t swap_endian_32(uint32_t value) {
+    return ((value & 0xFF000000) >> 24) |
+           ((value & 0x00FF0000) >> 8)  |
+           ((value & 0x0000FF00) << 8)  |
+           ((value & 0x000000FF) << 24);
+}
+
+// 플랫폼 간 데이터 전송 시 자동 변환
+if (source_endian != target_endian) {
+    convert_endianness(buffer, size, dtype);
+}</pre>
+
+        <h2>2.9 희소 텐서 포맷</h2>
+        <p>많은 신경망 텐서는 대부분 0을 포함하는 희소합니다. 희소 텐서를 효율적으로 저장하려면 특수 포맷이 필요합니다. WIA-AI-011은 여러 희소 포맷을 지원합니다.</p>
+
+        <h3>2.9.1 COO (Coordinate) 포맷</h3>
+        <pre>// COO 포맷: 각 비영 요소의 좌표와 값 저장
+{
+  "format": "COO",
+  "shape": [1000, 1000],
+  "nnz": 50,  // 비영 요소 개수
+  "indices": [
+    [0, 5],    // (행, 열) 좌표
+    [0, 123],
+    [1, 7],
+    // ... 50개 좌표
+  ],
+  "values": [1.5, 2.3, 0.7, ...],  // 50개 값
+  "sparsity": 0.9999  // 99.99% 희소
+}</pre>
+
+        <h3>2.9.2 CSR (Compressed Sparse Row) 포맷</h3>
+        <pre>// CSR 포맷: 행별로 압축 저장 (행렬 곱셈에 효율적)
+{
+  "format": "CSR",
+  "shape": [1000, 1000],
+  "nnz": 50,
+  "row_ptr": [0, 2, 3, 3, 5, ...],  // 각 행의 시작 인덱스 (1001개)
+  "col_indices": [5, 123, 7, ...],   // 열 인덱스 (50개)
+  "values": [1.5, 2.3, 0.7, ...],    // 값 (50개)
+
+  // 메모리 절약: 50*12 bytes vs 1000*1000*4 bytes
+  // 압축률: 600 bytes / 4MB = 0.015%
+}</pre>
+
+        <h2>2.10 실용적 구현 고려 사항</h2>
+        <p>WIA-AI-011 텐서 포맷을 구현하려면 성능 검증, 이전 버전과의 호환성 및 버전 관리를 포함한 여러 실용적 문제에 주의를 기울여야 합니다.</p>
+
+        <h3>2.10.1 성능 벤치마킹</h3>
+        <pre>// 텐서 포맷 성능 벤치마크
+void benchmark_tensor_format() {
+    // NCHW vs NHWC 성능 비교
+    float nchw_time = benchmark_convolution(tensor_nchw);
+    float nhwc_time = benchmark_convolution(tensor_nhwc);
+
+    printf("NCHW: %.3f ms\n", nchw_time);
+    printf("NHWC: %.3f ms\n", nhwc_time);
+    printf("속도 향상: %.2fx\n", nhwc_time / nchw_time);
+
+    // 메모리 대역폭 측정
+    float bandwidth = measure_memory_bandwidth(tensor);
+    printf("메모리 대역폭: %.2f GB/s\n", bandwidth);
+}</pre>
+
+        <h3>2.10.2 호환성 레이어</h3>
+        <pre>// 레거시 포맷과의 호환성
+wia_tensor_t* convert_from_legacy(legacy_tensor_t* legacy) {
+    // 레거시 포맷 감지
+    LegacyFormat format = detect_legacy_format(legacy);
+
+    // WIA-AI-011 포맷으로 변환
+    wia_tensor_t* tensor = wia_create_tensor(...);
+    convert_layout(legacy->data, tensor->data, format);
+
+    return tensor;
+}
+
+// 자동 변환 캐싱으로 성능 최적화
+wia_tensor_t* get_or_convert(legacy_tensor_t* legacy) {
+    // 캐시 확인
+    if (cache_contains(legacy->id)) {
+        return cache_get(legacy->id);
+    }
+
+    // 변환 및 캐싱
+    wia_tensor_t* tensor = convert_from_legacy(legacy);
+    cache_put(legacy->id, tensor);
+    return tensor;
+}</pre>
+
+        <h3>2.10.3 버전 관리 및 진화</h3>
+        <pre>// 버전 호환성 처리
+{
+  "version": "WIA-AI-011-v1.2",
+  "compatible_versions": ["v1.0", "v1.1", "v1.2"],
+  "deprecated_features": ["old_layout_format"],
+  "new_features": ["bfloat16_support", "sparse_csr"]
+}
+
+// 버전별 로더
+wia_tensor_t* load_tensor_versioned(const char* data) {
+    Version version = parse_version(data);
+
+    switch (version) {
+        case V1_0: return load_v1_0(data);
+        case V1_1: return load_v1_1(data);
+        case V1_2: return load_v1_2(data);
+        default:
+            fprintf(stderr, "지원되지 않는 버전: %s\n", version);
+            return NULL;
+    }
+}</pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>텐서는 형상, 데이터 타입, 메모리 레이아웃, 스트라이드로 정의되며 AI 계산의 핵심</li>
+                <li>NCHW(채널 우선)와 NHWC(채널 마지막)는 서로 다른 하드웨어에 최적화된 주요 레이아웃</li>
+                <li>스트라이드 기반 표현은 패딩과 블로킹을 포함한 임의의 메모리 구성 가능</li>
+                <li>부동소수점(FLOAT64/32/16, BFLOAT16)과 정수(INT8/16/32) 타입이 정밀도-성능 트레이드오프 제공</li>
+                <li>양자화는 INT8 등 저정밀도 포맷으로 4배 메모리 절약과 계산 가속 달성</li>
+                <li>WIA-AI-011 텐서 디스크립터는 형상, 타입, 메모리, 디바이스 정보를 완전히 지정</li>
+                <li>최소 64바이트 메모리 정렬은 DMA 효율성, 벡터화, 캐시 성능에 필수적</li>
+                <li>제로카피 데이터 공유는 공유 메모리와 참조 카운팅으로 복사 오버헤드 제거</li>
+                <li>동적 형상은 기호 차원과 제약 조건으로 가변 입력 크기 지원</li>
+                <li>희소 텐서(COO, CSR)는 0이 많은 데이터를 효율적으로 저장하여 메모리 99% 이상 절약</li>
+                <li>실용적 구현은 성능 벤치마킹, 레거시 호환성, 버전 관리 포함</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>텐서를 정의하는 5가지 핵심 속성을 나열하고 각각이 왜 중요한지 설명하십시오.</li>
+                <li>NCHW와 NHWC 메모리 레이아웃의 차이점을 설명하십시오. cuDNN은 어느 것을 선호하며 그 이유는 무엇입니까?</li>
+                <li>스트라이드가 임의의 메모리 레이아웃 표현을 어떻게 가능하게 합니까? 형상 [2, 3, 4]에 대한 NCHW 레이아웃의 스트라이드를 계산하십시오.</li>
+                <li>FLOAT16과 BFLOAT16을 비교하십시오. 각각의 장단점은 무엇이며 어떤 상황에서 사용하겠습니까?</li>
+                <li>INT8 양자화에서 대칭(symmetric)과 비대칭(asymmetric) 방식의 차이를 공식과 함께 설명하십시오.</li>
+                <li>메모리 정렬이 가속기 성능에 중요한 이유 4가지를 설명하십시오. WIA-AI-011의 최소 정렬 요구 사항은?</li>
+                <li>제로카피 데이터 공유 메커니즘을 설명하고 참조 카운팅이 어떻게 메모리를 안전하게 관리하는지 서술하십시오.</li>
+                <li>동적 텐서 형상이란 무엇입니까? 기호 차원(symbolic dimensions)을 사용하여 가변 배치 크기를 표현하는 예를 작성하십시오.</li>
+                <li>COO와 CSR 희소 텐서 포맷의 차이점을 설명하십시오. 각각을 언제 선택하는 것이 적합합니까?</li>
+                <li>형상 [1000, 1000]에 50개의 비영 요소를 가진 희소 행렬의 메모리 절약량을 FLOAT32 기준으로 계산하십시오.</li>
+                <li>WIA-AI-011 텐서 디스크립터의 주요 섹션들을 나열하고 각 섹션이 포함하는 정보를 설명하십시오.</li>
+                <li>크로스 플랫폼 호환성을 위해 텐서 디스크립터에 엔디안 정보를 포함해야 하는 이유를 리틀 엔디안과 빅 엔디안의 차이와 함께 설명하십시오.</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+            <span style="font-size: 0.9em; color: #6b7280;">WIA-AI-011 표준을 통해 모든 AI 개발자에게 이로움을 제공합니다</span>
+        </div>
+    </div>
+</body>
+</html>

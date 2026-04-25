@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 프로토콜 사양 및 통신 | WIA-SOCIAL</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --primary: #EC4899;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --success: #10b981;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { padding: 0; }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--text-secondary); }
+        .philosophy { color: var(--primary); font-size: 1.2rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">제5장</p>
+        <h1>프로토콜 사양 및 통신</h1>
+
+        <h2>5.1 네트워크 프로토콜 스택</h2>
+
+        <p>
+            WIA-SOCIAL 공공문서 시스템은 안전하고 신뢰할 수 있는 문서 교환을 위해 다계층 네트워크 프로토콜 스택을 사용합니다. 각 계층은 특정한 책임을 가지며, 하위 계층의 서비스를 사용하여 상위 계층에 추상화된 인터페이스를 제공합니다.
+        </p>
+
+        <h3>프로토콜 스택 계층</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>계층</th>
+                    <th>프로토콜</th>
+                    <th>역할</th>
+                    <th>보안 기능</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>응용 계층</td>
+                    <td>HTTPS, WebSocket</td>
+                    <td>API 요청/응답, 실시간 알림</td>
+                    <td>TLS 1.3 암호화, 인증서 검증</td>
+                </tr>
+                <tr>
+                    <td>표현 계층</td>
+                    <td>JSON, XML, PDF/A</td>
+                    <td>데이터 직렬화/역직렬화</td>
+                    <td>스키마 검증, 디지털 서명</td>
+                </tr>
+                <tr>
+                    <td>세션 계층</td>
+                    <td>OAuth 2.0, JWT</td>
+                    <td>인증 세션 관리</td>
+                    <td>토큰 기반 인증, 세션 암호화</td>
+                </tr>
+                <tr>
+                    <td>전송 계층</td>
+                    <td>TCP, QUIC</td>
+                    <td>신뢰성 있는 데이터 전송</td>
+                    <td>흐름 제어, 혼잡 제어</td>
+                </tr>
+                <tr>
+                    <td>네트워크 계층</td>
+                    <td>IPv4, IPv6</td>
+                    <td>패킷 라우팅</td>
+                    <td>IPsec (선택적)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>5.2 메시지 형식 및 구조</h2>
+
+        <p>
+            문서 교환 시 사용되는 메시지는 헤더, 페이로드, 메타데이터로 구성됩니다. 메시지 형식은 JSON 기반이며, 필요시 이진 형식(Protocol Buffers)으로 변환 가능합니다.
+        </p>
+
+        <h3>표준 메시지 구조</h3>
+
+        <pre><code>{
+  "messageId": "MSG-2025-01-15-ABC123",
+  "messageType": "DOCUMENT_TRANSFER",
+  "version": "1.0",
+  "timestamp": "2025-01-15T10:30:00Z",
+  "sender": {
+    "authorityId": "KR-SEOUL-GOV",
+    "systemId": "SEOUL-DOC-SYSTEM-01",
+    "officerId": "officer-12345"
+  },
+  "receiver": {
+    "authorityId": "KR-BUSAN-GOV",
+    "systemId": "BUSAN-DOC-SYSTEM-02"
+  },
+  "payload": {
+    "documents": [
+      {
+        "documentId": "WIA-DOC-2025-0123456789",
+        "documentType": "BIRTH_CERTIFICATE",
+        "transferReason": "RELOCATION",
+        "encryptedData": "base64_encrypted_document...",
+        "encryptionMethod": "AES-256-GCM",
+        "encryptedKey": "rsa_encrypted_aes_key..."
+      }
+    ]
+  },
+  "metadata": {
+    "priority": "NORMAL",
+    "requiresAcknowledgment": true,
+    "expiresAt": "2025-01-15T11:30:00Z",
+    "correlationId": "CORR-2025-01-15-XYZ789"
+  },
+  "signature": {
+    "algorithm": "RS256",
+    "value": "base64_signature...",
+    "certificateChain": ["cert1", "cert2", "root"]
+  }
+}</code></pre>
+
+        <h3>메시지 유형 및 사용 사례</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>메시지 유형</th>
+                    <th>목적</th>
+                    <th>주요 페이로드</th>
+                    <th>응답 필요</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>DOCUMENT_TRANSFER</strong></td>
+                    <td>기관 간 문서 전송</td>
+                    <td>문서 데이터, 암호화 키</td>
+                    <td>필수 (ACK)</td>
+                </tr>
+                <tr>
+                    <td><strong>VERIFICATION_REQUEST</strong></td>
+                    <td>문서 진위 확인 요청</td>
+                    <td>문서 ID, 검증 수준</td>
+                    <td>필수 (결과)</td>
+                </tr>
+                <tr>
+                    <td><strong>VERIFICATION_RESPONSE</strong></td>
+                    <td>검증 결과 반환</td>
+                    <td>검증 상태, 신뢰도</td>
+                    <td>선택 (ACK)</td>
+                </tr>
+                <tr>
+                    <td><strong>STATUS_UPDATE</strong></td>
+                    <td>문서 상태 변경 알림</td>
+                    <td>새 상태, 변경 사유</td>
+                    <td>선택</td>
+                </tr>
+                <tr>
+                    <td><strong>REVOCATION_NOTICE</strong></td>
+                    <td>문서 무효화 통지</td>
+                    <td>문서 ID, 무효화 사유</td>
+                    <td>필수 (ACK)</td>
+                </tr>
+                <tr>
+                    <td><strong>SYNC_REQUEST</strong></td>
+                    <td>데이터 동기화 요청</td>
+                    <td>동기화 범위, 타임스탬프</td>
+                    <td>필수 (데이터)</td>
+                </tr>
+                <tr>
+                    <td><strong>ACKNOWLEDGMENT</strong></td>
+                    <td>메시지 수신 확인</td>
+                    <td>원본 메시지 ID, 처리 상태</td>
+                    <td>선택</td>
+                </tr>
+                <tr>
+                    <td><strong>ERROR_REPORT</strong></td>
+                    <td>처리 오류 보고</td>
+                    <td>오류 코드, 오류 상세 정보</td>
+                    <td>선택</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>5.3 동기화 메커니즘</h2>
+
+        <p>
+            여러 정부 기관 간의 문서 데이터 동기화는 일관성, 정확성, 실시간성을 보장해야 합니다. WIA-SOCIAL은 Event Sourcing과 CQRS 패턴을 사용하여 분산 시스템 간 동기화를 구현합니다.
+        </p>
+
+        <h3>이벤트 주도 동기화</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>이벤트 타입</th>
+                    <th>발생 시점</th>
+                    <th>전파 대상</th>
+                    <th>우선순위</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>DOCUMENT_CREATED</td>
+                    <td>새 문서 발급</td>
+                    <td>중앙 저장소, 백업 시스템</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td>DOCUMENT_UPDATED</td>
+                    <td>문서 정보 수정</td>
+                    <td>모든 구독 기관</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>DOCUMENT_REVOKED</td>
+                    <td>문서 취소/무효화</td>
+                    <td>모든 검증 노드</td>
+                    <td>긴급</td>
+                </tr>
+                <tr>
+                    <td>DOCUMENT_EXPIRED</td>
+                    <td>문서 만료</td>
+                    <td>발급 기관, 소유자</td>
+                    <td>낮음</td>
+                </tr>
+                <tr>
+                    <td>VERIFICATION_REQUESTED</td>
+                    <td>제3자 검증 요청</td>
+                    <td>발급 기관</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>ACCESS_GRANTED</td>
+                    <td>문서 접근 권한 부여</td>
+                    <td>감사 시스템</td>
+                    <td>낮음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>이벤트 스트리밍 구현 (Kafka)</h3>
+
+        <pre><code>// Kafka Producer 설정
+const kafka = new Kafka({
+  clientId: 'wia-document-system',
+  brokers: ['kafka1.wia.org:9092', 'kafka2.wia.org:9092']
+});
+
+const producer = kafka.producer();
+
+// 문서 생성 이벤트 발행
+async function publishDocumentCreated(document: Document) {
+  await producer.connect();
+
+  const event = {
+    eventId: generateUUID(),
+    eventType: 'DOCUMENT_CREATED',
+    timestamp: new Date().toISOString(),
+    aggregateId: document.documentId,
+    aggregateType: 'Document',
+    version: 1,
+    data: {
+      documentId: document.documentId,
+      documentType: document.documentType,
+      issuingAuthority: document.issuingAuthority,
+      subjectId: document.subject.id,
+      issueDate: document.issueDate
+    },
+    metadata: {
+      userId: getCurrentUser().id,
+      ipAddress: getClientIP(),
+      userAgent: getUserAgent()
+    }
+  };
+
+  await producer.send({
+    topic: 'document-events',
+    messages: [
+      {
+        key: document.documentId,
+        value: JSON.stringify(event),
+        headers: {
+          'event-type': 'DOCUMENT_CREATED',
+          'content-type': 'application/json'
+        }
+      }
+    ]
+  });
+
+  await producer.disconnect();
+}
+
+// Kafka Consumer 설정
+const consumer = kafka.consumer({ groupId: 'document-sync-group' });
+
+async function consumeDocumentEvents() {
+  await consumer.connect();
+  await consumer.subscribe({
+    topic: 'document-events',
+    fromBeginning: false
+  });
+
+  await consumer.run({
+    eachMessage: async ({ topic, partition, message }) => {
+      const event = JSON.parse(message.value.toString());
+
+      switch (event.eventType) {
+        case 'DOCUMENT_CREATED':
+          await handleDocumentCreated(event);
+          break;
+        case 'DOCUMENT_REVOKED':
+          await handleDocumentRevoked(event);
+          break;
+        case 'DOCUMENT_UPDATED':
+          await handleDocumentUpdated(event);
+          break;
+      }
+    }
+  });
+}
+
+async function handleDocumentCreated(event: any) {
+  // 로컬 데이터베이스에 문서 정보 동기화
+  await db.documents.create({
+    documentId: event.data.documentId,
+    documentType: event.data.documentType,
+    issuingAuthority: event.data.issuingAuthority,
+    syncedAt: new Date()
+  });
+
+  // 검색 인덱스 업데이트
+  await searchIndex.addDocument(event.data);
+
+  // 관련 기관에 알림
+  await notifyInterestedParties(event);
+}
+</code></pre>
+
+        <h2>5.4 분산 문서 저장소</h2>
+
+        <p>
+            공공문서는 단일 장애점을 방지하고 높은 가용성을 보장하기 위해 분산 저장소에 보관됩니다. WIA-SOCIAL은 IPFS (InterPlanetary File System)와 분산 데이터베이스를 결합하여 사용합니다.
+        </p>
+
+        <h3>IPFS 기반 문서 저장</h3>
+
+        <pre><code>import { create } from 'ipfs-http-client';
+import { CID } from 'multiformats/cid';
+
+class IPFSDocumentStorage {
+  private ipfs: any;
+
+  constructor() {
+    this.ipfs = create({
+      host: 'ipfs.wia.org',
+      port: 5001,
+      protocol: 'https'
+    });
+  }
+
+  async storeDocument(documentData: any): Promise<string> {
+    // 문서를 JSON으로 직렬화
+    const documentJson = JSON.stringify(documentData);
+
+    // IPFS에 문서 저장
+    const { cid } = await this.ipfs.add(documentJson, {
+      pin: true,  // 영구 보관
+      wrapWithDirectory: false
+    });
+
+    // CID (Content Identifier) 반환
+    return cid.toString();
+  }
+
+  async retrieveDocument(cid: string): Promise<any> {
+    // IPFS에서 문서 조회
+    const chunks = [];
+    for await (const chunk of this.ipfs.cat(cid)) {
+      chunks.push(chunk);
+    }
+
+    const documentJson = Buffer.concat(chunks).toString('utf8');
+    return JSON.parse(documentJson);
+  }
+
+  async pinDocument(cid: string): Promise<void> {
+    // 문서를 영구 보관 목록에 추가
+    await this.ipfs.pin.add(cid);
+  }
+
+  async getDocumentStats(cid: string): Promise<any> {
+    // 문서 통계 조회 (크기, 블록 수 등)
+    return await this.ipfs.object.stat(cid);
+  }
+}
+
+// 사용 예시
+const storage = new IPFSDocumentStorage();
+
+// 문서 저장
+const cid = await storage.storeDocument({
+  documentId: 'WIA-DOC-2025-0123456789',
+  documentType: 'BIRTH_CERTIFICATE',
+  data: { /* 문서 데이터 */ }
+});
+
+console.log('문서가 IPFS에 저장됨:', cid);
+// 출력: QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG
+
+// 문서 조회
+const document = await storage.retrieveDocument(cid);
+</code></pre>
+
+        <h2>5.5 블록체인 통합</h2>
+
+        <p>
+            문서의 발급, 수정, 검증 이력을 불변의 방식으로 기록하기 위해 블록체인 기술을 사용합니다. WIA-SOCIAL은 Hyperledger Fabric 또는 Ethereum을 사용하여 감사 추적 시스템을 구현합니다.
+        </p>
+
+        <h3>스마트 컨트랙트 예시 (Solidity)</h3>
+
+        <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract PublicDocumentRegistry {
+    struct DocumentRecord {
+        string documentId;
+        string documentType;
+        address issuingAuthority;
+        bytes32 documentHash;
+        uint256 issueTimestamp;
+        bool isRevoked;
+        string ipfsCID;
+    }
+
+    mapping(string => DocumentRecord) private documents;
+    mapping(address => bool) private authorizedAuthorities;
+
+    event DocumentIssued(
+        string indexed documentId,
+        string documentType,
+        address indexed issuingAuthority,
+        uint256 timestamp
+    );
+
+    event DocumentRevoked(
+        string indexed documentId,
+        address indexed revokedBy,
+        uint256 timestamp
+    );
+
+    event DocumentVerified(
+        string indexed documentId,
+        address indexed verifier,
+        bool isValid,
+        uint256 timestamp
+    );
+
+    modifier onlyAuthorizedAuthority() {
+        require(
+            authorizedAuthorities[msg.sender],
+            "Not an authorized authority"
+        );
+        _;
+    }
+
+    constructor() {
+        // 관리자는 권한이 있는 발급 기관
+        authorizedAuthorities[msg.sender] = true;
+    }
+
+    function registerDocument(
+        string memory _documentId,
+        string memory _documentType,
+        bytes32 _documentHash,
+        string memory _ipfsCID
+    ) public onlyAuthorizedAuthority {
+        require(
+            bytes(documents[_documentId].documentId).length == 0,
+            "Document already exists"
+        );
+
+        documents[_documentId] = DocumentRecord({
+            documentId: _documentId,
+            documentType: _documentType,
+            issuingAuthority: msg.sender,
+            documentHash: _documentHash,
+            issueTimestamp: block.timestamp,
+            isRevoked: false,
+            ipfsCID: _ipfsCID
+        });
+
+        emit DocumentIssued(
+            _documentId,
+            _documentType,
+            msg.sender,
+            block.timestamp
+        );
+    }
+
+    function revokeDocument(string memory _documentId)
+        public
+        onlyAuthorizedAuthority
+    {
+        DocumentRecord storage doc = documents[_documentId];
+        require(
+            bytes(doc.documentId).length > 0,
+            "Document does not exist"
+        );
+        require(!doc.isRevoked, "Document already revoked");
+        require(
+            doc.issuingAuthority == msg.sender,
+            "Only issuing authority can revoke"
+        );
+
+        doc.isRevoked = true;
+
+        emit DocumentRevoked(_documentId, msg.sender, block.timestamp);
+    }
+
+    function verifyDocument(
+        string memory _documentId,
+        bytes32 _documentHash
+    ) public returns (bool) {
+        DocumentRecord memory doc = documents[_documentId];
+
+        bool isValid = bytes(doc.documentId).length > 0 &&
+            !doc.isRevoked &&
+            doc.documentHash == _documentHash;
+
+        emit DocumentVerified(
+            _documentId,
+            msg.sender,
+            isValid,
+            block.timestamp
+        );
+
+        return isValid;
+    }
+
+    function getDocument(string memory _documentId)
+        public
+        view
+        returns (
+            string memory documentType,
+            address issuingAuthority,
+            bytes32 documentHash,
+            uint256 issueTimestamp,
+            bool isRevoked,
+            string memory ipfsCID
+        )
+    {
+        DocumentRecord memory doc = documents[_documentId];
+        require(
+            bytes(doc.documentId).length > 0,
+            "Document does not exist"
+        );
+
+        return (
+            doc.documentType,
+            doc.issuingAuthority,
+            doc.documentHash,
+            doc.issueTimestamp,
+            doc.isRevoked,
+            doc.ipfsCID
+        );
+    }
+
+    function addAuthorizedAuthority(address _authority)
+        public
+        onlyAuthorizedAuthority
+    {
+        authorizedAuthorities[_authority] = true;
+    }
+}
+</code></pre>
+
+        <h2>5.6 실시간 통신 (WebSocket)</h2>
+
+        <p>
+            문서 상태 변경, 검증 요청 등의 실시간 알림을 위해 WebSocket 프로토콜을 사용합니다.
+        </p>
+
+        <h3>WebSocket 서버 구현 (Node.js)</h3>
+
+        <pre><code>import WebSocket from 'ws';
+import jwt from 'jsonwebtoken';
+
+const wss = new WebSocket.Server({ port: 8080 });
+
+// 클라이언트 연결 관리
+const clients = new Map<string, WebSocket>();
+
+wss.on('connection', (ws: WebSocket, req) => {
+  // 인증 토큰 검증
+  const token = req.headers['sec-websocket-protocol'];
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = payload.sub;
+
+    clients.set(userId, ws);
+
+    // 연결 확인 메시지
+    ws.send(JSON.stringify({
+      type: 'CONNECTION_ESTABLISHED',
+      userId: userId,
+      timestamp: new Date().toISOString()
+    }));
+
+    // 메시지 수신 처리
+    ws.on('message', (message: string) => {
+      const data = JSON.parse(message);
+      handleClientMessage(userId, data);
+    });
+
+    // 연결 종료 처리
+    ws.on('close', () => {
+      clients.delete(userId);
+      console.log(`Client ${userId} disconnected`);
+    });
+
+  } catch (error) {
+    ws.close(1008, 'Authentication failed');
+  }
+});
+
+// 문서 상태 변경 알림
+function notifyDocumentStatusChange(
+  documentId: string,
+  newStatus: string,
+  affectedUsers: string[]
+) {
+  const notification = {
+    type: 'DOCUMENT_STATUS_CHANGED',
+    documentId: documentId,
+    newStatus: newStatus,
+    timestamp: new Date().toISOString()
+  };
+
+  affectedUsers.forEach(userId => {
+    const client = clients.get(userId);
+    if (client && client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(notification));
+    }
+  });
+}
+
+// 검증 요청 알림
+function notifyVerificationRequest(
+  documentId: string,
+  requesterId: string,
+  issuingAuthorityId: string
+) {
+  // 발급 기관의 모든 연결된 담당자에게 알림
+  const notification = {
+    type: 'VERIFICATION_REQUEST',
+    documentId: documentId,
+    requesterId: requesterId,
+    timestamp: new Date().toISOString()
+  };
+
+  // 발급 기관 담당자들에게 전송
+  // (실제로는 데이터베이스에서 담당자 목록 조회)
+  broadcastToAuthority(issuingAuthorityId, notification);
+}
+</code></pre>
+
+        <h2>요약</h2>
+
+        <p>
+            이 장에서는 공공문서 시스템의 통신 프로토콜과 분산 아키텍처를 살펴보았습니다. 이벤트 주도 동기화, IPFS 기반 분산 저장소, 블록체인 감사 추적, WebSocket 실시간 통신 등을 통해 안전하고 신뢰할 수 있는 문서 교환 인프라를 구축할 수 있습니다. 다음 장에서는 보안 및 암호화 검증 메커니즘을 자세히 다룹니다.
+        </p>
+
+        <div class="info-box">
+            <h3>🤔 복습 질문</h3>
+            <ol>
+                <li>Event Sourcing과 CQRS 패턴이 문서 동기화에서 어떤 이점을 제공하나요?</li>
+                <li>IPFS의 Content Addressing이 전통적인 Location Addressing과 어떻게 다른가요?</li>
+                <li>블록체인을 사용하여 문서 이력을 기록할 때의 장단점을 설명하세요.</li>
+                <li>Kafka와 같은 메시지 큐가 분산 시스템에서 필요한 이유는 무엇인가요?</li>
+                <li>WebSocket이 HTTP보다 실시간 알림에 적합한 이유를 설명하세요.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

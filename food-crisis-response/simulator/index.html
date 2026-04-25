@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 WIA Food Crisis Response Simulator</title>
+    <style>
+        :root {
+            --primary: #84CC16;
+            --primary-dark: #65A30D;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2rem; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        .tab:hover { border-color: var(--primary); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Content */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .card {
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .card h2 { margin-bottom: 20px; color: var(--primary); }
+        .card h3 { margin: 20px 0 10px; color: var(--text); font-size: 1.1rem; }
+
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        textarea { min-height: 100px; font-family: monospace; }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 20px 10px 10px 0;
+            transition: all 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(132, 204, 22, 0.3); }
+
+        .result {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-top: 20px;
+            min-height: 100px;
+        }
+        pre {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+        .lang-switch {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+            z-index: 1000;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .crisis-card {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--danger);
+            margin: 10px 0;
+        }
+        .crisis-card.warning { border-left-color: var(--warning); }
+        .crisis-card.safe { border-left-color: var(--success); }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .metric:last-child { border-bottom: none; }
+        .metric-label { color: var(--text-muted); }
+        .metric-value { font-weight: bold; color: var(--primary); }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 1px solid;
+        }
+        .alert.danger { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); color: var(--danger); }
+        .alert.warning { background: rgba(245, 158, 11, 0.1); border-color: var(--warning); color: var(--warning); }
+        .alert.success { background: rgba(16, 185, 129, 0.1); border-color: var(--success); color: var(--success); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-critical { background: var(--danger); color: white; }
+        .status-warning { background: var(--warning); color: white; }
+        .status-stable { background: var(--success); color: white; }
+
+        footer {
+            margin-top: 60px;
+            padding: 30px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Food Crisis Response</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="lang-switch">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('ko')">KO</button>
+    </div>
+
+    <div class="container">
+        <h1 data-en="🚨 WIA Food Crisis Response Simulator" data-ko="🚨 WIA 식량 위기 대응 시뮬레이터">🚨 WIA Food Crisis Response Simulator</h1>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('overview')" data-en="📊 Overview" data-ko="📊 개요">📊 Overview</div>
+            <div class="tab" onclick="switchTab('data')" data-en="📋 Data Input" data-ko="📋 데이터 입력">📋 Data Input</div>
+            <div class="tab" onclick="switchTab('api')" data-en="🔌 API Test" data-ko="🔌 API 테스트">🔌 API Test</div>
+            <div class="tab" onclick="switchTab('protocol')" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="switchTab('integration')" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+        </div>
+
+        <!-- Tab 1: Overview -->
+        <div id="overview" class="tab-content active">
+            <div class="card">
+                <h2 data-en="Food Crisis Response System Overview" data-ko="식량 위기 대응 시스템 개요">Food Crisis Response System Overview</h2>
+
+                <p data-en="The WIA-AGRI-030 standard provides a comprehensive framework for managing food crises through standardized data formats, real-time monitoring, and coordinated response protocols." data-ko="WIA-AGRI-030 표준은 표준화된 데이터 형식, 실시간 모니터링, 조정된 대응 프로토콜을 통한 식량 위기 관리를 위한 포괄적인 프레임워크를 제공합니다.">The WIA-AGRI-030 standard provides a comprehensive framework for managing food crises through standardized data formats, real-time monitoring, and coordinated response protocols.</p>
+
+                <h3 data-en="Key Features" data-ko="주요 기능">Key Features</h3>
+                <div class="grid">
+                    <div class="crisis-card safe">
+                        <h4>🎯 <span data-en="Real-time Monitoring" data-ko="실시간 모니터링">Real-time Monitoring</span></h4>
+                        <p data-en="Track food security indicators across regions" data-ko="지역별 식량 안보 지표 추적">Track food security indicators across regions</p>
+                    </div>
+                    <div class="crisis-card safe">
+                        <h4>🚨 <span data-en="Early Warning System" data-ko="조기 경보 시스템">Early Warning System</span></h4>
+                        <p data-en="AI-powered crisis prediction and alerts" data-ko="AI 기반 위기 예측 및 경보">AI-powered crisis prediction and alerts</p>
+                    </div>
+                    <div class="crisis-card safe">
+                        <h4>📦 <span data-en="Supply Chain Coordination" data-ko="공급망 조정">Supply Chain Coordination</span></h4>
+                        <p data-en="Optimize resource allocation and distribution" data-ko="자원 할당 및 분배 최적화">Optimize resource allocation and distribution</p>
+                    </div>
+                    <div class="crisis-card safe">
+                        <h4>🤝 <span data-en="Multi-stakeholder Integration" data-ko="다자간 통합">Multi-stakeholder Integration</span></h4>
+                        <p data-en="Connect governments, NGOs, and local communities" data-ko="정부, NGO, 지역사회 연결">Connect governments, NGOs, and local communities</p>
+                    </div>
+                </div>
+
+                <h3 data-en="Crisis Severity Levels" data-ko="위기 심각도 수준">Crisis Severity Levels</h3>
+                <div class="metric">
+                    <span class="metric-label">Level 1:</span>
+                    <span class="status-badge status-stable" data-en="Stable" data-ko="안정">Stable</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Level 2:</span>
+                    <span class="status-badge status-warning" data-en="Moderate Risk" data-ko="중간 위험">Moderate Risk</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Level 3:</span>
+                    <span class="status-badge status-critical" data-en="Critical Emergency" data-ko="긴급 위기">Critical Emergency</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Data Input -->
+        <div id="data" class="tab-content">
+            <div class="card">
+                <h2 data-en="Crisis Data Generator" data-ko="위기 데이터 생성기">Crisis Data Generator</h2>
+
+                <label data-en="Region/Country" data-ko="지역/국가">Region/Country</label>
+                <input type="text" id="region" value="East Africa">
+
+                <label data-en="Population Affected (millions)" data-ko="영향받는 인구 (백만)">Population Affected (millions)</label>
+                <input type="number" id="population" value="5.2" step="0.1">
+
+                <label data-en="Food Security Level" data-ko="식량 안보 수준">Food Security Level</label>
+                <select id="securityLevel">
+                    <option value="1">Level 1 - Stable</option>
+                    <option value="2" selected>Level 2 - Moderate Risk</option>
+                    <option value="3">Level 3 - Critical Emergency</option>
+                </select>
+
+                <label data-en="Primary Crisis Type" data-ko="주요 위기 유형">Primary Crisis Type</label>
+                <select id="crisisType">
+                    <option value="drought">Drought</option>
+                    <option value="flood">Flood</option>
+                    <option value="conflict">Conflict</option>
+                    <option value="economic">Economic Collapse</option>
+                    <option value="pest">Pest Outbreak</option>
+                    <option value="supply">Supply Chain Disruption</option>
+                </select>
+
+                <label data-en="Duration (months)" data-ko="기간 (개월)">Duration (months)</label>
+                <input type="number" id="duration" value="6" min="1">
+
+                <label data-en="Food Reserves (metric tons)" data-ko="식량 비축량 (메트릭톤)">Food Reserves (metric tons)</label>
+                <input type="number" id="reserves" value="25000" step="1000">
+
+                <button onclick="generateCrisisData()" data-en="Generate Crisis Report" data-ko="위기 보고서 생성">Generate Crisis Report</button>
+
+                <div class="result" id="crisisResult"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: API Test -->
+        <div id="api" class="tab-content">
+            <div class="card">
+                <h2 data-en="Food Crisis Response API" data-ko="식량 위기 대응 API">Food Crisis Response API</h2>
+
+                <h3 data-en="1. Report Crisis Event" data-ko="1. 위기 사건 보고">1. Report Crisis Event</h3>
+                <pre>POST /api/v1/crisis/report
+Content-Type: application/json
+
+{
+  "region": "string",
+  "severity": 1-3,
+  "type": "drought|flood|conflict|economic|pest|supply",
+  "affectedPopulation": number,
+  "timestamp": "ISO-8601"
+}</pre>
+                <button onclick="testReportAPI()" data-en="Test Report API" data-ko="보고 API 테스트">Test Report API</button>
+
+                <h3 data-en="2. Request Emergency Aid" data-ko="2. 긴급 지원 요청">2. Request Emergency Aid</h3>
+                <pre>POST /api/v1/aid/request
+Content-Type: application/json
+
+{
+  "crisisId": "string",
+  "resources": ["food", "water", "medical"],
+  "quantity": number,
+  "urgency": "low|medium|high|critical"
+}</pre>
+                <button onclick="testAidAPI()" data-en="Test Aid Request API" data-ko="지원 요청 API 테스트">Test Aid Request API</button>
+
+                <h3 data-en="3. Track Supply Distribution" data-ko="3. 공급 분배 추적">3. Track Supply Distribution</h3>
+                <pre>GET /api/v1/distribution/{crisisId}
+
+Response: {
+  "status": "in-transit|delivered|delayed",
+  "location": { "lat": number, "lng": number },
+  "eta": "ISO-8601",
+  "items": [...]
+}</pre>
+                <button onclick="testTrackingAPI()" data-en="Test Tracking API" data-ko="추적 API 테스트">Test Tracking API</button>
+
+                <div class="result" id="apiResult"></div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Protocol -->
+        <div id="protocol" class="tab-content">
+            <div class="card">
+                <h2 data-en="Crisis Response Protocol" data-ko="위기 대응 프로토콜">Crisis Response Protocol</h2>
+
+                <h3 data-en="Response Workflow" data-ko="대응 워크플로우">Response Workflow</h3>
+
+                <div class="alert warning">
+                    <strong data-en="Phase 1: Detection & Assessment (0-24 hours)" data-ko="1단계: 감지 및 평가 (0-24시간)">Phase 1: Detection & Assessment (0-24 hours)</strong>
+                    <ul>
+                        <li data-en="Automated monitoring systems detect anomalies" data-ko="자동 모니터링 시스템이 이상 감지">Automated monitoring systems detect anomalies</li>
+                        <li data-en="AI assesses crisis severity and impact" data-ko="AI가 위기 심각도 및 영향 평가">AI assesses crisis severity and impact</li>
+                        <li data-en="Stakeholders are automatically notified" data-ko="이해관계자에게 자동 통보">Stakeholders are automatically notified</li>
+                    </ul>
+                </div>
+
+                <div class="alert warning">
+                    <strong data-en="Phase 2: Mobilization (24-72 hours)" data-ko="2단계: 동원 (24-72시간)">Phase 2: Mobilization (24-72 hours)</strong>
+                    <ul>
+                        <li data-en="Emergency response teams activated" data-ko="비상 대응팀 활성화">Emergency response teams activated</li>
+                        <li data-en="Resource allocation optimized via AI" data-ko="AI를 통한 자원 할당 최적화">Resource allocation optimized via AI</li>
+                        <li data-en="Supply chains coordinated across borders" data-ko="국경 간 공급망 조정">Supply chains coordinated across borders</li>
+                    </ul>
+                </div>
+
+                <div class="alert success">
+                    <strong data-en="Phase 3: Distribution (3-30 days)" data-ko="3단계: 분배 (3-30일)">Phase 3: Distribution (3-30 days)</strong>
+                    <ul>
+                        <li data-en="Real-time tracking of aid delivery" data-ko="지원 배송 실시간 추적">Real-time tracking of aid delivery</li>
+                        <li data-en="Blockchain-verified distribution records" data-ko="블록체인 검증 분배 기록">Blockchain-verified distribution records</li>
+                        <li data-en="Continuous needs assessment and adjustment" data-ko="지속적인 수요 평가 및 조정">Continuous needs assessment and adjustment</li>
+                    </ul>
+                </div>
+
+                <div class="alert success">
+                    <strong data-en="Phase 4: Recovery & Prevention (30+ days)" data-ko="4단계: 복구 및 예방 (30일 이상)">Phase 4: Recovery & Prevention (30+ days)</strong>
+                    <ul>
+                        <li data-en="Rebuild local food production capacity" data-ko="지역 식량 생산 능력 재건">Rebuild local food production capacity</li>
+                        <li data-en="Implement preventive measures" data-ko="예방 조치 시행">Implement preventive measures</li>
+                        <li data-en="Update crisis models with lessons learned" data-ko="학습된 교훈으로 위기 모델 업데이트">Update crisis models with lessons learned</li>
+                    </ul>
+                </div>
+
+                <button onclick="generateProtocol()" data-en="Generate Custom Protocol" data-ko="맞춤형 프로토콜 생성">Generate Custom Protocol</button>
+                <div class="result" id="protocolResult"></div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Integration -->
+        <div id="integration" class="tab-content">
+            <div class="card">
+                <h2 data-en="System Integration" data-ko="시스템 통합">System Integration</h2>
+
+                <h3 data-en="Compatible Systems" data-ko="호환 시스템">Compatible Systems</h3>
+
+                <div class="grid">
+                    <div class="crisis-card safe">
+                        <h4>🌾 <span data-en="WIA-AGRI Standards" data-ko="WIA-AGRI 표준">WIA-AGRI Standards</span></h4>
+                        <ul>
+                            <li>WIA-AGRI-001 Smart Farm</li>
+                            <li>WIA-AGRI-015 Food Traceability</li>
+                            <li>WIA-AGRI-021 Agricultural Supply Chain</li>
+                        </ul>
+                    </div>
+                    <div class="crisis-card safe">
+                        <h4>🏛️ <span data-en="Government Systems" data-ko="정부 시스템">Government Systems</span></h4>
+                        <ul>
+                            <li data-en="National Food Reserve Management" data-ko="국가 식량 비축 관리">National Food Reserve Management</li>
+                            <li data-en="Disaster Response Coordination" data-ko="재난 대응 조정">Disaster Response Coordination</li>
+                            <li data-en="Agricultural Policy Planning" data-ko="농업 정책 계획">Agricultural Policy Planning</li>
+                        </ul>
+                    </div>
+                    <div class="crisis-card safe">
+                        <h4>🌍 <span data-en="International Organizations" data-ko="국제 기구">International Organizations</span></h4>
+                        <ul>
+                            <li>UN World Food Programme (WFP)</li>
+                            <li>Food and Agriculture Organization (FAO)</li>
+                            <li>World Health Organization (WHO)</li>
+                        </ul>
+                    </div>
+                    <div class="crisis-card safe">
+                        <h4>📡 <span data-en="Data Sources" data-ko="데이터 소스">Data Sources</span></h4>
+                        <ul>
+                            <li data-en="Satellite Imagery (Crop Monitoring)" data-ko="위성 이미지 (작물 모니터링)">Satellite Imagery (Crop Monitoring)</li>
+                            <li data-en="Weather & Climate Data" data-ko="기상 및 기후 데이터">Weather & Climate Data</li>
+                            <li data-en="Market Price Information" data-ko="시장 가격 정보">Market Price Information</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3 data-en="Integration Example: Connect to WFP" data-ko="통합 예제: WFP 연결">Integration Example: Connect to WFP</h3>
+                <pre>// Initialize WIA Food Crisis SDK
+import { FoodCrisisClient } from '@wia/food-crisis-response';
+
+const client = new FoodCrisisClient({
+  apiKey: 'your-api-key',
+  region: 'africa-east-1'
+});
+
+// Subscribe to crisis alerts
+client.on('crisis-detected', async (event) => {
+  console.log('Crisis detected:', event);
+
+  // Automatically notify WFP
+  await client.notifyPartner('wfp', {
+    severity: event.severity,
+    region: event.region,
+    resources: event.requiredResources
+  });
+});
+
+// Request aid coordination
+const response = await client.requestAid({
+  crisisId: 'CRISIS-2025-001',
+  type: 'emergency-food',
+  quantity: 50000, // metric tons
+  urgency: 'critical'
+});</pre>
+
+                <button onclick="testIntegration()" data-en="Test Integration" data-ko="통합 테스트">Test Integration</button>
+                <div class="result" id="integrationResult"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>© 2025 WIA Standards - MIT License</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang);
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = text;
+                } else {
+                    el.textContent = text;
+                }
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function generateCrisisData() {
+            const region = document.getElementById('region').value;
+            const population = parseFloat(document.getElementById('population').value);
+            const securityLevel = parseInt(document.getElementById('securityLevel').value);
+            const crisisType = document.getElementById('crisisType').value;
+            const duration = parseInt(document.getElementById('duration').value);
+            const reserves = parseInt(document.getElementById('reserves').value);
+
+            const data = {
+                crisisId: `CRISIS-${Date.now()}`,
+                region: region,
+                affectedPopulation: population * 1000000,
+                securityLevel: securityLevel,
+                crisisType: crisisType,
+                duration: duration,
+                currentReserves: reserves,
+                timestamp: new Date().toISOString(),
+                severity: securityLevel === 3 ? 'CRITICAL' : securityLevel === 2 ? 'MODERATE' : 'LOW',
+                estimatedNeeds: {
+                    food: Math.round(population * 365 * 0.5), // metric tons
+                    water: Math.round(population * 365 * 2), // liters per day
+                    medical: Math.round(population * 10) // basic kits
+                },
+                responseRequired: securityLevel >= 2
+            };
+
+            document.getElementById('crisisResult').innerHTML = `
+                <h3>${currentLang === 'en' ? 'Crisis Report Generated' : '위기 보고서 생성됨'}</h3>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+        }
+
+        function testReportAPI() {
+            const response = {
+                success: true,
+                crisisId: `CRISIS-${Date.now()}`,
+                status: "RECEIVED",
+                message: "Crisis report successfully logged and assessment initiated",
+                nextSteps: [
+                    "Automated severity analysis in progress",
+                    "Stakeholders will be notified within 15 minutes",
+                    "Resource allocation calculation started"
+                ]
+            };
+
+            document.getElementById('apiResult').innerHTML = `
+                <h3>${currentLang === 'en' ? 'API Response: Report Crisis' : 'API 응답: 위기 보고'}</h3>
+                <pre>${JSON.stringify(response, null, 2)}</pre>
+            `;
+        }
+
+        function testAidAPI() {
+            const response = {
+                success: true,
+                requestId: `AID-${Date.now()}`,
+                status: "APPROVED",
+                allocatedResources: {
+                    food: { amount: 5000, unit: "metric tons", eta: "2025-12-30T12:00:00Z" },
+                    water: { amount: 100000, unit: "liters", eta: "2025-12-28T08:00:00Z" },
+                    medical: { amount: 500, unit: "kits", eta: "2025-12-29T14:00:00Z" }
+                },
+                suppliers: ["WFP", "Red Cross", "Local Government"],
+                trackingUrl: "https://track.wia-agri.org/aid/12345"
+            };
+
+            document.getElementById('apiResult').innerHTML = `
+                <h3>${currentLang === 'en' ? 'API Response: Aid Request' : 'API 응답: 지원 요청'}</h3>
+                <pre>${JSON.stringify(response, null, 2)}</pre>
+            `;
+        }
+
+        function testTrackingAPI() {
+            const response = {
+                crisisId: "CRISIS-2025-001",
+                shipments: [
+                    {
+                        id: "SHIP-001",
+                        status: "in-transit",
+                        items: ["Rice: 2000 MT", "Wheat: 1500 MT"],
+                        currentLocation: { lat: 1.2921, lng: 36.8219, name: "Nairobi, Kenya" },
+                        destination: { lat: 9.0320, lng: 38.7469, name: "Addis Ababa, Ethiopia" },
+                        eta: "2025-12-30T18:00:00Z",
+                        progress: 65
+                    }
+                ],
+                totalDelivered: "45%",
+                remainingNeeds: "55%"
+            };
+
+            document.getElementById('apiResult').innerHTML = `
+                <h3>${currentLang === 'en' ? 'API Response: Tracking' : 'API 응답: 추적'}</h3>
+                <pre>${JSON.stringify(response, null, 2)}</pre>
+            `;
+        }
+
+        function generateProtocol() {
+            const protocol = {
+                protocolId: `PROTOCOL-${Date.now()}`,
+                phases: [
+                    {
+                        phase: 1,
+                        name: "Detection & Assessment",
+                        duration: "0-24 hours",
+                        actions: ["Deploy monitoring sensors", "Run AI severity analysis", "Activate response team"],
+                        checkpoints: ["Data validation complete", "Stakeholders notified", "Initial resource estimate ready"]
+                    },
+                    {
+                        phase: 2,
+                        name: "Mobilization",
+                        duration: "24-72 hours",
+                        actions: ["Coordinate with partners", "Allocate resources", "Establish supply routes"],
+                        checkpoints: ["Resources committed", "Logistics confirmed", "Distribution plan approved"]
+                    },
+                    {
+                        phase: 3,
+                        name: "Distribution",
+                        duration: "3-30 days",
+                        actions: ["Deploy aid shipments", "Monitor distribution", "Adjust based on feedback"],
+                        checkpoints: ["First delivery complete", "50% distributed", "90% distributed"]
+                    },
+                    {
+                        phase: 4,
+                        name: "Recovery",
+                        duration: "30+ days",
+                        actions: ["Rebuild infrastructure", "Restore food production", "Implement prevention"],
+                        checkpoints: ["Local markets reopened", "Food security restored", "Prevention measures active"]
+                    }
+                ]
+            };
+
+            document.getElementById('protocolResult').innerHTML = `
+                <h3>${currentLang === 'en' ? 'Custom Protocol Generated' : '맞춤형 프로토콜 생성됨'}</h3>
+                <pre>${JSON.stringify(protocol, null, 2)}</pre>
+            `;
+        }
+
+        function testIntegration() {
+            const result = {
+                integrationStatus: "SUCCESS",
+                connectedSystems: [
+                    { name: "WFP Emergency Response", status: "connected", lastSync: new Date().toISOString() },
+                    { name: "FAO GIEWS", status: "connected", lastSync: new Date().toISOString() },
+                    { name: "WIA-AGRI-015 Traceability", status: "connected", lastSync: new Date().toISOString() }
+                ],
+                dataFlows: [
+                    { from: "Satellite Monitoring", to: "Crisis Detection", status: "active" },
+                    { from: "Crisis Detection", to: "WFP Notification", status: "active" },
+                    { from: "WFP", to: "Resource Allocation", status: "active" }
+                ],
+                message: "All systems integrated successfully. Real-time data exchange active."
+            };
+
+            document.getElementById('integrationResult').innerHTML = `
+                <h3>${currentLang === 'en' ? 'Integration Test Result' : '통합 테스트 결과'}</h3>
+                <pre>${JSON.stringify(result, null, 2)}</pre>
+            `;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

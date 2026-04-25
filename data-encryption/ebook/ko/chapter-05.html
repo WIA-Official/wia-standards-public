@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 키 관리 | WIA-SEC-011</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #10b981; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .warning-box { background: linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #ef4444; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+    </style>
+</head>
+<body>
+    <h1>제5장: 키 관리</h1>
+
+    <div class="objectives-box">
+        <h3>학습 목표</h3>
+        <ul>
+            <li>키 관리가 중요한 이유 이해</li>
+            <li>키 수명주기 단계 학습</li>
+            <li>키 도출 함수 탐구</li>
+            <li>안전한 키 저장소 구현</li>
+            <li>엔벨로프 암호화 적용</li>
+        </ul>
+    </div>
+
+    <h2>5.1 가장 취약한 연결고리</h2>
+
+    <div class="warning-box">
+        <h3>보안 원칙</h3>
+        <p>암호화된 데이터의 보안은 키의 보안만큼만 강력합니다. 대부분의 암호화 침해는 알고리즘 약점이 아닌 키 관리 실패에서 발생합니다.</p>
+    </div>
+
+    <h2>5.2 키 수명주기</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>단계</th>
+                <th>활동</th>
+                <th>모범 사례</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>생성</td>
+                <td>키 생성</td>
+                <td>CSRNG 사용, 충분한 엔트로피</td>
+            </tr>
+            <tr>
+                <td>배포</td>
+                <td>안전한 키 공유</td>
+                <td>비대칭 암호화, Diffie-Hellman</td>
+            </tr>
+            <tr>
+                <td>저장</td>
+                <td>저장 중 키 보호</td>
+                <td>HSM, KMS, 암호화된 키 저장소</td>
+            </tr>
+            <tr>
+                <td>사용</td>
+                <td>암호화에 키 사용</td>
+                <td>접근 제어, 로깅</td>
+            </tr>
+            <tr>
+                <td>순환</td>
+                <td>주기적 키 교체</td>
+                <td>대칭 90일, 비대칭 365일</td>
+            </tr>
+            <tr>
+                <td>파기</td>
+                <td>안전한 키 삭제</td>
+                <td>암호학적 삭제</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>5.3 키 도출 함수</h2>
+
+    <p>KDF는 비밀번호나 다른 소스에서 암호화 키를 도출합니다:</p>
+
+    <h3>5.3.1 PBKDF2</h3>
+
+    <pre><code>function deriveKeyFromPassword(password, salt) {
+  return crypto.pbkdf2Sync(
+    password,
+    salt,
+    100000,  // 반복 횟수
+    32,      // 키 길이
+    'sha256'
+  );
+}</code></pre>
+
+    <h3>5.3.2 Argon2 (권장)</h3>
+
+    <p>Password Hashing Competition 우승자인 Argon2가 더 안전합니다:</p>
+
+    <ul>
+        <li><strong>메모리 하드:</strong> GPU/ASIC 공격에 저항</li>
+        <li><strong>구성 가능:</strong> 시간 및 메모리 비용 조절 가능</li>
+        <li><strong>세 가지 변형:</strong> Argon2d, Argon2i, Argon2id (권장)</li>
+    </ul>
+
+    <h2>5.4 키 저장소 솔루션</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>솔루션</th>
+                <th>보안 수준</th>
+                <th>사용 사례</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>HSM (하드웨어 보안 모듈)</td>
+                <td>최고</td>
+                <td>금융, 정부</td>
+            </tr>
+            <tr>
+                <td>클라우드 KMS</td>
+                <td>높음</td>
+                <td>클라우드 애플리케이션</td>
+            </tr>
+            <tr>
+                <td>시크릿 매니저</td>
+                <td>중상</td>
+                <td>애플리케이션 시크릿</td>
+            </tr>
+            <tr>
+                <td>암호화된 파일</td>
+                <td>중간</td>
+                <td>개발, 테스트</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>5.5 엔벨로프 암호화</h2>
+
+    <p>데이터를 데이터 암호화 키(DEK)로 암호화한 다음, DEK를 키 암호화 키(KEK)로 암호화합니다:</p>
+
+    <pre><code>// 엔벨로프 암호화 패턴
+{
+  "encrypted_data": "AES 암호화된 콘텐츠...",
+  "encrypted_dek": "RSA 암호화된 DEK...",
+  "kek_id": "master-key-v2",
+  "algorithm": "AES-256-GCM"
+}</code></pre>
+
+    <h3>이점:</h3>
+    <ul>
+        <li>데이터 재암호화 없이 키 순환 가능</li>
+        <li>KEK는 HSM 또는 KMS에 저장</li>
+        <li>DEK는 암호화된 데이터와 함께 저장</li>
+        <li>AWS, Azure, Google Cloud에서 사용</li>
+    </ul>
+
+    <h2>5.6 키 순환 정책</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>키 유형</th>
+                <th>권장 주기</th>
+                <th>고려 사항</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>대칭 (데이터)</td>
+                <td>90일</td>
+                <td>자동화 권장</td>
+            </tr>
+            <tr>
+                <td>비대칭 (서명)</td>
+                <td>1-2년</td>
+                <td>인증서 수명과 연동</td>
+            </tr>
+            <tr>
+                <td>마스터 키 (KEK)</td>
+                <td>1년</td>
+                <td>HSM에서 관리</td>
+            </tr>
+            <tr>
+                <td>세션 키</td>
+                <td>세션마다</td>
+                <td>PFS 구현</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>5.7 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>키 관리는 대부분 시스템의 가장 취약한 연결고리</li>
+            <li>키 수명주기: 생성, 배포, 저장, 사용, 순환, 파기</li>
+            <li>비밀번호 기반 키 도출에는 Argon2id 사용</li>
+            <li>프로덕션에서는 HSM 또는 클라우드 KMS에 키 저장</li>
+            <li>엔벨로프 암호화로 효율적인 키 순환 가능</li>
+        </ul>
+    </blockquote>
+
+    <h2>5.8 복습 문제</h2>
+
+    <ol>
+        <li>키 관리가 가장 취약한 연결고리인 이유는?</li>
+        <li>키 수명주기의 6단계는?</li>
+        <li>Argon2가 PBKDF2보다 선호되는 이유는?</li>
+        <li>엔벨로프 암호화란 무엇이며 왜 사용하는가?</li>
+        <li>대칭 키의 권장 순환 주기는?</li>
+    </ol>
+
+    <h2>5.9 다음 장 미리보기</h2>
+
+    <p>제6장에서는 실제 구현 가이드를 제공합니다. 완전한 시스템 설계, 피해야 할 일반적인 함정, 테스트 전략을 다룹니다.</p>
+</body>
+</html>

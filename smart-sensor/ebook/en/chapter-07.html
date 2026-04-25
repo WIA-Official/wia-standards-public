@@ -1,0 +1,601 @@
+<<<<<<< HEAD
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Security, Privacy & OTA Updates | WIA-SEMI-015</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #8B5CF6; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1rem; border-radius: 5px; overflow-x: auto; border: 1px solid var(--border); margin: 1rem 0; }
+        pre code { padding: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 7</p>
+        <h1>Security, Privacy & OTA Updates</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Secure boot, TrustZone, hardware root of trust, encrypted communication, OTA firmware updates with rollback protection
+        </p>
+
+        <h2>Overview</h2>
+        <p>
+            Security represents a fundamental requirement for IoT devices, not an optional feature. Smart sensors collect sensitive data (health metrics, location, behavioral patterns), connect to networks vulnerable to attack, and often operate in physically accessible locations where tampering is possible. The WIA-SEMI-015 standard mandates multiple security layers including secure boot, encrypted communication, and secure OTA updates to protect against evolving threat landscapes.
+        </p>
+        <p>
+            This chapter explores comprehensive security frameworks for smart sensors, from hardware root of trust through cryptographic protocols to secure firmware update mechanisms. Privacy-preserving techniques enable edge AI to keep sensitive data local rather than transmitting to cloud servers. Understanding and implementing these protections is essential for WIA-SEMI-015 compliance and customer trust.
+        </p>
+
+        <div class="highlight-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>Secure boot verifies firmware integrity before execution (RSA-2048, ECDSA P-256)</li>
+                <li>Hardware root of trust (TrustZone, secure element) protects cryptographic keys</li>
+                <li>Encrypted communication mandatory: TLS 1.3, DTLS 1.2, or AES-128-GCM minimum</li>
+                <li>OTA updates require signature verification, dual-bank storage, rollback protection</li>
+                <li>Edge AI preserves privacy by processing sensitive data locally</li>
+            </ul>
+        </div>
+
+        <h2>Threat Landscape for Smart Sensors</h2>
+        <p>
+            Understanding potential threats guides security architecture decisions. Smart sensors face multiple attack vectors, each requiring specific countermeasures.
+        </p>
+
+        <h3>Physical Attacks</h3>
+        <p>
+            Device tampering involves opening enclosure to access circuit board, probing debug interfaces (SWD, JTAG), and extracting firmware from flash memory. Side-channel attacks observe power consumption (differential power analysis), electromagnetic emissions (EM analysis), and timing variations (timing attacks). Protection includes tamper-evident seals, disabling debug interfaces in production, flash readout protection, constant-time cryptographic implementations, and power consumption randomization.
+        </p>
+
+        <h3>Network Attacks</h3>
+        <p>
+            Eavesdropping intercepts wireless communications to capture sensitive data or credentials. Man-in-the-middle (MITM) attacks impersonate legitimate servers or devices. Replay attacks capture and retransmit valid messages. Denial of service (DoS) floods device or network to disrupt operation. Countermeasures include end-to-end encryption (TLS/DTLS), mutual authentication (certificates), message freshness (nonces, timestamps), and rate limiting plus packet filtering.
+        </p>
+
+        <h3>Software Attacks</h3>
+        <p>
+            Malicious firmware update attempts install compromised firmware. Exploit attacks target buffer overflows, integer overflows, or format string vulnerabilities. Privilege escalation bypasses security boundaries. Protection requires signature verification for updates, secure coding practices, memory protection (MPU/MMU), and TrustZone or secure enclaves.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Attack Vector</th><th>Threat Examples</th><th>Countermeasures</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Physical</td><td>Tampering, probing, extraction</td><td>Tamper detection, debug disable, flash protection</td></tr>
+                <tr><td>Network</td><td>Eavesdropping, MITM, replay</td><td>TLS/DTLS, mutual auth, nonces</td></tr>
+                <tr><td>Software</td><td>Malware, exploits, escalation</td><td>Secure boot, code signing, MPU</td></tr>
+                <tr><td>Supply Chain</td><td>Counterfeit, backdoors</td><td>Device authentication, provenance</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Secure Boot</h2>
+        <p>
+            Secure boot ensures that only authenticated firmware executes on the device, preventing malware installation even if attackers gain physical access. The WIA-SEMI-015 standard requires secure boot with RSA-2048, ECDSA P-256, or stronger signature algorithms.
+        </p>
+
+        <h3>Secure Boot Process</h3>
+        <p>
+            The boot sequence begins with immutable boot ROM (first-stage bootloader, factory-programmed, cannot be modified). It verifies second-stage bootloader signature using public key stored in OTP fuses or ROM. If valid, execution transfers to second-stage bootloader, which verifies application firmware signature using public key chain. If valid, execution transfers to application firmware. Any signature verification failure halts boot process.
+        </p>
+
+        <h3>Cryptographic Signature Schemes</h3>
+        <p>
+            RSA-2048 with SHA-256 provides 2048-bit keys with well-established security and widespread implementation, but has slower verification (50-200ms on Cortex-M4) and larger signatures (256 bytes). ECDSA P-256 with SHA-256 offers 256-bit keys with equivalent security to RSA-3072, faster verification (20-50ms on Cortex-M4), and smaller signatures (64 bytes), making it preferred for resource-constrained devices. Ed25519 (EdDSA) provides fast verification (10-30ms), 256-bit keys, simple implementation without complex parameter selection, and 64-byte signatures.
+        </p>
+
+<pre><code>// Example: Secure boot verification (simplified)
+bool verify_firmware_signature(
+    const uint8_t *firmware, size_t fw_len,
+    const uint8_t *signature, size_t sig_len,
+    const uint8_t *public_key)
+{
+    uint8_t hash[32];  // SHA-256 digest
+
+    // Compute firmware hash
+    sha256_compute(firmware, fw_len, hash);
+
+    // Verify signature using ECDSA P-256
+    if (ecdsa_p256_verify(hash, 32, signature, public_key)) {
+        return true;  // Signature valid, boot firmware
+    }
+
+    // Signature invalid, halt boot
+    return false;
+}
+</code></pre>
+
+        <h3>Key Storage and Protection</h3>
+        <p>
+            Public keys for signature verification must be protected from modification. Options include OTP (One-Time Programmable) fuses (permanent, cannot be changed, highest security), immutable boot ROM (public key embedded at manufacturing), and flash readout protection (prevents external reading of flash contents).
+        </p>
+
+        <h2>Hardware Root of Trust</h2>
+        <p>
+            A hardware root of trust provides a secure foundation for cryptographic operations, protecting private keys from extraction even if firmware is compromised. The WIA-SEMI-015 standard requires secure key storage in hardware secure element, OTP fuses, or TrustZone secure world for Level 3 compliance.
+        </p>
+
+        <h3>ARM TrustZone-M</h3>
+        <p>
+            TrustZone-M (available on Cortex-M33, M35P, M55) partitions the system into secure world (isolated execution environment, access to all resources) and non-secure world (normal application code, restricted access). Secure code manages cryptographic keys, performs sensitive operations (signature verification, decryption), and provides API to non-secure world. Attack surface is minimized by keeping secure world code small and auditable.
+        </p>
+
+        <h3>Dedicated Secure Elements</h3>
+        <p>
+            Discrete secure elements provide tamper-resistant key storage and crypto operations. Options include NXP EdgeLock SE050 (I2C interface, ECC/RSA/AES, Common Criteria EAL 6+ certified), Microchip ATECC608 (I2C, ECDSA/ECDH/SHA-256, low cost ~$1), and Infineon OPTIGA Trust M (I2C, ECC/RSA/AES, automotive qualified). These devices protect private keys (never leave secure element), accelerate crypto operations (hardware offload), and provide certified tamper resistance.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Solution</th><th>Security Level</th><th>Cost</th><th>Use Cases</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>TrustZone-M</td><td>High</td><td>Integrated (MCU)</td><td>General purpose, cost-sensitive</td></tr>
+                <tr><td>Secure Element (SE)</td><td>Very High</td><td>$1-5 per unit</td><td>Payment, medical, high-security</td></tr>
+                <tr><td>OTP Fuses</td><td>Medium</td><td>Integrated (MCU)</td><td>Public key storage, IDs</td></tr>
+                <tr><td>PUF (Physical Unclonable)</td><td>High</td><td>$0.10-1</td><td>Unique device identity</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Encrypted Communication</h2>
+        <p>
+            The WIA-SEMI-015 standard mandates encrypted wireless communication using TLS 1.3, DTLS 1.2, or AES-128-GCM minimum. This protects sensor data from eavesdropping and tampering during transmission.
+        </p>
+
+        <h3>TLS 1.3 for TCP-Based Protocols</h3>
+        <p>
+            TLS 1.3 provides encrypted, authenticated communication over TCP, suitable for Wi-Fi, cellular (NB-IoT, LTE-M), and Ethernet connections. Features include improved handshake (1-RTT, reduced latency), mandatory perfect forward secrecy (PFS), removal of obsolete ciphers (RC4, 3DES, SHA-1), and mutual authentication with client certificates.
+        </p>
+
+        <h3>DTLS 1.2 for UDP-Based Protocols</h3>
+        <p>
+            DTLS (Datagram TLS) adapts TLS for UDP transport, essential for CoAP and UDP-based IoT protocols. It handles packet loss and reordering, supports connection-less operation, and provides same security guarantees as TLS. Implementations include Mbed TLS (ARM, small footprint ~60KB code + 30KB RAM), wolfSSL (optimized for embedded, TLS 1.3 + DTLS 1.3), and TinyDTLS (minimal DTLS 1.2, <20KB code).
+        </p>
+
+        <h3>Application-Layer Encryption</h3>
+        <p>
+            For protocols without TLS/DTLS support, application-layer encryption secures payloads. AES-128-GCM provides authenticated encryption (confidentiality + integrity), 128-bit keys (sufficient for most applications), GCM mode with built-in authentication tag, and hardware acceleration on many MCUs (AES-NI, CRYPTO peripheral). Message format includes IV/nonce (96 bits, unique per message), ciphertext (encrypted payload), and authentication tag (128 bits, verifies integrity).
+        </p>
+
+        <h2>Over-The-Air (OTA) Firmware Updates</h2>
+        <p>
+            OTA updates enable remote firmware maintenance, security patching, and feature enhancements. The WIA-SEMI-015 standard requires OTA capability with cryptographic signature verification, atomic updates (dual-bank or equivalent), and rollback protection.
+        </p>
+
+        <h3>Dual-Bank Flash Architecture</h3>
+        <p>
+            Dual-bank architecture maintains two firmware images, allowing safe updates. Bank A holds currently running firmware, while Bank B receives new firmware download. After successful download and signature verification, the device reboots to Bank B. If Bank B boots successfully, it becomes the active firmware. If Bank B fails to boot, watchdog triggers rollback to Bank A. After successful operation, Bank A can be erased for the next update.
+        </p>
+
+        <h3>Update Process Flow</h3>
+        <p>
+            The secure update process begins with the server signing new firmware with private key. The device downloads firmware to inactive bank (Bank B), verifies signature using public key, and halts update if verification fails. Upon successful verification, the device sets boot flag to attempt Bank B, reboots and executes Bank B firmware, validates successful operation (application-specific checks), and commits update (marks Bank B as permanent). Failure at any stage triggers rollback to Bank A.
+        </p>
+
+<pre><code>// Example: OTA update verification and installation
+typedef enum {
+    OTA_SUCCESS,
+    OTA_SIGNATURE_INVALID,
+    OTA_FLASH_ERROR,
+    OTA_ROLLBACK
+} ota_status_t;
+
+ota_status_t ota_install_update(
+    const uint8_t *firmware_image, size_t fw_size,
+    const uint8_t *signature, size_t sig_size)
+{
+    // 1. Verify signature
+    if (!verify_firmware_signature(firmware_image, fw_size,
+                                   signature, sig_size,
+                                   ota_public_key)) {
+        return OTA_SIGNATURE_INVALID;
+    }
+
+    // 2. Erase inactive bank (Bank B)
+    if (!flash_erase(BANK_B_ADDRESS, fw_size)) {
+        return OTA_FLASH_ERROR;
+    }
+
+    // 3. Write firmware to Bank B
+    if (!flash_write(BANK_B_ADDRESS, firmware_image, fw_size)) {
+        return OTA_FLASH_ERROR;
+    }
+
+    // 4. Verify written data
+    if (!flash_verify(BANK_B_ADDRESS, firmware_image, fw_size)) {
+        return OTA_FLASH_ERROR;
+    }
+
+    // 5. Set boot flag to attempt Bank B
+    set_boot_bank(BANK_B);
+
+    // 6. Reboot to new firmware
+    system_reboot();
+
+    return OTA_SUCCESS;  // Not reached
+}
+</code></pre>
+
+        <h3>Update Size and Delta Updates</h3>
+        <p>
+            Full firmware updates transfer entire image (100KB-1MB typical), simple to implement and verify, but require significant bandwidth and time. Delta updates transfer only differences from current firmware (10-50KB typical for minor updates), reduce bandwidth by 80-95%, but require delta computation on server and patching on device. Binary diff algorithms include bsdiff (general purpose, compression-friendly) and Courgette (optimized for executable binaries).
+        </p>
+
+        <h2>Privacy-Preserving Edge AI</h2>
+        <p>
+            Edge AI enhances privacy by processing sensitive data locally rather than transmitting raw data to cloud servers. This approach aligns with regulations like GDPR and HIPAA.
+        </p>
+
+        <h3>Local Processing Benefits</h3>
+        <p>
+            Data minimization transmits only inference results (classifications, anomaly scores) rather than raw sensor data. Reduced attack surface eliminates cloud-side data breaches from processing. User control allows users to understand what data leaves device. Compliance with privacy regulations is simplified when sensitive data never leaves device.
+        </p>
+
+        <h3>Differential Privacy Techniques</h3>
+        <p>
+            For applications requiring aggregated data collection, differential privacy adds calibrated noise to prevent individual identification while preserving statistical properties. Local differential privacy (LDP) adds noise on-device before transmission, federated learning trains models on distributed devices without centralizing data, and secure aggregation combines individual contributions without revealing them.
+        </p>
+
+        <h2>Security Testing and Validation</h2>
+        <p>
+            WIA-SEMI-015 compliance requires documented security testing. Essential tests include penetration testing (attempt firmware extraction, debug interface access, and wireless protocol attacks), fuzzing (send malformed inputs to wireless stack, firmware update mechanism, and sensor interfaces), and cryptographic validation (verify proper random number generation, correct cryptographic implementation, and secure key storage).
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Security Requirement</th><th>Level 1</th><th>Level 2</th><th>Level 3</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Secure Boot</td><td>Optional</td><td>Required</td><td>Required</td></tr>
+                <tr><td>Encrypted Communication</td><td>Optional</td><td>Required (TLS/DTLS)</td><td>Required (TLS 1.3)</td></tr>
+                <tr><td>OTA Updates</td><td>Optional</td><td>Required</td><td>Required + Rollback</td></tr>
+                <tr><td>Secure Key Storage</td><td>Flash protection</td><td>OTP or SW isolation</td><td>Hardware SE or TrustZone</td></tr>
+                <tr><td>Security Testing</td><td>Basic</td><td>Standard</td><td>Comprehensive + Pentest</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Review Questions</h2>
+        <div class="info-box">
+            <ol>
+                <li>Explain the secure boot process. What cryptographic operations are performed at each stage?</li>
+                <li>Compare RSA-2048 and ECDSA P-256 for firmware signature verification. Which is preferred for embedded systems and why?</li>
+                <li>What is ARM TrustZone-M and how does it provide a hardware root of trust?</li>
+                <li>Describe the dual-bank flash architecture for OTA updates. How does it enable safe firmware updates with rollback protection?</li>
+                <li>Why is encrypted communication mandatory for WIA-SEMI-015 compliance? What are the minimum requirements?</li>
+                <li>How does edge AI enhance privacy compared to cloud-based processing?</li>
+                <li>What are the key differences between Level 2 and Level 3 security requirements in WIA-SEMI-015?</li>
+            </ol>
+        </div>
+
+        <h2>Summary</h2>
+        <p>
+            This chapter covered comprehensive security requirements for WIA-SEMI-015 compliant smart sensors. Secure boot with cryptographic signature verification (RSA-2048, ECDSA P-256) prevents unauthorized firmware execution. Hardware root of trust (TrustZone-M, secure elements) protects cryptographic keys from extraction. Encrypted communication (TLS 1.3, DTLS 1.2, AES-128-GCM) prevents eavesdropping and tampering. OTA firmware updates with signature verification, dual-bank storage, and rollback protection enable secure remote maintenance. Edge AI preserves privacy by processing sensitive data locally rather than transmitting to cloud servers. These security layers work together to protect against evolving threat landscapes and ensure customer trust.
+        </p>
+
+        </div>
+</body>
+</html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Communication Protocols | WIA-SMART-SENSOR</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #22c55e; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .code-block { background: #1a1a2e; border: 1px solid var(--border); border-radius: 5px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Monaco', monospace; font-size: 0.9rem; }
+        .code-block code { color: #a5f3fc; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; }
+        .cross-ref { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a7b 100%); padding: 1rem; border-radius: 5px; margin: 1rem 0; }
+        .cross-ref a { color: #67e8f9; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 7</p>
+        <h1>Communication Protocols</h1>
+
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Effective communication is essential for smart sensors to transmit data, receive commands, and integrate into larger systems. This chapter covers the protocols and standards that enable reliable, efficient sensor communication across wired and wireless interfaces.
+        </p>
+
+        <div class="cross-ref">
+            <strong>Related Standard:</strong> <a href="../../universal-protocol/ebook/en/index.html">WIA-UNIVERSAL-PROTOCOL</a> provides the foundational communication framework that WIA-SMART-SENSOR builds upon for interoperability.
+        </div>
+
+        <h2>Wired Communication Interfaces</h2>
+
+        <h3>I²C (Inter-Integrated Circuit)</h3>
+
+        <p>
+            I²C is a two-wire serial protocol widely used for sensor interfacing due to its simplicity and multi-device support. The protocol uses open-drain signaling with pull-up resistors, supporting multiple devices on a single bus through addressing. Standard mode operates at 100 kHz, Fast mode at 400 kHz, and Fast mode Plus at 1 MHz.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Standard</th>
+                    <th>Fast</th>
+                    <th>Fast+</th>
+                    <th>High-Speed</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Max Clock</strong></td>
+                    <td>100 kHz</td>
+                    <td>400 kHz</td>
+                    <td>1 MHz</td>
+                    <td>3.4 MHz</td>
+                </tr>
+                <tr>
+                    <td><strong>Max Capacitance</strong></td>
+                    <td>400 pF</td>
+                    <td>400 pF</td>
+                    <td>550 pF</td>
+                    <td>100 pF</td>
+                </tr>
+                <tr>
+                    <td><strong>Addressing</strong></td>
+                    <td colspan="4">7-bit (128 devices) or 10-bit (1024 devices)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block">
+<code>// I²C Sensor Read Example
+#define SENSOR_ADDR  0x48
+#define TEMP_REG     0x00
+
+int16_t read_temperature_i2c(I2C_HandleTypeDef* hi2c) {
+    uint8_t data[2];
+    
+    // Write register address
+    HAL_I2C_Master_Transmit(hi2c, SENSOR_ADDR << 1, &TEMP_REG, 1, 100);
+    
+    // Read temperature data
+    HAL_I2C_Master_Receive(hi2c, SENSOR_ADDR << 1, data, 2, 100);
+    
+    // Convert to temperature (example: 12-bit, 0.0625°C resolution)
+    int16_t raw = (data[0] << 4) | (data[1] >> 4);
+    if (raw & 0x800) raw |= 0xF000;  // Sign extend
+    
+    return raw;  // Returns temperature in 1/16 °C units
+}</code>
+        </div>
+
+        <h3>SPI (Serial Peripheral Interface)</h3>
+
+        <p>
+            SPI provides higher throughput than I²C through full-duplex operation and clock speeds up to 100 MHz. The four-wire interface (MOSI, MISO, SCK, CS) enables simple, fast communication at the cost of additional pins. SPI is preferred for high-data-rate sensors like accelerometers and ADCs.
+        </p>
+
+        <h3>UART (Universal Asynchronous Receiver-Transmitter)</h3>
+
+        <p>
+            UART provides simple point-to-point serial communication without a clock signal. Commonly used for GPS modules, cellular modems, and debugging interfaces. Standard baud rates range from 9600 to 115200, with some applications using higher rates up to several Mbps.
+        </p>
+
+        <h2>Wireless Communication Protocols</h2>
+
+        <h3>Bluetooth Low Energy (BLE)</h3>
+
+        <p>
+            BLE is the dominant wireless protocol for personal-area sensor applications. Its low power consumption, ubiquitous smartphone support, and flexible GATT profile system make it ideal for wearables, health monitors, and smart home sensors. BLE 5.x adds extended range, higher throughput, and improved coexistence.
+        </p>
+
+        <div class="highlight-box">
+            <strong>BLE Key Features:</strong>
+            <ul>
+                <li><strong>Connection Modes:</strong> Advertising (broadcast) and Connected (bidirectional)</li>
+                <li><strong>GATT Profiles:</strong> Standardized data organization with Services and Characteristics</li>
+                <li><strong>Power Optimization:</strong> Connection intervals, slave latency, advertising intervals</li>
+                <li><strong>BLE 5.x:</strong> 2x speed (2 Mbps), 4x range (Coded PHY), 8x advertising capacity</li>
+                <li><strong>Security:</strong> Pairing, bonding, encryption (AES-CCM)</li>
+            </ul>
+        </div>
+
+        <h3>Zigbee and Thread</h3>
+
+        <p>
+            Zigbee and Thread are mesh networking protocols designed for IoT applications. They enable self-healing networks where devices can route messages through multiple paths, improving reliability and extending coverage. Thread adds IPv6 support for direct internet connectivity.
+        </p>
+
+        <h3>LoRaWAN</h3>
+
+        <p>
+            LoRaWAN provides long-range, low-power communication for wide-area IoT deployments. Using chirp spread spectrum modulation, LoRa achieves ranges of 2-15 km with minimal power consumption. The trade-off is limited data rate (0.3-50 kbps) and duty cycle restrictions.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Protocol</th>
+                    <th>Range</th>
+                    <th>Data Rate</th>
+                    <th>Power</th>
+                    <th>Topology</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>BLE</strong></td>
+                    <td>10-100m</td>
+                    <td>1-2 Mbps</td>
+                    <td>Very Low</td>
+                    <td>Star/Mesh</td>
+                </tr>
+                <tr>
+                    <td><strong>Zigbee</strong></td>
+                    <td>10-100m</td>
+                    <td>250 kbps</td>
+                    <td>Low</td>
+                    <td>Mesh</td>
+                </tr>
+                <tr>
+                    <td><strong>Thread</strong></td>
+                    <td>10-100m</td>
+                    <td>250 kbps</td>
+                    <td>Low</td>
+                    <td>Mesh/IPv6</td>
+                </tr>
+                <tr>
+                    <td><strong>LoRaWAN</strong></td>
+                    <td>2-15 km</td>
+                    <td>0.3-50 kbps</td>
+                    <td>Very Low</td>
+                    <td>Star</td>
+                </tr>
+                <tr>
+                    <td><strong>NB-IoT</strong></td>
+                    <td>Cellular</td>
+                    <td>200 kbps</td>
+                    <td>Medium</td>
+                    <td>Cellular</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Application Layer Protocols</h2>
+
+        <h3>MQTT (Message Queuing Telemetry Transport)</h3>
+
+        <p>
+            MQTT is a lightweight publish-subscribe messaging protocol ideal for constrained IoT devices. Its small packet overhead and QoS levels (0: at most once, 1: at least once, 2: exactly once) make it suitable for unreliable networks. MQTT-SN (Sensor Networks) variant further reduces overhead for very constrained devices.
+        </p>
+
+        <div class="code-block">
+<code>// MQTT Sensor Data Publishing Example
+void publish_sensor_data(MQTTClient* client, SensorData* data) {
+    char topic[64];
+    char payload[256];
+    
+    // Format topic: sensors/{device_id}/{sensor_type}
+    snprintf(topic, sizeof(topic), "sensors/%s/temperature", device_id);
+    
+    // Format JSON payload
+    snprintf(payload, sizeof(payload),
+        "{"
+        "\"value\": %.2f,"
+        "\"unit\": \"celsius\","
+        "\"timestamp\": %lu,"
+        "\"quality\": %d"
+        "}",
+        data->temperature,
+        data->timestamp,
+        data->quality_indicator
+    );
+    
+    // Publish with QoS 1 (at least once delivery)
+    MQTTClient_publish(client, topic, strlen(payload), payload, 1, 0, NULL);
+}</code>
+        </div>
+
+        <h3>CoAP (Constrained Application Protocol)</h3>
+
+        <p>
+            CoAP brings REST-like semantics to constrained devices using UDP transport. Its request-response model with GET, PUT, POST, DELETE methods mirrors HTTP but with minimal overhead. CoAP is well-suited for resource-constrained sensors that need to expose data as web resources.
+        </p>
+
+        <h2>Industrial Protocols</h2>
+
+        <h3>IO-Link</h3>
+
+        <p>
+            IO-Link is the standardized sensor interface for industrial automation. It provides bidirectional communication for configuration, diagnostics, and process data over standard 3-wire sensor cables. IO-Link enables smart sensor capabilities in industrial environments while maintaining compatibility with existing infrastructure.
+        </p>
+
+        <h3>OPC UA</h3>
+
+        <p>
+            OPC Unified Architecture provides secure, reliable communication for industrial systems. While traditionally used at higher levels, OPC UA Pub/Sub and field-level variants are bringing standardized industrial communication to smart sensors, enabling seamless integration with enterprise systems.
+        </p>
+
+        <h2>Data Formats and Encoding</h2>
+
+        <div class="cross-ref">
+            <strong>Related Standard:</strong> <a href="../../universal-data-exchange/ebook/en/index.html">WIA-UNIVERSAL-DATA-EXCHANGE</a> defines standard data formats for sensor interoperability.
+        </div>
+
+        <h3>Efficient Serialization</h3>
+
+        <div class="highlight-box">
+            <strong>Serialization Format Comparison:</strong>
+            <ul>
+                <li><strong>JSON:</strong> Human-readable, flexible, verbose (good for debugging)</li>
+                <li><strong>CBOR:</strong> Binary JSON, compact, self-describing</li>
+                <li><strong>MessagePack:</strong> Binary, very compact, fast parsing</li>
+                <li><strong>Protocol Buffers:</strong> Schema-defined, efficient, requires code generation</li>
+                <li><strong>SenML:</strong> Sensor-specific format, JSON or CBOR encoding</li>
+            </ul>
+        </div>
+
+        <h2>Summary</h2>
+
+        <div class="highlight-box">
+            <h3 style="margin-top: 0;">Key Takeaways</h3>
+            <ul>
+                <li><strong>Wired Interfaces:</strong> I²C for simplicity, SPI for speed, UART for modules</li>
+                <li><strong>Wireless Choice:</strong> BLE for personal area, mesh for coverage, LoRa for range</li>
+                <li><strong>Application Protocols:</strong> MQTT and CoAP provide IoT-optimized communication</li>
+                <li><strong>Industrial Standards:</strong> IO-Link and OPC UA enable enterprise integration</li>
+                <li><strong>Data Encoding:</strong> Choose based on constraints (bandwidth, processing, readability)</li>
+                <li><strong>Interoperability:</strong> Follow WIA standards for cross-platform compatibility</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li>Compare I²C and SPI for sensor interfacing applications.</li>
+            <li>What features make BLE suitable for wearable sensor applications?</li>
+            <li>When would you choose LoRaWAN over BLE for sensor communication?</li>
+            <li>Explain the MQTT publish-subscribe model and QoS levels.</li>
+            <li>How does CoAP differ from HTTP, and why is this important for sensors?</li>
+            <li>What role does IO-Link play in industrial sensor communication?</li>
+            <li>Compare JSON and CBOR for sensor data encoding.</li>
+            <li>How do mesh protocols like Zigbee improve network reliability?</li>
+        </ol>
+
+        </div>
+</body>
+</html>
+>>>>>>> origin/main

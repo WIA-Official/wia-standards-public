@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 비대칭 암호화 | WIA-SEC-011</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #10b981; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>제3장: 비대칭 암호화</h1>
+
+    <div class="objectives-box">
+        <h3>학습 목표</h3>
+        <ul>
+            <li>공개키/개인키 개념 이해</li>
+            <li>RSA 알고리즘의 작동 원리 학습</li>
+            <li>타원 곡선 암호화(ECC) 탐구</li>
+            <li>디지털 서명 구현 방법 파악</li>
+            <li>키 크기 권장 사항 이해</li>
+        </ul>
+    </div>
+
+    <h2>3.1 비대칭 암호화란?</h2>
+
+    <p>비대칭 암호화(공개키 암호화)는 수학적으로 연결된 키 쌍을 사용합니다:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>키</th>
+                <th>보관</th>
+                <th>용도</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>공개키</td>
+                <td>누구나 보유 가능</td>
+                <td>암호화, 서명 검증</td>
+            </tr>
+            <tr>
+                <td>개인키</td>
+                <td>소유자만 비밀 보관</td>
+                <td>복호화, 서명 생성</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <blockquote>
+        <h3>핵심 원리</h3>
+        <p>공개키로 암호화된 것은 개인키로만 복호화할 수 있습니다. 개인키로 서명된 것은 공개키로 검증할 수 있습니다.</p>
+    </blockquote>
+
+    <h2>3.2 RSA 알고리즘</h2>
+
+    <p>RSA는 큰 소수의 인수분해 어려움에 기반한 암호화 알고리즘입니다:</p>
+
+    <h3>3.2.1 RSA 키 크기</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>키 크기</th>
+                <th>보안 수준</th>
+                <th>WIA 권장</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>2048비트</td>
+                <td>112비트</td>
+                <td>최소 요구사항</td>
+            </tr>
+            <tr>
+                <td>3072비트</td>
+                <td>128비트</td>
+                <td>권장</td>
+            </tr>
+            <tr>
+                <td>4096비트</td>
+                <td>140비트+</td>
+                <td>장기 보안용</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>3.2.2 RSA 구현</h3>
+
+    <pre><code>// Node.js에서 RSA 키 생성
+const crypto = require('crypto');
+
+// 4096비트 RSA 키 쌍 생성
+const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+  modulusLength: 4096,
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+});
+
+// 공개키로 암호화
+function encryptRSA(data, publicKey) {
+  return crypto.publicEncrypt(
+    { key: publicKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING },
+    Buffer.from(data)
+  );
+}
+
+// 개인키로 복호화
+function decryptRSA(encrypted, privateKey) {
+  return crypto.privateDecrypt(
+    { key: privateKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING },
+    encrypted
+  ).toString();
+}</code></pre>
+
+    <h2>3.3 타원 곡선 암호화 (ECC)</h2>
+
+    <p>ECC는 타원 곡선 이산 로그 문제에 기반하여 더 작은 키로 동등한 보안을 제공합니다:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ECC 키</th>
+                <th>RSA 동등</th>
+                <th>보안 수준</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>256비트</td>
+                <td>3072비트</td>
+                <td>128비트</td>
+            </tr>
+            <tr>
+                <td>384비트</td>
+                <td>7680비트</td>
+                <td>192비트</td>
+            </tr>
+            <tr>
+                <td>521비트</td>
+                <td>15360비트</td>
+                <td>256비트</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>3.3.1 권장 곡선</h3>
+
+    <ul>
+        <li><strong>P-256 (secp256r1):</strong> 일반 용도, 널리 지원</li>
+        <li><strong>P-384 (secp384r1):</strong> 높은 보안, WIA 권장</li>
+        <li><strong>P-521:</strong> 최고 보안, 성능 영향</li>
+        <li><strong>Curve25519:</strong> 현대적, 빠름, 키 교환용</li>
+    </ul>
+
+    <h2>3.4 디지털 서명</h2>
+
+    <p>디지털 서명은 메시지의 진본성과 무결성을 보장합니다:</p>
+
+    <pre><code>// ECDSA 서명 및 검증
+const crypto = require('crypto');
+
+// 서명 생성
+function signMessage(message, privateKey) {
+  const sign = crypto.createSign('SHA384');
+  sign.update(message);
+  return sign.sign(privateKey, 'base64');
+}
+
+// 서명 검증
+function verifySignature(message, signature, publicKey) {
+  const verify = crypto.createVerify('SHA384');
+  verify.update(message);
+  return verify.verify(publicKey, signature, 'base64');
+}</code></pre>
+
+    <h3>3.4.1 서명 알고리즘</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>알고리즘</th>
+                <th>기반</th>
+                <th>권장</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>RSA-PSS</td>
+                <td>RSA</td>
+                <td>✅ RSA 사용 시</td>
+            </tr>
+            <tr>
+                <td>ECDSA</td>
+                <td>ECC</td>
+                <td>✅ 일반 용도</td>
+            </tr>
+            <tr>
+                <td>EdDSA (Ed25519)</td>
+                <td>Curve25519</td>
+                <td>✅ 현대적 선택</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>3.5 키 교환</h2>
+
+    <p>Diffie-Hellman 키 교환을 통해 안전하지 않은 채널에서도 공유 비밀을 설정할 수 있습니다:</p>
+
+    <ul>
+        <li><strong>ECDH (Elliptic Curve DH):</strong> ECC 기반, 효율적</li>
+        <li><strong>X25519:</strong> Curve25519 기반, TLS 1.3에서 사용</li>
+    </ul>
+
+    <h2>3.6 RSA vs ECC</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>측면</th>
+                <th>RSA</th>
+                <th>ECC</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>키 크기</td>
+                <td>큼 (3072+)</td>
+                <td>작음 (256-521)</td>
+            </tr>
+            <tr>
+                <td>성능</td>
+                <td>느림</td>
+                <td>빠름</td>
+            </tr>
+            <tr>
+                <td>호환성</td>
+                <td>보편적</td>
+                <td>현대 시스템</td>
+            </tr>
+            <tr>
+                <td>권장</td>
+                <td>레거시 지원</td>
+                <td>신규 시스템</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>3.7 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>비대칭 암호화는 공개키/개인키 쌍 사용</li>
+            <li>RSA는 소인수분해 어려움에 기반 (3072비트+ 권장)</li>
+            <li>ECC는 더 작은 키로 동등한 보안 제공 (P-384 권장)</li>
+            <li>디지털 서명으로 진본성과 무결성 보장</li>
+            <li>신규 시스템에는 ECC 권장</li>
+        </ul>
+    </blockquote>
+
+    <h2>3.8 복습 문제</h2>
+
+    <ol>
+        <li>공개키와 개인키의 역할 차이는?</li>
+        <li>RSA 보안이 기반하는 수학적 문제는?</li>
+        <li>ECC가 RSA보다 효율적인 이유는?</li>
+        <li>디지털 서명의 목적은 무엇인가?</li>
+        <li>WIA가 권장하는 ECC 곡선은?</li>
+    </ol>
+
+    <h2>3.9 다음 장 미리보기</h2>
+
+    <p>제4장에서는 하이브리드 암호화를 다룹니다. 대칭 암호화의 속도와 비대칭 암호화의 편리함을 결합하는 방법, TLS가 어떻게 작동하는지 배웁니다.</p>
+</body>
+</html>

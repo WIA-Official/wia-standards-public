@@ -1278,9 +1278,7 @@ Authentication: JWT token in query parameter
 
 ### 12.1 Scientific Literature
 
-1. 선행 연구. "Application of electrolyzed water in the food industry." *Food Control*, 19(4), 329-345.
 
-2. 선행 연구. "Inactivation of Escherichia coli O157:H7 and Salmonella by electrolyzed water." *Journal of Food Protection*, 63(1), 19-24.
 
 3. Kowalski, W. (2009). "Ultraviolet Germicidal Irradiation Handbook." *Springer*, Berlin.
 

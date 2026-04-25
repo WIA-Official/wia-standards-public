@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제8장: 구현 가이드 - WIA-PET-LEGACY</title>
+</head>
+<body>
+<h1>제8장: 구현 가이드</h1>
+
+<blockquote>
+"홍익인간: 세심한 구현은 기억이 그들이 받을 자격 있는 보살핌으로 보존되도록 보장합니다."
+</blockquote>
+
+<hr>
+
+<h2>8.1 시스템 아키텍처</h2>
+
+<pre>
+서비스 아키텍처
+==============
+
++------------------+
+|   API 게이트웨이 |
++------------------+
+        |
++-------+-------+-------+-------+
+|       |       |       |       |
+v       v       v       v       v
+유산    미디어  추모    보관    알림
+서비스  서비스  서비스  서비스  서비스
+|       |       |       |       |
++-------+-------+-------+-------+
+        |
++-------+-------+
+|               |
+v               v
+PostgreSQL   객체 저장소
+             (핫 + 콜드)
+</pre>
+
+<hr>
+
+<h2>8.2 핵심 서비스</h2>
+
+<table border="1">
+<tr>
+<th>서비스</th>
+<th>책임</th>
+<th>기술</th>
+</tr>
+<tr>
+<td>유산 서비스</td>
+<td>프로필, 전기, 타임라인</td>
+<td>Rust/Go</td>
+</tr>
+<tr>
+<td>미디어 서비스</td>
+<td>업로드, 처리, 미디어 저장</td>
+<td>Rust + FFmpeg</td>
+</tr>
+<tr>
+<td>추모 서비스</td>
+<td>추모 페이지 생성</td>
+<td>Node.js/Rust</td>
+</tr>
+<tr>
+<td>보관 서비스</td>
+<td>장기 저장</td>
+<td>Go + 클라우드 API</td>
+</tr>
+<tr>
+<td>알림 서비스</td>
+<td>이메일, 푸시, SMS</td>
+<td>Node.js</td>
+</tr>
+<tr>
+<td>앨범 생성기</td>
+<td>추억 앨범 PDF</td>
+<td>Python + ReportLab</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>8.3 데이터베이스 스키마</h2>
+
+<pre>
+핵심 테이블
+==========
+
+-- 유산 프로필
+CREATE TABLE legacy_profiles (
+  legacy_id UUID PRIMARY KEY,
+  pet_id UUID NOT NULL,
+  owner_id UUID NOT NULL,
+  pet_info JSONB NOT NULL,
+  status VARCHAR(20) DEFAULT 'PLANNING',
+  memorial_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  activated_at TIMESTAMPTZ
+);
+
+-- 생애 사건
+CREATE TABLE life_events (
+  event_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  event_type VARCHAR(30) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  event_date DATE NOT NULL,
+  significance SMALLINT DEFAULT 3
+);
+
+-- 미디어
+CREATE TABLE media_attachments (
+  media_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  media_type VARCHAR(20) NOT NULL,
+  original_url TEXT NOT NULL,
+  archive_url TEXT,
+  visibility VARCHAR(20) DEFAULT 'FAMILY'
+);
+
+-- 헌사
+CREATE TABLE tributes (
+  tribute_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  author_name VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(20) DEFAULT 'PENDING'
+);
+
+-- 보관소
+CREATE TABLE legacy_archives (
+  archive_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  storage_location TEXT NOT NULL,
+  checksum VARCHAR(64) NOT NULL,
+  retention_years INTEGER DEFAULT 100
+);
+</pre>
+
+<hr>
+
+<h2>8.4 API 엔드포인트</h2>
+
+<pre>
+API 라우트
+==========
+
+유산:
+  POST   /api/v1/legacy           생성
+  GET    /api/v1/legacy           목록
+  GET    /api/v1/legacy/{id}      조회
+  PUT    /api/v1/legacy/{id}      수정
+  POST   /api/v1/legacy/{id}/activate  활성화
+
+타임라인:
+  GET    /api/v1/legacy/{id}/timeline  타임라인 조회
+  GET    /api/v1/legacy/{id}/events    사건 목록
+  POST   /api/v1/legacy/{id}/events    사건 추가
+
+미디어:
+  GET    /api/v1/legacy/{id}/media     미디어 목록
+  POST   /api/v1/legacy/{id}/media     업로드
+  GET    /api/v1/legacy/{id}/media/featured  AI 선택
+
+추모:
+  GET    /memorial/{id}           공개 페이지
+  GET    /api/v1/legacy/{id}/memorial/config  설정
+  PUT    /api/v1/legacy/{id}/memorial/config  수정
+
+헌사:
+  GET    /memorial/{id}/tributes  승인된 목록
+  POST   /memorial/{id}/tributes  제출
+  POST   /api/v1/legacy/{id}/tributes/{tid}/approve
+
+보관:
+  POST   /api/v1/legacy/{id}/archive   생성
+  GET    /api/v1/legacy/{id}/archive   상태
+  POST   /api/v1/legacy/{id}/export    내보내기
+</pre>
+
+<hr>
+
+<h2>8.5 보안</h2>
+
+<table border="1">
+<tr>
+<th>계층</th>
+<th>보호</th>
+</tr>
+<tr>
+<td>전송</td>
+<td>모든 곳에 TLS 1.3</td>
+</tr>
+<tr>
+<td>인증</td>
+<td>OAuth 2.0 / JWT</td>
+</tr>
+<tr>
+<td>인가</td>
+<td>유산별 RBAC</td>
+</tr>
+<tr>
+<td>저장 데이터</td>
+<td>AES-256 암호화</td>
+</tr>
+<tr>
+<td>보관소</td>
+<td>고객 관리 키</td>
+</tr>
+<tr>
+<td>감사</td>
+<td>완전한 접근 로깅</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>8.6 배포</h2>
+
+<pre>
+DOCKER COMPOSE
+==============
+
+version: '3.8'
+services:
+  legacy-api:
+    image: wia/legacy-api:latest
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://db:5432/legacy
+    depends_on:
+      - db
+
+  media-service:
+    image: wia/media-service:latest
+    environment:
+      STORAGE_BUCKET: wia-legacy-media
+      ARCHIVE_BUCKET: wia-legacy-archive
+    volumes:
+      - media_temp:/tmp/media
+
+  memorial-service:
+    image: wia/memorial-service:latest
+    environment:
+      CDN_BUCKET: wia-memorial-cdn
+
+  archive-worker:
+    image: wia/archive-worker:latest
+    environment:
+      GLACIER_VAULT: wia-legacy-glacier
+
+  db:
+    image: postgres:15
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+  media_temp:
+</pre>
+
+<hr>
+
+<h2>8.7 규정 준수 체크리스트</h2>
+
+<pre>
+구현 체크리스트
+==============
+
+데이터 형식:
+  [ ] 유산 프로필 스키마
+  [ ] 전기 구조
+  [ ] 생애 사건
+  [ ] 미디어 첨부
+  [ ] 헌사
+
+기능:
+  [ ] 사진 AI 선택
+  [ ] 타임라인 생성
+  [ ] 추모 페이지 렌더링
+  [ ] 헌사 검토
+  [ ] 가상 선물
+  [ ] 추억 앨범 생성
+
+저장소:
+  [ ] 핫/웜/콜드 티어
+  [ ] 보관 암호화
+  [ ] 무결성 검증
+  [ ] 보존 정책
+
+접근:
+  [ ] 가족 공유
+  [ ] 상속 시스템
+  [ ] 내보내기 기능
+  [ ] 복구 절차
+
+개인정보:
+  [ ] 공개 제어
+  [ ] 검토 도구
+  [ ] 동의 관리
+  [ ] 삭제권
+</pre>
+
+<hr>
+
+<h2>8.8 지원 통합</h2>
+
+<pre>
+슬픔 지원 리소스
+===============
+
+통합 포인트:
+  - 활성화 후 알림
+  - 추모 푸터
+  - 앱 도움말 섹션
+
+리소스 유형:
+  - 핫라인 번호
+  - 온라인 지원 그룹
+  - 지역 상담
+  - 반려동물 상실 문헌
+
+타이밍:
+  - 활성화 직후
+  - 주간 체크인 (선택)
+  - 기념일 알림
+  - 명절 지원
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 확장성을 위한 마이크로서비스 아키텍처</li>
+<li>[OK] 유연성을 위한 PostgreSQL과 JSONB</li>
+<li>[OK] 다단계 미디어 처리 파이프라인</li>
+<li>[OK] 템플릿 기반 추모 생성</li>
+<li>[OK] Docker 기반 배포</li>
+<li>[OK] 포괄적 보안 조치</li>
+</ul>
+
+<hr>
+
+<h2>문서 정보</h2>
+
+<table border="1">
+<tr><td>표준</td><td>WIA-PET-LEGACY 버전 1.0.0</td></tr>
+<tr><td>문서</td><td>구현 Ebook</td></tr>
+<tr><td>상태</td><td>활성</td></tr>
+<tr><td>철학</td><td>홍익인간</td></tr>
+</table>
+
+<hr>
+<aside class="ko-footer" style="margin-top:24px;padding:14px;border:1px solid rgba(127,127,127,0.25);border-radius:8px;color:#555;font-size:14px;line-height:1.6">
+<h3 style="margin:0 0 8px;font-size:15px;color:#333">본 장의 적합성 안내</h3>
+<p>이 장의 본문 내용은 WIA 표준의 PHASE 사양과 해당 spec/ 디렉토리에 수록된 정상 참조(normative reference)에 직접 대응합니다. WIA는 자가 선언, 제3자 평가, 인증의 3단계 적합성 평가 체계를 운영하며, 단계별 감사 주기는 배포의 위험도에 따라 차등 적용됩니다.</p>
+<p>본 장은 정보 제공 목적의 이북 자료이며, 구속력 있는 권위는 항상 spec/ 디렉토리의 PHASE 문서에 있습니다. 본문과 PHASE 문서가 충돌하는 경우 PHASE 문서가 우선합니다. 본 장의 인용은 ISO/IEC, IEEE, IETF RFC, OASIS, NIST와 같이 1차 출처가 검증 가능한 공개 표준만 포함합니다. 학술 논문 인용, 가공 통계, 미공개 임상 데이터는 정책상 본문에서 사용되지 않습니다.</p>
+<p>본 표준에 대한 의견과 적합성 보고는 WIA-Official GitHub 조직의 이슈 추적기를 통해 접수됩니다. 메이저 버전 변경은 <a href="https://wiastandards.com/governance">wiastandards.com/governance</a>에 명시된 거버넌스 절차를 따릅니다.</p>
+<p style="margin-top:8px;font-size:13px;color:#888"><strong>弘益人間 · 인류에게 이로움을 더하다</strong> · © 2026 WIA — 세계인증산업협회. MIT 라이선스로 배포됩니다.</p>
+</aside>
+
+</body>
+</html>

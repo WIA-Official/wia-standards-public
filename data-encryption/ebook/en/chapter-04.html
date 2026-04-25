@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Hybrid Encryption | WIA-SEC-011</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #10b981; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Hybrid Encryption</h1>
+
+    <div class="objectives-box">
+        <h3>Learning Objectives</h3>
+        <ul>
+            <li>Understand why hybrid encryption is needed</li>
+            <li>Learn the hybrid encryption workflow</li>
+            <li>Explore TLS as a real-world example</li>
+            <li>Implement hybrid encryption</li>
+            <li>Understand performance benefits</li>
+        </ul>
+    </div>
+
+    <h2>4.1 Best of Both Worlds</h2>
+
+    <p>Hybrid encryption combines the efficiency of symmetric encryption with the convenience of asymmetric encryption:</p>
+
+    <ol>
+        <li>Generate random symmetric key (AES-256)</li>
+        <li>Encrypt data with symmetric key (fast)</li>
+        <li>Encrypt symmetric key with recipient's public key</li>
+        <li>Send encrypted data + encrypted key</li>
+    </ol>
+
+    <blockquote>
+        <h3>Real-World Example: HTTPS</h3>
+        <p>When you visit an HTTPS website, your browser uses hybrid encryption:</p>
+        <ul>
+            <li>RSA/ECC for initial key exchange</li>
+            <li>AES for encrypting actual web traffic</li>
+            <li>This is how TLS (Transport Layer Security) works</li>
+        </ul>
+    </blockquote>
+
+    <h2>4.2 Implementation</h2>
+
+    <pre><code>function hybridEncrypt(data, recipientPublicKey) {
+  // 1. Generate random AES key
+  const aesKey = crypto.randomBytes(32);
+
+  // 2. Encrypt data with AES-GCM
+  const { ciphertext, iv, authTag } = encryptAES(data, aesKey);
+
+  // 3. Encrypt AES key with RSA-OAEP
+  const encryptedKey = crypto.publicEncrypt(
+    {
+      key: recipientPublicKey,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING
+    },
+    aesKey
+  );
+
+  return { ciphertext, encryptedKey, iv, authTag };
+}
+
+function hybridDecrypt(encrypted, privateKey) {
+  // 1. Decrypt AES key with private key
+  const aesKey = crypto.privateDecrypt(
+    {
+      key: privateKey,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING
+    },
+    encrypted.encryptedKey
+  );
+
+  // 2. Decrypt data with AES key
+  return decryptAES(encrypted.ciphertext, aesKey,
+                    encrypted.iv, encrypted.authTag);
+}</code></pre>
+
+    <h2>4.3 Performance Benefits</h2>
+
+    <p>Consider encrypting 1 GB of data:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>Time</th>
+                <th>Practicality</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>RSA-4096 only</td>
+                <td>~92 hours</td>
+                <td>❌ Impractical</td>
+            </tr>
+            <tr>
+                <td>AES-256 only</td>
+                <td>0.3 seconds</td>
+                <td>⚠️ Key distribution?</td>
+            </tr>
+            <tr>
+                <td>Hybrid</td>
+                <td>~0.3 seconds</td>
+                <td>✅ Best approach</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.4 TLS Handshake</h2>
+
+    <p>The TLS handshake is a perfect example of hybrid encryption in action:</p>
+
+    <pre><code>// TLS 1.3 Simplified Handshake
+1. Client Hello
+   - Supported cipher suites
+   - Client random
+   - Key share (ECDHE)
+
+2. Server Hello
+   - Selected cipher suite
+   - Server random
+   - Key share (ECDHE)
+   - Certificate
+
+3. Key Derivation
+   - ECDHE shared secret
+   - Derive symmetric keys
+
+4. Encrypted Communication
+   - AES-256-GCM for all traffic</code></pre>
+
+    <h2>4.5 Perfect Forward Secrecy</h2>
+
+    <p>Modern hybrid systems use ephemeral keys to achieve Perfect Forward Secrecy (PFS):</p>
+
+    <ul>
+        <li>Each session uses a new key pair (ECDHE)</li>
+        <li>Even if long-term keys are compromised, past sessions remain secure</li>
+        <li>TLS 1.3 mandates PFS for all connections</li>
+    </ul>
+
+    <h2>4.6 Chapter Summary</h2>
+
+    <blockquote>
+        <h3>Key Takeaways</h3>
+        <ul>
+            <li>Hybrid encryption combines symmetric speed with asymmetric convenience</li>
+            <li>TLS uses hybrid encryption for secure web traffic</li>
+            <li>Encrypt data with AES, encrypt AES key with RSA/ECC</li>
+            <li>Performance is essentially the same as pure symmetric</li>
+            <li>Perfect Forward Secrecy protects past communications</li>
+        </ul>
+    </blockquote>
+
+    <h2>4.7 Review Questions</h2>
+
+    <ol>
+        <li>Why do we need hybrid encryption?</li>
+        <li>What are the four steps of hybrid encryption?</li>
+        <li>How does TLS use hybrid encryption?</li>
+        <li>What is Perfect Forward Secrecy?</li>
+        <li>Why is ECDHE preferred for key exchange?</li>
+    </ol>
+
+    <h2>4.8 Next Chapter Preview</h2>
+
+    <p>Chapter 5 covers key management, the often-overlooked but critical aspect of any encryption system, including key lifecycle, storage, and rotation.</p>
+</body>
+</html>

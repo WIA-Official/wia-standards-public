@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Architecture and Access Models - WIA-ACCESS_CONTROL</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-success {
+            border-left-color: var(--success);
+        }
+        .highlight-warning {
+            border-left-color: var(--warning);
+        }
+        .highlight-error {
+            border-left-color: var(--error);
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: Architecture and Access Models</h1>
+
+    <p>The architecture of an access control system determines its scalability, performance, security, and manageability. This chapter explores the architectural patterns and access models defined by the WIA-ACCESS_CONTROL standard, with particular focus on Role-Based Access Control (RBAC) and Attribute-Based Access Control (ABAC).</p>
+
+    <h2>WIA-ACCESS_CONTROL Reference Architecture</h2>
+
+    <p>The WIA-ACCESS_CONTROL standard defines a modular, extensible architecture that can be adapted to various organizational needs. The reference architecture separates concerns into distinct components that communicate through well-defined interfaces.</p>
+
+    <pre>
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    WIA-ACCESS_CONTROL Reference Architecture            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│    ┌─────────────────────────────────────────────────────────────┐     │
+│    │                    Application Layer                         │     │
+│    │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │     │
+│    │  │ Web App │  │ Mobile  │  │   API   │  │ Service │        │     │
+│    │  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘        │     │
+│    └───────┼────────────┼────────────┼────────────┼──────────────┘     │
+│            │            │            │            │                     │
+│    ┌───────▼────────────▼────────────▼────────────▼──────────────┐     │
+│    │              Policy Enforcement Point (PEP)                  │     │
+│    │         Intercepts requests, enforces decisions              │     │
+│    └─────────────────────────┬───────────────────────────────────┘     │
+│                              │                                         │
+│    ┌─────────────────────────▼───────────────────────────────────┐     │
+│    │              Policy Decision Point (PDP)                     │     │
+│    │         Evaluates policies, renders decisions                │     │
+│    └──────┬─────────────────┬─────────────────┬──────────────────┘     │
+│           │                 │                 │                        │
+│    ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐                │
+│    │    PAP     │   │    PIP     │   │    PRP     │                │
+│    │  Policy    │   │  Policy    │   │  Policy    │                │
+│    │ Admin Pt   │   │ Info Pt    │   │ Retrieval  │                │
+│    └─────────────┘   └─────────────┘   └─────────────┘                │
+│                                                                         │
+│    ┌─────────────────────────────────────────────────────────────┐     │
+│    │                    Data Layer                                │     │
+│    │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │     │
+│    │  │ Policy  │  │ Identity│  │  Audit  │  │ Context │        │     │
+│    │  │  Store  │  │  Store  │  │   Log   │  │  Store  │        │     │
+│    │  └─────────┘  └─────────┘  └─────────┘  └─────────┘        │     │
+│    └─────────────────────────────────────────────────────────────┘     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2>Core Architectural Components</h2>
+
+    <h3>Policy Enforcement Point (PEP)</h3>
+    <p>The Policy Enforcement Point serves as the gateway for all access requests. It intercepts requests from applications, forwards them to the PDP for evaluation, and enforces the resulting decisions. The PEP must be positioned strategically to ensure no bypass is possible.</p>
+
+    <pre>
+class PolicyEnforcementPoint {
+    private pdp: PolicyDecisionPoint;
+    private cache: DecisionCache;
+    private auditor: AuditLogger;
+
+    constructor(config: PEPConfig) {
+        this.pdp = new PolicyDecisionPoint(config.pdpEndpoint);
+        this.cache = new DecisionCache(config.cacheTTL);
+        this.auditor = new AuditLogger(config.auditConfig);
+    }
+
+    async enforceAccess(request: AccessRequest): Promise<EnforcementResult> {
+        // Check cache first for performance
+        const cachedDecision = this.cache.get(request.getCacheKey());
+        if (cachedDecision && !cachedDecision.expired) {
+            this.auditor.logCachedDecision(request, cachedDecision);
+            return this.enforce(cachedDecision);
+        }
+
+        // Request decision from PDP
+        const decision = await this.pdp.evaluate(request);
+
+        // Cache the decision
+        this.cache.set(request.getCacheKey(), decision);
+
+        // Log the decision
+        this.auditor.logDecision(request, decision);
+
+        // Enforce the decision
+        return this.enforce(decision);
+    }
+
+    private enforce(decision: PolicyDecision): EnforcementResult {
+        if (decision.effect === 'Permit') {
+            return { allowed: true, obligations: decision.obligations };
+        } else {
+            return { allowed: false, reason: decision.reason };
+        }
+    }
+}
+    </pre>
+
+    <h3>Policy Decision Point (PDP)</h3>
+    <p>The Policy Decision Point is the brain of the access control system. It evaluates access requests against policies and renders authorization decisions. The PDP must handle complex policy logic efficiently while maintaining consistency.</p>
+
+    <div class="highlight">
+        <strong>Performance Consideration:</strong> The PDP is often the bottleneck in access control systems. WIA-ACCESS_CONTROL recommends implementing decision caching, policy indexing, and load balancing to ensure responsive authorization decisions even under heavy load.
+    </div>
+
+    <h3>Policy Administration Point (PAP)</h3>
+    <p>The Policy Administration Point provides interfaces for creating, editing, testing, and deploying access control policies. It should include workflow capabilities for policy approval, version control, and rollback mechanisms.</p>
+
+    <h3>Policy Information Point (PIP)</h3>
+    <p>The Policy Information Point retrieves attribute values needed for policy evaluation. It interfaces with identity providers, HR systems, asset databases, and other authoritative sources to gather subject, object, and environmental attributes.</p>
+
+    <h2>Role-Based Access Control (RBAC)</h2>
+
+    <p>RBAC is the most widely deployed access control model in enterprise environments. It simplifies administration by assigning permissions to roles rather than directly to users. The WIA-ACCESS_CONTROL standard defines a hierarchical RBAC model with support for constraints.</p>
+
+    <h3>RBAC Components</h3>
+
+    <ul>
+        <li><strong>Users:</strong> Human individuals or automated processes that need access</li>
+        <li><strong>Roles:</strong> Named collections of permissions that reflect job functions</li>
+        <li><strong>Permissions:</strong> Approved operations on specific resources</li>
+        <li><strong>Sessions:</strong> Mappings between users and activated roles</li>
+    </ul>
+
+    <pre>
+// WIA-ACCESS_CONTROL RBAC Model Implementation
+interface RBACModel {
+    // Core RBAC
+    users: Set&lt;User&gt;;
+    roles: Set&lt;Role&gt;;
+    permissions: Set&lt;Permission&gt;;
+
+    // User-Role Assignment
+    userRoleAssignment: Map&lt;User, Set&lt;Role&gt;&gt;;
+
+    // Permission-Role Assignment
+    permissionRoleAssignment: Map&lt;Role, Set&lt;Permission&gt;&gt;;
+
+    // Hierarchical RBAC
+    roleHierarchy: Map&lt;Role, Set&lt;Role&gt;&gt;; // Senior roles inherit from junior roles
+
+    // Constrained RBAC
+    staticSeparationOfDuty: SSDConstraint[];
+    dynamicSeparationOfDuty: DSDConstraint[];
+}
+
+// Role Definition
+interface Role {
+    id: string;
+    name: string;
+    description: string;
+    inheritsFrom: Role[];
+    permissions: Permission[];
+    constraints: RoleConstraint[];
+}
+
+// Example role hierarchy
+const roleHierarchy = {
+    'ceo': {
+        inherits: ['cto', 'cfo', 'coo'],
+        directPermissions: ['company.strategy.full']
+    },
+    'cto': {
+        inherits: ['engineering-director', 'security-director'],
+        directPermissions: ['technology.strategy.full']
+    },
+    'engineering-director': {
+        inherits: ['senior-engineer', 'team-lead'],
+        directPermissions: ['engineering.budget.approve', 'engineering.hire.approve']
+    },
+    'senior-engineer': {
+        inherits: ['engineer'],
+        directPermissions: ['code.review.approve', 'deploy.production.execute']
+    },
+    'engineer': {
+        inherits: [],
+        directPermissions: ['code.read', 'code.write', 'deploy.staging.execute']
+    }
+};
+    </pre>
+
+    <h3>RBAC Constraints</h3>
+
+    <p>Constraints add security controls to the RBAC model by limiting role assignments and activations.</p>
+
+    <div class="highlight highlight-warning">
+        <strong>Separation of Duties:</strong> Static Separation of Duty (SSD) prevents users from being assigned conflicting roles (e.g., a user cannot be both an auditor and an administrator). Dynamic Separation of Duty (DSD) prevents users from activating conflicting roles in the same session.
+    </div>
+
+    <pre>
+// Separation of Duty Constraints
+class SeparationOfDutyEngine {
+    private ssdConstraints: SSDConstraint[] = [];
+    private dsdConstraints: DSDConstraint[] = [];
+
+    addSSDConstraint(constraint: SSDConstraint): void {
+        // Example: User cannot be both 'accountant' and 'auditor'
+        this.ssdConstraints.push(constraint);
+    }
+
+    addDSDConstraint(constraint: DSDConstraint): void {
+        // Example: User cannot activate 'purchaser' and 'approver' in same session
+        this.dsdConstraints.push(constraint);
+    }
+
+    checkSSD(user: User, newRole: Role): boolean {
+        const userRoles = this.getUserRoles(user);
+
+        for (const constraint of this.ssdConstraints) {
+            const conflictingRoles = constraint.roles;
+            const cardinality = constraint.cardinality;
+
+            const matchingRoles = userRoles.filter(r =>
+                conflictingRoles.includes(r) || r === newRole
+            );
+
+            if (matchingRoles.length >= cardinality) {
+                return false; // Constraint violated
+            }
+        }
+        return true;
+    }
+
+    checkDSD(session: Session, roleToActivate: Role): boolean {
+        const activeRoles = session.getActiveRoles();
+
+        for (const constraint of this.dsdConstraints) {
+            const conflictingRoles = constraint.roles;
+            const cardinality = constraint.cardinality;
+
+            const matchingRoles = activeRoles.filter(r =>
+                conflictingRoles.includes(r) || r === roleToActivate
+            );
+
+            if (matchingRoles.length >= cardinality) {
+                return false; // Constraint violated
+            }
+        }
+        return true;
+    }
+}
+    </pre>
+
+    <h2>Attribute-Based Access Control (ABAC)</h2>
+
+    <p>ABAC provides fine-grained access control by evaluating attributes of subjects, objects, actions, and the environment. This model is more flexible than RBAC and can express complex, context-aware policies.</p>
+
+    <h3>ABAC Components</h3>
+
+    <table>
+        <tr>
+            <th>Component</th>
+            <th>Description</th>
+            <th>Examples</th>
+        </tr>
+        <tr>
+            <td>Subject Attributes</td>
+            <td>Properties of the requesting entity</td>
+            <td>Role, department, clearance, location</td>
+        </tr>
+        <tr>
+            <td>Object Attributes</td>
+            <td>Properties of the target resource</td>
+            <td>Classification, owner, type, sensitivity</td>
+        </tr>
+        <tr>
+            <td>Action Attributes</td>
+            <td>Properties of the requested operation</td>
+            <td>Read, write, delete, approve</td>
+        </tr>
+        <tr>
+            <td>Environment Attributes</td>
+            <td>Contextual conditions</td>
+            <td>Time, location, threat level, device trust</td>
+        </tr>
+    </table>
+
+    <pre>
+// WIA-ACCESS_CONTROL ABAC Policy Language
+interface ABACPolicy {
+    id: string;
+    name: string;
+    description: string;
+    target: PolicyTarget;
+    rules: PolicyRule[];
+    combiningAlgorithm: CombiningAlgorithm;
+}
+
+interface PolicyRule {
+    id: string;
+    effect: 'Permit' | 'Deny';
+    condition: Expression;
+    obligations?: Obligation[];
+}
+
+// Example ABAC Policy
+const documentAccessPolicy: ABACPolicy = {
+    id: 'policy-doc-001',
+    name: 'Confidential Document Access',
+    description: 'Controls access to confidential documents',
+    target: {
+        resources: { type: 'document', classification: 'confidential' }
+    },
+    combiningAlgorithm: 'deny-unless-permit',
+    rules: [
+        {
+            id: 'rule-1',
+            effect: 'Permit',
+            condition: {
+                and: [
+                    { attr: 'subject.clearance', op: '>=', value: 'confidential' },
+                    { attr: 'subject.department', op: '==', value: 'object.owner_department' },
+                    { attr: 'environment.network', op: 'in', value: ['corporate', 'vpn'] },
+                    { attr: 'environment.time', op: 'between', value: ['08:00', '18:00'] }
+                ]
+            },
+            obligations: [
+                { type: 'log', params: { level: 'info', message: 'Confidential access granted' } },
+                { type: 'notify', params: { recipient: 'security-team', condition: 'after-hours' } }
+            ]
+        },
+        {
+            id: 'rule-2-emergency',
+            effect: 'Permit',
+            condition: {
+                and: [
+                    { attr: 'subject.role', op: 'in', value: ['executive', 'security-admin'] },
+                    { attr: 'request.justification', op: 'exists' }
+                ]
+            },
+            obligations: [
+                { type: 'log', params: { level: 'alert', message: 'Emergency access invoked' } }
+            ]
+        }
+    ]
+};
+    </pre>
+
+    <h2>Hybrid RBAC-ABAC Model</h2>
+
+    <p>The WIA-ACCESS_CONTROL standard recommends a hybrid approach that combines the administrative simplicity of RBAC with the fine-grained flexibility of ABAC. This model uses RBAC for coarse-grained access control and ABAC for context-aware refinements.</p>
+
+    <div class="highlight highlight-success">
+        <strong>Best Practice:</strong> Start with RBAC for basic access control structure, then layer ABAC policies for scenarios requiring dynamic, context-aware decisions. This approach balances manageability with flexibility.
+    </div>
+
+    <pre>
+// Hybrid RBAC-ABAC Implementation
+class HybridAccessControl {
+    private rbacEngine: RBACEngine;
+    private abacEngine: ABACEngine;
+
+    async checkAccess(request: AccessRequest): Promise&lt;AccessDecision&gt; {
+        // Step 1: RBAC check - does the user's role permit this action?
+        const rbacDecision = await this.rbacEngine.evaluate({
+            subject: request.subject,
+            resource: request.resource,
+            action: request.action
+        });
+
+        if (rbacDecision.effect === 'Deny') {
+            return {
+                effect: 'Deny',
+                reason: 'RBAC: Insufficient role permissions',
+                evaluatedBy: 'RBAC'
+            };
+        }
+
+        // Step 2: ABAC refinement - check contextual constraints
+        const abacDecision = await this.abacEngine.evaluate({
+            subject: request.subject,
+            resource: request.resource,
+            action: request.action,
+            environment: request.environment
+        });
+
+        if (abacDecision.effect === 'Deny') {
+            return {
+                effect: 'Deny',
+                reason: `ABAC: ${abacDecision.reason}`,
+                evaluatedBy: 'ABAC'
+            };
+        }
+
+        // Both RBAC and ABAC permit - access granted
+        return {
+            effect: 'Permit',
+            obligations: [...rbacDecision.obligations, ...abacDecision.obligations],
+            evaluatedBy: 'Hybrid'
+        };
+    }
+}
+    </pre>
+
+    <h2>Deployment Architectures</h2>
+
+    <h3>Centralized Architecture</h3>
+    <p>All access control decisions are made by a central PDP. This simplifies policy management but can become a bottleneck and single point of failure.</p>
+
+    <h3>Distributed Architecture</h3>
+    <p>Multiple PDPs are deployed across the infrastructure. Policies are synchronized across instances. This improves performance and availability but increases complexity.</p>
+
+    <h3>Edge Architecture</h3>
+    <p>Lightweight PEPs with local decision-making capabilities are deployed at the edge. Complex decisions are escalated to central PDPs. This optimizes latency for common cases.</p>
+
+    <pre>
+// Deployment Configuration Examples
+const deploymentConfigs = {
+    centralized: {
+        pdp: {
+            instances: 2,
+            loadBalancing: 'round-robin',
+            cacheEnabled: true,
+            cacheTTL: 300
+        },
+        pep: {
+            mode: 'proxy',
+            pdpConnection: 'https://pdp.internal:8443'
+        }
+    },
+
+    distributed: {
+        pdp: {
+            instances: 'per-region',
+            syncMode: 'eventual-consistency',
+            syncInterval: 30,
+            conflictResolution: 'most-restrictive'
+        },
+        policyStore: {
+            type: 'distributed',
+            replicationFactor: 3
+        }
+    },
+
+    edge: {
+        edgePEP: {
+            localDecisionCapability: true,
+            commonPoliciesCache: true,
+            escalationThreshold: 'complex-policy'
+        },
+        centralPDP: {
+            role: 'escalation-handler',
+            policyAuthority: true
+        }
+    }
+};
+    </pre>
+
+    <h2>Summary</h2>
+
+    <p>This chapter has explored the architectural foundations of access control systems according to the WIA-ACCESS_CONTROL standard. We examined the reference architecture with its core components (PEP, PDP, PAP, PIP, PRP), dove deep into RBAC and ABAC models, and discussed hybrid approaches and deployment patterns.</p>
+
+    <div class="highlight">
+        <strong>Key Takeaways:</strong>
+        <ul>
+            <li>The WIA-ACCESS_CONTROL architecture separates concerns into distinct, well-defined components</li>
+            <li>RBAC provides administrative simplicity through role-based permission assignment</li>
+            <li>ABAC enables fine-grained, context-aware access control through attribute evaluation</li>
+            <li>Hybrid models combine RBAC and ABAC for optimal balance of manageability and flexibility</li>
+            <li>Deployment architecture should match organizational scale and performance requirements</li>
+        </ul>
+    </div>
+
+</body>
+</html>

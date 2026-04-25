@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Chiplet Architecture and UCIe 3.0 | WIA-SEMI-PKG-001</title>
+    <meta name="description" content="Deep dive into chiplet-based design and UCIe 3.0 standard for die-to-die interconnects">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a25;
+            --bg-card: #16161f;
+            --text-primary: #e8e8f0;
+            --text-secondary: #a0a0b0;
+            --text-muted: #6a6a7a;
+            --accent-primary: #00d4aa;
+            --accent-secondary: #0099ff;
+            --accent-tertiary: #ff6b35;
+            --accent-purple: #a855f7;
+            --border-color: #2a2a3a;
+            --gradient-1: linear-gradient(135deg, #00d4aa 0%, #0099ff 100%);
+            --gradient-2: linear-gradient(135deg, #ff6b35 0%, #ff3366 100%);
+            --gradient-3: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+            --shadow-glow: 0 0 40px rgba(0, 212, 170, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            width: 200%; height: 200%;
+            background: 
+                radial-gradient(ellipse 800px 600px at 20% 30%, rgba(0, 212, 170, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 600px 500px at 80% 70%, rgba(0, 153, 255, 0.06) 0%, transparent 50%);
+            animation: bgMove 30s ease-in-out infinite;
+        }
+
+        @keyframes bgMove { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-5%, -5%); } }
+
+        header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 50px; height: 50px;
+            background: var(--gradient-1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: #000;
+        }
+
+        .logo-text { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+        .logo-subtitle { font-size: 0.75rem; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 2px; }
+
+        nav ul { display: flex; gap: 30px; list-style: none; }
+        nav a { color: var(--text-secondary); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.3s; }
+        nav a:hover { color: var(--accent-primary); }
+
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-switch a { padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-decoration: none; transition: all 0.3s; }
+        .lang-switch a.active { background: var(--gradient-1); color: #000; }
+        .lang-switch a:not(.active) { color: var(--text-secondary); border: 1px solid var(--border-color); }
+
+        .chapter-hero { padding: 80px 40px 60px; max-width: 1200px; margin: 0 auto; }
+        .chapter-badge { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--accent-primary); color: var(--accent-primary); padding: 8px 20px; border-radius: 50px; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+
+        .chapter-hero h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 20px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .chapter-meta { display: flex; gap: 30px; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 30px; }
+        .chapter-content { max-width: 900px; margin: 0 auto; padding: 0 40px 100px; }
+        .content-section { margin-bottom: 60px; }
+        .content-section h2 { font-size: 2rem; font-weight: 700; margin-bottom: 25px; color: var(--text-primary); padding-bottom: 15px; border-bottom: 2px solid var(--border-color); }
+        .content-section h3 { font-size: 1.5rem; font-weight: 600; margin: 35px 0 20px; color: var(--accent-primary); }
+        .content-section h4 { font-size: 1.2rem; font-weight: 600; margin: 25px 0 15px; color: var(--text-primary); }
+        .content-section p { color: var(--text-secondary); margin-bottom: 20px; font-size: 1.05rem; line-height: 1.9; }
+        .content-section ul, .content-section ol { color: var(--text-secondary); margin: 20px 0 20px 30px; }
+        .content-section li { margin-bottom: 12px; line-height: 1.7; }
+
+        .info-box { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; padding: 30px; margin: 30px 0; }
+        .info-box.highlight { border-color: var(--accent-primary); background: linear-gradient(135deg, rgba(0, 212, 170, 0.1) 0%, rgba(0, 153, 255, 0.05) 100%); }
+        .info-box.warning { border-color: var(--accent-tertiary); background: linear-gradient(135deg, rgba(255, 107, 53, 0.1) 0%, rgba(255, 51, 102, 0.05) 100%); }
+        .info-box h4 { color: var(--accent-primary); font-size: 1.1rem; margin-bottom: 15px; }
+        .info-box.warning h4 { color: var(--accent-tertiary); }
+
+        .tech-table { width: 100%; border-collapse: collapse; margin: 30px 0; background: var(--bg-secondary); border-radius: 12px; overflow: hidden; }
+        .tech-table th, .tech-table td { padding: 16px 20px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .tech-table th { background: var(--bg-tertiary); color: var(--accent-primary); font-weight: 600; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; }
+        .tech-table td { color: var(--text-secondary); }
+        .tech-table tr:last-child td { border-bottom: none; }
+        .tech-table tr:hover td { background: var(--bg-tertiary); }
+
+        .code-block { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin: 25px 0; font-family: 'Fira Code', 'Monaco', monospace; font-size: 0.9rem; overflow-x: auto; }
+        .code-block .comment { color: var(--text-muted); }
+        .code-block .keyword { color: var(--accent-purple); }
+        .code-block .string { color: var(--accent-primary); }
+        .code-block .number { color: var(--accent-tertiary); }
+
+        .diagram-container { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; padding: 40px; margin: 40px 0; text-align: center; }
+        .diagram-title { color: var(--accent-primary); font-weight: 600; margin-bottom: 30px; font-size: 1.1rem; }
+
+        .ucie-layer { display: flex; justify-content: center; gap: 5px; margin: 10px 0; flex-wrap: wrap; }
+        .ucie-box { background: var(--bg-tertiary); border: 2px solid var(--accent-primary); border-radius: 8px; padding: 15px 25px; color: var(--text-primary); font-weight: 500; font-size: 0.9rem; }
+        .ucie-box.adapter { border-color: var(--accent-secondary); }
+        .ucie-box.phy { border-color: var(--accent-purple); }
+        .ucie-box.die { border-color: var(--accent-tertiary); }
+
+        .chapter-nav { display: flex; justify-content: space-between; align-items: center; padding: 40px; max-width: 900px; margin: 0 auto; border-top: 1px solid var(--border-color); }
+        .nav-btn { display: flex; align-items: center; gap: 10px; padding: 15px 30px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-primary); text-decoration: none; font-weight: 500; transition: all 0.3s; }
+        .nav-btn:hover { border-color: var(--accent-primary); background: var(--bg-tertiary); }
+        .nav-btn.next { background: var(--gradient-1); color: #000; border: none; }
+        .nav-btn.next:hover { transform: translateX(5px); }
+        .nav-btn.prev:hover { transform: translateX(-5px); }
+
+        footer { background: var(--bg-secondary); padding: 40px; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+        footer a { color: var(--accent-primary); text-decoration: none; }
+
+        @media (max-width: 768px) {
+            .chapter-hero h1 { font-size: 2rem; }
+            .chapter-meta { flex-direction: column; gap: 10px; }
+            .header-content { flex-direction: column; gap: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">W</div>
+                <div>
+                    <div class="logo-text">WIA Standards</div>
+                    <div class="logo-subtitle">Semiconductor Packaging</div>
+                </div>
+            </a>
+            <div class="lang-switch">
+                <a href="chapter-02.html" class="active">EN</a>
+                <a href="../ko/chapter-02.html">KO</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="chapter-hero">
+        <span class="chapter-badge">Chapter 02</span>
+        <h1>Chiplet Architecture and UCIe 3.0 Standard</h1>
+        <div class="chapter-meta">
+            <span>20 min read</span>
+            <span>Last updated: January 2026</span>
+            <span>WIA-SEMI-PKG-001</span>
+        </div>
+    </section>
+
+    <main class="chapter-content">
+        <section class="content-section">
+            <h2>2.1 The Chiplet Revolution</h2>
+            <p>
+                The chiplet architecture represents one of the most significant paradigm shifts in semiconductor 
+                design since the invention of the integrated circuit. Rather than designing and manufacturing a 
+                single monolithic die containing all system functions, the chiplet approach disaggregates the 
+                system into multiple smaller, specialized dies that are integrated within a single package. 
+                This modular approach offers compelling advantages in yield, cost, time-to-market, and design 
+                flexibility.
+            </p>
+            <p>
+                AMD pioneered the commercial adoption of chiplet architecture with their Zen 2 processor family 
+                in 2019, demonstrating that multiple small compute chiplets could be combined with a larger 
+                I/O die to create high-performance processors at competitive costs. This approach enabled AMD 
+                to offer 64-core server processors while maintaining competitive yields and pricing, something 
+                that would have been extremely challenging with a monolithic approach.
+            </p>
+
+            <h3>Advantages of Chiplet Design</h3>
+            <p>
+                The chiplet approach offers several fundamental advantages that become more pronounced as 
+                transistor densities increase and manufacturing costs escalate at advanced nodes:
+            </p>
+
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>Advantage</th>
+                        <th>Description</th>
+                        <th>Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Improved Yield</td>
+                        <td>Smaller dies have exponentially better yield</td>
+                        <td>40-60% cost reduction possible</td>
+                    </tr>
+                    <tr>
+                        <td>Process Flexibility</td>
+                        <td>Each chiplet uses optimal process node</td>
+                        <td>Better performance/watt, lower cost</td>
+                    </tr>
+                    <tr>
+                        <td>Design Reuse</td>
+                        <td>Validated chiplets used across products</td>
+                        <td>Faster time-to-market</td>
+                    </tr>
+                    <tr>
+                        <td>Product Scalability</td>
+                        <td>Same chiplets, different configurations</td>
+                        <td>Broader product portfolio</td>
+                    </tr>
+                    <tr>
+                        <td>Supplier Flexibility</td>
+                        <td>Chiplets from different vendors</td>
+                        <td>Reduced supply chain risk</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Chiplet Categories</h3>
+            <p>
+                Chiplets can be categorized by their function and the technology requirements for their 
+                implementation. Understanding these categories helps system architects select the right 
+                combination of chiplets for their target applications:
+            </p>
+            <ul>
+                <li><strong>Compute Chiplets:</strong> CPU cores, GPU compute units, and AI accelerators. These typically require the most advanced process nodes (3nm, 2nm) to maximize performance and energy efficiency.</li>
+                <li><strong>Memory Interface Chiplets:</strong> DDR5, LPDDR5X, and HBM controllers. Often implemented on mature nodes (7nm, 12nm) due to the analog-intensive nature of memory PHYs.</li>
+                <li><strong>I/O Chiplets:</strong> PCIe 6.0, CXL 3.0, Ethernet, and USB controllers. These integrate high-speed SerDes and typically use mature nodes for cost efficiency.</li>
+                <li><strong>Accelerator Chiplets:</strong> Specialized functions like video codecs, security engines, and DSP blocks. Node selection depends on performance requirements.</li>
+                <li><strong>Passive Interposers:</strong> Silicon or organic substrates providing interconnect between active chiplets without containing active circuitry.</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>2.2 Universal Chiplet Interconnect Express (UCIe)</h2>
+            <p>
+                The Universal Chiplet Interconnect Express (UCIe) specification represents a watershed moment 
+                for the semiconductor industry, providing the first comprehensive open standard for die-to-die 
+                interconnects. Announced in March 2022 by a consortium of industry leaders including AMD, ARM, 
+                ASE, Google, Intel, Meta, Microsoft, Qualcomm, Samsung, and TSMC, UCIe aims to create an 
+                ecosystem where chiplets from different vendors can interoperate seamlessly.
+            </p>
+            <p>
+                Prior to UCIe, each company developed proprietary die-to-die interfaces, making it impossible 
+                to mix chiplets from different sources. AMD's Infinity Fabric, Intel's AIB and EMIB, and 
+                TSMC's LIPINCON all used different electrical specifications, protocols, and physical 
+                implementations. UCIe addresses this fragmentation by defining a comprehensive standard 
+                covering the physical layer, protocol layer, and software stack.
+            </p>
+
+            <div class="info-box highlight">
+                <h4>UCIe 3.0 Release - August 2025</h4>
+                <p>
+                    UCIe 3.0, ratified in August 2025, introduces significant enhancements including 64 GT/s 
+                    per lane signaling (up from 32 GT/s in 2.0), advanced FEC for improved reliability, and 
+                    enhanced security features. The specification also introduces support for photonic 
+                    interconnects, enabling optical die-to-die communication for future high-bandwidth applications.
+                </p>
+            </div>
+
+            <h3>UCIe Protocol Stack</h3>
+            <p>
+                The UCIe specification defines a layered protocol stack similar to the OSI model used in 
+                networking. This modular approach allows flexibility in implementation while ensuring 
+                interoperability:
+            </p>
+
+            <div class="diagram-container">
+                <div class="diagram-title">UCIe Protocol Stack Architecture</div>
+                <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
+                    <div class="ucie-layer">
+                        <div class="ucie-box">PCIe</div>
+                        <div class="ucie-box">CXL</div>
+                        <div class="ucie-box">Streaming</div>
+                        <div class="ucie-box">Custom</div>
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">Protocol Layer</div>
+                    <div class="ucie-layer">
+                        <div class="ucie-box adapter">Die-to-Die Adapter</div>
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">Adapter Layer</div>
+                    <div class="ucie-layer">
+                        <div class="ucie-box phy">UCIe PHY - Electrical/Logical</div>
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">Physical Layer</div>
+                    <div class="ucie-layer">
+                        <div class="ucie-box die">Die-to-Die Link</div>
+                    </div>
+                </div>
+            </div>
+
+            <h4>Physical Layer</h4>
+            <p>
+                The UCIe physical layer defines the electrical characteristics, signaling protocols, and 
+                physical interface specifications for die-to-die communication. UCIe supports two packaging 
+                options: standard package (longer reach, ~25mm) and advanced package (shorter reach, ~2mm), 
+                each with different bump pitch and electrical requirements.
+            </p>
+
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Standard Package</th>
+                        <th>Advanced Package</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Bump Pitch</td>
+                        <td>100-130 μm</td>
+                        <td>25-55 μm</td>
+                    </tr>
+                    <tr>
+                        <td>Reach</td>
+                        <td>Up to 25mm</td>
+                        <td>Up to 2mm</td>
+                    </tr>
+                    <tr>
+                        <td>Data Rate (UCIe 3.0)</td>
+                        <td>32 GT/s</td>
+                        <td>64 GT/s</td>
+                    </tr>
+                    <tr>
+                        <td>Bandwidth Density</td>
+                        <td>28 GB/s/mm</td>
+                        <td>1350 GB/s/mm</td>
+                    </tr>
+                    <tr>
+                        <td>Energy Efficiency</td>
+                        <td>0.5 pJ/bit</td>
+                        <td>0.25 pJ/bit</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Die-to-Die Adapter Layer</h4>
+            <p>
+                The adapter layer bridges between the protocol layer and physical layer, handling link 
+                training, parameter negotiation, and error recovery. It provides a consistent interface to 
+                the protocol layer regardless of the underlying physical implementation, enabling the same 
+                protocol IP to work with both standard and advanced packaging options.
+            </p>
+
+            <h4>Protocol Layer</h4>
+            <p>
+                UCIe supports multiple protocols over the same physical interface, enabling flexible system 
+                architectures. Native protocol support includes:
+            </p>
+            <ul>
+                <li><strong>PCIe 6.0:</strong> For legacy compatibility and I/O expansion</li>
+                <li><strong>CXL 3.0:</strong> For cache-coherent memory expansion and pooling</li>
+                <li><strong>Streaming Protocol:</strong> For raw data streaming between chiplets</li>
+                <li><strong>Custom Protocols:</strong> Vendor-specific protocols for specialized applications</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>2.3 UCIe 3.0 Technical Specifications</h2>
+            <p>
+                UCIe 3.0 represents a significant advancement over previous versions, addressing the demands 
+                of next-generation AI accelerators and high-performance computing systems. The specification 
+                introduces several key enhancements:
+            </p>
+
+            <h3>Signaling Enhancements</h3>
+            <p>
+                UCIe 3.0 doubles the per-lane data rate to 64 GT/s for advanced packaging, achieved through 
+                PAM4 (4-level pulse amplitude modulation) signaling combined with advanced equalization 
+                techniques. This enables bandwidth densities exceeding 1.3 TB/s per millimeter of die edge, 
+                critical for memory-bandwidth-hungry AI workloads.
+            </p>
+
+            <div class="code-block">
+<span class="comment">// UCIe 3.0 Lane Configuration Example</span>
+<span class="keyword">typedef struct</span> {
+    <span class="keyword">uint8_t</span>  lane_count;        <span class="comment">// 16, 32, or 64 lanes</span>
+    <span class="keyword">uint8_t</span>  data_rate;         <span class="comment">// 32 or 64 GT/s</span>
+    <span class="keyword">uint8_t</span>  modulation;        <span class="comment">// NRZ or PAM4</span>
+    <span class="keyword">uint16_t</span> flit_size;         <span class="comment">// 256 bytes typical</span>
+    <span class="keyword">bool</span>     fec_enabled;       <span class="comment">// RS-FEC for reliability</span>
+    <span class="keyword">bool</span>     retry_enabled;     <span class="comment">// Link-level retry</span>
+} ucie_config_t;
+
+<span class="comment">// Bandwidth calculation</span>
+<span class="comment">// 64 lanes × 64 GT/s × 0.9375 (encoding) = 3.84 TB/s raw</span>
+<span class="comment">// With FEC overhead: ~3.5 TB/s effective bandwidth</span>
+            </div>
+
+            <h3>Forward Error Correction (FEC)</h3>
+            <p>
+                UCIe 3.0 mandates Reed-Solomon FEC for advanced package configurations operating at 64 GT/s. 
+                The FEC implementation provides a coding gain of approximately 6 dB, essential for maintaining 
+                bit error rates below 10^-15 at the elevated data rates. The specification supports multiple 
+                FEC modes to balance latency and reliability:
+            </p>
+            <ul>
+                <li><strong>Bypass Mode:</strong> No FEC, lowest latency, suitable for short reaches</li>
+                <li><strong>Light FEC:</strong> RS(544,514), 5.8% overhead, moderate correction</li>
+                <li><strong>Strong FEC:</strong> RS(544,480), 13.3% overhead, maximum correction</li>
+            </ul>
+
+            <h3>Security Features</h3>
+            <p>
+                UCIe 3.0 introduces comprehensive security features to protect against physical attacks and 
+                ensure data integrity across chiplet boundaries:
+            </p>
+
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Description</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>IDE (Integrity and Data Encryption)</td>
+                        <td>AES-256-GCM encryption for data-in-motion</td>
+                        <td>Confidential computing</td>
+                    </tr>
+                    <tr>
+                        <td>Authentication</td>
+                        <td>SPDM-based chiplet authentication</td>
+                        <td>Supply chain security</td>
+                    </tr>
+                    <tr>
+                        <td>Link Integrity</td>
+                        <td>MAC-based integrity verification</td>
+                        <td>Tamper detection</td>
+                    </tr>
+                    <tr>
+                        <td>Key Management</td>
+                        <td>Secure key provisioning and rotation</td>
+                        <td>Lifecycle management</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box warning">
+                <h4>Implementation Consideration</h4>
+                <p>
+                    Security features add latency to the die-to-die link. IDE encryption typically adds 
+                    10-20 nanoseconds of latency, which may impact performance-critical paths. System 
+                    architects should carefully evaluate which links require security features and which 
+                    can operate in bypass mode based on threat models.
+                </p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>2.4 Industry Implementations</h2>
+            <p>
+                Several major semiconductor companies have announced or shipped products utilizing chiplet 
+                architectures with various die-to-die interconnects. While UCIe adoption is growing, 
+                proprietary solutions continue to play important roles in the transition period.
+            </p>
+
+            <h3>AMD EPYC and Ryzen (Infinity Fabric)</h3>
+            <p>
+                AMD's Infinity Fabric has been the most commercially successful chiplet interconnect to date. 
+                Used across EPYC server processors, Ryzen desktop CPUs, and Instinct accelerators, Infinity 
+                Fabric enables AMD to scale from 8-core desktop chips to 192-core server processors using the 
+                same compute chiplet designs.
+            </p>
+            <p>
+                The fourth generation Infinity Fabric (IF4) in EPYC Genoa and Turin provides 32 GB/s per link 
+                with support for cache coherency across chiplets. AMD has committed to UCIe adoption for future 
+                products, enabling interoperability with third-party chiplets.
+            </p>
+
+            <h3>Intel Ponte Vecchio and Falcon Shores</h3>
+            <p>
+                Intel's Ponte Vecchio GPU, used in the Aurora supercomputer, represents one of the most 
+                complex chiplet designs ever produced. The package integrates 47 active tiles (chiplets) using 
+                Intel's EMIB (Embedded Multi-die Interconnect Bridge) and Foveros technologies. The successor 
+                Falcon Shores architecture is designed for UCIe compatibility.
+            </p>
+
+            <h3>NVIDIA Grace Hopper and Blackwell</h3>
+            <p>
+                NVIDIA's Grace Hopper superchip combines a Grace CPU with a Hopper GPU using NVLink-C2C 
+                (chip-to-chip) technology. The Blackwell architecture extends this with a 10 TB/s coherent 
+                interconnect between GPU dies. NVIDIA has joined the UCIe consortium, signaling future 
+                adoption of the standard.
+            </p>
+
+            <h3>UCIe Ecosystem Partners</h3>
+            <p>
+                The UCIe ecosystem extends beyond processor vendors to include IP providers, EDA tools, 
+                and packaging houses:
+            </p>
+            <ul>
+                <li><strong>IP Providers:</strong> Synopsys, Cadence, Rambus, and Alphawave Semi offer UCIe PHY and controller IP</li>
+                <li><strong>EDA Tools:</strong> Integrated design flows from Synopsys and Cadence support chiplet-based design</li>
+                <li><strong>OSATs:</strong> ASE, Amkor, and JCET provide UCIe-compatible packaging services</li>
+                <li><strong>Foundries:</strong> TSMC, Samsung, and Intel Foundry offer UCIe-compatible packaging technologies</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>2.5 Design Considerations for Chiplet Systems</h2>
+            <p>
+                Designing a chiplet-based system introduces unique challenges that differ significantly from 
+                monolithic IC design. System architects must consider partitioning strategies, interconnect 
+                bandwidth requirements, power delivery, thermal management, and test strategies.
+            </p>
+
+            <h3>System Partitioning</h3>
+            <p>
+                Effective chiplet partitioning requires careful analysis of data flows and communication patterns 
+                within the system. The goal is to minimize inter-chiplet bandwidth while maximizing the benefits 
+                of disaggregation. Key partitioning considerations include:
+            </p>
+            <ul>
+                <li><strong>Bandwidth Analysis:</strong> Identify high-bandwidth internal interfaces that should remain within a chiplet</li>
+                <li><strong>Latency Sensitivity:</strong> Time-critical paths may require co-location on the same chiplet</li>
+                <li><strong>Process Optimization:</strong> Group functions with similar process requirements</li>
+                <li><strong>Reuse Potential:</strong> Design chiplets for use across multiple product SKUs</li>
+                <li><strong>Yield Considerations:</strong> Balance chiplet size against yield improvements</li>
+            </ul>
+
+            <h3>Power Delivery Network</h3>
+            <p>
+                Chiplet systems present unique power delivery challenges. Each chiplet requires its own power 
+                delivery network (PDN), and the package substrate must distribute power efficiently to all 
+                chiplets while maintaining acceptable voltage droop. Advanced packaging technologies like CoWoS 
+                and EMIB include dedicated power distribution layers to address these challenges.
+            </p>
+
+            <h3>Thermal Management</h3>
+            <p>
+                The thermal challenge in chiplet systems stems from the concentration of heat sources across 
+                multiple dies within a single package. Hot spots can develop at chiplet boundaries and high-power 
+                regions. Thermal solutions must consider:
+            </p>
+            <ul>
+                <li>Non-uniform heat distribution across chiplets</li>
+                <li>Thermal interface between multiple dies and heat spreader</li>
+                <li>Different thermal requirements for different chiplet types</li>
+                <li>Impact of silicon interposer on vertical heat conduction</li>
+            </ul>
+
+            <div class="info-box highlight">
+                <h4>Best Practice: Chiplet Thermal Modeling</h4>
+                <p>
+                    Early thermal modeling is essential for chiplet system success. Create detailed thermal 
+                    models including all chiplets, interposer, substrate, and cooling solution. Validate models 
+                    with silicon measurements and iterate the design to ensure all chiplets operate within 
+                    thermal specifications under worst-case workloads.
+                </p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>2.6 Future Directions</h2>
+            <p>
+                The chiplet ecosystem continues to evolve rapidly, with several emerging trends shaping the 
+                future of heterogeneous integration:
+            </p>
+
+            <h3>Optical Interconnects</h3>
+            <p>
+                UCIe 3.0 introduces support for optical die-to-die communication, enabling dramatically higher 
+                bandwidth over longer distances with lower power consumption. Co-packaged optics (CPO) and 
+                on-die photonic integration are active research areas that could transform chiplet interconnects.
+            </p>
+
+            <h3>Chiplet Marketplaces</h3>
+            <p>
+                The UCIe standard enables the emergence of chiplet marketplaces where companies can source 
+                pre-validated chiplets from multiple vendors. This model, similar to the IP licensing model 
+                that transformed ASIC design, could democratize access to advanced semiconductor capabilities.
+            </p>
+
+            <h3>Advanced Bonding Technologies</h3>
+            <p>
+                Hybrid bonding and other advanced bonding technologies are pushing interconnect density beyond 
+                what bump-based approaches can achieve. Sub-micron pitch interconnects enable effective monolithic 
+                integration of separately manufactured dies, blurring the line between chiplet integration and 
+                wafer-level manufacturing.
+            </p>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <p>
+                Chiplet architecture and the UCIe standard represent a fundamental shift in how the 
+                semiconductor industry approaches system design. By enabling the integration of specialized 
+                dies from multiple sources, these technologies extend the benefits of Moore's Law through 
+                architectural innovation rather than transistor scaling alone.
+            </p>
+            <p>
+                UCIe 3.0, with its 64 GT/s signaling, enhanced security features, and optical interconnect 
+                support, provides the foundation for next-generation AI accelerators, high-performance 
+                computing systems, and data center infrastructure. As the ecosystem matures and more companies 
+                adopt the standard, the vision of a vibrant chiplet marketplace moves closer to reality.
+            </p>
+
+            <div class="info-box highlight">
+                <h4>Key Takeaways</h4>
+                <ul>
+                    <li>Chiplet architecture enables better yield, process optimization, and design reuse</li>
+                    <li>UCIe 3.0 provides standardized die-to-die interconnects at 64 GT/s</li>
+                    <li>The layered protocol stack supports PCIe, CXL, and custom protocols</li>
+                    <li>Security features protect against physical attacks and ensure data integrity</li>
+                    <li>Future directions include optical interconnects and chiplet marketplaces</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

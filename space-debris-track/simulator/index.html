@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SPACE-026 Space Debris Tracking Simulator | 弘益人間</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --accent: #a78bfa;
+            --border: #334155;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: var(--bg-card); border-bottom: 2px solid var(--primary); padding: 20px 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo h1 { font-size: 24px; color: var(--primary); }
+        .header-controls { display: flex; gap: 15px; align-items: center; }
+        .lang-select {
+            background: var(--bg);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 200px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { border-color: var(--primary); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+            50% { border-color: var(--primary-dark); box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+        }
+        .back-btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 600; text-decoration: none; transition: all 0.3s; }
+        .back-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .tabs { display: flex; background: var(--bg-card); border-radius: 12px 12px 0 0; overflow-x: auto; margin-top: 20px; }
+        .tab { padding: 16px 32px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; font-weight: 600; border-bottom: 3px solid transparent; white-space: nowrap; transition: all 0.3s; }
+        .tab:hover { color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(139, 92, 246, 0.15); }
+        .tab-content { display: none; background: var(--bg-card); border-radius: 0 0 12px 12px; padding: 30px; min-height: 600px; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 25px; }
+        .form-group label { display: block; color: var(--primary); font-weight: 600; margin-bottom: 8px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .btn-simulate { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 14px 32px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: all 0.3s; }
+        .btn-simulate:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4); }
+        .results { background: var(--bg); border: 2px solid var(--primary); border-radius: 12px; padding: 25px; margin-top: 30px; }
+        .results h3 { color: var(--primary); margin-bottom: 20px; }
+        .result-item { padding: 15px; background: var(--bg-card); border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--primary); }
+        .result-label { color: var(--text-secondary); font-size: 13px; text-transform: uppercase; margin-bottom: 5px; }
+        .result-value { color: var(--text); font-size: 16px; font-weight: 500; }
+        .info-box { background: rgba(139, 92, 246, 0.1); border: 2px solid var(--primary); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .info-box h4 { color: var(--primary); margin-bottom: 10px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: var(--bg); border: 2px solid var(--border); border-radius: 8px; padding: 20px; transition: all 0.3s; }
+        .card:hover { border-color: var(--primary); }
+        .card h4 { color: var(--primary); margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg); color: var(--primary); }
+        @media (max-width: 768px) { .tabs { flex-direction: column; } .form-row { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Space Debris Track</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <h1>🛰️ WIA-SPACE-026 Debris Tracking Simulator</h1>
+            </div>
+            <div class="header-controls">
+                <select class="lang-select" id="langSelect">
+                    <option value="en">🇬🇧 English</option>
+                    <option value="ko">🇰🇷 한국어</option>
+                    <option value="zh-CN">🇨🇳 中文</option>
+                    <option value="ja">🇯🇵 日本語</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                    <option value="pt">🇵🇹 Português</option>
+                    <option value="ru">🇷🇺 Русский</option>
+                    <option value="ar">🇸🇦 العربية</option>
+                    <option value="hi">🇮🇳 हिन्दी</option>
+                    <option value="bn">🇧🇩 বাংলা</option>
+                    <option value="pa">🇮🇳 ਪੰਜਾਬੀ</option>
+                    <option value="vi">🇻🇳 Tiếng Việt</option>
+                    <option value="th">🇹🇭 ไทย</option>
+                    <option value="tr">🇹🇷 Türkçe</option>
+                    <option value="pl">🇵🇱 Polski</option>
+                    <option value="uk">🇺🇦 Українська</option>
+                    <option value="ro">🇷🇴 Română</option>
+                    <option value="nl">🇳🇱 Nederlands</option>
+                    <option value="el">🇬🇷 Ελληνικά</option>
+                    <option value="cs">🇨🇿 Čeština</option>
+                    <option value="sv">🇸🇪 Svenska</option>
+                    <option value="hu">🇭🇺 Magyar</option>
+                    <option value="fi">🇫🇮 Suomi</option>
+                    <option value="no">🇳🇴 Norsk</option>
+                    <option value="da">🇩🇰 Dansk</option>
+                    <option value="he">🇮🇱 עברית</option>
+                    <option value="id">🇮🇩 Bahasa Indonesia</option>
+                    <option value="ms">🇲🇾 Bahasa Melayu</option>
+                    <option value="tl">🇵🇭 Tagalog</option>
+                    <option value="sw">🇰🇪 Kiswahili</option>
+                    <option value="fa">🇮🇷 فارسی</option>
+                    <option value="ur">🇵🇰 اردو</option>
+                    <option value="ta">🇮🇳 தமிழ்</option>
+                    <option value="te">🇮🇳 తెలుగు</option>
+                    <option value="mr">🇮🇳 मराठी</option>
+                    <option value="gu">🇮🇳 ગુજરાતી</option>
+                    <option value="kn">🇮🇳 ಕನ್ನಡ</option>
+                    <option value="ml">🇮🇳 മലയാളം</option>
+                    <option value="si">🇱🇰 සිංහල</option>
+                    <option value="km">🇰🇭 ខ្មែរ</option>
+                    <option value="lo">🇱🇦 ລາວ</option>
+                    <option value="my">🇲🇲 မြန်မာ</option>
+                    <option value="ne">🇳🇵 नेपाली</option>
+                    <option value="am">🇪🇹 አማርኛ</option>
+                    <option value="ha">🇳🇬 Hausa</option>
+                    <option value="yo">🇳🇬 Yorùbá</option>
+                    <option value="ig">🇳🇬 Igbo</option>
+                    <option value="zu">🇿🇦 isiZulu</option>
+                    <option value="af">🇿🇦 Afrikaans</option>
+                    <option value="sq">🇦🇱 Shqip</option>
+                    <option value="hy">🇦🇲 Հայերեն</option>
+                    <option value="az">🇦🇿 Azərbaycan</option>
+                    <option value="eu">🇪🇸 Euskara</option>
+                    <option value="be">🇧🇾 Беларуская</option>
+                    <option value="bs">🇧🇦 Bosanski</option>
+                    <option value="bg">🇧🇬 Български</option>
+                    <option value="ca">🇪🇸 Català</option>
+                    <option value="hr">🇭🇷 Hrvatski</option>
+                    <option value="eo">🌍 Esperanto</option>
+                    <option value="et">🇪🇪 Eesti</option>
+                    <option value="gl">🇪🇸 Galego</option>
+                    <option value="ka">🇬🇪 ქართული</option>
+                    <option value="is">🇮🇸 Íslenska</option>
+                    <option value="ga">🇮🇪 Gaeilge</option>
+                    <option value="kk">🇰🇿 Қазақ</option>
+                    <option value="ky">🇰🇬 Кыргызча</option>
+                    <option value="lv">🇱🇻 Latviešu</option>
+                    <option value="lt">🇱🇹 Lietuvių</option>
+                    <option value="lb">🇱🇺 Lëtzebuergesch</option>
+                    <option value="mk">🇲🇰 Македонски</option>
+                    <option value="mt">🇲🇹 Malti</option>
+                    <option value="mn">🇲🇳 Монгол</option>
+                    <option value="ps">🇦🇫 پښتو</option>
+                    <option value="sr">🇷🇸 Српски</option>
+                    <option value="sk">🇸🇰 Slovenčina</option>
+                    <option value="sl">🇸🇮 Slovenščina</option>
+                    <option value="so">🇸🇴 Soomaali</option>
+                    <option value="tg">🇹🇯 Тоҷикӣ</option>
+                    <option value="tk">🇹🇲 Türkmen</option>
+                    <option value="uz">🇺🇿 Oʻzbek</option>
+                    <option value="cy">🏴󠁧󠁢󠁷󠁬󠁳󠁿 Cymraeg</option>
+                    <option value="yi">🇮🇱 ייִדיש</option>
+                    <option value="mi">🇳🇿 Māori</option>
+                    <option value="sm">🇼🇸 Samoan</option>
+                    <option value="haw">🇺🇸 Hawaiian</option>
+                    <option value="ht">🇭🇹 Kreyòl</option>
+                    <option value="la">🏛️ Latina</option>
+                    <option value="gd">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Gàidhlig</option>
+                    <option value="ku">🇮🇶 Kurdî</option>
+                    <option value="sd">🇵🇰 سنڌي</option>
+                    <option value="xh">🇿🇦 isiXhosa</option>
+                    <option value="st">🇱🇸 Sesotho</option>
+                    <option value="sn">🇿🇼 Shona</option>
+                    <option value="rw">🇷🇼 Kinyarwanda</option>
+                </select>
+                <a href="../ebook/en/index.html" class="back-btn">📚 E-Book</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('tracking')">🎯 Orbit Tracking</button>
+            <button class="tab" onclick="switchTab('conjunction')">⚠️ Conjunction Analysis</button>
+            <button class="tab" onclick="switchTab('propagation')">🚀 Orbit Propagation</button>
+            <button class="tab" onclick="switchTab('sensors')">📡 Sensor Coverage</button>
+            <button class="tab" onclick="switchTab('data')">📊 Data Formats</button>
+        </div>
+
+        <div id="tracking" class="tab-content active">
+            <h2 style="color: var(--primary); margin-bottom: 30px;">Space Debris Orbit Tracking</h2>
+            <div class="info-box">
+                <h4>弘益人間 - Benefit All Humanity</h4>
+                <p>Simulate space debris tracking using radar and optical sensor networks. Track objects in LEO, MEO, and GEO orbits.</p>
+            </div>
+            <form onsubmit="calculateTracking(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Object NORAD ID</label>
+                        <input type="number" id="noradId" placeholder="25544" value="25544">
+                    </div>
+                    <div class="form-group">
+                        <label>Orbital Regime</label>
+                        <select id="orbitRegime">
+                            <option value="leo">LEO (200-2000 km)</option>
+                            <option value="meo">MEO (2000-35,786 km)</option>
+                            <option value="geo">GEO (~35,786 km)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sensor Type</label>
+                        <select id="sensorType">
+                            <option value="radar">Ground-Based Radar (SSN)</option>
+                            <option value="optical">Ground-Based Optical (GEODSS)</option>
+                            <option value="leolabs">LeoLabs Commercial Radar</option>
+                            <option value="exoanalytic">ExoAnalytic Optical Network</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tracking Duration (hours)</label>
+                        <input type="number" id="trackDuration" value="24" min="1" max="168">
+                    </div>
+                </div>
+                <button type="submit" class="btn-simulate">🎯 Simulate Tracking</button>
+            </form>
+            <div id="trackingResults" style="display:none;" class="results">
+                <h3>Tracking Results</h3>
+                <div class="grid-2">
+                    <div class="result-item">
+                        <div class="result-label">Observations Collected</div>
+                        <div class="result-value" id="obsCount">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Orbit Determination Accuracy</div>
+                        <div class="result-value" id="orbitAccuracy">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Position Uncertainty (3σ)</div>
+                        <div class="result-value" id="posUncertainty">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Next Pass Time</div>
+                        <div class="result-value" id="nextPass">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="conjunction" class="tab-content">
+            <h2 style="color: var(--primary); margin-bottom: 30px;">Conjunction Assessment & Collision Probability</h2>
+            <div class="info-box">
+                <h4>弘益人間 - Safe Space for All</h4>
+                <p>Calculate collision probability between two space objects using covariance analysis.</p>
+            </div>
+            <form onsubmit="calculateConjunction(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Primary Object Size (m)</label>
+                        <input type="number" id="obj1Size" value="10" step="0.1" min="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Object Size (m)</label>
+                        <input type="number" id="obj2Size" value="0.1" step="0.01" min="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Miss Distance (m)</label>
+                        <input type="number" id="missDistance" value="500" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Relative Velocity (km/s)</label>
+                        <input type="number" id="relVelocity" value="10" step="0.1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Position Uncertainty σ (m)</label>
+                        <input type="number" id="positionSigma" value="100" step="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Time to Closest Approach</label>
+                        <input type="datetime-local" id="tcaTime">
+                    </div>
+                </div>
+                <button type="submit" class="btn-simulate">⚠️ Calculate Collision Risk</button>
+            </form>
+            <div id="conjunctionResults" style="display:none;" class="results">
+                <h3>Conjunction Analysis Results</h3>
+                <div class="grid-2">
+                    <div class="result-item">
+                        <div class="result-label">Probability of Collision (Pc)</div>
+                        <div class="result-value" id="collisionProb">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Risk Assessment</div>
+                        <div class="result-value" id="riskLevel">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Combined Collision Cross-Section</div>
+                        <div class="result-value" id="collisionArea">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Recommended Action</div>
+                        <div class="result-value" id="recommendation">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="propagation" class="tab-content">
+            <h2 style="color: var(--primary); margin-bottom: 30px;">Orbital Propagation Simulation</h2>
+            <div class="info-box">
+                <h4>Predict Future Orbital Positions</h4>
+                <p>Simulate orbit propagation including atmospheric drag, J2 perturbations, and solar radiation pressure.</p>
+            </div>
+            <form onsubmit="calculatePropagation(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Semi-Major Axis (km)</label>
+                        <input type="number" id="semiMajor" value="6771" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Eccentricity</label>
+                        <input type="number" id="eccentricity" value="0.0001" step="0.0001" min="0" max="0.9">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Inclination (degrees)</label>
+                        <input type="number" id="inclination" value="51.6" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Ballistic Coefficient (kg/m²)</label>
+                        <input type="number" id="ballisticCoeff" value="100" step="10">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Propagation Duration (days)</label>
+                        <input type="number" id="propDuration" value="7" min="1" max="365">
+                    </div>
+                    <div class="form-group">
+                        <label>Propagator Type</label>
+                        <select id="propagatorType">
+                            <option value="sgp4">SGP4 (General Perturbations)</option>
+                            <option value="hpop">HPOP (Special Perturbations)</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn-simulate">🚀 Propagate Orbit</button>
+            </form>
+            <div id="propagationResults" style="display:none;" class="results">
+                <h3>Propagation Results</h3>
+                <div class="grid-2">
+                    <div class="result-item">
+                        <div class="result-label">Altitude Change (km)</div>
+                        <div class="result-value" id="altitudeChange">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Orbital Period Change (sec)</div>
+                        <div class="result-value" id="periodChange">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Position Uncertainty Growth</div>
+                        <div class="result-value" id="uncertaintyGrowth">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Dominant Perturbation</div>
+                        <div class="result-value" id="dominantPert">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="sensors" class="tab-content">
+            <h2 style="color: var(--primary); margin-bottom: 30px;">Sensor Coverage Analysis</h2>
+            <div class="info-box">
+                <h4>Global Tracking Network Simulation</h4>
+                <p>Analyze coverage from radar and optical sensor networks worldwide.</p>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <h4>US Space Surveillance Network</h4>
+                    <p>30+ radar and optical sites providing global coverage</p>
+                    <table>
+                        <tr><th>Site</th><th>Type</th><th>Coverage</th></tr>
+                        <tr><td>Cavalier AFS</td><td>Radar</td><td>LEO</td></tr>
+                        <tr><td>Clear SFS</td><td>Radar</td><td>Deep Space</td></tr>
+                        <tr><td>Eglin AFB</td><td>Radar</td><td>LEO</td></tr>
+                        <tr><td>GEODSS Sites</td><td>Optical</td><td>GEO/MEO</td></tr>
+                    </table>
+                </div>
+                <div class="card">
+                    <h4>Commercial Networks</h4>
+                    <p>LeoLabs, ExoAnalytic, NorthStar</p>
+                    <table>
+                        <tr><th>Network</th><th>Sites</th><th>Focus</th></tr>
+                        <tr><td>LeoLabs</td><td>4+</td><td>LEO debris</td></tr>
+                        <tr><td>ExoAnalytic</td><td>25+</td><td>GEO tracking</td></tr>
+                        <tr><td>NorthStar</td><td>40 sats</td><td>All orbits</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="data" class="tab-content">
+            <h2 style="color: var(--primary); margin-bottom: 30px;">Data Formats & Standards</h2>
+            <div class="info-box">
+                <h4>WIA-SPACE-026 Standard Formats</h4>
+                <p>Interoperable data formats for tracking observations, TLEs, and conjunction messages.</p>
+            </div>
+            <div class="card" style="margin: 20px 0;">
+                <h4>Two-Line Element (TLE) Format</h4>
+                <pre style="background: var(--bg); padding: 15px; border-radius: 8px; overflow-x: auto;">ISS (ZARYA)
+1 25544U 98067A   25001.50000000  .00016717  00000-0  10270-3 0  9003
+2 25544  51.6400 208.9163 0002417  86.0000 274.1463 15.54225995123456</pre>
+            </div>
+            <div class="card" style="margin: 20px 0;">
+                <h4>CCSDS Conjunction Data Message (CDM)</h4>
+                <pre style="background: var(--bg); padding: 15px; border-radius: 8px; overflow-x: auto;">{
+  "CCSDS_CDM_VERS": "1.0",
+  "CREATION_DATE": "2025-01-15T12:00:00Z",
+  "TCA": "2025-01-20T15:30:45Z",
+  "MISS_DISTANCE": 125.5,
+  "RELATIVE_SPEED": 10.2,
+  "PROBABILITY": 1.5e-5,
+  "OBJECT1": { "NORAD_ID": 25544 },
+  "OBJECT2": { "NORAD_ID": 12345 }
+}</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function calculateTracking(e) {
+            e.preventDefault();
+            const regime = document.getElementById('orbitRegime').value;
+            const sensor = document.getElementById('sensorType').value;
+            const duration = parseInt(document.getElementById('trackDuration').value);
+
+            const observations = regime === 'leo' ? duration * 8 : duration * 2;
+            const accuracy = regime === 'leo' ? '±0.5 km' : regime === 'meo' ? '±2 km' : '±5 km';
+            const uncertainty = regime === 'leo' ? '150 m' : regime === 'meo' ? '800 m' : '2.5 km';
+
+            document.getElementById('obsCount').textContent = observations;
+            document.getElementById('orbitAccuracy').textContent = accuracy;
+            document.getElementById('posUncertainty').textContent = uncertainty;
+            document.getElementById('nextPass').textContent = new Date(Date.now() + 5400000).toLocaleString();
+            document.getElementById('trackingResults').style.display = 'block';
+        }
+
+        function calculateConjunction(e) {
+            e.preventDefault();
+            const size1 = parseFloat(document.getElementById('obj1Size').value);
+            const size2 = parseFloat(document.getElementById('obj2Size').value);
+            const miss = parseFloat(document.getElementById('missDistance').value);
+            const sigma = parseFloat(document.getElementById('positionSigma').value);
+
+            const collisionRadius = (size1 + size2) / 2;
+            const normalizedDist = miss / sigma;
+            const pc = Math.exp(-normalizedDist * normalizedDist / 2) / 100000;
+            const risk = pc > 1e-3 ? 'CRITICAL' : pc > 1e-4 ? 'HIGH' : pc > 1e-5 ? 'MEDIUM' : 'LOW';
+            const action = pc > 1e-4 ? 'MANEUVER RECOMMENDED' : pc > 1e-5 ? 'Enhanced Monitoring' : 'Continue Tracking';
+
+            document.getElementById('collisionProb').textContent = pc.toExponential(2);
+            document.getElementById('riskLevel').innerHTML = `<span style="color:${risk==='CRITICAL'?'#ef4444':risk==='HIGH'?'#f59e0b':'#10b981'}">${risk}</span>`;
+            document.getElementById('collisionArea').textContent = (Math.PI * collisionRadius * collisionRadius).toFixed(2) + ' m²';
+            document.getElementById('recommendation').textContent = action;
+            document.getElementById('conjunctionResults').style.display = 'block';
+        }
+
+        function calculatePropagation(e) {
+            e.preventDefault();
+            const a = parseFloat(document.getElementById('semiMajor').value);
+            const bc = parseFloat(document.getElementById('ballisticCoeff').value);
+            const days = parseInt(document.getElementById('propDuration').value);
+
+            const altitude = a - 6371;
+            const dragEffect = altitude < 800 ? -0.05 * days * (1000/bc) : -0.001 * days;
+            const periodChange = dragEffect * 10;
+            const uncertainty = Math.sqrt(days) * 100;
+            const perturbation = altitude < 800 ? 'Atmospheric Drag' : altitude < 20000 ? 'J2 Gravity' : 'Solar/Lunar Gravity';
+
+            document.getElementById('altitudeChange').textContent = dragEffect.toFixed(3) + ' km';
+            document.getElementById('periodChange').textContent = periodChange.toFixed(2) + ' sec';
+            document.getElementById('uncertaintyGrowth').textContent = '±' + uncertainty.toFixed(0) + ' m';
+            document.getElementById('dominantPert').textContent = perturbation;
+            document.getElementById('propagationResults').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

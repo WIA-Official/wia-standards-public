@@ -124,12 +124,18 @@ pub mod adapters;
 pub mod core;
 pub mod error;
 pub mod integration;
+pub mod protocol;
+pub mod streaming;
+pub mod transport;
 pub mod types;
 
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::core::*;
     pub use crate::error::{Result, WiaAiError};
+    pub use crate::protocol::*;
+    pub use crate::streaming::*;
+    pub use crate::transport::*;
     pub use crate::types::*;
 }
 

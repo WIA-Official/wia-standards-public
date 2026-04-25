@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SPACE-018: UAM Simulator | 弘益人間</title>
+    <style>
+        :root { --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-secondary: #cbd5e1; --primary: #8B5CF6; --primary-dark: #7C3AED; --accent: #3b82f6; --border: #334155; --success: #10b981; --error: #ef4444; --warning: #f59e0b; --shadow: rgba(0, 0, 0, 0.5); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: var(--bg-card); border-bottom: 2px solid var(--primary); padding: 20px 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 6px var(--shadow); }
+        .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo h1 { font-size: 24px; color: var(--primary); }
+        .header-controls { display: flex; gap: 15px; align-items: center; }
+        .lang-select { background: var(--bg); border: 2px solid var(--primary); border-radius: 8px; padding: 10px 15px; color: var(--text); cursor: pointer; font-size: 14px; min-width: 200px; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); } 50% { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); } }
+        .back-btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; transition: all 0.3s ease; }
+        .back-btn:hover { background: var(--primary-dark); }
+        .tabs { display: flex; gap: 0; background: var(--bg-card); border-radius: 12px 12px 0 0; overflow-x: auto; margin-top: 20px; }
+        .tab { padding: 16px 32px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.3s ease; white-space: nowrap; }
+        .tab:hover { color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(139, 92, 246, 0.15); }
+        .tab-content { display: none; background: var(--bg-card); border-radius: 0 0 12px 12px; padding: 30px; border: 1px solid var(--border); border-top: none; }
+        .tab-content.active { display: block; }
+        .section-title { color: var(--primary); font-size: 24px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; margin-bottom: 8px; color: var(--text-secondary); font-weight: 600; }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 12px; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: var(--primary); }
+        .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.3s ease; border: none; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4); }
+        .btn-secondary { background: var(--bg); border: 2px solid var(--primary); color: var(--primary); }
+        .output-area { background: var(--bg); border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Consolas', monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; }
+        .card { background: var(--bg); border-radius: 12px; padding: 25px; border: 1px solid var(--border); }
+        .card-title { color: var(--primary); font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .status { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .status-error { background: rgba(239, 68, 68, 0.2); color: var(--error); }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 4px; transition: width 0.5s ease; }
+        footer { text-align: center; padding: 30px; color: var(--text-secondary); margin-top: 40px; }
+        .philosophy { color: var(--primary); font-size: 20px; letter-spacing: 4px; margin-bottom: 10px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .tabs { flex-wrap: wrap; } .tab { flex: 1; min-width: 120px; text-align: center; } }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Uam</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <header>
+        <div class="header-content">
+            <div class="logo"><h1>🚁 WIA-SPACE-018: UAM Simulator</h1></div>
+            <div class="header-controls">
+                <select class="lang-select" id="langSelect">
+                    <option value="en">🇬🇧 English</option>
+                    <option value="ko">🇰🇷 한국어</option>
+                    <option value="zh-CN">🇨🇳 中文</option>
+                    <option value="ja">🇯🇵 日本語</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                    <option value="pt">🇵🇹 Português</option>
+                    <option value="ru">🇷🇺 Русский</option>
+                    <option value="ar">🇸🇦 العربية</option>
+                    <option value="hi">🇮🇳 हिन्दी</option>
+                    <option value="bn">🇧🇩 বাংলা</option>
+                    <option value="pa">🇮🇳 ਪੰਜਾਬੀ</option>
+                    <option value="vi">🇻🇳 Tiếng Việt</option>
+                    <option value="th">🇹🇭 ไทย</option>
+                    <option value="tr">🇹🇷 Türkçe</option>
+                    <option value="pl">🇵🇱 Polski</option>
+                    <option value="uk">🇺🇦 Українська</option>
+                    <option value="ro">🇷🇴 Română</option>
+                    <option value="nl">🇳🇱 Nederlands</option>
+                    <option value="el">🇬🇷 Ελληνικά</option>
+                    <option value="cs">🇨🇿 Čeština</option>
+                    <option value="sv">🇸🇪 Svenska</option>
+                    <option value="hu">🇭🇺 Magyar</option>
+                    <option value="fi">🇫🇮 Suomi</option>
+                    <option value="no">🇳🇴 Norsk</option>
+                    <option value="da">🇩🇰 Dansk</option>
+                    <option value="he">🇮🇱 עברית</option>
+                    <option value="id">🇮🇩 Bahasa Indonesia</option>
+                    <option value="ms">🇲🇾 Bahasa Melayu</option>
+                    <option value="tl">🇵🇭 Tagalog</option>
+                    <option value="sw">🇰🇪 Kiswahili</option>
+                    <option value="fa">🇮🇷 فارسی</option>
+                    <option value="ur">🇵🇰 اردو</option>
+                    <option value="ta">🇮🇳 தமிழ்</option>
+                    <option value="te">🇮🇳 తెలుగు</option>
+                    <option value="mr">🇮🇳 मराठी</option>
+                    <option value="gu">🇮🇳 ગુજરાતી</option>
+                    <option value="kn">🇮🇳 ಕನ್ನಡ</option>
+                    <option value="ml">🇮🇳 മലയാളം</option>
+                    <option value="si">🇱🇰 සිංහල</option>
+                    <option value="km">🇰🇭 ខ្មែរ</option>
+                    <option value="lo">🇱🇦 ລາວ</option>
+                    <option value="my">🇲🇲 မြန်မာ</option>
+                    <option value="ne">🇳🇵 नेपाली</option>
+                    <option value="am">🇪🇹 አማርኛ</option>
+                    <option value="ha">🇳🇬 Hausa</option>
+                    <option value="yo">🇳🇬 Yorùbá</option>
+                    <option value="ig">🇳🇬 Igbo</option>
+                    <option value="zu">🇿🇦 isiZulu</option>
+                    <option value="af">🇿🇦 Afrikaans</option>
+                    <option value="sq">🇦🇱 Shqip</option>
+                    <option value="hy">🇦🇲 Հայերեն</option>
+                    <option value="az">🇦🇿 Azərbaycan</option>
+                    <option value="eu">🇪🇸 Euskara</option>
+                    <option value="be">🇧🇾 Беларуская</option>
+                    <option value="bs">🇧🇦 Bosanski</option>
+                    <option value="bg">🇧🇬 Български</option>
+                    <option value="ca">🇪🇸 Català</option>
+                    <option value="hr">🇭🇷 Hrvatski</option>
+                    <option value="eo">🌍 Esperanto</option>
+                    <option value="et">🇪🇪 Eesti</option>
+                    <option value="gl">🇪🇸 Galego</option>
+                    <option value="ka">🇬🇪 ქართული</option>
+                    <option value="is">🇮🇸 Íslenska</option>
+                    <option value="ga">🇮🇪 Gaeilge</option>
+                    <option value="kk">🇰🇿 Қазақ</option>
+                    <option value="ky">🇰🇬 Кыргызча</option>
+                    <option value="lv">🇱🇻 Latviešu</option>
+                    <option value="lt">🇱🇹 Lietuvių</option>
+                    <option value="lb">🇱🇺 Lëtzebuergesch</option>
+                    <option value="mk">🇲🇰 Македонски</option>
+                    <option value="mt">🇲🇹 Malti</option>
+                    <option value="mn">🇲🇳 Монгол</option>
+                    <option value="ps">🇦🇫 پښتو</option>
+                    <option value="sr">🇷🇸 Српски</option>
+                    <option value="sk">🇸🇰 Slovenčina</option>
+                    <option value="sl">🇸🇮 Slovenščina</option>
+                    <option value="so">🇸🇴 Soomaali</option>
+                    <option value="tg">🇹🇯 Тоҷикӣ</option>
+                    <option value="tk">🇹🇲 Türkmen</option>
+                    <option value="uz">🇺🇿 Oʻzbek</option>
+                    <option value="cy">🏴󠁧󠁢󠁷󠁬󠁳󠁿 Cymraeg</option>
+                    <option value="yi">🇮🇱 ייִדיש</option>
+                    <option value="mi">🇳🇿 Māori</option>
+                    <option value="sm">🇼🇸 Samoan</option>
+                    <option value="haw">🇺🇸 Hawaiian</option>
+                    <option value="ht">🇭🇹 Kreyòl</option>
+                    <option value="la">🏛️ Latina</option>
+                    <option value="gd">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Gàidhlig</option>
+                    <option value="ku">🇮🇶 Kurdî</option>
+                    <option value="sd">🇵🇰 سنڌي</option>
+                    <option value="xh">🇿🇦 isiXhosa</option>
+                    <option value="st">🇱🇸 Sesotho</option>
+                    <option value="sn">🇿🇼 Shona</option>
+                    <option value="rw">🇷🇼 Kinyarwanda</option>
+                </select>
+                <a href="../ebook/en/index.html" class="back-btn">📚 eBook</a>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('flight-plan')">✈️ Flight Planning</button>
+            <button class="tab" onclick="showTab('vertiport')">🏗️ Vertiport Design</button>
+            <button class="tab" onclick="showTab('traffic')">🛫 Traffic Management</button>
+            <button class="tab" onclick="showTab('aircraft')">🚁 Aircraft Config</button>
+            <button class="tab" onclick="showTab('economics')">💰 Economics</button>
+        </div>
+        <div id="flight-plan" class="tab-content active">
+            <h2 class="section-title">✈️ UAM Flight Planning Simulator</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">📍 Route Configuration</h3>
+                    <div class="input-group"><label>Origin Vertiport</label><input type="text" id="origin" placeholder="e.g., Downtown LA" value="Downtown LA"></div>
+                    <div class="input-group"><label>Destination Vertiport</label><input type="text" id="destination" placeholder="e.g., LAX Airport" value="LAX Airport"></div>
+                    <div class="input-group"><label>Distance (miles)</label><input type="number" id="distance" value="25" min="1" max="200"></div>
+                    <div class="input-group"><label>Cruise Altitude (feet)</label><input type="number" id="altitude" value="2500" min="500" max="5000" step="100"></div>
+                    <div class="input-group"><label>Passengers</label><input type="number" id="passengers" value="4" min="1" max="6"></div>
+                    <button class="btn btn-primary" onclick="calculateFlight()">🚁 Calculate Flight Plan</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📊 Flight Analysis</h3>
+                    <div class="output-area" id="flightOutput">
+<strong>弘益人間 - Benefit All Humanity</strong>
+
+Configure flight parameters and click "Calculate Flight Plan" to see:
+• Flight time and energy requirements
+• Comparison with ground transportation
+• Environmental impact analysis
+• Cost estimation
+• Safety parameters
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="vertiport" class="tab-content">
+            <h2 class="section-title">🏗️ Vertiport Design Simulator</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">🛫 Design Parameters</h3>
+                    <div class="input-group"><label>Number of Landing Pads</label><select id="pads"><option value="1">1 Pad (Basic)</option><option value="2" selected>2 Pads (Standard)</option><option value="4">4 Pads (Hub)</option><option value="6">6 Pads (Major Hub)</option></select></div>
+                    <div class="input-group"><label>Aircraft Size (wingspan ft)</label><input type="number" id="wingspan" value="40" min="20" max="80"></div>
+                    <div class="input-group"><label>Peak Operations/Hour</label><input type="number" id="peakOps" value="20" min="4" max="100"></div>
+                    <div class="input-group"><label>Charging Power (kW)</label><select id="chargePower"><option value="500">500 kW</option><option value="1000" selected>1 MW</option><option value="2000">2 MW</option></select></div>
+                    <button class="btn btn-primary" onclick="designVertiport()">🏗️ Design Vertiport</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📐 Design Specifications</h3>
+                    <div class="output-area" id="vertiportOutput">Vertiport design specifications will appear here...</div>
+                </div>
+            </div>
+        </div>
+        <div id="traffic" class="tab-content">
+            <h2 class="section-title">🛫 UAM Traffic Management Simulator</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">📡 UTM Configuration</h3>
+                    <div class="input-group"><label>UAM Maturity Level</label><select id="uml"><option value="1">UML-1 (Nascent)</option><option value="2">UML-2 (Limited)</option><option value="3" selected>UML-3 (Initial UTM)</option><option value="4">UML-4 (Mature UTM)</option><option value="5">UML-5 (Advanced Auto)</option><option value="6">UML-6 (Full Autonomy)</option></select></div>
+                    <div class="input-group"><label>Aircraft in Airspace</label><input type="number" id="aircraft" value="25" min="1" max="500"></div>
+                    <div class="input-group"><label>Airspace Volume (cubic miles)</label><input type="number" id="airspace" value="100" min="10" max="1000"></div>
+                    <button class="btn btn-primary" onclick="simulateTraffic()">📡 Simulate Traffic</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📊 Traffic Analysis</h3>
+                    <div style="margin-bottom: 15px;"><span class="status status-success" id="trafficStatus">✓ UTM Operating Normally</span></div>
+                    <div class="output-area" id="trafficOutput">UTM simulation results will appear here...</div>
+                </div>
+            </div>
+        </div>
+        <div id="aircraft" class="tab-content">
+            <h2 class="section-title">🚁 eVTOL Aircraft Configuration</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">⚙️ Aircraft Specifications</h3>
+                    <div class="input-group"><label>Configuration Type</label><select id="configType"><option value="multicopter">Multicopter (18 rotors)</option><option value="lift-cruise" selected>Lift + Cruise</option><option value="vectored">Vectored Thrust</option></select></div>
+                    <div class="input-group"><label>Battery Capacity (kWh)</label><input type="number" id="batteryKwh" value="200" min="100" max="400"></div>
+                    <div class="input-group"><label>Battery Energy Density (Wh/kg)</label><input type="number" id="energyDensity" value="280" min="200" max="500"></div>
+                    <div class="input-group"><label>Cruise Speed (mph)</label><input type="number" id="cruiseSpeed" value="150" min="50" max="200"></div>
+                    <button class="btn btn-primary" onclick="analyzeAircraft()">🚁 Analyze Aircraft</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📊 Performance Analysis</h3>
+                    <div class="output-area" id="aircraftOutput">Aircraft performance data will appear here...</div>
+                </div>
+            </div>
+        </div>
+        <div id="economics" class="tab-content">
+            <h2 class="section-title">💰 UAM Economics Simulator</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">💵 Cost Parameters</h3>
+                    <div class="input-group"><label>Aircraft Cost ($M)</label><input type="number" id="aircraftCost" value="3.0" min="1" max="10" step="0.1"></div>
+                    <div class="input-group"><label>Daily Flight Hours</label><input type="number" id="dailyHours" value="8" min="2" max="16"></div>
+                    <div class="input-group"><label>Passengers per Flight</label><input type="number" id="paxPerFlight" value="4" min="1" max="6"></div>
+                    <div class="input-group"><label>Average Trip Distance (mi)</label><input type="number" id="avgDistance" value="30" min="5" max="150"></div>
+                    <div class="input-group"><label>Price per Mile ($)</label><input type="number" id="pricePerMile" value="2.50" min="0.50" max="10" step="0.10"></div>
+                    <button class="btn btn-primary" onclick="calculateEconomics()">💰 Calculate Economics</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📈 Financial Analysis</h3>
+                    <div class="output-area" id="economicsOutput">Economic analysis will appear here...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <div class="philosophy">弘益人間</div>
+        <p>© 2025 WIA - World Certification Industry Association</p>
+        <p style="margin-top: 10px;">Urban Air Mobility Standards & Simulator</p>
+    </footer>
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+        function calculateFlight() {
+            const origin = document.getElementById('origin').value;
+            const dest = document.getElementById('destination').value;
+            const dist = parseFloat(document.getElementById('distance').value);
+            const alt = parseInt(document.getElementById('altitude').value);
+            const pax = parseInt(document.getElementById('passengers').value);
+            const cruiseSpeed = 150; // mph
+            const climbRate = 1000; // fpm
+            const climbTime = (alt / climbRate) * 2; // up and down in minutes
+            const cruiseTime = (dist / cruiseSpeed) * 60; // minutes
+            const totalTime = climbTime + cruiseTime;
+            const energyConsumption = dist * 0.8; // kWh per mile estimate
+            const groundTime = (dist / 30) * 60; // assume 30 mph average ground speed
+            const timeSavings = groundTime - totalTime;
+            const co2Savings = dist * 0.4; // kg CO2 vs car
+            const output = `<strong>✈️ FLIGHT PLAN: ${origin} → ${dest}</strong>
+
+<strong>Flight Parameters:</strong>
+• Distance: ${dist} miles
+• Cruise Altitude: ${alt.toLocaleString()} feet
+• Passengers: ${pax}
+• Cruise Speed: ${cruiseSpeed} mph
+
+<strong>Time Analysis:</strong>
+• Climb/Descent: ${climbTime.toFixed(1)} min
+• Cruise: ${cruiseTime.toFixed(1)} min
+• Total Flight Time: ${totalTime.toFixed(1)} min (${(totalTime/60).toFixed(2)} hours)
+
+<strong>Comparison with Ground Transport:</strong>
+• Ground Transport Time: ${groundTime.toFixed(0)} min
+• UAM Flight Time: ${totalTime.toFixed(0)} min
+• Time Savings: ${timeSavings.toFixed(0)} min (${((timeSavings/groundTime)*100).toFixed(0)}% faster)
+
+<strong>Energy & Environment:</strong>
+• Energy Consumption: ${energyConsumption.toFixed(1)} kWh
+• CO2 Savings vs Car: ${co2Savings.toFixed(1)} kg
+• Zero Direct Emissions ✓
+
+<strong>弘益人間 Impact:</strong>
+Saving ${timeSavings.toFixed(0)} minutes per trip enables ${pax} passengers
+to spend more time on productive or meaningful activities,
+benefiting individuals, families, and communities.
+`;
+            document.getElementById('flightOutput').textContent = output;
+        }
+        function designVertiport() {
+            const pads = parseInt(document.getElementById('pads').value);
+            const span = parseInt(document.getElementById('wingspan').value);
+            const ops = parseInt(document.getElementById('peakOps').value);
+            const power = parseInt(document.getElementById('chargePower').value);
+            const tlofDiam = span * 1.0;
+            const fatoDiam = tlofDiam * 1.5;
+            const padSpacing = fatoDiam * 1.8;
+            const totalArea = pads * (fatoDiam * fatoDiam * 0.785) * 2.5; // sq ft
+            const gridPower = power * pads * 0.7; // kW
+            const peakCapacity = (pads * 4) * 0.8; // ops/hour with 80% efficiency
+            const output = `<strong>🏗️ VERTIPORT DESIGN SPECIFICATIONS</strong>
+
+<strong>Pad Configuration:</strong>
+• Number of Pads: ${pads}
+• TLOF Diameter: ${tlofDiam.toFixed(0)} ft
+• FATO Diameter: ${fatoDiam.toFixed(0)} ft
+• Pad Center Spacing: ${padSpacing.toFixed(0)} ft
+
+<strong>Area Requirements:</strong>
+• Total Footprint: ${(totalArea/43560).toFixed(2)} acres (${totalArea.toLocaleString()} sq ft)
+• Safety Area: ${(totalArea * 1.3 / 43560).toFixed(2)} acres (with buffers)
+
+<strong>Electrical Infrastructure:</strong>
+• Charging Power per Pad: ${power} kW
+• Peak Grid Connection: ${gridPower.toLocaleString()} kW (${(gridPower/1000).toFixed(1)} MW)
+• Backup Power: ${(gridPower * 0.3).toFixed(0)} kW (30% redundancy)
+
+<strong>Capacity Analysis:</strong>
+• Peak Design Capacity: ${peakCapacity.toFixed(0)} ops/hour
+• Target Operations: ${ops} ops/hour
+• Utilization: ${((ops/peakCapacity)*100).toFixed(0)}%
+• Recommendation: ${ ops > peakCapacity * 0.9 ? 'Consider adding pads' : 'Adequate capacity'}
+
+<strong>Infrastructure Elements:</strong>
+✓ Lighting: LED perimeter + floodlights
+✓ Weather: AWOS with multi-height wind sensors
+✓ Fire Safety: Foam suppression systems
+✓ Passenger Facilities: Waiting area, restrooms, Wi-Fi
+✓ Multimodal Access: Ground transport connections
+
+<strong>弘益人間 Design Philosophy:</strong>
+Vertiport designed to serve community needs with
+minimal environmental impact, accessible facilities,
+and integration with public transportation.
+`;
+            document.getElementById('vertiportOutput').textContent = output;
+        }
+        function simulateTraffic() {
+            const uml = parseInt(document.getElementById('uml').value);
+            const aircraft = parseInt(document.getElementById('aircraft').value);
+            const airspace = parseInt(document.getElementById('airspace').value);
+            const density = aircraft / airspace;
+            const automation = ['Manual VFR', 'Basic UTM', 'Core UTM', 'Advanced UTM', 'Supervised Auto', 'Full Autonomy'][uml-1];
+            const maxDensity = [0.05, 0.15, 0.4, 0.8, 1.5, 3.0][uml-1];
+            const status = density > maxDensity ? 'Warning: Traffic density exceeds UML capability' : 'Operating within safe parameters';
+            const conflicts = Math.max(0, Math.floor((density - maxDensity) * airspace * 5));
+            document.getElementById('trafficStatus').textContent = density <= maxDensity ? '✓ UTM Operating Normally' : '⚠ Traffic Density High';
+            document.getElementById('trafficStatus').className = density <= maxDensity ? 'status status-success' : 'status status-warning';
+            const output = `<strong>🛫 UAM TRAFFIC MANAGEMENT SIMULATION</strong>
+
+<strong>Airspace Configuration:</strong>
+• UAM Maturity Level: UML-${uml} (${automation})
+• Aircraft in Airspace: ${aircraft}
+• Airspace Volume: ${airspace} cubic miles
+• Traffic Density: ${density.toFixed(2)} aircraft/cubic mile
+
+<strong>UML-${uml} Capabilities:</strong>
+• Maximum Safe Density: ${maxDensity} aircraft/cubic mile
+• Current Utilization: ${((density/maxDensity)*100).toFixed(0)}%
+• Automation Level: ${automation}
+• Conflict Detection: ${uml >= 3 ? 'Automated' : 'Pilot-based'}
+• Conflict Resolution: ${uml >= 4 ? 'Automated tactical' : 'Manual'}
+
+<strong>Safety Analysis:</strong>
+• Status: ${status}
+• Potential Conflicts Detected: ${conflicts}
+• Separation Method: ${uml >= 3 ? 'UTM automated' : 'Visual/ATC'}
+• Weather Integration: ${uml >= 3 ? 'Real-time routing' : 'Pre-flight planning'}
+
+<strong>Communication Systems:</strong>
+• Pilot-UTM: ${uml >= 2 ? 'Digital datalink' : 'Voice radio'}
+• V2V (Vehicle-to-Vehicle): ${uml >= 4 ? 'Active' : 'Not available'}
+• ATC Integration: ${uml >= 3 ? 'FIMS coordination' : 'Traditional handoffs'}
+
+<strong>Recommendations:</strong>
+${density > maxDensity ? '⚠ Reduce traffic or upgrade to higher UML' : '✓ Traffic manageable at current UML'}
+${uml < 4 && aircraft > 50 ? '• Consider advancing to UML-4 for efficiency' : ''}
+${conflicts > 0 ? `• ${conflicts} conflicts require resolution` : '• No conflicts detected'}
+
+<strong>弘益人間 - Safe Skies for All:</strong>
+UTM systems ensure safe operations protecting
+passengers, communities, and airspace users through
+advanced automation and rigorous safety standards.
+`;
+            document.getElementById('trafficOutput').textContent = output;
+        }
+        function analyzeAircraft() {
+            const config = document.getElementById('configType').value;
+            const battKwh = parseInt(document.getElementById('batteryKwh').value);
+            const energyDens = parseInt(document.getElementById('energyDensity').value);
+            const cruise = parseInt(document.getElementById('cruiseSpeed').value);
+            const battWeight = (battKwh * 1000) / energyDens; // kg
+            const efficiency = {'multicopter': 0.7, 'lift-cruise': 0.85, 'vectored': 0.9}[config];
+            const range = (battKwh * efficiency * 0.6).toFixed(0); // miles (simplified)
+            const noise = {'multicopter': 65, 'lift-cruise': 62, 'vectored': 60}[config];
+            const output = `<strong>🚁 eVTOL AIRCRAFT ANALYSIS</strong>
+
+<strong>Configuration:</strong>
+• Type: ${config === 'multicopter' ? 'Multicopter (18 rotors)' : config === 'lift-cruise' ? 'Lift + Cruise' : 'Vectored Thrust'}
+• Propulsion: Distributed electric
+• Cruise Speed: ${cruise} mph
+
+<strong>Battery System:</strong>
+• Capacity: ${battKwh} kWh
+• Energy Density: ${energyDens} Wh/kg
+• Battery Weight: ${battWeight.toFixed(0)} kg (${(battWeight * 2.205).toFixed(0)} lbs)
+• Technology: ${energyDens < 250 ? 'Current Li-Ion' : energyDens < 350 ? 'Advanced Li-Ion' : 'Solid-State'}
+
+<strong>Performance:</strong>
+• Estimated Range: ${range} miles
+• Cruise Efficiency: ${(efficiency * 100).toFixed(0)}%
+• Energy Consumption: ${(battKwh / range).toFixed(2)} kWh/mile
+• Reserve: 20% (${(battKwh * 0.2).toFixed(0)} kWh)
+
+<strong>Noise Profile:</strong>
+• Cruise Noise: ${noise} dB @ 500 ft
+• Comparison: ${noise > 75 ? 'Helicopter-like' : noise > 65 ? 'Moderate urban' : 'Quiet urban'}
+• Community Acceptance: ${noise < 65 ? 'High' : 'Moderate'}
+
+<strong>Safety Features:</strong>
+• Redundancy: ${config === 'multicopter' ? 'Multiple independent rotors' : 'Dual propulsion systems'}
+• Fail-Safe: Can complete flight with motor failures
+• Flight Controls: Fly-by-wire with triple redundancy
+• Battery: Segmented with thermal management
+
+<strong>Configuration Trade-offs:</strong>
+Multicopter: Simple, redundant, but less efficient cruise
+Lift+Cruise: Balanced efficiency and range
+Vectored Thrust: Maximum efficiency, complex mechanisms
+
+<strong>弘益人間 Application:</strong>
+This aircraft can serve ${(range * 0.7).toFixed(0)}-mile routes with reserves,
+providing fast, clean transportation benefiting
+urban communities and reducing congestion.
+`;
+            document.getElementById('aircraftOutput').textContent = output;
+        }
+        function calculateEconomics() {
+            const acCost = parseFloat(document.getElementById('aircraftCost').value) * 1000000;
+            const hours = parseFloat(document.getElementById('dailyHours').value);
+            const pax = parseInt(document.getElementById('paxPerFlight').value);
+            const dist = parseInt(document.getElementById('avgDistance').value);
+            const price = parseFloat(document.getElementById('pricePerMile').value);
+            const cruiseSpeed = 120; // mph average including climb/descent
+            const tripsPerDay = (hours * cruiseSpeed) / dist;
+            const paxPerDay = tripsPerDay * pax;
+            const revenuePerDay = paxPerDay * dist * price;
+            const revenuePerYear = revenuePerDay * 300; // 300 operating days
+            const directCosts = hours * 200; // $/hour operating costs
+            const pilotCost = 120000 / 300; // daily pilot cost
+            const maintenanceCost = hours * 150;
+            const dailyCosts = directCosts + pilotCost + maintenanceCost;
+            const annualCosts = dailyCosts * 300;
+            const grossProfit = revenuePerYear - annualCosts;
+            const capitalCost = acCost * 0.15; // 15% annual capital cost
+            const netProfit = grossProfit - capitalCost;
+            const breakeven = acCost / (netProfit > 0 ? netProfit : 1);
+            const costPerSeatMile = (annualCosts + capitalCost) / (paxPerDay * dist * 300);
+            const output = `<strong>💰 UAM ECONOMICS ANALYSIS</strong>
+
+<strong>Operating Parameters:</strong>
+• Aircraft Cost: $${(acCost/1000000).toFixed(1)}M
+• Daily Flight Hours: ${hours} hours
+• Average Passengers: ${pax} per flight
+• Average Trip: ${dist} miles
+• Price: $${price.toFixed(2)} per mile
+
+<strong>Daily Operations:</strong>
+• Trips per Day: ${tripsPerDay.toFixed(1)}
+• Passengers per Day: ${paxPerDay.toFixed(0)}
+• Revenue per Day: $${revenuePerDay.toLocaleString(undefined, {maximumFractionDigits: 0})}
+• Operating Costs: $${dailyCosts.toLocaleString(undefined, {maximumFractionDigits: 0})}
+
+<strong>Annual Financial Performance:</strong>
+• Annual Revenue: $${(revenuePerYear/1000000).toFixed(2)}M
+• Operating Costs: $${(annualCosts/1000000).toFixed(2)}M
+• Gross Profit: $${(grossProfit/1000000).toFixed(2)}M
+• Capital Cost (15%): $${(capitalCost/1000000).toFixed(2)}M
+• Net Profit: $${(netProfit/1000000).toFixed(2)}M
+
+<strong>Unit Economics:</strong>
+• Cost per Seat-Mile: $${costPerSeatMile.toFixed(2)}
+• Revenue per Seat-Mile: $${price.toFixed(2)}
+• Margin per Seat-Mile: $${(price - costPerSeatMile).toFixed(2)}
+• Profitability: ${netProfit > 0 ? 'Profitable ✓' : 'Unprofitable ✗'}
+
+<strong>Investment Analysis:</strong>
+• Payback Period: ${netProfit > 0 ? breakeven.toFixed(1) + ' years' : 'Not profitable at current parameters'}
+• ROI: ${((netProfit / acCost) * 100).toFixed(1)}%
+• Recommendation: ${netProfit > 0 && breakeven < 8 ? 'Viable investment' : 'Needs optimization'}
+
+<strong>Path to Profitability:</strong>
+${netProfit < 0 ? '• Increase utilization (flight hours)\n• Optimize pricing for demand\n• Reduce operational costs through automation' : '• Scale fleet to achieve network effects\n• Continuous cost reduction through technology\n• Expand routes to maximize utilization'}
+
+<strong>弘益人間 - Sustainable Operations:</strong>
+Profitability ensures long-term service to communities.
+As technology advances and scale increases, costs will
+decrease, making UAM accessible to more people.
+
+Current Model Serves: ${price > 3 ? 'Premium market' : price > 1.5 ? 'Broad market' : 'Mass market'}
+Future Goal: Universal accessibility at <$1/mile
+`;
+            document.getElementById('economicsOutput').textContent = output;
+        }
+        // Auto-calculate flight plan on page load
+        window.addEventListener('load', () => {
+            calculateFlight();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 오류 처리 및 복구 | WIA-AI-015</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.8;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        header { padding: 2rem 0; border-bottom: 2px solid #10B981; margin-bottom: 3rem; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #10B981; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; }
+        h3 { color: #10B981; font-size: 1.3rem; margin: 2rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        .nav-links { margin-top: 1rem; }
+        .nav-links a { color: #10B981; text-decoration: none; margin-right: 1rem; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .callout-title { color: #10B981; font-weight: 600; margin-bottom: 0.5rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; border: 1px solid #334155; margin: 3rem 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; border: 1px solid #334155; margin: 2rem 0; }
+        footer { text-align: center; padding: 3rem 0; margin-top: 3rem; border-top: 1px solid #334155; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">제7장</div>
+            <h1>오류 처리 및 복구</h1>
+            <div class="nav-links">
+                <a href="index.html">← 목차</a>
+                <a href="chapter-06.html">← 이전</a>
+                <a href="chapter-08.html">다음 →</a>
+            </div>
+        </header>
+
+        <section>
+            <p>
+                AI 시스템은 불가피하게 오류를 만들 것입니다. 완벽한 AI를 만드는 것은 불가능하므로 대신 오류를 우아하게 처리하고 신속하게 복구하는 시스템을 구축해야 합니다. 이 장에서는 오류 감지, 영향 완화, 복구 지원 및 실패로부터 학습하는 전략을 탐구합니다. 弘益人間의 철학은 오류 처리가 사용자를 비난하거나 좌절시키는 것이 아니라 이해하고, 교육하며, 시스템이 시간이 지남에 따라 개선되도록 돕는 기회라고 가르칩니다.
+            </p>
+        </section>
+
+        <h2>오류의 유형</h2>
+        <p>
+            AI-인간 협업에서 발생할 수 있는 다양한 오류를 이해하는 것이 효과적인 처리의 첫 단계입니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>오류 유형</th>
+                    <th>설명</th>
+                    <th>예시</th>
+                    <th>심각도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>예측 오류</td>
+                    <td>AI가 잘못된 예측 또는 분류</td>
+                    <td>스팸이 아닌 이메일을 스팸으로 분류</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>환각</td>
+                    <td>AI가 사실이 아닌 정보 생성</td>
+                    <td>존재하지 않는 참조 인용</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td>분포 외 입력</td>
+                    <td>학습 데이터와 다른 입력</td>
+                    <td>새로운 언어 또는 도메인</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>컨텍스트 오해</td>
+                    <td>AI가 상황을 잘못 해석</td>
+                    <td>풍자를 진지하게 받아들임</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>시스템 장애</td>
+                    <td>기술적 오류 또는 중단</td>
+                    <td>API 시간 초과, 메모리 부족</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td>편향 오류</td>
+                    <td>공정하지 않거나 차별적인 결과</td>
+                    <td>인구 통계 그룹에 대한 체계적 오분류</td>
+                    <td>치명적</td>
+                </tr>
+                <tr>
+                    <td>안전 위반</td>
+                    <td>안전 또는 윤리 지침 위반</td>
+                    <td>유해한 내용 생성</td>
+                    <td>치명적</td>
+                </tr>
+                <tr>
+                    <td>사용자 오류</td>
+                    <td>잘못된 입력 또는 오해</td>
+                    <td>모호한 쿼리, 잘못된 매개변수</td>
+                    <td>낮음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>오류 감지</h2>
+        <p>
+            오류를 처리하기 전에 감지해야 합니다. 효과적인 감지는 여러 전략을 결합합니다.
+        </p>
+
+        <h3>신뢰도 기반 감지</h3>
+        <pre><code>interface ErrorDetection {
+  method: string;
+  confidence: number;  // 감지 신뢰도
+  detected_error_type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  evidence: any[];
+}
+
+// 낮은 신뢰도 출력 감지
+function detectLowConfidence(
+  prediction: AIPrediction,
+  threshold: number = 0.7
+): ErrorDetection | null {
+  if (prediction.confidence < threshold) {
+    return {
+      method: 'confidence_threshold',
+      confidence: 1.0 - prediction.confidence,
+      detected_error_type: 'low_confidence',
+      severity: prediction.confidence < 0.5 ? 'high' : 'medium',
+      evidence: [
+        { type: 'confidence_score', value: prediction.confidence },
+        { type: 'threshold', value: threshold }
+      ]
+    };
+  }
+
+  return null;
+}
+
+// 앙상블 불일치 감지
+function detectEnsembleDisagreement(
+  ensemble_predictions: AIPrediction[]
+): ErrorDetection | null {
+  // 앙상블 모델 간의 동의 측정
+  const agreement = calculateAgreement(ensemble_predictions);
+
+  if (agreement < 0.6) {
+    return {
+      method: 'ensemble_disagreement',
+      confidence: 1.0 - agreement,
+      detected_error_type: 'high_uncertainty',
+      severity: agreement < 0.4 ? 'high' : 'medium',
+      evidence: ensemble_predictions.map(p => ({
+        type: 'prediction',
+        value: p.result,
+        confidence: p.confidence
+      }))
+    };
+  }
+
+  return null;
+}
+
+function calculateAgreement(predictions: AIPrediction[]): number {
+  if (predictions.length === 0) return 1.0;
+
+  // 가장 일반적인 예측 찾기
+  const counts = new Map<any, number>();
+  for (const pred of predictions) {
+    const key = JSON.stringify(pred.result);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  const max_count = Math.max(...counts.values());
+  return max_count / predictions.length;
+}</code></pre>
+
+        <h3>이상 감지</h3>
+        <pre><code>// 분포 외 입력 감지
+class OutOfDistributionDetector {
+  private training_distribution: Distribution;
+
+  constructor(training_data: any[]) {
+    // 학습 데이터 분포 학습
+    this.training_distribution = this.learnDistribution(training_data);
+  }
+
+  detect(input: any): ErrorDetection | null {
+    // 입력이 학습 분포에서 얼마나 멀리 떨어져 있는지 측정
+    const distance = this.measureDistance(
+      input,
+      this.training_distribution
+    );
+
+    // 거리 임계값
+    const threshold = this.computeThreshold();
+
+    if (distance > threshold) {
+      return {
+        method: 'ood_detection',
+        confidence: Math.min(1.0, distance / (threshold * 2)),
+        detected_error_type: 'out_of_distribution',
+        severity: distance > threshold * 2 ? 'high' : 'medium',
+        evidence: [
+          { type: 'distance', value: distance },
+          { type: 'threshold', value: threshold }
+        ]
+      };
+    }
+
+    return null;
+  }
+
+  private measureDistance(input: any, distribution: Distribution): number {
+    // Mahalanobis 거리 또는 유사한 메트릭 사용
+    const features = extractFeatures(input);
+    return distribution.computeMahalanobisDistance(features);
+  }
+}
+
+// 출력 일관성 검사
+function detectInconsistentOutput(
+  output: any,
+  context: TaskContext
+): ErrorDetection | null {
+  const checks = [
+    checkFormatValidity(output),
+    checkValueRanges(output),
+    checkInternalConsistency(output),
+    checkContextualRelevance(output, context)
+  ];
+
+  const failed_checks = checks.filter(c => !c.passed);
+
+  if (failed_checks.length > 0) {
+    return {
+      method: 'consistency_check',
+      confidence: failed_checks.length / checks.length,
+      detected_error_type: 'inconsistent_output',
+      severity: failed_checks.some(c => c.severity === 'high') ? 'high' : 'medium',
+      evidence: failed_checks.map(c => ({
+        type: 'failed_check',
+        check_name: c.name,
+        reason: c.reason
+      }))
+    };
+  }
+
+  return null;
+}</code></pre>
+
+        <h2>오류 심각도 평가</h2>
+        <p>
+            모든 오류가 동등하게 생성되는 것은 아닙니다. 심각도 평가는 대응의 우선순위를 정하는 데 도움이 됩니다.
+        </p>
+
+        <pre><code>interface SeverityAssessment {
+  severity_level: 'low' | 'medium' | 'high' | 'critical';
+  impact_score: number;  // 0-1
+  urgency: 'can_wait' | 'needs_attention' | 'immediate';
+  factors: {
+    user_impact: number;
+    data_impact: number;
+    safety_risk: number;
+    business_impact: number;
+  };
+  recommended_action: string;
+}
+
+function assessErrorSeverity(
+  error: DetectedError,
+  context: OperationalContext
+): SeverityAssessment {
+  // 다양한 영향 요인 평가
+  const user_impact = assessUserImpact(error, context);
+  const data_impact = assessDataImpact(error, context);
+  const safety_risk = assessSafetyRisk(error, context);
+  const business_impact = assessBusinessImpact(error, context);
+
+  // 전체 영향 점수 계산
+  const impact_score =
+    user_impact * 0.4 +
+    safety_risk * 0.3 +
+    business_impact * 0.2 +
+    data_impact * 0.1;
+
+  // 심각도 수준 결정
+  let severity_level: 'low' | 'medium' | 'high' | 'critical';
+  let urgency: 'can_wait' | 'needs_attention' | 'immediate';
+
+  if (safety_risk > 0.8 || impact_score > 0.9) {
+    severity_level = 'critical';
+    urgency = 'immediate';
+  } else if (impact_score > 0.7 || safety_risk > 0.5) {
+    severity_level = 'high';
+    urgency = 'immediate';
+  } else if (impact_score > 0.4) {
+    severity_level = 'medium';
+    urgency = 'needs_attention';
+  } else {
+    severity_level = 'low';
+    urgency = 'can_wait';
+  }
+
+  return {
+    severity_level,
+    impact_score,
+    urgency,
+    factors: {
+      user_impact,
+      data_impact,
+      safety_risk,
+      business_impact
+    },
+    recommended_action: determineRecommendedAction(severity_level, error)
+  };
+}
+
+function assessUserImpact(
+  error: DetectedError,
+  context: OperationalContext
+): number {
+  let impact = 0;
+
+  // 영향을 받는 사용자 수
+  const users_affected = context.users_affected || 1;
+  impact += Math.min(1.0, users_affected / 1000) * 0.4;
+
+  // 사용자 작업 차단 여부
+  if (error.blocks_user_action) {
+    impact += 0.3;
+  }
+
+  // 사용자 데이터 손실 위험
+  if (error.risks_data_loss) {
+    impact += 0.3;
+  }
+
+  return Math.min(1.0, impact);
+}
+
+function assessSafetyRisk(
+  error: DetectedError,
+  context: OperationalContext
+): number {
+  // 안전에 중요한 애플리케이션인가?
+  if (context.safety_critical) {
+    // 안전에 중요한 시스템의 모든 오류는 높은 위험
+    return 0.8;
+  }
+
+  // 특정 안전 위반
+  if (error.type === 'safety_violation') {
+    return 1.0;
+  }
+
+  // 편향 또는 공정성 문제
+  if (error.type === 'bias_error') {
+    return 0.7;
+  }
+
+  return 0.0;
+}</code></pre>
+
+        <h2>오류 완화 전략</h2>
+        <p>
+            오류가 감지되면 여러 전략이 영향을 완화할 수 있습니다.
+        </p>
+
+        <h3>그레이스풀 디그레이데이션</h3>
+        <pre><code>// 완전히 실패하는 대신 감소된 기능 제공
+class GracefulDegradation {
+  handleError(
+    error: DetectedError,
+    original_request: Request
+  ): Response {
+    // 오류 심각도에 따라 폴백 전략 선택
+    const severity = assessErrorSeverity(error, original_request.context);
+
+    switch (severity.severity_level) {
+      case 'low':
+        // 경고와 함께 최선의 노력 결과 제공
+        return {
+          result: this.generateBestEffortResult(original_request),
+          warning: this.formatErrorWarning(error),
+          confidence: 0.5
+        };
+
+      case 'medium':
+        // 단순화된 폴백 사용
+        return {
+          result: this.useFallbackMethod(original_request),
+          notice: 'AI가 일시적으로 제한된 모드로 작동 중입니다',
+          confidence: 0.6
+        };
+
+      case 'high':
+        // 인간 검토 요청
+        return {
+          result: null,
+          action_required: 'human_review',
+          message: '이 요청은 전문가 검토가 필요합니다',
+          review_request: this.createReviewRequest(original_request, error)
+        };
+
+      case 'critical':
+        // 안전하게 실패
+        return {
+          result: null,
+          error: 'CRITICAL_ERROR',
+          message: '안전을 위해 이 작업을 완료할 수 없습니다',
+          escalation: this.escalateToCriticalTeam(error)
+        };
+    }
+  }
+
+  private useFallbackMethod(request: Request): any {
+    // 간단하고 신뢰할 수 있는 폴백 메서드
+    const fallback_strategies = [
+      () => this.useRuleBasedFallback(request),
+      () => this.useSimpleModelFallback(request),
+      () => this.useTemplateBasedFallback(request),
+      () => this.useCachedResultFallback(request)
+    ];
+
+    for (const strategy of fallback_strategies) {
+      try {
+        const result = strategy();
+        if (result !== null) {
+          return result;
+        }
+      } catch (e) {
+        continue;  // 다음 전략 시도
+      }
+    }
+
+    return null;
+  }
+}</code></pre>
+
+        <h3>인간 개입 요청</h3>
+        <pre><code>interface HumanInterventionRequest {
+  request_id: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  error_context: DetectedError;
+  original_task: Task;
+  suggested_actions: Array<{
+    action: string;
+    rationale: string;
+    estimated_time: number;
+  }>;
+  deadline?: Date;
+  assigned_to?: string;
+}
+
+class HumanInterventionManager {
+  async requestIntervention(
+    error: DetectedError,
+    task: Task
+  ): Promise<HumanInterventionRequest> {
+    // 개입 요청 생성
+    const request: HumanInterventionRequest = {
+      request_id: generateId(),
+      priority: this.determinePriority(error, task),
+      error_context: error,
+      original_task: task,
+      suggested_actions: this.suggestActions(error, task),
+      deadline: this.calculateDeadline(error, task)
+    };
+
+    // 적절한 인간 전문가에게 할당
+    request.assigned_to = await this.assignToExpert(request);
+
+    // 요청 대기열에 추가
+    await this.intervention_queue.enqueue(request);
+
+    // 할당된 전문가에게 알림
+    await this.notifyExpert(request);
+
+    return request;
+  }
+
+  private suggestActions(
+    error: DetectedError,
+    task: Task
+  ): Array<any> {
+    const actions = [];
+
+    // 오류 유형에 따라 제안
+    switch (error.type) {
+      case 'low_confidence':
+        actions.push({
+          action: '더 많은 컨텍스트 제공',
+          rationale: 'AI가 불확실합니다. 추가 정보가 도움이 될 수 있습니다.',
+          estimated_time: 2
+        });
+        actions.push({
+          action: '수동으로 결정',
+          rationale: '전문가 판단이 필요합니다',
+          estimated_time: 5
+        });
+        break;
+
+      case 'hallucination':
+        actions.push({
+          action: '사실 확인',
+          rationale: 'AI가 부정확한 정보를 생성했을 수 있습니다',
+          estimated_time: 10
+        });
+        actions.push({
+          action: '신뢰할 수 있는 소스로 다시 생성',
+          rationale: '검증된 참조로 재시도',
+          estimated_time: 5
+        });
+        break;
+
+      case 'bias_error':
+        actions.push({
+          action: '편향 검토',
+          rationale: '공정성 문제가 감지되었습니다',
+          estimated_time: 15
+        });
+        actions.push({
+          action: '대체 방법 사용',
+          rationale: '편향되지 않은 접근 방식 사용',
+          estimated_time: 10
+        });
+        break;
+    }
+
+    return actions;
+  }
+}</code></pre>
+
+        <h2>자동 복구</h2>
+        <p>
+            많은 오류는 인간 개입 없이 자동으로 복구될 수 있습니다.
+        </p>
+
+        <pre><code>class AutoRecoverySystem {
+  private recovery_strategies: Map<string, RecoveryStrategy>;
+
+  async attemptRecovery(
+    error: DetectedError,
+    context: OperationalContext
+  ): Promise<RecoveryResult> {
+    // 오류 유형에 대한 복구 전략 가져오기
+    const strategies = this.recovery_strategies.get(error.type) || [];
+
+    for (const strategy of strategies) {
+      try {
+        console.log(`복구 전략 시도: ${strategy.name}`);
+
+        // 전략 실행
+        const result = await strategy.execute(error, context);
+
+        if (result.success) {
+          console.log(`복구 성공: ${strategy.name}`);
+
+          // 복구 기록
+          await this.logRecovery(error, strategy, result);
+
+          return result;
+        }
+      } catch (e) {
+        console.error(`복구 전략 실패: ${strategy.name}`, e);
+        continue;  // 다음 전략 시도
+      }
+    }
+
+    // 모든 자동 복구 시도 실패
+    return {
+      success: false,
+      requires_human_intervention: true,
+      attempted_strategies: strategies.map(s => s.name)
+    };
+  }
+
+  // 일반적인 복구 전략
+  private initializeStrategies(): void {
+    // 재시도 전략
+    this.recovery_strategies.set('timeout', [
+      {
+        name: 'exponential_backoff_retry',
+        execute: async (error, context) => {
+          return await this.retryWithBackoff(context.original_request, {
+            max_attempts: 3,
+            initial_delay: 1000,
+            multiplier: 2
+          });
+        }
+      }
+    ]);
+
+    // 입력 정제 전략
+    this.recovery_strategies.set('invalid_input', [
+      {
+        name: 'input_sanitization',
+        execute: async (error, context) => {
+          const sanitized_input = this.sanitizeInput(
+            context.original_request.input
+          );
+          return await this.retryWithInput(sanitized_input);
+        }
+      },
+      {
+        name: 'default_value_substitution',
+        execute: async (error, context) => {
+          const input_with_defaults = this.applyDefaults(
+            context.original_request.input
+          );
+          return await this.retryWithInput(input_with_defaults);
+        }
+      }
+    ]);
+
+    // 모델 폴백 전략
+    this.recovery_strategies.set('model_error', [
+      {
+        name: 'fallback_to_previous_version',
+        execute: async (error, context) => {
+          const previous_model = this.getPreviousModelVersion();
+          return await this.retryWithModel(
+            previous_model,
+            context.original_request
+          );
+        }
+      },
+      {
+        name: 'fallback_to_simpler_model',
+        execute: async (error, context) => {
+          const simpler_model = this.getSimplerModel();
+          return await this.retryWithModel(
+            simpler_model,
+            context.original_request
+          );
+        }
+      }
+    ]);
+  }
+
+  private async retryWithBackoff(
+    request: Request,
+    config: BackoffConfig
+  ): Promise<RecoveryResult> {
+    let delay = config.initial_delay;
+
+    for (let attempt = 0; attempt < config.max_attempts; attempt++) {
+      try {
+        // 재시도 전 대기
+        if (attempt > 0) {
+          await sleep(delay);
+          delay *= config.multiplier;
+        }
+
+        // 요청 재시도
+        const result = await this.executeRequest(request);
+
+        return {
+          success: true,
+          result,
+          attempts: attempt + 1
+        };
+      } catch (e) {
+        if (attempt === config.max_attempts - 1) {
+          throw e;  // 마지막 시도였음
+        }
+      }
+    }
+
+    return { success: false };
+  }
+}</code></pre>
+
+        <h2>오류 소통</h2>
+        <p>
+            사용자에게 오류를 소통하는 방법은 사용자 경험에 큰 영향을 미칩니다. 명확하고 실행 가능하며 비난하지 않는 오류 메시지가 중요합니다.
+        </p>
+
+        <pre><code>interface ErrorMessage {
+  title: string;
+  description: string;
+  technical_details?: string;  // 선택적, 전문가용
+  user_impact: string;  // 사용자에게 의미하는 바
+  suggested_actions: string[];
+  support_info?: {
+    error_code: string;
+    timestamp: Date;
+    support_link: string;
+  };
+}
+
+// 사용자 친화적인 오류 메시지 생성
+function generateUserFriendlyError(
+  error: DetectedError,
+  user_type: 'novice' | 'intermediate' | 'expert'
+): ErrorMessage {
+  // 기술 용어를 평이한 언어로 번역
+  const user_facing_description = translateToPlainLanguage(
+    error.type,
+    error.details
+  );
+
+  // 실행 가능한 단계 제공
+  const actions = generateActionableSteps(error, user_type);
+
+  // 사용자에 따라 세부 정보 조정
+  const include_technical = user_type === 'expert';
+
+  return {
+    title: generateErrorTitle(error),
+    description: user_facing_description,
+    technical_details: include_technical ? error.details : undefined,
+    user_impact: describeUserImpact(error),
+    suggested_actions: actions,
+    support_info: {
+      error_code: error.code,
+      timestamp: new Date(),
+      support_link: generateSupportLink(error)
+    }
+  };
+}
+
+function translateToPlainLanguage(
+  error_type: string,
+  details: any
+): string {
+  const translations: Record<string, string> = {
+    'low_confidence': 'AI가 이 요청을 처리하는 데 확신이 없습니다.',
+    'hallucination': 'AI가 부정확한 정보를 생성했을 수 있습니다.',
+    'out_of_distribution': '이 요청은 AI가 학습한 것과 매우 다릅니다.',
+    'timeout': '요청 처리 시간이 너무 오래 걸렸습니다.',
+    'invalid_input': '입력이 예상 형식과 일치하지 않습니다.',
+    'bias_error': 'AI가 공정하지 않거나 편향된 결과를 생성했습니다.',
+    'safety_violation': '이 요청은 안전 지침을 위반합니다.'
+  };
+
+  return translations[error_type] ||
+    'AI가 예상치 못한 문제를 만났습니다.';
+}
+
+function generateActionableSteps(
+  error: DetectedError,
+  user_type: string
+): string[] {
+  const steps: string[] = [];
+
+  switch (error.type) {
+    case 'low_confidence':
+      steps.push('더 구체적인 정보를 제공해 보세요');
+      steps.push('다르게 표현해 보세요');
+      if (user_type !== 'novice') {
+        steps.push('전문가 검토를 요청하세요');
+      }
+      break;
+
+    case 'hallucination':
+      steps.push('제공된 정보를 독립적으로 확인하세요');
+      steps.push('신뢰할 수 있는 소스를 요청하세요');
+      steps.push('사실 확인 도구를 사용하세요');
+      break;
+
+    case 'timeout':
+      steps.push('잠시 후 다시 시도하세요');
+      steps.push('요청을 더 작은 부분으로 나누세요');
+      break;
+
+    case 'invalid_input':
+      steps.push('입력 형식이 올바른지 확인하세요');
+      steps.push('예제를 참조하세요');
+      steps.push('입력 유효성 검사 도움말을 확인하세요');
+      break;
+  }
+
+  // 항상 지원 옵션 포함
+  steps.push('문제가 지속되면 지원팀에 문의하세요');
+
+  return steps;
+}
+
+// 오류 메시지 표시
+function displayError(error_message: ErrorMessage): void {
+  // 비난하지 않는 톤 사용
+  // 명확하고 간결한 언어
+  // 다음 단계 제공
+  // 필요한 경우 지원 제공
+
+  const error_ui = `
+    <div class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h2>${error_message.title}</h2>
+      <p class="error-description">${error_message.description}</p>
+
+      <div class="user-impact">
+        <strong>이것이 의미하는 바:</strong>
+        <p>${error_message.user_impact}</p>
+      </div>
+
+      <div class="suggested-actions">
+        <strong>시도해 볼 수 있는 것:</strong>
+        <ol>
+          ${error_message.suggested_actions.map(a => `<li>${a}</li>`).join('')}
+        </ol>
+      </div>
+
+      ${error_message.technical_details ? `
+        <details class="technical-details">
+          <summary>기술 세부 정보</summary>
+          <pre>${error_message.technical_details}</pre>
+        </details>
+      ` : ''}
+
+      <div class="support-info">
+        <p>오류 코드: ${error_message.support_info?.error_code}</p>
+        <a href="${error_message.support_info?.support_link}">지원팀에 문의</a>
+      </div>
+    </div>
+  `;
+
+  // UI에 표시
+  showModal(error_ui);
+}</code></pre>
+
+        <h2>오류로부터 학습</h2>
+        <p>
+            모든 오류는 시스템을 개선할 수 있는 기회입니다. 체계적인 오류 분석과 피드백 루프는 지속적인 개선을 가능하게 합니다.
+        </p>
+
+        <pre><code>class ErrorLearningSystem {
+  private error_db: ErrorDatabase;
+  private improvement_pipeline: ImprovementPipeline;
+
+  async analyzeErrors(time_period: TimeRange): Promise<ErrorAnalysis> {
+    // 기간 동안 모든 오류 수집
+    const errors = await this.error_db.getErrors(time_period);
+
+    return {
+      total_errors: errors.length,
+      error_rate: this.calculateErrorRate(errors, time_period),
+      error_types: this.groupByType(errors),
+      common_patterns: await this.identifyPatterns(errors),
+      root_causes: await this.analyzeRootCauses(errors),
+      impact_assessment: this.assessImpact(errors),
+      improvement_opportunities: this.identifyImprovements(errors)
+    };
+  }
+
+  private async identifyPatterns(errors: DetectedError[]): Promise<Pattern[]> {
+    const patterns: Pattern[] = [];
+
+    // 시간적 패턴
+    const temporal_patterns = this.findTemporalPatterns(errors);
+    patterns.push(...temporal_patterns);
+
+    // 입력 패턴
+    const input_patterns = this.findInputPatterns(errors);
+    patterns.push(...input_patterns);
+
+    // 컨텍스트 패턴
+    const context_patterns = this.findContextPatterns(errors);
+    patterns.push(...context_patterns);
+
+    return patterns.filter(p => p.significance > 0.7);
+  }
+
+  private findTemporalPatterns(errors: DetectedError[]): Pattern[] {
+    // 특정 시간에 오류가 급증하는가?
+    const hourly_counts = this.groupByHour(errors);
+    const daily_counts = this.groupByDay(errors);
+
+    const patterns: Pattern[] = [];
+
+    // 특정 시간대의 급증 찾기
+    for (const [hour, count] of hourly_counts) {
+      const avg_count = this.average(Array.from(hourly_counts.values()));
+
+      if (count > avg_count * 2) {
+        patterns.push({
+          type: 'temporal_spike',
+          description: `시간 ${hour}에 오류가 ${count}개로 급증`,
+          significance: count / avg_count,
+          recommendation: '이 시간대의 부하 또는 데이터 품질 조사'
+        });
+      }
+    }
+
+    return patterns;
+  }
+
+  private async analyzeRootCauses(
+    errors: DetectedError[]
+  ): Promise<RootCause[]> {
+    const root_causes: RootCause[] = [];
+
+    // 오류 유형별로 그룹화
+    const by_type = this.groupByType(errors);
+
+    for (const [type, type_errors] of by_type) {
+      // 이 유형의 공통 속성 찾기
+      const common_attrs = this.findCommonAttributes(type_errors);
+
+      if (common_attrs.length > 0) {
+        root_causes.push({
+          error_type: type,
+          affected_errors: type_errors.length,
+          likely_cause: this.inferCause(type, common_attrs),
+          common_attributes: common_attrs,
+          confidence: this.calculateCauseConfidence(common_attrs),
+          suggested_fix: this.suggestFix(type, common_attrs)
+        });
+      }
+    }
+
+    return root_causes.sort((a, b) =>
+      b.affected_errors - a.affected_errors
+    );
+  }
+
+  private identifyImprovements(
+    errors: DetectedError[]
+  ): ImprovementOpportunity[] {
+    const opportunities: ImprovementOpportunity[] = [];
+
+    // 자주 발생하는 오류는 개선 우선순위가 높음
+    const frequent_errors = this.findFrequentErrors(errors);
+
+    for (const error_type of frequent_errors) {
+      opportunities.push({
+        type: 'reduce_frequent_error',
+        target: error_type.type,
+        current_rate: error_type.rate,
+        target_rate: error_type.rate * 0.5,  // 50% 감소 목표
+        actions: [
+          '이 유형에 대한 모델 재학습',
+          '입력 유효성 검사 개선',
+          '더 나은 오류 복구 전략 구현'
+        ],
+        estimated_impact: error_type.count,
+        priority: error_type.count > 100 ? 'high' : 'medium'
+      });
+    }
+
+    // 영향이 큰 오류는 우선순위가 높음
+    const high_impact_errors = errors.filter(e =>
+      this.calculateImpact(e) > 0.7
+    );
+
+    if (high_impact_errors.length > 0) {
+      opportunities.push({
+        type: 'reduce_high_impact_errors',
+        target: 'high_severity_errors',
+        current_rate: high_impact_errors.length,
+        target_rate: Math.floor(high_impact_errors.length * 0.3),
+        actions: [
+          '더 나은 오류 감지 구현',
+          '인간 감독 임계값 낮추기',
+          '안전 검사 강화'
+        ],
+        estimated_impact: high_impact_errors.length,
+        priority: 'critical'
+      });
+    }
+
+    return opportunities.sort((a, b) => {
+      const priority_order = { critical: 3, high: 2, medium: 1, low: 0 };
+      return priority_order[b.priority] - priority_order[a.priority];
+    });
+  }
+}</code></pre>
+
+        <div class="callout">
+            <div class="callout-title">오류 처리의 弘益人間</div>
+            <p>
+                오류는 실패가 아니라 학습 기회입니다. 오류를 처리할 때 우리는 사용자를 비난하거나 좌절시키지 말고 이해하고 교육하며 지원해야 합니다. 오류 메시지는 명확하고 실행 가능하며 비난하지 않아야 합니다. 시스템은 가능한 한 자동으로 복구하고, 불가능한 경우 우아하게 저하되어야 합니다. 모든 오류는 기록되고 분석되어 미래의 오류를 방지해야 합니다. 이렇게 함으로써 우리는 시간이 지남에 따라 더 강력하고 신뢰할 수 있으며 유용한 시스템을 만듭니다. 이것이 널리 인간을 이롭게 하는 방법입니다.
+            </p>
+        </div>
+
+        <h2>회복력 지표</h2>
+        <p>
+            시스템이 오류를 얼마나 잘 처리하는지 측정합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>지표</th>
+                    <th>설명</th>
+                    <th>목표</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>평균 탐지 시간 (MTTD)</td>
+                    <td>오류를 감지하는 데 걸리는 시간</td>
+                    <td>&lt; 1초</td>
+                </tr>
+                <tr>
+                    <td>평균 복구 시간 (MTTR)</td>
+                    <td>오류에서 복구하는 데 걸리는 시간</td>
+                    <td>&lt; 5초</td>
+                </tr>
+                <tr>
+                    <td>자동 복구율</td>
+                    <td>인간 개입 없이 복구된 오류 비율</td>
+                    <td>&gt; 80%</td>
+                </tr>
+                <tr>
+                    <td>오류 재발률</td>
+                    <td>동일한 오류가 다시 발생하는 빈도</td>
+                    <td>&lt; 10%</td>
+                </tr>
+                <tr>
+                    <td>우아한 저하 성공률</td>
+                    <td>완전한 실패 대신 저하된 경우</td>
+                    <td>&gt; 90%</td>
+                </tr>
+                <tr>
+                    <td>사용자 영향 점수</td>
+                    <td>오류가 사용자에게 미치는 영향</td>
+                    <td>&lt; 0.3</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <p>효과적인 오류 처리는 강력한 AI-인간 협업 시스템을 구축하는 데 필수적입니다. 주요 개념은 다음과 같습니다:</p>
+            <ul>
+                <li>오류는 예측 오류, 환각, 분포 외 입력, 시스템 장애, 편향, 안전 위반 등 다양한 유형이 있습니다</li>
+                <li>오류 감지는 신뢰도 임계값, 앙상블 불일치, 이상 감지, 일관성 검사를 사용합니다</li>
+                <li>심각도 평가는 사용자 영향, 안전 위험, 비즈니스 영향을 기반으로 대응의 우선순위를 정합니다</li>
+                <li>완화 전략에는 우아한 저하, 폴백 메서드, 인간 개입 요청이 포함됩니다</li>
+                <li>자동 복구는 재시도, 입력 정제, 모델 폴백을 통해 많은 오류를 인간 개입 없이 처리합니다</li>
+                <li>오류 소통은 명확하고 실행 가능하며 비난하지 않으며 사용자 전문성 수준에 맞게 조정되어야 합니다</li>
+                <li>오류로부터 학습하는 것은 패턴 식별, 근본 원인 분석, 개선 기회를 통해 시스템을 지속적으로 개선합니다</li>
+                <li>회복력 지표는 오류 감지 및 복구 효과를 측정합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>AI-인간 협업에서 발생할 수 있는 주요 오류 유형은 무엇이며 각각의 심각도는 무엇입니까?</li>
+                <li>낮은 신뢰도와 앙상블 불일치를 사용한 오류 감지가 어떻게 작동하는지 설명하세요.</li>
+                <li>오류 심각도를 평가할 때 어떤 요인을 고려해야 합니까?</li>
+                <li>우아한 저하란 무엇이며 완전한 실패보다 왜 선호됩니까?</li>
+                <li>자동 복구에 사용할 수 있는 주요 전략은 무엇이며 각각은 언제 적절합니까?</li>
+                <li>효과적인 오류 메시지의 특징은 무엇이며 어떻게 사용자 친화적으로 만들 수 있습니까?</li>
+                <li>시스템이 어떻게 오류 패턴을 식별하고 근본 원인을 분석할 수 있습니까?</li>
+                <li>오류 분석이 어떻게 구체적인 시스템 개선으로 이어집니까?</li>
+                <li>시스템 회복력을 측정해야 하는 주요 지표는 무엇입니까?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

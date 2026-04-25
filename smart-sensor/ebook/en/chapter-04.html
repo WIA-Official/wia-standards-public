@@ -1,0 +1,687 @@
+<<<<<<< HEAD
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Power Optimization & Energy Harvesting | WIA-SEMI-015</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #8B5CF6; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1rem; border-radius: 5px; overflow-x: auto; border: 1px solid var(--border); margin: 1rem 0; }
+        pre code { padding: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 4</p>
+        <h1>Power Optimization & Energy Harvesting</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Ultra-low-power design strategies, duty cycling, dynamic voltage scaling, battery life extension, and energy harvesting technologies
+        </p>
+
+        <h2>Overview</h2>
+        <p>
+            Power optimization represents the single most critical design consideration for battery-powered smart sensors. While cloud-connected devices can rely on wall power, edge sensors deployed in remote locations, wearables, or industrial environments must operate for months or years on compact batteries. The WIA-SEMI-015 standard mandates minimum one-year battery life on standard batteries (CR2032 coin cell or AA), requiring average power consumption well below 100 µA, and often targeting 10-50 µA for multi-year operation.
+        </p>
+        <p>
+            This chapter explores comprehensive power optimization strategies spanning hardware selection, firmware design, intelligent duty cycling, dynamic voltage/frequency scaling, and energy harvesting technologies that can extend battery life or even enable perpetual operation. Understanding the power budget and optimizing every component is essential for successful deployment.
+        </p>
+
+        <div class="highlight-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>Target average power consumption: <50 µA for multi-year battery life on coin cells</li>
+                <li>Duty cycling: spend 99%+ time in deep sleep (<50 µA) for battery-powered applications</li>
+                <li>Dynamic voltage/frequency scaling (DVFS) reduces active power by 30-60%</li>
+                <li>Energy harvesting (solar, vibration, thermal) can eliminate battery replacement</li>
+                <li>Power profiling essential: measure actual consumption, not just datasheet estimates</li>
+            </ul>
+        </div>
+
+        <h2>Power Budget Analysis</h2>
+        <p>
+            Effective power optimization begins with detailed power budget analysis, accounting for every component and operational state. A typical smart sensor alternates between active periods (sensor sampling, ML inference, wireless transmission) and sleep periods (waiting for next event or timer expiry).
+        </p>
+
+        <h3>Battery Capacity and Target Lifetime</h3>
+        <p>
+            Common battery options include CR2032 coin cell (220 mAh at 3V, compact form factor, 5-10 year shelf life), AA alkaline (2500 mAh at 1.5V, widely available, low cost), and AAA alkaline (1000 mAh at 1.5V, smaller than AA). Lithium primary cells (CR123A, 1500 mAh at 3V) offer higher energy density and better temperature performance.
+        </p>
+        <p>
+            For one-year battery life on CR2032 (220 mAh), the average current must not exceed 220 mAh / 8760 hours = 25 µA. Accounting for 80% usable capacity (temperature effects, end-of-life voltage drop), the target becomes approximately 20 µA average. For five-year lifetime, the target drops to just 4-5 µA average, demanding extreme optimization.
+        </p>
+
+        <h3>Power State Analysis</h3>
+        <p>
+            Break down operation into distinct power states and calculate time-weighted average consumption. For example, deep sleep state (<50 µA) spending 99.9% of time, sensor sampling (2-5 mA) for 100ms every 60 seconds (0.17% duty cycle), ML inference (20-50 mA) for 50ms every 60 seconds (0.083% duty cycle), and BLE transmission (8-15 mA) for 10ms every 60 seconds (0.017% duty cycle).
+        </p>
+
+<pre><code>// Example power budget calculation
+// Assumptions: 60-second measurement interval
+const float SLEEP_CURRENT_UA = 30.0;      // Deep sleep
+const float SLEEP_TIME_S = 59.84;         // 99.73% duty cycle
+
+const float SAMPLE_CURRENT_MA = 3.0;      // Sensor active
+const float SAMPLE_TIME_S = 0.1;          // 100ms
+
+const float INFERENCE_CURRENT_MA = 40.0;  // MCU + ML
+const float INFERENCE_TIME_S = 0.05;      // 50ms
+
+const float TX_CURRENT_MA = 10.0;         // BLE transmit
+const float TX_TIME_S = 0.01;             // 10ms
+
+// Calculate average current in µA
+float avg_current_ua =
+    (SLEEP_CURRENT_UA * SLEEP_TIME_S +
+     SAMPLE_CURRENT_MA * 1000 * SAMPLE_TIME_S +
+     INFERENCE_CURRENT_MA * 1000 * INFERENCE_TIME_S +
+     TX_CURRENT_MA * 1000 * TX_TIME_S) / 60.0;
+
+// Result: ~36.5 µA average
+// Battery life on CR2032: 220mAh * 0.8 / 0.0365mA = ~4800 hours = 6.6 months
+</code></pre>
+
+        <table>
+            <thead>
+                <tr><th>Power State</th><th>Current</th><th>Duration (per 60s)</th><th>Contribution</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Deep Sleep</td><td>30 µA</td><td>59.84 s (99.73%)</td><td>29.9 µA</td></tr>
+                <tr><td>Sensor Sampling</td><td>3 mA</td><td>0.1 s (0.17%)</td><td>5.0 µA</td></tr>
+                <tr><td>ML Inference</td><td>40 mA</td><td>0.05 s (0.083%)</td><td>33.3 µA</td></tr>
+                <tr><td>BLE Transmission</td><td>10 mA</td><td>0.01 s (0.017%)</td><td>1.7 µA</td></tr>
+                <tr><td colspan="3"><strong>Average Current</strong></td><td><strong>69.9 µA</strong></td></tr>
+            </tbody>
+        </table>
+
+        <h2>Ultra-Low-Power MCU Modes</h2>
+        <p>
+            Modern microcontrollers provide multiple power modes with varying levels of functionality, current consumption, and wake-up latency. Effective firmware design transitions between modes based on system requirements, maximizing time in the lowest-power states.
+        </p>
+
+        <h3>Active Mode</h3>
+        <p>
+            Active mode runs CPU at full speed with all peripherals available, consuming 40-200 µA/MHz depending on architecture and voltage. A Cortex-M4 at 80 MHz and 3.3V typically draws 6-10 mA. Minimize active time by completing tasks quickly and returning to sleep, using interrupt-driven architecture rather than polling, and leveraging DMA to transfer data without CPU intervention.
+        </p>
+
+        <h3>Sleep Mode</h3>
+        <p>
+            Sleep mode halts CPU execution while maintaining peripheral operation, with typical consumption of 1-5 mA. The CPU stops but SRAM retained, peripherals (timers, UART, I2C) continue operating, and wake-up is instantaneous (µs). This mode suits brief waits for peripheral operations like waiting for ADC conversion, SPI transfer completion, or UART reception.
+        </p>
+
+        <h3>Deep Sleep Mode</h3>
+        <p>
+            Deep sleep disables most peripherals while retaining SRAM and critical timers, consuming 10-50 µA. SRAM contents preserved, RTC (Real-Time Clock) continues, wake sources limited (RTC alarm, external interrupt), and wake-up time ranges from tens to hundreds of microseconds. This represents the primary power state for battery-operated sensors, where the system spends 99%+ of time.
+        </p>
+
+        <h3>Shutdown/Standby Mode</h3>
+        <p>
+            The lowest power mode (<5 µA, often 1-2 µA) loses SRAM contents requiring full system reset, maintains only critical registers (RTC backup), has limited wake sources (RTC alarm, reset pin), and incurs millisecond wake-up latency. Use for extreme power savings during long dormant periods or when sensor is disabled until user interaction.
+        </p>
+
+        <h2>Dynamic Voltage and Frequency Scaling (DVFS)</h2>
+        <p>
+            DVFS adjusts MCU operating voltage and clock frequency based on workload, reducing active power consumption by 30-60% for non-critical tasks. Power consumption relates to frequency and voltage: P ∝ f × V². Reducing voltage from 3.3V to 1.8V cuts power by roughly (1.8/3.3)² = 30%, and halving frequency provides another 50% reduction, combining for ~65% total savings.
+        </p>
+
+        <h3>Implementation Strategies</h3>
+        <p>
+            Run sensor sampling at low frequency (8-16 MHz, 1.8V) consuming 1-2 mA versus 6-8 mA at full speed. Execute ML inference at maximum frequency (80-120 MHz, 3.3V) to minimize active time and return to sleep faster. Handle wireless communication at protocol-required speed (typically 48-64 MHz for BLE). Configure peripherals (ADC, timers) to operate during sleep when possible.
+        </p>
+
+<pre><code>// Example: Dynamic frequency scaling for sensor reading
+void read_sensor_low_power(void) {
+    // Reduce clock to 8 MHz, voltage to 1.8V
+    system_clock_set_frequency(CLOCK_8MHZ);
+    power_set_voltage(VOLTAGE_1V8);
+
+    // Sample sensor (takes longer, but uses less energy)
+    i2c_read_sensor(&sensor_data);
+
+    // Return to high performance for ML inference
+    power_set_voltage(VOLTAGE_3V3);
+    system_clock_set_frequency(CLOCK_80MHZ);
+
+    // Run inference at full speed
+    run_ml_inference(&sensor_data, &result);
+
+    // Enter deep sleep
+    enter_deep_sleep_until_next_interval();
+}
+</code></pre>
+
+        <h2>Peripheral Power Management</h2>
+        <p>
+            Sensors and peripherals often dominate the power budget, especially in active state. Careful management is essential for meeting battery life targets.
+        </p>
+
+        <h3>Sensor Power Optimization</h3>
+        <p>
+            Many MEMS sensors provide multiple power modes. For example, Bosch BMA400 accelerometer offers normal mode (14 µA at 100 Hz), low-power mode (3.5 µA at 100 Hz), and sleep mode (0.8 µA). Strategies include power down sensors between measurements, use lowest sampling rate meeting application needs (1 Hz instead of 100 Hz saves 90% power), leverage built-in motion detection to wake system only when needed, and batch multiple measurements before waking MCU.
+        </p>
+
+        <h3>Wireless Radio Management</h3>
+        <p>
+            Wireless transceivers consume significant power during transmission and reception: BLE transmission (8-15 mA), BLE reception (8-12 mA), LoRaWAN transmission (30-120 mA peak, brief bursts), and Wi-Fi transmission/reception (80-200 mA). Optimization techniques include minimize connection intervals (advertise less frequently), reduce packet size to minimize airtime, use connection parameters optimized for power (longer intervals, more latency tolerance), implement sleep between transmissions, and consider LoRaWAN Class A (lowest power) versus Class C (always listening).
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Wireless Protocol</th><th>TX Power</th><th>RX Power</th><th>Sleep Power</th><th>Range</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>BLE 5.0</td><td>8-15 mA</td><td>8-12 mA</td><td>5-10 µA</td><td>50-100 m</td></tr>
+                <tr><td>LoRaWAN</td><td>30-120 mA</td><td>10-15 mA</td><td>1-5 µA</td><td>2-15 km</td></tr>
+                <tr><td>NB-IoT</td><td>100-220 mA</td><td>50-80 mA</td><td>3-10 µA</td><td>1-10 km</td></tr>
+                <tr><td>Wi-Fi</td><td>120-200 mA</td><td>80-150 mA</td><td>10-50 µA</td><td>50-100 m</td></tr>
+                <tr><td>Zigbee</td><td>25-35 mA</td><td>20-30 mA</td><td>5-10 µA</td><td>10-100 m</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Software Optimization for Power</h2>
+        <p>
+            Firmware design profoundly impacts power consumption. Poorly optimized code can waste 50%+ energy through unnecessary wake-ups, inefficient algorithms, or failure to utilize hardware features.
+        </p>
+
+        <h3>Interrupt-Driven Architecture</h3>
+        <p>
+            Avoid polling loops that keep CPU active, instead use interrupts to wake from sleep on events (sensor data ready, timer expiry, wireless packet received). Configure peripherals to use interrupt-driven operation, leverage DMA for data transfers, and minimize interrupt service routine duration to return to sleep quickly.
+        </p>
+
+        <h3>Event-Driven State Machines</h3>
+        <p>
+            Structure firmware as state machines responding to events rather than continuous execution loops. Each state transition performs minimal work then returns to sleep, ensuring the system is never active without purpose. RTOS task notifications or event flags coordinate complex behaviors efficiently.
+        </p>
+
+        <h3>Computational Efficiency</h3>
+        <p>
+            Reduce active time through algorithmic optimization: use fixed-point instead of floating-point when possible (fewer CPU cycles), leverage hardware accelerators (CRC, AES, MAC), pre-compute constants and lookup tables, and optimize critical loops (unroll, vectorize with SIMD). A 2× speedup in computation halves active energy consumption.
+        </p>
+
+        <h2>Energy Harvesting Technologies</h2>
+        <p>
+            Energy harvesting captures ambient energy to supplement or replace batteries, enabling perpetual operation or dramatically extending battery life. The WIA-SEMI-015 standard includes optional support for energy harvesting interfaces.
+        </p>
+
+        <h3>Solar/Photovoltaic</h3>
+        <p>
+            Solar cells convert light to electricity with varying efficiency based on illumination. Indoor lighting provides 10-100 µW/cm² (fluorescent, LED office lighting), while outdoor sunlight delivers 1-10 mW/cm² (diffuse) to 10-100 mW/cm² (direct sun). A 5 cm² indoor cell generates 50-500 µW, sufficient for low-duty-cycle sensors (<1% duty cycle, deep sleep between samples). Outdoor deployment enables much higher power budgets.
+        </p>
+        <p>
+            Implementation uses maximum power point tracking (MPPT) to optimize energy extraction, supercapacitors or thin-film batteries for energy storage, and power management ICs like Texas Instruments BQ25570 (nanopower harvesting, cold-start from 330 mV) or Analog Devices ADP5090 (solar/TEG optimized).
+        </p>
+
+        <h3>Vibration/Piezoelectric</h3>
+        <p>
+            Piezoelectric generators convert mechanical vibration to electrical energy, suitable for industrial machinery monitoring, automotive applications, and structural health monitoring. Output power depends on vibration amplitude and frequency: low vibration (10 µW - 100 µW), moderate vibration (100 µW - 500 µW), and high vibration (0.5 mW - 5 mW).
+        </p>
+        <p>
+            Piezo harvesters require AC-to-DC rectification, impedance matching to maximize power transfer, and energy storage (supercapacitor) to buffer intermittent generation. Typical implementation charges supercapacitor during vibration, then powers sensor burst when sufficient energy accumulated.
+        </p>
+
+        <h3>Thermoelectric Generators (TEG)</h3>
+        <p>
+            TEGs convert temperature differentials to electricity using the Seebeck effect. Power output relates to temperature difference: 5°C delta generates 100-500 µW, 10°C delta produces 500 µW - 2 mW, and 20°C delta yields 2-10 mW. Applications include body heat harvesting (wearables using skin temperature vs. ambient), industrial process monitoring (hot pipes, machinery), and HVAC duct sensors.
+        </p>
+        <p>
+            TEG modules like Micropelt MPG-D751 (13mm × 13mm, 20 µW to 5 mW depending on ΔT) pair with PMICs offering ultra-low input voltage capability (Analog Devices LTC3108 starts from 20 mV input).
+        </p>
+
+        <h3>RF Energy Harvesting</h3>
+        <p>
+            RF harvesting captures ambient radio frequency energy or uses dedicated RF beacons. Ambient RF (Wi-Fi, cellular, broadcast) provides 1-10 µW at typical distances, while dedicated RF beacons (900 MHz, 2.4 GHz) deliver 100 µW - 1 mW at 1-10 meter range. Applications include RFID-like scenarios, warehouse asset tracking, and proximity-based sensors.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Harvesting Method</th><th>Power Density</th><th>Applications</th><th>Advantages</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Indoor Solar</td><td>10-100 µW/cm²</td><td>Building sensors</td><td>Predictable, clean</td></tr>
+                <tr><td>Outdoor Solar</td><td>1-100 mW/cm²</td><td>Agriculture, weather</td><td>High power, abundant</td></tr>
+                <tr><td>Vibration</td><td>10 µW - 5 mW</td><td>Industrial, automotive</td><td>Coincides with monitoring need</td></tr>
+                <tr><td>Thermal (TEG)</td><td>100 µW - 10 mW</td><td>Process, HVAC, wearable</td><td>Continuous in stable environments</td></tr>
+                <tr><td>RF (Ambient)</td><td>1-10 µW</td><td>RFID, tracking</td><td>Ubiquitous in buildings</td></tr>
+                <tr><td>RF (Dedicated)</td><td>100 µW - 1 mW</td><td>Proximity sensors</td><td>Controlled, reliable</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Power Measurement and Profiling</h2>
+        <p>
+            Accurate power measurement is essential for validating optimization efforts and ensuring WIA-SEMI-015 compliance. Relying solely on datasheet estimates often leads to 2-5× underestimation of actual consumption due to overlooked peripherals, suboptimal firmware, or board leakage currents.
+        </p>
+
+        <h3>Measurement Tools</h3>
+        <p>
+            Options include benchtop power supplies with built-in current measurement (µA to A range, logging capability), dedicated power profilers (Nordic PPK2, Otii Arc, Joulescope JS220), oscilloscope with current probe (captures transients, high bandwidth), and energy harvesting simulators (Keysight E3640A with energy harvesting simulation).
+        </p>
+
+        <h3>Measurement Techniques</h3>
+        <p>
+            Insert current sense resistor (1-10Ω) in supply path and measure voltage drop, use power profiler with automated data logging and analysis, capture full power cycles including sleep, wake, active, and transmission phases, and measure over extended periods (hours to days) to capture all operational modes. Calculate average, peak, and energy per cycle metrics.
+        </p>
+
+        <h2>Review Questions</h2>
+        <div class="info-box">
+            <ol>
+                <li>Calculate the maximum average current for one-year battery life on a CR2032 coin cell (220 mAh), accounting for 80% usable capacity.</li>
+                <li>Explain how dynamic voltage and frequency scaling (DVFS) reduces power consumption. What is the relationship between voltage, frequency, and power?</li>
+                <li>Why is it critical to spend 99%+ time in deep sleep for battery-powered sensors? Provide a power budget example.</li>
+                <li>Compare the power consumption characteristics of BLE, LoRaWAN, and Wi-Fi for smart sensors.</li>
+                <li>What are the typical power densities for indoor solar, outdoor solar, and vibration energy harvesting?</li>
+                <li>Describe three firmware optimization techniques that reduce active power consumption.</li>
+                <li>Why is actual power measurement essential rather than relying on datasheet estimates?</li>
+            </ol>
+        </div>
+
+        <h2>Summary</h2>
+        <p>
+            This chapter explored comprehensive power optimization strategies essential for achieving the WIA-SEMI-015 requirement of one-year battery life. Key techniques include duty cycling (99%+ time in deep sleep at <50 µA), dynamic voltage/frequency scaling (30-60% active power reduction), peripheral power management (sensor modes, wireless optimization), and software efficiency (interrupt-driven, event-based architecture). Energy harvesting technologies (solar, vibration, thermal, RF) can eliminate battery replacement for appropriately designed systems. Accurate power measurement validates optimizations and ensures compliance with standard requirements.
+        </p>
+
+        </div>
+</body>
+</html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Embedded Machine Learning | WIA-SMART-SENSOR</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --primary: #22c55e;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --success: #10b981;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .code-block { background: #1a1a2e; border: 1px solid var(--border); border-radius: 5px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Monaco', monospace; font-size: 0.9rem; }
+        .code-block code { color: #a5f3fc; background: none; padding: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; }
+        .spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
+        .spec-card { background: var(--bg); padding: 1.5rem; border-radius: 8px; text-align: center; border: 2px solid var(--border); }
+        .spec-value { font-size: 1.8rem; color: var(--primary); font-weight: bold; }
+        .spec-label { color: var(--text-secondary); margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 4</p>
+        <h1>Embedded Machine Learning</h1>
+
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            The integration of machine learning capabilities directly into smart sensors represents a paradigm
+            shift from cloud-centric to edge-centric intelligence. TinyML enables real-time inference with
+            minimal latency, reduced bandwidth, and enhanced privacy.
+        </p>
+
+        <h2>The TinyML Revolution</h2>
+
+        <p>
+            TinyML refers to machine learning algorithms optimized to run on microcontrollers with extremely
+            limited resources—often less than 256KB of Flash memory and 64KB of RAM. This field has emerged
+            from the convergence of advances in model compression, efficient neural network architectures,
+            and specialized hardware accelerators. The result is the ability to deploy sophisticated AI
+            capabilities directly on smart sensors without cloud connectivity.
+        </p>
+
+        <p>
+            The benefits of edge ML are compelling: sub-millisecond inference latency, operation without
+            network connectivity, reduced data transmission costs, and enhanced privacy since raw sensor
+            data never leaves the device. For applications like keyword spotting, anomaly detection, and
+            gesture recognition, TinyML enables capabilities that were previously impossible on
+            resource-constrained devices.
+        </p>
+
+        <div class="spec-grid">
+            <div class="spec-card">
+                <div class="spec-value">< 256KB</div>
+                <div class="spec-label">Model Flash Size</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">< 64KB</div>
+                <div class="spec-label">Runtime RAM</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">< 1ms</div>
+                <div class="spec-label">Inference Latency</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">< 1mW</div>
+                <div class="spec-label">Power Consumption</div>
+            </div>
+        </div>
+
+        <h2>ML Model Architectures for Sensors</h2>
+
+        <p>
+            Not all neural network architectures are suitable for embedded deployment. Smart sensor applications
+            typically use architectures specifically designed for efficiency, including MobileNets, EfficientNets,
+            and custom architectures optimized for specific sensor modalities.
+        </p>
+
+        <h3>Convolutional Neural Networks (CNNs)</h3>
+
+        <p>
+            CNNs excel at processing spatial and temporal patterns in sensor data. Depthwise separable
+            convolutions, as used in MobileNet, dramatically reduce computational requirements while
+            maintaining accuracy. For time-series sensor data, 1D convolutions are particularly efficient.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Architecture</th>
+                    <th>Parameters</th>
+                    <th>MACs</th>
+                    <th>Accuracy (ImageNet)</th>
+                    <th>Suitability</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>MobileNetV2</strong></td>
+                    <td>3.4M</td>
+                    <td>300M</td>
+                    <td>72%</td>
+                    <td>Good - with pruning</td>
+                </tr>
+                <tr>
+                    <td><strong>MobileNetV3-Small</strong></td>
+                    <td>2.5M</td>
+                    <td>56M</td>
+                    <td>67%</td>
+                    <td>Excellent</td>
+                </tr>
+                <tr>
+                    <td><strong>EfficientNet-B0</strong></td>
+                    <td>5.3M</td>
+                    <td>390M</td>
+                    <td>77%</td>
+                    <td>Moderate - needs optimization</td>
+                </tr>
+                <tr>
+                    <td><strong>MCUNet</strong></td>
+                    <td>0.7M</td>
+                    <td>81M</td>
+                    <td>62%</td>
+                    <td>Excellent - designed for MCUs</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Recurrent Neural Networks (RNNs)</h3>
+
+        <p>
+            For sequential sensor data like audio, vibration, or time-series measurements, RNN variants
+            such as LSTM and GRU provide temporal modeling capabilities. However, their sequential nature
+            can limit throughput. Alternatives like Temporal Convolutional Networks (TCNs) offer parallelizable
+            processing with similar modeling capabilities.
+        </p>
+
+        <h3>Transformers for Sensors</h3>
+
+        <p>
+            Attention-based models have shown remarkable performance across domains. While standard
+            Transformers are too resource-intensive for MCUs, efficient variants like Linear Attention
+            and Performer architectures are being adapted for edge deployment. These models excel at
+            capturing long-range dependencies in sensor data.
+        </p>
+
+        <h2>Model Optimization Techniques</h2>
+
+        <p>
+            Deploying ML models on microcontrollers requires aggressive optimization to meet memory and
+            compute constraints. Multiple complementary techniques are employed to reduce model size and
+            inference cost while preserving accuracy.
+        </p>
+
+        <h3>Quantization</h3>
+
+        <p>
+            Quantization reduces the precision of model weights and activations from 32-bit floating point
+            to lower bit-widths. 8-bit integer quantization typically provides 4x memory reduction with
+            minimal accuracy loss. More aggressive quantization to 4-bit or even binary can achieve further
+            compression but requires careful training techniques.
+        </p>
+
+        <div class="code-block">
+<code># TensorFlow Lite Quantization Example
+import tensorflow as tf
+
+# Post-training quantization
+converter = tf.lite.TFLiteConverter.from_saved_model('saved_model')
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+# Full integer quantization for MCU deployment
+def representative_dataset():
+    for data in calibration_data:
+        yield [data.astype(np.float32)]
+
+converter.representative_dataset = representative_dataset
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.int8
+converter.inference_output_type = tf.int8
+
+tflite_model = converter.convert()
+
+# Model size comparison
+print(f"Original: {original_size / 1024:.1f} KB")
+print(f"Quantized: {len(tflite_model) / 1024:.1f} KB")
+print(f"Compression: {original_size / len(tflite_model):.1f}x")</code>
+        </div>
+
+        <h3>Pruning</h3>
+
+        <p>
+            Pruning removes redundant weights or entire neurons/filters that contribute minimally to model
+            accuracy. Structured pruning removes entire channels or layers, enabling direct speedup on
+            standard hardware. Unstructured pruning achieves higher compression but requires sparse
+            computation support for acceleration.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Pruning Strategies:</strong>
+            <ul>
+                <li><strong>Magnitude Pruning:</strong> Remove weights below threshold</li>
+                <li><strong>Structured Pruning:</strong> Remove entire filters/channels</li>
+                <li><strong>Movement Pruning:</strong> Prune based on weight changes during training</li>
+                <li><strong>Lottery Ticket:</strong> Find sparse subnetworks that train well</li>
+                <li><strong>Neural Architecture Search:</strong> Automatically find efficient architectures</li>
+            </ul>
+        </div>
+
+        <h3>Knowledge Distillation</h3>
+
+        <p>
+            Knowledge distillation trains a small "student" model to mimic a larger "teacher" model.
+            The student learns not just the hard labels but the teacher's soft probability distributions,
+            which encode additional information about class relationships. This often enables smaller
+            models to achieve accuracy comparable to much larger models.
+        </p>
+
+        <h2>TinyML Frameworks and Tools</h2>
+
+        <p>
+            Several frameworks support the development and deployment of ML models on microcontrollers.
+            These provide model conversion, optimization, and runtime libraries specifically designed
+            for resource-constrained environments.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Framework</th>
+                    <th>Provider</th>
+                    <th>Key Features</th>
+                    <th>Target Platforms</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>TensorFlow Lite Micro</strong></td>
+                    <td>Google</td>
+                    <td>Full TFLite op coverage, interpreter-based</td>
+                    <td>Cortex-M, RISC-V, ESP32</td>
+                </tr>
+                <tr>
+                    <td><strong>CMSIS-NN</strong></td>
+                    <td>ARM</td>
+                    <td>Optimized kernels for Cortex-M</td>
+                    <td>ARM Cortex-M series</td>
+                </tr>
+                <tr>
+                    <td><strong>X-CUBE-AI</strong></td>
+                    <td>STMicroelectronics</td>
+                    <td>STM32 optimized, code generation</td>
+                    <td>STM32 MCUs</td>
+                </tr>
+                <tr>
+                    <td><strong>Edge Impulse</strong></td>
+                    <td>Edge Impulse</td>
+                    <td>End-to-end platform, AutoML</td>
+                    <td>Multiple MCU platforms</td>
+                </tr>
+                <tr>
+                    <td><strong>microTVM</strong></td>
+                    <td>Apache TVM</td>
+                    <td>Compiler-based optimization</td>
+                    <td>Various MCUs and accelerators</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Neural Network Accelerators</h2>
+
+        <p>
+            Hardware acceleration is essential for achieving real-time ML inference within power budgets.
+            Modern MCUs increasingly integrate neural processing units (NPUs) or leverage DSP extensions
+            for efficient ML computation.
+        </p>
+
+        <h3>Accelerator Architectures</h3>
+
+        <div class="code-block">
+<code>// Example: Using ARM Ethos-U NPU
+#include "ethos_u_driver.h"
+
+// Initialize NPU
+struct ethosu_driver ethosu_drv;
+ethosu_init(&ethosu_drv, ETHOSU_BASE_ADDRESS, NULL, 0, 1, 1);
+
+// Run inference
+struct ethosu_driver* drv_list[] = {&ethosu_drv};
+int result = ethosu_invoke(
+    drv_list,
+    1,
+    &inference_request,
+    model_data,
+    model_size,
+    input_data,
+    input_size,
+    output_data,
+    output_size
+);
+
+// Performance metrics
+printf("Inference cycles: %lu\n", ethosu_drv.total_cycles);
+printf("Inference time: %.2f ms\n", cycles_to_ms(ethosu_drv.total_cycles));</code>
+        </div>
+
+        <h2>Application Examples</h2>
+
+        <h3>Keyword Spotting</h3>
+
+        <p>
+            Wake word detection is a canonical TinyML application. Models process audio spectrograms
+            to detect specific keywords with high accuracy while consuming minimal power in always-on
+            operation. State-of-the-art models achieve >95% accuracy with <500KB model size.
+        </p>
+
+        <h3>Anomaly Detection</h3>
+
+        <p>
+            Smart sensors can learn normal operating patterns and detect anomalies indicating potential
+            failures or security threats. Autoencoder-based approaches compare reconstruction error
+            against learned thresholds, while one-class classification models directly identify outliers.
+        </p>
+
+        <h3>Predictive Maintenance</h3>
+
+        <p>
+            Vibration analysis using ML can predict equipment failures before they occur. Models trained
+            on historical failure data can identify subtle patterns in frequency spectra that precede
+            failures, enabling proactive maintenance and reducing downtime.
+        </p>
+
+        <h2>Summary</h2>
+
+        <div class="highlight-box">
+            <h3 style="margin-top: 0;">Key Takeaways</h3>
+            <ul>
+                <li><strong>TinyML Enables Edge AI:</strong> ML models can run on MCUs with <256KB Flash and <64KB RAM</li>
+                <li><strong>Efficient Architectures:</strong> MobileNets, MCUNet, and similar designs are optimized for embedded deployment</li>
+                <li><strong>Optimization is Essential:</strong> Quantization, pruning, and distillation reduce models to fit MCU constraints</li>
+                <li><strong>Framework Support:</strong> TFLite Micro, CMSIS-NN, and platform tools simplify deployment</li>
+                <li><strong>Hardware Acceleration:</strong> NPUs and DSP extensions enable real-time inference within power budgets</li>
+                <li><strong>Practical Applications:</strong> Keyword spotting, anomaly detection, and predictive maintenance are proven use cases</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li>What are the key constraints for deploying ML models on microcontrollers?</li>
+            <li>Compare depthwise separable convolutions with standard convolutions in terms of efficiency.</li>
+            <li>Explain how quantization reduces model size and what trade-offs are involved.</li>
+            <li>What is knowledge distillation and how does it enable smaller models?</li>
+            <li>Describe the role of neural network accelerators in embedded ML.</li>
+            <li>What preprocessing is typically required for audio-based keyword spotting?</li>
+            <li>How can autoencoder-based anomaly detection work without labeled anomaly data?</li>
+            <li>What factors should be considered when choosing a TinyML framework?</li>
+        </ol>
+
+        </div>
+</body>
+</html>
+>>>>>>> origin/main

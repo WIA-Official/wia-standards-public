@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 5: Kernel Compilation and Optimization | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .chapter-header { border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px; }
+        h1 { font-size: 2.5em; color: #1c1917; margin: 10px 0 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; text-align: justify; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .summary { background: #f0fdf4; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div style="color: #10B981; font-weight: bold;">Chapter 5</div>
+            <h1>Kernel Compilation and Optimization</h1>
+        </div>
+
+        <h2>5.1 The Compilation Pipeline</h2>
+        <p>Transforming high-level operations into efficient accelerator code requires a sophisticated compilation pipeline. WIA-AI-011 defines a multi-stage compilation process: frontend parsing, intermediate representation (IR) generation, optimization passes, backend code generation, and device-specific assembly. Each stage plays a crucial role in achieving optimal performance while maintaining portability across diverse accelerator architectures.</p>
+
+        <p>The compilation pipeline serves as the bridge between human-readable code and machine-executable instructions. Modern AI accelerators feature diverse architectures—systolic arrays, vector processors, spatial architectures, and hybrid designs. A well-designed compilation pipeline must abstract these differences while enabling hardware-specific optimizations.</p>
+
+        <pre>Source Code → Frontend → IR → Optimization → Backend → Assembly → Binary
+                                  ↓
+                        Device-specific tuning
+                                  ↓
+                        Performance Analysis
+                                  ↓
+                        Iterative Refinement</pre>
+
+        <p>The frontend stage parses source code and performs semantic analysis. For WIA-AI-011, frontends may accept PyTorch models, TensorFlow graphs, ONNX representations, or domain-specific languages. The frontend validates correctness, infers types and shapes, and constructs an initial IR representation.</p>
+
+        <pre>// Frontend compilation example
+wia_compiler_t* compiler = wia_create_compiler(WIA_BACKEND_NPU);
+
+// Configure compiler options
+wia_compiler_config_t config = {
+    .optimization_level = WIA_OPT_LEVEL_3,
+    .target_precision = WIA_FLOAT16,
+    .enable_fusion = true,
+    .enable_auto_tuning = true,
+    .max_compilation_time = 300  // seconds
+};
+
+wia_set_compiler_config(compiler, &config);
+
+// Compile from PyTorch model
+wia_compiled_module_t* module = wia_compile_from_pytorch(
+    compiler, "model.pt", &config);
+
+// Or compile from ONNX
+wia_compiled_module_t* onnx_module = wia_compile_from_onnx(
+    compiler, "model.onnx", &config);
+</pre>
+
+        <div class="note">
+            <strong>Note:</strong> WIA-AI-011 compilers support multiple input formats, enabling seamless integration with existing ML frameworks and tools. The compilation process is framework-agnostic at the IR level.
+        </div>
+
+        <h2>5.2 Intermediate Representations</h2>
+        <p>A well-designed IR enables portable optimization while abstracting hardware details. WIA-AI-011 adopts a multi-level IR approach inspired by MLIR (Multi-Level Intermediate Representation). The high-level IR represents tensor operations with shape and type information. The mid-level IR introduces explicit memory operations and control flow. The low-level IR exposes hardware-specific instructions for final optimization.</p>
+
+        <p>This multi-level approach provides flexibility at each abstraction layer. High-level optimizations like operator fusion and algebraic simplification operate on tensor semantics. Mid-level optimizations focus on memory layout, tiling strategies, and parallelization. Low-level optimizations leverage specific hardware capabilities like specialized instructions or memory hierarchies.</p>
+
+        <pre>// High-level IR - Tensor operations
+%result = tensor.matmul %A, %B : (tensor<1024x512xf32>, tensor<512x256xf32>)
+                                 -> tensor<1024x256xf32>
+%biased = tensor.add %result, %bias : (tensor<1024x256xf32>, tensor<256xf32>)
+                                      -> tensor<1024x256xf32>
+%activated = tensor.relu %biased : tensor<1024x256xf32> -> tensor<1024x256xf32>
+
+// Mid-level IR - Explicit memory and control flow
+%buffer_a = memref.alloc() : memref<1024x512xf32>
+%buffer_b = memref.alloc() : memref<512x256xf32>
+%buffer_out = memref.alloc() : memref<1024x256xf32>
+
+affine.for %i = 0 to 1024 step 64 {
+  affine.for %j = 0 to 256 step 64 {
+    affine.for %k = 0 to 512 step 64 {
+      linalg.matmul
+        ins(%buffer_a, %buffer_b : memref<1024x512xf32>, memref<512x256xf32>)
+        outs(%buffer_out : memref<1024x256xf32>)
+        tile_sizes = [64, 64, 64]
+    }
+  }
+}
+
+// Low-level IR (device-specific for NPU)
+npu.dma_copy %host_a -> %device_a, size=2097152
+npu.dma_copy %host_b -> %device_b, size=524288
+npu.sync
+
+npu.tile_matmul_fused %device_a, %device_b, %device_bias, %device_out,
+  tile_size=64x64x64,
+  precision=fp16,
+  activation=relu,
+  use_tensor_cores=true
+
+npu.sync
+npu.dma_copy %device_out -> %host_out, size=1048576</pre>
+
+        <p>Each IR level uses appropriate dialects and abstractions. The high-level IR uses tensor dialects with implicit parallelism. The mid-level IR uses affine and linalg dialects with explicit loop structures. The low-level IR uses hardware-specific dialects exposing device instructions.</p>
+
+        <h3>5.2.1 IR Validation and Verification</h3>
+        <p>Compilation passes must preserve semantics across transformations. WIA-AI-011 compilers implement verification passes that check IR invariants: type safety, shape compatibility, memory access legality, and resource constraints. These checks catch bugs early in the compilation process.</p>
+
+        <pre>// IR verification example
+wia_ir_module_t* ir = wia_get_ir_module(compiler, WIA_IR_LEVEL_MID);
+
+wia_verification_result_t result;
+if (!wia_verify_ir(ir, &result)) {
+    fprintf(stderr, "IR verification failed:\n");
+    fprintf(stderr, "  Error: %s\n", result.error_message);
+    fprintf(stderr, "  Location: %s:%d\n", result.file, result.line);
+    wia_print_ir_context(ir, result.location, 5);  // Show 5 lines context
+}
+</pre>
+
+        <h2>5.3 Operator Fusion</h2>
+        <p>Fusing multiple operations into single kernels reduces memory traffic and launch overhead. Element-wise operations following matrix multiplications or convolutions are prime fusion candidates. WIA-AI-011 compilers automatically detect fusion opportunities through pattern matching and cost models.</p>
+
+        <p>Consider a typical neural network layer: matrix multiplication followed by bias addition and activation. Without fusion, this requires three kernel launches and two intermediate memory writes. With fusion, all operations execute in a single kernel with one memory write, dramatically improving performance.</p>
+
+        <pre>// Unfused: Three kernel launches, two memory writes
+Y = MatMul(A, B)        // Write Y to memory
+Z = Bias(Y, bias)       // Read Y, write Z
+Out = ReLU(Z)           // Read Z, write Out
+
+// Performance characteristics:
+// - 3 kernel launches (overhead: ~30-50 μs each)
+// - Memory traffic: Write Y (4 MB) + Write Z (4 MB) + Write Out (4 MB) = 12 MB
+// - Latency: Launch + 3x memory latency
+
+// Fused: One kernel, one memory write
+Out = FusedMatMulBiasReLU(A, B, bias)
+
+// Performance characteristics:
+// - 1 kernel launch (overhead: ~30-50 μs)
+// - Memory traffic: Write Out (4 MB) = 4 MB  (3x reduction!)
+// - Latency: Launch + 1x memory latency
+// - Speedup: Typically 2-3x for small to medium matrices</pre>
+
+        <h3>5.3.1 Fusion Pattern Library</h3>
+        <p>WIA-AI-011 compilers maintain libraries of fusion patterns. Common patterns include:</p>
+
+        <ul>
+            <li><strong>Conv-Bias-Activation:</strong> Convolutional layer with bias and activation (ReLU, Sigmoid, etc.)</li>
+            <li><strong>MatMul-Bias-Activation:</strong> Linear layer with bias and activation</li>
+            <li><strong>Batch Normalization Fusion:</strong> Conv/MatMul followed by batch norm and activation</li>
+            <li><strong>Attention Pattern Fusion:</strong> Q·K^T → Scale → Softmax → Dropout → ·V fused into single kernel</li>
+            <li><strong>Residual Connection Fusion:</strong> Operation followed by element-wise addition with skip connection</li>
+        </ul>
+
+        <pre>// Advanced fusion example: Multi-head attention
+// Pattern recognition and fusion
+def fused_multihead_attention(Q, K, V, mask, dropout_rate):
+    """
+    Unfused operations:
+    1. scores = Q @ K.T          (matmul)
+    2. scores = scores / sqrt(d)  (scale)
+    3. scores = scores + mask     (masked addition)
+    4. probs = softmax(scores)    (softmax)
+    5. probs = dropout(probs)     (dropout)
+    6. output = probs @ V         (matmul)
+
+    Fused into single kernel with intermediate results in registers/cache
+    """
+    return wia_fused_attention_kernel(Q, K, V, mask, dropout_rate)
+
+// Compiler automatically recognizes this pattern
+wia_fusion_pattern_t attention_pattern = {
+    .pattern_name = "multihead_attention",
+    .operations = {
+        WIA_OP_MATMUL,
+        WIA_OP_SCALE,
+        WIA_OP_MASKED_ADD,
+        WIA_OP_SOFTMAX,
+        WIA_OP_DROPOUT,
+        WIA_OP_MATMUL
+    },
+    .num_operations = 6,
+    .expected_speedup = 2.5,  // Based on profiling data
+    .memory_reduction = 0.75  // 75% less memory traffic
+};
+
+wia_register_fusion_pattern(compiler, &attention_pattern);
+</pre>
+
+        <div class="warning">
+            <strong>Warning:</strong> Fusion is not always beneficial. For very large tensors, fused kernels may have poor cache locality or register pressure. WIA-AI-011 compilers use cost models to determine when fusion improves performance.
+        </div>
+
+        <h2>5.4 Auto-Tuning and Kernel Selection</h2>
+        <p>Optimal kernel parameters vary by problem size, data layout, and hardware characteristics. Auto-tuning explores the configuration space through systematic search or machine learning models. WIA-AI-011 supports both offline tuning (during compilation) and runtime adaptive tuning based on actual execution profiles.</p>
+
+        <p>The parameter space for kernel optimization is vast. For a matrix multiplication kernel alone, tuning parameters include tile sizes, unroll factors, vectorization width, prefetch strategies, register blocking, and instruction scheduling. Exhaustive search is impractical; intelligent exploration is essential.</p>
+
+        <pre>wia_autotune_config_t config = {
+    .method = WIA_AUTOTUNE_GENETIC,
+    .time_budget_seconds = 300,
+    .population_size = 50,
+    .num_generations = 100,
+    .mutation_rate = 0.1,
+
+    .parameter_space = {
+        .tile_sizes = {16, 32, 64, 128, 256},
+        .unroll_factors = {1, 2, 4, 8, 16},
+        .vectorization_width = {4, 8, 16, 32},
+        .prefetch_distance = {0, 1, 2, 4, 8},
+        .register_blocking = {1, 2, 4, 8}
+    },
+
+    .optimization_objective = WIA_OBJECTIVE_THROUGHPUT,
+    .constraints = {
+        .max_register_usage = 64,
+        .max_shared_memory = 49152,  // bytes
+        .max_latency_ms = 10.0
+    }
+};
+
+wia_autotune_kernel(ctx, kernel_spec, &config, &optimized_kernel);
+
+// Save tuned kernel to cache for reuse
+wia_cache_kernel(optimized_kernel, "matmul_1024x1024_fp16.wiak");
+</pre>
+
+        <h3>5.4.1 Machine Learning-Based Tuning</h3>
+        <p>Advanced auto-tuners use machine learning to predict optimal configurations without exhaustive search. These models learn from historical tuning data, generalizing across similar kernels and problem sizes.</p>
+
+        <pre>// ML-based auto-tuning
+wia_ml_autotuner_t* ml_tuner = wia_create_ml_autotuner();
+
+// Load pre-trained model (trained on thousands of kernels)
+wia_load_autotuner_model(ml_tuner, "wia_tuner_model_v2.pb");
+
+// Predict optimal configuration
+wia_kernel_config_t predicted_config;
+wia_predict_kernel_config(ml_tuner, kernel_spec, &predicted_config);
+
+// Optionally refine with limited search
+wia_refine_config_local_search(ml_tuner, kernel_spec,
+                                &predicted_config,
+                                refinement_budget_seconds=30);
+
+printf("Predicted tile size: %dx%d\n",
+       predicted_config.tile_m, predicted_config.tile_n);
+printf("Predicted performance: %.2f TFLOPS\n",
+       predicted_config.estimated_tflops);
+</pre>
+
+        <h2>5.5 Memory Access Optimization</h2>
+        <p>Memory bandwidth often limits performance more than compute throughput. Optimizations include tiling to improve cache locality, memory coalescing to maximize bandwidth utilization, and prefetching to hide latency. The compiler analyzes access patterns and automatically applies these transformations.</p>
+
+        <p>Modern accelerators feature complex memory hierarchies: registers, L1 cache, L2 cache, shared memory (scratchpad), and global memory (DRAM or HBM). Effective optimization requires orchestrating data movement across these levels to minimize expensive global memory accesses.</p>
+
+        <h3>5.5.1 Tiling and Blocking</h3>
+        <p>Tiling decomposes large operations into smaller blocks that fit in cache or shared memory. This improves temporal locality—reusing data before it's evicted—and spatial locality—accessing contiguous memory.</p>
+
+        <pre>// Matrix multiplication with hierarchical tiling
+// Original: C[M,N] = A[M,K] * B[K,N]
+
+// Level 1: Tile for L2 cache (256 KB)
+for (int mm = 0; mm < M; mm += TILE_M1) {
+  for (int nn = 0; nn < N; nn += TILE_N1) {
+    for (int kk = 0; kk < K; kk += TILE_K1) {
+
+      // Level 2: Tile for L1 cache (32 KB)
+      for (int m = mm; m < min(mm+TILE_M1, M); m += TILE_M2) {
+        for (int n = nn; n < min(nn+TILE_N1, N); n += TILE_N2) {
+          for (int k = kk; k < min(kk+TILE_K1, K); k += TILE_K2) {
+
+            // Level 3: Register blocking
+            for (int mr = m; mr < min(m+TILE_M2, M); mr += REG_M) {
+              for (int nr = n; nr < min(n+TILE_N2, N); nr += REG_N) {
+                // Innermost computation stays in registers
+                matmul_micro_kernel(A, B, C, mr, nr, k, REG_M, REG_N, TILE_K2);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Compiler automatically determines optimal tile sizes based on:
+// - Cache sizes (L1: 32KB, L2: 256KB, L3: 8MB)
+// - Register file size
+// - Problem dimensions
+// - Data types
+</pre>
+
+        <h3>5.5.2 Memory Coalescing</h3>
+        <p>GPUs and many NPUs achieve peak bandwidth only with coalesced memory accesses—consecutive threads accessing consecutive addresses. Compilers transform layouts and access patterns to maximize coalescing.</p>
+
+        <pre>// Uncoalesced access pattern (poor performance)
+// Each thread accesses strided memory
+for (int thread_id = 0; thread_id < num_threads; thread_id++) {
+    int idx = thread_id * stride;  // stride != 1, causes scattered accesses
+    result[thread_id] = data[idx];
+}
+// Bandwidth utilization: 10-20%
+
+// Coalesced access pattern (optimal performance)
+// Consecutive threads access consecutive memory
+for (int thread_id = 0; thread_id < num_threads; thread_id++) {
+    int idx = thread_id;  // Consecutive access
+    result[thread_id] = data[idx];
+}
+// Bandwidth utilization: 85-95%
+
+// WIA-AI-011 compiler transformation
+wia_memory_transform_t transform = {
+    .original_layout = WIA_LAYOUT_NCHW,  // Channels strided
+    .optimized_layout = WIA_LAYOUT_NHWC,  // Channels coalesced
+    .reason = "Improve coalescing for element-wise operations"
+};
+
+wia_apply_layout_transform(ir, &transform);
+</pre>
+
+        <h3>5.5.3 Prefetching</h3>
+        <p>Prefetching loads data into cache before it's needed, hiding memory latency behind computation. Software prefetching or hardware-assisted prefetching can dramatically improve performance for predictable access patterns.</p>
+
+        <pre>// Manual prefetching in generated code
+for (int i = 0; i < N; i += BLOCK_SIZE) {
+    // Prefetch next iteration's data
+    if (i + BLOCK_SIZE < N) {
+        wia_prefetch(&A[i + BLOCK_SIZE], BLOCK_SIZE, WIA_PREFETCH_L1);
+        wia_prefetch(&B[i + BLOCK_SIZE], BLOCK_SIZE, WIA_PREFETCH_L1);
+    }
+
+    // Compute current iteration while next data loads
+    compute_block(&A[i], &B[i], &C[i], BLOCK_SIZE);
+}
+
+// Prefetch distance tuning
+wia_prefetch_config_t pf_config = {
+    .prefetch_distance = 2,  // Prefetch 2 iterations ahead
+    .target_cache_level = WIA_CACHE_L2,
+    .prefetch_hint = WIA_HINT_TEMPORAL  // or WIA_HINT_NON_TEMPORAL
+};
+</pre>
+
+        <h2>5.6 Instruction-Level Parallelism</h2>
+        <p>Modern accelerators execute multiple instructions concurrently through pipelining and superscalar execution. Loop unrolling exposes more parallelism for instruction schedulers. Software pipelining overlaps computation from different loop iterations. The compiler balances these techniques against register pressure and code size.</p>
+
+        <h3>5.6.1 Loop Unrolling</h3>
+        <p>Unrolling duplicates loop bodies, reducing branch overhead and exposing independent operations for parallel execution.</p>
+
+        <pre>// Original loop
+for (int i = 0; i < N; i++) {
+    C[i] = A[i] + B[i];
+}
+
+// Unrolled by factor of 4
+for (int i = 0; i < N; i += 4) {
+    C[i+0] = A[i+0] + B[i+0];
+    C[i+1] = A[i+1] + B[i+1];
+    C[i+2] = A[i+2] + B[i+2];
+    C[i+3] = A[i+3] + B[i+3];
+}
+
+// Benefits:
+// - 75% fewer branch instructions
+// - 4 independent additions can execute in parallel
+// - Better instruction-level parallelism (ILP)
+// - Enables vectorization
+
+// WIA compiler automatic unrolling
+wia_loop_transform_t unroll = {
+    .type = WIA_TRANSFORM_UNROLL,
+    .factor = 8,  // Compiler chooses factor based on register availability
+    .allow_partial = true  // Handle non-multiple loop counts
+};
+</pre>
+
+        <h3>5.6.2 Software Pipelining</h3>
+        <p>Software pipelining overlaps iterations by reordering instructions, hiding latency within throughput-oriented execution.</p>
+
+        <pre>// Original loop with dependencies
+for (int i = 0; i < N; i++) {
+    load = memory[i];          // 100 cycles latency
+    compute = process(load);   // 10 cycles
+    memory[i] = compute;       // 100 cycles latency
+}
+// Total per iteration: 100 + 10 + 100 = 210 cycles
+
+// Software pipelined version
+load0 = memory[0];
+load1 = memory[1];
+for (int i = 0; i < N-2; i++) {
+    load2 = memory[i+2];      // Load iteration i+2
+    compute0 = process(load0); // Process iteration i
+    memory[i] = compute0;      // Store iteration i-1
+
+    // Rotate registers
+    load0 = load1;
+    load1 = load2;
+}
+// Overlapped execution, ~10 cycles per iteration after startup
+</pre>
+
+        <h2>5.7 Quantization and Mixed Precision</h2>
+        <p>Lower precision (INT8, FP16) enables faster computation and reduced memory usage. The compiler must insert quantization/dequantization operations correctly, choose appropriate precision for each operation, and maintain accuracy. WIA-AI-011 supports both post-training quantization (PTQ) and quantization-aware training (QAT).</p>
+
+        <h3>5.7.1 Post-Training Quantization</h3>
+        <p>PTQ converts a trained FP32 model to lower precision without retraining. This involves calibration to determine quantization scales and zero points.</p>
+
+        <pre>// Post-training quantization workflow
+wia_quantization_config_t quant_cfg = {
+    .mode = WIA_QUANT_MODE_PTQ,
+    .weight_precision = WIA_INT8,
+    .activation_precision = WIA_INT8,
+    .bias_precision = WIA_INT32,
+    .calibration_method = WIA_CALIB_MINMAX,  // or WIA_CALIB_ENTROPY
+    .num_calibration_batches = 100
+};
+
+// Calibration phase
+wia_quantizer_t* quantizer = wia_create_quantizer(model, &quant_cfg);
+
+for (int i = 0; i < 100; i++) {
+    batch = get_calibration_batch(i);
+    wia_quantizer_calibrate(quantizer, batch);
+}
+
+// Compute optimal scales and zero points
+wia_quantizer_finalize(quantizer);
+
+// Generate quantized model
+wia_model_t* quantized_model = wia_quantizer_get_model(quantizer);
+
+// Accuracy verification
+float fp32_accuracy = evaluate_model(original_model, test_set);
+float int8_accuracy = evaluate_model(quantized_model, test_set);
+printf("Accuracy: FP32=%.2f%%, INT8=%.2f%% (delta=%.2f%%)\n",
+       fp32_accuracy, int8_accuracy, fp32_accuracy - int8_accuracy);
+</pre>
+
+        <h3>5.7.2 Quantization-Aware Training</h3>
+        <p>QAT inserts fake quantization operations during training, allowing the model to adapt to quantization errors.</p>
+
+        <pre>// Quantization-aware training
+wia_qat_config_t qat_cfg = {
+    .mode = WIA_QUANT_MODE_QAT,
+    .weight_precision = WIA_INT8,
+    .activation_precision = WIA_INT8,
+    .quantize_layers = WIA_QUANTIZE_ALL,  // or selective
+    .freeze_bn_stats_after_epoch = 5
+};
+
+// Insert fake quantization nodes
+wia_model_t* qat_model = wia_prepare_qat_model(original_model, &qat_cfg);
+
+// Train with fake quantization
+for (int epoch = 0; epoch < num_epochs; epoch++) {
+    for (batch in training_data) {
+        // Forward pass simulates quantized inference
+        loss = wia_qat_forward(qat_model, batch);
+
+        // Backward pass updates weights accounting for quantization
+        wia_qat_backward(qat_model, loss);
+        wia_qat_optimizer_step(qat_model);
+    }
+}
+
+// Convert to actual quantized model
+wia_model_t* final_quantized = wia_qat_finalize(qat_model);
+</pre>
+
+        <h3>5.7.3 Mixed Precision Strategies</h3>
+        <p>Not all operations require the same precision. Mixed precision uses lower precision where possible while maintaining higher precision for sensitive operations.</p>
+
+        <pre>// Mixed precision compilation
+wia_precision_config_t precision = {
+    .default_precision = WIA_FLOAT16,
+    .accumulator_precision = WIA_FLOAT32,  // Higher precision for accumulation
+    .weight_precision = WIA_INT8,
+    .activation_precision = WIA_FLOAT16,
+
+    // Per-layer overrides
+    .layer_overrides = {
+        {"layer_norm_*", WIA_FLOAT32},  // Layer norm sensitive to precision
+        {"softmax_*", WIA_FLOAT32},     // Softmax needs FP32 for stability
+        {"embedding_*", WIA_FLOAT16},   // Embeddings can use FP16
+        {"matmul_*", WIA_INT8}          // Matrix multiplies use INT8
+    },
+    .num_overrides = 4
+};
+
+wia_compile_with_precision(kernel_spec, &precision, &kernel);
+
+// Automatic precision selection
+wia_auto_mixed_precision_config_t amp_cfg = {
+    .target_accuracy_loss = 0.005,  // Max 0.5% accuracy loss
+    .optimization_objective = WIA_MINIMIZE_LATENCY
+};
+
+wia_model_t* amp_model = wia_auto_mixed_precision(model, &amp_cfg,
+                                                    validation_set);
+</pre>
+
+        <h2>5.8 Backend Code Generation</h2>
+        <p>The backend translates optimized IR into device-specific assembly or machine code. Different accelerators require different code generation strategies. GPUs use SIMT (Single Instruction Multiple Thread), TPUs use SIMD systolic arrays, and NPUs may use specialized instruction sets. The backend must leverage each architecture's unique features.</p>
+
+        <h3>5.8.1 Target-Specific Backends</h3>
+        <p>WIA-AI-011 supports multiple backend targets, each with specialized code generators.</p>
+
+        <pre>// GPU backend (SIMT architecture)
+wia_backend_config_t gpu_cfg = {
+    .target = WIA_TARGET_GPU_NVIDIA,
+    .arch = WIA_ARCH_AMPERE,
+    .sm_version = 86,  // Compute capability 8.6
+
+    .thread_block_size = 256,
+    .max_registers_per_thread = 255,
+    .shared_memory_size = 49152,
+
+    .use_tensor_cores = true,
+    .use_async_copy = true,
+    .use_cooperative_groups = true
+};
+
+wia_compiled_kernel_t* gpu_kernel = wia_generate_gpu_code(ir, &gpu_cfg);
+
+// NPU backend (Spatial architecture)
+wia_backend_config_t npu_cfg = {
+    .target = WIA_TARGET_NPU_CUSTOM,
+    .arch = WIA_ARCH_SPATIAL_ARRAY,
+
+    .array_dimensions = {128, 128},  // 128x128 processing elements
+    .local_memory_per_pe = 1024,     // bytes per PE
+    .systolic_mode = WIA_SYSTOLIC_OUTPUT,
+
+    .dataflow = WIA_DATAFLOW_WEIGHT_STATIONARY,
+    .pipeline_depth = 8
+};
+
+wia_compiled_kernel_t* npu_kernel = wia_generate_npu_code(ir, &npu_cfg);
+
+// TPU backend (Systolic array)
+wia_backend_config_t tpu_cfg = {
+    .target = WIA_TARGET_TPU_V4,
+    .arch = WIA_ARCH_SYSTOLIC,
+
+    .matrix_unit_size = 128,
+    .vector_unit_lanes = 128,
+
+    .hbm_bandwidth_gb_s = 1200,
+    .peak_tflops_bf16 = 275
+};
+
+wia_compiled_kernel_t* tpu_kernel = wia_generate_tpu_code(ir, &tpu_cfg);
+</pre>
+
+        <h3>5.8.2 Instruction Selection and Scheduling</h3>
+        <p>The backend selects appropriate instructions and schedules them to maximize throughput while respecting dependencies and resource constraints.</p>
+
+        <pre>// Example generated assembly for GPU
+// Matrix multiplication C = A * B using Tensor Cores
+
+KERNEL_ENTRY matmul_tensorcore:
+    // Load tile of A into shared memory
+    LDGSTS.E.128 [sharedA], [globalA + tid*16]
+
+    // Load tile of B into shared memory
+    LDGSTS.E.128 [sharedB], [globalB + tid*16]
+
+    // Synchronize threads
+    BAR.SYNC 0
+
+    // Tensor Core WMMA instructions
+    WMMA.LOAD.A.SYNC a_frag, [sharedA], 16
+    WMMA.LOAD.B.SYNC b_frag, [sharedB], 16
+    WMMA.MMA.SYNC c_frag, a_frag, b_frag, c_frag
+
+    // Store result
+    BAR.SYNC 0
+    WMMA.STORE.SYNC [sharedC], c_frag, 16
+    STGSTS.E.128 [globalC + tid*16], [sharedC]
+
+    EXIT
+
+// Instruction scheduling optimizations:
+// - Interleave memory loads with computation
+// - Hide memory latency with arithmetic
+// - Balance instruction mix for maximum throughput
+</pre>
+
+        <h2>5.9 JIT Compilation and Caching</h2>
+        <p>Just-in-time (JIT) compilation enables runtime specialization based on actual input shapes and properties. However, compilation overhead can dominate for small operations. WIA-AI-011 implements persistent caching of compiled kernels, indexed by operation signature, to amortize compilation costs across invocations.</p>
+
+        <pre>// JIT compile with caching
+wia_jit_config_t jit_cfg = {
+    .cache_dir = "/var/cache/wia-kernels",
+    .cache_size_mb = 1024,
+    .specialization_level = WIA_SPECIALIZE_SHAPES,
+    .enable_persistent_cache = true,
+    .cache_eviction_policy = WIA_EVICT_LRU
+};
+
+// First invocation: compiles and caches
+wia_kernel_t* kernel1 = wia_jit_compile(ctx, operation, &jit_cfg);
+// Compilation time: 250ms
+
+// Second invocation with same shape: cache hit
+wia_kernel_t* kernel2 = wia_jit_compile(ctx, operation, &jit_cfg);
+// Compilation time: <1ms (cached)
+
+// Different shape: new compilation
+operation.input_shape = {2048, 512};
+wia_kernel_t* kernel3 = wia_jit_compile(ctx, operation, &jit_cfg);
+// Compilation time: 300ms (larger kernel)
+
+// Cache statistics
+wia_cache_stats_t stats;
+wia_get_cache_stats(&jit_cfg, &stats);
+printf("Cache hits: %d, misses: %d, hit rate: %.1f%%\n",
+       stats.hits, stats.misses,
+       100.0 * stats.hits / (stats.hits + stats.misses));
+</pre>
+
+        <h3>5.9.1 Adaptive Compilation</h3>
+        <p>Adaptive compilation uses runtime profiling to recompile hot code paths with aggressive optimizations.</p>
+
+        <pre>// Adaptive JIT compilation
+wia_adaptive_jit_config_t adaptive_cfg = {
+    .initial_optimization_level = WIA_OPT_LEVEL_1,  // Fast compilation
+    .hot_threshold_invocations = 100,
+    .hot_optimization_level = WIA_OPT_LEVEL_3,      // Aggressive optimization
+    .enable_profiling = true
+};
+
+// Initially compiles with fast settings
+wia_kernel_t* kernel = wia_adaptive_jit_compile(ctx, op, &adaptive_cfg);
+
+// After 100 invocations, automatically recompiles with aggressive optimization
+// User code unchanged, optimization happens transparently
+for (int i = 0; i < 1000; i++) {
+    wia_execute_kernel(ctx, kernel, inputs, outputs);
+}
+
+// At iteration 100:
+// [WIA JIT] Detected hot kernel, recompiling with O3...
+// [WIA JIT] Recompilation improved performance by 1.8x
+</pre>
+
+        <h2>5.10 Performance Profiling and Analysis</h2>
+        <p>Understanding where optimization efforts should focus requires detailed profiling. WIA-AI-011 compilers generate instrumented code that tracks kernel execution time, memory bandwidth, compute utilization, and cache metrics. This profiling data guides further optimization iterations.</p>
+
+        <pre>// Enable compiler-generated profiling
+wia_compiler_profiling_t prof = {
+    .enable_kernel_timing = true,
+    .enable_memory_profiling = true,
+    .enable_hardware_counters = true,
+    .instrumentation_level = WIA_INSTRUMENT_DETAILED
+};
+
+wia_compiled_module_t* profiled_module =
+    wia_compile_with_profiling(model, &prof);
+
+// Execute and collect profile data
+wia_execute_module(ctx, profiled_module, inputs, outputs);
+
+// Analyze profiling results
+wia_profile_report_t* report = wia_get_profile_report(profiled_module);
+
+printf("Kernel Performance Analysis:\n");
+for (int i = 0; i < report->num_kernels; i++) {
+    wia_kernel_profile_t* kp = &report->kernels[i];
+    printf("  %s:\n", kp->name);
+    printf("    Time: %.3f ms\n", kp->execution_time_ms);
+    printf("    GFLOPS: %.1f\n", kp->gflops);
+    printf("    Memory BW: %.1f GB/s\n", kp->memory_bandwidth_gbs);
+    printf("    Compute utilization: %.1f%%\n", kp->compute_utilization);
+    printf("    Bottleneck: %s\n", kp->bottleneck);  // "compute" or "memory"
+}
+
+// Optimization suggestions
+printf("\nOptimization Suggestions:\n");
+for (int i = 0; i < report->num_suggestions; i++) {
+    printf("  - %s\n", report->suggestions[i]);
+}
+</pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Multi-stage compilation pipeline transforms high-level operations to optimized device code through frontend, IR, optimization, and backend stages</li>
+                <li>Multi-level IR (high/mid/low) balances portability and hardware-specific optimization across abstraction layers</li>
+                <li>Operator fusion reduces memory traffic and kernel launch overhead by combining operations into single kernels (2-3x speedup typical)</li>
+                <li>Auto-tuning explores vast parameter spaces using genetic algorithms or ML-based prediction to find optimal kernel configurations</li>
+                <li>Memory access optimizations (hierarchical tiling, coalescing, prefetching) maximize bandwidth utilization and cache effectiveness</li>
+                <li>Instruction-level parallelism through loop unrolling and software pipelining exposes concurrent execution opportunities</li>
+                <li>Mixed precision compilation uses INT8/FP16 where appropriate while maintaining FP32 for sensitive operations</li>
+                <li>Backend code generation produces target-specific assembly leveraging architecture features (SIMT, systolic arrays, spatial architectures)</li>
+                <li>JIT compilation with persistent caching enables runtime specialization while amortizing compilation overhead</li>
+                <li>Compiler-generated profiling and automated analysis guide iterative optimization efforts</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Describe the complete WIA-AI-011 compilation pipeline and the role of each stage in transforming source code to executable kernels.</li>
+                <li>Why does WIA-AI-011 use a multi-level IR approach? How do optimizations differ across IR levels?</li>
+                <li>Explain operator fusion with a concrete example. What are the performance benefits and when might fusion be counterproductive?</li>
+                <li>Compare genetic algorithm-based auto-tuning with ML-based configuration prediction. What are the trade-offs?</li>
+                <li>Describe hierarchical tiling for matrix multiplication. Why is multi-level tiling more effective than single-level?</li>
+                <li>What is memory coalescing and why is it critical for GPU/NPU performance? Provide a code example.</li>
+                <li>How does loop unrolling improve instruction-level parallelism? What are the downsides of excessive unrolling?</li>
+                <li>Compare post-training quantization and quantization-aware training. When would you choose each approach?</li>
+                <li>Explain how backend code generation differs for SIMT (GPU), systolic array (TPU), and spatial architecture (NPU) targets.</li>
+                <li>What problem does JIT compilation caching solve? Describe the cache lookup and eviction strategy.</li>
+                <li>How does adaptive JIT compilation balance fast initial compilation with aggressive optimization for hot paths?</li>
+                <li>What metrics should compiler-generated profiling track to identify optimization opportunities?</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · Benefit All Humanity</strong>
+            <p style="margin-top: 10px; font-size: 0.9em; color: #64748b;">Optimized compilation democratizes AI acceleration, enabling efficient inference and training across diverse hardware platforms.</p>
+        </div>
+    </div>
+</body>
+</html>

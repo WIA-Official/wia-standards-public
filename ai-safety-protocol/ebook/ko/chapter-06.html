@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제6장: 가드레일 시스템 - WIA-AI-010</title>
+    <style>* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #1a1a1a; color: #e0e0e0; line-height: 1.8; } .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; } .header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 3rem 2rem; margin: -3rem -2rem 3rem -2rem; border-radius: 0 0 12px 12px; } .chapter-number { color: rgba(255,255,255,0.8); font-size: 1.2rem; margin-bottom: 0.5rem; } h1 { color: white; font-size: 2.5rem; margin-bottom: 1rem; } .chapter-intro { color: rgba(255,255,255,0.9); font-size: 1.2rem; font-style: italic; } h2 { color: #10B981; font-size: 2rem; margin: 3rem 0 1.5rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #10B981; } h3 { color: #10B981; font-size: 1.5rem; margin: 2rem 0 1rem 0; } p { margin-bottom: 1.5rem; font-size: 1.1rem; } .highlight { background: #2a2a2a; padding: 1.5rem; border-left: 4px solid #10B981; border-radius: 8px; margin: 2rem 0; } .code-block { background: #0f172a; padding: 1.5rem; border-radius: 8px; font-family: 'Courier New', monospace; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #10B981; font-size: 0.95rem; line-height: 1.5; } ul, ol { margin: 1.5rem 0 1.5rem 2rem; } li { margin-bottom: 0.8rem; font-size: 1.1rem; } .summary { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 12px; margin: 3rem 0; } .summary h3 { color: white; border-bottom: 2px solid rgba(255,255,255,0.3); padding-bottom: 1rem; margin-bottom: 1rem; } .review { background: #2a2a2a; padding: 2rem; border-radius: 12px; margin: 3rem 0; } .review h3 { color: #10B981; } .review-question { background: #1a1a1a; padding: 1rem; border-radius: 8px; margin: 1rem 0; } .nav-links { display: flex; justify-content: space-between; margin: 3rem 0; gap: 1rem; } .nav-link { background: #2a2a2a; color: #10B981; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; transition: all 0.3s; flex: 1; text-align: center; } .nav-link:hover { background: #10B981; color: white; transform: translateY(-3px); } .philosophy { text-align: center; padding: 2rem; margin: 3rem 0; font-size: 1.5rem; color: #10B981; } strong { color: #10B981; } table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: #2a2a2a; } th, td { padding: 1rem; border: 1px solid #444; text-align: left; } th { background: #10B981; color: white; font-weight: bold; } </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">제6장</div>
+            <h1>가드레일 시스템</h1>
+            <div class="chapter-intro">자동화된 가드레일을 통한 실시간 안전 적용</div>
+        </div>
+
+        <h2>가드레일이란 무엇인가?</h2>
+        <p>
+            가드레일은 AI 시스템에 실시간으로 행동 경계를 적용하는 자동화된 안전 메커니즘입니다.
+            유해한 출력, 위험한 행동 및 정책 위반이 사용자에게 도달하기 전에 방지하는 프로그램적
+            제약으로 작동합니다. 사후 필터링과 달리, 가드레일은 AI 시스템의 의사 결정 프로세스의
+            능동적 구성 요소로 작동합니다.
+        </p>
+
+        <p>
+            효과적인 가드레일은 안전과 유용성의 균형을 맞추어, 진정으로 유해한 행동을 차단하면서
+            AI가 도움이 되고, 창의적이며, 합법적인 사용자 요구에 반응할 수 있는 능력을 보존합니다.
+        </p>
+
+        <h2>가드레일의 유형</h2>
+
+        <h3>1. 입력 가드레일</h3>
+        <p>
+            처리 전에 사용자 입력을 검증하고 정제합니다. 프롬프트 주입, 악의적 콘텐츠 또는
+            범위 외 요청을 탐지합니다. 인코딩이나 난독화를 통한 회피를 방지하기 위해 입력을
+            정규화합니다.
+        </p>
+
+        <div class="code-block">
+// 입력 가드레일 구현
+class InputGuardrail {
+    async validate(userInput, context) {
+        const checks = {
+            promptInjection: await this.detectInjection(userInput),
+            maliciousContent: await this.scanContent(userInput),
+            scopeViolation: await this.checkScope(userInput, context),
+            rateLimits: await this.checkRateLimit(context.userId),
+            inputSanitization: this.sanitize(userInput)
+        };
+
+        if (checks.promptInjection.detected) {
+            return {
+                allowed: false,
+                reason: "잠재적 프롬프트 주입 탐지됨",
+                confidence: checks.promptInjection.confidence
+            };
+        }
+
+        return { allowed: true, sanitizedInput: checks.inputSanitization };
+    }
+}
+        </div>
+
+        <h3>2. 출력 가드레일</h3>
+        <p>
+            사용자에게 전달하기 전에 AI 출력을 필터링합니다. 콘텐츠 정책, PII 수정, 독성 필터
+            및 사실 검증을 적용합니다. 유해한 콘텐츠가 빠져나가지 않도록 보장하는 최종 방어 계층.
+        </p>
+
+        <h3>3. 행동 가드레일</h3>
+        <p>
+            AI 행동 및 기능을 제약합니다. 의도된 기능 외의 파일 시스템 접근, 네트워크 요청,
+            코드 실행 또는 기타 위험한 작업을 방지합니다.
+        </p>
+
+        <h3>4. 맥락 가드레일</h3>
+        <p>
+            맥락에 적합한 행동을 적용합니다. 사용자 연령, 애플리케이션 도메인, 규제 요구 사항
+            또는 대화 이력에 따라 안전 임계값을 조정합니다.
+        </p>
+
+        <h3>5. 리소스 가드레일</h3>
+        <p>
+            속도 제한, 토큰 제한, 계산 예산 및 시간 초과 적용을 통해 리소스 고갈을 방지합니다.
+            서비스 거부 및 비용 악용으로부터 보호합니다.
+        </p>
+
+        <h3>6. 데이터 가드레일</h3>
+        <p>
+            데이터 접근을 제어하고 유출을 방지합니다. 데이터 보존 정책, 접근 제어 및 프라이버시
+            보호를 적용합니다. 로그 및 출력에서 민감한 정보를 수정합니다.
+        </p>
+
+        <h3>7. 정렬 가드레일</h3>
+        <p>
+            핵심 가치 및 원칙과의 정렬을 유지합니다. 명세 게이밍, 목표 하이재킹 또는 의도된
+            행동으로부터의 드리프트를 탐지합니다. 불확실할 때 인간 검토로 에스컬레이션합니다.
+        </p>
+
+        <h3>8. 규정 준수 가드레일</h3>
+        <p>
+            규제 요구 사항, 산업 표준 및 법적 의무를 적용합니다. 감사 추적, 동의 관리 및
+            관할 제한을 유지합니다.
+        </p>
+
+        <h2>가드레일 아키텍처</h2>
+
+        <div class="code-block">
+// 다층 가드레일 시스템 아키텍처
+class GuardrailSystem {
+    constructor(config) {
+        this.layers = {
+            preprocessing: new PreprocessingLayer(config.input),
+            inputValidation: new InputGuardrails(config.input),
+            modelWrapper: new ModelWrapper(config.model),
+            outputFiltering: new OutputGuardrails(config.output),
+            postprocessing: new PostprocessingLayer(config.output),
+            monitoring: new MonitoringLayer(config.monitoring)
+        };
+
+        this.circuitBreaker = new CircuitBreaker(config.failsafe);
+        this.auditLog = new AuditLogger(config.logging);
+    }
+
+    async process(request) {
+        const startTime = Date.now();
+
+        try {
+            // 계층 1: 전처리
+            const preprocessed = await this.layers.preprocessing
+                .transform(request.input);
+
+            // 계층 2: 입력 검증
+            const inputCheck = await this.layers.inputValidation
+                .validate(preprocessed, request.context);
+
+            if (!inputCheck.allowed) {
+                return this.buildResponse('BLOCKED_INPUT', inputCheck);
+            }
+
+            // 계층 3: 래퍼를 사용한 모델 호출
+            const modelOutput = await this.circuitBreaker.execute(
+                () => this.layers.modelWrapper.generate(
+                    inputCheck.sanitizedInput,
+                    request.context
+                )
+            );
+
+            // 계층 4: 출력 필터링
+            const outputCheck = await this.layers.outputFiltering
+                .validate(modelOutput, request.context);
+
+            if (!outputCheck.allowed) {
+                return this.buildResponse('BLOCKED_OUTPUT', outputCheck);
+            }
+
+            // 계층 5: 후처리
+            const final = await this.layers.postprocessing
+                .transform(outputCheck.sanitized);
+
+            // 계층 6: 모니터링
+            await this.layers.monitoring.record({
+                request,
+                response: final,
+                duration: Date.now() - startTime,
+                guardrailDecisions: { inputCheck, outputCheck }
+            });
+
+            return this.buildResponse('SUCCESS', final);
+
+        } catch (error) {
+            await this.handleError(error, request);
+            return this.buildResponse('ERROR', error);
+        }
+    }
+}
+        </div>
+
+        <h2>효과적인 가드레일 구현</h2>
+
+        <h3>설계 원칙</h3>
+        <ul>
+            <li><strong>페일 세이프 기본값:</strong> 불확실할 때 허용보다는 차단을 기본으로</li>
+            <li><strong>심층 방어:</strong> 여러 독립적인 보호 계층</li>
+            <li><strong>최소 권한:</strong> 최소한 필요한 기능만 부여</li>
+            <li><strong>관심사 분리:</strong> 각 가드레일은 단일하고 명확한 책임</li>
+            <li><strong>조합 가능성:</strong> 가드레일을 유연하게 결합하고 구성 가능</li>
+            <li><strong>관찰 가능성:</strong> 모든 결정을 로깅하고 모니터링</li>
+            <li><strong>우아한 저하:</strong> 구성 요소가 실패해도 시스템은 안전하게 유지</li>
+            <li><strong>사용자 피드백:</strong> 요청이 차단될 때 결정 설명</li>
+        </ul>
+
+        <h3>성능 최적화</h3>
+        <p>
+            가드레일은 허용할 수 없는 지연 시간 없이 실시간으로 작동해야 합니다. 최적화 전략에는
+            캐싱, 병렬 실행, 조기 종료 및 계층화된 확인이 포함됩니다.
+        </p>
+
+        <div class="code-block">
+// 최적화된 가드레일 실행
+class OptimizedGuardrails {
+    async fastPath(input) {
+        // 먼저 빠른 결정적 확인 (< 1ms)
+        if (await this.blocklist.contains(input)) {
+            return { allowed: false, reason: "차단 목록 일치" };
+        }
+
+        // 패턴 매칭 (< 5ms)
+        if (await this.patterns.matches(input)) {
+            return { allowed: false, reason: "패턴 위반" };
+        }
+
+        // 빠른 확인이 통과하면 느린 ML 확인 진행
+        return null; // 느린 경로로 계속
+    }
+
+    async slowPath(input) {
+        // 독립적인 ML 확인의 병렬 실행
+        const results = await Promise.all([
+            this.toxicityModel.score(input),
+            this.piiDetector.scan(input),
+            this.intentClassifier.classify(input)
+        ]);
+
+        return this.aggregateResults(results);
+    }
+
+    async check(input) {
+        // 먼저 빠른 경로 시도
+        const fastResult = await this.fastPath(input);
+        if (fastResult !== null) {
+            return fastResult;
+        }
+
+        // 필요할 때만 느린 경로로 폴백
+        return await this.slowPath(input);
+    }
+}
+        </div>
+
+        <h2>일반적인 가드레일 패턴</h2>
+
+        <h3>허용 목록 패턴</h3>
+        <p>
+            명시적으로 허용된 행동을 정의하고 나머지는 모두 차단합니다. 보수적이지만 매우
+            안전합니다. 잘 정의된 사용 사례가 있는 고위험 도메인에 적합합니다.
+        </p>
+
+        <h3>차단 목록 패턴</h3>
+        <p>
+            금지된 행동을 정의하고 나머지는 모두 허용합니다. 더 허용적이지만 포괄적인 위협
+            모델링이 필요합니다. 범용 애플리케이션에 적합합니다.
+        </p>
+
+        <h3>임계값 패턴</h3>
+        <p>
+            위험 임계값 미만의 행동은 허용하고, 초과는 차단하며, 경계선 케이스는 인간 검토로
+            에스컬레이션합니다. 자동화와 인간 판단의 균형을 맞춥니다.
+        </p>
+
+        <h3>서킷 브레이커 패턴</h3>
+        <p>
+            반복된 안전 위반을 모니터링하고 남용이 탐지되면 일시적으로 기능을 비활성화합니다.
+            지속적인 공격을 방지합니다.
+        </p>
+
+        <div class="highlight">
+            <strong>서킷 브레이커 상태:</strong>
+            <ul>
+                <li><strong>닫힘 (정상):</strong> 모든 요청이 정상적으로 처리됨</li>
+                <li><strong>열림 (차단):</strong> 임계값 초과 후 모든 요청 빠르게 실패</li>
+                <li><strong>반열림 (테스트):</strong> 문제 해결 테스트를 위해 제한된 요청 허용</li>
+            </ul>
+        </div>
+
+        <h3>에스컬레이션 패턴</h3>
+        <p>
+            복잡하거나 고위험 결정을 인간 검토자에게 라우팅합니다. 자동화된 가드레일은 명확한
+            케이스를 처리하고, 인간은 모호성을 처리합니다.
+        </p>
+
+        <h2>가드레일 구성</h2>
+
+        <h3>엄격 모드</h3>
+        <p>
+            최대 안전, 최소 위험 허용. 어린이 애플리케이션, 규제 산업 또는 고위험 결정에
+            사용됩니다. 더 높은 거짓 양성률이 허용 가능합니다.
+        </p>
+
+        <table>
+            <tr>
+                <th>가드레일</th>
+                <th>엄격 모드</th>
+                <th>균형 모드</th>
+                <th>허용 모드</th>
+            </tr>
+            <tr>
+                <td>독성 임계값</td>
+                <td>0.3</td>
+                <td>0.6</td>
+                <td>0.8</td>
+            </tr>
+            <tr>
+                <td>PII 탐지</td>
+                <td>모두 수정</td>
+                <td>민감한 것만 수정</td>
+                <td>경고만</td>
+            </tr>
+            <tr>
+                <td>프롬프트 주입</td>
+                <td>의심스러운 것 차단</td>
+                <td>명백한 것 차단</td>
+                <td>로그만</td>
+            </tr>
+            <tr>
+                <td>속도 제한</td>
+                <td>100/시간</td>
+                <td>1000/시간</td>
+                <td>10000/시간</td>
+            </tr>
+        </table>
+
+        <h2>동적 가드레일</h2>
+        <p>
+            정적 규칙은 진화하는 위협에 불충분합니다. 동적 가드레일은 맥락, 사용자 이력,
+            위협 정보 및 학습된 패턴을 기반으로 적응합니다.
+        </p>
+
+        <div class="code-block">
+// 동적 가드레일 적응
+class AdaptiveGuardrail {
+    constructor() {
+        this.baselineThreshold = 0.7;
+        this.userReputationSystem = new ReputationSystem();
+        this.threatIntel = new ThreatIntelligence();
+    }
+
+    async computeThreshold(user, context) {
+        let threshold = this.baselineThreshold;
+
+        // 사용자 평판에 따라 조정
+        const reputation = await this.userReputationSystem.get(user.id);
+        if (reputation > 0.9) {
+            threshold += 0.1; // 신뢰할 수 있는 사용자에게 더 허용적
+        } else if (reputation < 0.3) {
+            threshold -= 0.2; // 문제 있는 사용자에게 더 엄격
+        }
+
+        // 위협 수준에 따라 조정
+        const threatLevel = await this.threatIntel.getCurrentLevel();
+        threshold -= threatLevel * 0.3; // 공격 중에 더 엄격
+
+        // 맥락에 따라 조정
+        if (context.domain === 'children') {
+            threshold = 0.3; // 어린이에게는 항상 엄격
+        }
+
+        return Math.max(0.1, Math.min(0.9, threshold));
+    }
+}
+        </div>
+
+        <h2>가드레일 테스팅</h2>
+
+        <h3>단위 테스팅</h3>
+        <p>
+            알려진 좋은 입력과 나쁜 입력으로 각 가드레일을 독립적으로 테스트합니다. 올바른
+            분류, 적절한 임계값 및 엣지 케이스 처리를 검증합니다.
+        </p>
+
+        <h3>통합 테스팅</h3>
+        <p>
+            현실적인 시나리오로 완전한 가드레일 파이프라인을 테스트합니다. 가드레일이
+            충돌이나 간격 없이 올바르게 함께 작동하는지 검증합니다.
+        </p>
+
+        <h3>레드팀 테스팅</h3>
+        <p>
+            적대적 기술을 사용하여 가드레일을 우회하려고 시도합니다. 회피 전략을 발견하고
+            방어를 강화합니다.
+        </p>
+
+        <h3>성능 테스팅</h3>
+        <p>
+            지연 시간, 처리량 및 리소스 사용을 측정합니다. 가드레일이 프로덕션 요구 사항을
+            충족하는지 확인합니다.
+        </p>
+
+        <h3>회귀 테스팅</h3>
+        <p>
+            이전 우회 시도의 테스트 스위트를 유지합니다. 업데이트가 이전 취약점을
+            재도입하지 않도록 보장합니다.
+        </p>
+
+        <h2>모니터링 및 유지 관리</h2>
+
+        <h3>실시간 대시보드</h3>
+        <ul>
+            <li>가드레일별 요청 볼륨 및 차단률</li>
+            <li>지연 시간 백분위수 및 성능 추세</li>
+            <li>거짓 양성/음성률</li>
+            <li>상위 차단 범주 및 이유</li>
+            <li>비정상적 패턴에 대한 이상 징후 탐지</li>
+        </ul>
+
+        <h3>지속적인 개선</h3>
+        <ol>
+            <li>사용자 및 검토자로부터 차단된 요청에 대한 피드백 수집</li>
+            <li>지나치게 엄격한 규칙을 식별하기 위해 거짓 양성 분석</li>
+            <li>커버리지 간격을 식별하기 위해 거짓 음성 분석</li>
+            <li>발견 사항을 기반으로 가드레일 파라미터 및 모델 업데이트</li>
+            <li>카나리아 테스팅으로 점진적으로 업데이트 배포</li>
+            <li>영향 모니터링 및 반복</li>
+        </ol>
+
+        <h2>일반적인 함정</h2>
+
+        <ul>
+            <li><strong>과도한 차단:</strong> 너무 엄격한 가드레일은 합법적 사용자를 좌절시킴</li>
+            <li><strong>불충분한 차단:</strong> 너무 허용적인 가드레일은 유해한 콘텐츠를 허용</li>
+            <li><strong>단일 실패 지점:</strong> 심층 방어 대신 하나의 가드레일에 의존</li>
+            <li><strong>성능 병목:</strong> 느린 가드레일은 사용자 경험을 저하시킴</li>
+            <li><strong>불충분한 로깅:</strong> 상세한 로그 없이는 디버그나 개선 불가능</li>
+            <li><strong>정적 규칙:</strong> 진화하는 위협에 적응하지 못함</li>
+            <li><strong>나쁜 사용자 피드백:</strong> 설명 없이 차단하면 사용자를 좌절시킴</li>
+            <li><strong>부적절한 테스팅:</strong> 테스트되지 않은 가드레일 배포는 문제를 야기</li>
+        </ul>
+
+        <div class="philosophy">
+            弘益人間<br>
+            <span style="font-size: 1rem; color: #94a3b8;">
+                가드레일은 AI가 도울 수 있는 능력을 보존하면서 모든 사용자를 보호합니다
+            </span>
+        </div>
+
+        <div class="summary">
+            <h3>요약</h3>
+            <ul>
+                <li>가드레일은 AI 시스템에 실시간으로 행동 경계를 적용합니다</li>
+                <li>8가지 유형: 입력, 출력, 행동, 맥락, 리소스, 데이터, 정렬, 규정 준수</li>
+                <li>다층 아키텍처는 심층 방어를 제공합니다</li>
+                <li>설계 원칙에는 페일 세이프 기본값, 조합 가능성 및 관찰 가능성이 포함됩니다</li>
+                <li>일반적인 패턴: 허용 목록, 차단 목록, 임계값, 서킷 브레이커, 에스컬레이션</li>
+                <li>구성 모드(엄격/균형/허용)는 위험 허용도를 조정합니다</li>
+                <li>동적 가드레일은 맥락, 평판 및 위협 정보에 적응합니다</li>
+                <li>효과성을 위해서는 지속적인 테스팅, 모니터링 및 개선이 필수적입니다</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h3>복습 문제</h3>
+            <div class="review-question"><strong>1.</strong> 가드레일과 사후 콘텐츠 필터링을 구별하는 것은 무엇입니까?</div>
+            <div class="review-question"><strong>2.</strong> WIA-AI-010의 8가지 가드레일 유형을 설명하세요.</div>
+            <div class="review-question"><strong>3.</strong> 페일 세이프 기본값 원칙이 중요한 이유는 무엇입니까?</div>
+            <div class="review-question"><strong>4.</strong> 서킷 브레이커 패턴과 3가지 상태를 설명하세요.</div>
+            <div class="review-question"><strong>5.</strong> 동적 가드레일은 정적 규칙과 어떻게 다릅니까?</div>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-05.html" class="nav-link">← 이전: 레드팀 운영</a>
+            <a href="chapter-07.html" class="nav-link">다음: 안전 벤치마크 →</a>
+        </div>
+    </div>
+</body>
+</html>

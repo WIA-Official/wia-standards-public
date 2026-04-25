@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 06 - 디지털 소멸 프로토콜</title>
+    <style>:root{--primary:#f59e0b;--primary-dark:#d97706}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:#475569;margin:25px 0 15px;font-size:1.3em}.content p{margin:15px 0}.content ul,.content ol{margin:15px 0 15px 30px;line-height:2}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:#fef3c7;border-left:5px solid #f59e0b;padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin:25px 0;background:white;box-shadow:0 2px 8px rgba(0,0,0,.1)}th{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:15px;text-align:left;font-weight:600}td{padding:12px 15px;border-bottom:1px solid #e2e8f0}tr:hover{background:#f8fafc}pre{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:0.85em;line-height:1.5}code{font-family:'Courier New',monospace;font-size:0.9em}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:background 0.3s}.nav-button:hover{background:var(--primary-dark)}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Chapter 06</h1>
+            <h2 style="font-size:1.8em;font-weight:400;margin-top:20px">디지털 소멸 프로토콜</h2>
+            <p style="margin-top:15px;font-size:1.1em">WIA-ERASURE-PROTOCOL (WEP) v1.0</p>
+        </div>
+
+        <div class="content">
+            <h2>1. 프로토콜 개요</h2>
+            <p>WIA-ERASURE-PROTOCOL (WEP)은 서로 다른 시스템과 플랫폼 간에 개인정보 삭제 요청을 안전하고 효율적으로 전달하기 위한 통신 프로토콜입니다. API가 단일 시스템 내의 인터페이스라면, 프로토콜은 여러 시스템 간의 통신 규약입니다.</p>
+
+            <div class="info-box">
+                <h4>📌 학습 목표</h4>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>WEP 프로토콜의 구조와 메시지 형식 이해</li>
+                    <li>시스템 간 동기화 메커니즘</li>
+                    <li>블록체인 기반 삭제 검증 방법</li>
+                    <li>제3자 플랫폼 연동 프로토콜</li>
+                    <li>국제 상호운용성 보장 방안</li>
+                </ul>
+            </div>
+
+            <h2>2. WEP 프로토콜 스택</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>계층</th>
+                        <th>프로토콜</th>
+                        <th>역할</th>
+                        <th>기술</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>응용 계층</strong></td>
+                        <td>WEP-APP</td>
+                        <td>비즈니스 로직, 데이터 형식</td>
+                        <td>JSON-LD, Schema.org</td>
+                    </tr>
+                    <tr>
+                        <td><strong>표현 계층</strong></td>
+                        <td>WEP-DATA</td>
+                        <td>데이터 인코딩, 압축</td>
+                        <td>Protocol Buffers, gRPC</td>
+                    </tr>
+                    <tr>
+                        <td><strong>세션 계층</strong></td>
+                        <td>WEP-SESSION</td>
+                        <td>연결 관리, 상태 유지</td>
+                        <td>WebSocket, SSE</td>
+                    </tr>
+                    <tr>
+                        <td><strong>전송 계층</strong></td>
+                        <td>WEP-TRANSPORT</td>
+                        <td>신뢰성 보장, 재전송</td>
+                        <td>HTTP/3, QUIC</td>
+                    </tr>
+                    <tr>
+                        <td><strong>보안 계층</strong></td>
+                        <td>WEP-SECURITY</td>
+                        <td>암호화, 인증, 서명</td>
+                        <td>TLS 1.3, mTLS</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3. 프로토콜 메시지 형식</h2>
+
+            <h3>3.1 기본 메시지 구조</h3>
+            <pre><code>/**
+ * WEP 표준 메시지 형식
+ * @version 1.0.0
+ * @spec WIA-ERASURE-PROTOCOL
+ */
+
+{
+  // 메시지 헤더
+  "header": {
+    "version": "1.0.0",
+    "messageId": "MSG-2025-0107-001234",
+    "messageType": "ERASURE_REQUEST",  // REQUEST | RESPONSE | NOTIFICATION | ACK
+    "timestamp": "2025-01-07T14:30:00Z",
+    "sender": {
+      "platformId": "NAVER_KR",
+      "systemId": "naver-erasure-service",
+      "certificate": "-----BEGIN CERTIFICATE-----..."
+    },
+    "receiver": {
+      "platformId": "KAKAO_KR",
+      "systemId": "kakao-data-management"
+    },
+    "priority": "HIGH",  // LOW | NORMAL | HIGH | URGENT
+    "encryption": "AES-256-GCM",
+    "signature": "SHA256-RSA"
+  },
+
+  // 메시지 본문
+  "body": {
+    "requestId": "ER-2025-0107-001234",
+    "userId": {
+      "type": "EMAIL",
+      "value": "user@example.com",
+      "hash": "SHA256:a3b2c1d4..."  // 프라이버시 보호
+    },
+    "action": "DELETE",  // DELETE | ANONYMIZE | ARCHIVE
+    "scope": {
+      "dataTypes": ["PROFILE", "POSTS", "MESSAGES"],
+      "platforms": ["WEB", "MOBILE"],
+      "includeBackups": true,
+      "includeThirdParty": true
+    },
+    "legalBasis": "PIPA_ARTICLE_21",
+    "deadline": "2025-01-17T23:59:59Z",
+    "verificationProof": {
+      "method": "OTP",
+      "verified": true,
+      "timestamp": "2025-01-07T14:25:00Z"
+    }
+  },
+
+  // 메시지 푸터 (무결성 검증)
+  "footer": {
+    "checksum": "CRC32:a1b2c3d4",
+    "signature": "-----BEGIN SIGNATURE-----...",
+    "chain": {
+      "previousHash": "SHA256:prev_message_hash",
+      "blockNumber": 12345
+    }
+  }
+}</code></pre>
+
+            <h3>3.2 메시지 유형별 정의</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>메시지 유형</th>
+                        <th>방향</th>
+                        <th>설명</th>
+                        <th>응답 필요</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>ERASURE_REQUEST</strong></td>
+                        <td>Client → Server</td>
+                        <td>삭제 요청 전송</td>
+                        <td>✅ 필수</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ERASURE_RESPONSE</strong></td>
+                        <td>Server → Client</td>
+                        <td>요청 수신 확인</td>
+                        <td>✅ ACK 필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>STATUS_UPDATE</strong></td>
+                        <td>Server → Client</td>
+                        <td>진행 상황 통지</td>
+                        <td>❌ 선택</td>
+                    </tr>
+                    <tr>
+                        <td><strong>COMPLETION_NOTIFY</strong></td>
+                        <td>Server → Client</td>
+                        <td>삭제 완료 알림</td>
+                        <td>✅ ACK 필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ERROR_NOTIFY</strong></td>
+                        <td>Server → Client</td>
+                        <td>오류 통지</td>
+                        <td>✅ 필수</td>
+                    </tr>
+                    <tr>
+                        <td><strong>THIRD_PARTY_RELAY</strong></td>
+                        <td>Server → Third Party</td>
+                        <td>제3자에게 삭제 요청 전달</td>
+                        <td>✅ 필수</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4. 시스템 간 동기화 프로토콜</h2>
+
+            <h3>4.1 Pub/Sub 아키텍처</h3>
+            <p>WEP는 Google Cloud Pub/Sub, AWS SNS/SQS, Apache Kafka 등과 호환되는 Pub/Sub 패턴을 사용합니다.</p>
+
+            <pre><code>/**
+ * WEP Pub/Sub 토픽 설계
+ */
+
+// 토픽 구조
+const WEP_TOPICS = {
+  // 삭제 요청 토픽
+  erasureRequests: 'wep.erasure.requests.{region}.{platform}',
+
+  // 상태 업데이트 토픽
+  statusUpdates: 'wep.status.updates.{requestId}',
+
+  // 완료 알림 토픽
+  completionNotifications: 'wep.completion.notifications',
+
+  // 제3자 전달 토픽
+  thirdPartyRelay: 'wep.thirdparty.relay.{partnerId}',
+
+  // 오류 알림 토픽
+  errorNotifications: 'wep.errors.{severity}'
+};
+
+// 네이버 → 카카오 삭제 요청 전달 예제
+import { PubSub } from '@google-cloud/pubsub';
+
+const pubsub = new PubSub();
+
+async function relayErasureRequestToKakao(request) {
+  const topic = pubsub.topic('wep.thirdparty.relay.kakao');
+
+  const message = {
+    header: {
+      version: '1.0.0',
+      messageType: 'THIRD_PARTY_RELAY',
+      sender: { platformId: 'NAVER_KR' },
+      receiver: { platformId: 'KAKAO_KR' }
+    },
+    body: {
+      requestId: request.requestId,
+      userId: {
+        type: 'EMAIL',
+        value: request.email,
+        linkedAccount: {
+          platform: 'KAKAO',
+          discoveredBy: 'OAUTH_LINK'
+        }
+      },
+      action: 'DELETE',
+      reason: '네이버 계정 삭제에 따른 연동 계정 삭제',
+      legalBasis: 'PIPA_ARTICLE_21'
+    }
+  };
+
+  await topic.publish(Buffer.from(JSON.stringify(message)));
+  console.log('카카오에 삭제 요청 전달 완료');
+}</code></pre>
+
+            <h3>4.2 이벤트 소싱 (Event Sourcing)</h3>
+            <p>모든 삭제 이벤트는 불변 이벤트 로그에 기록되어 감사 추적(Audit Trail)을 보장합니다.</p>
+
+            <pre><code>/**
+ * 이벤트 소싱 패턴
+ */
+
+interface ErasureEvent {
+  eventId: string;
+  eventType: 'REQUEST_RECEIVED' | 'VERIFIED' | 'DELETION_STARTED' |
+             'DELETION_COMPLETED' | 'ERROR_OCCURRED';
+  aggregateId: string;  // requestId
+  timestamp: Date;
+  actor: {
+    type: 'USER' | 'SYSTEM' | 'THIRD_PARTY';
+    id: string;
+  };
+  payload: any;
+  metadata: {
+    ipAddress?: string;
+    userAgent?: string;
+    location?: string;
+  };
+}
+
+// 이벤트 스트림 예제
+const erasureEventStream = [
+  {
+    eventId: 'EVT-001',
+    eventType: 'REQUEST_RECEIVED',
+    aggregateId: 'ER-2025-0107-001234',
+    timestamp: '2025-01-07T14:30:00Z',
+    actor: { type: 'USER', id: 'user@example.com' },
+    payload: { dataTypes: ['PROFILE', 'POSTS'] }
+  },
+  {
+    eventId: 'EVT-002',
+    eventType: 'VERIFIED',
+    aggregateId: 'ER-2025-0107-001234',
+    timestamp: '2025-01-07T14:32:00Z',
+    actor: { type: 'SYSTEM', id: 'verification-service' },
+    payload: { method: 'EMAIL_OTP', success: true }
+  },
+  {
+    eventId: 'EVT-003',
+    eventType: 'DELETION_STARTED',
+    aggregateId: 'ER-2025-0107-001234',
+    timestamp: '2025-01-08T00:00:00Z',
+    actor: { type: 'SYSTEM', id: 'deletion-engine' },
+    payload: { systems: ['PRIMARY_DB', 'BACKUPS'] }
+  },
+  // ... 이벤트 계속
+];</code></pre>
+
+            <h2>5. 블록체인 기반 삭제 검증</h2>
+
+            <h3>5.1 검증 체인 구조</h3>
+            <p>WEP는 선택적으로 블록체인 기술을 활용하여 삭제의 무결성을 검증합니다. 이는 개인정보보호위원회의 감사 시 증거자료로 활용될 수 있습니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>블록 유형</th>
+                        <th>내용</th>
+                        <th>블록 크기</th>
+                        <th>생성 주기</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Genesis Block</strong></td>
+                        <td>체인 시작점</td>
+                        <td>1 KB</td>
+                        <td>최초 1회</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Request Block</strong></td>
+                        <td>삭제 요청 기록</td>
+                        <td>2-5 KB</td>
+                        <td>요청 시</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Verification Block</strong></td>
+                        <td>인증 완료 기록</td>
+                        <td>1-2 KB</td>
+                        <td>인증 시</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Deletion Block</strong></td>
+                        <td>삭제 완료 기록</td>
+                        <td>5-10 KB</td>
+                        <td>삭제 완료 시</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Audit Block</strong></td>
+                        <td>검증 및 감사 기록</td>
+                        <td>3-7 KB</td>
+                        <td>주기적</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 스마트 컨트랙트 예제</h3>
+            <pre><code>/**
+ * WEP 삭제 검증 스마트 컨트랙트 (Solidity)
+ * @blockchain Ethereum / Polygon
+ */
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract WIAErasureVerification {
+    struct ErasureRecord {
+        string requestId;
+        address requester;
+        uint256 timestamp;
+        bytes32 dataHash;  // 삭제된 데이터의 해시
+        bool verified;
+        string[] systemsCompleted;
+    }
+
+    mapping(string => ErasureRecord) public records;
+    mapping(address => bool) public authorizedPlatforms;
+
+    event ErasureRequested(string requestId, address requester, uint256 timestamp);
+    event ErasureVerified(string requestId, uint256 timestamp);
+    event SystemCompleted(string requestId, string systemName);
+
+    modifier onlyAuthorized() {
+        require(authorizedPlatforms[msg.sender], "Not authorized");
+        _;
+    }
+
+    // 삭제 요청 기록
+    function recordErasureRequest(
+        string memory _requestId,
+        bytes32 _dataHash
+    ) public onlyAuthorized {
+        require(records[_requestId].timestamp == 0, "Request already exists");
+
+        records[_requestId] = ErasureRecord({
+            requestId: _requestId,
+            requester: msg.sender,
+            timestamp: block.timestamp,
+            dataHash: _dataHash,
+            verified: false,
+            systemsCompleted: new string[](0)
+        });
+
+        emit ErasureRequested(_requestId, msg.sender, block.timestamp);
+    }
+
+    // 시스템별 삭제 완료 기록
+    function recordSystemCompletion(
+        string memory _requestId,
+        string memory _systemName
+    ) public onlyAuthorized {
+        require(records[_requestId].timestamp > 0, "Request not found");
+
+        records[_requestId].systemsCompleted.push(_systemName);
+        emit SystemCompleted(_requestId, _systemName);
+    }
+
+    // 최종 검증
+    function verifyErasure(string memory _requestId) public onlyAuthorized {
+        require(records[_requestId].timestamp > 0, "Request not found");
+        require(!records[_requestId].verified, "Already verified");
+
+        records[_requestId].verified = true;
+        emit ErasureVerified(_requestId, block.timestamp);
+    }
+
+    // 검증 결과 조회
+    function getErasureStatus(string memory _requestId)
+        public view returns (bool verified, uint256 timestamp, uint256 systemsCount)
+    {
+        ErasureRecord memory record = records[_requestId];
+        return (record.verified, record.timestamp, record.systemsCompleted.length);
+    }
+}</code></pre>
+
+            <h2>6. 제3자 플랫폼 연동</h2>
+
+            <h3>6.1 연동 시나리오</h3>
+            <p>사용자가 네이버 계정을 삭제할 때, 네이버와 연동된 제3자 서비스(예: 배달앱, 쇼핑몰)에도 삭제 요청이 자동으로 전달되어야 합니다.</p>
+
+            <div class="info-box">
+                <h4>🔗 연동 플로우</h4>
+                <ol style="margin:10px 0 0 20px;line-height:2">
+                    <li><strong>Step 1</strong>: 사용자가 네이버 계정 삭제 요청</li>
+                    <li><strong>Step 2</strong>: 네이버가 OAuth 연동 서비스 목록 조회</li>
+                    <li><strong>Step 3</strong>: 각 제3자 서비스에 WEP 메시지 전송</li>
+                    <li><strong>Step 4</strong>: 제3자 서비스가 삭제 처리</li>
+                    <li><strong>Step 5</strong>: 완료 응답을 네이버에 회신</li>
+                    <li><strong>Step 6</strong>: 모든 연동 서비스 삭제 완료 후 네이버 계정 최종 삭제</li>
+                </ol>
+            </div>
+
+            <h3>6.2 제3자 연동 구현</h3>
+            <pre><code>/**
+ * 제3자 플랫폼 연동 매니저
+ */
+
+class ThirdPartyErasureManager {
+  private linkedServices: Map<string, ServiceConfig>;
+
+  constructor() {
+    this.linkedServices = new Map();
+  }
+
+  // 사용자의 연동 서비스 목록 조회
+  async getLinkedServices(userId: string): Promise<LinkedService[]> {
+    // OAuth 연동 기록 조회
+    const oauthLinks = await db.query(`
+      SELECT service_id, service_name, linked_at, access_scope
+      FROM oauth_links
+      WHERE user_id = ? AND status = 'ACTIVE'
+    `, [userId]);
+
+    return oauthLinks.map(link => ({
+      serviceId: link.service_id,
+      serviceName: link.service_name,
+      linkedAt: link.linked_at,
+      wepEndpoint: this.getWepEndpoint(link.service_id)
+    }));
+  }
+
+  // 모든 연동 서비스에 삭제 요청 전송
+  async propagateErasureRequest(requestId: string, userId: string) {
+    const services = await this.getLinkedServices(userId);
+
+    const promises = services.map(service =>
+      this.sendErasureToService(service, requestId, userId)
+    );
+
+    const results = await Promise.allSettled(promises);
+
+    // 결과 집계
+    const summary = {
+      total: services.length,
+      success: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      details: results.map((r, i) => ({
+        service: services[i].serviceName,
+        status: r.status,
+        error: r.status === 'rejected' ? r.reason : null
+      }))
+    };
+
+    return summary;
+  }
+
+  // 개별 서비스에 WEP 메시지 전송
+  private async sendErasureToService(
+    service: LinkedService,
+    requestId: string,
+    userId: string
+  ) {
+    const wepMessage = {
+      header: {
+        version: '1.0.0',
+        messageType: 'THIRD_PARTY_RELAY',
+        sender: { platformId: 'NAVER_KR' },
+        receiver: { platformId: service.serviceId }
+      },
+      body: {
+        requestId: requestId,
+        userId: { type: 'NAVER_ID', value: userId },
+        action: 'DELETE',
+        legalBasis: 'PIPA_ARTICLE_21',
+        deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)  // 10일 후
+      }
+    };
+
+    const response = await fetch(service.wepEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/wep+json',
+        'WEP-Version': '1.0.0',
+        'Authorization': `Bearer ${await this.getServiceToken(service.serviceId)}`
+      },
+      body: JSON.stringify(wepMessage)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Service ${service.serviceName} failed: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+}</code></pre>
+
+            <h2>7. 국제 상호운용성</h2>
+
+            <h3>7.1 지역별 프로토콜 변형</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>지역</th>
+                        <th>프로토콜 변형</th>
+                        <th>주요 차이점</th>
+                        <th>법적 근거</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>유럽연합</strong></td>
+                        <td>WEP-EU</td>
+                        <td>GDPR Article 17 필드 필수</td>
+                        <td>GDPR</td>
+                    </tr>
+                    <tr>
+                        <td><strong>한국</strong></td>
+                        <td>WEP-KR</td>
+                        <td>개인정보보호위원회 신고 절차</td>
+                        <td>개인정보보호법</td>
+                    </tr>
+                    <tr>
+                        <td><strong>미국</strong></td>
+                        <td>WEP-US</td>
+                        <td>주별 법률 준수 (CCPA 등)</td>
+                        <td>CCPA, CPRA</td>
+                    </tr>
+                    <tr>
+                        <td><strong>일본</strong></td>
+                        <td>WEP-JP</td>
+                        <td>개인정보보호위원회 가이드라인</td>
+                        <td>個人情報保護法</td>
+                    </tr>
+                    <tr>
+                        <td><strong>중국</strong></td>
+                        <td>WEP-CN</td>
+                        <td>국가 안보 예외 처리</td>
+                        <td>PIPL</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>7.2 국제 데이터 전송 프로토콜</h3>
+            <pre><code>/**
+ * 국제 데이터 전송 표준 계약 조항 (SCC) 통합
+ */
+
+interface CrossBorderErasureRequest {
+  requestId: string;
+  sourceRegion: 'EU' | 'KR' | 'US' | 'JP' | 'CN';
+  targetRegion: 'EU' | 'KR' | 'US' | 'JP' | 'CN';
+
+  // Standard Contractual Clauses (SCC) 준수
+  legalMechanism: 'SCC' | 'BCR' | 'ADEQUACY_DECISION' | 'DEROGATION';
+
+  dataSubject: {
+    id: string;
+    nationality: string;
+    residence: string;
+  };
+
+  // 지역별 법적 요구사항
+  compliance: {
+    sourceCompliance: string[];  // e.g., ['GDPR_ARTICLE_17', 'EDPB_GUIDELINES']
+    targetCompliance: string[];  // e.g., ['PIPA_ARTICLE_21']
+  };
+
+  // 데이터 현지화 (Data Localization) 준수
+  dataLocalization: {
+    mustStayInRegion: boolean;
+    allowedRegions: string[];
+    transferMechanism: string;
+  };
+}
+
+// 한국 → EU 삭제 요청 전송 예제
+const krToEuRequest: CrossBorderErasureRequest = {
+  requestId: 'ER-2025-0107-001234',
+  sourceRegion: 'KR',
+  targetRegion: 'EU',
+  legalMechanism: 'SCC',  // Standard Contractual Clauses
+  dataSubject: {
+    id: 'user@example.com',
+    nationality: 'KR',
+    residence: 'DE'  // 독일 거주
+  },
+  compliance: {
+    sourceCompliance: ['PIPA_ARTICLE_21'],
+    targetCompliance: ['GDPR_ARTICLE_17', 'EDPB_GUIDELINES_4_2019']
+  },
+  dataLocalization: {
+    mustStayInRegion: false,
+    allowedRegions: ['EU', 'KR'],
+    transferMechanism: 'EU_KR_ADEQUACY_DECISION'
+  }
+};</code></pre>
+
+            <h2>8. 프로토콜 보안</h2>
+
+            <h3>8.1 암호화 계층</h3>
+            <div class="warning-box">
+                <h4>🔐 보안 요구사항</h4>
+                <ul style="margin:10px 0 0 20px;line-height:2">
+                    <li><strong>전송 암호화</strong>: TLS 1.3 이상 필수</li>
+                    <li><strong>메시지 암호화</strong>: AES-256-GCM</li>
+                    <li><strong>키 교환</strong>: ECDH (Elliptic Curve Diffie-Hellman)</li>
+                    <li><strong>디지털 서명</strong>: RSA-4096 또는 Ed25519</li>
+                    <li><strong>해시 알고리즘</strong>: SHA-256 이상</li>
+                    <li><strong>Perfect Forward Secrecy</strong>: 세션별 키 생성</li>
+                    <li><strong>Certificate Pinning</strong>: 중간자 공격 방지</li>
+                </ul>
+            </div>
+
+            <h2>9. 성능 최적화</h2>
+
+            <h3>9.1 프로토콜 성능 지표</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>지표</th>
+                        <th>목표 값</th>
+                        <th>측정 방법</th>
+                        <th>개선 방안</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>메시지 전송 시간</strong></td>
+                        <td>&lt; 100ms</td>
+                        <td>End-to-end latency</td>
+                        <td>gRPC, HTTP/3 사용</td>
+                    </tr>
+                    <tr>
+                        <td><strong>처리량</strong></td>
+                        <td>10,000 msg/sec</td>
+                        <td>Messages per second</td>
+                        <td>메시지 배치 처리</td>
+                    </tr>
+                    <tr>
+                        <td><strong>동기화 지연</strong></td>
+                        <td>&lt; 1초</td>
+                        <td>Multi-system sync</td>
+                        <td>Eventual Consistency</td>
+                    </tr>
+                    <tr>
+                        <td><strong>프로토콜 오버헤드</strong></td>
+                        <td>&lt; 5%</td>
+                        <td>Payload vs Total size</td>
+                        <td>Protocol Buffers</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>10. 요약 정리</h2>
+
+            <div class="key-takeaways">
+                <h3>🎯 Chapter 06 핵심 요점</h3>
+                <ul style="line-height:2">
+                    <li><strong>WEP 프로토콜</strong>: 5계층 스택 (응용, 표현, 세션, 전송, 보안)</li>
+                    <li><strong>메시지 형식</strong>: Header, Body, Footer 구조, 6가지 메시지 유형</li>
+                    <li><strong>시스템 동기화</strong>: Pub/Sub 패턴, 이벤트 소싱</li>
+                    <li><strong>블록체인 검증</strong>: 스마트 컨트랙트 기반 삭제 무결성 보장</li>
+                    <li><strong>제3자 연동</strong>: OAuth 연동 서비스 자동 전파</li>
+                    <li><strong>국제 상호운용성</strong>: 지역별 프로토콜 변형 (WEP-EU, WEP-KR 등)</li>
+                    <li><strong>보안</strong>: TLS 1.3, AES-256-GCM, Perfect Forward Secrecy</li>
+                    <li><strong>성능</strong>: 100ms 전송 시간, 10,000 msg/sec 처리</li>
+                    <li><strong>법적 준수</strong>: GDPR, 개인정보보호법, CCPA 등 모든 지역 법규 지원</li>
+                    <li><strong>弘益人間</strong>: 국경을 넘어 전 세계 누구나 안전하게 개인정보를 관리하여 널리 이롭게 하라 🌍</li>
+                </ul>
+            </div>
+
+            <h2>11. 학습 점검 질문</h2>
+
+            <div class="info-box">
+                <h4>❓ Self-Check Questions</h4>
+                <ol style="margin:10px 0 0 20px;line-height:2">
+                    <li>WEP 프로토콜 스택의 5계층을 설명하시오.</li>
+                    <li>메시지 유형 중 응답이 필수인 것은 무엇인가?</li>
+                    <li>Pub/Sub 패턴이 WEP에서 어떻게 활용되는가?</li>
+                    <li>블록체인을 사용한 삭제 검증의 장점은?</li>
+                    <li>제3자 플랫폼 연동 시 6단계 플로우를 설명하시오.</li>
+                    <li>WEP-EU와 WEP-KR의 주요 차이점은?</li>
+                    <li>국제 데이터 전송 시 SCC가 필요한 이유는?</li>
+                    <li>Perfect Forward Secrecy가 무엇인가?</li>
+                </ol>
+            </div>
+
+            <h2>12. 다음 장 예고</h2>
+
+            <p><strong>Chapter 07: 시스템 통합</strong>에서는 WEP 프로토콜을 실제 시스템에 적용하는 방법을 다룹니다:</p>
+            <ul>
+                <li>레거시 시스템 통합 전략</li>
+                <li>마이크로서비스 아키텍처 적용</li>
+                <li>클라우드 네이티브 구현</li>
+                <li>네이버/카카오/구글 실제 통합 사례</li>
+                <li>DevOps 및 CI/CD 파이프라인</li>
+            </ul>
+
+            <div class="navigation">
+                <a href="chapter-05.html" class="nav-button">← 이전 장</a>
+                <a href="chapter-07.html" class="nav-button">다음 장: Integration →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

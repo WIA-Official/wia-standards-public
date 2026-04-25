@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WIA-SEC-009: 신원 관리 - 구현 가이드</title>
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.8;
+        background: #0f172a;
+        color: #e2e8f0;
+    }
+    h1 {
+        color: #8B5CF6;
+        border-bottom: 3px solid #8B5CF6;
+        padding-bottom: 10px;
+    }
+    h2 {
+        color: #a78bfa;
+        margin-top: 30px;
+    }
+    h3 {
+        color: #c4b5fd;
+    }
+    blockquote {
+        border-left: 4px solid #8B5CF6;
+        margin: 20px 0;
+        padding: 10px 20px;
+        background: #1e293b;
+        font-style: italic;
+        color: #ffd700;
+    }
+    hr {
+        border: none;
+        border-top: 2px solid #334155;
+        margin: 30px 0;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background: #1e293b;
+    }
+    table, th, td {
+        border: 1px solid #334155;
+    }
+    th, td {
+        padding: 12px;
+        text-align: left;
+    }
+    th {
+        background: #8B5CF6;
+        color: white;
+        font-weight: 600;
+    }
+    tr:hover {
+        background: rgba(139, 92, 246, 0.1);
+    }
+    a {
+        color: #8B5CF6;
+        text-decoration: none;
+    }
+    a:hover {
+        color: #a78bfa;
+        text-decoration: underline;
+    }
+    ul, ol {
+        margin-left: 20px;
+    }
+    li {
+        margin: 8px 0;
+    }
+    .badge {
+        display: inline-block;
+        background: rgba(139, 92, 246, 0.2);
+        color: #8B5CF6;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.9em;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+</style>
+</head>
+<body>
+
+<h1>WIA-SEC-009: 신원 관리</h1>
+<h2>디지털 신원 및 접근 관리 표준</h2>
+<h3>구현 가이드 (한글)</h3>
+
+<blockquote>
+弘益人間 (홍익인간): "기술은 개인이 디지털 신원을 통제하면서도 서비스에 안전하고 프라이버시를 보호하는 접근을 가능하게 해야 합니다."
+</blockquote>
+
+<hr>
+
+<h2>목차</h2>
+
+<ol>
+    <li><a href="#introduction">소개 및 개요</a></li>
+    <li><a href="#did-fundamentals">분산 신원 식별자 (DID)</a></li>
+    <li><a href="#verifiable-credentials">검증 가능한 자격증명</a></li>
+    <li><a href="#iam-systems">IAM 시스템 통합</a></li>
+    <li><a href="#authentication">인증 프로토콜</a></li>
+    <li><a href="#provisioning">SCIM을 이용한 사용자 프로비저닝</a></li>
+    <li><a href="#federation">신원 연합 및 SSO</a></li>
+    <li><a href="#implementation">구현 가이드</a></li>
+    <li><a href="#best-practices">보안 모범 사례</a></li>
+    <li><a href="#case-studies">실제 사례 연구</a></li>
+</ol>
+
+<hr>
+
+<h2 id="introduction">1. 소개 및 개요</h2>
+
+<h3>WIA-SEC-009란 무엇인가?</h3>
+
+<p>WIA-SEC-009는 디지털 신원 관리 및 접근 제어 시스템을 위한 포괄적인 표준입니다. 전통적인 신원 및 접근 관리(IAM) 시스템과 새로운 분산 신원 기술 사이의 격차를 해소합니다.</p>
+
+<h3>주요 기능</h3>
+
+<ul>
+    <li><span class="badge">🆔 DID 지원</span> W3C 분산 신원 식별자</li>
+    <li><span class="badge">🎫 검증 가능한 자격증명</span> W3C VC 데이터 모델</li>
+    <li><span class="badge">🔐 IAM 통합</span> LDAP, Active Directory, Azure AD</li>
+    <li><span class="badge">🔄 SCIM 2.0</span> 자동화된 사용자 프로비저닝</li>
+    <li><span class="badge">🌐 SSO 및 연합</span> OAuth 2.0, OIDC, SAML 2.0</li>
+    <li><span class="badge">🛡️ 자기주권 신원</span> 사용자 통제 자격증명</li>
+    <li><span class="badge">📱 다중 인증</span> 향상된 보안</li>
+    <li><span class="badge">🔒 프라이버시 보호</span> 영지식 증명</li>
+</ul>
+
+<h3>신원 관리가 중요한 이유</h3>
+
+<p>오늘날의 상호 연결된 디지털 세상에서 신원은 보안, 프라이버시, 신뢰의 기반입니다. 조직은 다음을 수행하는 강력한 신원 관리 시스템이 필요합니다:</p>
+
+<ul>
+    <li>높은 신뢰도로 사용자 신원 확인</li>
+    <li>리소스 및 데이터에 대한 접근 제어</li>
+    <li>시스템 간 원활한 사용자 경험 제공</li>
+    <li>사용자 프라이버시 보호 및 규정 준수 (GDPR, CCPA)</li>
+    <li>신원 사기 및 무단 접근 방지</li>
+</ul>
+
+<hr>
+
+<h2 id="did-fundamentals">2. 분산 신원 식별자 (DID)</h2>
+
+<h3>DID란 무엇인가?</h3>
+
+<p>분산 신원 식별자(DID)는 검증 가능하고 분산된 디지털 신원을 가능하게 하는 전역적으로 고유한 식별자입니다. 전통적인 식별자(이메일, 사용자명)와 달리 DID는:</p>
+
+<ul>
+    <li><strong>자기주권적</strong>: 사용자가 자신의 식별자를 통제</li>
+    <li><strong>분산</strong>: 중앙 기관 불필요</li>
+    <li><strong>지속성</strong>: 시스템과 시간에 걸쳐 유효</li>
+    <li><strong>해석 가능</strong>: 관련 정보를 조회 가능</li>
+    <li><strong>암호학적으로 검증 가능</strong>: 공개 키 암호화 기반</li>
+</ul>
+
+<h3>DID 구문</h3>
+
+<p>DID는 다음 형식을 따릅니다:</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto;">
+did:&lt;method&gt;:&lt;method-specific-identifier&gt;
+
+예시:
+did:web:example.com:users:alice
+did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK
+did:ethr:0x3b0BC51Ab9De1e5B7B6E34E5b960285805C41736
+did:ion:EiClkZMDxPKqC9c-umQfTkR8vvZ9JPhl_xLDI9Nfk38w5w
+</pre>
+
+<h3>일반적인 DID 방식</h3>
+
+<table>
+    <tr>
+        <th>방식</th>
+        <th>설명</th>
+        <th>사용 사례</th>
+    </tr>
+    <tr>
+        <td><strong>did:web</strong></td>
+        <td>웹 도메인 기반</td>
+        <td>기존 웹 인프라에 쉽게 적용</td>
+    </tr>
+    <tr>
+        <td><strong>did:key</strong></td>
+        <td>암호화 키 기반</td>
+        <td>간단하고 상태 없는 오프라인 우선</td>
+    </tr>
+    <tr>
+        <td><strong>did:ethr</strong></td>
+        <td>이더리움 블록체인</td>
+        <td>스마트 컨트랙트 통합</td>
+    </tr>
+    <tr>
+        <td><strong>did:ion</strong></td>
+        <td>비트코인 + IPFS (Sidetree)</td>
+        <td>확장 가능하고 분산</td>
+    </tr>
+</table>
+
+<h3>DID 문서</h3>
+
+<p>DID 문서에는 다음이 포함됩니다:</p>
+
+<ul>
+    <li><strong>검증 방법</strong>: 인증을 위한 공개 키</li>
+    <li><strong>인증</strong>: 통제를 증명하는 방법</li>
+    <li><strong>서비스 엔드포인트</strong>: 신원과 상호작용하는 위치</li>
+    <li><strong>키 합의</strong>: 암호화를 위한 키</li>
+</ul>
+
+<hr>
+
+<h2 id="verifiable-credentials">3. 검증 가능한 자격증명</h2>
+
+<h3>검증 가능한 자격증명 이해하기</h3>
+
+<p>검증 가능한 자격증명(VC)은 암호학적으로 안전하고 프라이버시를 존중하는 디지털 자격증명입니다. 다음을 가능하게 합니다:</p>
+
+<ul>
+    <li><strong>발급자</strong>: 자격증명을 발급하는 조직 (대학, 정부, 고용주)</li>
+    <li><strong>보유자</strong>: 자격증명을 받고 통제하는 개인</li>
+    <li><strong>검증자</strong>: 자격증명을 검증하는 조직 (고용주, 서비스)</li>
+</ul>
+
+<h3>VC 데이터 모델</h3>
+
+<p>검증 가능한 자격증명에는 다음이 포함됩니다:</p>
+
+<ol>
+    <li><strong>메타데이터</strong>: 유형, 발급자, 발급 날짜, 만료</li>
+    <li><strong>클레임</strong>: 자격증명 주체에 대한 진술</li>
+    <li><strong>증명</strong>: 암호화 서명</li>
+</ol>
+
+<h3>검증 가능한 자격증명의 이점</h3>
+
+<ul>
+    <li>✅ <strong>변조 방지</strong>: 암호화 증명으로 변경 감지</li>
+    <li>✅ <strong>프라이버시 보호</strong>: 선택적 공개, 영지식 증명</li>
+    <li>✅ <strong>이식성</strong>: 시스템 및 조직 간 작동</li>
+    <li>✅ <strong>기계 검증 가능</strong>: 사람의 개입 없는 자동 검증</li>
+    <li>✅ <strong>폐기 가능</strong>: 필요시 발급자가 폐기 가능</li>
+</ul>
+
+<hr>
+
+<h2 id="iam-systems">4. IAM 시스템 통합</h2>
+
+<h3>LDAP 통합</h3>
+
+<p>경량 디렉토리 접근 프로토콜(LDAP)은 중앙 집중식 신원 관리에 널리 사용됩니다. WIA-SEC-009는 다음을 제공합니다:</p>
+
+<ul>
+    <li>DID 및 VC를 위한 표준 LDAP 스키마 확장</li>
+    <li>상호 운용성을 위한 속성 매핑</li>
+    <li>인증 위임</li>
+    <li>사용자 동기화 프로토콜</li>
+</ul>
+
+<h3>Active Directory 통합</h3>
+
+<p>Microsoft Active Directory(AD) 통합에는 다음이 포함됩니다:</p>
+
+<ul>
+    <li>사용자 정의 AD 스키마 속성</li>
+    <li>Azure AD 커넥터</li>
+    <li>그룹 기반 접근 제어 매핑</li>
+    <li>하이브리드 신원 시나리오</li>
+</ul>
+
+<h3>현대 IAM 플랫폼</h3>
+
+<p>클라우드 IAM 플랫폼과의 통합:</p>
+
+<ul>
+    <li><strong>Okta</strong>: 사용자 프로비저닝, SSO, API 통합</li>
+    <li><strong>Auth0</strong>: 소셜 로그인, MFA, 사용자 정의 규칙</li>
+    <li><strong>Azure AD</strong>: Microsoft Graph API, 조건부 접근</li>
+    <li><strong>Google Workspace</strong>: 디렉토리 API, OAuth 2.0</li>
+</ul>
+
+<hr>
+
+<h2 id="authentication">5. 인증 프로토콜</h2>
+
+<h3>DID 인증 (DID-Auth)</h3>
+
+<p>DID 및 암호화 증명을 사용한 인증:</p>
+
+<ol>
+    <li>서비스가 인증 챌린지 전송</li>
+    <li>사용자가 개인 키로 챌린지 서명</li>
+    <li>서비스가 DID 문서를 사용하여 서명 검증</li>
+    <li>검증 성공 시 접근 허용</li>
+</ol>
+
+<h3>OAuth 2.0 및 OpenID Connect</h3>
+
+<p>현대적인 인증 흐름:</p>
+
+<ul>
+    <li><strong>인증 코드 흐름</strong>: 웹 애플리케이션</li>
+    <li><strong>PKCE</strong>: 모바일 및 SPA 보안</li>
+    <li><strong>클라이언트 자격증명</strong>: 서비스 간</li>
+    <li><strong>장치 코드</strong>: 입력 제한 장치</li>
+</ul>
+
+<h3>다중 인증</h3>
+
+<p>지원되는 MFA 방법:</p>
+
+<ul>
+    <li>📱 <strong>TOTP</strong>: 시간 기반 일회용 비밀번호 (Google Authenticator, Authy)</li>
+    <li>📧 <strong>이메일 OTP</strong>: 이메일을 통한 일회용 코드</li>
+    <li>💬 <strong>SMS OTP</strong>: 문자 메시지 코드</li>
+    <li>🔐 <strong>WebAuthn</strong>: 생체인식, 보안 키 (FIDO2)</li>
+    <li>📲 <strong>푸시 알림</strong>: 모바일 앱 승인</li>
+</ul>
+
+<hr>
+
+<h2 id="provisioning">6. SCIM을 이용한 사용자 프로비저닝</h2>
+
+<h3>SCIM이란 무엇인가?</h3>
+
+<p>도메인 간 신원 관리 시스템(SCIM) 2.0은 자동화된 사용자 수명주기 관리를 가능하게 합니다:</p>
+
+<ul>
+    <li><strong>프로비저닝</strong>: 자동으로 사용자 생성</li>
+    <li><strong>프로비저닝 해제</strong>: 사용자 퇴사 시 접근 제거</li>
+    <li><strong>동기화</strong>: 시스템 간 속성 동기화 유지</li>
+    <li><strong>그룹 관리</strong>: 그룹 멤버십 관리</li>
+</ul>
+
+<h3>SCIM 작업</h3>
+
+<table>
+    <tr>
+        <th>작업</th>
+        <th>HTTP 메서드</th>
+        <th>설명</th>
+    </tr>
+    <tr>
+        <td>사용자 생성</td>
+        <td>POST</td>
+        <td>새 사용자 계정 프로비저닝</td>
+    </tr>
+    <tr>
+        <td>사용자 조회</td>
+        <td>GET</td>
+        <td>사용자 세부 정보 검색</td>
+    </tr>
+    <tr>
+        <td>사용자 업데이트</td>
+        <td>PUT / PATCH</td>
+        <td>사용자 속성 수정</td>
+    </tr>
+    <tr>
+        <td>사용자 삭제</td>
+        <td>DELETE</td>
+        <td>사용자 계정 제거</td>
+    </tr>
+    <tr>
+        <td>사용자 검색</td>
+        <td>필터가 있는 GET</td>
+        <td>속성별로 사용자 쿼리</td>
+    </tr>
+</table>
+
+<hr>
+
+<h2 id="federation">7. 신원 연합 및 SSO</h2>
+
+<h3>싱글 사인온 (SSO)</h3>
+
+<p>SSO는 사용자가 한 번 인증하여 여러 애플리케이션에 접근할 수 있게 합니다:</p>
+
+<ul>
+    <li>향상된 사용자 경험</li>
+    <li>비밀번호 피로 감소</li>
+    <li>중앙 집중식 접근 제어</li>
+    <li>간소화된 감사 및 규정 준수</li>
+</ul>
+
+<h3>연합 프로토콜</h3>
+
+<ul>
+    <li><strong>SAML 2.0</strong>: 기업 SSO 표준</li>
+    <li><strong>OpenID Connect</strong>: 현대적이고 API 친화적</li>
+    <li><strong>OAuth 2.0</strong>: 위임된 권한 부여</li>
+</ul>
+
+<h3>신뢰 모델</h3>
+
+<p>연합은 신원 제공자(IdP)와 서비스 제공자(SP) 간의 신뢰가 필요합니다:</p>
+
+<ul>
+    <li><strong>직접 신뢰</strong>: 양자 계약</li>
+    <li><strong>연합 허브</strong>: 중앙 신뢰 브로커</li>
+    <li><strong>신뢰 웹</strong>: 분산 신뢰 (DID 기반)</li>
+</ul>
+
+<hr>
+
+<h2 id="implementation">8. 구현 가이드</h2>
+
+<h3>시작하기</h3>
+
+<ol>
+    <li><strong>요구사항 평가</strong>: 신원 요구사항, 규정 준수 요구사항 식별</li>
+    <li><strong>아키텍처 선택</strong>: 중앙 집중식, 연합 또는 하이브리드</li>
+    <li><strong>기술 선택</strong>: DID 방식, 자격증명 형식, IAM 플랫폼</li>
+    <li><strong>워크플로 설계</strong>: 등록, 인증, 프로비저닝</li>
+    <li><strong>보안 구현</strong>: MFA, 암호화, 키 관리</li>
+    <li><strong>테스트 및 검증</strong>: 보안 테스트, 사용자 수용 테스트</li>
+    <li><strong>배포 및 모니터링</strong>: 점진적 롤아웃, 감사 로깅</li>
+</ol>
+
+<h3>참조 구현</h3>
+
+<p>WIA는 여러 언어로 참조 구현을 제공합니다:</p>
+
+<ul>
+    <li>TypeScript/Node.js</li>
+    <li>Python</li>
+    <li>Java/Spring Boot</li>
+    <li>.NET/C#</li>
+    <li>Go</li>
+</ul>
+
+<hr>
+
+<h2 id="best-practices">9. 보안 모범 사례</h2>
+
+<ul>
+    <li>🔐 <strong>강력한 암호화 사용</strong>: Ed25519, ECDSA (P-256), RSA (2048+ 비트)</li>
+    <li>🔑 <strong>안전한 키 저장</strong>: 하드웨어 보안 모듈 (HSM), 키 볼트</li>
+    <li>🛡️ <strong>MFA 구현</strong>: 민감한 작업에 다중 인증 필수</li>
+    <li>📊 <strong>모든 것을 감사</strong>: 신원 이벤트의 포괄적 로깅</li>
+    <li>⏰ <strong>자격증명 회전</strong>: 정기적인 키 회전, 자격증명 만료</li>
+    <li>🔒 <strong>최소 권한 원칙</strong>: 필요한 최소 권한만 부여</li>
+    <li>🚫 <strong>제로 트러스트</strong>: 절대 신뢰하지 말고 항상 검증</li>
+    <li>📜 <strong>설계로 프라이버시</strong>: 데이터 최소화, 선택적 공개</li>
+</ul>
+
+<hr>
+
+<h2 id="case-studies">10. 실제 사례 연구</h2>
+
+<h3>사례 연구 1: 글로벌 기업 SSO</h3>
+
+<p><strong>도전 과제</strong>: 여러 대륙에 걸쳐 50,000명의 직원을 보유한 대기업이 통합 신원 관리가 필요했습니다.</p>
+
+<p><strong>솔루션</strong>: Azure AD 통합, SAML SSO, SCIM 프로비저닝을 갖춘 WIA-SEC-009 구현.</p>
+
+<p><strong>결과</strong>:</p>
+<ul>
+    <li>✅ 비밀번호 재설정 티켓 90% 감소</li>
+    <li>✅ 자동화된 프로비저닝으로 온보딩 시간이 2일에서 2시간으로 단축</li>
+    <li>✅ 필수 MFA로 향상된 보안</li>
+</ul>
+
+<h3>사례 연구 2: 의료 자격증명 검증</h3>
+
+<p><strong>도전 과제</strong>: 의료 네트워크가 병원 전체에서 의료 면허 및 자격증을 검증해야 했습니다.</p>
+
+<p><strong>솔루션</strong>: 의료 면허를 위한 검증 가능한 자격증명 구현, 주 면허 위원회와 통합.</p>
+
+<p><strong>결과</strong>:</p>
+<ul>
+    <li>✅ 즉시 면허 검증 (이전에는 2-3일)</li>
+    <li>✅ 실시간 폐기 알림</li>
+    <li>✅ 자격증명 사기 감소</li>
+</ul>
+
+<hr>
+
+<h2>추가 자료</h2>
+
+<ul>
+    <li>📄 <a href="../../spec/PHASE-1-FOUNDATION.md" target="_blank">전체 기술 명세</a></li>
+    <li>🎮 <a href="../../simulator/index.html">인터랙티브 시뮬레이터</a></li>
+    <li>💻 <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub 저장소</a></li>
+    <li>🌐 <a href="https://wiastandards.com" target="_blank">WIA 표준 웹사이트</a></li>
+</ul>
+
+<hr>
+
+<h2>문서 정보</h2>
+
+<table>
+    <tr><td><strong>표준</strong></td><td>WIA-SEC-009 신원 관리 v1.0.0</td></tr>
+    <tr><td><strong>문서</strong></td><td>구현 전자책 (한글)</td></tr>
+    <tr><td><strong>상태</strong></td><td>활성</td></tr>
+    <tr><td><strong>날짜</strong></td><td>2025-12-25</td></tr>
+    <tr><td><strong>철학</strong></td><td>弘益人間 (홍익인간) - 널리 인간을 이롭게 하라</td></tr>
+</table>
+
+<hr>
+
+<p style="text-align: center; color: #ffd700; font-size: 1.2em;">
+弘益人間 · 널리 인간을 이롭게 하라
+</p>
+
+<p style="text-align: center; color: #94a3b8;">
+© 2025 WIA (World Certification Industry Association)<br>
+MIT 라이선스 하에 배포
+</p>
+</body>
+</html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>제4장: Phase 1 - 햅틱 프리미티브 - WIA Haptic 표준</title>
+    <style>
+        :root { --primary: #8B5CF6; --primary-dark: #7C3AED; --secondary: #10b981; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 40px 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: var(--primary); margin-bottom: 30px; font-size: 2.2rem; border-bottom: 3px solid var(--primary); padding-bottom: 15px; }
+        h2 { color: var(--primary); margin: 40px 0 20px; }
+        h3 { color: var(--secondary); margin: 30px 0 15px; }
+        p { margin: 15px 0; color: var(--text-muted); }
+        a { color: var(--primary); text-decoration: none; }
+        blockquote { border-left: 4px solid #ffd700; padding: 20px; margin: 30px 0; background: var(--bg-card); border-radius: 0 8px 8px 0; }
+        blockquote p { color: var(--text); margin: 5px 0; }
+        pre { background: var(--bg-card); padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid var(--border); font-size: 0.8rem; }
+        code { font-family: 'Monaco', monospace; font-size: 0.85rem; color: var(--secondary); }
+        pre code { color: var(--text); }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--bg-card); color: var(--primary); }
+        td { color: var(--text-muted); }
+        ul, ol { margin: 15px 0; padding-left: 30px; color: var(--text-muted); }
+        li { margin: 8px 0; }
+        hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 30px; flex-wrap: wrap; gap: 10px; }
+        .nav a { color: var(--text-muted); padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; }
+        .chapter-nav { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 1px solid var(--border); }
+        .footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--border); }
+        .footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        .info-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤚 제4장: Phase 1 - 햅틱 프리미티브</h1>
+
+        <blockquote>
+            <p>이 장에서는 WIA Haptic 표준의 기본 빌딩 블록인 파형, ADSR 엔벨로프, 주파수 대역 및 강도 레벨을 정의합니다.</p>
+        </blockquote>
+
+        <hr>
+
+        <h2>4.1 파형 유형</h2>
+
+        <h3>4.1.1 기본 파형</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>파형</th>
+                    <th>설명</th>
+                    <th>촉각 인식</th>
+                    <th>용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>sine</code></td>
+                    <td>부드러운 연속 진동</td>
+                    <td>온화하고 유동적인 느낌</td>
+                    <td>배경 피드백, 거리 표시</td>
+                </tr>
+                <tr>
+                    <td><code>square</code></td>
+                    <td>급격한 온/오프 전환</td>
+                    <td>선명하고 확실한 펄스</td>
+                    <td>확인, 알림</td>
+                </tr>
+                <tr>
+                    <td><code>triangle</code></td>
+                    <td>선형 상승 및 하강</td>
+                    <td>중간 선명도</td>
+                    <td>방향 신호</td>
+                </tr>
+                <tr>
+                    <td><code>sawtooth</code></td>
+                    <td>점진적 상승, 급격한 하강</td>
+                    <td>래칫 느낌</td>
+                    <td>진행 표시</td>
+                </tr>
+                <tr>
+                    <td><code>noise</code></td>
+                    <td>랜덤 변화</td>
+                    <td>거칠고 질감 있는 느낌</td>
+                    <td>경고, 장애물</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.1.2 파형 설정 스키마</h3>
+
+        <pre><code>interface WaveformConfig {
+  // 파형 유형
+  type: 'sine' | 'square' | 'triangle' | 'sawtooth' | 'noise';
+
+  // 사각파의 듀티 사이클 (0.0-1.0)
+  dutyCycle?: number;
+
+  // 전환 스무딩 계수 (0.0-1.0)
+  smoothing?: number;
+
+  // 노이즈 특성
+  noiseType?: 'white' | 'pink' | 'brown';
+}</code></pre>
+
+        <hr>
+
+        <h2>4.2 ADSR 엔벨로프</h2>
+
+        <p>Attack-Decay-Sustain-Release (ADSR) 엔벨로프는 시간에 따른 햅틱 신호의 진폭을 형성합니다.</p>
+
+        <h3>4.2.1 엔벨로프 시각화</h3>
+
+        <pre>
+강도
+   ^
+1.0|     /\
+   |    /  \____
+0.7|   /        \____
+   |  /              \
+0.0|_/________________\___> 시간
+   |A | D |  S   | R  |
+
+   A = Attack   (피크까지 시간)
+   D = Decay    (서스테인 레벨까지 시간)
+   S = Sustain  (유지 강도 레벨)
+   R = Release  (페이드아웃 시간)
+        </pre>
+
+        <h3>4.2.2 프리셋 엔벨로프</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>프리셋</th>
+                    <th>Attack</th>
+                    <th>Decay</th>
+                    <th>Sustain</th>
+                    <th>Release</th>
+                    <th>특성</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>sharp</code></td>
+                    <td>5ms</td>
+                    <td>20ms</td>
+                    <td>0.0</td>
+                    <td>30ms</td>
+                    <td>빠른 탭</td>
+                </tr>
+                <tr>
+                    <td><code>punch</code></td>
+                    <td>10ms</td>
+                    <td>50ms</td>
+                    <td>0.3</td>
+                    <td>50ms</td>
+                    <td>임팩트 느낌</td>
+                </tr>
+                <tr>
+                    <td><code>smooth</code></td>
+                    <td>100ms</td>
+                    <td>100ms</td>
+                    <td>0.7</td>
+                    <td>150ms</td>
+                    <td>부드러운 파동</td>
+                </tr>
+                <tr>
+                    <td><code>pulse</code></td>
+                    <td>5ms</td>
+                    <td>0ms</td>
+                    <td>1.0</td>
+                    <td>5ms</td>
+                    <td>온/오프</td>
+                </tr>
+                <tr>
+                    <td><code>swell</code></td>
+                    <td>200ms</td>
+                    <td>50ms</td>
+                    <td>0.8</td>
+                    <td>200ms</td>
+                    <td>증가하는 강도</td>
+                </tr>
+                <tr>
+                    <td><code>fade</code></td>
+                    <td>50ms</td>
+                    <td>200ms</td>
+                    <td>0.5</td>
+                    <td>300ms</td>
+                    <td>점진적 감쇠</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h2>4.3 주파수 사양</h2>
+
+        <h3>4.3.1 인간 촉각 인식 범위</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>수용기 유형</th>
+                    <th>주파수 범위</th>
+                    <th>위치</th>
+                    <th>민감도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>마이스너 소체</td>
+                    <td>10-50 Hz</td>
+                    <td>손가락 끝, 손바닥</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td>파치니 소체</td>
+                    <td>40-400 Hz</td>
+                    <td>심부 조직</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>머켈 원반</td>
+                    <td>0.4-3 Hz</td>
+                    <td>표피</td>
+                    <td>저주파</td>
+                </tr>
+                <tr>
+                    <td>루피니 종말</td>
+                    <td>0.4-3 Hz</td>
+                    <td>진피</td>
+                    <td>신장</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.3.2 의미론적 주파수 매핑</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>의미</th>
+                    <th>주파수 대역</th>
+                    <th>근거</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>안전/명확</td>
+                    <td>낮음 (30-80 Hz)</td>
+                    <td>차분하고 안심되는</td>
+                </tr>
+                <tr>
+                    <td>정보</td>
+                    <td>중간 (80-150 Hz)</td>
+                    <td>중립적이고 명확한</td>
+                </tr>
+                <tr>
+                    <td>주의</td>
+                    <td>높음 (150-250 Hz)</td>
+                    <td>주의 환기</td>
+                </tr>
+                <tr>
+                    <td>위험/긴급</td>
+                    <td>매우 높음 (250-300 Hz)</td>
+                    <td>경보</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h2>4.4 강도 사양</h2>
+
+        <h3>4.4.1 표준 강도 프리셋</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>레벨</th>
+                    <th>값</th>
+                    <th>설명</th>
+                    <th>용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>subtle</code></td>
+                    <td>0.2</td>
+                    <td>간신히 인식 가능</td>
+                    <td>배경, 주변</td>
+                </tr>
+                <tr>
+                    <td><code>light</code></td>
+                    <td>0.4</td>
+                    <td>부드러운 피드백</td>
+                    <td>확인</td>
+                </tr>
+                <tr>
+                    <td><code>medium</code></td>
+                    <td>0.6</td>
+                    <td>표준 피드백</td>
+                    <td>탐색</td>
+                </tr>
+                <tr>
+                    <td><code>strong</code></td>
+                    <td>0.8</td>
+                    <td>확실한 피드백</td>
+                    <td>알림</td>
+                </tr>
+                <tr>
+                    <td><code>maximum</code></td>
+                    <td>1.0</td>
+                    <td>최대 강도</td>
+                    <td>비상</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h2>4.5 완전한 프리미티브 정의</h2>
+
+        <pre><code>interface HapticPrimitive {
+  // 고유 식별자
+  id: string;
+
+  // 사람이 읽을 수 있는 이름
+  name: string;
+
+  // 기본 파형 설정
+  waveform: WaveformConfig;
+
+  // 진폭 엔벨로프
+  envelope: HapticEnvelope;
+
+  // Hz 단위 진동 주파수 (1-300)
+  frequency: number;
+
+  // 기본 강도 (0.0-1.0)
+  intensity: number;
+
+  // 밀리초 단위 지속 시간
+  duration: number;
+
+  // 선택적 메타데이터
+  metadata?: {
+    category?: HapticCategory;
+    description?: string;
+    learnability?: 'easy' | 'moderate' | 'complex';
+  };
+}</code></pre>
+
+        <hr>
+
+        <h2>4.6 장 요약</h2>
+
+        <div class="info-box">
+            <p><strong>핵심 내용:</strong></p>
+            <ol style="color: var(--text);">
+                <li><strong>파형:</strong> 5가지 유형 (사인, 사각, 삼각, 톱니, 노이즈)</li>
+                <li><strong>ADSR 엔벨로프:</strong> Attack, Decay, Sustain, Release가 시간에 따른 진폭 형성</li>
+                <li><strong>주파수 대역:</strong> 의미론적 의미를 가진 1-300 Hz의 5개 대역</li>
+                <li><strong>강도 레벨:</strong> subtle (0.2)에서 maximum (1.0)까지 5개 프리셋</li>
+                <li><strong>프리미티브:</strong> 모든 매개변수를 결합한 완전한 빌딩 블록</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

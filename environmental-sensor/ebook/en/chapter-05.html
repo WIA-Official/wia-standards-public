@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 05: Phase 2 - API Interface - WIA Environmental Sensor</title>
+    <style>
+        :root {--primary: #8B5CF6;--primary-dark: #7C3AED;--bg: #0f172a;--bg-card: #1e293b;--text: #f8fafc;--text-muted: #94a3b8;--border: #334155;}
+        * {margin:0;padding:0;box-sizing:border-box;}
+        body {font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px;}
+        .container {max-width:900px;margin:0 auto;}
+        header {margin-bottom:40px;padding-bottom:20px;border-bottom:2px solid var(--border);}
+        .chapter-num {color:var(--primary);font-size:1rem;font-weight:600;margin-bottom:10px;}
+        h1 {font-size:2.5rem;margin-bottom:20px;color:var(--text);}
+        h2 {font-size:1.8rem;margin-top:40px;margin-bottom:20px;color:var(--primary);}
+        h3 {font-size:1.4rem;margin-top:30px;margin-bottom:15px;color:var(--text);}
+        p {margin-bottom:20px;color:var(--text-muted);}
+        ul,ol {margin-bottom:20px;margin-left:30px;color:var(--text-muted);}
+        li {margin-bottom:10px;}
+        table {width:100%;border-collapse:collapse;margin:30px 0;background:var(--bg-card);border-radius:8px;overflow:hidden;}
+        th,td {padding:15px;text-align:left;border-bottom:1px solid var(--border);}
+        th {background:var(--bg);color:var(--primary);font-weight:600;}
+        tr:hover {background:var(--bg);}
+        .callout {background:var(--bg-card);border-left:4px solid var(--primary);padding:20px;margin:30px 0;border-radius:4px;}
+        .callout-title {color:var(--primary);font-weight:600;margin-bottom:10px;}
+        .summary {background:var(--bg-card);border:2px solid var(--primary);border-radius:12px;padding:30px;margin:40px 0;}
+        .summary h2 {margin-top:0;}
+        .key-takeaways {list-style:none;margin-left:0;}
+        .key-takeaways li {padding-left:30px;position:relative;}
+        .key-takeaways li:before {content:"✓";position:absolute;left:0;color:var(--primary);font-weight:bold;}
+        .review-questions {background:var(--bg-card);border-radius:12px;padding:30px;margin:40px 0;}
+        .code-block {background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;font-family:'Courier New',monospace;overflow-x:auto;font-size:0.9rem;}
+        .nav-buttons {display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border);}
+        .btn {background:var(--primary);color:white;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.3s;}
+        .btn:hover {background:var(--primary-dark);transform:translateY(-2px);}
+        .btn-secondary {background:var(--bg-card);border:2px solid var(--border);}
+        .btn-secondary:hover {border-color:var(--primary);}
+        @media (max-width:768px) {body {padding:20px 15px;}h1 {font-size:2rem;}h2 {font-size:1.5rem;}table {font-size:0.9rem;}th,td {padding:10px;}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-num">CHAPTER 05</div>
+            <h1>Phase 2 - API Interface</h1>
+        </header>
+
+        <main>
+            <h2>5.1 Introduction to WIA API Standards</h2>
+            <p>Phase 2 of the WIA Environmental Sensor Standard defines standardized Application Programming Interfaces (APIs) for accessing environmental sensor data and controlling sensor devices. While Phase 1 standardizes data format, Phase 2 standardizes how applications discover sensors, retrieve data, configure devices, and receive real-time updates. This API standardization transforms interoperability from a data-level concept to an operational reality.</p>
+
+            <p>The WIA API standard adopts RESTful (Representational State Transfer) design principles, leveraging HTTP as the underlying protocol. REST was chosen because it is universally supported, scales well from small to massive deployments, is cacheable for performance, and has extensive tooling and developer familiarity. The API standard also specifies real-time streaming interfaces using WebSockets and Server-Sent Events for applications requiring immediate data delivery.</p>
+
+            <p>A key design goal is consistency—applications interacting with one WIA-compliant API can immediately work with others. URL structures, query parameters, request/response formats, error handling, and authentication mechanisms are all standardized. This consistency dramatically reduces integration effort and enables developers to build applications that work with diverse environmental sensor platforms without custom per-platform code.</p>
+
+            <h2>5.2 API Architecture and Principles</h2>
+            <p>The WIA API architecture follows several core principles that guide all aspects of the specification.</p>
+
+            <h3>Resource-Oriented Design</h3>
+            <p>The API is resource-oriented, treating sensors, sensor data, locations, and other entities as resources accessible via URLs. Each resource has a canonical URL structure. For example, a specific sensor might be accessed at /api/v1/sensors/{sensorId}, while that sensor's data is accessed at /api/v1/sensors/{sensorId}/data. This intuitive, hierarchical structure makes APIs self-documenting and easy to learn.</p>
+
+            <h3>Standard HTTP Methods</h3>
+            <p>The API uses standard HTTP methods semantically: GET for retrieving resources (sensors, data), POST for creating resources (registering sensors, submitting commands), PUT for updating resources (sensor configuration), DELETE for removing resources (deregistering sensors). This alignment with HTTP semantics leverages existing infrastructure and developer knowledge.</p>
+
+            <h3>Stateless Operations</h3>
+            <p>API operations are stateless—each request contains all information needed to process it. Servers don't maintain session state between requests. This statelessness enables horizontal scaling, simplifies server implementation, and improves reliability through idempotent operations that can be safely retried.</p>
+
+            <h3>Content Negotiation</h3>
+            <p>The API supports content negotiation through standard HTTP headers. Clients specify desired response formats using Accept headers (application/json, application/xml, application/cbor). Servers indicate response format using Content-Type headers. This flexibility accommodates different client capabilities and preferences while maintaining a single API endpoint.</p>
+
+            <h3>Versioning</h3>
+            <p>API versioning is explicit in the URL path (/api/v1/, /api/v2/). This approach makes versioning transparent and allows multiple API versions to coexist during migration periods. Major version changes indicate breaking changes, while minor and patch versions maintain backward compatibility.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Principle</th>
+                        <th>Implementation</th>
+                        <th>Benefits</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Resource-Oriented</td>
+                        <td>URL hierarchy, RESTful paths</td>
+                        <td>Intuitive navigation, self-documenting</td>
+                    </tr>
+                    <tr>
+                        <td>HTTP Methods</td>
+                        <td>GET/POST/PUT/DELETE semantics</td>
+                        <td>Leverages HTTP infrastructure, familiar to developers</td>
+                    </tr>
+                    <tr>
+                        <td>Stateless</td>
+                        <td>Complete requests, no server session</td>
+                        <td>Scalability, reliability, simplicity</td>
+                    </tr>
+                    <tr>
+                        <td>Content Negotiation</td>
+                        <td>Accept/Content-Type headers</td>
+                        <td>Format flexibility, single endpoint</td>
+                    </tr>
+                    <tr>
+                        <td>Versioning</td>
+                        <td>Path-based (/api/v1/)</td>
+                        <td>Transparent, migration-friendly</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.3 Core API Endpoints</h2>
+            <p>The WIA API defines a set of core endpoints that all compliant implementations must support. These endpoints enable essential operations for sensor discovery, data retrieval, and device management.</p>
+
+            <h3>Sensor Discovery and Registry</h3>
+            <p>Sensor discovery enables applications to find available sensors and understand their capabilities.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors
+  Returns list of all sensors accessible to the authenticated user
+  Query parameters:
+    - type: Filter by sensor type (air_quality, water_quality, etc.)
+    - location: Geographic bounding box (lat1,lon1,lat2,lon2)
+    - status: Filter by status (active, inactive, maintenance)
+    - limit: Maximum results to return (default 100, max 1000)
+    - offset: Pagination offset
+
+Response:
+{
+  "total": 1547,
+  "count": 100,
+  "offset": 0,
+  "sensors": [
+    {
+      "deviceId": "ENV-AIR-001",
+      "type": "air_quality",
+      "location": {"latitude": 37.5665, "longitude": 126.9780},
+      "status": "active",
+      "lastUpdate": "2024-12-26T10:30:00Z",
+      "capabilities": ["pm2_5", "pm10", "temperature", "humidity"]
+    },
+    // ... more sensors
+  ],
+  "links": {
+    "next": "/api/v1/sensors?offset=100",
+    "self": "/api/v1/sensors"
+  }
+}
+            </div>
+
+            <h3>Individual Sensor Details</h3>
+            <p>Retrieving detailed information about a specific sensor.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors/{sensorId}
+
+Response:
+{
+  "deviceId": "ENV-AIR-001",
+  "type": "air_quality",
+  "manufacturer": "AirSense Corp",
+  "model": "AS-3000",
+  "firmware": "v2.4.1",
+  "location": {
+    "latitude": 37.5665,
+    "longitude": 126.9780,
+    "altitude": 38.5,
+    "address": "Seoul, South Korea"
+  },
+  "status": "active",
+  "lastCalibration": "2024-11-15T09:00:00Z",
+  "nextCalibration": "2025-02-15T09:00:00Z",
+  "capabilities": {
+    "pm2_5": {"range": [0, 500], "unit": "μg/m³", "accuracy": 2.0},
+    "pm10": {"range": [0, 500], "unit": "μg/m³", "accuracy": 3.0},
+    "temperature": {"range": [-40, 85], "unit": "°C", "accuracy": 0.3},
+    "humidity": {"range": [0, 100], "unit": "%RH", "accuracy": 2.0}
+  },
+  "metadata": {
+    "owner": "Seoul Metropolitan Government",
+    "installationDate": "2023-03-15",
+    "heightAboveGround": 3.5
+  }
+}
+            </div>
+
+            <h2>5.4 Data Retrieval Endpoints</h2>
+            <p>Data retrieval endpoints provide flexible querying of historical and recent sensor measurements.</p>
+
+            <h3>Latest Data</h3>
+            <p>Retrieve the most recent measurement from a sensor.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors/{sensorId}/data/latest
+
+Response:
+{
+  "version": "1.0.0",
+  "standard": "WIA-ENE-027",
+  "deviceId": "ENV-AIR-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "sensorType": "air_quality",
+  "readings": {
+    "pm2_5": {"value": 15.3, "unit": "μg/m³"},
+    "pm10": {"value": 22.7, "unit": "μg/m³"},
+    "temperature": {"value": 23.5, "unit": "°C"},
+    "humidity": {"value": 65, "unit": "%RH"}
+  },
+  "quality": {"overall": "good", "flags": []},
+  "location": {
+    "latitude": 37.5665,
+    "longitude": 126.9780
+  }
+}
+            </div>
+
+            <h3>Historical Data with Time Range Query</h3>
+            <p>Retrieve historical data for a specified time period with flexible aggregation options.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors/{sensorId}/data
+  Query parameters:
+    - start: ISO 8601 timestamp (e.g., 2024-12-25T00:00:00Z)
+    - end: ISO 8601 timestamp
+    - parameters: Comma-separated list (e.g., pm2_5,temperature)
+    - aggregation: none, hourly, daily, weekly, monthly
+    - format: json, csv, xml
+
+Response (with aggregation=hourly):
+{
+  "deviceId": "ENV-AIR-001",
+  "start": "2024-12-25T00:00:00Z",
+  "end": "2024-12-26T00:00:00Z",
+  "aggregation": "hourly",
+  "data": [
+    {
+      "timestamp": "2024-12-25T00:00:00Z",
+      "pm2_5": {
+        "mean": 12.5,
+        "min": 8.2,
+        "max": 18.3,
+        "stddev": 2.1,
+        "count": 60
+      },
+      "temperature": {
+        "mean": 22.1,
+        "min": 20.5,
+        "max": 23.8
+      }
+    },
+    // ... more hourly aggregates
+  ]
+}
+            </div>
+
+            <h3>Bulk Data Retrieval</h3>
+            <p>Retrieve data from multiple sensors simultaneously.</p>
+
+            <div class="code-block">
+POST /api/v1/data/bulk
+  Request body:
+{
+  "sensorIds": ["ENV-AIR-001", "ENV-AIR-002", "ENV-AIR-003"],
+  "start": "2024-12-26T00:00:00Z",
+  "end": "2024-12-26T12:00:00Z",
+  "parameters": ["pm2_5", "temperature"],
+  "aggregation": "hourly"
+}
+
+Response:
+{
+  "sensors": [
+    {
+      "deviceId": "ENV-AIR-001",
+      "data": [/* aggregated data */]
+    },
+    {
+      "deviceId": "ENV-AIR-002",
+      "data": [/* aggregated data */]
+    }
+  ]
+}
+            </div>
+
+            <h2>5.5 Real-Time Streaming Interfaces</h2>
+            <p>For applications requiring immediate data delivery, the WIA standard specifies real-time streaming interfaces using WebSockets and Server-Sent Events (SSE).</p>
+
+            <h3>WebSocket Streaming</h3>
+            <p>WebSocket connections provide full-duplex communication for real-time data streaming and device control.</p>
+
+            <div class="code-block">
+// WebSocket connection
+ws://api.example.com/v1/stream
+
+// Subscribe to sensor(s)
+{
+  "action": "subscribe",
+  "sensors": ["ENV-AIR-001", "ENV-AIR-002"],
+  "parameters": ["pm2_5", "temperature"]
+}
+
+// Server sends data as it arrives
+{
+  "type": "measurement",
+  "deviceId": "ENV-AIR-001",
+  "timestamp": "2024-12-26T10:30:00Z",
+  "readings": {
+    "pm2_5": {"value": 15.3, "unit": "μg/m³"}
+  }
+}
+
+// Heartbeat messages maintain connection
+{
+  "type": "ping",
+  "timestamp": "2024-12-26T10:35:00Z"
+}
+            </div>
+
+            <h3>Server-Sent Events (SSE)</h3>
+            <p>SSE provides one-way server-to-client streaming over HTTP, simpler than WebSockets for read-only scenarios.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors/ENV-AIR-001/stream
+  Accept: text/event-stream
+
+Response (streaming):
+event: measurement
+data: {"timestamp":"2024-12-26T10:30:00Z","pm2_5":15.3}
+
+event: measurement
+data: {"timestamp":"2024-12-26T10:31:00Z","pm2_5":15.5}
+
+event: heartbeat
+data: {"timestamp":"2024-12-26T10:35:00Z"}
+            </div>
+
+            <h2>5.6 Authentication and Authorization</h2>
+            <p>Security is fundamental to the WIA API standard. Multiple authentication mechanisms accommodate different security requirements and deployment scenarios.</p>
+
+            <h3>API Keys</h3>
+            <p>API keys provide simple authentication suitable for server-to-server communication and low-security applications.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors
+  Authorization: Bearer YOUR_API_KEY_HERE
+
+// Or via query parameter (less secure)
+GET /api/v1/sensors?api_key=YOUR_API_KEY_HERE
+            </div>
+
+            <h3>OAuth 2.0</h3>
+            <p>OAuth 2.0 enables secure delegated access, ideal for third-party applications accessing user data.</p>
+
+            <div class="code-block">
+// Authorization Code Flow
+1. Redirect user to authorization endpoint:
+   GET /oauth/authorize?client_id=...&response_type=code&redirect_uri=...
+
+2. Exchange authorization code for access token:
+   POST /oauth/token
+   {
+     "grant_type": "authorization_code",
+     "code": "AUTH_CODE",
+     "client_id": "CLIENT_ID",
+     "client_secret": "CLIENT_SECRET"
+   }
+
+3. Use access token:
+   GET /api/v1/sensors
+   Authorization: Bearer ACCESS_TOKEN
+            </div>
+
+            <h3>JWT (JSON Web Tokens)</h3>
+            <p>JWTs provide stateless authentication with embedded claims, reducing server-side session management.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+// JWT payload includes:
+{
+  "sub": "user@example.com",
+  "iss": "https://auth.wia.io",
+  "exp": 1704067200,
+  "permissions": ["sensors:read", "data:read"]
+}
+            </div>
+
+            <h3>Role-Based Access Control (RBAC)</h3>
+            <p>The API supports role-based permissions governing what operations users can perform.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Permissions</th>
+                        <th>Typical Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Public Viewer</td>
+                        <td>Read public sensor data</td>
+                        <td>Open data platforms, citizen access</td>
+                    </tr>
+                    <tr>
+                        <td>Data Consumer</td>
+                        <td>Read all sensor data, metadata</td>
+                        <td>Researchers, analysts</td>
+                    </tr>
+                    <tr>
+                        <td>Sensor Operator</td>
+                        <td>Read data, update sensor config, submit commands</td>
+                        <td>Field technicians, maintenance staff</td>
+                    </tr>
+                    <tr>
+                        <td>Administrator</td>
+                        <td>Full access including sensor registration, user management</td>
+                        <td>Platform administrators</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.7 Error Handling and Status Codes</h2>
+            <p>Consistent error handling enables robust applications. The WIA API uses standard HTTP status codes with detailed error messages.</p>
+
+            <h3>Standard HTTP Status Codes</h3>
+            <ul>
+                <li><strong>200 OK:</strong> Successful request</li>
+                <li><strong>201 Created:</strong> Resource successfully created</li>
+                <li><strong>204 No Content:</strong> Successful request with no response body</li>
+                <li><strong>400 Bad Request:</strong> Invalid request syntax or parameters</li>
+                <li><strong>401 Unauthorized:</strong> Authentication required or failed</li>
+                <li><strong>403 Forbidden:</strong> Authenticated but insufficient permissions</li>
+                <li><strong>404 Not Found:</strong> Requested resource doesn't exist</li>
+                <li><strong>429 Too Many Requests:</strong> Rate limit exceeded</li>
+                <li><strong>500 Internal Server Error:</strong> Server-side error</li>
+                <li><strong>503 Service Unavailable:</strong> Server temporarily unavailable</li>
+            </ul>
+
+            <h3>Error Response Format</h3>
+            <div class="code-block">
+{
+  "error": {
+    "code": "SENSOR_NOT_FOUND",
+    "message": "Sensor with ID 'ENV-AIR-999' not found",
+    "details": {
+      "requestedId": "ENV-AIR-999",
+      "suggestion": "Check sensor ID or permissions"
+    },
+    "timestamp": "2024-12-26T10:30:00Z",
+    "requestId": "req_abc123def456"
+  }
+}
+            </div>
+
+            <h2>5.8 Rate Limiting and Quotas</h2>
+            <p>To ensure fair resource usage and system stability, the API implements rate limiting.</p>
+
+            <div class="code-block">
+// Rate limit headers in response
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 987
+X-RateLimit-Reset: 1704067200
+
+// When rate limit exceeded (429 response)
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "API rate limit exceeded",
+    "retryAfter": 3600
+  }
+}
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Requests/Hour</th>
+                        <th>Burst Limit</th>
+                        <th>Typical User</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Free/Public</td>
+                        <td>1,000</td>
+                        <td>100/minute</td>
+                        <td>Developers, hobbyists</td>
+                    </tr>
+                    <tr>
+                        <td>Standard</td>
+                        <td>10,000</td>
+                        <td>500/minute</td>
+                        <td>Small organizations</td>
+                    </tr>
+                    <tr>
+                        <td>Professional</td>
+                        <td>100,000</td>
+                        <td>2,000/minute</td>
+                        <td>Large deployments</td>
+                    </tr>
+                    <tr>
+                        <td>Enterprise</td>
+                        <td>Unlimited</td>
+                        <td>Custom</td>
+                        <td>Mission-critical systems</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.9 Pagination and Performance</h2>
+            <p>Large datasets require efficient pagination to maintain performance and usability.</p>
+
+            <h3>Offset-Based Pagination</h3>
+            <div class="code-block">
+GET /api/v1/sensors?limit=100&offset=200
+
+Response:
+{
+  "total": 1547,
+  "count": 100,
+  "offset": 200,
+  "limit": 100,
+  "sensors": [/* ... */],
+  "links": {
+    "first": "/api/v1/sensors?limit=100&offset=0",
+    "prev": "/api/v1/sensors?limit=100&offset=100",
+    "self": "/api/v1/sensors?limit=100&offset=200",
+    "next": "/api/v1/sensors?limit=100&offset=300",
+    "last": "/api/v1/sensors?limit=100&offset=1500"
+  }
+}
+            </div>
+
+            <h3>Cursor-Based Pagination</h3>
+            <p>For real-time data streams, cursor-based pagination provides stable pagination even as data changes.</p>
+
+            <div class="code-block">
+GET /api/v1/sensors/ENV-AIR-001/data?limit=100
+
+Response:
+{
+  "data": [/* ... */],
+  "cursor": {
+    "next": "eyJpZCI6MTIzNDU2LCJ0aW1lIjoiMjAyNC0xMi0yNlQxMDozMDowMFoifQ==",
+    "hasMore": true
+  }
+}
+
+// Next page
+GET /api/v1/sensors/ENV-AIR-001/data?limit=100&cursor=eyJ...
+            </div>
+
+            <div class="callout">
+                <div class="callout-title">Best Practice: API Client Design</div>
+                <p>When building applications using WIA APIs, implement proper error handling and retry logic with exponential backoff, respect rate limits and use caching where appropriate, use streaming interfaces for real-time requirements rather than polling, implement timeout handling for network resilience, and log request IDs for troubleshooting. Well-designed API clients are robust to network issues and server-side problems.</p>
+            </div>
+
+            <div class="summary">
+                <h2>Chapter Summary</h2>
+                <p>Chapter 5 explored Phase 2 of the WIA standard—API Interface specification. We examined RESTful API design principles, core endpoints for sensor discovery and data retrieval, real-time streaming using WebSockets and SSE, authentication mechanisms, error handling, and performance optimization through pagination and rate limiting.</p>
+
+                <h3>Key Takeaways</h3>
+                <ul class="key-takeaways">
+                    <li>WIA APIs follow REST principles with resource-oriented design, standard HTTP methods, stateless operations, and explicit versioning, enabling consistent interaction across all compliant platforms.</li>
+                    <li>Core endpoints support sensor discovery (GET /sensors), detailed sensor information (GET /sensors/{id}), latest and historical data retrieval with flexible querying and aggregation options.</li>
+                    <li>Real-time streaming via WebSockets and Server-Sent Events provides immediate data delivery for time-critical applications, complementing request-response APIs for different use cases.</li>
+                    <li>Multiple authentication mechanisms (API keys, OAuth 2.0, JWT) and role-based access control support diverse security requirements from public data access to enterprise deployments.</li>
+                    <li>Standardized error handling, rate limiting, and pagination ensure robust, performant applications while protecting server resources and maintaining quality of service for all users.</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Explain the REST architectural principles underlying the WIA API standard. Why is a resource-oriented approach beneficial for environmental sensor APIs?</li>
+                    <li>Describe the difference between the /sensors/{id}/data/latest endpoint and the /sensors/{id}/data endpoint with time range parameters. When would you use each?</li>
+                    <li>Compare WebSocket and Server-Sent Events for real-time sensor data streaming. What are the advantages and trade-offs of each approach?</li>
+                    <li>Explain the OAuth 2.0 authorization code flow. Why is this more secure than simply using API keys for third-party applications?</li>
+                    <li>How do rate limiting and pagination work together to ensure API performance and fairness? What headers communicate rate limit status to clients?</li>
+                    <li>Describe the standard error response format. What information should be included to help clients handle errors appropriately?</li>
+                </ol>
+            </div>
+
+            <div class="callout">
+                <div class="callout-title">Looking Ahead</div>
+                <p>Chapter 6 examines Phase 3 of the WIA standard—Communication Protocols. We'll explore MQTT, CoAP, and LoRaWAN implementations for IoT sensor networks, message formats and topic structures, security considerations including encryption and authentication, and edge computing patterns for distributed intelligence.</p>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

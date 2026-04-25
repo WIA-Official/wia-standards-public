@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04: 애플리케이션 수준 방어 - WIA-DDOS_PROTECTION</title>
+    <style>:root{--primary:#ef4444;--primary-dark:#dc2626;--primary-light:#f87171;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--dark:#1e293b;--light:#f8fafc;--border:#e2e8f0;--text:#334155;--text-light:#64748b}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.6;color:var(--text);background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,.2)}.header p{font-size:1.2em;opacity:.95}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:var(--primary);margin:25px 0 15px}.content p{margin:15px 0;text-align:justify}.content ul,.content ol{margin:15px 0 15px 30px}.content li{margin:8px 0}.info-box{background:linear-gradient(135deg,#fee2e2,#fecaca);border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:linear-gradient(135deg,#fef3c7,#fed7aa);border-left:5px solid var(--warning);padding:20px;margin:25px 0;border-radius:8px}.success-box{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-left:5px solid var(--success);padding:20px;margin:25px 0;border-radius:8px}.code-block{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border-left:4px solid var(--primary)}.code-block code{font-family:"Courier New",monospace;font-size:.9em;line-height:1.5}table{width:100%;border-collapse:collapse;margin:20px 0;box-shadow:0 2px 8px rgba(0,0,0,.1)}table th{background:var(--primary);color:white;padding:15px;text-align:left;font-weight:600}table td{padding:12px 15px;border-bottom:1px solid var(--border)}table tr:hover{background:var(--light)}.review-section{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--warning)}.review-section h3{color:#92400e;margin-bottom:20px}.review-section ol{margin-left:25px}.review-section li{margin:12px 0;color:#78350f}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--success)}.key-takeaways h3{color:#065f46;margin-bottom:20px}.key-takeaways ul{margin-left:25px}.key-takeaways li{margin:12px 0;color:#064e3b}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid var(--border)}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:all .3s;display:inline-block}.nav-button:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 12px rgba(239,68,68,.4)}.footer{background:var(--dark);color:white;text-align:center;padding:30px;font-size:.9em}.footer p{margin:5px 0}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Chapter 04</h1>
+            <p>애플리케이션 수준 방어: L7 공격 차단</p>
+        </div>
+        <div class="content">
+            <h2>1. WAF (Web Application Firewall)</h2>
+            <p>WAF는 HTTP/HTTPS 트래픽을 검사하여 악의적인 요청을 차단합니다. DDoS뿐 아니라 SQL Injection, XSS 등도 방어합니다.</p>
+            <div class="code-block">
+<code># ModSecurity (오픈소스 WAF) 설정
+# Apache/Nginx에 통합 가능
+
+# 1. 설치 (Ubuntu)
+apt-get install libapache2-mod-security2
+
+# 2. 설정 파일
+cp /etc/modsecurity/modsecurity.conf-recommended /etc/modsecurity/modsecurity.conf
+
+# 3. 규칙 활성화
+SecRuleEngine On
+
+# 4. DDoS 방어 규칙
+# HTTP Flood 방어
+SecRule REMOTE_ADDR "@unconditionalMatch" \
+    "id:1001,phase:1,pass,nolog,setvar:ip.requests_per_minute=+1,expirevar:ip.requests_per_minute=60"
+
+SecRule IP:REQUESTS_PER_MINUTE "@gt 100" \
+    "id:1002,phase:1,deny,status:429,msg:'Rate limit exceeded'"
+
+# Slowloris 방어
+SecRequestBodyNoFilesLimit 131072  # 128KB 제한
+SecRequestBodyLimit 10485760        # 10MB 제한
+SecRequestBodyLimitAction Reject
+
+# User-Agent 검증 (봇 차단)
+SecRule REQUEST_HEADERS:User-Agent "^$" \
+    "id:1003,phase:1,deny,status:403,msg:'Missing User-Agent'"</code>
+            </div>
+            <h2>2. Rate Limiting Algorithms</h2>
+            <h3>2.1 Token Bucket</h3>
+            <p>가장 널리 사용되는 Rate Limiting 알고리즘으로, 버스트 트래픽을 허용하면서도 장기 평균을 제한합니다.</p>
+            <div class="code-block">
+<code># Token Bucket 원리
+# 버킷에 토큰이 일정 속도로 추가됨
+# 요청 시 토큰 1개 소비
+# 토큰 없으면 요청 거부
+
+import time
+
+class TokenBucket:
+    def __init__(self, capacity, refill_rate):
+        self.capacity = capacity      # 최대 토큰 수
+        self.tokens = capacity         # 현재 토큰
+        self.refill_rate = refill_rate # 초당 토큰 추가 수
+        self.last_refill = time.time()
+    
+    def refill(self):
+        now = time.time()
+        elapsed = now - self.last_refill
+        tokens_to_add = elapsed * self.refill_rate
+        self.tokens = min(self.capacity, self.tokens + tokens_to_add)
+        self.last_refill = now
+    
+    def consume(self, tokens=1):
+        self.refill()
+        if self.tokens >= tokens:
+            self.tokens -= tokens
+            return True  # 요청 허용
+        return False     # 요청 거부
+
+# 사용 예시
+bucket = TokenBucket(capacity=100, refill_rate=10)  # 최대 100개, 초당 10개 추가
+
+for i in range(150):
+    if bucket.consume():
+        print(f"Request {i}: Allowed")
+    else:
+        print(f"Request {i}: Rate limited")
+    time.sleep(0.05)  # 초당 20 요청</code>
+            </div>
+            <h3>2.2 Leaky Bucket</h3>
+            <div class="code-block">
+<code># Leaky Bucket 원리
+# 요청을 큐에 추가
+# 일정 속도로 처리 (물이 새듯)
+
+from collections import deque
+import time
+
+class LeakyBucket:
+    def __init__(self, capacity, leak_rate):
+        self.capacity = capacity    # 큐 최대 크기
+        self.leak_rate = leak_rate  # 초당 처리 수
+        self.queue = deque()
+        self.last_leak = time.time()
+    
+    def leak(self):
+        now = time.time()
+        elapsed = now - self.last_leak
+        leaks = int(elapsed * self.leak_rate)
+        for _ in range(min(leaks, len(self.queue))):
+            self.queue.popleft()
+        self.last_leak = now
+    
+    def add_request(self):
+        self.leak()
+        if len(self.queue) < self.capacity:
+            self.queue.append(time.time())
+            return True
+        return False
+
+# Nginx rate limiting (Leaky Bucket 기반)
+# nginx.conf
+http {
+    limit_req_zone $binary_remote_addr zone=mylimit:10m rate=10r/s;
+    
+    server {
+        location /api/ {
+            limit_req zone=mylimit burst=20;
+            # rate=10r/s: 초당 10 요청
+            # burst=20: 버스트 20개 허용
+        }
+    }
+}</code>
+            </div>
+            <h3>2.3 Sliding Window</h3>
+            <div class="code-block">
+<code># Sliding Window Rate Limiting (Redis)
+# 정확한 Rate Limiting, 시간 경계 문제 해결
+
+import redis
+import time
+
+r = redis.Redis(host='localhost', port=6379)
+
+def rate_limit(user_id, limit=100, window=60):
+    """
+    user_id: 사용자 식별자
+    limit: 윈도우당 최대 요청 수
+    window: 윈도우 크기 (초)
+    """
+    key = f"rate_limit:{user_id}"
+    now = time.time()
+    
+    # 1. 오래된 요청 제거 (윈도우 밖)
+    r.zremrangebyscore(key, 0, now - window)
+    
+    # 2. 현재 요청 수 확인
+    current_requests = r.zcard(key)
+    
+    if current_requests < limit:
+        # 3. 요청 추가
+        r.zadd(key, {now: now})
+        r.expire(key, window)
+        return True  # 허용
+    
+    return False  # 거부
+
+# 사용 예시
+for i in range(150):
+    if rate_limit("user123", limit=100, window=60):
+        print(f"Request {i}: Allowed")
+    else:
+        print(f"Request {i}: Rate limited")
+    time.sleep(0.3)  # 초당 3.3 요청</code>
+            </div>
+            <h2>3. CAPTCHA & Challenge</h2>
+            <h3>3.1 Google reCAPTCHA v3</h3>
+            <div class="code-block">
+<code><!-- HTML에 reCAPTCHA v3 추가 -->
+<form id="myForm" method="POST" action="/submit">
+    <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response">
+    <!-- 기타 폼 필드 -->
+</form>
+
+# 서버 측 검증 (Python)
+import requests
+
+def verify_recaptcha(token):
+    secret_key = "YOUR_SECRET_KEY"
+    response = requests.post('https://www.google.com/recaptcha/api/siteverify', data={
+        'secret': secret_key,
+        'response': token
+    })
+    result = response.json()
+    
+    # score: 0.0 (봇) ~ 1.0 (사람)
+    if result['success'] and result['score'] >= 0.5:
+        return True  # 사람으로 판단
+    return False     # 봇으로 판단</code>
+            </div>
+            <h3>3.2 JavaScript Challenge</h3>
+            <p>Cloudflare 방식으로, JavaScript 실행 능력을 검증하여 봇을 차단합니다.</p>
+            <div class="code-block">
+<code># JavaScript Challenge 동작
+# 1. 클라이언트 요청
+GET / HTTP/1.1
+
+# 2. 서버 응답 (Challenge)
+HTTP/1.1 503 Service Unavailable
+Content-Type: text/html
+
+<html>
+<p>Checking your browser...</p>
+</html>
+
+# 3. 클라이언트 재요청 (쿠키 포함)
+GET / HTTP/1.1
+Cookie: cf_clearance=MTIzNDU2...
+
+# 4. 서버 쿠키 검증 후 정상 응답
+HTTP/1.1 200 OK
+
+# 봇은 JavaScript 실행 불가 → 차단!</code>
+            </div>
+            <h2>4. CDN (Content Delivery Network)</h2>
+            <p>CDN은 지리적으로 분산된 서버로 트래픽을 분산하여 DDoS 공격을 흡수합니다.</p>
+            <table>
+                <thead>
+                    <tr><th>CDN 제공자</th><th>PoP 수</th><th>처리량</th><th>주요 기능</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Cloudflare</strong></td><td>310+</td><td>무제한</td><td>Free DDoS, WAF, Bot Management</td></tr>
+                    <tr><td><strong>Akamai</strong></td><td>4,100+</td><td>최대 3.9 Tbps</td><td>Prolexic (DDoS 전용)</td></tr>
+                    <tr><td><strong>AWS CloudFront</strong></td><td>450+</td><td>자동 스케일</td><td>Shield Standard (무료)</td></tr>
+                    <tr><td><strong>Fastly</strong></td><td>70+</td><td>최대 300 Tbps</td><td>Edge Computing, WAF</td></tr>
+                </tbody>
+            </table>
+            <div class="code-block">
+<code># Cloudflare 설정 예시
+# 1. DNS를 Cloudflare로 변경
+# 2. Proxy 활성화 (주황색 구름)
+
+# 3. DDoS 방어 규칙
+# Firewall Rules
+(cf.threat_score gt 10) and (not cf.client.bot)
+→ Challenge (CAPTCHA)
+
+(cf.threat_score gt 50)
+→ Block
+
+# Rate Limiting
+# /api/* 경로에 초당 10 요청 제한
+Expression: (http.request.uri.path matches "/api/.*")
+Requests: 10 per 10 seconds
+Action: Block for 1 hour
+
+# 4. Page Rules
+# 캐시 설정으로 오리진 부하 감소
+Cache Level: Cache Everything
+Edge Cache TTL: 1 month</code>
+            </div>
+            <h2>5. Connection Pooling & Queue</h2>
+            <div class="code-block">
+<code># Nginx connection pooling
+http {
+    upstream backend {
+        server backend1.example.com:8080 max_conns=100;
+        server backend2.example.com:8080 max_conns=100;
+        
+        # Connection pooling
+        keepalive 32;
+        keepalive_requests 100;
+        keepalive_timeout 60s;
+    }
+    
+    server {
+        location / {
+            proxy_pass http://backend;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            
+            # Queue 설정
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 10s;
+            proxy_read_timeout 10s;
+        }
+    }
+}
+
+# max_conns: 백엔드당 최대 100 연결
+# keepalive: 32개 연결 재사용
+# 초과 요청은 큐에 대기 → 타임아웃 시 503 반환</code>
+            </div>
+            <div class="review-section">
+                <h3>📝 복습 질문</h3>
+                <ol>
+                    <li>WAF와 일반 방화벽의 차이는 무엇인가요?</li>
+                    <li>Token Bucket과 Leaky Bucket 알고리즘의 차이를 설명하세요.</li>
+                    <li>Sliding Window Rate Limiting이 Fixed Window보다 정확한 이유는?</li>
+                    <li>reCAPTCHA v3의 score가 0.0~1.0 범위인데, 어떤 기준으로 봇을 판단하나요?</li>
+                    <li>JavaScript Challenge가 봇을 차단하는 원리를 설명하세요.</li>
+                    <li>CDN이 DDoS 방어에 효과적인 이유 3가지는?</li>
+                    <li>Nginx의 max_conns 설정의 역할은 무엇인가요?</li>
+                    <li>ModSecurity에서 SecRequestBodyLimit를 설정하는 이유는?</li>
+                    <li>Rate Limiting 시 429 상태 코드를 반환하는 이유는?</li>
+                    <li>Application Layer 방어가 Network Layer 방어보다 CPU를 많이 사용하는 이유는?</li>
+                </ol>
+            </div>
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>WAF</strong>: HTTP/HTTPS 트래픽 검사, ModSecurity (오픈소스)</li>
+                    <li><strong>Token Bucket</strong>: 버스트 허용, 장기 평균 제한</li>
+                    <li><strong>Leaky Bucket</strong>: 일정 속도 처리, Nginx 기본</li>
+                    <li><strong>Sliding Window</strong>: 정확한 Rate Limiting, Redis 활용</li>
+                    <li><strong>reCAPTCHA v3</strong>: Score 기반 (0.0 봇 ~ 1.0 사람)</li>
+                    <li><strong>JavaScript Challenge</strong>: JS 실행 검증, Cloudflare 방식</li>
+                    <li><strong>CDN</strong>: 트래픽 분산, 캐싱, 오리진 보호</li>
+                    <li><strong>Connection Pooling</strong>: 연결 재사용, 백엔드 부하 감소</li>
+                    <li><strong>429 Too Many Requests</strong>: Rate Limit 초과 시 표준 응답</li>
+                    <li>弘益人間: 애플리케이션 방어로 사용자 경험 보호, 모두를 위한 서비스 🚀</li>
+                </ul>
+            </div>
+            <div class="navigation">
+                <a href="chapter-03.html" class="nav-button">← 03. 네트워크 수준 방어</a>
+                <a href="chapter-05.html" class="nav-button">05. 클라우드 DDoS 서비스 →</a>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

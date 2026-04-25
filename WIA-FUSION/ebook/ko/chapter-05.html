@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 2단계 - API 인터페이스 | WIA-FUSION</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #06B6D4; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; --warning: #f59e0b; --info: #3b82f6; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        h4 { color: var(--primary); font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .success-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid var(--success); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--info); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: var(--bg); padding: 1.5rem; border-radius: 8px; overflow-x: auto; font-family: 'Monaco', monospace; font-size: 0.85rem; margin: 1.5rem 0; border: 1px solid var(--border); }
+        code { color: var(--success); }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        .endpoint { background: var(--bg); padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid var(--primary); }
+        .method { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: bold; margin-right: 0.5rem; font-size: 0.85rem; }
+        .method-get { background: #10b981; color: white; }
+        .method-post { background: #3b82f6; color: white; }
+        .method-delete { background: #ef4444; color: white; }
+        .philosophy { font-size: 1.5rem; color: var(--primary); text-align: center; margin: 2rem 0; letter-spacing: 3px; font-weight: bold; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; }
+        .questions { background: var(--bg-tertiary); padding: 2rem; border-radius: 10px; margin: 2rem 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .questions li { margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">제5장</p>
+        <h1>2단계: API 인터페이스</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">표준화된 데이터를 프로그래밍 방식으로 접근. RESTful API, WebSocket 스트리밍, SDK로 전 세계 핵융합 시설을 하나의 네트워크로 연결합니다.</p>
+
+        <h2>API의 필요성</h2>
+        <p>표준 데이터 형식이 있다면, 다음 단계는 이 데이터에 접근하는 표준 방법입니다. 과거에는 각 핵융합 시설에 방문하거나, 특수 소프트웨어를 설치하거나, 개인 연락처를 통해 데이터를 요청해야 했습니다. 이는 비효율적이고 확장 불가능하며 협업을 저해했습니다.</p>
+
+        <p>WIA-FUSION API는 이 모든 것을 변화시킵니다. 이제 연구자는 어디서나, 어떤 프로그래밍 언어로든, 표준 HTTP 요청으로 KSTAR, JET, DIII-D, ITER의 데이터에 접근할 수 있습니다.</p>
+
+        <h2>아키텍처 개요</h2>
+        <p>WIA-FUSION API는 3가지 접근 방식을 제공합니다:</p>
+
+        <div class="highlight-box">
+            <strong>1. REST API (과거 데이터, 쿼리, 분석)</strong>
+            <ul>
+                <li>HTTP GET/POST/DELETE 메서드</li>
+                <li>JSON 요청/응답</li>
+                <li>JWT 토큰 인증</li>
+                <li>속도 제한: 1,000 요청/분</li>
+            </ul>
+
+            <strong>2. WebSocket (실시간 데이터 스트리밍)</strong>
+            <ul>
+                <li>양방향 실시간 통신</li>
+                <li>최대 10 kHz 샘플링</li>
+                <li>다중 채널 구독</li>
+                <li>자동 재연결</li>
+            </ul>
+
+            <strong>3. SDK (라이브러리 래퍼)</strong>
+            <ul>
+                <li>TypeScript, Python, Rust, Julia 지원</li>
+                <li>타입 안전성</li>
+                <li>자동 재시도 및 오류 처리</li>
+                <li>단위 변환 내장</li>
+            </ul>
+        </div>
+
+        <h2>REST API 엔드포인트</h2>
+
+        <h3>인증 및 시작</h3>
+        <div class="endpoint">
+            <span class="method method-post">POST</span> <code>/auth/token</code>
+            <p style="margin-top: 0.5rem;">API 키로 JWT 토큰을 발급받습니다.</p>
+        </div>
+
+<pre><code>// 요청
+POST https://api.fusion.wia.live/v1/auth/token
+Content-Type: application/json
+
+{
+  "api_key": "wia_fusion_live_abc123...",
+  "facility": "KSTAR"
+}
+
+// 응답
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expires_in": 3600,
+  "facility": "KSTAR",
+  "permissions": ["read", "stream"]
+}</code></pre>
+
+        <h3>플라즈마 데이터 조회</h3>
+        <div class="endpoint">
+            <span class="method method-get">GET</span> <code>/plasma/shots</code>
+            <p style="margin-top: 0.5rem;">샷 목록을 조회합니다.</p>
+        </div>
+
+<pre><code>// 요청
+GET /v1/plasma/shots?facility=KSTAR&date_from=2023-01-01&date_to=2023-12-31&limit=100
+Authorization: Bearer &lt;token&gt;
+
+// 응답
+{
+  "total": 2450,
+  "page": 1,
+  "shots": [
+    {
+      "shot_id": "KSTAR-2023-12-15-24501",
+      "timestamp": "2023-12-15T09:23:45.250Z",
+      "duration_s": 102.3,
+      "peak_temperature_keV": 8.6,
+      "peak_density_1e20m3": 0.85,
+      "disruption": false
+    },
+    ...
+  ]
+}</code></pre>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span> <code>/plasma/shots/{shot_id}</code>
+            <p style="margin-top: 0.5rem;">특정 샷의 상세 데이터를 가져옵니다.</p>
+        </div>
+
+        <div class="endpoint">
+            <span class="method method-post">POST</span> <code>/plasma/query</code>
+            <p style="margin-top: 0.5rem;">복잡한 조건으로 데이터를 검색합니다.</p>
+        </div>
+
+<pre><code>// 요청
+POST /v1/plasma/query
+{
+  "facility": ["KSTAR", "JET"],
+  "temperature_keV": {"min": 5, "max": 15},
+  "beta_percent": {"min": 2},
+  "disruption": false,
+  "date_range": {
+    "from": "2022-01-01",
+    "to": "2023-12-31"
+  },
+  "limit": 1000
+}
+
+// 응답
+{
+  "matches": 1247,
+  "shots": [...]
+}</code></pre>
+
+        <h3>AI 예측 서비스</h3>
+        <div class="endpoint">
+            <span class="method method-post">POST</span> <code>/ai/predict/disruption</code>
+            <p style="margin-top: 0.5rem;">현재 플라즈마 상태에서 붕괴 확률을 예측합니다.</p>
+        </div>
+
+<pre><code>// 요청
+POST /v1/ai/predict/disruption
+{
+  "plasma_state": {
+    "temperature_keV": 10.0,
+    "density_1e20m3": 1.2,
+    "plasma_current_ma": 15,
+    "beta_percent": 2.8,
+    "mhd_amplitude": 0.25
+  },
+  "model": "KAIST-DNN-v3.2"
+}
+
+// 응답
+{
+  "prediction": {
+    "disruption_probability": 0.72,
+    "time_to_disruption_ms": 350,
+    "confidence": 0.94,
+    "recommended_actions": [
+      {
+        "action": "reduce_heating_power",
+        "target": "NBI",
+        "amount_percent": -30,
+        "urgency": "high"
+      },
+      {
+        "action": "activate_elm_mitigation",
+        "method": "RMP_coils",
+        "urgency": "medium"
+      }
+    ],
+    "model_version": "KAIST-DNN-v3.2",
+    "training_data": "KSTAR+JET+DIII-D (2018-2023)"
+  }
+}</code></pre>
+
+        <h2>WebSocket 실시간 스트리밍</h2>
+        <p>실시간 플라즈마 모니터링과 제어를 위해 WIA-FUSION은 WebSocket 프로토콜을 지원합니다. KSTAR는 최대 10 kHz로 70개 이상의 진단 채널을 스트리밍합니다.</p>
+
+        <h3>연결 및 구독</h3>
+<pre><code>// JavaScript/TypeScript 예시
+const ws = new WebSocket('wss://api.fusion.wia.live/v1/stream/plasma');
+
+// 인증
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    action: 'auth',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+  }));
+
+  // 채널 구독
+  ws.send(JSON.stringify({
+    action: 'subscribe',
+    facility: 'KSTAR',
+    shot_id: 'KSTAR-2024-01-15-24600',
+    channels: [
+      'plasma_state',      // 플라즈마 상태 (10 Hz)
+      'thomson_scattering',// Thomson 산란 (100 Hz)
+      'ece',               // 전자 사이클로트론 (1 kHz)
+      'magnetics',         // 자기 신호 (10 kHz)
+      'ai_predictions'     // AI 예측 (1 Hz)
+    ],
+    sample_rate_hz: 100    // 최대 샘플링 레이트
+  }));
+};
+
+// 데이터 수신
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  if (data.channel === 'plasma_state') {
+    console.log(`온도: ${data.temperature_keV.ion} keV`);
+    console.log(`밀도: ${data.density_1e20m3} × 10²⁰/m³`);
+    console.log(`베타: ${data.beta_percent}%`);
+    updateDashboard(data);
+  }
+
+  if (data.channel === 'ai_predictions') {
+    if (data.disruption_probability > 0.7) {
+      console.warn('⚠️ 붕괴 위험 높음!', data);
+      triggerAlert(data);
+    }
+  }
+};
+
+// 오류 처리
+ws.onerror = (error) => {
+  console.error('WebSocket 오류:', error);
+};
+
+// 재연결
+ws.onclose = () => {
+  console.log('연결 종료, 5초 후 재연결...');
+  setTimeout(connectWebSocket, 5000);
+};</code></pre>
+
+        <h2>KSTAR 실시간 API 구현</h2>
+        <p>국가핵융합연구소(KFE)는 2024년 KSTAR에 완전한 WIA-FUSION API를 구축했습니다. 이는 세계 최초의 PLATINUM 인증 API입니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>구성 요소</th>
+                    <th>기술 스택</th>
+                    <th>성능</th>
+                    <th>가용성</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>API 게이트웨이</td>
+                    <td>Kong + Kubernetes</td>
+                    <td>10,000 req/s</td>
+                    <td>99.99%</td>
+                </tr>
+                <tr>
+                    <td>REST 서버</td>
+                    <td>Node.js + Express</td>
+                    <td><5 ms 지연</td>
+                    <td>99.95%</td>
+                </tr>
+                <tr>
+                    <td>WebSocket 서버</td>
+                    <td>Go + gorilla/websocket</td>
+                    <td>10 kHz 스트리밍</td>
+                    <td>99.9%</td>
+                </tr>
+                <tr>
+                    <td>데이터베이스</td>
+                    <td>PostgreSQL + TimescaleDB</td>
+                    <td>100 TB 저장</td>
+                    <td>99.99%</td>
+                </tr>
+                <tr>
+                    <td>캐시</td>
+                    <td>Redis Cluster</td>
+                    <td><1 ms 응답</td>
+                    <td>99.99%</td>
+                </tr>
+                <tr>
+                    <td>AI 추론</td>
+                    <td>NVIDIA Triton + TensorRT</td>
+                    <td><10 ms 예측</td>
+                    <td>99.9%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>SDK 사용 예시</h2>
+
+        <h3>TypeScript SDK</h3>
+<pre><code>import { FusionClient } from '@wia/fusion-sdk';
+
+// 클라이언트 초기화
+const client = new FusionClient({
+  apiKey: process.env.WIA_FUSION_API_KEY,
+  facility: 'KSTAR',
+  baseURL: 'https://api.fusion.wia.live/v1'
+});
+
+// 샷 조회
+const shots = await client.plasma.getShots({
+  dateFrom: '2023-01-01',
+  dateTo: '2023-12-31',
+  temperatureMin: 5,
+  disruptionOnly: false
+});
+
+console.log(`${shots.total}개 샷 발견`);
+
+// 특정 샷 상세 정보
+const shot = await client.plasma.getShot('KSTAR-2023-12-15-24501');
+console.log(`최고 온도: ${shot.peak_temperature_keV} keV`);
+console.log(`지속 시간: ${shot.duration_s}초`);
+
+// AI 붕괴 예측
+const prediction = await client.ai.predictDisruption({
+  temperature_keV: 10.0,
+  density_1e20m3: 1.2,
+  beta_percent: 2.8
+});
+
+if (prediction.disruption_probability > 0.7) {
+  console.warn('⚠️ 붕괴 위험!');
+  console.log(`예상 시간: ${prediction.time_to_disruption_ms}ms`);
+  console.log('권장 조치:', prediction.recommended_actions);
+}
+
+// 실시간 스트리밍
+const stream = client.stream.connect('KSTAR-2024-01-15-24600');
+
+stream.subscribe(['plasma_state', 'ai_predictions'], (data) => {
+  console.log('실시간 데이터:', data);
+});
+
+stream.on('disruption_warning', (warning) => {
+  console.error('🚨 붕괴 경고!', warning);
+});</code></pre>
+
+        <h3>Python SDK</h3>
+<pre><code>from wia_fusion import FusionClient
+import asyncio
+
+# 클라이언트 초기화
+client = FusionClient(
+    api_key=os.getenv("WIA_FUSION_API_KEY"),
+    facility="KSTAR"
+)
+
+# 샷 조회 (동기)
+shots = client.plasma.get_shots(
+    date_from="2023-01-01",
+    date_to="2023-12-31",
+    temperature_min=5
+)
+
+print(f"{shots.total}개 샷 발견")
+
+# AI 예측 (동기)
+prediction = client.ai.predict_disruption(
+    temperature_keV=10.0,
+    density_1e20m3=1.2,
+    beta_percent=2.8
+)
+
+if prediction.disruption_probability > 0.7:
+    print("⚠️ 붕괴 위험!")
+    print(f"확률: {prediction.disruption_probability * 100}%")
+
+# 실시간 스트리밍 (비동기)
+async def stream_data():
+    async with client.stream.connect("KSTAR-2024-01-15-24600") as stream:
+        await stream.subscribe(["plasma_state", "ai_predictions"])
+
+        async for data in stream:
+            print(f"온도: {data.temperature_keV} keV")
+
+            if data.channel == "ai_predictions":
+                if data.disruption_probability > 0.7:
+                    print("🚨 붕괴 경고!")
+
+# 실행
+asyncio.run(stream_data())</code></pre>
+
+        <h2>한국 대학의 API 활용</h2>
+        <div class="success-box">
+            <strong>서울대학교 (SNU) - 글로벌 플라즈마 비교 도구:</strong><br>
+            SNU는 WIA-FUSION API를 사용하여 KSTAR, JET, DIII-D, EAST의 데이터를 실시간으로 비교하는 웹 애플리케이션을 개발했습니다. 연구자들은 동일한 플라즈마 조건을 서로 다른 토카막에서 어떻게 달성했는지 비교할 수 있습니다. 이 도구는 매달 2,000명 이상의 연구자가 사용합니다.
+            <br><br>
+            <strong>KAIST - 자동 실험 최적화:</strong><br>
+            KAIST는 API를 통해 KSTAR 제어 시스템과 통합된 강화 학습 에이전트를 개발했습니다. 이 AI는 실시간 데이터를 받아 최적의 가열 및 전류 프로파일을 제안하며, 운영자는 API를 통해 이 제안을 검토하고 적용할 수 있습니다. 2024년 테스트에서 이 시스템은 H-모드 가둠 시간을 평균 15% 향상시켰습니다.
+            <br><br>
+            <strong>POSTECH - 교육용 대시보드:</strong><br>
+            POSTECH은 WIA-FUSION API를 사용하여 학부생들이 실시간 KSTAR 데이터를 볼 수 있는 교육용 대시보드를 만들었습니다. 학생들은 플라즈마 물리학 이론을 실제 데이터와 연결하여 학습할 수 있으며, API 사용법도 배웁니다. 이 프로그램은 한국의 10개 대학으로 확장되었습니다.
+        </div>
+
+        <h2>보안 및 접근 제어</h2>
+        <p>핵융합 시설은 민감한 국가 인프라입니다. WIA-FUSION API는 다층 보안을 제공합니다:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>보안 계층</th>
+                    <th>메커니즘</th>
+                    <th>목적</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>인증</td>
+                    <td>API 키 + JWT 토큰</td>
+                    <td>사용자 신원 확인</td>
+                </tr>
+                <tr>
+                    <td>인가</td>
+                    <td>역할 기반 접근 제어 (RBAC)</td>
+                    <td>권한 관리 (read/write/admin)</td>
+                </tr>
+                <tr>
+                    <td>전송</td>
+                    <td>TLS 1.3 암호화</td>
+                    <td>데이터 전송 보호</td>
+                </tr>
+                <tr>
+                    <td>속도 제한</td>
+                    <td>토큰 버킷 알고리즘</td>
+                    <td>남용 방지 (1,000 req/min)</td>
+                </tr>
+                <tr>
+                    <td>감사</td>
+                    <td>모든 요청 로깅</td>
+                    <td>추적성 및 컴플라이언스</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>접근 레벨</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>레벨</th>
+                    <th>권한</th>
+                    <th>대상</th>
+                    <th>승인 과정</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PUBLIC</td>
+                    <td>요약 데이터 읽기</td>
+                    <td>모든 사용자</td>
+                    <td>자동 (이메일 확인)</td>
+                </tr>
+                <tr>
+                    <td>RESEARCHER</td>
+                    <td>전체 데이터 읽기</td>
+                    <td>학술 연구자</td>
+                    <td>소속 기관 확인 (1-3일)</td>
+                </tr>
+                <tr>
+                    <td>OPERATOR</td>
+                    <td>읽기 + 제어 제안</td>
+                    <td>시설 운영자</td>
+                    <td>KFE 직접 승인 (1주)</td>
+                </tr>
+                <tr>
+                    <td>ADMIN</td>
+                    <td>전체 제어</td>
+                    <td>시설 관리자</td>
+                    <td>KFE 이사회 승인</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>성능 최적화</h2>
+        <p>KSTAR API는 다음 기술로 고성능을 달성합니다:</p>
+
+        <div class="highlight-box">
+            <strong>1. 계층적 캐싱:</strong>
+            <ul>
+                <li>CDN (CloudFlare): 정적 데이터, 전 세계 분산</li>
+                <li>Redis: 최근 조회 데이터, TTL 1시간</li>
+                <li>In-memory: 실시간 샷 데이터</li>
+            </ul>
+
+            <strong>2. 데이터베이스 최적화:</strong>
+            <ul>
+                <li>TimescaleDB: 시계열 데이터에 최적화</li>
+                <li>하이퍼테이블: 자동 파티셔닝</li>
+                <li>인덱싱: facility, shot_id, timestamp</li>
+            </ul>
+
+            <strong>3. 압축 및 스트리밍:</strong>
+            <ul>
+                <li>gzip 압축: 응답 크기 70% 감소</li>
+                <li>청크 전송: 대용량 데이터 스트리밍</li>
+                <li>페이지네이션: 메모리 효율적 조회</li>
+            </ul>
+        </div>
+
+        <h2>弘益人間: API를 통한 글로벌 협력</h2>
+        <div class="philosophy">弘益人間</div>
+        <p style="text-align: center; font-size: 1.1rem; margin-top: 0;">접근성을 통한 인류의 이익</p>
+
+        <p>WIA-FUSION API는 弘益人間 정신을 실천합니다:</p>
+        <ul>
+            <li><strong>민주화:</strong> 누구나 핵융합 데이터에 접근 (PUBLIC 레벨)</li>
+            <li><strong>교육:</strong> 학생들이 실제 데이터로 학습</li>
+            <li><strong>협력:</strong> 국경을 넘어 연구자들이 협력</li>
+            <li><strong>투명성:</strong> 공개 API 문서, 오픈 소스 SDK</li>
+            <li><strong>혁신:</strong> 누구나 새로운 도구와 분석 개발 가능</li>
+        </ul>
+
+        <div class="highlight-box">
+            <h3 style="margin-top:0">핵심 요약</h3>
+            <ul>
+                <li>WIA-FUSION 2단계는 REST API, WebSocket, SDK로 핵융합 데이터 접근을 표준화</li>
+                <li>REST API: 과거 데이터 조회, 복잡한 쿼리, AI 예측 (<5 ms 지연)</li>
+                <li>WebSocket: 실시간 스트리밍, 최대 10 kHz, 70개 채널 (KSTAR)</li>
+                <li>SDK: TypeScript, Python, Rust, Julia 지원, 타입 안전, 자동 오류 처리</li>
+                <li>KSTAR API: 세계 최초 PLATINUM 인증, 99.99% 가용성, 10,000 req/s</li>
+                <li>SNU, KAIST, POSTECH가 API로 비교 도구, 자동 최적화, 교육 대시보드 개발</li>
+                <li>다층 보안: API 키, JWT, TLS 1.3, RBAC, 속도 제한</li>
+                <li>4가지 접근 레벨: PUBLIC, RESEARCHER, OPERATOR, ADMIN</li>
+                <li>弘益人間: 민주화, 교육, 협력, 투명성, 혁신</li>
+            </ul>
+        </div>
+
+        <div class="questions">
+            <h3 style="color: var(--primary); margin-top: 0;">복습 질문</h3>
+            <ol>
+                <li>WIA-FUSION API의 3가지 접근 방식과 각각의 용도는?</li>
+                <li>JWT 토큰을 발급받는 과정과 유효 기간은?</li>
+                <li>복잡한 플라즈마 데이터 검색을 위한 POST /plasma/query의 예시는?</li>
+                <li>AI 붕괴 예측 API가 반환하는 recommended_actions의 의미는?</li>
+                <li>WebSocket으로 KSTAR 실시간 데이터를 구독하는 방법은?</li>
+                <li>KSTAR API의 기술 스택과 성능 지표는?</li>
+                <li>KAIST의 강화 학습 에이전트가 달성한 성과는?</li>
+                <li>WIA-FUSION API의 4가지 접근 레벨과 승인 과정은?</li>
+                <li>API 성능 최적화를 위한 캐싱 전략은?</li>
+            </ol>
+        </div>
+
+        <div class="success-box">
+            <h3 style="margin-top:0; color: var(--success);">다음 장 미리보기</h3>
+            <p><strong>제6장: 3단계 - 프로토콜</strong></p>
+            <p>데이터와 API로 기술적 상호운용성을 달성했으니, 이제 운영 표준으로 넘어갑니다. 제6장에서는 플라즈마 시작 시퀀스, 정상 상태 제어, 안전한 종료, 비상 대응 프로토콜을 배웁니다. KSTAR가 어떻게 AI로 1억 °C 플라즈마를 102초간 유지하는지, 그리고 이 운영 지식을 어떻게 표준화하여 ITER와 공유하는지 살펴봅니다.</p>
+        </div>
+
+        </div>
+</body>
+</html>

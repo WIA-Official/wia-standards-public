@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA DeFi Simulator</title>
+    <style>
+        :root {
+            --primary: #22C55E;
+            --primary-dark: #16A34A;
+            --secondary: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --gold: #ffd700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 60px 20px; }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-logo {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .header-logo:hover { color: var(--primary); }
+        .header-title { color: var(--primary); font-size: 1rem; }
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        .lang-switch { display: flex; gap: 5px; }
+        .lang-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .tab:hover { border-color: var(--primary); color: var(--primary); }
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Panels */
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* Card */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        .card h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Buttons */
+        .btn-center {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Output */
+        .output {
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .output pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 60px;
+            padding: 30px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        footer .philosophy {
+            color: var(--gold);
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        footer p {
+            color: var(--text-muted);
+            margin: 5px 0;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+            }
+            .tabs {
+                flex-direction: column;
+            }
+            .tab {
+                width: 100%;
+                text-align: center;
+            }
+        }
+        body { padding-top: 64px !important; }
+        /* hide duplicate nav header — ws-sitekit nav replaces it */
+        header.header:not(.ws-header) { display: none !important; }
+        
+        /* ── WIA Site Kit spacing fix ── */
+        body { padding-bottom: 0 !important; }
+        #ws-footer { margin-top: 60px; }
+        
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Defi</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div id="ws-header"></div>
+    <div class="container">
+        <header class="header">
+            <div class="header-left">
+                <a href="https://wiastandards.com" class="header-logo" target="_blank">🤟 WIA</a>
+                <span class="header-title">🔗 DeFi Simulator</span>
+            </div>
+            <div class="header-right">
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)">
+                <span data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</span>
+            </div>
+            <div class="tab" onclick="showPanel(1)">
+                <span data-en="🔢 AMM Algorithms" data-ko="🔢 AMM 알고리즘">🔢 AMM Algorithms</span>
+            </div>
+            <div class="tab" onclick="showPanel(2)">
+                <span data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</span>
+            </div>
+            <div class="tab" onclick="showPanel(3)">
+                <span data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</span>
+            </div>
+            <div class="tab" onclick="showPanel(4)">
+                <span data-en="📱 QR & VC" data-ko="📱 QR & VC">📱 QR & VC</span>
+            </div>
+        </div>
+
+        <!-- Panel 0: Data Format -->
+        <div class="panel active" id="panel-0">
+            <div class="card">
+                <h3 data-en="DeFi Protocol Data Format" data-ko="DeFi 프로토콜 데이터 형식">DeFi Protocol Data Format</h3>
+
+                <div class="form-group">
+                    <label data-en="Protocol Type" data-ko="프로토콜 유형">Protocol Type</label>
+                    <select id="protocolType">
+                        <option value="AMM">AMM (Automated Market Maker)</option>
+                        <option value="Lending">Lending Protocol</option>
+                        <option value="Yield">Yield Farming</option>
+                        <option value="Staking">Staking</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Token Pair" data-ko="토큰 쌍">Token Pair</label>
+                    <input type="text" id="tokenPair" placeholder="ETH/USDC" value="ETH/USDC">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Liquidity (USD)" data-ko="유동성 (USD)">Liquidity (USD)</label>
+                    <input type="number" id="liquidity" placeholder="1000000" value="1000000">
+                </div>
+
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateDataFormat()">
+                        <span data-en="Generate Format" data-ko="형식 생성">Generate Format</span>
+                    </button>
+                </div>
+
+                <div class="output" id="output-0"></div>
+            </div>
+        </div>
+
+        <!-- Panel 1: AMM Algorithms -->
+        <div class="panel" id="panel-1">
+            <div class="card">
+                <h3 data-en="AMM (Automated Market Maker) Calculator" data-ko="AMM 계산기">AMM Calculator</h3>
+
+                <div class="form-group">
+                    <label data-en="AMM Type" data-ko="AMM 유형">AMM Type</label>
+                    <select id="ammType">
+                        <option value="constantProduct">Constant Product (x*y=k)</option>
+                        <option value="stableSwap">Stable Swap (Curve)</option>
+                        <option value="concentrated">Concentrated Liquidity (Uniswap v3)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Reserve A (Token 0)" data-ko="보유량 A (토큰 0)">Reserve A</label>
+                    <input type="number" id="reserveA" value="1000000" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Reserve B (Token 1)" data-ko="보유량 B (토큰 1)">Reserve B</label>
+                    <input type="number" id="reserveB" value="2000000" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Swap Amount (Token A)" data-ko="교환량 (토큰 A)">Swap Amount</label>
+                    <input type="number" id="swapAmount" value="1000" step="0.01">
+                </div>
+
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="calculateAMM()">
+                        <span data-en="Calculate Swap" data-ko="교환 계산">Calculate Swap</span>
+                    </button>
+                </div>
+
+                <div class="stats-grid" id="ammStats"></div>
+                <div class="output" id="output-1"></div>
+            </div>
+        </div>
+
+        <!-- Panel 2: Protocol -->
+        <div class="panel" id="panel-2">
+            <div class="card">
+                <h3 data-en="Flash Loan Protocol" data-ko="플래시론 프로토콜">Flash Loan Protocol</h3>
+
+                <div class="form-group">
+                    <label data-en="Borrow Amount (ETH)" data-ko="대출 금액 (ETH)">Borrow Amount</label>
+                    <input type="number" id="flashLoanAmount" value="100" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Flash Loan Fee (%)" data-ko="플래시론 수수료 (%)">Flash Loan Fee (%)</label>
+                    <input type="number" id="flashLoanFee" value="0.09" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Arbitrage Profit (%)" data-ko="차익 거래 수익 (%)">Arbitrage Profit (%)</label>
+                    <input type="number" id="arbProfit" value="1.5" step="0.1">
+                </div>
+
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="simulateFlashLoan()">
+                        <span data-en="Simulate Flash Loan" data-ko="플래시론 시뮬레이션">Simulate Flash Loan</span>
+                    </button>
+                </div>
+
+                <div class="output" id="output-2"></div>
+            </div>
+        </div>
+
+        <!-- Panel 3: Integration -->
+        <div class="panel" id="panel-3">
+            <div class="card">
+                <h3 data-en="Yield Farming Calculator" data-ko="이자 농사 계산기">Yield Farming Calculator</h3>
+
+                <div class="form-group">
+                    <label data-en="Staked Amount (USD)" data-ko="스테이킹 금액 (USD)">Staked Amount</label>
+                    <input type="number" id="stakedAmount" value="10000" step="100">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="APY (%)" data-ko="연이율 (%)">APY (%)</label>
+                    <input type="number" id="apy" value="120" step="1">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Compounding Frequency" data-ko="복리 빈도">Compounding</label>
+                    <select id="compounding">
+                        <option value="1">Annually</option>
+                        <option value="12">Monthly</option>
+                        <option value="365" selected>Daily</option>
+                        <option value="8760">Hourly</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Time Period (days)" data-ko="기간 (일)">Time Period (days)</label>
+                    <input type="number" id="timePeriod" value="365" step="1">
+                </div>
+
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="calculateYield()">
+                        <span data-en="Calculate Yield" data-ko="수익 계산">Calculate Yield</span>
+                    </button>
+                </div>
+
+                <div class="stats-grid" id="yieldStats"></div>
+                <div class="output" id="output-3"></div>
+            </div>
+        </div>
+
+        <!-- Panel 4: QR & VC -->
+        <div class="panel" id="panel-4">
+            <div class="card">
+                <h3 data-en="DeFi Position Verifiable Credential" data-ko="DeFi 포지션 검증 가능 자격증명">DeFi Position VC</h3>
+
+                <div class="form-group">
+                    <label data-en="Wallet Address" data-ko="지갑 주소">Wallet Address</label>
+                    <input type="text" id="walletAddress" placeholder="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb" value="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb">
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Protocol" data-ko="프로토콜">Protocol</label>
+                    <select id="defiProtocol">
+                        <option value="Uniswap">Uniswap</option>
+                        <option value="Aave">Aave</option>
+                        <option value="Compound">Compound</option>
+                        <option value="Curve">Curve</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label data-en="Position Type" data-ko="포지션 유형">Position Type</label>
+                    <select id="positionType">
+                        <option value="liquidity">Liquidity Provider</option>
+                        <option value="lender">Lender</option>
+                        <option value="borrower">Borrower</option>
+                        <option value="staker">Staker</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label data-en="TVL (USD)" data-ko="TVL (USD)">Total Value Locked</label>
+                    <input type="number" id="tvl" value="50000" step="100">
+                </div>
+
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateVC()">
+                        <span data-en="Generate VC & QR" data-ko="VC & QR 생성">Generate VC & QR</span>
+                    </button>
+                </div>
+
+                <div class="output" id="output-4"></div>
+                <div id="qrcode" style="text-align: center; margin-top: 20px;"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>© 2025 WIA Standards | MIT License</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => {
+                p.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateDataFormat() {
+            const protocolType = document.getElementById('protocolType').value;
+            const tokenPair = document.getElementById('tokenPair').value;
+            const liquidity = document.getElementById('liquidity').value;
+
+            const data = {
+                "version": "1.0.0",
+                "standard": "WIA-FIN-006",
+                "protocol": protocolType,
+                "timestamp": new Date().toISOString(),
+                "pool": {
+                    "id": "pool_" + Math.random().toString(36).substr(2, 9),
+                    "tokenPair": tokenPair,
+                    "liquidity": parseFloat(liquidity),
+                    "tvl": parseFloat(liquidity),
+                    "volume24h": parseFloat(liquidity) * 0.3,
+                    "fees24h": parseFloat(liquidity) * 0.003
+                },
+                "metrics": {
+                    "apy": (Math.random() * 100 + 20).toFixed(2) + "%",
+                    "apr": (Math.random() * 80 + 15).toFixed(2) + "%",
+                    "utilization": (Math.random() * 50 + 40).toFixed(2) + "%"
+                }
+            };
+
+            document.getElementById('output-0').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        function calculateAMM() {
+            const ammType = document.getElementById('ammType').value;
+            const reserveA = parseFloat(document.getElementById('reserveA').value);
+            const reserveB = parseFloat(document.getElementById('reserveB').value);
+            const swapAmount = parseFloat(document.getElementById('swapAmount').value);
+
+            let outputAmount, priceImpact, newReserveA, newReserveB;
+
+            if (ammType === 'constantProduct') {
+                // x * y = k
+                const k = reserveA * reserveB;
+                newReserveA = reserveA + swapAmount;
+                newReserveB = k / newReserveA;
+                outputAmount = reserveB - newReserveB;
+
+                const oldPrice = reserveB / reserveA;
+                const newPrice = newReserveB / newReserveA;
+                priceImpact = ((newPrice - oldPrice) / oldPrice) * 100;
+            }
+
+            const stats = `
+                <div class="stat-box">
+                    <div class="stat-label">Output Amount</div>
+                    <div class="stat-value">${outputAmount.toFixed(4)}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Price Impact</div>
+                    <div class="stat-value">${Math.abs(priceImpact).toFixed(2)}%</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">New Reserve A</div>
+                    <div class="stat-value">${newReserveA.toFixed(2)}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">New Reserve B</div>
+                    <div class="stat-value">${newReserveB.toFixed(2)}</div>
+                </div>
+            `;
+
+            document.getElementById('ammStats').innerHTML = stats;
+
+            const result = {
+                "ammType": ammType,
+                "formula": "x * y = k",
+                "k": reserveA * reserveB,
+                "input": {
+                    "tokenA": swapAmount,
+                    "reserveA": reserveA,
+                    "reserveB": reserveB
+                },
+                "output": {
+                    "tokenB": outputAmount,
+                    "newReserveA": newReserveA,
+                    "newReserveB": newReserveB,
+                    "priceImpact": priceImpact.toFixed(4) + "%",
+                    "exchangeRate": (outputAmount / swapAmount).toFixed(6)
+                }
+            };
+
+            document.getElementById('output-1').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        }
+
+        function simulateFlashLoan() {
+            const amount = parseFloat(document.getElementById('flashLoanAmount').value);
+            const fee = parseFloat(document.getElementById('flashLoanFee').value);
+            const profit = parseFloat(document.getElementById('arbProfit').value);
+
+            const feeAmount = amount * (fee / 100);
+            const profitAmount = amount * (profit / 100);
+            const netProfit = profitAmount - feeAmount;
+
+            const simulation = {
+                "flashLoan": {
+                    "borrowAmount": amount + " ETH",
+                    "fee": fee + "%",
+                    "feeAmount": feeAmount.toFixed(4) + " ETH",
+                    "mustRepay": (amount + feeAmount).toFixed(4) + " ETH"
+                },
+                "arbitrage": {
+                    "profitPercent": profit + "%",
+                    "grossProfit": profitAmount.toFixed(4) + " ETH",
+                    "netProfit": netProfit.toFixed(4) + " ETH",
+                    "roi": ((netProfit / amount) * 100).toFixed(2) + "%"
+                },
+                "steps": [
+                    "1. Borrow " + amount + " ETH from Aave",
+                    "2. Swap on DEX A at lower price",
+                    "3. Swap on DEX B at higher price",
+                    "4. Repay " + (amount + feeAmount).toFixed(4) + " ETH",
+                    "5. Keep profit: " + netProfit.toFixed(4) + " ETH"
+                ]
+            };
+
+            document.getElementById('output-2').innerHTML = `<pre>${JSON.stringify(simulation, null, 2)}</pre>`;
+        }
+
+        function calculateYield() {
+            const principal = parseFloat(document.getElementById('stakedAmount').value);
+            const apy = parseFloat(document.getElementById('apy').value) / 100;
+            const n = parseFloat(document.getElementById('compounding').value);
+            const days = parseFloat(document.getElementById('timePeriod').value);
+            const t = days / 365;
+
+            // Compound interest formula: A = P(1 + r/n)^(nt)
+            const finalAmount = principal * Math.pow(1 + apy / n, n * t);
+            const totalEarned = finalAmount - principal;
+            const dailyEarning = totalEarned / days;
+
+            const stats = `
+                <div class="stat-box">
+                    <div class="stat-label">Initial Stake</div>
+                    <div class="stat-value">$${principal.toLocaleString()}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Final Amount</div>
+                    <div class="stat-value">$${finalAmount.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Total Earned</div>
+                    <div class="stat-value">$${totalEarned.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Daily Earning</div>
+                    <div class="stat-value">$${dailyEarning.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                </div>
+            `;
+
+            document.getElementById('yieldStats').innerHTML = stats;
+
+            const result = {
+                "yieldFarming": {
+                    "principal": "$" + principal.toLocaleString(),
+                    "apy": (apy * 100) + "%",
+                    "compounding": document.getElementById('compounding').options[document.getElementById('compounding').selectedIndex].text,
+                    "duration": days + " days"
+                },
+                "results": {
+                    "finalAmount": "$" + finalAmount.toFixed(2),
+                    "totalEarned": "$" + totalEarned.toFixed(2),
+                    "dailyEarning": "$" + dailyEarning.toFixed(2),
+                    "roi": ((totalEarned / principal) * 100).toFixed(2) + "%"
+                }
+            };
+
+            document.getElementById('output-3').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        }
+
+        function generateVC() {
+            const address = document.getElementById('walletAddress').value;
+            const protocol = document.getElementById('defiProtocol').value;
+            const positionType = document.getElementById('positionType').value;
+            const tvl = document.getElementById('tvl').value;
+
+            const vc = {
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://wiastandards.com/credentials/defi/v1"
+                ],
+                "type": ["VerifiableCredential", "DeFiPositionCredential"],
+                "issuer": "did:wia:defi:issuer:001",
+                "issuanceDate": new Date().toISOString(),
+                "credentialSubject": {
+                    "id": "did:eth:" + address,
+                    "walletAddress": address,
+                    "protocol": protocol,
+                    "positionType": positionType,
+                    "tvl": "$" + parseFloat(tvl).toLocaleString(),
+                    "healthFactor": (Math.random() * 2 + 1).toFixed(2),
+                    "duration": Math.floor(Math.random() * 365) + " days"
+                },
+                "proof": {
+                    "type": "EcdsaSecp256k1Signature2019",
+                    "created": new Date().toISOString(),
+                    "proofPurpose": "assertionMethod",
+                    "verificationMethod": "did:wia:defi:issuer:001#key-1",
+                    "jws": "eyJhbGc...mock_signature"
+                }
+            };
+
+            document.getElementById('output-4').innerHTML = `<pre>${JSON.stringify(vc, null, 2)}</pre>`;
+
+            // Generate QR Code (simple ASCII representation)
+            const qrData = `WIA-DeFi://${protocol}/${address}?tvl=${tvl}&type=${positionType}`;
+            document.getElementById('qrcode').innerHTML = `
+                <div style="background: white; padding: 20px; display: inline-block; border-radius: 8px;">
+                    <div style="font-family: monospace; font-size: 8px; line-height: 1; color: black;">
+                        ████████████████████████<br>
+                        ██░░░░░░░░██░░░░░░░░░░██<br>
+                        ██░░████░░██░░████░░░░██<br>
+                        ██░░████░░██░░████░░░░██<br>
+                        ██░░████░░██░░████░░░░██<br>
+                        ██░░░░░░░░██░░░░░░░░░░██<br>
+                        ████████████████████████<br>
+                    </div>
+                    <p style="color: black; margin-top: 10px; font-size: 0.8rem;">${protocol} Position</p>
+                </div>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+
+    <div id="ws-footer"></div>
+    <script src="/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+
+    <script>
+    /* WIA Site Kit language modal bridge */
+    (function(){
+      function applyLang(){
+        var code = (localStorage.getItem('wia-lang') || 'en').toLowerCase();
+        if(typeof setLang==='function') setLang(code);
+        if(typeof setLanguage==='function') setLanguage(code==='ko'?'ko':'en');
+      }
+      // 페이지 로드 시 저장된 언어 적용
+      document.addEventListener('DOMContentLoaded', applyLang);
+      // 언어 모달에서 변경 시
+      window.addEventListener('wia-language-changed', function(e){
+        var code = (e.detail&&e.detail.language||'en').toLowerCase();
+        if(typeof setLang==='function') setLang(code);
+        if(typeof setLanguage==='function') setLanguage(code==='ko'?'ko':'en');
+        var el=document.getElementById('ws-lang-code');
+        if(el) el.textContent=code.toUpperCase();
+      });
+    })();
+    </script>
+</body>
+</html>

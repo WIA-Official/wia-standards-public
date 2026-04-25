@@ -1,0 +1,947 @@
+<<<<<<< HEAD
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Embedded Machine Learning | WIA-SEMI-015</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #8B5CF6; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1rem; border-radius: 5px; overflow-x: auto; border: 1px solid var(--border); margin: 1rem 0; }
+        pre code { padding: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 3</p>
+        <h1>Embedded Machine Learning</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            TensorFlow Lite Micro, CMSIS-NN, Edge Impulse, quantization techniques, and neural network optimization for microcontrollers
+        </p>
+
+        <h2>Overview</h2>
+        <p>
+            Embedded machine learning, commonly known as TinyML, enables neural network inference on resource-constrained microcontrollers with kilobytes of RAM and megabytes of storage. This chapter explores the software frameworks, optimization techniques, and development workflows that make edge AI practical for smart sensors. Unlike cloud-based ML that requires constant connectivity and incurs latency, TinyML processes data locally with sub-100ms response times, enhanced privacy, and minimal power consumption.
+        </p>
+        <p>
+            The WIA-SEMI-015 standard requires on-device ML inference with model sizes ≤500KB, latency <100ms for typical models, and support for INT8 quantization. Achieving these targets demands careful model architecture selection, aggressive optimization, and leveraging specialized software libraries and hardware accelerators.
+        </p>
+
+        <div class="highlight-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>TensorFlow Lite Micro is the de facto standard for embedded ML inference</li>
+                <li>ARM CMSIS-NN provides hand-optimized kernels achieving 2-5× speedup on Cortex-M</li>
+                <li>INT8 quantization reduces model size by 4× and accelerates inference 2-4× with <1% accuracy loss</li>
+                <li>Edge Impulse (acquired by Qualcomm 2025) streamlines end-to-end TinyML development</li>
+                <li>Typical TinyML models: 10-200KB size, 5-50ms latency, 1-20mW power consumption</li>
+            </ul>
+        </div>
+
+        <h2>TensorFlow Lite Micro</h2>
+        <p>
+            TensorFlow Lite Micro (TFLM), developed by Google, has emerged as the industry standard runtime for executing neural networks on microcontrollers. Derived from the mobile-focused TensorFlow Lite, TFLM removes dependencies on operating system services, dynamic memory allocation, and standard C++ libraries, enabling deployment on bare-metal systems with minimal overhead.
+        </p>
+
+        <h3>Architecture and Design Principles</h3>
+        <p>
+            TFLM employs a static memory allocation strategy where all buffers are pre-allocated at initialization, eliminating runtime malloc/free and associated fragmentation. The interpreter loads a FlatBuffer model file containing network topology and quantized weights, then executes operators sequentially according to the graph structure. Memory arenas hold intermediate activation tensors, with careful planning to reuse buffers across layers and minimize peak memory usage.
+        </p>
+        <p>
+            The framework supports a subset of TensorFlow Lite operators optimized for embedded execution: convolution (Conv2D, DepthwiseConv2D), pooling (MaxPool2D, AveragePool2D), activation functions (ReLU, ReLU6, Sigmoid), fully connected (Dense), normalization (BatchNorm), and utility operations (Reshape, Concatenate, Pad). Quantization-aware training operators handle INT8 arithmetic with per-channel quantization parameters.
+        </p>
+
+        <h3>Integration and Optimization</h3>
+        <p>
+            TFLM integrates with vendor-optimized kernels for maximum performance. On ARM Cortex-M processors, CMSIS-NN implementations replace reference kernels, leveraging DSP extensions and SIMD instructions. Microcontroller vendors provide further optimizations: STMicroelectronics X-CUBE-AI generates highly optimized code for STM32 MCUs with 2-3× speedup, NXP eIQ integrates with i.MX RT processors supporting CMSIS-NN and Glow compiler, and Cadence Tensilica HiFi DSPs provide specialized neural network libraries.
+        </p>
+        <p>
+            Model conversion from TensorFlow to TensorFlow Lite employs the TFLite Converter, which performs graph optimization (operator fusion, constant folding), quantization (post-training or quantization-aware), and validation (numerical accuracy verification). The resulting .tflite file can be converted to C array for embedding in firmware or loaded from external flash storage.
+        </p>
+
+<pre><code>// Example: Loading and running inference with TFLM
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "model_data.h"  // Generated from .tflite file
+
+constexpr int kTensorArenaSize = 80 * 1024;  // 80KB arena
+uint8_t tensor_arena[kTensorArenaSize];
+
+// Load model
+const tflite::Model* model = tflite::GetModel(g_model_data);
+
+// Setup interpreter with required operators
+tflite::MicroMutableOpResolver<6> resolver;
+resolver.AddConv2D();
+resolver.AddMaxPool2D();
+resolver.AddFullyConnected();
+resolver.AddRelu();
+resolver.AddSoftmax();
+resolver.AddReshape();
+
+tflite::MicroInterpreter interpreter(
+    model, resolver, tensor_arena, kTensorArenaSize);
+interpreter.AllocateTensors();
+
+// Get input/output tensors
+TfLiteTensor* input = interpreter.input(0);
+TfLiteTensor* output = interpreter.output(0);
+
+// Copy sensor data to input
+for (int i = 0; i < input->bytes; i++) {
+    input->data.int8[i] = quantized_sensor_data[i];
+}
+
+// Run inference
+TfLiteStatus invoke_status = interpreter.Invoke();
+
+// Read results
+int8_t max_score = -128;
+int predicted_class = 0;
+for (int i = 0; i < output->dims->data[1]; i++) {
+    if (output->data.int8[i] > max_score) {
+        max_score = output->data.int8[i];
+        predicted_class = i;
+    }
+}
+</code></pre>
+
+        <h2>ARM CMSIS-NN</h2>
+        <p>
+            The ARM Cortex Microcontroller Software Interface Standard Neural Network (CMSIS-NN) library provides hand-optimized implementations of common neural network functions that exploit ARM Cortex-M processor features. Integration with TensorFlow Lite Micro delivers 2-5× performance improvements over reference implementations.
+        </p>
+
+        <h3>Optimization Techniques</h3>
+        <p>
+            CMSIS-NN leverages several ARM-specific optimizations. SIMD (Single Instruction Multiple Data) instructions like SMLAD (Signed Multiply Accumulate Dual) process four 8-bit values in parallel, achieving 4× throughput for INT8 operations. The DSP extension provides saturating arithmetic preventing overflow in quantized networks and specialized MAC (Multiply-ACcumulate) instructions optimized for convolution. Memory access patterns are optimized to maximize cache locality and minimize SRAM latency.
+        </p>
+        <p>
+            Quantized convolution implementations employ several tricks: im2col transformation converting convolution to matrix multiplication (GEMM), tiling strategies to fit activations in SRAM, and kernel-specific optimizations for common filter sizes (1×1, 3×3, 5×5). Depthwise separable convolutions receive special attention, as they appear frequently in efficient architectures like MobileNet.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Operation</th><th>Reference (ms)</th><th>CMSIS-NN (ms)</th><th>Speedup</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Conv2D 3×3 (INT8)</td><td>42.5</td><td>12.3</td><td>3.5×</td></tr>
+                <tr><td>DepthwiseConv2D 3×3</td><td>18.2</td><td>4.7</td><td>3.9×</td></tr>
+                <tr><td>Fully Connected (INT8)</td><td>8.4</td><td>3.2</td><td>2.6×</td></tr>
+                <tr><td>MaxPool2D 2×2</td><td>2.1</td><td>0.9</td><td>2.3×</td></tr>
+                <tr><td>ReLU (INT8)</td><td>1.3</td><td>0.6</td><td>2.2×</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Quantization Techniques</h2>
+        <p>
+            Quantization reduces model size and accelerates inference by converting 32-bit floating-point weights and activations to 8-bit integers. The WIA-SEMI-015 standard mandates INT8 support, as it provides the optimal balance between accuracy, performance, and hardware support across embedded platforms.
+        </p>
+
+        <h3>Post-Training Quantization (PTQ)</h3>
+        <p>
+            PTQ converts a trained floating-point model to quantized format without retraining. The process involves collecting activation statistics using representative calibration data (typically 100-1000 samples), computing per-layer scale factors mapping FP32 range to INT8 [-128, 127], converting weights using min-max or percentile calibration, and validating accuracy on test dataset. PTQ typically achieves 1-3% accuracy degradation for well-structured models, requires no changes to training pipeline, and completes in minutes to hours.
+        </p>
+
+        <h3>Quantization-Aware Training (QAT)</h3>
+        <p>
+            QAT simulates quantization effects during training, allowing the network to adapt and compensate for reduced precision. Fake quantization nodes inject quantization/dequantization in the forward pass, gradients flow through in full precision during backpropagation, and the optimizer learns weight values robust to quantization. QAT achieves <1% accuracy loss even for challenging models, enables more aggressive quantization strategies (per-channel vs. per-tensor), but requires access to training data and retraining time (hours to days).
+        </p>
+
+        <h3>Advanced Quantization</h3>
+        <p>
+            Mixed-precision quantization applies different bit widths to different layers based on sensitivity analysis: INT8 for most layers, INT16 for sensitive layers (first/last layers), and INT4 or binary for ultra-compact models. Per-channel quantization uses separate scale factors for each output channel in convolutions, improving accuracy by 1-2% with minimal overhead. Dynamic quantization quantizes weights offline but activations at runtime, useful when activation ranges are unknown or highly variable.
+        </p>
+
+        <h2>Edge Impulse Platform</h2>
+        <p>
+            Edge Impulse, acquired by Qualcomm in 2025, provides an end-to-end platform for developing TinyML applications. The cloud-based workflow handles data collection and labeling, feature engineering (spectral analysis, MFCC, image preprocessing), model training (neural networks, decision trees, anomaly detection), optimization and quantization, and deployment code generation for 200+ edge devices.
+        </p>
+
+        <h3>Workflow and Integration</h3>
+        <p>
+            Development begins with data collection using Edge Impulse mobile apps, web uploader, or direct sensor integration. Signal processing blocks extract features: for audio (MFCC, spectrogram, zero-crossing rate), for IMU sensors (spectral analysis, time-series stats), and for images (RGB to grayscale, normalization, augmentation). Learning blocks define model architectures from templates (classification, regression, object detection, anomaly detection) or custom Keras models.
+        </p>
+        <p>
+            The platform performs automated quantization (post-training INT8), benchmarking on target hardware (inference time, RAM, Flash), and generates deployment packages (Arduino library, C++ library, TensorFlow Lite model, or firmware binary). Integration with CMSIS-NN, vendor SDKs (STM32Cube.AI, NXP MCUXpresso), and hardware platforms (Arduino, Raspberry Pi Pico, Nordic nRF52840) enables rapid prototyping.
+        </p>
+
+        <h2>Model Architecture Selection</h2>
+        <p>
+            Choosing appropriate neural network architectures is critical for embedded deployment. Compact models optimized for mobile/edge devices adapt well to microcontrollers after quantization and optimization.
+        </p>
+
+        <h3>MobileNet Family</h3>
+        <p>
+            MobileNetV1 introduced depthwise separable convolutions, reducing computation and parameters by 8-9× compared to standard convolutions. MobileNetV2 added inverted residual blocks with linear bottlenecks, improving accuracy while maintaining efficiency. MobileNetV3 incorporated neural architecture search (NAS) and squeeze-and-excitation blocks for further optimization. Typical configurations for TinyML: MobileNetV1 0.25 (60-80KB quantized), MobileNetV2 0.35 (100-150KB quantized), suitable for image classification, object detection, and pose estimation.
+        </p>
+
+        <h3>Specialized Architectures</h3>
+        <p>
+            MicroNet targets extreme resource constraints with <500KB models achieving competitive ImageNet accuracy using automated search, dynamic channel scaling, and novel activation functions. Tiny-YOLO enables object detection on microcontrollers with 20-50KB models detecting 2-10 object classes with 20-40% mAP, real-time performance (5-15 FPS) on Cortex-M7. 1D CNN architectures excel for time-series sensor data with convolutional layers processing temporal windows, global pooling reducing dimensionality, and lightweight fully-connected classifier layers, achieving 5-20KB models for activity recognition, vibration analysis, and audio classification.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Architecture</th><th>Model Size (INT8)</th><th>Typical Use Cases</th><th>Inference Time (Cortex-M7)</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>MobileNetV1 0.25</td><td>60-80 KB</td><td>Image classification</td><td>150-200 ms</td></tr>
+                <tr><td>MobileNetV2 0.35</td><td>100-150 KB</td><td>Object detection</td><td>200-300 ms</td></tr>
+                <tr><td>Tiny-YOLO</td><td>20-50 KB</td><td>Object detection</td><td>80-150 ms</td></tr>
+                <tr><td>1D CNN (3 layers)</td><td>5-20 KB</td><td>Activity recognition</td><td>5-15 ms</td></tr>
+                <tr><td>LSTM (small)</td><td>10-30 KB</td><td>Time-series prediction</td><td>20-50 ms</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Memory and Latency Optimization</h2>
+        <p>
+            Embedded deployment requires aggressive optimization to fit within memory constraints and meet latency requirements. Several techniques reduce resource usage without sacrificing accuracy.
+        </p>
+
+        <h3>Model Compression</h3>
+        <p>
+            Pruning removes less important weights or entire neurons/filters based on magnitude-based criteria (remove smallest weights), gradient-based importance, or structured pruning (entire channels or layers). Achieving 30-60% sparsity with <1% accuracy loss is common. Knowledge distillation trains a smaller student model to mimic a larger teacher model, transferring learned representations to a compact architecture that requires access to training data but can reduce model size by 5-10× while maintaining 95%+ of teacher accuracy.
+        </p>
+
+        <h3>Operator Fusion and Graph Optimization</h3>
+        <p>
+            The TFLite converter automatically optimizes computational graphs by fusing BatchNorm into Conv layers (eliminating separate normalize step), combining Conv-ReLU into single operator (reducing memory access), and replacing groups of operations with single optimized kernels. Custom transformations can further reduce overhead for specific architectures.
+        </p>
+
+        <h3>Memory Reuse Strategies</h3>
+        <p>
+            Careful tensor arena management minimizes peak memory usage. In-place operations reuse input buffers for outputs when possible, lifetime analysis tracks when tensors are no longer needed and buffer recycling allocates multiple tensors to the same memory region at different execution stages. The TFLM memory planner automatically optimizes these patterns, but manual tuning can reduce peak usage by 20-40%.
+        </p>
+
+        <h2>Benchmarking and Profiling</h2>
+        <p>
+            Accurate performance measurement guides optimization efforts. WIA-SEMI-015 compliance testing requires documented inference latency, peak memory usage, and average power consumption.
+        </p>
+
+        <h3>Timing Measurements</h3>
+        <p>
+            Precise timing uses hardware timers or DWT (Data Watchpoint and Trace) cycle counters on ARM Cortex-M processors. Per-operator profiling identifies bottlenecks, overall inference time validates against <100ms requirement, and statistical analysis (min/mean/max over 1000 runs) characterizes variability. Be cautious of cache effects and system state affecting measurements.
+        </p>
+
+        <h3>Memory Profiling</h3>
+        <p>
+            Track tensor arena usage during execution to determine the minimum viable buffer size. Static analysis examines model structure to predict memory needs, runtime instrumentation monitors actual allocation patterns, and incremental reduction iteratively decreases arena size until allocation fails, then adds 10-20% margin.
+        </p>
+
+        <h3>Power Measurement</h3>
+        <p>
+            Power profiling uses current measurement (power supply current monitoring with µA resolution), energy calculation (integrate current over time for mJ per inference), and comparison of different optimization strategies (CMSIS-NN vs. reference, hardware accelerators vs. software). Nordic Power Profiler Kit II, Joulescope JS220, and oscilloscope current probes provide measurement capabilities.
+        </p>
+
+        <h2>Review Questions</h2>
+        <div class="info-box">
+            <ol>
+                <li>What are the key differences between TensorFlow Lite Micro and standard TensorFlow Lite?</li>
+                <li>Explain how INT8 quantization reduces both model size and inference latency. What is the typical accuracy impact?</li>
+                <li>Why does CMSIS-NN achieve 2-5× speedup over reference implementations on ARM Cortex-M processors?</li>
+                <li>Compare post-training quantization (PTQ) and quantization-aware training (QAT). When should each be used?</li>
+                <li>What advantages does Edge Impulse provide for TinyML development, and how has Qualcomm's acquisition impacted the ecosystem?</li>
+                <li>Why are depthwise separable convolutions particularly effective for embedded deployment?</li>
+                <li>Describe three techniques for reducing peak memory usage during inference execution.</li>
+            </ol>
+        </div>
+
+        <h2>Summary</h2>
+        <p>
+            This chapter explored embedded machine learning frameworks and techniques enabling neural network inference on microcontrollers. TensorFlow Lite Micro provides the standard runtime, ARM CMSIS-NN delivers optimized kernels achieving 2-5× speedup, and INT8 quantization reduces model size by 4× with minimal accuracy loss. Edge Impulse streamlines end-to-end development from data collection through deployment. Successful TinyML implementation requires careful model architecture selection (MobileNet, 1D CNN), aggressive optimization (pruning, fusion, quantization), and thorough benchmarking to validate compliance with WIA-SEMI-015 requirements.
+        </p>
+
+        </div>
+</body>
+</html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Hardware Architecture and Design | WIA-SMART-SENSOR</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --primary: #22c55e;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-secondary);
+            padding: 3rem;
+            border-radius: 10px;
+        }
+
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+
+        .highlight-box {
+            background: var(--bg-tertiary);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 5px;
+        }
+
+        .code-block {
+            background: #1a1a2e;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+
+        .code-block code { color: #a5f3fc; background: none; padding: 0; }
+
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin: 3rem 0;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: var(--bg);
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+
+        .arch-diagram {
+            background: var(--bg);
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .arch-diagram pre {
+            color: var(--text);
+            font-family: 'Monaco', monospace;
+            font-size: 0.85rem;
+            text-align: left;
+            display: inline-block;
+        }
+
+        .spec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .spec-card {
+            background: var(--bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid var(--border);
+        }
+
+        .spec-value {
+            font-size: 1.8rem;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .spec-label {
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 3</p>
+        <h1>Hardware Architecture and Design</h1>
+
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            The hardware architecture of smart sensors represents a sophisticated integration of sensing elements,
+            signal processing circuits, embedded computing, and communication interfaces. This chapter explores
+            the fundamental building blocks and design principles that enable intelligent sensing capabilities.
+        </p>
+
+        <h2>Smart Sensor Architecture Overview</h2>
+
+        <p>
+            A smart sensor is fundamentally different from a traditional sensor in that it incorporates on-board
+            intelligence for signal processing, decision making, and communication. The architecture typically
+            consists of multiple layers, each responsible for specific functions in the sensing pipeline. This
+            layered approach enables modularity, scalability, and the ability to optimize each component independently
+            while maintaining system-level integration.
+        </p>
+
+        <div class="arch-diagram">
+            <pre>
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     SMART SENSOR ARCHITECTURE                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐     │
+│  │  SENSING LAYER  │    │  PROCESSING     │    │  COMMUNICATION  │     │
+│  │                 │    │  LAYER          │    │  LAYER          │     │
+│  │  ┌───────────┐  │    │  ┌───────────┐  │    │  ┌───────────┐  │     │
+│  │  │ Transducer│  │───▶│  │   ADC     │  │───▶│  │  RF/Wire  │  │     │
+│  │  └───────────┘  │    │  └───────────┘  │    │  │  Interface│  │     │
+│  │  ┌───────────┐  │    │  ┌───────────┐  │    │  └───────────┘  │     │
+│  │  │Signal     │  │    │  │   DSP     │  │    │  ┌───────────┐  │     │
+│  │  │Conditioning│ │    │  │   Core    │  │    │  │ Protocol  │  │     │
+│  │  └───────────┘  │    │  └───────────┘  │    │  │  Stack    │  │     │
+│  │  ┌───────────┐  │    │  ┌───────────┐  │    │  └───────────┘  │     │
+│  │  │Reference  │  │    │  │   MCU     │  │    │  ┌───────────┐  │     │
+│  │  │Generation │  │    │  │   + ML    │  │    │  │  Security │  │     │
+│  │  └───────────┘  │    │  └───────────┘  │    │  │  Module   │  │     │
+│  └─────────────────┘    └─────────────────┘    │  └───────────┘  │     │
+│                                                 └─────────────────┘     │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                      POWER MANAGEMENT UNIT                       │   │
+│  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │   │
+│  │   │ Battery  │  │  Energy  │  │  Voltage │  │  Power   │       │   │
+│  │   │ /Harvest │  │  Storage │  │Regulators│  │  Gating  │       │   │
+│  │   └──────────┘  └──────────┘  └──────────┘  └──────────┘       │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+
+        <h2>Sensing Elements and Transducers</h2>
+
+        <p>
+            The transducer is the heart of any sensor, converting physical phenomena into electrical signals.
+            Smart sensors may incorporate single or multiple transducer types, enabling multi-modal sensing
+            capabilities. The selection of transducer technology depends on the measurand, required accuracy,
+            operating environment, and power constraints.
+        </p>
+
+        <h3>MEMS-Based Sensors</h3>
+
+        <p>
+            Micro-Electro-Mechanical Systems (MEMS) technology has revolutionized the sensor industry by enabling
+            the fabrication of miniaturized mechanical structures on silicon substrates. MEMS sensors offer
+            significant advantages in terms of size, cost, power consumption, and the ability to integrate
+            multiple sensing functions on a single chip. Common MEMS sensor types include accelerometers,
+            gyroscopes, pressure sensors, and microphones.
+        </p>
+
+        <div class="spec-grid">
+            <div class="spec-card">
+                <div class="spec-value">< 1mm³</div>
+                <div class="spec-label">MEMS Die Size</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">µW-mW</div>
+                <div class="spec-label">Power Range</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">16-24 bit</div>
+                <div class="spec-label">ADC Resolution</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-value">±0.1%</div>
+                <div class="spec-label">Typical Accuracy</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>MEMS Type</th>
+                    <th>Sensing Principle</th>
+                    <th>Key Specifications</th>
+                    <th>Applications</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Capacitive Accelerometer</strong></td>
+                    <td>Capacitance change with proof mass displacement</td>
+                    <td>±2g to ±16g range, 0.1mg resolution</td>
+                    <td>Motion tracking, vibration monitoring</td>
+                </tr>
+                <tr>
+                    <td><strong>Piezoelectric Gyroscope</strong></td>
+                    <td>Coriolis force on vibrating structure</td>
+                    <td>±250 to ±2000°/s, 0.01°/s noise</td>
+                    <td>IMU, navigation, stabilization</td>
+                </tr>
+                <tr>
+                    <td><strong>Piezoresistive Pressure</strong></td>
+                    <td>Resistance change under strain</td>
+                    <td>0-10 bar, 0.1% accuracy</td>
+                    <td>Barometry, altitude, industrial</td>
+                </tr>
+                <tr>
+                    <td><strong>Capacitive Microphone</strong></td>
+                    <td>Diaphragm capacitance modulation</td>
+                    <td>-38dBV sensitivity, 65dB SNR</td>
+                    <td>Voice, acoustic monitoring</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Optical Sensors</h3>
+
+        <p>
+            Optical sensing technologies leverage the interaction of light with matter to measure various
+            physical and chemical parameters. Photodiodes, phototransistors, and image sensors form the
+            foundation of optical smart sensors. Advanced implementations include spectroscopic sensors
+            for material identification and LiDAR sensors for distance measurement.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Optical Sensor Technologies:</strong>
+            <ul>
+                <li><strong>Photodiodes:</strong> Simple light intensity measurement, fast response</li>
+                <li><strong>Ambient Light Sensors:</strong> Visible light detection for display control</li>
+                <li><strong>Proximity Sensors:</strong> IR-based object detection</li>
+                <li><strong>Time-of-Flight:</strong> Distance measurement using light pulses</li>
+                <li><strong>Spectral Sensors:</strong> Multi-wavelength analysis for material ID</li>
+                <li><strong>Image Sensors:</strong> 2D/3D imaging with on-chip processing</li>
+            </ul>
+        </div>
+
+        <h2>Signal Conditioning Circuits</h2>
+
+        <p>
+            Raw transducer outputs are typically weak, noisy, and non-linear. Signal conditioning circuits
+            prepare these signals for digitization by providing amplification, filtering, linearization,
+            and impedance matching. The design of these circuits is critical for achieving the desired
+            sensor accuracy and dynamic range.
+        </p>
+
+        <h3>Amplification Stages</h3>
+
+        <p>
+            Instrumentation amplifiers are commonly used in smart sensors due to their high common-mode
+            rejection ratio (CMRR), high input impedance, and precise gain setting. For very low-level
+            signals, programmable gain amplifiers (PGAs) enable dynamic range optimization by adjusting
+            gain based on signal levels.
+        </p>
+
+        <div class="code-block">
+<code>// Programmable Gain Amplifier Configuration
+typedef struct {
+    uint8_t gain_setting;    // 0-7 for gains 1x to 128x
+    uint8_t bandwidth;       // Filter bandwidth selection
+    bool differential_mode;  // Single-ended or differential
+    bool chopper_enable;     // Chopper stabilization for low offset
+} PGA_Config;
+
+// Gain calculation: Gain = 2^gain_setting
+// Example: gain_setting = 5 -> Gain = 32x
+
+void configure_pga(PGA_Config* config) {
+    uint8_t reg_value = 0;
+    reg_value |= (config->gain_setting & 0x07);
+    reg_value |= (config->bandwidth << 3);
+    reg_value |= (config->differential_mode << 5);
+    reg_value |= (config->chopper_enable << 6);
+    write_register(PGA_CTRL_REG, reg_value);
+}</code>
+        </div>
+
+        <h3>Anti-Aliasing Filters</h3>
+
+        <p>
+            Before analog-to-digital conversion, anti-aliasing filters remove frequency components above
+            the Nyquist frequency to prevent aliasing artifacts. These are typically implemented as
+            active low-pass filters with carefully chosen cutoff frequencies and roll-off characteristics.
+            Switched-capacitor filters offer programmable cutoff frequencies for flexible system design.
+        </p>
+
+        <h2>Analog-to-Digital Conversion</h2>
+
+        <p>
+            The ADC is a critical component that determines the resolution, speed, and accuracy of the
+            digitized sensor data. Smart sensors employ various ADC architectures optimized for different
+            requirements.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ADC Architecture</th>
+                    <th>Resolution</th>
+                    <th>Speed</th>
+                    <th>Power</th>
+                    <th>Best For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>SAR (Successive Approximation)</strong></td>
+                    <td>12-18 bits</td>
+                    <td>100kSPS - 10MSPS</td>
+                    <td>Low</td>
+                    <td>General purpose, battery</td>
+                </tr>
+                <tr>
+                    <td><strong>Delta-Sigma (ΔΣ)</strong></td>
+                    <td>16-24 bits</td>
+                    <td>10SPS - 1MSPS</td>
+                    <td>Medium</td>
+                    <td>High resolution, precision</td>
+                </tr>
+                <tr>
+                    <td><strong>Pipeline</strong></td>
+                    <td>10-16 bits</td>
+                    <td>10MSPS - 1GSPS</td>
+                    <td>High</td>
+                    <td>High-speed imaging</td>
+                </tr>
+                <tr>
+                    <td><strong>Flash</strong></td>
+                    <td>6-10 bits</td>
+                    <td>> 1GSPS</td>
+                    <td>Very High</td>
+                    <td>Ultra-high speed</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Digital Signal Processing</h2>
+
+        <p>
+            Once digitized, sensor data undergoes various digital signal processing operations to extract
+            meaningful information. Modern smart sensors incorporate dedicated DSP cores or leverage the
+            DSP capabilities of embedded microcontrollers.
+        </p>
+
+        <h3>Common DSP Operations</h3>
+
+        <div class="highlight-box">
+            <strong>Digital Signal Processing Functions:</strong>
+            <ul>
+                <li><strong>Digital Filtering:</strong> FIR/IIR filters for noise reduction, band selection</li>
+                <li><strong>Decimation:</strong> Sample rate reduction with anti-aliasing</li>
+                <li><strong>Interpolation:</strong> Sample rate increase for synchronization</li>
+                <li><strong>FFT/DFT:</strong> Frequency domain analysis for vibration, audio</li>
+                <li><strong>Correlation:</strong> Pattern matching, time delay estimation</li>
+                <li><strong>Adaptive Filtering:</strong> Noise cancellation, echo removal</li>
+                <li><strong>Compression:</strong> Data reduction for bandwidth-limited transmission</li>
+            </ul>
+        </div>
+
+        <div class="code-block">
+<code>// Example: Digital Low-Pass Filter Implementation
+#define FILTER_ORDER 4
+#define FILTER_SECTIONS (FILTER_ORDER / 2)
+
+typedef struct {
+    float b[3];  // Numerator coefficients
+    float a[3];  // Denominator coefficients
+    float x[3];  // Input history
+    float y[3];  // Output history
+} BiquadSection;
+
+float biquad_filter(BiquadSection* section, float input) {
+    // Shift input history
+    section->x[2] = section->x[1];
+    section->x[1] = section->x[0];
+    section->x[0] = input;
+    
+    // Calculate output
+    float output = section->b[0] * section->x[0]
+                 + section->b[1] * section->x[1]
+                 + section->b[2] * section->x[2]
+                 - section->a[1] * section->y[1]
+                 - section->a[2] * section->y[2];
+    
+    // Shift output history
+    section->y[2] = section->y[1];
+    section->y[1] = section->y[0];
+    section->y[0] = output;
+    
+    return output;
+}
+
+float cascaded_filter(BiquadSection sections[], int num_sections, float input) {
+    float output = input;
+    for (int i = 0; i < num_sections; i++) {
+        output = biquad_filter(&sections[i], output);
+    }
+    return output;
+}</code>
+        </div>
+
+        <h2>Embedded Computing Platform</h2>
+
+        <p>
+            The embedded computing platform provides the intelligence that distinguishes smart sensors from
+            conventional sensors. This typically includes a microcontroller unit (MCU) with integrated
+            peripherals, memory, and increasingly, hardware acceleration for machine learning inference.
+        </p>
+
+        <h3>MCU Selection Criteria</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Criterion</th>
+                    <th>Low-Power IoT</th>
+                    <th>Industrial</th>
+                    <th>Edge AI</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Core Architecture</strong></td>
+                    <td>Cortex-M0+/M4</td>
+                    <td>Cortex-M4/M7</td>
+                    <td>Cortex-M55/M85</td>
+                </tr>
+                <tr>
+                    <td><strong>Clock Speed</strong></td>
+                    <td>32-64 MHz</td>
+                    <td>120-480 MHz</td>
+                    <td>200-800 MHz</td>
+                </tr>
+                <tr>
+                    <td><strong>Flash Memory</strong></td>
+                    <td>64-256 KB</td>
+                    <td>512KB-2MB</td>
+                    <td>2-8 MB</td>
+                </tr>
+                <tr>
+                    <td><strong>RAM</strong></td>
+                    <td>16-64 KB</td>
+                    <td>128-512 KB</td>
+                    <td>512KB-4MB</td>
+                </tr>
+                <tr>
+                    <td><strong>Active Power</strong></td>
+                    <td>< 50 µA/MHz</td>
+                    <td>< 100 µA/MHz</td>
+                    <td>< 200 µA/MHz</td>
+                </tr>
+                <tr>
+                    <td><strong>ML Accelerator</strong></td>
+                    <td>None</td>
+                    <td>Optional</td>
+                    <td>NPU/DSP</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Communication Interfaces</h2>
+
+        <p>
+            Smart sensors require robust communication interfaces for data transmission, configuration,
+            and integration into larger systems. The choice of interface depends on data rates, range,
+            power constraints, and the target application environment.
+        </p>
+
+        <h3>Wired Interfaces</h3>
+
+        <div class="highlight-box">
+            <strong>Common Wired Protocols:</strong>
+            <ul>
+                <li><strong>I²C:</strong> Simple 2-wire, 100kHz-3.4MHz, short range, multi-device bus</li>
+                <li><strong>SPI:</strong> High-speed 4-wire, up to 100MHz, full duplex, single master</li>
+                <li><strong>UART:</strong> Point-to-point serial, flexible baud rates, simple protocol</li>
+                <li><strong>CAN:</strong> Industrial robustness, up to 1Mbps, automotive/industrial</li>
+                <li><strong>Ethernet:</strong> High bandwidth, long range, industrial Ethernet variants</li>
+                <li><strong>IO-Link:</strong> Standardized sensor interface, bidirectional communication</li>
+            </ul>
+        </div>
+
+        <h3>Wireless Interfaces</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Protocol</th>
+                    <th>Range</th>
+                    <th>Data Rate</th>
+                    <th>Power</th>
+                    <th>Use Cases</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>BLE 5.x</strong></td>
+                    <td>100-400m</td>
+                    <td>2 Mbps</td>
+                    <td>Very Low</td>
+                    <td>Wearables, proximity</td>
+                </tr>
+                <tr>
+                    <td><strong>Wi-Fi (802.11)</strong></td>
+                    <td>50-100m</td>
+                    <td>Up to Gbps</td>
+                    <td>High</td>
+                    <td>High bandwidth, indoor</td>
+                </tr>
+                <tr>
+                    <td><strong>Zigbee/Thread</strong></td>
+                    <td>10-100m</td>
+                    <td>250 kbps</td>
+                    <td>Low</td>
+                    <td>Mesh networks, home</td>
+                </tr>
+                <tr>
+                    <td><strong>LoRa</strong></td>
+                    <td>2-15 km</td>
+                    <td>0.3-50 kbps</td>
+                    <td>Very Low</td>
+                    <td>Long range IoT, rural</td>
+                </tr>
+                <tr>
+                    <td><strong>NB-IoT/LTE-M</strong></td>
+                    <td>Cellular</td>
+                    <td>Up to 1 Mbps</td>
+                    <td>Medium</td>
+                    <td>Wide area, mobile</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Power Management Architecture</h2>
+
+        <p>
+            Power management is often the most critical aspect of smart sensor design, especially for
+            battery-powered and energy-harvesting applications. A comprehensive power management unit
+            (PMU) must efficiently convert, regulate, and distribute power while supporting various
+            operating modes for optimal energy utilization.
+        </p>
+
+        <h3>Power Architecture Components</h3>
+
+        <div class="code-block">
+<code>// Power Management State Machine
+typedef enum {
+    POWER_STATE_OFF,        // Complete shutdown
+    POWER_STATE_DEEP_SLEEP, // Minimal retention, RTC only
+    POWER_STATE_SLEEP,      // RAM retention, fast wake
+    POWER_STATE_IDLE,       // Peripherals off, CPU halt
+    POWER_STATE_ACTIVE_LOW, // Low-performance operation
+    POWER_STATE_ACTIVE_HIGH // Full performance
+} PowerState;
+
+typedef struct {
+    PowerState current_state;
+    uint32_t wake_sources;      // Bitmask of wake triggers
+    uint32_t active_peripherals; // Bitmask of powered peripherals
+    float battery_voltage;
+    float power_budget_mW;
+} PowerContext;
+
+// State transition with power budget check
+bool transition_power_state(PowerContext* ctx, PowerState new_state) {
+    float required_power = get_state_power_requirement(new_state);
+    
+    if (required_power > ctx->power_budget_mW) {
+        return false; // Insufficient power budget
+    }
+    
+    // Perform state-specific preparations
+    prepare_state_transition(ctx->current_state, new_state);
+    
+    // Configure wake sources
+    configure_wake_sources(ctx->wake_sources);
+    
+    // Update state
+    ctx->current_state = new_state;
+    return true;
+}</code>
+        </div>
+
+        <h2>Summary</h2>
+
+        <div class="highlight-box">
+            <h3 style="margin-top: 0;">Key Takeaways</h3>
+            <ul>
+                <li><strong>Layered Architecture:</strong> Sensing, processing, communication, and power
+                    management form distinct but integrated layers</li>
+                <li><strong>MEMS Dominance:</strong> MEMS technology enables miniaturized, low-power,
+                    multi-modal sensing capabilities</li>
+                <li><strong>Signal Chain:</strong> Careful design of amplification, filtering, and ADC
+                    stages determines overall sensor performance</li>
+                <li><strong>DSP Integration:</strong> On-chip digital processing reduces data bandwidth
+                    and enables intelligent feature extraction</li>
+                <li><strong>Flexible Communication:</strong> Multiple wired and wireless options enable
+                    deployment across diverse applications</li>
+                <li><strong>Power Optimization:</strong> Sophisticated power management with multiple
+                    operating states is essential for battery life</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li>What are the key advantages of MEMS-based sensors over traditional sensors?</li>
+            <li>Explain the role of signal conditioning in the smart sensor signal chain.</li>
+            <li>Compare SAR and Delta-Sigma ADC architectures for sensor applications.</li>
+            <li>What digital signal processing operations are commonly performed in smart sensors?</li>
+            <li>How do power states enable energy optimization in battery-powered sensors?</li>
+            <li>What factors influence the choice between wired and wireless communication interfaces?</li>
+            <li>Describe the trade-offs between MCU performance and power consumption.</li>
+            <li>How does the layered architecture enable modularity and scalability?</li>
+        </ol>
+
+        </div>
+</body>
+</html>
+>>>>>>> origin/main

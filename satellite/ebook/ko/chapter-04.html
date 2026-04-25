@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4장: 원격측정 및 추적 - WIA-SPACE-002</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-SPACE-002 v1.0</div>
+    <h1>4장</h1>
+    <p class="subtitle">원격측정 및 추적</p>
+    <p class="subtitle">TT&C, 지상국 연동</p>
+  </header>
+
+  <main>
+    <h2>4.1 TT&C 시스템 개요</h2>
+
+    <p>TT&C (Telemetry, Tracking, and Command)는 위성 운용의 핵심입니다. 지상국과 위성 간의 생명선 역할을 하며, 위성의 상태를 모니터링하고 제어 명령을 전송합니다.</p>
+
+    <div class="info-box">
+      <h4>🎯 TT&C의 3대 기능</h4>
+      <ul>
+        <li><strong>Telemetry (원격측정):</strong> 위성의 상태 데이터를 지상으로 전송</li>
+        <li><strong>Tracking (추적):</strong> 위성의 위치와 속도를 정밀하게 측정</li>
+        <li><strong>Command (명령):</strong> 지상에서 위성에 제어 명령 전송</li>
+      </ul>
+    </div>
+
+    <h3>TT&C의 중요성</h3>
+
+    <p>TT&C 시스템은 위성의 "신경계"입니다. 이 시스템 없이는:</p>
+
+    <ul>
+      <li>위성의 건강 상태를 알 수 없습니다</li>
+      <li>궤도 수정이 불가능합니다</li>
+      <li>소프트웨어 업데이트를 할 수 없습니다</li>
+      <li>이상 상황에 대응할 수 없습니다</li>
+      <li>페이로드 작동을 제어할 수 없습니다</li>
+    </ul>
+
+    <p>TT&C 시스템은 위성이 우주에 있는 동안 24시간 365일 작동해야 하는 가장 중요한 시스템입니다.</p>
+
+    <h2>4.2 원격측정 (Telemetry)</h2>
+
+    <p>원격측정은 위성의 상태 정보를 지상으로 전송하는 기능입니다. 수백~수천 개의 센서 데이터를 실시간으로 모니터링합니다.</p>
+
+    <h3>텔레메트리 데이터 종류</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>카테고리</th>
+          <th>측정 항목</th>
+          <th>목적</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>전력계</td>
+          <td>태양전지판 전류/전압, 배터리 전압/온도, 버스 전압, 전력 소모</td>
+          <td>전력 균형 모니터링</td>
+        </tr>
+        <tr>
+          <td>열제어</td>
+          <td>각 부품 온도, 라디에이터 온도, 히터 상태</td>
+          <td>열 균형 확인</td>
+        </tr>
+        <tr>
+          <td>자세제어</td>
+          <td>자이로 출력, 별 추적기 데이터, 반작용 휠 속도/전류</td>
+          <td>자세 정확도 검증</td>
+        </tr>
+        <tr>
+          <td>추진계</td>
+          <td>추진제 압력/온도, 밸브 상태, 탱크 압력</td>
+          <td>연료 잔량 추정</td>
+        </tr>
+        <tr>
+          <td>통신계</td>
+          <td>신호 세기, 비트 오류율, 증폭기 전력, 안테나 포인팅</td>
+          <td>링크 품질 모니터링</td>
+        </tr>
+        <tr>
+          <td>C&DH</td>
+          <td>CPU 사용률, 메모리 상태, 명령 실행 상태, 소프트웨어 버전</td>
+          <td>시스템 건강도</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>텔레메트리 프레임 구조</h3>
+
+    <p>텔레메트리 데이터는 표준화된 프레임으로 전송됩니다. CCSDS (Consultative Committee for Space Data Systems) 표준을 따릅니다.</p>
+
+    <div class="code-box">
+텔레메트리 프레임 구조:
+
+┌─────────────┬─────────────┬─────────────┬─────────────┐
+│   헤더      │  타임스탬프  │  데이터      │   오류검출   │
+│  (6 bytes)  │  (8 bytes)  │ (가변)       │   (2 bytes)  │
+└─────────────┴─────────────┴─────────────┴─────────────┘
+
+헤더:
+- 프레임 ID
+- 버전 번호
+- 데이터 길이
+
+데이터:
+- 아날로그 데이터 (ADC 값)
+- 디지털 데이터 (상태 비트)
+- 이벤트 메시지
+    </div>
+
+    <h3>텔레메트리 샘플링 전략</h3>
+
+    <p>모든 데이터를 항상 전송하는 것은 비효율적입니다. 데이터의 중요도와 변화율에 따라 샘플링 주기를 조절합니다:</p>
+
+    <ul>
+      <li><strong>고속 샘플링 (1Hz~10Hz):</strong> 자세 센서, 중요 전압/온도</li>
+      <li><strong>중속 샘플링 (0.1Hz):</strong> 일반 하우스키핑 데이터</li>
+      <li><strong>저속 샘플링 (0.01Hz):</strong> 느리게 변하는 파라미터</li>
+      <li><strong>이벤트 기반:</strong> 임계값 초과, 명령 실행 결과</li>
+    </ul>
+
+    <div class="warning-box">
+      <h4>⚠️ 텔레메트리 대역폭 관리</h4>
+      <p>LEO 위성은 지상국과의 가시 시간이 하루 10~30분에 불과합니다. 이 짧은 시간에 하루 치 데이터를 모두 다운로드해야 하므로, 데이터 압축과 우선순위 관리가 중요합니다. 일반적으로 실시간 데이터는 매 패스마다 전송하고, 상세 데이터는 온보드 메모리에 저장했다가 전송합니다.</p>
+    </div>
+
+    <h2>4.3 추적 (Tracking)</h2>
+
+    <p>추적은 위성의 정확한 위치와 속도를 측정하는 과정입니다. 정밀한 궤도 결정(Orbit Determination)과 궤도 예측(Orbit Propagation)에 필수적입니다.</p>
+
+    <h3>추적 방법</h3>
+
+    <h4>1. 거리 측정 (Ranging)</h4>
+
+    <p>지상국에서 위성까지의 거리를 측정합니다.</p>
+
+    <div class="info-box">
+      <h4>레인징 원리</h4>
+      <p>지상국이 특정 신호(레인징 톤 또는 의사랜덤 코드)를 위성으로 전송하고, 위성이 이를 되돌려 보냅니다. 왕복 시간(Round-Trip Time)을 측정하여 거리를 계산합니다:</p>
+      <div class="code-box">
+거리 = (왕복 시간 × 광속) / 2
+      </div>
+      <p>정밀도: 수 m ~ 수십 cm</p>
+    </div>
+
+    <h4>2. 각도 측정 (Angle Tracking)</h4>
+
+    <p>지상국에서 본 위성의 방위각(Azimuth)과 고도각(Elevation)을 측정합니다.</p>
+
+    <ul>
+      <li><strong>모노펄스 추적:</strong> 안테나 빔을 조금씩 움직여 신호 세기 최대점 찾기</li>
+      <li><strong>전자 추적:</strong> 위상 배열 안테나로 전자적 빔 조향</li>
+      <li><strong>정밀도:</strong> 0.01~0.1도</li>
+    </ul>
+
+    <h4>3. 도플러 측정 (Doppler Shift)</h4>
+
+    <p>위성의 상대 속도로 인해 수신 주파수가 변합니다. 이 도플러 편이를 측정하여 시선 방향 속도(radial velocity)를 계산합니다.</p>
+
+    <div class="code-box">
+도플러 편이: Δf = (v/c) × f₀
+
+여기서:
+- v: 시선 방향 상대 속도
+- c: 광속 (3×10⁸ m/s)
+- f₀: 원래 주파수
+
+예시: LEO 위성 (7.5 km/s), S-band (2 GHz)
+최대 도플러: ±50 kHz
+    </div>
+
+    <h4>4. GPS 기반 추적</h4>
+
+    <p>위성에 GPS 수신기를 탑재하여 자체적으로 위치를 측정합니다. LEO 위성에 효과적입니다.</p>
+
+    <ul>
+      <li><strong>정밀도:</strong> 수 m (단독), 수십 cm (차분 GPS)</li>
+      <li><strong>장점:</strong> 자율적, 실시간, 지상국 불필요</li>
+      <li><strong>제한:</strong> GPS 위성 고도(20,000 km) 이하에서만 작동</li>
+    </ul>
+
+    <h3>궤도 결정 과정</h3>
+
+    <p>추적 데이터를 이용하여 위성의 정확한 궤도를 계산하는 과정:</p>
+
+    <ol>
+      <li><strong>데이터 수집:</strong> 여러 지상국에서 거리, 각도, 도플러 측정</li>
+      <li><strong>전처리:</strong> 측정 오차 제거, 대기 지연 보정</li>
+      <li><strong>궤도 추정:</strong> 칼만 필터 또는 최소제곱법으로 궤도 요소 계산</li>
+      <li><strong>궤도 예측:</strong> 섭동력 모델로 미래 궤도 예측</li>
+      <li><strong>검증:</strong> 예측과 실제 측정 비교</li>
+    </ol>
+
+    <div class="info-box">
+      <h4>궤도 정밀도의 중요성</h4>
+      <p>지구 관측 위성은 수십 cm급 궤도 정밀도가 필요합니다. 간섭계 SAR(InSAR)는 밀리미터급 지표 변화를 측정하므로, 위성 궤도도 그에 상응하는 정밀도로 알아야 합니다. GPS는 수 나노초급 시각 동기가 필요하므로, 위성 궤도를 수십 cm 이내로 알아야 합니다.</p>
+    </div>
+
+    <h2>4.4 명령 (Command)</h2>
+
+    <p>명령 시스템은 지상에서 위성에 제어 신호를 전송합니다. 위성의 모든 작동은 명령으로 시작됩니다.</p>
+
+    <h3>명령의 종류</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>명령 유형</th>
+          <th>설명</th>
+          <th>예시</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>즉시 명령</td>
+          <td>수신 즉시 실행</td>
+          <td>안테나 방향 변경, 히터 ON/OFF</td>
+        </tr>
+        <tr>
+          <td>지연 명령</td>
+          <td>특정 시각에 실행</td>
+          <td>내일 03:00에 궤도 기동 시작</td>
+        </tr>
+        <tr>
+          <td>조건 명령</td>
+          <td>특정 조건 만족 시 실행</td>
+          <td>온도가 40도 초과하면 히터 OFF</td>
+        </tr>
+        <tr>
+          <td>매크로 명령</td>
+          <td>사전 정의된 명령 시퀀스</td>
+          <td>세이프 모드 진입 절차</td>
+        </tr>
+        <tr>
+          <td>메모리 로드</td>
+          <td>데이터/프로그램 업로드</td>
+          <td>소프트웨어 패치, 새 파라미터 테이블</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>명령 보안</h3>
+
+    <p>명령 시스템은 철저한 보안이 필요합니다. 잘못된 명령은 위성을 손상시키거나 임무를 실패시킬 수 있습니다.</p>
+
+    <div class="warning-box">
+      <h4>⚠️ 명령 보안 메커니즘</h4>
+      <ul>
+        <li><strong>인증 (Authentication):</strong> 명령이 정당한 지상국에서 온 것인지 확인</li>
+        <li><strong>암호화 (Encryption):</strong> 명령 내용을 암호화하여 전송</li>
+        <li><strong>CRC 검증:</strong> 전송 오류 검출</li>
+        <li><strong>명령 번호:</strong> 순차 번호로 중복 명령 방지</li>
+        <li><strong>위험 명령 2단계 확인:</strong> 중요 명령은 ARM-FIRE 절차로 이중 확인</li>
+      </ul>
+    </div>
+
+    <p>ARM-FIRE 절차의 예:</p>
+
+    <div class="code-box">
+1단계 (ARM): "추력기 밸브 개방 준비"
+   → 위성: 상태 확인 후 준비 완료 응답
+
+2단계 (FIRE): "추력기 밸브 개방 실행"
+   → 위성: 명령 실행
+
+만약 1단계 없이 2단계가 오면 명령 거부
+    </div>
+
+    <h3>명령 프레임 구조</h3>
+
+    <div class="code-box">
+명령 프레임 (CCSDS 표준):
+
+┌────────┬────────┬────────┬──────────┬────────┬────────┐
+│  헤더  │  인증  │ 명령ID │ 파라미터 │  CRC   │  꼬리  │
+│ 6바이트 │ 4바이트 │ 2바이트 │  가변    │ 2바이트 │ 1바이트 │
+└────────┴────────┴────────┴──────────┴────────┴────────┘
+
+헤더:
+- 프레임 동기 패턴
+- 버전 번호
+- 명령 길이
+
+인증:
+- 암호화된 인증 코드
+
+명령 ID:
+- 실행할 명령 식별자 (예: 0x0042 = 히터 제어)
+
+파라미터:
+- 명령에 필요한 데이터 (예: 히터 번호, ON/OFF)
+    </div>
+
+    <h2>4.5 지상국 시스템</h2>
+
+    <p>지상국은 위성과 통신하는 지상 시설입니다. 안테나, 송수신기, 추적 시스템, 데이터 처리 시스템으로 구성됩니다.</p>
+
+    <h3>지상국의 종류</h3>
+
+    <h4>1. TT&C 지상국</h4>
+
+    <p>위성 운용 전용 지상국입니다.</p>
+
+    <ul>
+      <li><strong>안테나:</strong> 7~13m 파라볼라, 자동 추적</li>
+      <li><strong>주파수:</strong> S-band (2 GHz)</li>
+      <li><strong>기능:</strong> 명령 송신, 텔레메트리 수신, 추적</li>
+      <li><strong>위치:</strong> 전 세계 분산 배치 (LEO 위성은 여러 지상국 필요)</li>
+    </ul>
+
+    <h4>2. 페이로드 데이터 지상국</h4>
+
+    <p>위성의 임무 데이터를 수신하는 지상국입니다.</p>
+
+    <ul>
+      <li><strong>안테나:</strong> 10~30m (고속 데이터 수신)</li>
+      <li><strong>주파수:</strong> X-band (8 GHz) 또는 Ka-band</li>
+      <li><strong>데이터 레이트:</strong> 수십 Mbps ~ Gbps</li>
+      <li><strong>예시:</strong> NOAA 기상위성 수신국, Landsat 영상 수신국</li>
+    </ul>
+
+    <h4>3. 상업 지상국 네트워크</h4>
+
+    <p>위성 운영자에게 서비스를 제공하는 상업 지상국입니다.</p>
+
+    <ul>
+      <li><strong>AWS Ground Station:</strong> 전 세계 12개 이상 위치</li>
+      <li><strong>KSAT (Kongsberg):</strong> 극지방 위주 네트워크</li>
+      <li><strong>SSC (Swedish Space Corporation):</strong> 북유럽 및 남극</li>
+      <li><strong>장점:</strong> 초기 투자 불필요, 유연한 사용, 전 지구 커버리지</li>
+    </ul>
+
+    <h3>안테나 추적 방식</h3>
+
+    <p>LEO 위성은 빠르게 이동하므로 안테나가 자동으로 추적해야 합니다.</p>
+
+    <div class="info-box">
+      <h4>추적 모드</h4>
+      <ul>
+        <li><strong>프로그램 추적 (Program Track):</strong> 사전 계산된 궤도 예측으로 안테나 지향. 위성 신호 없이도 추적 가능</li>
+        <li><strong>자동 추적 (Auto Track):</strong> 수신 신호 세기를 최대화하도록 실시간 추적. 더 정확하지만 신호 필요</li>
+        <li><strong>하이브리드:</strong> 프로그램 추적으로 초기 획득, 자동 추적으로 정밀 추적</li>
+      </ul>
+    </div>
+
+    <h3>지상국 가시성 계산</h3>
+
+    <p>LEO 위성은 특정 지상국 상공을 하루 몇 회만 통과합니다. 가시 시간은 위성 고도와 최소 고도각에 따라 결정됩니다.</p>
+
+    <div class="code-box">
+예시: 600km 고도, 최소 고도각 5도
+
+최대 가시 거리 = 2,400 km
+지평선까지 각도 = 약 30도
+단일 패스 지속 시간 = 약 10분
+하루 패스 횟수 = 4~6회 (지상국 위치에 따라)
+하루 총 가시 시간 = 40~60분
+    </div>
+
+    <p>전 지구 커버리지를 위해서는 여러 지상국이 필요하거나, 위성 간 통신(ISL)으로 데이터를 중계해야 합니다.</p>
+
+    <h2>4.6 임무 통제 센터 (MCC - Mission Control Center)</h2>
+
+    <p>임무 통제 센터는 위성 운용의 두뇌입니다. 텔레메트리를 분석하고, 명령을 생성하며, 이상 상황에 대응합니다.</p>
+
+    <h3>MCC의 주요 기능</h3>
+
+    <ul>
+      <li><strong>실시간 모니터링:</strong> 위성 상태를 24/7 감시</li>
+      <li><strong>이상 탐지:</strong> 비정상 텔레메트리 자동 경보</li>
+      <li><strong>명령 계획 및 실행:</strong> 일일 운용 계획 수립 및 명령 전송</li>
+      <li><strong>궤도 결정 및 예측:</strong> 추적 데이터 분석, 궤도 기동 계획</li>
+      <li><strong>트렌드 분석:</strong> 장기 데이터로 성능 추이 분석</li>
+      <li><strong>이상 대응:</strong> 고장 진단 및 복구 절차 실행</li>
+    </ul>
+
+    <h3>운용 팀 구성</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>역할</th>
+          <th>책임</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Flight Director</td>
+          <td>전체 운용 총괄, 의사결정</td>
+        </tr>
+        <tr>
+          <td>Spacecraft Engineer</td>
+          <td>위성 시스템 모니터링, 이상 진단</td>
+        </tr>
+        <tr>
+          <td>Flight Dynamics Officer</td>
+          <td>궤도 분석, 기동 계획</td>
+        </tr>
+        <tr>
+          <td>Ground Systems Engineer</td>
+          <td>지상국 운용, 통신 링크 관리</td>
+        </tr>
+        <tr>
+          <td>Payload Engineer</td>
+          <td>페이로드 운용, 데이터 품질 확인</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4.7 자율 운용</h2>
+
+    <p>현대 위성은 지상국과 연결되지 않은 시간 동안 자율적으로 작동해야 합니다. 특히 심우주 탐사선은 통신 지연이 수 분~수 시간이므로 자율성이 필수입니다.</p>
+
+    <h3>자율 기능</h3>
+
+    <ul>
+      <li><strong>이상 탐지 및 대응 (FDIR - Fault Detection, Isolation, and Recovery):</strong> 이상 감지 시 자동으로 세이프 모드 진입</li>
+      <li><strong>자율 항법:</strong> GPS 또는 별 추적기로 자체 위치/자세 결정</li>
+      <li><strong>자율 전력 관리:</strong> 일식 시 자동 전력 절감</li>
+      <li><strong>자율 열제어:</strong> 온도에 따라 히터 자동 제어</li>
+      <li><strong>자율 궤도 유지:</strong> 사전 정의된 임계값 벗어나면 자동 궤도 수정</li>
+    </ul>
+
+    <div class="info-box">
+      <h4>세이프 모드 (Safe Mode)</h4>
+      <p>위성이 심각한 이상을 감지하면 자동으로 세이프 모드로 전환됩니다. 이 모드에서는:</p>
+      <ul>
+        <li>페이로드를 OFF하여 전력 절감</li>
+        <li>태양전지판을 태양으로 지향하여 최대 전력 확보</li>
+        <li>안테나를 지구로 지향하여 통신 유지</li>
+        <li>필수 시스템만 작동하여 생존 보장</li>
+        <li>지상국의 명령을 기다림</li>
+      </ul>
+      <p>세이프 모드는 위성이 스스로를 보호하는 "생존 본능"입니다.</p>
+    </div>
+
+    <h2>4.8 데이터 처리 및 보관</h2>
+
+    <p>텔레메트리 데이터는 방대합니다. 이를 효율적으로 처리하고 보관하는 시스템이 필요합니다.</p>
+
+    <h3>데이터 처리 파이프라인</h3>
+
+    <ol>
+      <li><strong>실시간 처리:</strong> 수신 즉시 디스플레이, 이상 경보</li>
+      <li><strong>레벨 0 처리:</strong> 원시 프레임 정렬, 타임스탬프 부여</li>
+      <li><strong>레벨 1 처리:</strong> 공학 단위 변환 (ADC 값 → 전압, 온도 등)</li>
+      <li><strong>레벨 2 처리:</strong> 과학 데이터 추출 (지구 관측 영상 등)</li>
+      <li><strong>보관:</strong> 장기 데이터베이스 저장</li>
+    </ol>
+
+    <h3>데이터 보관 정책</h3>
+
+    <ul>
+      <li><strong>실시간 데이터:</strong> 24시간 빠른 액세스 스토리지</li>
+      <li><strong>최근 데이터 (1개월):</strong> 온라인 스토리지</li>
+      <li><strong>과거 데이터 (1년):</strong> 니어라인 스토리지</li>
+      <li><strong>아카이브 (10년+):</strong> 테이프 또는 클라우드</li>
+    </ul>
+
+    <p>NASA는 수십 년 된 위성 데이터도 보관하여, 기후 변화 등 장기 추세 연구에 활용합니다.</p>
+
+    <h2>4.9 표준 및 프로토콜</h2>
+
+    <h3>CCSDS (Consultative Committee for Space Data Systems)</h3>
+
+    <p>CCSDS는 우주 데이터 시스템의 국제 표준을 제정합니다. 주요 표준:</p>
+
+    <ul>
+      <li><strong>TM (Telemetry):</strong> 텔레메트리 프레임 및 패킷 구조</li>
+      <li><strong>TC (Telecommand):</strong> 명령 프레임 구조</li>
+      <li><strong>AOS (Advanced Orbiting Systems):</strong> 고급 데이터 링크 프로토콜</li>
+      <li><strong>CFDP (CCSDS File Delivery Protocol):</strong> 파일 전송 프로토콜</li>
+      <li><strong>SLE (Space Link Extension):</strong> 지상국 간 데이터 교환</li>
+    </ul>
+
+    <p>CCSDS 표준을 따르면 다른 기관의 지상국을 사용할 수 있어, 글로벌 협력이 용이합니다.</p>
+
+    <h2>4.10 요약</h2>
+
+    <p>이 장에서는 TT&C 시스템과 지상국 운용을 다루었습니다:</p>
+
+    <ul>
+      <li>TT&C는 원격측정, 추적, 명령의 3대 기능으로 위성 운용의 핵심입니다</li>
+      <li>텔레메트리는 수천 개 센서 데이터를 실시간으로 모니터링합니다</li>
+      <li>추적은 거리, 각도, 도플러 측정으로 정밀한 궤도를 결정합니다</li>
+      <li>명령은 인증과 암호화로 보안을 유지하며 위성을 제어합니다</li>
+      <li>지상국은 안테나, 송수신기, 추적 시스템으로 구성됩니다</li>
+      <li>임무 통제 센터는 24/7 위성을 모니터링하고 운용합니다</li>
+      <li>자율 운용 기능으로 이상 시 스스로 세이프 모드로 전환합니다</li>
+      <li>CCSDS 표준으로 국제 상호운용성을 보장합니다</li>
+    </ul>
+
+    <p>다음 장에서는 위성 궤도 역학을 심화 학습하겠습니다.</p>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-03.html" class="nav-button">3장</a>
+    <a href="chapter-05.html" class="nav-button next">5장</a>
+  </div>
+</body>
+</html>

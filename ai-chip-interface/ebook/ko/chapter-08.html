@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>8장: 성능 프로파일링 및 미래 방향 | WIA-AI-011</title>
+    <style>
+        body { font-family: 'Noto Sans KR'; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { font-size: 2.5em; margin: 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px; }
+        h3 { color: #059669; font-size: 1.4em; margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; line-height: 2; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; overflow-x: auto; border-left: 4px solid #10B981; }
+        code { font-family: 'Consolas', monospace; font-size: 0.95em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #10B981; font-weight: bold; }
+        .summary, .review-questions { padding: 30px; border-radius: 8px; margin: 40px 0; }
+        .summary { background: #f0fdf4; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="color: #10B981; font-weight: bold; border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px;">
+            <div>8장</div><h1>성능 프로파일링 및 미래 방향</h1>
+        </div>
+
+        <h2>8.1 프로파일링 도구 개요</h2>
+        <p>WIA-AI-011은 다층 프로파일링 아키텍처를 제공하여 하드웨어 수준부터 애플리케이션 수준까지 성능 데이터를 수집합니다. 프로파일링 API는 타이밍, 메모리 사용량, 하드웨어 카운터, 통신 메트릭을 포착하며, 오버헤드를 최소화하기 위해 샘플링 및 계측 방식을 모두 지원합니다.</p>
+
+        <h3>8.1.1 프로파일러 아키텍처</h3>
+        <p>프로파일러는 여러 계층에서 데이터를 수집합니다:</p>
+        <ul>
+            <li><strong>하드웨어 카운터</strong>: GPU/NPU의 성능 모니터링 유닛(PMU)에서 직접 수집</li>
+            <li><strong>런타임 이벤트</strong>: 커널 실행, 메모리 전송, 동기화 포인트</li>
+            <li><strong>통신 추적</strong>: 집합 연산, P2P 전송, RDMA 활동</li>
+            <li><strong>메모리 프로파일링</strong>: 할당/해제 패턴, 메모리 대역폭, 캐시 히트율</li>
+        </ul>
+
+        <pre><code>// 프로파일러 초기화 및 설정
+#include &lt;wia_ai_011/profiler.h&gt;
+
+// 프로파일링 컨텍스트 생성
+wiaProfilerContext* profiler;
+wiaProfilerConfig config = {
+    .mode = WIA_PROFILER_TIMELINE,        // 타임라인 모드
+    .sample_rate = 1000,                   // 1kHz 샘플링
+    .enable_hw_counters = true,            // 하드웨어 카운터 활성화
+    .enable_memory_tracking = true,        // 메모리 추적
+    .output_format = WIA_PROFILER_JSON     // JSON 출력
+};
+wiaCreateProfiler(&config, &profiler);
+
+// 프로파일링 범위 시작
+wiaProfilerScope scope;
+wiaProfilerBeginScope(profiler, "model_inference", &scope);
+
+// 추적할 작업 수행
+wiaLaunchKernel(context, kernel, grid, block, stream);
+wiaMemcpyAsync(dst, src, size, WIA_MEMCPY_DEVICE_TO_HOST, stream);
+
+// 프로파일링 범위 종료
+wiaProfilerEndScope(profiler, &scope);
+
+// 결과 저장
+wiaProfilerExport(profiler, "profile_results.json");
+wiaDestroyProfiler(profiler);</code></pre>
+
+        <h3>8.1.2 타이밍 측정</h3>
+        <p>정확한 타이밍 측정은 성능 분석의 기초입니다. WIA-AI-011은 마이크로초 정밀도의 이벤트 타이머를 제공합니다:</p>
+
+        <pre><code>// 고정밀 타이밍 측정
+wiaEvent start, end;
+wiaEventCreate(&start);
+wiaEventCreate(&end);
+
+// 이벤트 기록
+wiaEventRecord(start, stream);
+
+// 측정할 작업
+for (int i = 0; i &lt; num_iterations; i++) {
+    wiaLaunchKernel(context, kernel, grid, block, stream);
+}
+
+wiaEventRecord(end, stream);
+wiaStreamSynchronize(stream);
+
+// 경과 시간 계산 (밀리초)
+float elapsed_ms;
+wiaEventElapsedTime(&elapsed_ms, start, end);
+
+printf("평균 커널 실행 시간: %.3f ms\n", elapsed_ms / num_iterations);
+
+wiaEventDestroy(start);
+wiaEventDestroy(end);</code></pre>
+
+        <h2>8.2 타임라인 프로파일링</h2>
+        <p>타임라인 프로파일링은 시간 축에 따라 모든 하드웨어 활동을 시각화하여 병목 지점, 유휴 시간, 중복 효율성을 파악할 수 있게 합니다.</p>
+
+        <h3>8.2.1 타임라인 이벤트 수집</h3>
+        <p>타임라인 프로파일러는 스트림별, 디바이스별로 이벤트를 추적합니다:</p>
+
+        <table>
+            <tr>
+                <th>이벤트 유형</th>
+                <th>설명</th>
+                <th>메트릭</th>
+            </tr>
+            <tr>
+                <td>커널 실행</td>
+                <td>컴퓨트 커널 실행 시간</td>
+                <td>시작/종료 시간, 점유율, FLOPS</td>
+            </tr>
+            <tr>
+                <td>메모리 전송</td>
+                <td>H2D, D2H, D2D 복사</td>
+                <td>크기, 대역폭, 지연 시간</td>
+            </tr>
+            <tr>
+                <td>동기화</td>
+                <td>스트림 대기, 이벤트 대기</td>
+                <td>대기 시간, 블로킹 이벤트</td>
+            </tr>
+            <tr>
+                <td>집합 연산</td>
+                <td>AllReduce, Broadcast 등</td>
+                <td>알고리즘, 데이터 크기, 지연 시간</td>
+            </tr>
+        </table>
+
+        <h3>8.2.2 타임라인 분석</h3>
+        <p>타임라인 분석을 통해 다음을 식별할 수 있습니다:</p>
+        <ul>
+            <li><strong>GPU 기아 (GPU Starvation)</strong>: 컴퓨트 유닛이 유휴 상태인 시간</li>
+            <li><strong>메모리 병목</strong>: 메모리 전송이 전체 실행 시간을 지배하는 경우</li>
+            <li><strong>동기화 오버헤드</strong>: 불필요한 동기화로 인한 대기 시간</li>
+            <li><strong>파이프라인 버블</strong>: 스트림 간 의존성으로 인한 유휴 시간</li>
+        </ul>
+
+        <pre><code>// 타임라인 추적을 위한 자동 계측
+#define WIA_TRACE_SCOPE(name) \
+    wiaProfilerScope __scope_##__LINE__; \
+    wiaProfilerBeginScope(g_profiler, name, &__scope_##__LINE__); \
+    struct __scope_guard_##__LINE__ { \
+        wiaProfilerScope* s; \
+        ~__scope_guard_##__LINE__() { wiaProfilerEndScope(g_profiler, s); } \
+    } __guard_##__LINE__{&__scope_##__LINE__};
+
+// 사용 예제
+void inference_pipeline() {
+    WIA_TRACE_SCOPE("전체_추론");
+
+    {
+        WIA_TRACE_SCOPE("전처리");
+        preprocess_input(input_data);
+    }
+
+    {
+        WIA_TRACE_SCOPE("모델_실행");
+        for (int layer = 0; layer &lt; num_layers; layer++) {
+            WIA_TRACE_SCOPE("레이어_" + std::to_string(layer));
+            execute_layer(layer);
+        }
+    }
+
+    {
+        WIA_TRACE_SCOPE("후처리");
+        postprocess_output(output_data);
+    }
+}</code></pre>
+
+        <h2>8.3 메모리 프로파일링</h2>
+        <p>메모리 프로파일링은 메모리 누수, 단편화, 비효율적인 할당 패턴을 감지하여 메모리 사용을 최적화합니다.</p>
+
+        <h3>8.3.1 메모리 사용 추적</h3>
+        <p>WIA-AI-011 메모리 프로파일러는 모든 할당/해제를 추적하고 메모리 사용 패턴을 분석합니다:</p>
+
+        <pre><code>// 메모리 프로파일링 활성화
+wiaMemoryProfilerConfig mem_config = {
+    .track_allocations = true,      // 모든 할당 추적
+    .track_callstacks = true,       // 호출 스택 기록
+    .detect_leaks = true,           // 메모리 누수 감지
+    .fragmentation_threshold = 0.3  // 단편화 임계값 30%
+};
+wiaEnableMemoryProfiler(&mem_config);
+
+// 메모리 스냅샷 캡처
+wiaMemorySnapshot snapshot;
+wiaCaptureMemorySnapshot(&snapshot);
+
+printf("총 할당 메모리: %.2f MB\n", snapshot.total_allocated / (1024.0 * 1024.0));
+printf("피크 메모리 사용: %.2f MB\n", snapshot.peak_usage / (1024.0 * 1024.0));
+printf("활성 할당 개수: %d\n", snapshot.active_allocations);
+printf("메모리 단편화율: %.1f%%\n", snapshot.fragmentation * 100);
+
+// 메모리 누수 보고서
+wiaMemoryLeakReport leak_report;
+wiaCheckMemoryLeaks(&leak_report);
+if (leak_report.num_leaks > 0) {
+    printf("경고: %d개의 메모리 누수 감지!\n", leak_report.num_leaks);
+    for (int i = 0; i &lt; leak_report.num_leaks; i++) {
+        printf("  누수 #%d: %zu bytes at %s:%d\n",
+               i, leak_report.leaks[i].size,
+               leak_report.leaks[i].file,
+               leak_report.leaks[i].line);
+    }
+}</code></pre>
+
+        <h3>8.3.2 메모리 대역폭 분석</h3>
+        <p>메모리 대역폭 프로파일링은 실제 대역폭 활용률과 이론적 피크의 비율을 측정합니다:</p>
+
+        <pre><code>// 메모리 대역폭 프로파일링
+wiaMemoryBandwidthProfiler bw_profiler;
+wiaCreateBandwidthProfiler(&bw_profiler);
+
+// 커널 실행 중 대역폭 측정
+wiaProfileBandwidthBegin(bw_profiler, stream);
+wiaLaunchKernel(context, matmul_kernel, grid, block, stream);
+wiaProfileBandwidthEnd(bw_profiler, stream);
+
+// 결과 분석
+wiaMemoryBandwidthStats stats;
+wiaGetBandwidthStats(bw_profiler, &stats);
+
+printf("실제 대역폭: %.2f GB/s\n", stats.achieved_bandwidth / 1e9);
+printf("이론적 피크: %.2f GB/s\n", stats.peak_bandwidth / 1e9);
+printf("대역폭 효율: %.1f%%\n",
+       (stats.achieved_bandwidth / stats.peak_bandwidth) * 100);
+printf("평균 메모리 지연시간: %.2f ns\n", stats.avg_latency * 1e9);</code></pre>
+
+        <h2>8.4 커널 분석 및 루프라인 모델</h2>
+        <p>루프라인 모델(Roofline Model)은 커널이 컴퓨트 바운드인지 메모리 바운드인지 판단하여 최적화 방향을 제시합니다.</p>
+
+        <h3>8.4.1 루프라인 모델 기초</h3>
+        <p>루프라인 모델은 다음 공식으로 성능 상한을 정의합니다:</p>
+        <ul>
+            <li><strong>산술 강도 (Arithmetic Intensity)</strong>: I = FLOP / Bytes</li>
+            <li><strong>성능 상한</strong>: P = min(피크_FLOPS, I × 메모리_대역폭)</li>
+        </ul>
+
+        <pre><code>// 루프라인 분석을 위한 커널 메트릭 수집
+wiaKernelProfiler kernel_profiler;
+wiaCreateKernelProfiler(&kernel_profiler);
+
+// 커널 프로파일링
+wiaKernelMetrics metrics;
+wiaProfileKernel(kernel_profiler, kernel, &metrics);
+
+// 산술 강도 계산
+double arithmetic_intensity =
+    (double)metrics.total_flops / (double)metrics.total_bytes;
+
+// 루프라인 분석
+wiaRooflineAnalysis analysis;
+wiaComputeRoofline(&metrics, &analysis);
+
+printf("=== 루프라인 분석 ===\n");
+printf("총 FLOP: %.2e\n", (double)metrics.total_flops);
+printf("총 Bytes: %.2e\n", (double)metrics.total_bytes);
+printf("산술 강도: %.2f FLOP/Byte\n", arithmetic_intensity);
+printf("실제 성능: %.2f TFLOPS\n", metrics.achieved_tflops);
+printf("피크 성능: %.2f TFLOPS\n", analysis.peak_tflops);
+printf("성능 효율: %.1f%%\n",
+       (metrics.achieved_tflops / analysis.peak_tflops) * 100);
+
+// 병목 진단
+if (analysis.is_compute_bound) {
+    printf("진단: 컴퓨트 바운드 - 연산 최적화 필요\n");
+    printf("  권장: 명령어 수준 병렬성(ILP), 루프 언롤링\n");
+} else {
+    printf("진단: 메모리 바운드 - 메모리 접근 최적화 필요\n");
+    printf("  권장: 데이터 재사용, 캐시 블로킹, 메모리 코어레싱\n");
+}</code></pre>
+
+        <h3>8.4.2 커널 점유율 분석</h3>
+        <p>커널 점유율(Occupancy)은 하드웨어 활용도를 나타내는 핵심 메트릭입니다:</p>
+
+        <pre><code>// 점유율 계산기
+wiaOccupancyCalculator calc;
+wiaKernelAttributes attrs = {
+    .num_regs_per_thread = 64,       // 스레드당 레지스터 수
+    .shared_mem_per_block = 16384,   // 블록당 공유 메모리 (bytes)
+    .block_size = 256                // 블록 크기
+};
+
+double theoretical_occupancy;
+wiaCalculateOccupancy(&attrs, &theoretical_occupancy);
+
+printf("이론적 점유율: %.1f%%\n", theoretical_occupancy * 100);
+
+// 점유율 제한 요인 분석
+wiaOccupancyLimiters limiters;
+wiaAnalyzeOccupancyLimiters(&attrs, &limiters);
+
+if (limiters.limited_by_registers) {
+    printf("제한 요인: 레지스터 사용량 (%.1f%%)\n",
+           limiters.register_pressure * 100);
+}
+if (limiters.limited_by_shared_memory) {
+    printf("제한 요인: 공유 메모리 사용량 (%.1f%%)\n",
+           limiters.shared_memory_pressure * 100);
+}</code></pre>
+
+        <h2>8.5 통신 프로파일링</h2>
+        <p>분산 학습에서 통신 오버헤드는 전체 성능에 큰 영향을 미칩니다. 통신 프로파일링은 집합 연산, P2P 전송, 통신-연산 중복을 분석합니다.</p>
+
+        <h3>8.5.1 집합 연산 추적</h3>
+        <pre><code>// 통신 프로파일러 초기화
+wiaCommProfiler comm_profiler;
+wiaCreateCommProfiler(&comm_profiler);
+
+// AllReduce 프로파일링
+wiaCommEvent comm_event;
+wiaCommProfileBegin(comm_profiler, &comm_event);
+
+wiaAllReduce(sendbuf, recvbuf, count, WIA_FLOAT32,
+             WIA_SUM, comm, stream);
+
+wiaCommProfileEnd(comm_profiler, &comm_event);
+
+// 통신 메트릭 수집
+wiaCommMetrics comm_metrics;
+wiaGetCommMetrics(comm_profiler, &comm_metrics);
+
+printf("=== 통신 프로파일링 결과 ===\n");
+printf("AllReduce 지연시간: %.3f ms\n", comm_metrics.latency_ms);
+printf("데이터 크기: %.2f MB\n", comm_metrics.data_size / (1024.0 * 1024.0));
+printf("유효 대역폭: %.2f GB/s\n", comm_metrics.bandwidth / 1e9);
+printf("알고리즘: %s\n", comm_metrics.algorithm_name);
+printf("통신-연산 중복: %.1f%%\n", comm_metrics.overlap_ratio * 100);</code></pre>
+
+        <h3>8.5.2 통신 패턴 분석</h3>
+        <p>통신 패턴 분석은 비효율적인 통신을 식별하고 최적화 기회를 제공합니다:</p>
+
+        <table>
+            <tr>
+                <th>통신 패턴</th>
+                <th>특징</th>
+                <th>최적화 전략</th>
+            </tr>
+            <tr>
+                <td>Small Message</td>
+                <td>작은 데이터 크기, 높은 지연 시간</td>
+                <td>메시지 병합, 파이프라이닝</td>
+            </tr>
+            <tr>
+                <td>Large Message</td>
+                <td>큰 데이터 크기, 대역폭 포화</td>
+                <td>압축, 양자화, 희소성 활용</td>
+            </tr>
+            <tr>
+                <td>Frequent Sync</td>
+                <td>잦은 동기화, 블로킹</td>
+                <td>비동기 통신, 중복 증가</td>
+            </tr>
+            <tr>
+                <td>Imbalanced</td>
+                <td>랭크 간 불균형</td>
+                <td>로드 밸런싱, 동적 스케줄링</td>
+            </tr>
+        </table>
+
+        <h2>8.6 성능 벤치마킹</h2>
+        <p>정확한 벤치마킹은 재현 가능한 성능 측정과 공정한 비교를 보장합니다.</p>
+
+        <h3>8.6.1 벤치마크 모범 사례</h3>
+        <ul>
+            <li><strong>워밍업 (Warm-up)</strong>: 최소 3-5회 워밍업 실행으로 JIT 컴파일, 캐시 프리페칭 효과 제거</li>
+            <li><strong>반복 측정</strong>: 최소 10회 이상 반복하여 중앙값 또는 평균 사용</li>
+            <li><strong>환경 격리</strong>: 다른 프로세스의 간섭을 최소화</li>
+            <li><strong>주파수 고정</strong>: GPU/CPU 클럭을 고정하여 일관된 결과 보장</li>
+            <li><strong>통계 분석</strong>: 표준편차, 신뢰구간 계산</li>
+        </ul>
+
+        <pre><code>// 벤치마크 유틸리티
+class WIABenchmark {
+public:
+    WIABenchmark(const char* name, int warmup_iters = 5, int bench_iters = 20)
+        : name_(name), warmup_iters_(warmup_iters), bench_iters_(bench_iters) {}
+
+    template&lt;typename Func&gt;
+    void run(Func&& func) {
+        // 워밍업
+        for (int i = 0; i &lt; warmup_iters_; i++) {
+            func();
+        }
+
+        // 실제 측정
+        std::vector&lt;double&gt; timings;
+        for (int i = 0; i &lt; bench_iters_; i++) {
+            auto start = std::chrono::high_resolution_clock::now();
+            func();
+            wiaDeviceSynchronize();  // 동기화 필수!
+            auto end = std::chrono::high_resolution_clock::now();
+
+            double elapsed_ms =
+                std::chrono::duration&lt;double, std::milli&gt;(end - start).count();
+            timings.push_back(elapsed_ms);
+        }
+
+        // 통계 계산
+        auto stats = compute_statistics(timings);
+
+        printf("=== %s 벤치마크 결과 ===\n", name_);
+        printf("평균: %.3f ms\n", stats.mean);
+        printf("중앙값: %.3f ms\n", stats.median);
+        printf("표준편차: %.3f ms\n", stats.stddev);
+        printf("최소: %.3f ms\n", stats.min);
+        printf("최대: %.3f ms\n", stats.max);
+        printf("95%% 신뢰구간: [%.3f, %.3f] ms\n",
+               stats.ci_lower, stats.ci_upper);
+    }
+
+private:
+    const char* name_;
+    int warmup_iters_;
+    int bench_iters_;
+};
+
+// 사용 예제
+WIABenchmark bench("GEMM 1024x1024", 5, 20);
+bench.run([&]() {
+    wiaGemm(handle, WIA_OP_N, WIA_OP_N,
+            1024, 1024, 1024,
+            &alpha, A, B, &beta, C);
+});</code></pre>
+
+        <h3>8.6.2 표준 벤치마크 스위트</h3>
+        <p>WIA-AI-011은 다음과 같은 표준 벤치마크를 제공합니다:</p>
+        <ul>
+            <li><strong>MLPerf</strong>: 표준 ML 워크로드 벤치마크</li>
+            <li><strong>DeepBench</strong>: 딥러닝 연산 벤치마크</li>
+            <li><strong>NCCL Tests</strong>: 다중 GPU 통신 벤치마크</li>
+            <li><strong>Custom Kernels</strong>: 도메인별 커널 벤치마크</li>
+        </ul>
+
+        <h2>8.7 자동 최적화 제안</h2>
+        <p>프로파일링 데이터를 분석하여 자동으로 최적화 제안을 생성하는 시스템입니다.</p>
+
+        <h3>8.7.1 최적화 권장 사항 생성</h3>
+        <pre><code>// AI 기반 최적화 어드바이저
+wiaOptimizationAdvisor advisor;
+wiaCreateAdvisor(&advisor);
+
+// 프로파일링 데이터 입력
+wiaAdvisorAddProfile(advisor, profiler);
+
+// 최적화 제안 생성
+wiaOptimizationRecommendations recommendations;
+wiaGenerateRecommendations(advisor, &recommendations);
+
+printf("=== 최적화 권장 사항 (%d개) ===\n", recommendations.count);
+for (int i = 0; i &lt; recommendations.count; i++) {
+    auto& rec = recommendations.items[i];
+
+    printf("\n[%d] %s (우선순위: %s)\n",
+           i+1, rec.title, rec.priority);
+    printf("  설명: %s\n", rec.description);
+    printf("  예상 개선: %.1f%%\n", rec.expected_improvement * 100);
+    printf("  구현 난이도: %s\n", rec.difficulty);
+    printf("  적용 방법:\n");
+    for (int j = 0; j &lt; rec.num_steps; j++) {
+        printf("    %d. %s\n", j+1, rec.steps[j]);
+    }
+}
+
+// 예시 출력:
+// [1] 커널 퓨전 적용 (우선순위: 높음)
+//   설명: Conv2D와 ReLU를 단일 커널로 병합하여 메모리 접근 감소
+//   예상 개선: 23.5%
+//   구현 난이도: 중간
+//   적용 방법:
+//     1. wiaFuseKernels(conv_kernel, relu_kernel, &fused_kernel);
+//     2. 퓨즈된 커널로 교체
+//     3. 성능 재측정</code></pre>
+
+        <h3>8.7.2 자동 튜닝 시스템</h3>
+        <p>자동 튜닝은 파라미터 공간을 탐색하여 최적의 설정을 찾습니다:</p>
+
+        <pre><code>// 자동 튜너 설정
+wiaAutoTuner tuner;
+wiaAutoTunerConfig tuner_config = {
+    .search_algorithm = WIA_TUNER_BAYESIAN,  // 베이지안 최적화
+    .max_trials = 100,                       // 최대 시도 횟수
+    .timeout_seconds = 3600,                 // 1시간 제한
+    .metric = WIA_METRIC_LATENCY             // 지연시간 최소화
+};
+wiaCreateAutoTuner(&tuner_config, &tuner);
+
+// 튜닝 파라미터 공간 정의
+wiaAddTuningParameter(tuner, "block_size",
+                      WIA_PARAM_INT, 64, 1024, 64);  // 64-1024, step 64
+wiaAddTuningParameter(tuner, "tile_size",
+                      WIA_PARAM_INT, 8, 64, 8);      // 8-64, step 8
+wiaAddTuningParameter(tuner, "unroll_factor",
+                      WIA_PARAM_INT, 1, 8, 1);       // 1-8, step 1
+
+// 튜닝 실행
+wiaTuneKernel(tuner, matmul_kernel);
+
+// 최적 파라미터 적용
+wiaKernelConfig optimal_config;
+wiaGetOptimalConfig(tuner, &optimal_config);
+
+printf("=== 자동 튜닝 결과 ===\n");
+printf("최적 블록 크기: %d\n", optimal_config.block_size);
+printf("최적 타일 크기: %d\n", optimal_config.tile_size);
+printf("최적 언롤 팩터: %d\n", optimal_config.unroll_factor);
+printf("성능 개선: %.1f%%\n", optimal_config.improvement * 100);</code></pre>
+
+        <h2>8.8 미래 하드웨어 트렌드</h2>
+        <p>WIA-AI-011은 미래 하드웨어 아키텍처를 지원하기 위해 지속적으로 진화합니다.</p>
+
+        <h3>8.8.1 특수 연산 유닛</h3>
+        <p>차세대 가속기는 다양한 특수 연산 유닛을 통합합니다:</p>
+        <ul>
+            <li><strong>Tensor Cores (Gen 5+)</strong>: FP4/FP6 정밀도 지원, 희소 텐서 가속</li>
+            <li><strong>Matrix Engines</strong>: 대규모 행렬 연산 전용 유닛 (8192×8192 이상)</li>
+            <li><strong>Vector Processors</strong>: 가변 길이 벡터 명령어 지원 (SVE2, RVV)</li>
+            <li><strong>Dataflow Engines</strong>: 프로그래머블 데이터플로우 아키텍처</li>
+            <li><strong>Neural Processing Units</strong>: 신경망 추론 최적화 ASIC</li>
+        </ul>
+
+        <h3>8.8.2 근메모리 처리 (Processing-in-Memory)</h3>
+        <p>PIM 기술은 메모리 대역폭 병목을 해결합니다:</p>
+        <ul>
+            <li><strong>HBM-PIM</strong>: HBM 스택 내부 연산 유닛 통합</li>
+            <li><strong>CXL-attached PIM</strong>: CXL 프로토콜을 통한 PIM 장치 연결</li>
+            <li><strong>Disaggregated Memory</strong>: 컴퓨트와 메모리 분리 아키텍처</li>
+        </ul>
+
+        <pre><code>// PIM 장치 지원 (미래 API 예시)
+wiaDeviceProperties props;
+wiaGetDeviceProperties(device, &props);
+
+if (props.supports_pim) {
+    printf("PIM 지원: 활성\n");
+    printf("PIM 유형: %s\n", props.pim_type);
+    printf("PIM 연산: ");
+
+    // PIM에서 지원하는 연산 확인
+    if (props.pim_ops & WIA_PIM_OP_GEMM) printf("GEMM ");
+    if (props.pim_ops & WIA_PIM_OP_REDUCE) printf("Reduce ");
+    if (props.pim_ops & WIA_PIM_OP_SCAN) printf("Scan ");
+    printf("\n");
+
+    // PIM으로 연산 오프로드
+    wiaGemmPIM(A, B, C, m, n, k, WIA_PIM_DEVICE_0);
+}</code></pre>
+
+        <h3>8.8.3 광학 가속기</h3>
+        <p>광학 컴퓨팅은 초저전력 고속 행렬 연산을 가능하게 합니다:</p>
+        <ul>
+            <li><strong>광학 행렬 곱셈</strong>: 빛의 간섭 패턴을 이용한 아날로그 연산</li>
+            <li><strong>광전자 혼합</strong>: 전자-광학 하이브리드 아키텍처</li>
+            <li><strong>초저지연</strong>: 광속 전파로 인한 나노초 미만 지연시간</li>
+        </ul>
+
+        <h3>8.8.4 양자 가속기 연동</h3>
+        <p>양자-고전 하이브리드 워크플로우 지원:</p>
+        <ul>
+            <li><strong>양자 게이트 실행</strong>: 특정 서브루틴을 양자 프로세서로 오프로드</li>
+            <li><strong>변분 알고리즘</strong>: 양자-고전 반복 최적화</li>
+            <li><strong>양자 시뮬레이션</strong>: 고전 GPU에서 소규모 양자 회로 시뮬레이션</li>
+        </ul>
+
+        <h2>8.9 WIA-AI-011 로드맵</h2>
+        <p>WIA-AI-011의 미래 발전 계획입니다.</p>
+
+        <h3>8.9.1 단계별 계획</h3>
+        <table>
+            <tr>
+                <th>버전</th>
+                <th>릴리스 시기</th>
+                <th>주요 기능</th>
+            </tr>
+            <tr>
+                <td>v1.0 (현재)</td>
+                <td>2025 Q1</td>
+                <td>기본 HAL, 텐서 연산, 메모리 관리</td>
+            </tr>
+            <tr>
+                <td>v1.5</td>
+                <td>2025 Q4</td>
+                <td>고급 프로파일링, 자동 튜닝, 다중 스트림 최적화</td>
+            </tr>
+            <tr>
+                <td>v2.0</td>
+                <td>2026 Q3</td>
+                <td>PIM 지원, 광학 가속기 통합, CXL 3.0</td>
+            </tr>
+            <tr>
+                <td>v2.5</td>
+                <td>2027 Q2</td>
+                <td>양자 하이브리드, 뉴로모픽 칩 지원</td>
+            </tr>
+            <tr>
+                <td>v3.0</td>
+                <td>2028+</td>
+                <td>완전 자율 최적화, AI 코파일럿</td>
+            </tr>
+        </table>
+
+        <h3>8.9.2 확장 영역</h3>
+        <ul>
+            <li><strong>에지 디바이스</strong>: 저전력 모바일/IoT 가속기 지원</li>
+            <li><strong>클라우드 네이티브</strong>: Kubernetes, 서버리스 통합</li>
+            <li><strong>보안 강화</strong>: 신뢰 실행 환경(TEE), 동형 암호 연산</li>
+            <li><strong>지속 가능성</strong>: 전력 효율 메트릭, 탄소 추적</li>
+        </ul>
+
+        <div class="note">
+            <strong>참여 방법:</strong> WIA-AI-011은 개방형 표준으로, 누구나 기여할 수 있습니다. GitHub에서 제안서를 제출하거나, 워킹 그룹에 참여하거나, 레퍼런스 구현을 개선할 수 있습니다.
+        </div>
+
+        <h2>8.10 커뮤니티 및 생태계</h2>
+        <p>WIA-AI-011의 성공은 활발한 커뮤니티와 풍부한 생태계에 달려 있습니다.</p>
+
+        <h3>8.10.1 오픈소스 커뮤니티</h3>
+        <ul>
+            <li><strong>레퍼런스 구현</strong>: 완전한 오픈소스 HAL 구현 제공</li>
+            <li><strong>드라이버 생태계</strong>: 주요 가속기 벤더의 WIA-AI-011 드라이버</li>
+            <li><strong>프레임워크 통합</strong>: PyTorch, TensorFlow, JAX 공식 지원</li>
+            <li><strong>도구 체인</strong>: 컴파일러, 프로파일러, 디버거 오픈소스화</li>
+        </ul>
+
+        <h3>8.10.2 교육 및 문서화</h3>
+        <ul>
+            <li><strong>공식 문서</strong>: 상세한 API 레퍼런스, 튜토리얼, 베스트 프랙티스</li>
+            <li><strong>예제 코드</strong>: 100+ 실전 예제 및 템플릿</li>
+            <li><strong>온라인 강좌</strong>: 무료 교육 과정 및 인증 프로그램</li>
+            <li><strong>커뮤니티 포럼</strong>: Stack Overflow, Discord, Slack 채널</li>
+        </ul>
+
+        <h3>8.10.3 산업 파트너십</h3>
+        <p>WIA-AI-011은 다음 조직들과 협력합니다:</p>
+        <ul>
+            <li><strong>하드웨어 벤더</strong>: NVIDIA, AMD, Intel, ARM, RISC-V 재단</li>
+            <li><strong>클라우드 제공자</strong>: AWS, Azure, Google Cloud, Oracle Cloud</li>
+            <li><strong>연구 기관</strong>: MIT, Stanford, Berkeley, KAIST, 서울대</li>
+            <li><strong>표준 기구</strong>: Khronos Group, MLCommons, ONNX</li>
+        </ul>
+
+        <pre><code>// 커뮤니티 기여 예시: 새로운 백엔드 추가
+class MyCustomBackend : public wiaBackend {
+public:
+    // 백엔드 초기화
+    wiaStatus initialize() override {
+        // 하드웨어 초기화 로직
+        return WIA_SUCCESS;
+    }
+
+    // 디바이스 열거
+    wiaStatus enumerateDevices(std::vector&lt;wiaDevice*&gt;& devices) override {
+        // 디바이스 검색 로직
+        return WIA_SUCCESS;
+    }
+
+    // 커널 실행
+    wiaStatus launchKernel(wiaKernel* kernel,
+                          const wiaGridDim& grid,
+                          const wiaBlockDim& block,
+                          wiaStream* stream) override {
+        // 커널 실행 로직
+        return WIA_SUCCESS;
+    }
+
+    // ... 기타 필수 메서드 구현
+};
+
+// 백엔드 등록
+WIA_REGISTER_BACKEND("my_custom", MyCustomBackend);
+
+// 사용자는 환경 변수로 백엔드 선택 가능
+// export WIA_BACKEND=my_custom</code></pre>
+
+        <h3>8.10.4 弘益人間 철학의 실천</h3>
+        <p>WIA-AI-011은 "널리 인간을 이롭게 하라"는 철학을 다음과 같이 실천합니다:</p>
+        <ul>
+            <li><strong>접근성</strong>: 모든 사람이 첨단 AI 가속을 사용할 수 있도록</li>
+            <li><strong>교육</strong>: 무료 교육 자료로 지식 격차 해소</li>
+            <li><strong>포용성</strong>: 다양한 하드웨어, 언어, 플랫폼 지원</li>
+            <li><strong>지속 가능성</strong>: 에너지 효율 최적화로 환경 보호</li>
+            <li><strong>협력</strong>: 개방형 거버넌스로 모두의 목소리 반영</li>
+        </ul>
+
+        <div class="note">
+            <strong>기여하기:</strong> WIA-AI-011 커뮤니티에 참여하여 인류의 AI 미래를 함께 만들어 가세요!
+            <br>GitHub: <a href="https://github.com/WIA-Official/wia-ai-011" style="color: #10B981;">github.com/WIA-Official/wia-ai-011</a>
+            <br>포럼: <a href="https://forum.wia-standards.org" style="color: #10B981;">forum.wia-standards.org</a>
+        </div>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li><strong>프로파일링 도구</strong>는 타이밍, 메모리, 통신 등 다층 성능 데이터를 수집합니다</li>
+                <li><strong>타임라인 프로파일링</strong>은 병목 지점, 유휴 시간, 파이프라인 버블을 시각화합니다</li>
+                <li><strong>메모리 프로파일링</strong>은 누수, 단편화, 대역폭 활용률을 분석합니다</li>
+                <li><strong>루프라인 모델</strong>은 컴퓨트 바운드 vs 메모리 바운드를 판단하여 최적화 방향을 제시합니다</li>
+                <li><strong>통신 프로파일링</strong>은 분산 학습의 집합 연산 효율과 중복을 측정합니다</li>
+                <li><strong>벤치마킹</strong>은 워밍업, 반복 측정, 통계 분석으로 재현 가능한 결과를 보장합니다</li>
+                <li><strong>자동 최적화</strong>는 프로파일 데이터에서 권장 사항을 생성하고 파라미터를 자동 튜닝합니다</li>
+                <li><strong>미래 하드웨어</strong>는 PIM, 광학 가속기, 양자 하이브리드를 포함합니다</li>
+                <li><strong>WIA-AI-011 로드맵</strong>은 2028년까지 단계적 기능 확장을 계획합니다</li>
+                <li><strong>커뮤니티 생태계</strong>는 오픈소스, 교육, 산업 파트너십으로 弘益人間 철학을 실천합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>WIA-AI-011 프로파일러가 수집하는 4가지 주요 메트릭 유형은 무엇입니까?</li>
+                <li>타임라인 프로파일링에서 "GPU 기아(GPU Starvation)" 현상은 무엇이며, 어떻게 식별합니까?</li>
+                <li>메모리 프로파일링에서 메모리 단편화율을 계산하는 방법과 임계값은 얼마입니까?</li>
+                <li>루프라인 모델에서 산술 강도(Arithmetic Intensity)의 정의는 무엇이며, 이를 통해 무엇을 판단할 수 있습니까?</li>
+                <li>커널 점유율(Occupancy)에 영향을 미치는 주요 제한 요인 2가지는 무엇입니까?</li>
+                <li>분산 학습에서 통신-연산 중복(Communication-Computation Overlap)이 중요한 이유는 무엇입니까?</li>
+                <li>성능 벤치마킹에서 워밍업(Warm-up) 단계가 필요한 이유를 2가지 설명하세요.</li>
+                <li>자동 튜닝 시스템에서 베이지안 최적화를 사용하는 이유는 무엇입니까?</li>
+                <li>PIM(Processing-in-Memory) 기술이 해결하려는 주요 병목은 무엇입니까?</li>
+                <li>WIA-AI-011이 弘益人間 철학을 실천하는 구체적인 방법 3가지를 제시하세요.</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong>
+            <br><br>
+            <div style="font-size: 0.9em; color: #64748b;">
+                WIA-AI-011 AI Chip Interface Standard<br>
+                © 2025 World Certification Industry Association
+            </div>
+        </div>
+    </div>
+</body>
+</html>

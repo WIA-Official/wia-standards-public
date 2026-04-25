@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Gas Supply Simulator | 가스 공급 시뮬레이터</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .lang-switch {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 15px;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Language Selector */
+        .language-selector {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .language-selector select {
+            padding: 10px 20px;
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .tab:hover { border-color: var(--primary); }
+        .tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* Panels */
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .panel.active { display: block; }
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        .panel h3 {
+            color: var(--text);
+            margin: 25px 0 15px;
+            font-size: 1.3rem;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin: 20px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        /* Buttons */
+        .btn-center {
+            text-align: center;
+            margin: 25px 0;
+        }
+        .btn {
+            padding: 14px 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        /* Output */
+        .output {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+        .output pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        /* QR Code */
+        .qr-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        #qrcode {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 60px;
+            border-top: 1px solid var(--border);
+        }
+        .philosophy {
+            font-size: 1.3rem;
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+                align-items: center;
+            }
+            .tab {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Gas Supply</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1 data-en="🔥 Gas Supply Simulator" data-ko="🔥 가스 공급 시뮬레이터">🔥 Gas Supply Simulator</h1>
+            <p data-en="Interactive simulator for natural gas distribution and pipeline management" data-ko="천연가스 배급 및 파이프라인 관리를 위한 인터랙티브 시뮬레이터">Interactive simulator for natural gas distribution and pipeline management</p>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                <button class="lang-btn" onclick="setLang('ko')">KO</button>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="language-selector">
+            <label data-en="🌍 Select Language (99 Languages):" data-ko="🌍 언어 선택 (99개 언어):">🌍 Select Language (99 Languages):</label>
+            <select id="langSelector" onchange="changeSimulatorLang()">
+                <option value="en">English</option>
+                <option value="ko">한국어 (Korean)</option>
+                <option value="ja">日本語 (Japanese)</option>
+                <option value="zh">中文 (Chinese)</option>
+                <option value="es">Español (Spanish)</option>
+                <option value="fr">Français (French)</option>
+                <option value="de">Deutsch (German)</option>
+                <option value="ar">العربية (Arabic)</option>
+                <option value="ru">Русский (Russian)</option>
+                <option value="pt">Português (Portuguese)</option>
+                <option value="hi">हिन्दी (Hindi)</option>
+                <option value="it">Italiano (Italian)</option>
+                <option value="nl">Nederlands (Dutch)</option>
+                <option value="tr">Türkçe (Turkish)</option>
+                <option value="pl">Polski (Polish)</option>
+                <option value="vi">Tiếng Việt (Vietnamese)</option>
+                <option value="th">ไทย (Thai)</option>
+                <option value="id">Bahasa Indonesia</option>
+                <option value="sv">Svenska (Swedish)</option>
+                <option value="da">Dansk (Danish)</option>
+            </select>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔢 Algorithms" data-ko="🔢 알고리즘">🔢 Algorithms</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📱 QR & VC" data-ko="📱 QR & VC">📱 QR & VC</div>
+        </div>
+
+        <!-- Panel 1: Data Format -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📊 Gas Supply Data Format" data-ko="📊 가스 공급 데이터 형식">📊 Gas Supply Data Format</h2>
+
+            <div class="form-group">
+                <label data-en="Pipeline ID:" data-ko="파이프라인 ID:">Pipeline ID:</label>
+                <input type="text" id="pipelineId" value="PL-KR-001-2025" placeholder="PL-XX-XXX-YYYY">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Gas Type:" data-ko="가스 유형:">Gas Type:</label>
+                <select id="gasType">
+                    <option value="natural_gas">Natural Gas (CH4)</option>
+                    <option value="lng">Liquefied Natural Gas (LNG)</option>
+                    <option value="lpg">Liquefied Petroleum Gas (LPG)</option>
+                    <option value="hydrogen">Hydrogen (H2)</option>
+                    <option value="blended">Hydrogen Blended (H2+CH4)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Pressure (bar):" data-ko="압력 (bar):">Pressure (bar):</label>
+                <input type="number" id="pressure" value="50" min="0" max="200" step="0.1">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Flow Rate (m³/h):" data-ko="유량 (m³/h):">Flow Rate (m³/h):</label>
+                <input type="number" id="flowRate" value="10000" min="0" max="100000" step="100">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Temperature (°C):" data-ko="온도 (°C):">Temperature (°C):</label>
+                <input type="number" id="temperature" value="15" min="-50" max="50" step="0.1">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="generateGasData()">
+                    <span data-en="Generate Data Format" data-ko="데이터 형식 생성">Generate Data Format</span>
+                </button>
+            </div>
+
+            <div class="output" id="dataOutput"></div>
+        </div>
+
+        <!-- Panel 2: Algorithms -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🔢 Gas Flow Algorithms" data-ko="🔢 가스 흐름 알고리즘">🔢 Gas Flow Algorithms</h2>
+
+            <h3 data-en="Pipeline Capacity Calculator" data-ko="파이프라인 용량 계산기">Pipeline Capacity Calculator</h3>
+
+            <div class="form-group">
+                <label data-en="Pipe Diameter (mm):" data-ko="파이프 직경 (mm):">Pipe Diameter (mm):</label>
+                <input type="number" id="diameter" value="600" min="50" max="2000" step="50">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Pipe Length (km):" data-ko="파이프 길이 (km):">Pipe Length (km):</label>
+                <input type="number" id="pipeLength" value="50" min="1" max="1000" step="1">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Inlet Pressure (bar):" data-ko="입구 압력 (bar):">Inlet Pressure (bar):</label>
+                <input type="number" id="inletPressure" value="70" min="1" max="200" step="1">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Outlet Pressure (bar):" data-ko="출구 압력 (bar):">Outlet Pressure (bar):</label>
+                <input type="number" id="outletPressure" value="50" min="1" max="200" step="1">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="calculatePipelineCapacity()">
+                    <span data-en="Calculate Capacity" data-ko="용량 계산">Calculate Capacity</span>
+                </button>
+            </div>
+
+            <div class="stats-grid" id="capacityStats"></div>
+            <div class="output" id="algorithmOutput"></div>
+        </div>
+
+        <!-- Panel 3: Protocol -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📡 SCADA Communication Protocol" data-ko="📡 SCADA 통신 프로토콜">📡 SCADA Communication Protocol</h2>
+
+            <h3 data-en="Real-time Monitoring Message" data-ko="실시간 모니터링 메시지">Real-time Monitoring Message</h3>
+
+            <div class="form-group">
+                <label data-en="Station ID:" data-ko="스테이션 ID:">Station ID:</label>
+                <input type="text" id="stationId" value="STATION-SEOUL-01" placeholder="STATION-XXX-XX">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Protocol Type:" data-ko="프로토콜 유형:">Protocol Type:</label>
+                <select id="protocolType">
+                    <option value="modbus">Modbus TCP/IP</option>
+                    <option value="opcua">OPC UA</option>
+                    <option value="mqtt">MQTT</option>
+                    <option value="dnp3">DNP3</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Sensor Type:" data-ko="센서 유형:">Sensor Type:</label>
+                <select id="sensorType">
+                    <option value="pressure">Pressure Sensor</option>
+                    <option value="flow">Flow Meter</option>
+                    <option value="temperature">Temperature Sensor</option>
+                    <option value="leak">Leak Detector</option>
+                    <option value="valve">Valve Position</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="generateProtocolMessage()">
+                    <span data-en="Generate Protocol Message" data-ko="프로토콜 메시지 생성">Generate Protocol Message</span>
+                </button>
+            </div>
+
+            <div class="output" id="protocolOutput"></div>
+        </div>
+
+        <!-- Panel 4: Integration -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🔗 System Integration" data-ko="🔗 시스템 통합">🔗 System Integration</h2>
+
+            <h3 data-en="LNG Terminal Integration" data-ko="LNG 터미널 통합">LNG Terminal Integration</h3>
+
+            <div class="form-group">
+                <label data-en="Terminal Name:" data-ko="터미널 이름:">Terminal Name:</label>
+                <input type="text" id="terminalName" value="Incheon LNG Terminal" placeholder="Terminal Name">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Storage Capacity (m³):" data-ko="저장 용량 (m³):">Storage Capacity (m³):</label>
+                <input type="number" id="storageCapacity" value="200000" min="1000" max="1000000" step="1000">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Current Level (%):" data-ko="현재 레벨 (%):">Current Level (%):</label>
+                <input type="number" id="currentLevel" value="75" min="0" max="100" step="1">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Regasification Rate (ton/day):" data-ko="재기화 속도 (ton/day):">Regasification Rate (ton/day):</label>
+                <input type="number" id="regasRate" value="5000" min="100" max="20000" step="100">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="generateIntegrationConfig()">
+                    <span data-en="Generate Integration Config" data-ko="통합 구성 생성">Generate Integration Config</span>
+                </button>
+            </div>
+
+            <div class="output" id="integrationOutput"></div>
+        </div>
+
+        <!-- Panel 5: QR & VC -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📱 QR Code & Verifiable Credentials" data-ko="📱 QR 코드 및 검증 가능한 자격증명">📱 QR Code & Verifiable Credentials</h2>
+
+            <h3 data-en="Gas Meter Certification" data-ko="가스 계량기 인증">Gas Meter Certification</h3>
+
+            <div class="form-group">
+                <label data-en="Meter Serial Number:" data-ko="계량기 일련번호:">Meter Serial Number:</label>
+                <input type="text" id="meterSerial" value="GM-2025-KR-001234" placeholder="GM-YYYY-XX-XXXXXX">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Calibration Date:" data-ko="교정 날짜:">Calibration Date:</label>
+                <input type="date" id="calibrationDate" value="2025-01-01">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Accuracy Class:" data-ko="정확도 등급:">Accuracy Class:</label>
+                <select id="accuracyClass">
+                    <option value="0.5">Class 0.5 (±0.5%)</option>
+                    <option value="1.0">Class 1.0 (±1.0%)</option>
+                    <option value="1.5">Class 1.5 (±1.5%)</option>
+                    <option value="2.0">Class 2.0 (±2.0%)</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="generateQRandVC()">
+                    <span data-en="Generate QR & VC" data-ko="QR 및 VC 생성">Generate QR & VC</span>
+                </button>
+            </div>
+
+            <div class="qr-container">
+                <div id="qrcode"></div>
+            </div>
+
+            <div class="output" id="vcOutput"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>WIA - World Certification Industry Association</p>
+            <p>© 2025 MIT License</p>
+        </footer>
+    </div>
+
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        let currentSimLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function changeSimulatorLang() {
+            currentSimLang = document.getElementById('langSelector').value;
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => {
+                p.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateGasData() {
+            const data = {
+                "standard": "WIA-SOC-011",
+                "version": "1.0",
+                "pipelineId": document.getElementById('pipelineId').value,
+                "gasType": document.getElementById('gasType').value,
+                "measurement": {
+                    "pressure": {
+                        "value": parseFloat(document.getElementById('pressure').value),
+                        "unit": "bar"
+                    },
+                    "flowRate": {
+                        "value": parseFloat(document.getElementById('flowRate').value),
+                        "unit": "m³/h"
+                    },
+                    "temperature": {
+                        "value": parseFloat(document.getElementById('temperature').value),
+                        "unit": "°C"
+                    }
+                },
+                "timestamp": new Date().toISOString(),
+                "location": {
+                    "latitude": 37.5665,
+                    "longitude": 126.9780,
+                    "city": "Seoul"
+                },
+                "quality": {
+                    "methaneContent": 95.8,
+                    "calorificValue": 38.5,
+                    "wobbeIndex": 51.2
+                },
+                "safety": {
+                    "leakDetection": "normal",
+                    "pressureStatus": "within_limits",
+                    "alarmStatus": "none"
+                }
+            };
+
+            document.getElementById('dataOutput').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+
+        function calculatePipelineCapacity() {
+            const diameter = parseFloat(document.getElementById('diameter').value) / 1000; // mm to m
+            const length = parseFloat(document.getElementById('pipeLength').value);
+            const p1 = parseFloat(document.getElementById('inletPressure').value);
+            const p2 = parseFloat(document.getElementById('outletPressure').value);
+
+            // Simplified Weymouth equation for capacity calculation
+            const area = Math.PI * Math.pow(diameter / 2, 2);
+            const capacity = area * 3600 * Math.sqrt((p1 * p1 - p2 * p2) / (length * 0.01));
+            const velocity = capacity / (area * 3600);
+            const reynoldsNumber = (velocity * diameter * 0.7) / (0.000011);
+
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${capacity.toFixed(0)}</div>
+                    <div class="stat-label">Flow Capacity (m³/h)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${velocity.toFixed(2)}</div>
+                    <div class="stat-label">Gas Velocity (m/s)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${(p1 - p2).toFixed(1)}</div>
+                    <div class="stat-label">Pressure Drop (bar)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${reynoldsNumber.toExponential(2)}</div>
+                    <div class="stat-label">Reynolds Number</div>
+                </div>
+            `;
+
+            const result = {
+                "calculation": "Weymouth Equation",
+                "inputs": {
+                    "diameter_m": diameter,
+                    "length_km": length,
+                    "inlet_pressure_bar": p1,
+                    "outlet_pressure_bar": p2
+                },
+                "results": {
+                    "flow_capacity_m3_h": capacity.toFixed(2),
+                    "gas_velocity_m_s": velocity.toFixed(3),
+                    "pressure_drop_bar": (p1 - p2).toFixed(2),
+                    "reynolds_number": reynoldsNumber.toExponential(2),
+                    "flow_regime": reynoldsNumber > 4000 ? "Turbulent" : "Laminar"
+                },
+                "recommendations": {
+                    "optimal_pressure": ((p1 + p2) / 2).toFixed(1) + " bar",
+                    "max_capacity_utilization": "85%",
+                    "maintenance_interval": "6 months"
+                }
+            };
+
+            document.getElementById('capacityStats').innerHTML = statsHtml;
+            document.getElementById('algorithmOutput').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+        }
+
+        function generateProtocolMessage() {
+            const protocol = document.getElementById('protocolType').value;
+            const sensor = document.getElementById('sensorType').value;
+
+            let message;
+            if (protocol === 'modbus') {
+                message = {
+                    "protocol": "Modbus TCP/IP",
+                    "function_code": 3,
+                    "station_id": document.getElementById('stationId').value,
+                    "register_address": 40001,
+                    "register_count": 10,
+                    "data": {
+                        "sensor_type": sensor,
+                        "value": Math.random() * 100,
+                        "unit": sensor === 'pressure' ? 'bar' : sensor === 'flow' ? 'm³/h' : '°C',
+                        "timestamp": new Date().toISOString(),
+                        "quality": "good"
+                    }
+                };
+            } else if (protocol === 'opcua') {
+                message = {
+                    "protocol": "OPC UA",
+                    "endpoint": "opc.tcp://gas-station:4840",
+                    "nodeId": `ns=2;s=${sensor}`,
+                    "value": {
+                        "dataType": "Double",
+                        "value": Math.random() * 100,
+                        "sourceTimestamp": new Date().toISOString(),
+                        "statusCode": 0
+                    }
+                };
+            } else if (protocol === 'mqtt') {
+                message = {
+                    "protocol": "MQTT",
+                    "topic": `gas/station/${document.getElementById('stationId').value}/${sensor}`,
+                    "qos": 1,
+                    "retain": false,
+                    "payload": {
+                        "sensor": sensor,
+                        "value": Math.random() * 100,
+                        "timestamp": new Date().toISOString(),
+                        "location": document.getElementById('stationId').value
+                    }
+                };
+            } else {
+                message = {
+                    "protocol": "DNP3",
+                    "source_address": 1,
+                    "destination_address": 10,
+                    "function": "READ",
+                    "object": "Analog Input",
+                    "point_index": 0,
+                    "value": Math.random() * 100
+                };
+            }
+
+            document.getElementById('protocolOutput').innerHTML = '<pre>' + JSON.stringify(message, null, 2) + '</pre>';
+        }
+
+        function generateIntegrationConfig() {
+            const config = {
+                "standard": "WIA-SOC-011",
+                "integration_type": "LNG Terminal",
+                "terminal": {
+                    "name": document.getElementById('terminalName').value,
+                    "id": "LNG-" + Date.now(),
+                    "location": {
+                        "country": "KR",
+                        "city": "Incheon",
+                        "coordinates": [37.4563, 126.7052]
+                    }
+                },
+                "storage": {
+                    "total_capacity_m3": parseInt(document.getElementById('storageCapacity').value),
+                    "current_level_percent": parseInt(document.getElementById('currentLevel').value),
+                    "available_capacity_m3": parseInt(document.getElementById('storageCapacity').value) * (100 - parseInt(document.getElementById('currentLevel').value)) / 100,
+                    "tank_count": 4,
+                    "tank_type": "Full Containment"
+                },
+                "regasification": {
+                    "capacity_ton_per_day": parseInt(document.getElementById('regasRate').value),
+                    "vaporizers": {
+                        "count": 3,
+                        "type": "Submerged Combustion Vaporizer (SCV)",
+                        "capacity_each": parseInt(document.getElementById('regasRate').value) / 3
+                    },
+                    "sendout_pressure_bar": 70
+                },
+                "connections": {
+                    "pipeline_network": ["PL-KR-001", "PL-KR-002", "PL-KR-003"],
+                    "distribution_stations": 12,
+                    "industrial_customers": 45
+                },
+                "wia_integration": {
+                    "connected_standards": [
+                        "WIA-ENE-001 (Energy Grid)",
+                        "WIA-SOC-010 (Water Supply)",
+                        "WIA-SEC-001 (Security)"
+                    ],
+                    "data_sharing": true,
+                    "certification_status": "WIA Certified"
+                },
+                "timestamp": new Date().toISOString()
+            };
+
+            document.getElementById('integrationOutput').innerHTML = '<pre>' + JSON.stringify(config, null, 2) + '</pre>';
+        }
+
+        function generateQRandVC() {
+            const meterSerial = document.getElementById('meterSerial').value;
+            const calibrationDate = document.getElementById('calibrationDate').value;
+            const accuracyClass = document.getElementById('accuracyClass').value;
+
+            const vc = {
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://wiastandards.com/credentials/gas-meter/v1"
+                ],
+                "id": `https://wiastandards.com/credentials/${meterSerial}`,
+                "type": ["VerifiableCredential", "GasMeterCalibrationCertificate"],
+                "issuer": {
+                    "id": "did:wia:certification-authority",
+                    "name": "WIA Gas Measurement Certification Authority"
+                },
+                "issuanceDate": new Date().toISOString(),
+                "expirationDate": new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString(),
+                "credentialSubject": {
+                    "id": `did:wia:meter:${meterSerial}`,
+                    "meterType": "Smart Gas Meter",
+                    "serialNumber": meterSerial,
+                    "manufacturer": "WIA Certified Manufacturer",
+                    "calibration": {
+                        "date": calibrationDate,
+                        "accuracyClass": accuracyClass,
+                        "method": "ISO 17025",
+                        "laboratory": "National Metrology Institute",
+                        "certificateNumber": `CAL-${Date.now()}`
+                    },
+                    "specifications": {
+                        "maxFlowRate": "16 m³/h",
+                        "minFlowRate": "0.016 m³/h",
+                        "maxPressure": "100 bar",
+                        "communication": ["Modbus", "M-Bus", "LoRaWAN"]
+                    },
+                    "wiaCompliance": {
+                        "standard": "WIA-SOC-011",
+                        "version": "1.0",
+                        "certificationDate": new Date().toISOString().split('T')[0]
+                    }
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": new Date().toISOString(),
+                    "verificationMethod": "did:wia:certification-authority#keys-1",
+                    "proofPurpose": "assertionMethod",
+                    "proofValue": "z" + btoa(Math.random().toString()).substr(0, 86)
+                }
+            };
+
+            // Generate QR Code
+            document.getElementById('qrcode').innerHTML = '';
+            new QRCode(document.getElementById('qrcode'), {
+                text: JSON.stringify({
+                    standard: "WIA-SOC-011",
+                    serial: meterSerial,
+                    verify: `https://wiastandards.com/verify/${meterSerial}`
+                }),
+                width: 256,
+                height: 256,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            document.getElementById('vcOutput').innerHTML = '<pre>' + JSON.stringify(vc, null, 2) + '</pre>';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

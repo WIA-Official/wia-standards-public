@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Tensor Data Formats and Memory Layouts | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .chapter-header { border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; font-weight: bold; }
+        h1 { font-size: 2.5em; color: #1c1917; margin: 10px 0 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; padding-top: 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; text-align: justify; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; color: #059669; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border-left: 4px solid #10B981; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .highlight { background: #dcfce7; padding: 20px; border-left: 4px solid #10B981; margin: 20px 0; border-radius: 4px; }
+        .summary { background: #f0fdf4; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #10B981; }
+        .summary h2 { margin-top: 0; }
+        .review-questions { background: #fef3c7; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        .nav a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #10B981; color: white; }
+        tr:nth-child(even) { background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">Chapter 2</div>
+            <h1>Tensor Data Formats and Memory Layouts</h1>
+        </div>
+
+        <h2>2.1 The Foundation: Tensor Representation</h2>
+        <p>At the heart of every deep learning computation lies the tensor—a multidimensional array of numbers. While conceptually simple, the physical representation of tensors in memory has profound implications for performance, portability, and correctness. WIA-AI-011 Phase 1 establishes comprehensive standards for tensor data formats, ensuring that tensors can be seamlessly shared across different accelerators without conversion overhead or numerical degradation.</p>
+
+        <p>A tensor is characterized by several fundamental properties: its shape (dimensions), data type (element format), and layout (memory organization). Consider a simple RGB image tensor representing a batch of 32 images, each 224×224 pixels with 3 color channels. This tensor has shape [32, 3, 224, 224], but how should these 4,816,896 elements be arranged in linear memory?</p>
+
+        <h2>2.2 Memory Layout Conventions</h2>
+        <p>Different frameworks and hardware vendors have historically adopted different conventions for organizing multidimensional data in memory. The two dominant approaches are row-major (C-style) and column-major (Fortran-style), but for tensors with more than two dimensions, the situation becomes more nuanced.</p>
+
+        <h3>2.2.1 NCHW Layout (Batch, Channel, Height, Width)</h3>
+        <p>The NCHW layout, also known as channels-first, stores all channels of each spatial location together. For our image example, this means storing all pixels of channel 0, then all pixels of channel 1, then channel 2, for each image in the batch. This layout is favored by NVIDIA's cuDNN library and PyTorch (on GPU) because it enables efficient convolution implementations.</p>
+
+        <pre>// NCHW memory layout for [2, 3, 2, 2] tensor
+Batch 0, Channel 0: [a, b, c, d]
+Batch 0, Channel 1: [e, f, g, h]
+Batch 0, Channel 2: [i, j, k, l]
+Batch 1, Channel 0: [m, n, o, p]
+Batch 1, Channel 1: [q, r, s, t]
+Batch 1, Channel 2: [u, v, w, x]
+
+Linear memory: [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x]</pre>
+
+        <h3>2.2.2 NHWC Layout (Batch, Height, Width, Channel)</h3>
+        <p>The NHWC layout, or channels-last, stores all channels of each pixel together. For the same tensor, this interleaves the channels: pixel (0,0) gets R,G,B values, then pixel (0,1), and so on. This layout is preferred by TensorFlow, ARM processors, and many mobile NPUs because it exhibits better cache locality for certain operations and matches how images are typically stored.</p>
+
+        <pre>// NHWC memory layout for [2, 3, 2, 2] tensor
+Batch 0, Pixel (0,0): [a, e, i]
+Batch 0, Pixel (0,1): [b, f, j]
+Batch 0, Pixel (1,0): [c, g, k]
+Batch 0, Pixel (1,1): [d, h, l]
+Batch 1, Pixel (0,0): [m, q, u]
+...
+
+Linear memory: [a,e,i,b,f,j,c,g,k,d,h,l,m,q,u,n,r,v,o,s,w,p,t,x]</pre>
+
+        <h3>2.2.3 WIA-AI-011 Layout Specification</h3>
+        <p>The WIA-AI-011 standard mandates that implementations support both NCHW and NHWC layouts as first-class citizens. Additionally, it defines a stride-based representation that can describe arbitrary layouts, including blocked and padded formats commonly used for hardware optimization.</p>
+
+        <pre>{
+  "shape": [32, 3, 224, 224],
+  "layout": "NCHW",
+  "strides": [150528, 50176, 224, 1],
+  "offset": 0,
+  "element_size_bytes": 4
+}
+
+// Strides specify the number of elements to skip
+// to move to the next position along each dimension
+// Element at [n, c, h, w] is at:
+// offset + n*strides[0] + c*strides[1] + h*strides[2] + w*strides[3]</pre>
+
+        <h2>2.3 Data Types and Precision</h2>
+        <p>Neural networks can operate at various numerical precisions, trading accuracy for performance and energy efficiency. WIA-AI-011 defines a comprehensive type system covering the full spectrum of precision formats used in modern AI accelerators.</p>
+
+        <h3>2.3.1 Floating-Point Formats</h3>
+        <p>Standard IEEE 754 floating-point formats provide familiar, well-defined numerical behavior but consume significant memory and bandwidth.</p>
+
+        <table>
+            <tr>
+                <th>Type</th>
+                <th>Bits</th>
+                <th>Exponent</th>
+                <th>Mantissa</th>
+                <th>Range</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td>FLOAT64</td>
+                <td>64</td>
+                <td>11</td>
+                <td>52</td>
+                <td>±10^308</td>
+                <td>Scientific computing</td>
+            </tr>
+            <tr>
+                <td>FLOAT32</td>
+                <td>32</td>
+                <td>8</td>
+                <td>23</td>
+                <td>±10^38</td>
+                <td>Default training</td>
+            </tr>
+            <tr>
+                <td>FLOAT16</td>
+                <td>16</td>
+                <td>5</td>
+                <td>10</td>
+                <td>±65504</td>
+                <td>Mixed precision</td>
+            </tr>
+            <tr>
+                <td>BFLOAT16</td>
+                <td>16</td>
+                <td>8</td>
+                <td>7</td>
+                <td>±10^38</td>
+                <td>TPU, modern training</td>
+            </tr>
+        </table>
+
+        <h3>2.3.2 Integer and Fixed-Point Formats</h3>
+        <p>Integer formats, particularly INT8, have become essential for efficient inference. They require careful calibration through quantization but offer 4× memory savings and significant computational speedups.</p>
+
+        <pre>// Quantization parameters in WIA-AI-011
+{
+  "dtype": "INT8",
+  "quantization": {
+    "scheme": "per_tensor_symmetric",
+    "scale": 0.0235,
+    "zero_point": 0,
+    "range": [-128, 127]
+  }
+}
+
+// Dequantized value = (quantized_value - zero_point) * scale
+// For symmetric quantization, zero_point = 0</pre>
+
+        <h3>2.3.3 Specialized Formats</h3>
+        <p>Several specialized formats have emerged for specific use cases:</p>
+
+        <ul>
+            <li><strong>TensorFloat-32 (TF32):</strong> NVIDIA's format with FP32 range but reduced precision (19 bits total)</li>
+            <li><strong>INT4/UINT4:</strong> Sub-byte quantization for extreme compression in LLM inference</li>
+            <li><strong>FP8:</strong> Emerging 8-bit floating-point formats with different exponent/mantissa splits</li>
+            <li><strong>Posit:</strong> Alternative to IEEE 754 with dynamic precision (rarely used in practice)</li>
+        </ul>
+
+        <h2>2.4 Tensor Descriptor Format</h2>
+        <p>The WIA-AI-011 tensor descriptor is a comprehensive metadata structure that fully specifies a tensor's properties. This descriptor serves as the contract between different system components, ensuring unambiguous interpretation.</p>
+
+        <pre>{
+  "version": "WIA-AI-011-v1.0",
+  "tensor_id": "uuid-string",
+  "name": "input_images",
+
+  "shape": {
+    "dimensions": [32, 3, 224, 224],
+    "layout": "NCHW",
+    "symbolic": false
+  },
+
+  "dtype": {
+    "base_type": "FLOAT16",
+    "quantization": null,
+    "byte_order": "little_endian"
+  },
+
+  "memory": {
+    "strides": [150528, 50176, 224, 1],
+    "offset_bytes": 0,
+    "total_bytes": 9633792,
+    "alignment": 256,
+    "device": {
+      "type": "NPU",
+      "id": 0,
+      "memory_space": "device"
+    }
+  },
+
+  "properties": {
+    "requires_grad": false,
+    "is_pinned": true,
+    "is_contiguous": true,
+    "zero_copy_compatible": true
+  },
+
+  "metadata": {
+    "created_at": "2025-01-15T10:30:00Z",
+    "framework": "pytorch",
+    "producer": "data_loader_v2"
+  }
+}</pre>
+
+        <h2>2.5 Memory Alignment and Padding</h2>
+        <p>Modern accelerators impose alignment requirements on memory allocations for optimal performance. Unaligned access can cause significant slowdowns or even hardware exceptions. WIA-AI-011 specifies alignment requirements and padding rules.</p>
+
+        <h3>2.5.1 Alignment Requirements</h3>
+        <p>Different accelerators have different alignment requirements:</p>
+
+        <ul>
+            <li><strong>GPUs:</strong> Typically require 256-byte alignment for coalesced memory access</li>
+            <li><strong>TPUs:</strong> Often require 128-byte alignment for systolic array operations</li>
+            <li><strong>NPUs:</strong> May require 64-byte or 128-byte alignment</li>
+            <li><strong>CPU (SIMD):</strong> 32-byte (AVX2) or 64-byte (AVX-512) alignment</li>
+        </ul>
+
+        <p>WIA-AI-011 mandates a minimum alignment of 64 bytes for all tensor allocations, with devices free to request stricter alignment through capability queries.</p>
+
+        <h3>2.5.2 Padding Strategies</h3>
+        <p>Padding adds extra elements to dimensions to meet hardware requirements. For example, many accelerators perform best when channel counts are multiples of 8 or 16.</p>
+
+        <pre>// Original tensor: [32, 11, 224, 224]
+// Padded for optimal performance: [32, 16, 224, 224]
+// 5 channels of padding added
+
+{
+  "shape": [32, 11, 224, 224],
+  "physical_shape": [32, 16, 224, 224],
+  "padding": {
+    "dims": [false, true, false, false],
+    "values": [0, 5, 0, 0],
+    "mode": "zero_fill"
+  }
+}</pre>
+
+        <h2>2.6 Zero-Copy Data Sharing</h2>
+        <p>One of the most significant performance optimizations in WIA-AI-011 is zero-copy data sharing. Traditional approaches require copying data when moving between devices or framework boundaries. Zero-copy mechanisms eliminate these copies by sharing the underlying memory buffer.</p>
+
+        <h3>2.6.1 Shared Memory Protocol</h3>
+        <p>WIA-AI-011 defines a buffer sharing protocol based on file descriptors (POSIX) or handles (Windows) that allows processes and devices to map the same physical memory:</p>
+
+        <pre>// Zero-copy buffer sharing
+{
+  "buffer_handle": {
+    "type": "dma_buf_fd",  // Linux DMA-BUF
+    "fd": 42,
+    "size_bytes": 9633792,
+    "permissions": "read_write"
+  },
+  "mapping": {
+    "device_address": "0x7f4a2000",
+    "cpu_address": null,
+    "access_mode": "device_only"
+  }
+}</pre>
+
+        <h3>2.6.2 Pinned Memory</h3>
+        <p>Pinned (or page-locked) memory cannot be swapped to disk, ensuring stable physical addresses that hardware DMA engines can use directly. WIA-AI-011 provides APIs for allocating pinned memory:</p>
+
+        <pre>// Pinned memory allocation
+wia_memory_desc_t desc = {
+    .size = 9633792,
+    .alignment = 256,
+    .flags = WIA_MEM_PINNED | WIA_MEM_ZERO_COPY,
+    .device_affinity = WIA_DEVICE_NPU_0
+};
+
+wia_buffer_t buffer;
+wia_status_t status = wia_allocate_memory(&desc, &buffer);</pre>
+
+        <h2>2.7 Handling Dynamic Shapes</h2>
+        <p>Many modern neural networks have dynamic shapes that vary based on input. Transformer models process variable-length sequences, object detectors handle different image sizes, and beam search generates outputs of unknown length. WIA-AI-011 supports dynamic shapes through symbolic dimensions.</p>
+
+        <pre>{
+  "shape": {
+    "dimensions": ["batch", "sequence_length", 768],
+    "symbolic": true,
+    "constraints": {
+      "batch": {"min": 1, "max": 256},
+      "sequence_length": {"min": 1, "max": 2048, "multiple_of": 8}
+    }
+  },
+  "allocation_strategy": "overallocate",
+  "max_physical_shape": [256, 2048, 768]
+}</pre>
+
+        <h2>2.8 Endianness and Cross-Platform Compatibility</h2>
+        <p>While most modern systems use little-endian byte ordering, ensuring cross-platform compatibility requires explicit specification. WIA-AI-011 tensors carry endianness metadata:</p>
+
+        <pre>{
+  "dtype": {
+    "base_type": "FLOAT32",
+    "byte_order": "little_endian",  // or "big_endian", "network_order"
+    "bit_order": "lsb_first"
+  }
+}</pre>
+
+        <p>When transferring tensors between systems with different endianness, WIA-AI-011 implementations must perform byte swapping automatically or raise an error if in-place conversion is impossible.</p>
+
+        <h2>2.9 Sparse Tensor Formats</h2>
+        <p>Many neural network tensors are sparse, containing mostly zeros. Storing sparse tensors efficiently requires specialized formats. WIA-AI-011 supports several sparse formats:</p>
+
+        <h3>2.9.1 Coordinate (COO) Format</h3>
+        <pre>{
+  "format": "COO",
+  "shape": [1000, 1000],
+  "nnz": 5000,  // number of non-zero elements
+  "indices": {
+    "dtype": "INT32",
+    "data": [[0,5], [0,12], [1,3], ...]  // [row, col] pairs
+  },
+  "values": {
+    "dtype": "FLOAT32",
+    "data": [1.5, 2.3, 0.7, ...]
+  }
+}</pre>
+
+        <h3>2.9.2 Compressed Sparse Row (CSR) Format</h3>
+        <p>CSR is more efficient for sparse matrix operations, particularly for GPUs:</p>
+
+        <pre>{
+  "format": "CSR",
+  "shape": [1000, 1000],
+  "row_pointers": [0, 3, 7, 12, ...],  // 1001 elements
+  "column_indices": [5, 12, 45, ...],  // nnz elements
+  "values": [1.5, 2.3, 0.7, ...]       // nnz elements
+}</pre>
+
+        <h2>2.10 Practical Implementation Considerations</h2>
+        <p>Implementing WIA-AI-011 tensor formats requires careful attention to several practical concerns:</p>
+
+        <h3>Performance Validation</h3>
+        <p>Implementations should include benchmarks verifying that the standardized formats don't introduce overhead compared to vendor-native formats. Layout conversions, when necessary, should be lazy and cached.</p>
+
+        <h3>Backward Compatibility</h3>
+        <p>Providing adapters for existing framework tensor formats eases adoption. PyTorch's torch.Tensor, TensorFlow's tf.Tensor, and NumPy's ndarray should all have efficient conversion paths to/from WIA-AI-011 descriptors.</p>
+
+        <h3>Versioning</h3>
+        <p>The tensor descriptor includes a version field, allowing future extensions while maintaining compatibility with existing implementations. Readers must gracefully handle newer versions by ignoring unknown fields.</p>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Tensor representation encompasses shape, data type, and memory layout—all critical for performance and portability</li>
+                <li>NCHW and NHWC are the two dominant layout conventions; WIA-AI-011 requires supporting both</li>
+                <li>Stride-based layout representation enables arbitrary memory organizations including padding and blocking</li>
+                <li>Data types range from FLOAT64 to INT4, with quantization metadata for reduced-precision formats</li>
+                <li>Comprehensive tensor descriptors provide unambiguous specifications including device, alignment, and properties</li>
+                <li>Memory alignment (minimum 64 bytes) is essential for hardware performance; padding may be needed</li>
+                <li>Zero-copy data sharing eliminates expensive copies through shared buffers and pinned memory</li>
+                <li>Dynamic shapes are supported through symbolic dimensions with constraints</li>
+                <li>Sparse tensor formats (COO, CSR) enable efficient storage and computation for sparse data</li>
+                <li>Practical considerations include performance validation, backward compatibility, and versioning</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain the difference between NCHW and NHWC memory layouts. Which is preferred by cuDNN and why?</li>
+                <li>How do strides enable representation of arbitrary memory layouts? Give an example calculation.</li>
+                <li>Compare FLOAT16 and BFLOAT16. What are the trade-offs between them?</li>
+                <li>What is symmetric quantization, and how does it differ from asymmetric quantization?</li>
+                <li>Why is memory alignment important for accelerator performance? What is WIA-AI-011's minimum alignment requirement?</li>
+                <li>Describe the zero-copy data sharing mechanism and its performance benefits.</li>
+                <li>How does WIA-AI-011 handle dynamic tensor shapes? What are symbolic dimensions?</li>
+                <li>Explain the difference between COO and CSR sparse tensor formats. When would you choose each?</li>
+                <li>What role does the tensor descriptor play in the WIA-AI-011 ecosystem?</li>
+                <li>Why must tensor descriptors include endianness information for cross-platform compatibility?</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · Benefit All Humanity</strong>
+        </div>
+    </div>
+</body>
+</html>

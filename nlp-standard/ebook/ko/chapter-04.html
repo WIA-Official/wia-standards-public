@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장 - 트랜스포머와 어텐션 메커니즘 | WIA-AI-023</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 40px 20px;
+        }
+        .container { max-width: 850px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 50px; padding-bottom: 30px; border-bottom: 2px solid var(--border); }
+        .chapter-num { color: var(--primary); font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+        h1 { font-size: 2.5rem; margin-bottom: 15px; color: var(--text); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 40px 0 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        h3 { color: var(--text); font-size: 1.4rem; margin: 30px 0 15px; }
+        p { margin: 15px 0; color: var(--text-muted); font-size: 1.05rem; }
+        .highlight { background: var(--bg-card); border-left: 4px solid var(--primary); padding: 20px; margin: 25px 0; border-radius: 8px; }
+        code { background: var(--bg-card); padding: 3px 8px; border-radius: 4px; font-family: 'Courier New', monospace; color: var(--primary); }
+        pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; color: var(--text); }
+        ul, ol { margin: 15px 0; padding-left: 30px; }
+        li { margin: 10px 0; color: var(--text-muted); }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--bg-card); color: var(--primary); font-weight: 600; }
+        .summary { background: var(--bg-card); border: 2px solid var(--primary); border-radius: 12px; padding: 30px; margin: 40px 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        .review { background: var(--bg-card); border-radius: 12px; padding: 30px; margin: 40px 0; }
+        .review h2 { border: none; margin-top: 0; }
+        footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 2px solid var(--border); }
+        .philosophy { color: var(--primary); font-size: 1.2rem; margin-bottom: 15px; font-weight: 600; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-btn { padding: 12px 24px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; transition: all 0.3s; }
+        .nav-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-num">4장</div>
+            <h1>트랜스포머와 어텐션 메커니즘</h1>
+        </div>
+
+        <h2>4.1 트랜스포머 혁명</h2>
+        <p>
+            "Attention is All You Need" (Vaswani et al., 2017)에서 소개된 트랜스포머 아키텍처는 NLP를 근본적으로 변화시켰습니다. 순환 및 합성곱 계층을 어텐션 메커니즘으로 대체함으로써, 트랜스포머는 병렬 처리를 가능하게 하고, 장거리 의존성을 더 효과적으로 포착하며, 사실상 모든 NLP 작업에서 최첨단 결과를 달성했습니다.
+        </p>
+        <p>
+            트랜스포머 이전에는 RNN과 LSTM이 시퀀스 처리를 지배했습니다. 그러나 이들은 순차적 계산 병목, 기울기 소실/폭발 문제, 장거리 의존성 포착의 어려움을 겪었습니다. 트랜스포머는 셀프 어텐션과 위치 인코딩을 통해 이러한 문제를 해결했습니다.
+        </p>
+
+        <div class="highlight">
+            <h3>트랜스포머의 핵심 혁신</h3>
+            <ul>
+                <li><strong>셀프 어텐션:</strong> 관련성에 기반하여 입력 요소에 가중치 부여</li>
+                <li><strong>병렬 처리:</strong> RNN과 같은 순차적 의존성 없음</li>
+                <li><strong>위치 인코딩:</strong> 시퀀스 순서 정보 통합</li>
+                <li><strong>멀티헤드 어텐션:</strong> 여러 표현 부분공간 학습</li>
+                <li><strong>레이어 정규화:</strong> 깊은 네트워크의 학습 안정화</li>
+            </ul>
+        </div>
+
+        <h2>4.2 어텐션 메커니즘 기초</h2>
+        <p>
+            어텐션 메커니즘은 모델이 출력을 생성할 때 입력의 관련 부분에 집중할 수 있게 합니다. 전체 시퀀스를 고정 크기 벡터로 인코딩하는 대신, 어텐션은 모든 입력 요소의 가중 조합을 동적으로 계산합니다.
+        </p>
+
+        <h3>어텐션 공식</h3>
+        <p>
+            핵심 어텐션 메커니즘은 쿼리(Q), 키(K), 값(V) 사이의 점수를 계산합니다:
+        </p>
+
+        <pre><code>Attention(Q, K, V) = softmax(QK^T / sqrt(d_k)) * V
+
+여기서:
+- Q (쿼리): 찾고 있는 것
+- K (키): 비교 대상
+- V (값): 검색할 실제 콘텐츠
+- d_k: 키 벡터의 차원 (스케일링용)</code></pre>
+
+        <h3>스케일드 닷-프로덕트 어텐션 구현</h3>
+        <pre><code>import torch
+import torch.nn as nn
+import math
+
+def scaled_dot_product_attention(query, key, value, mask=None):
+    """
+    스케일드 닷-프로덕트 어텐션 계산
+
+    Args:
+        query: (batch, heads, seq_len, d_k)
+        key: (batch, heads, seq_len, d_k)
+        value: (batch, heads, seq_len, d_v)
+        mask: 패딩/미래 토큰에 대한 선택적 마스크
+    """
+    d_k = query.size(-1)
+
+    # 어텐션 점수 계산
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+
+    # 마스크 적용 (제공된 경우)
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, -1e9)
+
+    # 소프트맥스 적용
+    attention_weights = torch.softmax(scores, dim=-1)
+
+    # 값에 어텐션 적용
+    output = torch.matmul(attention_weights, value)
+
+    return output, attention_weights</code></pre>
+
+        <h2>4.3 멀티헤드 어텐션</h2>
+        <p>
+            멀티헤드 어텐션은 여러 어텐션 메커니즘을 병렬로 실행하며, 각각 단어 간 관계의 다른 측면을 학습합니다. 이를 통해 모델이 다양한 표현 부분공간의 정보에 동시에 주의를 기울일 수 있습니다.
+        </p>
+
+        <pre><code>class MultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super().__init__()
+        assert d_model % num_heads == 0
+
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+
+        # Q, K, V에 대한 선형 계층
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, d_model)
+        self.W_v = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_model)
+
+    def forward(self, query, key, value, mask=None):
+        batch_size = query.size(0)
+
+        # 선형 투영 및 헤드로 분할
+        Q = self.W_q(query).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+        K = self.W_k(key).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+        V = self.W_v(value).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+
+        # 어텐션 적용
+        x, attention = scaled_dot_product_attention(Q, K, V, mask)
+
+        # 헤드 연결
+        x = x.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
+
+        # 최종 선형 투영
+        return self.W_o(x)</code></pre>
+
+        <h2>4.4 위치 인코딩</h2>
+        <p>
+            트랜스포머는 모든 위치를 병렬로 처리하므로 명시적인 위치 정보가 필요합니다. 위치 인코딩은 입력 임베딩에 위치 의존적 패턴을 추가하여 모델이 시퀀스 순서를 활용할 수 있게 합니다.
+        </p>
+
+        <pre><code>class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super().__init__()
+
+        # 위치 인코딩 행렬 생성
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1).float()
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() *
+                           -(math.log(10000.0) / d_model))
+
+        # 짝수 인덱스에 사인 적용
+        pe[:, 0::2] = torch.sin(position * div_term)
+        # 홀수 인덱스에 코사인 적용
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        # 입력에 위치 인코딩 추가
+        return x + self.pe[:, :x.size(1)]</code></pre>
+
+        <h2>4.5 트랜스포머 인코더 아키텍처</h2>
+        <p>
+            트랜스포머 인코더는 스택된 계층으로 구성되며, 각 계층은 멀티헤드 어텐션과 위치별 피드포워드 네트워크를 포함하고, 잔차 연결 및 레이어 정규화가 있습니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>구성요소</th>
+                    <th>목적</th>
+                    <th>주요 파라미터</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>입력 임베딩</td>
+                    <td>토큰을 벡터로 변환</td>
+                    <td>vocab_size, d_model</td>
+                </tr>
+                <tr>
+                    <td>위치 인코딩</td>
+                    <td>위치 정보 추가</td>
+                    <td>max_len, d_model</td>
+                </tr>
+                <tr>
+                    <td>멀티헤드 어텐션</td>
+                    <td>모든 위치에 주의</td>
+                    <td>num_heads, d_k, d_v</td>
+                </tr>
+                <tr>
+                    <td>피드포워드 네트워크</td>
+                    <td>위치별 변환</td>
+                    <td>d_ff (일반적으로 4*d_model)</td>
+                </tr>
+                <tr>
+                    <td>레이어 정규화</td>
+                    <td>학습 안정화</td>
+                    <td>epsilon</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.6 트랜스포머 디코더 아키텍처</h2>
+        <p>
+            디코더는 미래 토큰에 주의하는 것을 방지하기 위한 추가 마스킹된 멀티헤드 어텐션 계층과 입력 시퀀스의 관련 부분에 집중하기 위한 인코더-디코더 어텐션을 포함합니다.
+        </p>
+
+        <h3>마스킹된 셀프 어텐션</h3>
+        <p>
+            학습 중에 디코더는 미래 토큰을 볼 수 없어야 합니다. 마스킹된 어텐션은 위치 i가 위치 ≤ i에만 주의할 수 있도록 삼각 마스크를 적용합니다.
+        </p>
+
+        <pre><code>def create_causal_mask(seq_len):
+    """인과적(자기회귀) 어텐션을 위한 마스크 생성"""
+    mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+    return ~mask  # 반전: True는 주의, False는 마스크
+
+# 사용 예
+seq_len = 5
+mask = create_causal_mask(seq_len)
+print(mask)
+# 출력:
+# tensor([[ True, False, False, False, False],
+#         [ True,  True, False, False, False],
+#         [ True,  True,  True, False, False],
+#         [ True,  True,  True,  True, False],
+#         [ True,  True,  True,  True,  True]])</code></pre>
+
+        <h2>4.7 BERT: 양방향 인코더 표현</h2>
+        <p>
+            BERT는 양방향 맥락으로 트랜스포머 인코더만 사용합니다. 마스킹된 언어 모델링과 다음 문장 예측에 대해 사전 학습된 BERT는 후속 작업에 잘 전이되는 깊은 양방향 표현을 학습합니다.
+        </p>
+
+        <div class="highlight">
+            <h3>BERT 사전 학습 작업</h3>
+            <ul>
+                <li><strong>마스킹된 언어 모델링(MLM):</strong> 무작위로 마스킹된 토큰 예측</li>
+                <li><strong>다음 문장 예측(NSP):</strong> 두 문장이 연속적인지 판단</li>
+            </ul>
+        </div>
+
+        <pre><code>from transformers import BertTokenizer, BertModel
+
+# 사전 학습된 BERT 로드
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertModel.from_pretrained('bert-base-uncased')
+
+# 텍스트 인코딩
+text = "트랜스포머를 사용한 자연어 처리"
+inputs = tokenizer(text, return_tensors='pt', padding=True)
+
+# 임베딩 가져오기
+outputs = model(**inputs)
+last_hidden_states = outputs.last_hidden_state
+pooled_output = outputs.pooler_output
+
+print(f"마지막 은닉 상태 형태: {last_hidden_states.shape}")
+print(f"풀링된 출력 형태: {pooled_output.shape}")</code></pre>
+
+        <h2>4.8 GPT: 생성적 사전 학습 트랜스포머</h2>
+        <p>
+            GPT는 자기회귀 언어 모델링을 위해 트랜스포머 디코더를 사용합니다. 이전 토큰이 주어졌을 때 다음 토큰을 예측하도록 학습된 GPT는 텍스트 생성과 퓨샷 학습에서 뛰어납니다.
+        </p>
+
+        <h3>GPT 대 BERT</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>측면</th>
+                    <th>BERT</th>
+                    <th>GPT</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>아키텍처</td>
+                    <td>인코더만</td>
+                    <td>디코더만</td>
+                </tr>
+                <tr>
+                    <td>어텐션</td>
+                    <td>양방향</td>
+                    <td>단방향(인과적)</td>
+                </tr>
+                <tr>
+                    <td>주요 용도</td>
+                    <td>이해 작업</td>
+                    <td>생성 작업</td>
+                </tr>
+                <tr>
+                    <td>사전 학습</td>
+                    <td>MLM + NSP</td>
+                    <td>다음 토큰 예측</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.9 트랜스포머 변형</h2>
+        <p>
+            원래 트랜스포머 이후, 효율성, 성능을 개선하거나 특정 작업에 특화하기 위해 수많은 변형이 개발되었습니다.
+        </p>
+
+        <h3>주목할 만한 트랜스포머 변형</h3>
+        <ul>
+            <li><strong>RoBERTa:</strong> 향상된 학습으로 강력하게 최적화된 BERT</li>
+            <li><strong>ALBERT:</strong> 파라미터 효율적인 BERT 변형</li>
+            <li><strong>T5:</strong> 통합된 작업 처리를 위한 텍스트-투-텍스트 트랜스포머</li>
+            <li><strong>XLNet:</strong> 순열 기반 언어 모델링</li>
+            <li><strong>Longformer:</strong> 긴 문서를 위한 효율적인 어텐션</li>
+            <li><strong>ELECTRA:</strong> MLM 대신 교체된 토큰 탐지</li>
+        </ul>
+
+        <h2>4.10 WIA-AI-023 트랜스포머 표준</h2>
+        <p>
+            WIA-AI-023 표준은 트랜스포머 모델 인터페이스를 정의하여 구현 간의 상호운용성과 일관된 동작을 보장합니다.
+        </p>
+
+        <pre><code>{
+  "standard": "WIA-AI-023",
+  "version": "1.0",
+  "transformer_spec": {
+    "model": {
+      "type": "encoder",
+      "architecture": "transformer",
+      "num_layers": 12,
+      "hidden_size": 768,
+      "num_attention_heads": 12,
+      "intermediate_size": 3072,
+      "max_position_embeddings": 512,
+      "vocab_size": 30522
+    },
+    "input": {
+      "text": "WIA-AI-023이 NLP 시스템을 표준화합니다",
+      "token_ids": [101, 17953, 1011, 9932, 1011, 6185, 2509, 2629, 17953, 3343, 2361, 102],
+      "attention_mask": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "output": {
+      "last_hidden_state": "형태: [1, 12, 768]",
+      "pooler_output": "형태: [1, 768]",
+      "attention_weights": "형태: [1, 12, 12, 12]"
+    }
+  }
+}</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <p><strong>핵심 내용:</strong></p>
+            <ul>
+                <li>트랜스포머는 셀프 어텐션과 병렬 처리를 통해 NLP를 혁신</li>
+                <li>스케일드 닷-프로덕트 어텐션은 관련성에 기반하여 입력 요소에 가중치 부여</li>
+                <li>멀티헤드 어텐션은 여러 표현 부분공간을 동시에 학습</li>
+                <li>위치 인코딩은 트랜스포머에 시퀀스 순서 정보 제공</li>
+                <li>인코더 아키텍처(BERT)는 양방향 맥락으로 이해 작업에서 뛰어남</li>
+                <li>디코더 아키텍처(GPT)는 인과적 어텐션으로 생성에서 뛰어남</li>
+                <li>수많은 트랜스포머 변형이 효율성, 성능 또는 특정 사용 사례에 최적화</li>
+                <li>WIA-AI-023 표준은 시스템 간 트랜스포머 상호운용성 보장</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>셀프 어텐션이 RNN 순차 처리와 어떻게 다른지 설명하시오.</li>
+                <li>닷-프로덕트 어텐션 공식에서 스케일링이 적용되는 이유는?</li>
+                <li>멀티헤드 어텐션이 단일 헤드 어텐션에 비해 어떻게 개선되는가?</li>
+                <li>위치 인코딩이 트랜스포머에서 어떤 문제를 해결하는가?</li>
+                <li>BERT와 GPT 아키텍처를 비교하시오. 주요 사용 사례는 무엇인가?</li>
+                <li>트랜스포머 디코더에서 마스킹된 어텐션이 왜 필요한가?</li>
+            </ol>
+        </div>
+
+        <div class="highlight">
+            <h3>다음 장 안내</h3>
+            <p>
+                5장에서는 맥락에서 단어를 식별하고 분류하는 기본적인 시퀀스 라벨링 작업인 개체명 인식(NER)과 품사(POS) 태깅을 탐구합니다. 다양한 NER 접근법과 트랜스포머가 최첨단 성능을 달성하는 방법을 배우게 됩니다.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>3장: 하드웨어 추상화 계층 설계 | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { font-size: 2.5em; color: #1c1917; margin: 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        .summary, .review-questions { padding: 30px; border-radius: 8px; margin: 40px 0; }
+        .summary { background: #f0fdf4; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #10B981; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="color: #10B981; font-weight: bold; border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px;">
+            <div>3장</div>
+            <h1>하드웨어 추상화 계층 설계</h1>
+        </div>
+
+        <h2>3.1 추상화 과제와 철학</h2>
+        <p>AI 가속기를 위한 하드웨어 추상화 계층(HAL)을 만드는 것은 고유한 과제를 제시합니다. 최소 공통 분모 인터페이스를 노출할 수 있는 전통적인 컴퓨팅 API와 달리 AI 워크로드는 이식성과 성능을 모두 요구합니다. WIA-AI-011의 HAL 설계 철학은 "점진적 공개(Progressive Disclosure)"에 중점을 둡니다.</p>
+
+        <p><strong>점진적 공개 원칙:</strong></p>
+        <ul>
+            <li><strong>Level 1:</strong> 기본 작업 - 모든 디바이스에서 작동하는 고수준 API (텐서 생성, 기본 연산)</li>
+            <li><strong>Level 2:</strong> 최적화된 작업 - 디바이스별 최적화가 적용된 중간 수준 API (컨볼루션, 행렬 곱셈)</li>
+            <li><strong>Level 3:</strong> 전문가 제어 - 하드웨어 특화 기능에 직접 접근 (사용자 정의 커널, 메모리 제어)</li>
+        </ul>
+
+        <pre>// 점진적 공개 예제
+
+// Level 1: 간단하고 이식 가능
+wia_tensor_t* result = wia_matmul(A, B);
+
+// Level 2: 성능 힌트 제공
+wia_matmul_config_t config = {
+    .algorithm = WIA_MATMUL_AUTO,     // 자동 알고리즘 선택
+    .precision = WIA_PRECISION_MIXED  // 혼합 정밀도
+};
+wia_tensor_t* result = wia_matmul_optimized(A, B, &config);
+
+// Level 3: 완전한 제어
+wia_kernel_t* kernel = wia_compile_kernel(custom_matmul_code);
+wia_launch_config_t launch = {
+    .grid_dim = {128, 128, 1},
+    .block_dim = {16, 16, 1},
+    .shared_mem = 49152  // 48KB 공유 메모리
+};
+wia_launch_kernel(kernel, &launch, A, B, result);</pre>
+
+        <h2>3.2 디바이스 검색 및 열거</h2>
+        <p>모든 계산이 발생하기 전에 애플리케이션은 사용 가능한 가속기를 검색하고 해당 기능을 쿼리해야 합니다. WIA-AI-011은 체계적인 디바이스 열거 API를 제공합니다.</p>
+
+        <pre>// WIA 호환 디바이스 검색 및 정보 수집
+#include <wia/device.h>
+
+int main() {
+    // 1. 디바이스 개수 확인
+    int device_count = wia_get_device_count();
+    printf("발견된 WIA 호환 디바이스: %d개\n", device_count);
+
+    // 2. 각 디바이스 정보 조회
+    for (int i = 0; i < device_count; i++) {
+        wia_device_t* device = wia_get_device(i);
+        wia_device_info_t info;
+        wia_get_device_info(device, &info);
+
+        printf("\n디바이스 %d:\n", i);
+        printf("  이름: %s\n", info.name);
+        printf("  벤더: %s\n", info.vendor);
+        printf("  유형: %s\n", device_type_to_string(info.type));
+        printf("  컴퓨팅 유닛: %d개\n", info.compute_units);
+        printf("  메모리: %llu MB\n", info.memory_size / 1024 / 1024);
+        printf("  대역폭: %.1f GB/s\n", info.memory_bandwidth / 1e9);
+        printf("  FLOPS: %.1f TFLOPS\n", info.peak_flops / 1e12);
+    }
+
+    return 0;
+}</pre>
+
+        <h3>3.2.1 디바이스 기능 쿼리</h3>
+        <p>기능 시스템을 통해 애플리케이션은 디바이스가 지원하는 기능을 쿼리할 수 있습니다. 모든 디바이스가 동일하다고 가정하는 대신 애플리케이션은 사용 가능한 기능에 적응할 수 있습니다.</p>
+
+        <pre>// 디바이스 기능 확인
+wia_device_capabilities_t caps;
+wia_get_device_capabilities(device, &caps);
+
+// 데이터 타입 지원 확인
+if (caps.supports_float16) {
+    printf("✓ FLOAT16 지원\n");
+}
+if (caps.supports_bfloat16) {
+    printf("✓ BFLOAT16 지원\n");
+}
+if (caps.supports_int8) {
+    printf("✓ INT8 양자화 지원\n");
+}
+
+// 메모리 기능 확인
+if (caps.supports_unified_memory) {
+    printf("✓ 통합 메모리 지원\n");
+    // 통합 메모리 사용
+    tensor = wia_create_tensor_unified(...);
+} else {
+    printf("✗ 통합 메모리 미지원, 명시적 전송 필요\n");
+    // 명시적 메모리 전송
+    tensor = wia_create_tensor_device(...);
+}
+
+// 통신 기능 확인
+if (caps.supports_peer_to_peer) {
+    printf("✓ 피어 투 피어 통신 지원\n");
+    // 디바이스 간 직접 전송
+    wia_copy_peer_to_peer(src_device, dst_device, tensor);
+}</pre>
+
+        <h2>3.3 컨텍스트 관리</h2>
+        <p>컨텍스트는 가속기 작업의 실행 환경을 나타냅니다. 디바이스 상태, 메모리 풀 및 실행 스트림을 캡슐화합니다. WIA-AI-011은 숨겨진 전역 상태를 피하고 다중 디바이스 프로그래밍을 가능하게 하기 위해 명시적 컨텍스트 객체를 사용합니다.</p>
+
+        <pre>// 컨텍스트 생성 및 관리
+wia_context_t* create_context_for_device(int device_id) {
+    // 1. 컨텍스트 생성 설정
+    wia_context_config_t config = {
+        .device_id = device_id,
+        .memory_pool_size = 1024 * 1024 * 1024,  // 1GB 메모리 풀
+        .max_streams = 4,                         // 최대 4개 스트림
+        .enable_profiling = true,                 // 프로파일링 활성화
+        .flags = WIA_CONTEXT_EXCLUSIVE            // 독점 모드
+    };
+
+    // 2. 컨텍스트 생성
+    wia_context_t* ctx = wia_create_context(&config);
+    if (!ctx) {
+        fprintf(stderr, "컨텍스트 생성 실패\n");
+        return NULL;
+    }
+
+    // 3. 컨텍스트 설정
+    wia_context_set_memory_limit(ctx, 2ULL * 1024 * 1024 * 1024);  // 2GB 제한
+    wia_context_set_timeout(ctx, 30000);  // 30초 타임아웃
+
+    return ctx;
+}
+
+// 다중 디바이스 컨텍스트 관리
+wia_context_t* ctx_gpu0 = create_context_for_device(0);
+wia_context_t* ctx_gpu1 = create_context_for_device(1);
+
+// 각 컨텍스트에서 독립적으로 작업 실행
+wia_compute_in_context(ctx_gpu0, operation1);
+wia_compute_in_context(ctx_gpu1, operation2);
+
+// 정리
+wia_destroy_context(ctx_gpu0);
+wia_destroy_context(ctx_gpu1);</pre>
+
+        <h2>3.4 스트림 기반 실행</h2>
+        <p>스트림(또는 큐, 명령 버퍼)은 비동기, 중복 실행을 가능하게 합니다. 여러 스트림이 디바이스에서 동시에 실행될 수 있어 계산이 데이터 전송과 중복될 수 있습니다.</p>
+
+        <pre>// 스트림을 사용한 비동기 실행
+wia_stream_t* create_computation_pipeline(wia_context_t* ctx) {
+    // 3개 스트림 생성: 전송, 계산, 후처리
+    wia_stream_t* transfer_stream = wia_create_stream(ctx, 0);
+    wia_stream_t* compute_stream = wia_create_stream(ctx, 0);
+    wia_stream_t* postprocess_stream = wia_create_stream(ctx, 0);
+
+    // 비동기 작업 제출
+    // 스트림 1: 데이터 전송 (H2D)
+    wia_copy_async(host_data, device_data, size, transfer_stream);
+
+    // 스트림 2: 계산 (전송 완료 후)
+    wia_stream_wait_event(compute_stream, transfer_complete);
+    wia_launch_kernel_async(kernel, device_data, compute_stream);
+
+    // 스트림 3: 후처리 (계산 완료 후)
+    wia_stream_wait_event(postprocess_stream, compute_complete);
+    wia_postprocess_async(result, postprocess_stream);
+
+    return compute_stream;
+}
+
+// 파이프라이닝으로 처리량 극대화
+for (int batch = 0; batch < num_batches; batch++) {
+    // 각 배치가 다른 스트림에서 중복 실행
+    wia_stream_t* stream = streams[batch % 3];
+
+    // 전송과 계산이 병렬로 진행
+    wia_copy_async(batch_data[batch], device_buffer, size, stream);
+    wia_compute_async(device_buffer, stream);
+    wia_copy_async(device_buffer, batch_result[batch], size, stream);
+}</pre>
+
+        <h3>3.4.1 스트림 종속성과 이벤트</h3>
+        <pre>// 이벤트 기반 동기화로 복잡한 워크플로우 관리
+void complex_pipeline_with_dependencies() {
+    // 이벤트 생성
+    wia_event_t* transfer_done = wia_create_event();
+    wia_event_t* compute_done = wia_create_event();
+    wia_event_t* reduction_done = wia_create_event();
+
+    // 파이프라인 1: 전송 → 계산 A
+    wia_copy_async(input_a, device_a, size, stream_a);
+    wia_event_record(transfer_done, stream_a);
+
+    wia_stream_wait_event(stream_compute_a, transfer_done);
+    wia_compute_async(device_a, result_a, stream_compute_a);
+    wia_event_record(compute_done, stream_compute_a);
+
+    // 파이프라인 2: 전송 → 계산 B (병렬 실행)
+    wia_copy_async(input_b, device_b, size, stream_b);
+    wia_compute_async(device_b, result_b, stream_b);
+
+    // 파이프라인 3: 결과 병합 (A와 B 완료 후)
+    wia_stream_wait_event(stream_merge, compute_done);
+    wia_stream_wait_stream(stream_merge, stream_b);  // stream_b 완료 대기
+    wia_merge_async(result_a, result_b, final_result, stream_merge);
+
+    // 최종 동기화
+    wia_stream_synchronize(stream_merge);
+
+    // 정리
+    wia_destroy_event(transfer_done);
+    wia_destroy_event(compute_done);
+}</pre>
+
+        <h2>3.5 메모리 관리 API</h2>
+        <p>효율적인 메모리 관리는 성능에 중요합니다. WIA-AI-011은 다양한 메모리 유형과 할당 전략을 지원하여 할당을 세밀하게 제어합니다.</p>
+
+        <h3>3.5.1 메모리 유형</h3>
+        <table>
+            <tr>
+                <th>메모리 유형</th>
+                <th>위치</th>
+                <th>접근 패턴</th>
+                <th>사용 사례</th>
+            </tr>
+            <tr>
+                <td>DEVICE</td>
+                <td>디바이스 전용</td>
+                <td>디바이스만 접근</td>
+                <td>일반 계산, 최고 대역폭</td>
+            </tr>
+            <tr>
+                <td>HOST</td>
+                <td>호스트 메모리</td>
+                <td>CPU만 접근</td>
+                <td>준비 단계, CPU 처리</td>
+            </tr>
+            <tr>
+                <td>PINNED</td>
+                <td>호스트 고정 메모리</td>
+                <td>CPU 접근, 빠른 DMA</td>
+                <td>호스트-디바이스 전송</td>
+            </tr>
+            <tr>
+                <td>UNIFIED</td>
+                <td>통합 주소 공간</td>
+                <td>CPU와 디바이스 모두</td>
+                <td>단순한 프로그래밍</td>
+            </tr>
+            <tr>
+                <td>MANAGED</td>
+                <td>자동 마이그레이션</td>
+                <td>자동 페이지 마이그레이션</td>
+                <td>복잡한 데이터 흐름</td>
+            </tr>
+        </table>
+
+        <pre>// 다양한 메모리 유형 사용 예제
+void demonstrate_memory_types(wia_context_t* ctx, size_t size) {
+    // 1. 디바이스 메모리: 최고 성능
+    wia_memory_t* device_mem = wia_alloc(
+        ctx, size, WIA_MEMORY_DEVICE
+    );
+
+    // 2. 고정 메모리: 빠른 전송
+    wia_memory_t* pinned_mem = wia_alloc(
+        ctx, size, WIA_MEMORY_PINNED
+    );
+    // 고정 메모리는 페이지 아웃되지 않으므로 DMA 전송 가능
+    wia_copy_async(pinned_mem, device_mem, size, stream);
+
+    // 3. 통합 메모리: 간단한 프로그래밍
+    wia_memory_t* unified_mem = wia_alloc(
+        ctx, size, WIA_MEMORY_UNIFIED
+    );
+    // CPU와 GPU 모두 같은 포인터 사용
+    float* data = (float*)wia_memory_ptr(unified_mem);
+    data[0] = 1.0f;  // CPU에서 초기화
+    wia_compute(unified_mem);  // GPU에서 계산 (자동 전송)
+
+    // 4. 관리 메모리: 자동 최적화
+    wia_memory_t* managed_mem = wia_alloc(
+        ctx, size, WIA_MEMORY_MANAGED
+    );
+    // 런타임이 자동으로 최적 위치 결정
+
+    // 정리
+    wia_free(device_mem);
+    wia_free(pinned_mem);
+    wia_free(unified_mem);
+    wia_free(managed_mem);
+}</pre>
+
+        <h3>3.5.2 메모리 풀</h3>
+        <pre>// 메모리 풀을 사용한 효율적인 할당
+wia_memory_pool_t* pool = wia_create_memory_pool(ctx);
+
+// 풀 설정
+wia_pool_config_t pool_config = {
+    .initial_size = 512 * 1024 * 1024,    // 512MB 초기 크기
+    .max_size = 2ULL * 1024 * 1024 * 1024, // 2GB 최대 크기
+    .block_size = 256,                     // 256바이트 블록
+    .enable_caching = true,                // 캐싱 활성화
+    .defragment_threshold = 0.3            // 30% 단편화 시 정리
+};
+wia_configure_pool(pool, &pool_config);
+
+// 풀에서 빠른 할당 (malloc보다 100배 빠름)
+for (int i = 0; i < 10000; i++) {
+    wia_memory_t* mem = wia_alloc_from_pool(pool, tensor_size);
+    wia_compute(mem);
+    wia_free_to_pool(pool, mem);  // 풀로 반환 (실제 해제 안 함)
+}
+
+// 풀 통계
+wia_pool_stats_t stats;
+wia_get_pool_stats(pool, &stats);
+printf("할당 횟수: %llu\n", stats.num_allocations);
+printf("캐시 적중률: %.2f%%\n", stats.cache_hit_rate * 100);
+printf("단편화: %.2f%%\n", stats.fragmentation * 100);
+
+wia_destroy_pool(pool);</pre>
+
+        <h2>3.6 커널 시작 추상화</h2>
+        <p>커널은 가속기에서 계산의 기본 단위입니다. WIA-AI-011은 높은 수준의 작업 API와 낮은 수준의 커널 시작 프리미티브를 모두 제공합니다.</p>
+
+        <h3>3.6.1 고수준 작업 라이브러리</h3>
+        <pre>// 최적화된 고수준 작업 사용
+#include <wia/ops.h>
+
+void high_level_operations(wia_context_t* ctx) {
+    // 1. 행렬 곱셈 (자동 최적화)
+    wia_tensor_t* C = wia_matmul(A, B, ctx);
+
+    // 2. 컨볼루션 (cuDNN/MIOpen 등 최적 구현 자동 선택)
+    wia_conv_config_t conv_config = {
+        .padding = {1, 1},
+        .stride = {1, 1},
+        .dilation = {1, 1},
+        .groups = 1
+    };
+    wia_tensor_t* output = wia_conv2d(input, weight, &conv_config, ctx);
+
+    // 3. 활성화 함수
+    wia_tensor_t* activated = wia_relu(output, ctx);
+
+    // 4. 배치 정규화
+    wia_tensor_t* normalized = wia_batch_norm(
+        activated, scale, bias, mean, variance, ctx
+    );
+
+    // 5. 풀링
+    wia_pool_config_t pool_config = {
+        .type = WIA_POOL_MAX,
+        .kernel_size = {2, 2},
+        .stride = {2, 2}
+    };
+    wia_tensor_t* pooled = wia_pool2d(normalized, &pool_config, ctx);
+}</pre>
+
+        <h3>3.6.2 사용자 정의 커널</h3>
+        <pre>// 사용자 정의 커널 작성 및 시작
+const char* custom_kernel_source = R"(
+    // WIA 커널 언어 (OpenCL 스타일)
+    __kernel void vector_add(
+        __global const float* a,
+        __global const float* b,
+        __global float* c,
+        int n
+    ) {
+        int gid = get_global_id(0);
+        if (gid < n) {
+            c[gid] = a[gid] + b[gid];  // 벡터 덧셈
+        }
+    }
+)";
+
+// 커널 컴파일
+wia_kernel_t* kernel = wia_compile_kernel(
+    ctx, custom_kernel_source, "vector_add"
+);
+
+// 시작 설정
+wia_launch_config_t config = {
+    .global_size = {n, 1, 1},      // 전역 작업 크기
+    .local_size = {256, 1, 1},     // 작업 그룹 크기
+    .shared_memory = 0              // 공유 메모리 크기
+};
+
+// 커널 인자 설정
+wia_set_kernel_arg(kernel, 0, &tensor_a);
+wia_set_kernel_arg(kernel, 1, &tensor_b);
+wia_set_kernel_arg(kernel, 2, &tensor_c);
+wia_set_kernel_arg(kernel, 3, &n);
+
+// 비동기 실행
+wia_launch_kernel_async(kernel, &config, stream);
+
+// 정리
+wia_destroy_kernel(kernel);</pre>
+
+        <h2>3.7 텐서 작업 API</h2>
+        <p>기본 커널을 넘어 WIA-AI-011은 딥러닝 프리미티브의 전체 스펙트럼을 포함하는 포괄적인 텐서 작업 라이브러리를 제공합니다.</p>
+
+        <pre>// 포괄적인 텐서 작업 예제
+void tensor_operations_showcase(wia_context_t* ctx) {
+    // 요소별 작업
+    wia_tensor_t* sum = wia_add(a, b);           // 덧셈
+    wia_tensor_t* product = wia_mul(a, b);       // 곱셈
+    wia_tensor_t* relu_out = wia_relu(a);        // ReLU 활성화
+    wia_tensor_t* gelu_out = wia_gelu(a);        // GELU 활성화
+    wia_tensor_t* sigmoid_out = wia_sigmoid(a);  // Sigmoid
+
+    // 축소 작업
+    wia_tensor_t* row_sum = wia_sum(a, /*axis=*/1);     // 행 방향 합
+    wia_tensor_t* col_max = wia_max(a, /*axis=*/0);     // 열 방향 최대값
+    wia_tensor_t* softmax_out = wia_softmax(a, /*axis=*/1);  // Softmax
+
+    // 변환 작업
+    wia_tensor_t* reshaped = wia_reshape(a, new_shape);  // 재형상
+    wia_tensor_t* transposed = wia_transpose(a, perm);   // 전치
+    wia_tensor_t* concatenated = wia_concat(tensors, n, /*axis=*/0);  // 연결
+    wia_tensor_t* sliced = wia_slice(a, start, end);     // 슬라이싱
+
+    // 선형 대수
+    wia_tensor_t* matmul = wia_matmul(a, b);             // 행렬 곱
+    wia_tensor_t* bmm = wia_batch_matmul(a, b);          // 배치 행렬 곱
+
+    // 정리
+    wia_release_tensor(sum);
+    wia_release_tensor(product);
+    // ... 나머지 텐서들
+}</pre>
+
+        <h2>3.8 동기화 프리미티브</h2>
+        <p>스트림과 디바이스 간의 실행을 조정하려면 강력한 동기화 메커니즘이 필요합니다.</p>
+
+        <pre>// 다양한 동기화 메커니즘
+void synchronization_patterns(wia_context_t* ctx) {
+    // 1. 스트림 동기화 - 스트림의 모든 작업 완료 대기
+    wia_stream_synchronize(stream);
+
+    // 2. 컨텍스트 동기화 - 컨텍스트의 모든 작업 완료 대기
+    wia_context_synchronize(ctx);
+
+    // 3. 이벤트 기반 동기화
+    wia_event_t* event = wia_create_event();
+    wia_compute_async(data, stream_a);
+    wia_event_record(event, stream_a);          // 이벤트 기록
+    wia_stream_wait_event(stream_b, event);     // stream_b가 event 대기
+    wia_process_async(data, stream_b);
+
+    // 4. 디바이스 간 동기화
+    wia_peer_barrier_t* barrier = wia_create_peer_barrier(devices, 4);
+    wia_peer_barrier_wait(barrier);  // 4개 디바이스 모두 대기
+
+    // 5. 호스트-디바이스 동기화
+    wia_fence_t* fence = wia_create_fence();
+    wia_submit_with_fence(commands, fence);
+    wia_wait_fence(fence, TIMEOUT_INFINITE);
+
+    // 정리
+    wia_destroy_event(event);
+    wia_destroy_peer_barrier(barrier);
+    wia_destroy_fence(fence);
+}</pre>
+
+        <h2>3.9 오류 처리 및 복구</h2>
+        <p>강력한 오류 처리는 프로덕션 시스템에 필수적입니다. WIA-AI-011은 명시적 오류 코드를 사용하고 자세한 오류 정보를 제공합니다.</p>
+
+        <pre>// 포괄적인 오류 처리
+wia_error_t safe_compute(wia_context_t* ctx, wia_tensor_t* input) {
+    wia_error_t err;
+
+    // 1. 작업 실행 및 오류 확인
+    err = wia_compute(input, ctx);
+    if (err != WIA_SUCCESS) {
+        // 2. 오류 정보 수집
+        const char* err_msg = wia_get_error_string(err);
+        wia_error_details_t details;
+        wia_get_error_details(ctx, &details);
+
+        // 3. 오류 로깅
+        fprintf(stderr, "오류 발생: %s\n", err_msg);
+        fprintf(stderr, "  코드: %d\n", details.code);
+        fprintf(stderr, "  파일: %s:%d\n", details.file, details.line);
+        fprintf(stderr, "  함수: %s\n", details.function);
+        fprintf(stderr, "  메시지: %s\n", details.message);
+
+        // 4. 오류 유형별 처리
+        switch (err) {
+            case WIA_ERROR_OUT_OF_MEMORY:
+                // 메모리 부족 - 가비지 컬렉션 시도
+                wia_memory_gc(ctx);
+                return safe_compute(ctx, input);  // 재시도
+
+            case WIA_ERROR_DEVICE_LOST:
+                // 디바이스 손실 - 재초기화 필요
+                wia_reset_device(ctx);
+                return WIA_ERROR_DEVICE_LOST;
+
+            case WIA_ERROR_TIMEOUT:
+                // 타임아웃 - 더 긴 타임아웃으로 재시도
+                wia_set_timeout(ctx, 60000);  // 60초
+                return safe_compute(ctx, input);
+
+            default:
+                return err;
+        }
+    }
+
+    return WIA_SUCCESS;
+}</pre>
+
+        <h2>3.10 프로파일링 및 디버깅 지원</h2>
+        <p>성능 특성을 이해하려면 HAL에 내장된 프로파일링 지원이 필요합니다.</p>
+
+        <pre>// 프로파일링 활성화 및 데이터 수집
+void profile_application(wia_context_t* ctx) {
+    // 1. 프로파일러 설정
+    wia_profiler_config_t prof_config = {
+        .enable_timing = true,
+        .enable_memory_tracking = true,
+        .enable_kernel_profiling = true,
+        .output_format = WIA_PROFILE_JSON
+    };
+    wia_enable_profiling(ctx, &prof_config);
+
+    // 2. 프로파일링 세션 시작
+    wia_profiler_t* profiler = wia_begin_profiling(ctx);
+
+    // 3. 애플리케이션 실행
+    wia_tensor_t* result = run_model(input, ctx);
+
+    // 4. 프로파일링 세션 종료
+    wia_end_profiling(profiler);
+
+    // 5. 프로파일 데이터 분석
+    wia_profile_report_t report;
+    wia_get_profile_report(profiler, &report);
+
+    printf("총 실행 시간: %.3f ms\n", report.total_time_ms);
+    printf("커널 실행: %.3f ms (%.1f%%)\n",
+           report.kernel_time_ms,
+           report.kernel_time_ms / report.total_time_ms * 100);
+    printf("메모리 전송: %.3f ms (%.1f%%)\n",
+           report.memory_time_ms,
+           report.memory_time_ms / report.total_time_ms * 100);
+    printf("최대 메모리 사용량: %llu MB\n",
+           report.peak_memory_bytes / 1024 / 1024);
+
+    // 6. 상세 커널 통계
+    for (int i = 0; i < report.num_kernels; i++) {
+        wia_kernel_stats_t* stats = &report.kernel_stats[i];
+        printf("  커널 '%s': %.3f ms, 호출 %d회\n",
+               stats->name, stats->total_time_ms, stats->call_count);
+    }
+
+    // 7. 프로파일 데이터 저장
+    wia_save_profile(profiler, "profile_report.json");
+
+    wia_destroy_profiler(profiler);
+}</pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>WIA-AI-011 HAL은 점진적 공개 원칙으로 이식성과 성능 균형 달성</li>
+                <li>디바이스 검색과 기능 쿼리로 다양한 하드웨어에 적응하는 이식 가능한 코드 작성</li>
+                <li>명시적 컨텍스트 관리로 전역 상태 없이 깔끔한 다중 디바이스 프로그래밍</li>
+                <li>스트림과 이벤트 기반 실행으로 비동기 작업과 파이프라이닝 지원</li>
+                <li>다섯 가지 메모리 유형(DEVICE, HOST, PINNED, UNIFIED, MANAGED)이 다양한 사용 패턴 지원</li>
+                <li>메모리 풀은 캐싱과 재사용으로 할당 오버헤드 100배 감소</li>
+                <li>고수준 작업 라이브러리는 최적화된 프리미티브 제공 (행렬 곱, 컨볼루션 등)</li>
+                <li>사용자 정의 커널 지원으로 하드웨어별 최적화와 특수 작업 구현</li>
+                <li>포괄적인 동기화 프리미티브 (스트림, 이벤트, 배리어, 펜스)</li>
+                <li>강력한 오류 처리로 복구 가능한 프로덕션 시스템 구축</li>
+                <li>내장 프로파일러로 타이밍, 메모리, 커널 통계 수집 및 최적화 지원</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>HAL 설계에서 "점진적 공개(Progressive Disclosure)"란 무엇입니까? 3가지 레벨을 설명하고 각 레벨의 장단점을 논하십시오.</li>
+                <li>디바이스 기능 쿼리가 이식 가능한 코드 작성에 어떻게 도움이 됩니까? 구체적인 예를 들어 설명하십시오.</li>
+                <li>WIA-AI-011에서 컨텍스트란 무엇입니까? 암시적 전역 상태 대신 명시적 컨텍스트를 사용하는 이유를 설명하십시오.</li>
+                <li>스트림 기반 실행이 작업 중복을 통해 성능을 어떻게 향상시킵니까? 전송과 계산을 파이프라이닝하는 예를 작성하십시오.</li>
+                <li>다섯 가지 메모리 유형(DEVICE, HOST, PINNED, UNIFIED, MANAGED)을 비교하고 각각의 최적 사용 사례를 설명하십시오.</li>
+                <li>메모리 풀이 직접 할당/해제보다 어떤 성능 이점을 제공합니까? 캐싱 메커니즘을 설명하십시오.</li>
+                <li>고수준 작업 API와 사용자 정의 커널의 차이를 설명하십시오. 각각을 언제 사용해야 합니까?</li>
+                <li>이벤트 기반 동기화가 스트림 간 종속성을 어떻게 표현합니까? 복잡한 파이프라인 예를 작성하십시오.</li>
+                <li>프로덕션 시스템에서 포괄적인 오류 처리가 중요한 이유는 무엇입니까? 복구 가능한 오류 처리 패턴을 설명하십시오.</li>
+                <li>WIA-AI-011 프로파일러가 수집하는 성능 메트릭을 나열하고 각 메트릭이 최적화에 어떻게 도움이 되는지 설명하십시오.</li>
+                <li>스트림과 이벤트를 사용하여 3개의 GPU에서 병렬로 실행되는 데이터 병렬 워크로드를 구현하는 의사 코드를 작성하십시오.</li>
+                <li>통합 메모리(UNIFIED)와 관리 메모리(MANAGED)의 차이점을 설명하고 각각의 장단점을 논하십시오.</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+            <span style="font-size: 0.9em; color: #6b7280;">하드웨어 추상화를 통해 모든 개발자가 모든 가속기를 사용할 수 있도록</span>
+        </div>
+    </div>
+</body>
+</html>

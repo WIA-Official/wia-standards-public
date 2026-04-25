@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 4단계 - 시스템 통합 | WIA-ROB-011 청소 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--cleaning-color:#06B6D4;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--cleaning-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--cleaning-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--cleaning-color);margin:40px 0 20px;border-bottom:2px solid var(--cleaning-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--cleaning-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--cleaning-color);text-decoration:none;padding:10px 20px;border:2px solid var(--cleaning-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--cleaning-color)}
+        strong{color:var(--cleaning-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:monospace;color:#06B6D4}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--cleaning-color);margin:20px 0;font-size:18px}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--cleaning-color);padding:20px;margin:25px 0;border-radius:5px}
+        ul,ol{margin-left:30px;margin-top:15px}
+        li{margin:10px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제7장: 4단계 - 시스템 통합</h1>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) - 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>7.1 스마트홈 통합</h2>
+        <p>
+            WIA-ROB-011 표준을 준수하는 청소 로봇은 주요 스마트홈 플랫폼과 원활하게 통합됩니다.
+            단일 표준을 구현하면 여러 플랫폼을 동시에 지원할 수 있습니다.
+        </p>
+
+        <h3>7.1.1 지원 플랫폼</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>플랫폼</th>
+                    <th>통합 방식</th>
+                    <th>지원 기능</th>
+                    <th>난이도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Google Home</td>
+                    <td>Cloud-to-Cloud</td>
+                    <td>음성 제어, 스케줄링</td>
+                    <td>낮음</td>
+                </tr>
+                <tr>
+                    <td>Amazon Alexa</td>
+                    <td>Smart Home Skill</td>
+                    <td>음성 제어, 루틴</td>
+                    <td>낮음</td>
+                </tr>
+                <tr>
+                    <td>Apple HomeKit</td>
+                    <td>HAP Protocol</td>
+                    <td>Siri, 자동화</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>Samsung SmartThings</td>
+                    <td>DTH/Edge Driver</td>
+                    <td>통합 제어, 자동화</td>
+                    <td>낮음</td>
+                </tr>
+                <tr>
+                    <td>Home Assistant</td>
+                    <td>MQTT/REST</td>
+                    <td>완전 제어, 커스터마이징</td>
+                    <td>낮음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.1.2 Google Home 통합</h3>
+        <pre><code>// Google Actions 스마트홈 구현
+{
+  "requestId": "ff36a3cc-ec34-11e6-b1a0-64510650abcf",
+  "inputs": [{
+    "intent": "action.devices.EXECUTE",
+    "payload": {
+      "commands": [{
+        "devices": [{
+          "id": "CR-2025-001"
+        }],
+        "execution": [{
+          "command": "action.devices.commands.StartStop",
+          "params": {
+            "start": true
+          }
+        }]
+      }]
+    }
+  }]
+}
+
+// WIA-ROB-011 → Google Home 매핑
+const deviceTraits = {
+  'action.devices.traits.StartStop': {
+    start: () => robot.commands.start(),
+    stop: () => robot.commands.stop()
+  },
+  'action.devices.traits.OnOff': {
+    on: () => robot.commands.start(),
+    off: () => robot.commands.return()
+  },
+  'action.devices.traits.EnergyStorage': {
+    queryOnlyEnergyStorage: true,
+    isRechargeable: true
+  }
+};</code></pre>
+
+        <h3>7.1.3 Amazon Alexa 통합</h3>
+        <pre><code>// Alexa Smart Home Skill
+{
+  "directive": {
+    "header": {
+      "namespace": "Alexa.PowerController",
+      "name": "TurnOn",
+      "messageId": "abc-123-def-456",
+      "correlationToken": "token",
+      "payloadVersion": "3"
+    },
+    "endpoint": {
+      "endpointId": "CR-2025-001"
+    },
+    "payload": {}
+  }
+}
+
+// 응답
+{
+  "event": {
+    "header": {
+      "namespace": "Alexa",
+      "name": "Response",
+      "messageId": "response-123"
+    },
+    "endpoint": {
+      "endpointId": "CR-2025-001"
+    },
+    "payload": {}
+  },
+  "context": {
+    "properties": [{
+      "namespace": "Alexa.PowerController",
+      "name": "powerState",
+      "value": "ON",
+      "timeOfSample": "2025-12-29T10:30:00Z"
+    }, {
+      "namespace": "Alexa.EndpointHealth",
+      "name": "connectivity",
+      "value": {
+        "value": "OK"
+      }
+    }]
+  }
+}</code></pre>
+
+        <h3>7.1.4 Apple HomeKit 통합</h3>
+        <pre><code>// HomeKit Accessory Protocol
+{
+  "accessories": [{
+    "aid": 1,
+    "services": [{
+      "type": "vacuum-robot",
+      "iid": 1,
+      "characteristics": [{
+        "type": "on",
+        "iid": 2,
+        "perms": ["pr", "pw", "ev"],
+        "format": "bool",
+        "value": false
+      }, {
+        "type": "current-state",
+        "iid": 3,
+        "perms": ["pr", "ev"],
+        "format": "uint8",
+        "minValue": 0,
+        "maxValue": 3,
+        "value": 0
+      }, {
+        "type": "battery-level",
+        "iid": 4,
+        "perms": ["pr", "ev"],
+        "format": "uint8",
+        "unit": "percentage",
+        "minValue": 0,
+        "maxValue": 100,
+        "value": 85
+      }]
+    }]
+  }]
+}</code></pre>
+
+        <h2>7.2 음성 비서 통합</h2>
+        <p>
+            자연어 명령을 WIA-ROB-011 API 호출로 변환합니다.
+        </p>
+
+        <h3>7.2.1 지원 명령 예시</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>음성 명령</th>
+                    <th>의도 (Intent)</th>
+                    <th>API 호출</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>"청소 시작해줘"</td>
+                    <td>StartCleaning</td>
+                    <td>POST /commands/start</td>
+                </tr>
+                <tr>
+                    <td>"거실만 청소해"</td>
+                    <td>CleanRoom</td>
+                    <td>POST /commands/start {rooms: ["living_room"]}</td>
+                </tr>
+                <tr>
+                    <td>"배터리 몇 퍼센트야?"</td>
+                    <td>QueryBattery</td>
+                    <td>GET /status (battery field)</td>
+                </tr>
+                <tr>
+                    <td>"청소 중지"</td>
+                    <td>StopCleaning</td>
+                    <td>POST /commands/stop</td>
+                </tr>
+                <tr>
+                    <td>"충전하러 가"</td>
+                    <td>ReturnToDock</td>
+                    <td>POST /commands/return</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.2.2 자연어 처리 예시</h3>
+        <pre><code>// 음성 명령 파싱
+class VoiceCommandParser {
+  parse(utterance) {
+    const patterns = {
+      start: /청소|시작|작동/,
+      stop: /중지|멈춰|정지/,
+      pause: /일시정지|잠깐/,
+      resume: /재개|다시|계속/,
+      return: /복귀|충전|돌아가/,
+      room: /거실|침실|주방|화장실/
+    };
+
+    let command = {};
+
+    if (patterns.start.test(utterance)) {
+      command.action = 'start';
+    } else if (patterns.stop.test(utterance)) {
+      command.action = 'stop';
+    }
+
+    const roomMatch = utterance.match(patterns.room);
+    if (roomMatch) {
+      command.rooms = this.mapRoomName(roomMatch[0]);
+    }
+
+    return command;
+  }
+
+  mapRoomName(koreanName) {
+    const mapping = {
+      '거실': 'living_room',
+      '침실': 'bedroom',
+      '주방': 'kitchen',
+      '화장실': 'bathroom'
+    };
+    return [mapping[koreanName]];
+  }
+}</code></pre>
+
+        <h2>7.3 클라우드 플랫폼 통합</h2>
+        <p>
+            청소 로봇 데이터를 클라우드에 저장하고 분석하여 인사이트를 도출합니다.
+        </p>
+
+        <h3>7.3.1 클라우드 아키텍처</h3>
+        <pre><code>// AWS IoT Core 통합
+{
+  "thingName": "CR-2025-001",
+  "thingTypeName": "WIA-ROB-011-CleaningRobot",
+  "attributes": {
+    "manufacturer": "Example Corp",
+    "model": "CleanBot Pro",
+    "firmware": "2.5.1"
+  },
+  "connectivity": {
+    "connected": true,
+    "timestamp": 1703851800000
+  }
+}
+
+// IoT 규칙 (Rule)
+SELECT * FROM 'wia-rob-011/+/status/#'
+WHERE battery.level < 20
+
+// DynamoDB 저장
+{
+  "robot_id": "CR-2025-001",
+  "timestamp": "2025-12-29T10:30:00Z",
+  "status": {...},
+  "ttl": 1735651800  // 30일 후 자동 삭제
+}</code></pre>
+
+        <h3>7.3.2 데이터 분석 파이프라인</h3>
+        <div class="highlight-box">
+            <strong>데이터 흐름:</strong>
+            <ol>
+                <li>로봇 → MQTT → IoT Core</li>
+                <li>IoT Core → Kinesis Data Streams</li>
+                <li>Kinesis → Lambda (실시간 처리)</li>
+                <li>Lambda → S3 (원본 저장)</li>
+                <li>S3 → Glue (ETL)</li>
+                <li>Glue → Redshift (분석용 DW)</li>
+                <li>Redshift → QuickSight (대시보드)</li>
+            </ol>
+        </div>
+
+        <h3>7.3.3 분석 쿼리 예시</h3>
+        <pre><code>-- 일별 청소 통계
+SELECT
+  DATE(start_time) as date,
+  COUNT(*) as cleaning_sessions,
+  AVG(duration) as avg_duration,
+  SUM(area_cleaned) as total_area,
+  AVG(battery_consumed) as avg_battery
+FROM cleaning_history
+WHERE robot_id = 'CR-2025-001'
+  AND start_time >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY DATE(start_time)
+ORDER BY date DESC;
+
+-- 방별 청소 빈도
+SELECT
+  room_name,
+  COUNT(*) as times_cleaned,
+  AVG(duration) as avg_duration
+FROM cleaning_sessions
+CROSS JOIN UNNEST(rooms_cleaned) AS t(room_name)
+WHERE robot_id = 'CR-2025-001'
+GROUP BY room_name
+ORDER BY times_cleaned DESC;</code></pre>
+
+        <h2>7.4 자동화 및 시나리오</h2>
+        <p>
+            다양한 조건과 트리거를 조합하여 지능적인 청소 자동화를 구현합니다.
+        </p>
+
+        <h3>7.4.1 자동화 예시</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>트리거</th>
+                    <th>조건</th>
+                    <th>액션</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>시간: 매일 9시</td>
+                    <td>집에 사람 없음</td>
+                    <td>전체 청소 시작</td>
+                </tr>
+                <tr>
+                    <td>현관문 잠금</td>
+                    <td>외출 모드 활성화</td>
+                    <td>거실+주방 청소</td>
+                </tr>
+                <tr>
+                    <td>배터리 < 20%</td>
+                    <td>청소 중</td>
+                    <td>자동 복귀 충전</td>
+                </tr>
+                <tr>
+                    <td>먼지통 가득참</td>
+                    <td>-</td>
+                    <td>푸시 알림 전송</td>
+                </tr>
+                <tr>
+                    <td>청소 완료</td>
+                    <td>-</td>
+                    <td>공기청정기 작동</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.4.2 자동화 구현</h3>
+        <pre><code>// Node-RED 플로우 예시
+{
+  "id": "auto_cleaning_flow",
+  "type": "tab",
+  "label": "Auto Cleaning",
+  "nodes": [
+    {
+      "id": "time_trigger",
+      "type": "inject",
+      "cron": "0 9 * * *",
+      "wires": [["check_presence"]]
+    },
+    {
+      "id": "check_presence",
+      "type": "function",
+      "func": `
+        const presence = global.get('home_presence');
+        if (!presence.anyone_home) {
+          return msg;
+        }
+        return null;
+      `,
+      "wires": [["start_cleaning"]]
+    },
+    {
+      "id": "start_cleaning",
+      "type": "http request",
+      "method": "POST",
+      "url": "https://api.example.com/robots/CR-2025-001/commands/start",
+      "payload": {
+        "mode": "auto",
+        "power_level": "high"
+      }
+    }
+  ]
+}</code></pre>
+
+        <h2>7.5 멀티 로봇 조정</h2>
+        <p>
+            여러 대의 청소 로봇을 효율적으로 관리하고 조정합니다.
+        </p>
+
+        <h3>7.5.1 작업 분배 알고리즘</h3>
+        <pre><code>// 구역 기반 작업 분배
+class MultiRobotCoordinator {
+  assignTasks(robots, areas) {
+    const assignments = [];
+
+    // 1. 로봇 가용성 확인
+    const available = robots.filter(r =>
+      r.status.state === 'idle' &&
+      r.status.battery > 30
+    );
+
+    // 2. 배터리 수준으로 정렬
+    available.sort((a, b) =>
+      b.status.battery - a.status.battery
+    );
+
+    // 3. 면적 기준 내림차순 정렬
+    areas.sort((a, b) => b.area - a.area);
+
+    // 4. 그리디 알고리즘으로 할당
+    for (let i = 0; i < Math.min(available.length, areas.length); i++) {
+      assignments.push({
+        robot_id: available[i].id,
+        area: areas[i],
+        priority: i
+      });
+    }
+
+    return assignments;
+  }
+
+  async execute(assignments) {
+    const promises = assignments.map(async (task) => {
+      return await this.startCleaning(task.robot_id, {
+        zones: [task.area],
+        priority: task.priority
+      });
+    });
+
+    return await Promise.all(promises);
+  }
+}</code></pre>
+
+        <h3>7.5.2 충돌 방지</h3>
+        <pre><code>// 로봇 간 거리 유지
+{
+  "collision_avoidance": {
+    "enabled": true,
+    "min_distance": 500,  // mm
+    "protocol": "beacon",
+    "update_interval": 1000  // ms
+  },
+  "zones": {
+    "robot_CR_001": {
+      "current": "zone_A",
+      "reserved": ["zone_B"]
+    },
+    "robot_CR_002": {
+      "current": "zone_C",
+      "reserved": ["zone_D"]
+    }
+  }
+}</code></pre>
+
+        <h2>7.6 대시보드 및 모니터링</h2>
+        <p>
+            모든 청소 로봇을 중앙에서 모니터링하고 관리할 수 있는 대시보드를 구축합니다.
+        </p>
+
+        <h3>7.6.1 핵심 메트릭</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>메트릭</th>
+                    <th>설명</th>
+                    <th>임계값</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>가동률</td>
+                    <td>전체 시간 중 청소 비율</td>
+                    <td>> 60%</td>
+                </tr>
+                <tr>
+                    <td>완료율</td>
+                    <td>성공한 작업 비율</td>
+                    <td>> 95%</td>
+                </tr>
+                <tr>
+                    <td>평균 배터리 소모</td>
+                    <td>청소 1회당 배터리</td>
+                    <td>< 80%</td>
+                </tr>
+                <tr>
+                    <td>오류 발생률</td>
+                    <td>작업 100회당 오류</td>
+                    <td>< 5회</td>
+                </tr>
+                <tr>
+                    <td>평균 청소 면적</td>
+                    <td>시간당 청소 면적</td>
+                    <td>> 50m²</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.6.2 알림 및 경고</h3>
+        <pre><code>// 알림 규칙 정의
+{
+  "alerts": [
+    {
+      "id": "battery_critical",
+      "condition": "battery < 10",
+      "severity": "critical",
+      "channels": ["push", "email"],
+      "message": "배터리가 매우 낮습니다 ({{battery}}%)"
+    },
+    {
+      "id": "cleaning_failed",
+      "condition": "status = 'error' AND error.recoverable = false",
+      "severity": "high",
+      "channels": ["push", "sms"],
+      "message": "청소 작업 실패: {{error.message}}"
+    },
+    {
+      "id": "maintenance_due",
+      "condition": "total_runtime > maintenance_threshold",
+      "severity": "medium",
+      "channels": ["email"],
+      "message": "정기 점검이 필요합니다"
+    }
+  ]
+}</code></pre>
+
+        <h2>7.7 펌웨어 업데이트</h2>
+        <p>
+            OTA(Over-The-Air) 업데이트를 통해 원격으로 펌웨어를 갱신합니다.
+        </p>
+
+        <h3>7.7.1 업데이트 프로세스</h3>
+        <div class="highlight-box">
+            <strong>안전한 OTA 업데이트 절차:</strong>
+            <ol>
+                <li><strong>사전 검증:</strong> 배터리 > 50%, 청소 중이 아님</li>
+                <li><strong>다운로드:</strong> 펌웨어 파일 다운로드 (체크섬 확인)</li>
+                <li><strong>검증:</strong> 디지털 서명 확인</li>
+                <li><strong>백업:</strong> 현재 펌웨어 백업</li>
+                <li><strong>설치:</strong> 새 펌웨어 플래싱</li>
+                <li><strong>재부팅:</strong> 시스템 재시작</li>
+                <li><strong>검증:</strong> 정상 작동 확인</li>
+                <li><strong>롤백:</strong> 실패 시 이전 버전 복원</li>
+            </ol>
+        </div>
+
+        <pre><code>// OTA 업데이트 API
+POST /robots/{robot_id}/firmware/update
+{
+  "version": "2.6.0",
+  "url": "https://cdn.example.com/firmware/v2.6.0.bin",
+  "checksum": "sha256:abc123...",
+  "signature": "rsa_signature...",
+  "release_notes": "버그 수정 및 성능 개선",
+  "schedule": {
+    "type": "immediate" | "scheduled",
+    "time": "2025-12-30T02:00:00Z"
+  }
+}
+
+// 업데이트 진행 상태
+{
+  "update_id": "upd_001",
+  "status": "in_progress",
+  "progress": 65,
+  "stage": "installing",
+  "eta": 180,
+  "current_version": "2.5.1",
+  "target_version": "2.6.0"
+}</code></pre>
+
+        <h2>7.8 규정 준수 및 보안</h2>
+        <p>
+            시스템 통합 시 관련 법규와 보안 표준을 준수해야 합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>영역</th>
+                    <th>규정/표준</th>
+                    <th>요구사항</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>개인정보</td>
+                    <td>GDPR, CCPA</td>
+                    <td>데이터 최소화, 암호화, 동의</td>
+                </tr>
+                <tr>
+                    <td>사이버 보안</td>
+                    <td>IEC 62443</td>
+                    <td>네트워크 분리, 인증, 로깅</td>
+                </tr>
+                <tr>
+                    <td>IoT 보안</td>
+                    <td>ETSI EN 303 645</td>
+                    <td>기본 비밀번호 없음, 업데이트</td>
+                </tr>
+                <tr>
+                    <td>무선 통신</td>
+                    <td>FCC, CE</td>
+                    <td>전파 인증, 간섭 방지</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <h3>핵심 내용 요약</h3>
+            <ul>
+                <li>주요 스마트홈 플랫폼 통합: Google Home, Alexa, HomeKit, SmartThings</li>
+                <li>자연어 음성 명령을 API 호출로 변환</li>
+                <li>클라우드 데이터 파이프라인: IoT Core → Kinesis → Lambda → S3 → Analytics</li>
+                <li>조건 기반 자동화 시나리오 구현</li>
+                <li>멀티 로봇 조정: 작업 분배, 충돌 방지</li>
+                <li>실시간 대시보드 및 알림 시스템</li>
+                <li>안전한 OTA 펌웨어 업데이트 (8단계 프로세스)</li>
+                <li>GDPR, IEC 62443 등 규정 준수</li>
+            </ul>
+        </div>
+
+        <div class="highlight-box">
+            <h3>복습 질문</h3>
+            <ol>
+                <li>WIA-ROB-011을 준수하면 여러 스마트홈 플랫폼을 쉽게 지원할 수 있는 이유는?</li>
+                <li>멀티 로봇 환경에서 충돌을 방지하는 방법은 무엇인가요?</li>
+                <li>안전한 OTA 펌웨어 업데이트의 8단계 절차를 설명하세요.</li>
+                <li>클라우드 데이터 분석 파이프라인의 주요 구성 요소는?</li>
+                <li>자동화 시나리오를 구현할 때 고려해야 할 요소는 무엇인가요?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

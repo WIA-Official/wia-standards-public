@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Authentication Mechanisms - WIA-ACCESS_CONTROL</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-success {
+            border-left-color: var(--success);
+        }
+        .highlight-warning {
+            border-left-color: var(--warning);
+        }
+        .highlight-error {
+            border-left-color: var(--error);
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Authentication Mechanisms</h1>
+
+    <p>Authentication is the critical first step in the access control process, establishing the identity of subjects before any authorization decisions can be made. This chapter explores the authentication mechanisms supported by the WIA-ACCESS_CONTROL standard, from traditional passwords to cutting-edge biometric and passwordless solutions.</p>
+
+    <h2>Understanding Authentication</h2>
+
+    <p>Authentication answers the fundamental security question: "Who are you?" It is the process of verifying that an entity is who or what it claims to be. Strong authentication is essential because authorization decisions are only as trustworthy as the identity verification that precedes them.</p>
+
+    <div class="highlight">
+        <strong>Authentication Factors:</strong>
+        <ul>
+            <li><strong>Something You Know:</strong> Passwords, PINs, security questions</li>
+            <li><strong>Something You Have:</strong> Smart cards, hardware tokens, mobile devices</li>
+            <li><strong>Something You Are:</strong> Fingerprints, facial recognition, voice patterns</li>
+            <li><strong>Somewhere You Are:</strong> Geographic location, IP address, network</li>
+            <li><strong>Something You Do:</strong> Behavioral patterns, typing dynamics, gait</li>
+        </ul>
+    </div>
+
+    <h2>Password-Based Authentication</h2>
+
+    <p>Despite their well-known weaknesses, passwords remain the most common authentication mechanism. The WIA-ACCESS_CONTROL standard provides guidelines for implementing password authentication securely.</p>
+
+    <h3>Password Security Requirements</h3>
+
+    <pre>
+// WIA-ACCESS_CONTROL Password Policy Configuration
+const passwordPolicy = {
+    minLength: 12,
+    maxLength: 128,
+    complexity: {
+        requireUppercase: true,
+        requireLowercase: true,
+        requireNumbers: true,
+        requireSpecialChars: true,
+        minCharacterClasses: 3
+    },
+    history: {
+        preventReuse: 12,  // Cannot reuse last 12 passwords
+        minAgeDays: 1      // Minimum time before password change
+    },
+    expiration: {
+        maxAgeDays: 90,
+        warningDays: 14,
+        graceLogins: 3
+    },
+    lockout: {
+        maxAttempts: 5,
+        lockoutDuration: 900,  // 15 minutes
+        resetCounterAfter: 1800
+    },
+    breachDetection: {
+        enabled: true,
+        checkOnCreate: true,
+        checkOnLogin: true,
+        apiProvider: 'haveibeenpwned'
+    }
+};
+    </pre>
+
+    <h3>Secure Password Storage</h3>
+
+    <p>Passwords must never be stored in plain text. The WIA-ACCESS_CONTROL standard mandates the use of modern password hashing algorithms with appropriate work factors.</p>
+
+    <pre>
+import { Argon2id } from '@wia/crypto';
+
+class SecurePasswordStorage {
+    private readonly hashConfig = {
+        algorithm: 'argon2id',
+        memoryCost: 65536,    // 64 MB
+        timeCost: 3,          // 3 iterations
+        parallelism: 4,       // 4 parallel threads
+        hashLength: 32        // 256-bit hash
+    };
+
+    async hashPassword(plaintext: string): Promise&lt;string&gt; {
+        // Generate cryptographically secure salt
+        const salt = crypto.randomBytes(16);
+
+        // Hash with Argon2id
+        const hash = await Argon2id.hash(plaintext, {
+            salt: salt,
+            ...this.hashConfig
+        });
+
+        // Return encoded hash string
+        return this.encodeHash(hash, salt, this.hashConfig);
+    }
+
+    async verifyPassword(plaintext: string, storedHash: string): Promise&lt;boolean&gt; {
+        const { hash, salt, config } = this.decodeHash(storedHash);
+
+        const computedHash = await Argon2id.hash(plaintext, {
+            salt: salt,
+            ...config
+        });
+
+        // Constant-time comparison to prevent timing attacks
+        return crypto.timingSafeEqual(hash, computedHash);
+    }
+
+    needsRehash(storedHash: string): boolean {
+        const { config } = this.decodeHash(storedHash);
+        return config.memoryCost &lt; this.hashConfig.memoryCost ||
+               config.timeCost &lt; this.hashConfig.timeCost;
+    }
+}
+    </pre>
+
+    <h2>Multi-Factor Authentication (MFA)</h2>
+
+    <p>Multi-factor authentication requires users to provide two or more verification factors. This dramatically reduces the risk of unauthorized access even if one factor is compromised.</p>
+
+    <div class="highlight highlight-success">
+        <strong>MFA Effectiveness:</strong> According to industry research, MFA blocks over 99.9% of automated attacks. The WIA-ACCESS_CONTROL standard strongly recommends MFA for all privileged access and recommends it for all user accounts.
+    </div>
+
+    <h3>Time-Based One-Time Passwords (TOTP)</h3>
+
+    <pre>
+import { TOTP } from '@wia/auth';
+
+class TOTPAuthenticator {
+    private readonly config = {
+        algorithm: 'SHA256',
+        digits: 6,
+        period: 30,           // 30-second window
+        window: 1             // Allow 1 period drift
+    };
+
+    generateSecret(): string {
+        // Generate 160-bit secret
+        const secret = crypto.randomBytes(20);
+        return this.base32Encode(secret);
+    }
+
+    generateQRCode(secret: string, user: string, issuer: string): string {
+        const uri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user)}` +
+                   `?secret=${secret}&issuer=${encodeURIComponent(issuer)}` +
+                   `&algorithm=${this.config.algorithm}&digits=${this.config.digits}` +
+                   `&period=${this.config.period}`;
+        return uri;
+    }
+
+    verifyToken(secret: string, token: string): VerificationResult {
+        const currentTime = Math.floor(Date.now() / 1000);
+
+        for (let offset = -this.config.window; offset &lt;= this.config.window; offset++) {
+            const timeStep = Math.floor((currentTime + offset * this.config.period) / this.config.period);
+            const expectedToken = this.generateTOTP(secret, timeStep);
+
+            if (crypto.timingSafeEqual(
+                Buffer.from(token),
+                Buffer.from(expectedToken)
+            )) {
+                return { valid: true, drift: offset };
+            }
+        }
+
+        return { valid: false, drift: null };
+    }
+
+    private generateTOTP(secret: string, timeStep: number): string {
+        const hmac = crypto.createHmac(this.config.algorithm, this.base32Decode(secret));
+        hmac.update(this.intToBytes(timeStep));
+        const hash = hmac.digest();
+
+        const offset = hash[hash.length - 1] & 0x0f;
+        const binary = ((hash[offset] & 0x7f) &lt;&lt; 24) |
+                      ((hash[offset + 1] & 0xff) &lt;&lt; 16) |
+                      ((hash[offset + 2] & 0xff) &lt;&lt; 8) |
+                      (hash[offset + 3] & 0xff);
+
+        const otp = binary % Math.pow(10, this.config.digits);
+        return otp.toString().padStart(this.config.digits, '0');
+    }
+}
+    </pre>
+
+    <h3>Hardware Security Keys (FIDO2/WebAuthn)</h3>
+
+    <p>Hardware security keys provide the strongest form of authentication. They use public-key cryptography and are resistant to phishing attacks because they verify the origin of authentication requests.</p>
+
+    <pre>
+import { WebAuthn } from '@wia/auth';
+
+class FIDO2Authenticator {
+    private webAuthn: WebAuthn;
+
+    constructor() {
+        this.webAuthn = new WebAuthn({
+            rpName: 'WIA Enterprise',
+            rpId: 'auth.wia.org',
+            origin: 'https://auth.wia.org',
+            attestation: 'direct',
+            authenticatorSelection: {
+                authenticatorAttachment: 'cross-platform',
+                userVerification: 'required',
+                residentKey: 'preferred'
+            }
+        });
+    }
+
+    async startRegistration(user: User): Promise&lt;RegistrationOptions&gt; {
+        const challenge = crypto.randomBytes(32);
+
+        const options = await this.webAuthn.generateRegistrationOptions({
+            user: {
+                id: user.id,
+                name: user.email,
+                displayName: user.displayName
+            },
+            challenge: challenge,
+            excludeCredentials: await this.getUserCredentials(user.id),
+            timeout: 60000
+        });
+
+        // Store challenge for verification
+        await this.storeChallenge(user.id, challenge, 'registration');
+
+        return options;
+    }
+
+    async completeRegistration(
+        userId: string,
+        response: RegistrationResponse
+    ): Promise&lt;Credential&gt; {
+        const challenge = await this.getStoredChallenge(userId, 'registration');
+
+        const verification = await this.webAuthn.verifyRegistrationResponse({
+            response: response,
+            expectedChallenge: challenge,
+            expectedOrigin: this.webAuthn.origin,
+            expectedRPID: this.webAuthn.rpId
+        });
+
+        if (!verification.verified) {
+            throw new AuthenticationError('Registration verification failed');
+        }
+
+        // Store credential
+        const credential = {
+            id: verification.credentialId,
+            publicKey: verification.credentialPublicKey,
+            counter: verification.counter,
+            transports: response.transports,
+            createdAt: new Date()
+        };
+
+        await this.storeCredential(userId, credential);
+        return credential;
+    }
+
+    async authenticate(userId: string, response: AuthenticationResponse): Promise&lt;boolean&gt; {
+        const credential = await this.getCredential(userId, response.credentialId);
+        const challenge = await this.getStoredChallenge(userId, 'authentication');
+
+        const verification = await this.webAuthn.verifyAuthenticationResponse({
+            response: response,
+            expectedChallenge: challenge,
+            expectedOrigin: this.webAuthn.origin,
+            expectedRPID: this.webAuthn.rpId,
+            credential: credential
+        });
+
+        if (verification.verified) {
+            // Update counter to prevent replay attacks
+            await this.updateCredentialCounter(credential.id, verification.newCounter);
+            return true;
+        }
+
+        return false;
+    }
+}
+    </pre>
+
+    <h2>Biometric Authentication</h2>
+
+    <p>Biometric authentication uses unique physical or behavioral characteristics to verify identity. While convenient, biometrics require careful implementation to address privacy concerns and false acceptance/rejection rates.</p>
+
+    <table>
+        <tr>
+            <th>Biometric Type</th>
+            <th>FAR</th>
+            <th>FRR</th>
+            <th>Use Cases</th>
+        </tr>
+        <tr>
+            <td>Fingerprint</td>
+            <td>0.001%</td>
+            <td>0.1%</td>
+            <td>Device unlock, physical access</td>
+        </tr>
+        <tr>
+            <td>Facial Recognition</td>
+            <td>0.01%</td>
+            <td>0.5%</td>
+            <td>Mobile authentication, surveillance</td>
+        </tr>
+        <tr>
+            <td>Iris Scan</td>
+            <td>0.0001%</td>
+            <td>0.2%</td>
+            <td>High-security facilities</td>
+        </tr>
+        <tr>
+            <td>Voice Recognition</td>
+            <td>0.1%</td>
+            <td>2%</td>
+            <td>Phone banking, virtual assistants</td>
+        </tr>
+        <tr>
+            <td>Behavioral</td>
+            <td>1%</td>
+            <td>5%</td>
+            <td>Continuous authentication</td>
+        </tr>
+    </table>
+
+    <div class="highlight highlight-warning">
+        <strong>Privacy Consideration:</strong> Biometric data cannot be changed if compromised. WIA-ACCESS_CONTROL requires that biometric templates be stored securely, preferably on-device, and that raw biometric data never be transmitted or stored on servers.
+    </div>
+
+    <h2>Token-Based Authentication</h2>
+
+    <h3>JSON Web Tokens (JWT)</h3>
+
+    <p>JWTs are widely used for stateless authentication in modern applications. They contain encoded claims about the authenticated subject and are cryptographically signed.</p>
+
+    <pre>
+import { JWT } from '@wia/auth';
+
+class JWTService {
+    private readonly config = {
+        algorithm: 'RS256',
+        issuer: 'wia-access-control',
+        audience: 'wia-services',
+        accessTokenTTL: 900,      // 15 minutes
+        refreshTokenTTL: 604800   // 7 days
+    };
+
+    private privateKey: crypto.KeyObject;
+    private publicKey: crypto.KeyObject;
+
+    async generateTokenPair(user: AuthenticatedUser): Promise&lt;TokenPair&gt; {
+        const now = Math.floor(Date.now() / 1000);
+        const jti = crypto.randomUUID();
+
+        const accessToken = await JWT.sign({
+            // Header
+            alg: this.config.algorithm,
+            typ: 'JWT',
+            kid: this.currentKeyId
+        }, {
+            // Payload
+            iss: this.config.issuer,
+            sub: user.id,
+            aud: this.config.audience,
+            iat: now,
+            exp: now + this.config.accessTokenTTL,
+            jti: jti,
+            // Custom claims
+            roles: user.roles,
+            permissions: user.permissions,
+            sessionId: user.sessionId
+        }, this.privateKey);
+
+        const refreshToken = await JWT.sign({
+            alg: this.config.algorithm,
+            typ: 'JWT'
+        }, {
+            iss: this.config.issuer,
+            sub: user.id,
+            iat: now,
+            exp: now + this.config.refreshTokenTTL,
+            jti: crypto.randomUUID(),
+            type: 'refresh',
+            accessTokenId: jti
+        }, this.privateKey);
+
+        // Store refresh token hash for revocation capability
+        await this.storeRefreshToken(user.id, refreshToken);
+
+        return { accessToken, refreshToken };
+    }
+
+    async verifyAccessToken(token: string): Promise&lt;TokenPayload&gt; {
+        const payload = await JWT.verify(token, this.publicKey, {
+            algorithms: [this.config.algorithm],
+            issuer: this.config.issuer,
+            audience: this.config.audience
+        });
+
+        // Check if token has been revoked
+        if (await this.isTokenRevoked(payload.jti)) {
+            throw new AuthenticationError('Token has been revoked');
+        }
+
+        return payload;
+    }
+
+    async refreshAccessToken(refreshToken: string): Promise&lt;TokenPair&gt; {
+        const payload = await JWT.verify(refreshToken, this.publicKey);
+
+        if (payload.type !== 'refresh') {
+            throw new AuthenticationError('Invalid token type');
+        }
+
+        // Verify refresh token is still valid
+        if (!await this.validateRefreshToken(payload.sub, refreshToken)) {
+            throw new AuthenticationError('Refresh token invalid or revoked');
+        }
+
+        // Revoke old access token
+        await this.revokeToken(payload.accessTokenId);
+
+        // Generate new token pair
+        const user = await this.getUserById(payload.sub);
+        return this.generateTokenPair(user);
+    }
+}
+    </pre>
+
+    <h2>Passwordless Authentication</h2>
+
+    <p>Passwordless authentication eliminates passwords entirely, using alternative factors such as magic links, biometrics, or hardware keys. This approach improves both security and user experience.</p>
+
+    <pre>
+class PasswordlessAuth {
+    async sendMagicLink(email: string): Promise&lt;void&gt; {
+        const user = await this.userService.findByEmail(email);
+        if (!user) {
+            // Return success even if user not found (prevent enumeration)
+            return;
+        }
+
+        // Generate secure token
+        const token = crypto.randomBytes(32).toString('base64url');
+        const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+        // Store token hash
+        await this.tokenStore.save({
+            tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+            userId: user.id,
+            expiresAt: expiresAt,
+            type: 'magic-link'
+        });
+
+        // Send email
+        await this.emailService.send({
+            to: email,
+            subject: 'Sign in to WIA',
+            template: 'magic-link',
+            data: {
+                link: `https://auth.wia.org/verify?token=${token}`,
+                expiresIn: '15 minutes'
+            }
+        });
+    }
+
+    async verifyMagicLink(token: string): Promise&lt;AuthResult&gt; {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+        const storedToken = await this.tokenStore.findByHash(tokenHash);
+        if (!storedToken || storedToken.expiresAt &lt; Date.now()) {
+            throw new AuthenticationError('Invalid or expired token');
+        }
+
+        // Delete token (single use)
+        await this.tokenStore.delete(storedToken.id);
+
+        // Authenticate user
+        const user = await this.userService.findById(storedToken.userId);
+        return this.createSession(user);
+    }
+}
+    </pre>
+
+    <h2>Adaptive Authentication</h2>
+
+    <p>Adaptive authentication adjusts authentication requirements based on risk assessment. Low-risk scenarios may require minimal authentication, while high-risk scenarios trigger additional verification steps.</p>
+
+    <div class="highlight highlight-success">
+        <strong>Risk Signals:</strong> WIA-ACCESS_CONTROL evaluates multiple signals including device trust, network location, user behavior patterns, time of access, and resource sensitivity to calculate risk scores and determine appropriate authentication levels.
+    </div>
+
+    <pre>
+class AdaptiveAuthEngine {
+    async calculateRiskScore(context: AuthContext): Promise&lt;RiskAssessment&gt; {
+        const signals = await Promise.all([
+            this.evaluateDevice(context.device),
+            this.evaluateNetwork(context.network),
+            this.evaluateGeolocation(context.location),
+            this.evaluateBehavior(context.user, context.request),
+            this.evaluateTime(context.timestamp),
+            this.evaluateResourceSensitivity(context.resource)
+        ]);
+
+        const riskScore = this.aggregateSignals(signals);
+
+        return {
+            score: riskScore,
+            level: this.getRiskLevel(riskScore),
+            factors: signals,
+            recommendedAuthLevel: this.getRequiredAuthLevel(riskScore),
+            additionalFactors: this.getAdditionalFactors(riskScore, context)
+        };
+    }
+
+    private getRiskLevel(score: number): RiskLevel {
+        if (score &lt; 0.3) return 'low';
+        if (score &lt; 0.6) return 'medium';
+        if (score &lt; 0.8) return 'high';
+        return 'critical';
+    }
+
+    private getRequiredAuthLevel(score: number): AuthLevel {
+        if (score &lt; 0.3) return { factors: 1, methods: ['password', 'biometric'] };
+        if (score &lt; 0.6) return { factors: 2, methods: ['password+totp', 'biometric+pin'] };
+        if (score &lt; 0.8) return { factors: 2, methods: ['password+fido2', 'biometric+fido2'] };
+        return { factors: 3, methods: ['password+fido2+biometric'], stepUp: true };
+    }
+}
+    </pre>
+
+    <h2>Summary</h2>
+
+    <p>This chapter has covered the authentication mechanisms supported by the WIA-ACCESS_CONTROL standard. From traditional passwords with modern security controls, through multi-factor authentication and biometrics, to cutting-edge passwordless and adaptive approaches, the standard provides a comprehensive framework for verifying user identities.</p>
+
+    <div class="highlight">
+        <strong>Key Takeaways:</strong>
+        <ul>
+            <li>Strong authentication is the foundation of effective access control</li>
+            <li>Multi-factor authentication dramatically reduces unauthorized access risk</li>
+            <li>Hardware security keys provide the strongest protection against phishing</li>
+            <li>Biometrics require careful implementation to protect privacy</li>
+            <li>Adaptive authentication balances security with user experience</li>
+            <li>Passwordless authentication represents the future of identity verification</li>
+        </ul>
+    </div>
+
+</body>
+</html>

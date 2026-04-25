@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Error Handling and Recovery | WIA-AI-015</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        header { padding: 2rem 0; border-bottom: 2px solid #10B981; margin-bottom: 3rem; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #10B981; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; }
+        h3 { color: #10B981; font-size: 1.3rem; margin: 2rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        .nav-links { margin-top: 1rem; }
+        .nav-links a { color: #10B981; text-decoration: none; margin-right: 1rem; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .callout-title { color: #10B981; font-weight: 600; margin-bottom: 0.5rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; border: 1px solid #334155; margin: 3rem 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; border: 1px solid #334155; margin: 2rem 0; }
+        footer { text-align: center; padding: 3rem 0; margin-top: 3rem; border-top: 1px solid #334155; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 7</div>
+            <h1>Error Handling and Recovery</h1>
+            <div class="nav-links">
+                <a href="index.html">← Contents</a>
+                <a href="chapter-06.html">← Previous</a>
+                <a href="chapter-08.html">Next →</a>
+            </div>
+        </header>
+
+        <section>
+            <p>
+                All systems fail sometimes. The difference between fragile and robust collaboration lies not in preventing all errors, but in how gracefully systems handle and recover from failures. This chapter explores strategies for resilient AI-human collaboration that maintains operational continuity even when components fail, guided by 弘익人間 principles that prioritize human safety and dignity.
+            </p>
+        </section>
+
+        <h2>Types of Errors</h2>
+        <p>
+            Understanding error types helps design appropriate handling strategies. Different errors require different responses.
+        </p>
+
+        <h3>AI Model Errors</h3>
+        <ul>
+            <li><strong>Prediction errors:</strong> Wrong classification or forecast</li>
+            <li><strong>Confidence miscalibration:</strong> Confidence doesn't match accuracy</li>
+            <li><strong>Distribution shift:</strong> Real-world data differs from training data</li>
+            <li><strong>Adversarial inputs:</strong> Maliciously crafted inputs fool the model</li>
+            <li><strong>Edge cases:</strong> Novel situations outside training distribution</li>
+        </ul>
+
+        <h3>Human Errors</h3>
+        <ul>
+            <li><strong>Automation bias:</strong> Over-relying on AI without verification</li>
+            <li><strong>Attention failures:</strong> Missing critical information due to cognitive overload</li>
+            <li><strong>Misunderstanding:</strong> Misinterpreting AI output or interface</li>
+            <li><strong>Fatigue errors:</strong> Mistakes due to prolonged work</li>
+            <li><strong>Policy violations:</strong> Decisions inconsistent with guidelines</li>
+        </ul>
+
+        <h3>System Errors</h3>
+        <ul>
+            <li><strong>Infrastructure failures:</strong> Server downtime, network issues</li>
+            <li><strong>Integration failures:</strong> Communication breakdown between components</li>
+            <li><strong>Data pipeline errors:</strong> Missing or corrupted data</li>
+            <li><strong>Scaling failures:</strong> Performance degradation under high load</li>
+        </ul>
+
+        <h2>Error Detection</h2>
+        <p>
+            Catching errors early limits their impact. Implement multiple layers of detection across the collaboration pipeline.
+        </p>
+
+        <h3>AI Self-Monitoring</h3>
+        <p>
+            AI systems can detect some errors themselves through confidence assessment and anomaly detection.
+        </p>
+
+        <pre><code>interface ErrorDetector {
+  async detectAnomalies(
+    input: any,
+    prediction: any
+  ): Promise<{
+    anomalies_detected: boolean;
+    anomaly_types: string[];
+    confidence_in_detection: number;
+  }>;
+}
+
+class PredictionMonitor implements ErrorDetector {
+  async detectAnomalies(
+    input: any,
+    prediction: any
+  ): Promise<any> {
+    const anomalies: string[] = [];
+
+    // Check for out-of-distribution inputs
+    const input_anomaly_score = await this.calculateAnomalyScore(input);
+    if (input_anomaly_score > 0.8) {
+      anomalies.push('out_of_distribution_input');
+    }
+
+    // Check for confidence-prediction mismatch
+    const expected_confidence = await this.estimateExpectedConfidence(input);
+    if (Math.abs(prediction.confidence - expected_confidence) > 0.3) {
+      anomalies.push('confidence_miscalibration');
+    }
+
+    // Check for adversarial patterns
+    const adversarial_score = await this.detectAdversarial(input);
+    if (adversarial_score > 0.7) {
+      anomalies.push('possible_adversarial_input');
+    }
+
+    return {
+      anomalies_detected: anomalies.length > 0,
+      anomaly_types: anomalies,
+      confidence_in_detection: this.calculateDetectionConfidence(anomalies)
+    };
+  }
+}</code></pre>
+
+        <h3>Human Error Detection</h3>
+        <p>
+            Monitor human behavior patterns for signs of errors:
+        </p>
+
+        <pre><code>class HumanErrorDetector {
+  async detectPotentialErrors(
+    reviewer_id: string,
+    decision: any,
+    context: any
+  ): Promise<{
+    error_likely: boolean;
+    warning_signals: string[];
+  }> {
+    const signals: string[] = [];
+
+    // Check for automation bias
+    const recent_decisions = await this.getRecentDecisions(reviewer_id, 20);
+    const agreement_rate = recent_decisions.filter(d =>
+      d.decision === d.ai_suggestion
+    ).length / recent_decisions.length;
+
+    if (agreement_rate > 0.95) {
+      signals.push('possible_automation_bias');
+    }
+
+    // Check for unusually fast decisions on complex cases
+    const decision_time = decision.time_spent;
+    const expected_time = await this.estimateExpectedReviewTime(context);
+
+    if (decision_time < expected_time * 0.5 && context.complexity > 7) {
+      signals.push('insufficient_review_time');
+    }
+
+    // Check for inconsistency with past decisions
+    const similar_past = await this.findSimilarDecisions(context);
+    const consistency_rate = similar_past.filter(d =>
+      d.decision === decision.decision
+    ).length / similar_past.length;
+
+    if (consistency_rate < 0.3) {
+      signals.push('inconsistent_with_history');
+    }
+
+    return {
+      error_likely: signals.length >= 2,
+      warning_signals: signals
+    };
+  }
+}</code></pre>
+
+        <h3>Cross-Validation</h3>
+        <p>
+            Use multiple signals to validate decisions:
+        </p>
+
+        <pre><code>class CrossValidator {
+  async validateDecision(
+    decision: any,
+    context: any
+  ): Promise<{
+    validation_passed: boolean;
+    issues: string[];
+  }> {
+    const issues: string[] = [];
+
+    // Check multiple AI models agree
+    const models = await this.getEnsembleModels();
+    const predictions = await Promise.all(
+      models.map(m => m.predict(context.features))
+    );
+
+    const consensus = this.checkConsensus(predictions);
+    if (!consensus && decision.source === 'ai') {
+      issues.push('model_disagreement');
+    }
+
+    // Check business rules
+    const rule_violations = await this.checkBusinessRules(decision, context);
+    if (rule_violations.length > 0) {
+      issues.push(...rule_violations);
+    }
+
+    // Check statistical outliers
+    const historical_similar = await this.getHistoricalDecisions(context);
+    if (this.isOutlier(decision, historical_similar)) {
+      issues.push('statistical_outlier');
+    }
+
+    return {
+      validation_passed: issues.length === 0,
+      issues
+    };
+  }
+}</code></pre>
+
+        <h2>Graceful Degradation</h2>
+        <p>
+            When errors occur, systems should degrade gracefully rather than fail catastrophically. Provide reduced functionality rather than no functionality.
+        </p>
+
+        <h3>Degradation Levels</h3>
+        <pre><code>enum DegradationLevel {
+  FULL_OPERATION = 0,      // All features working
+  REDUCED_CONFIDENCE = 1,  // AI less certain, more human review
+  AI_DISABLED = 2,         // AI offline, full manual operation
+  QUEUE_ONLY = 3,          // Accept requests, process when restored
+  READ_ONLY = 4            // View-only mode, no new decisions
+}
+
+class GracefulDegradation {
+  async handleFailure(
+    failure_type: string,
+    severity: number
+  ): Promise<DegradationLevel> {
+    switch (failure_type) {
+      case 'ai_model_error':
+        if (severity > 0.8) {
+          // Critical AI failure - switch to manual
+          await this.switchToManualMode();
+          return DegradationLevel.AI_DISABLED;
+        } else {
+          // Reduce AI confidence, increase human review
+          await this.lowerConfidenceThresholds();
+          return DegradationLevel.REDUCED_CONFIDENCE;
+        }
+
+      case 'database_error':
+        if (severity > 0.9) {
+          // Can't write - read-only mode
+          return DegradationLevel.READ_ONLY;
+        } else {
+          // Queue operations for later
+          await this.enableQueueMode();
+          return DegradationLevel.QUEUE_ONLY;
+        }
+
+      case 'high_load':
+        // Prioritize critical operations
+        await this.enablePriorityMode();
+        return DegradationLevel.REDUCED_CONFIDENCE;
+
+      default:
+        return DegradationLevel.FULL_OPERATION;
+    }
+  }
+}</code></pre>
+
+        <h3>Fallback Strategies</h3>
+        <ul>
+            <li><strong>Previous model version:</strong> Roll back to last known good model</li>
+            <li><strong>Simpler algorithm:</strong> Use faster, simpler backup model</li>
+            <li><strong>Human-only mode:</strong> All decisions go to humans</li>
+            <li><strong>Queue and defer:</strong> Accept inputs, process when recovered</li>
+            <li><strong>Reduced feature set:</strong> Disable non-essential features</li>
+        </ul>
+
+        <h2>Error Recovery Strategies</h2>
+        <p>
+            Different errors require different recovery approaches. Design recovery strategies appropriate to error types and contexts.
+        </p>
+
+        <h3>Automatic Recovery</h3>
+        <p>
+            Some errors can be automatically resolved:
+        </p>
+
+        <pre><code>class AutoRecovery {
+  async attemptRecovery(
+    error: Error,
+    context: any
+  ): Promise<{
+    recovered: boolean;
+    recovery_method: string;
+  }> {
+    // Retry with exponential backoff
+    if (error.type === 'transient_network_error') {
+      return await this.retryWithBackoff(context.operation, 3);
+    }
+
+    // Use cached data
+    if (error.type === 'data_unavailable') {
+      const cached = await this.getCachedData(context.data_key);
+      if (cached && !this.isStale(cached)) {
+        return {
+          recovered: true,
+          recovery_method: 'used_cached_data'
+        };
+      }
+    }
+
+    // Fallback to simpler model
+    if (error.type === 'model_timeout') {
+      const result = await this.useFallbackModel(context.input);
+      return {
+        recovered: true,
+        recovery_method: 'fallback_model'
+      };
+    }
+
+    return {
+      recovered: false,
+      recovery_method: 'none'
+    };
+  }
+}</code></pre>
+
+        <h3>Human-Assisted Recovery</h3>
+        <p>
+            Complex errors may require human intervention:
+        </p>
+
+        <pre><code>class HumanAssistedRecovery {
+  async escalateForRecovery(
+    error: Error,
+    failed_operation: any
+  ): Promise<void> {
+    // Create recovery task for human
+    const recovery_task = {
+      task_id: generateId(),
+      error_type: error.type,
+      error_message: error.message,
+      failed_operation: failed_operation,
+      context: await this.gatherContext(error),
+      suggested_actions: await this.suggestRecoveryActions(error),
+      priority: this.assessPriority(error)
+    };
+
+    // Route to appropriate expert
+    const expert = await this.findExpert(error.type);
+    await this.assignRecoveryTask(recovery_task, expert);
+
+    // Notify stakeholders
+    await this.notifyStakeholders(error, recovery_task);
+  }
+
+  async suggestRecoveryActions(
+    error: Error
+  ): Promise<string[]> {
+    const actions = [];
+
+    if (error.type === 'data_corruption') {
+      actions.push('Restore from backup');
+      actions.push('Manually correct corrupted records');
+      actions.push('Re-run data validation pipeline');
+    }
+
+    if (error.type === 'model_drift') {
+      actions.push('Retrain model with recent data');
+      actions.push('Adjust confidence thresholds');
+      actions.push('Increase human review percentage');
+    }
+
+    return actions;
+  }
+}</code></pre>
+
+        <h3>Rollback and Replay</h3>
+        <p>
+            For serious errors, rollback to known good state and replay operations:
+        </p>
+
+        <pre><code>class RollbackManager {
+  async rollbackAndReplay(
+    error_timestamp: Date,
+    error_scope: string
+  ): Promise<void> {
+    // Find last known good state
+    const checkpoint = await this.findCheckpoint(error_timestamp);
+
+    // Rollback to checkpoint
+    await this.restoreFromCheckpoint(checkpoint);
+
+    // Identify operations after checkpoint
+    const operations_to_replay = await this.getOperations(
+      checkpoint.timestamp,
+      error_timestamp
+    );
+
+    // Filter out erroneous operations
+    const valid_operations = operations_to_replay.filter(op =>
+      !this.isErroneous(op, error_scope)
+    );
+
+    // Replay valid operations
+    for (const op of valid_operations) {
+      await this.replayOperation(op);
+    }
+
+    // Verify system state
+    await this.verifyIntegrity();
+  }
+}</code></pre>
+
+        <h2>Communication During Failures</h2>
+        <p>
+            How errors are communicated affects user trust and response. Transparent, actionable communication maintains confidence even during failures.
+        </p>
+
+        <h3>User Communication Principles</h3>
+        <ul>
+            <li><strong>Be honest:</strong> Don't hide or minimize errors</li>
+            <li><strong>Be specific:</strong> Explain what went wrong</li>
+            <li><strong>Be actionable:</strong> Tell users what to do next</li>
+            <li><strong>Be timely:</strong> Communicate quickly, update regularly</li>
+            <li><strong>Be empathetic:</strong> Acknowledge impact on users</li>
+        </ul>
+
+        <pre><code>interface ErrorCommunication {
+  user_message: {
+    headline: string;
+    description: string;
+    impact: string;
+    user_action: string;
+    timeline: string;
+  };
+  technical_details?: {
+    error_code: string;
+    stack_trace: string;
+    debug_info: any;
+  };
+  updates: Array<{
+    timestamp: Date;
+    status: string;
+    message: string;
+  }>;
+}
+
+class ErrorCommunicator {
+  async communicateError(
+    error: Error,
+    impact_assessment: any
+  ): Promise<ErrorCommunication> {
+    const message: ErrorCommunication = {
+      user_message: {
+        headline: this.generateHeadline(error),
+        description: this.explainError(error),
+        impact: this.describeImpact(impact_assessment),
+        user_action: this.suggestUserAction(error),
+        timeline: this.estimateRecovery(error)
+      },
+      updates: []
+    };
+
+    // Include technical details for power users
+    if (this.userWantsTechnicalDetails()) {
+      message.technical_details = {
+        error_code: error.code,
+        stack_trace: error.stack,
+        debug_info: await this.gatherDebugInfo(error)
+      };
+    }
+
+    await this.sendNotification(message);
+    return message;
+  }
+
+  explainError(error: Error): string {
+    const explanations = {
+      'model_error': 'Our AI system encountered an issue processing your request. The prediction may be less accurate than usual.',
+      'data_error': 'We're experiencing issues accessing some data. Some information may be incomplete.',
+      'system_overload': 'We're handling higher than normal volume. Processing may be slower than usual.',
+    };
+
+    return explanations[error.type] ||
+           'We encountered an unexpected issue. Our team has been notified.';
+  }
+}</code></pre>
+
+        <h2>Learning from Failures</h2>
+        <p>
+            Every error is an opportunity to improve. Systematic error analysis reveals patterns and informs preventive measures.
+        </p>
+
+        <h3>Post-Incident Analysis</h3>
+        <pre><code>interface IncidentReport {
+  incident_id: string;
+  incident_date: Date;
+  detection_time: Date;
+  resolution_time: Date;
+  error_type: string;
+  root_cause: string;
+  contributing_factors: string[];
+  impact: {
+    users_affected: number;
+    decisions_affected: number;
+    downtime_minutes: number;
+    financial_impact?: number;
+  };
+  timeline: Array<{
+    timestamp: Date;
+    event: string;
+  }>;
+  what_went_well: string[];
+  what_went_wrong: string[];
+  lessons_learned: string[];
+  action_items: Array<{
+    action: string;
+    owner: string;
+    due_date: Date;
+    status: 'open' | 'in_progress' | 'completed';
+  }>;
+}
+
+class PostIncidentReview {
+  async conductReview(incident_id: string): Promise<IncidentReport> {
+    // Gather incident data
+    const incident = await this.getIncidentData(incident_id);
+
+    // Conduct blameless retrospective
+    const retrospective = await this.facilitateRetrospective(
+      incident.team_members
+    );
+
+    // Identify root cause
+    const root_cause = await this.performRootCauseAnalysis(incident);
+
+    // Generate action items
+    const actions = await this.identifyPreventiveMeasures(
+      root_cause,
+      retrospective
+    );
+
+    const report: IncidentReport = {
+      incident_id,
+      incident_date: incident.start_time,
+      detection_time: incident.detected_at,
+      resolution_time: incident.resolved_at,
+      error_type: incident.type,
+      root_cause: root_cause.primary_cause,
+      contributing_factors: root_cause.contributing_factors,
+      impact: await this.assessImpact(incident),
+      timeline: incident.timeline,
+      what_went_well: retrospective.went_well,
+      what_went_wrong: retrospective.went_wrong,
+      lessons_learned: retrospective.lessons,
+      action_items: actions
+    };
+
+    await this.publishReport(report);
+    return report;
+  }
+}</code></pre>
+
+        <h3>Preventive Measures</h3>
+        <p>
+            Use incident learnings to prevent future failures:
+        </p>
+
+        <ul>
+            <li><strong>Enhanced monitoring:</strong> Add checks for error precursors</li>
+            <li><strong>Improved testing:</strong> Add test cases for failure scenarios</li>
+            <li><strong>Circuit breakers:</strong> Prevent cascading failures</li>
+            <li><strong>Rate limiting:</strong> Protect against overload</li>
+            <li><strong>Redundancy:</strong> Eliminate single points of failure</li>
+            <li><strong>Training:</strong> Educate team on error patterns</li>
+        </ul>
+
+        <div class="callout">
+            <div class="callout-title">弘益人間 in Error Handling</div>
+            <p>
+                Error handling guided by 弘익人間 prioritizes human safety and dignity. Never hide errors that could harm users. Provide graceful degradation that maintains essential services. Communicate honestly about failures. Learn from mistakes to prevent future harm. The goal is not zero errors (impossible) but ethical, transparent, and compassionate handling when errors occur.
+            </p>
+        </div>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <p>Resilient AI-human collaboration requires robust error handling and recovery. Key concepts include:</p>
+            <ul>
+                <li>Understanding error types: AI model errors, human errors, and system errors</li>
+                <li>Multi-layered error detection through AI self-monitoring, human behavior analysis, and cross-validation</li>
+                <li>Graceful degradation that provides reduced functionality rather than complete failure</li>
+                <li>Recovery strategies including automatic recovery, human-assisted recovery, and rollback/replay</li>
+                <li>Transparent error communication that is honest, specific, actionable, timely, and empathetic</li>
+                <li>Post-incident analysis to learn from failures and implement preventive measures</li>
+                <li>Focus on human safety and dignity in all error handling decisions</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the three main categories of errors in collaborative AI systems? Give examples of each.</li>
+                <li>How can AI systems detect their own errors? What signals indicate potential problems?</li>
+                <li>What is graceful degradation? Describe different degradation levels and when each is appropriate.</li>
+                <li>Compare automatic recovery with human-assisted recovery. When is each needed?</li>
+                <li>What principles should guide error communication to users? Why is each principle important?</li>
+                <li>How should post-incident reviews be conducted? What should they produce?</li>
+                <li>What preventive measures can reduce future errors?</li>
+                <li>How does 弘익人間 philosophy apply to error handling? What would ethical error handling look like?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

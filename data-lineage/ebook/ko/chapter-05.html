@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 근본 원인 분석 | WIA-DATA-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        .highlight-box strong { color: #10B981; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .example { background: #0f1729; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; margin: 2rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">5장</div>
+            <h1>근본 원인 분석</h1>
+        </header>
+        <p>데이터 품질 문제가 발생하면 시간이 촉박합니다. 잘못된 데이터로 비즈니스 결정이 내려지고, 보고서에 잘못된 숫자가 표시되며, 이해관계자의 신뢰가 떨어집니다. 데이터 계보를 사용한 근본 원인 분석은 문제를 소스까지 빠르게 추적하는 데 도움을 줍니다.</p>
+
+        <h2>데이터 품질 문제의 과제</h2>
+
+        <p>계보 없이 데이터 문제를 해결하는 것은 스택 트레이스 없이 디버깅하는 것과 같습니다. 무언가 잘못되었다는 것은 알지만 범인을 찾을 때까지 모든 변환, 조인, 필터를 수동으로 조사해야 합니다.</p>
+
+        <div class="highlight-box">
+            <strong>계보 기반 솔루션:</strong> 계보 그래프를 통해 역으로 추적하여 문제가 발생한 정확한 변환을 격리할 때까지 각 업스트림 노드를 테스트합니다.
+        </div>
+
+        <h2>근본 원인 분석 프로세스</h2>
+
+        <h3>1단계: 증상 식별</h3>
+        <p>무엇이 잘못되었는지 명확히 정의합니다:</p>
+        <ul>
+            <li><strong>위치:</strong> 문제가 어디에 보이나요?</li>
+            <li><strong>성격:</strong> 무엇이 잘못되었나요? (값, 개수, 누락된 데이터)</li>
+            <li><strong>범위:</strong> 모든 레코드 또는 특정 하위 집합?</li>
+            <li><strong>타임라인:</strong> 언제 시작되었나요?</li>
+        </ul>
+
+        <h3>2단계: 업스트림 계보 쿼리</h3>
+        <p>소스까지 전체 계보 경로를 가져옵니다.</p>
+
+        <h3>3단계: 계보를 통한 이진 검색</h3>
+        <p>계보 경로의 중간에서 시작하여 역으로 작업합니다.</p>
+
+        <h3>4단계: 근본 원인 검증</h3>
+        <p>가설을 확인합니다:</p>
+        <ul>
+            <li>변환 변경 이력 확인</li>
+            <li>해당 날짜의 git 커밋 검토</li>
+            <li>변경 전후 데이터 비교</li>
+            <li>알려진 양호한 기준선에 대해 검증</li>
+        </ul>
+
+        <h3>5단계: 영향 범위 평가</h3>
+        <p>전방 계보를 사용하여 다른 영향을 받은 것을 찾습니다.</p>
+
+        <h2>일반적인 데이터 품질 패턴</h2>
+
+        <h3>패턴 1: 자동 절단</h3>
+        <p><strong>증상:</strong> 예상보다 짧은 문자열 또는 반올림된 숫자<br>
+        <strong>원인:</strong> 변환의 데이터 타입 불일치<br>
+        <strong>계보 검색:</strong> 타입 변환 찾기 (VARCHAR(50) → VARCHAR(20))</p>
+
+        <h3>패턴 2: 누락된 레코드</h3>
+        <p><strong>증상:</strong> 예상보다 적은 행 수<br>
+        <strong>원인:</strong> 지나치게 제한적인 필터 또는 실패한 조인<br>
+        <strong>계보 검색:</strong> WHERE 절 및 JOIN 조건 확인</p>
+
+        <h3>패턴 3: 중복 레코드</h3>
+        <p><strong>증상:</strong> 예상보다 많은 행 수<br>
+        <strong>원인:</strong> 누락된 DISTINCT 또는 잘못된 조인<br>
+        <strong>계보 검색:</strong> 다대다 조인 찾기</p>
+
+        <h3>패턴 4: 오래된 데이터</h3>
+        <p><strong>증상:</strong> 데이터가 최근에 업데이트되지 않음<br>
+        <strong>원인:</strong> 업스트림 파이프라인 실패<br>
+        <strong>계보 검색:</strong> 작업 실행 타임스탬프 확인</p>
+
+        <h3>패턴 5: 잘못된 집계</h3>
+        <p><strong>증상:</strong> 합계가 예상 값과 일치하지 않음<br>
+        <strong>원인:</strong> 잘못된 GROUP BY 또는 SUM 로직<br>
+        <strong>계보 검색:</strong> 집계 변환 추적</p>
+
+        <h2>자동화된 근본 원인 탐지</h2>
+
+        <p>데이터 품질 모니터링과 계보를 결합하여 문제를 자동으로 진단할 수 있습니다.</p>
+
+        <h2>6. 오류 전파 분석</h2>
+
+        <p>데이터 품질 문제는 종종 파이프라인을 통해 전파됩니다. 계보를 사용하면 오류가 어떻게 확산되는지 추적할 수 있습니다.</p>
+
+        <h3>오류 전파 시나리오</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0;">
+            <thead>
+                <tr style="background: #1e293b; border-bottom: 2px solid #10B981;">
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">시나리오</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">원인</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">전파 방식</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">단일 소스 오류</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">업스트림 데이터 소스의 불량 데이터</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">모든 다운스트림 변환에 영향</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">변환 버그</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">잘못된 로직 또는 코드 오류</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">해당 변환 이후 모든 데이터셋</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">스키마 불일치</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">예상치 못한 스키마 변경</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">조인 실패, NULL 값 증가</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">타이밍 문제</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">파이프라인 스케줄링 충돌</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">오래된 데이터 또는 부분 로드</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">집계 오류</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">중복 레코드 또는 누락된 필터</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">잘못된 합계, 부정확한 메트릭</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>전파 경로 추적</h3>
+        <div class="example">
+            <div class="example-title">오류 전파 맵</div>
+            <pre><code>문제: 보고서의 매출 수치가 20% 높음
+
+계보 역추적:
+┌────────────────────────────────────────────────────┐
+│ dashboards.revenue_summary (문제 발견)               │
+│   총 매출: $1.2M (예상: $1.0M)                      │
+└────────────────────────────────────────────────────┘
+                    ↑
+    [AGGREGATION: SUM(revenue)]
+                    │
+┌────────────────────────────────────────────────────┐
+│ analytics.daily_sales (데이터 정상으로 보임)         │
+│   행 수: 45,892                                     │
+└────────────────────────────────────────────────────┘
+                    ↑
+    [JOIN + FILTER]
+                    │
+┌────────────────────────────────────────────────────┐
+│ warehouse.orders (의심 지점!)                        │
+│   행 수: 54,203 (예상: 45,000)                      │
+│   ⚠️ 중복 레코드 감지!                               │
+└────────────────────────────────────────────────────┘
+                    ↑
+    [ETL: 복사]
+                    │
+┌────────────────────────────────────────────────────┐
+│ staging.raw_orders (원인 발견!)                      │
+│   중복 키 제약 조건 없음                             │
+│   2025-01-26: 동일 배치가 2회 로드됨                │
+│   → ETL 작업이 재시도로 2회 실행됨                   │
+└────────────────────────────────────────────────────┘
+
+근본 원인:
+- Airflow 작업이 일시적 네트워크 오류로 재시도됨
+- 멱등성 검사 없이 데이터 재삽입
+- 다운스트림으로 중복 레코드 전파
+
+해결책:
+1. staging.raw_orders에 고유 제약 조건 추가
+2. ETL 작업에 멱등성 검사 구현
+3. warehouse.orders에서 중복 제거
+4. 영향받은 모든 다운스트림 테이블 재처리</code></pre>
+        </div>
+
+        <h2>7. 디버깅 워크플로우</h2>
+
+        <p>계보 기반 디버깅은 체계적인 접근 방식을 따릅니다:</p>
+
+        <h3>단계별 디버깅 프로세스</h3>
+        <ol>
+            <li><strong>증상 정량화:</strong> 정확히 무엇이 잘못되었는지 측정</li>
+            <li><strong>타임라인 설정:</strong> 문제가 언제 시작되었는지 확인</li>
+            <li><strong>계보 그래프 로드:</strong> 영향받은 자산의 전체 업스트림 경로</li>
+            <li><strong>이진 검색 적용:</strong> 중간 노드부터 테스트</li>
+            <li><strong>변경 이력 확인:</strong> 해당 기간의 배포 검토</li>
+            <li><strong>가설 검증:</strong> 의심 변환 테스트</li>
+            <li><strong>수정 적용:</strong> 근본 원인 해결</li>
+            <li><strong>영향 재평가:</strong> 다운스트림 재처리 필요성 확인</li>
+        </ol>
+
+        <div class="example">
+            <div class="example-title">디버깅 체크리스트</div>
+            <pre><code>데이터 품질 문제 디버깅 체크리스트:
+
+□ 1. 문제 정의
+  □ 영향받은 테이블/컬럼 식별
+  □ 예상 값 vs 실제 값 문서화
+  □ 영향받은 레코드 범위 결정 (전체? 일부?)
+
+□ 2. 타임라인 분석
+  □ 마지막으로 정상이었던 시점 확인
+  □ 문제 시작 시간 식별
+  □ 해당 기간의 배포/변경 검토
+
+□ 3. 계보 조사
+  □ 전체 업스트림 계보 가져오기 (depth 5+)
+  □ 계보 경로에서 각 노드 식별
+  □ 중간 노드들의 데이터 샘플 검사
+
+□ 4. 이진 검색
+  □ 중간 노드부터 시작
+  □ 정상이면 다운스트림 검사
+  □ 비정상이면 업스트림 검사
+  □ 문제 노드 격리될 때까지 반복
+
+□ 5. 근본 원인 확인
+  □ 변환 로직 검토
+  □ 코드 변경 이력 확인
+  □ 구성 변경 검토
+  □ 데이터 프로파일 비교 (이전 vs 현재)
+
+□ 6. 영향 평가
+  □ 다운스트림 계보 확인
+  □ 영향받은 모든 자산 목록화
+  □ SLA 영향 평가
+
+□ 7. 수정 및 검증
+  □ 수정 적용
+  □ 테스트 데이터로 검증
+  □ 다운스트림 재처리
+  □ 모니터링 설정</code></pre>
+        </div>
+
+        <h2>8. 자동화된 이상 탐지</h2>
+
+        <p>수동 디버깅을 보완하여 자동화된 이상 탐지는 문제를 조기에 발견합니다.</p>
+
+        <div class="example">
+            <div class="example-title">데이터 품질 모니터링 파이프라인</div>
+            <pre><code>from great_expectations as ge
+from lineage_client import LineageAPI
+
+class LineageAwareDataQuality:
+    """계보를 활용한 데이터 품질 모니터링"""
+
+    def __init__(self, lineage_api):
+        self.lineage = lineage_api
+        self.alerts = []
+
+    def check_dataset_quality(self, dataset_name, df):
+        """데이터셋 품질 검사 및 계보 기반 알림"""
+
+        # Great Expectations로 데이터 검증
+        ge_df = ge.from_pandas(df)
+
+        # 기대값 정의
+        expectations = {
+            "row_count_stable": ge_df.expect_table_row_count_to_be_between(
+                min_value=int(0.8 * self.historical_avg(dataset_name)),
+                max_value=int(1.2 * self.historical_avg(dataset_name))
+            ),
+            "no_nulls_in_key": ge_df.expect_column_values_to_not_be_null(
+                column="primary_key"
+            ),
+            "valid_values": ge_df.expect_column_values_to_be_in_set(
+                column="status",
+                value_set=["active", "inactive", "pending"]
+            )
+        }
+
+        # 실패한 검사 처리
+        for check_name, result in expectations.items():
+            if not result.success:
+                # 계보를 사용하여 영향 분석
+                impact = self.lineage.get_downstream_impact(dataset_name)
+
+                alert = {
+                    "dataset": dataset_name,
+                    "check": check_name,
+                    "severity": self.calculate_severity(impact),
+                    "affected_downstream": len(impact.datasets),
+                    "critical_systems": impact.critical_count,
+                    "recommended_action": self.suggest_action(check_name, impact)
+                }
+
+                self.alerts.append(alert)
+                self.notify_teams(alert)
+
+    def calculate_severity(self, impact):
+        """영향 기반 심각도 계산"""
+        if impact.critical_count > 0:
+            return "CRITICAL"
+        elif impact.datasets_count > 10:
+            return "HIGH"
+        elif impact.datasets_count > 3:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
+    def suggest_action(self, check_name, impact):
+        """권장 조치 제안"""
+        if check_name == "row_count_stable":
+            # 업스트림 계보 확인
+            upstream = self.lineage.get_upstream_lineage(impact.dataset)
+            return f"업스트림 소스 확인: {upstream.immediate_sources}"
+        elif check_name == "no_nulls_in_key":
+            return "ETL 로직의 조인 조건 검토"
+        else:
+            return "데이터 프로파일링 실행 및 계보 추적"</code></pre>
+        </div>
+
+        <h2>9. 계보 기반 디버깅 도구</h2>
+
+        <p>효과적인 디버깅을 위한 도구와 기술:</p>
+
+        <h3>데이터 diff 도구</h3>
+        <div class="example">
+            <div class="example-title">데이터 변경 비교</div>
+            <pre><code>-- 양호한 기준선과 현재 데이터 비교
+WITH baseline AS (
+    SELECT * FROM customers_backup_20250125
+),
+current AS (
+    SELECT * FROM customers
+),
+differences AS (
+    SELECT
+        COALESCE(b.customer_id, c.customer_id) as customer_id,
+        CASE
+            WHEN b.customer_id IS NULL THEN 'ADDED'
+            WHEN c.customer_id IS NULL THEN 'DELETED'
+            WHEN b.email != c.email THEN 'MODIFIED'
+            ELSE 'UNCHANGED'
+        END as change_type,
+        b.email as baseline_email,
+        c.email as current_email
+    FROM baseline b
+    FULL OUTER JOIN current c ON b.customer_id = c.customer_id
+)
+SELECT
+    change_type,
+    COUNT(*) as count,
+    COUNT(*) * 100.0 / SUM(COUNT(*)) OVER () as percentage
+FROM differences
+GROUP BY change_type;
+
+-- 결과:
+-- change_type  | count  | percentage
+-- UNCHANGED    | 44,892 | 97.8%
+-- MODIFIED     | 523    | 1.1%
+-- ADDED        | 312    | 0.7%
+-- DELETED      | 165    | 0.4%
+-- ⚠️ MODIFIED 비율이 비정상적으로 높음 → 조사 필요</code></pre>
+        </div>
+
+        <h3>계보 시간 여행</h3>
+        <p>과거 시점의 계보를 확인하여 변경 사항을 추적합니다:</p>
+
+        <div class="example">
+            <div class="example-title">시간 여행 쿼리</div>
+            <pre><code># 특정 날짜의 계보 스냅샷 비교
+lineage_jan25 = api.get_lineage(
+    dataset="analytics.revenue",
+    as_of="2025-01-25T00:00:00Z"
+)
+
+lineage_jan26 = api.get_lineage(
+    dataset="analytics.revenue",
+    as_of="2025-01-26T00:00:00Z"
+)
+
+# 계보 변경 감지
+diff = compare_lineage(lineage_jan25, lineage_jan26)
+
+print("계보 변경 사항:")
+for change in diff.changes:
+    print(f"- {change.type}: {change.description}")
+
+# 출력:
+# - NEW_DEPENDENCY: analytics.revenue now depends on warehouse.refunds
+# - MODIFIED_TRANSFORM: revenue calculation changed from SUM(amount) to SUM(amount - refund_amount)
+# - REMOVED_DEPENDENCY: no longer depends on staging.adjustments</code></pre>
+        </div>
+
+        <h2>10. 사례 연구: 복잡한 문제 해결</h2>
+
+        <div class="example">
+            <div class="example-title">실제 디버깅 시나리오</div>
+            <pre><code>문제: 월간 매출 보고서의 숫자가 지난주부터 일관성 없음
+
+1단계: 증상 식별
+- 영향: 경영진 대시보드
+- 발생: 2025-01-20부터
+- 패턴: 일부 날짜만 영향, 다른 날짜는 정상
+
+2단계: 계보 로드
+source_systems.orders → staging.order_events → warehouse.orders
+→ analytics.daily_revenue → reports.monthly_revenue → dashboards.executive
+
+3단계: 이진 검색
+✓ dashboards.executive (문제 있음)
+✓ reports.monthly_revenue (문제 있음)
+✓ analytics.daily_revenue (일부 날짜만 문제)
+✓ warehouse.orders (일부 날짜만 문제)
+? staging.order_events (조사 중...)
+
+4단계: 변경 이력
+# Git 로그 확인
+git log --since="2025-01-19" --until="2025-01-21" -- etl/
+
+commit abc123:
+  "Fix timezone handling in order_events ETL"
+  - Changed: UTC → America/New_York for consistency
+  ⚠️ 의심되는 변경!
+
+5단계: 가설 검증
+-- 타임존 변경이 일부 주문을 다른 날짜로 이동시킴
+SELECT
+    order_date_utc,
+    order_date_ny,
+    COUNT(*) as affected_orders
+FROM staging.order_events
+WHERE order_date_utc::date != order_date_ny::date
+GROUP BY 1, 2;
+
+-- 결과: 2,341개 주문이 다른 날짜로 분류됨 (오후 7시 이후)
+
+6단계: 근본 원인 확인
+- ETL 로직이 타임존 변환 추가
+- 하지만 일일 집계는 여전히 UTC 날짜 사용
+- 날짜 불일치로 인한 이중 계산 또는 누락
+
+7단계: 해결
+1. 일일 집계를 NY 타임존 날짜 사용하도록 업데이트
+2. 2025-01-20 이후 모든 데이터 재처리
+3. 타임존 처리를 문서화
+4. 데이터 품질 검사 추가: 날짜별 주문 합계 검증
+
+8단계: 영향 완화
+- 다운스트림: 3개 테이블, 5개 보고서
+- 재처리 시간: 4시간
+- 이해관계자 알림: 경영진, 재무팀</code></pre>
+        </div>
+
+        <h2>11. 모범 사례</h2>
+
+        <ol>
+            <li><strong>변경 문서화:</strong> 변경 이력으로 변환에 주석 달기</li>
+            <li><strong>각 노드에서 테스트:</strong> 최종 출력만 테스트하지 마세요</li>
+            <li><strong>기준선 유지:</strong> 비교를 위해 알려진 양호한 데이터 보관</li>
+            <li><strong>가능한 자동화:</strong> 하지만 인간을 루프에 유지</li>
+            <li><strong>발견 공유:</strong> 조직 지식 구축</li>
+            <li><strong>체계적 접근:</strong> 무작위 추측보다 이진 검색 사용</li>
+            <li><strong>타임스탬프 추적:</strong> 모든 변환에 처리 시간 기록</li>
+            <li><strong>계보 버전 관리:</strong> 시간 경과에 따른 계보 변경 추적</li>
+            <li><strong>경보 임계값:</strong> 이상 감지를 위한 데이터 품질 모니터링</li>
+            <li><strong>사후 분석:</strong> 문제 해결 후 원인과 교훈 문서화</li>
+        </ol>
+
+        <h2>12. 장 요약</h2>
+
+        <p>이 장에서는 데이터 품질 문제의 근본 원인을 찾기 위한 계보 사용 방법을 다루었습니다:</p>
+
+        <ul>
+            <li><strong>체계적 접근:</strong> 증상 식별, 타임라인 설정, 이진 검색을 통한 격리</li>
+            <li><strong>일반 패턴:</strong> 절단, 누락, 중복, 오래된 데이터, 잘못된 집계</li>
+            <li><strong>오류 전파:</strong> 계보를 통한 품질 문제 확산 추적</li>
+            <li><strong>디버깅 도구:</strong> 데이터 diff, 시간 여행, 자동화된 이상 탐지</li>
+            <li><strong>자동화:</strong> 계보 인식 데이터 품질 모니터링</li>
+        </ul>
+
+        <p>계보 기반 근본 원인 분석은 디버깅 시간을 몇 시간에서 몇 분으로 단축하고, 문제를 조기에 발견하며, 데이터 시스템의 전반적인 안정성을 향상시킵니다.</p>
+
+        <h2>13. 복습 질문</h2>
+
+        <ol>
+            <li><strong>이진 검색 방법이 선형 검색보다 디버깅에 더 효과적인 이유는 무엇인가요?</strong>
+                <br><em>답변 힌트: 시간 복잡도, 탐색 공간 축소</em>
+            </li>
+            <li><strong>데이터 품질 문제의 다섯 가지 일반적인 패턴을 설명하세요.</strong>
+                <br><em>답변 힌트: 절단, 누락, 중복, 오래된 데이터, 잘못된 집계</em>
+            </li>
+            <li><strong>오류 전파 분석이 왜 중요한가요? 예를 들어 설명하세요.</strong>
+                <br><em>답변 힌트: 단일 오류가 여러 다운스트림 자산에 영향</em>
+            </li>
+            <li><strong>자동화된 이상 탐지를 계보와 통합하는 이점은 무엇인가요?</strong>
+                <br><em>답변 힌트: 영향 기반 심각도, 자동 근본 원인 제안</em>
+            </li>
+            <li><strong>계보 시간 여행이 디버깅에 어떻게 도움이 되나요?</strong>
+                <br><em>답변 힌트: 변경 전후 비교, 회귀 식별</em>
+            </li>
+        </ol>
+
+        <div class="highlight-box">
+            <strong>핵심 요점:</strong> 근본 원인 분석은 몇 시간 또는 며칠의 수동 조사를 몇 분의 가이드 탐색으로 변환합니다. 데이터 계보는 디버깅의 초능력입니다.
+        </div>
+
+        </div>
+</body>
+</html>

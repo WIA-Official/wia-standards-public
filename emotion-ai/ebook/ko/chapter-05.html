@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: Phase 2 - API 인터페이스 - WIA 감정 AI 표준</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+</head>
+<body>
+
+<h1>제5장: Phase 2 - API 인터페이스</h1>
+
+<blockquote>
+<p>"RESTful API 인터페이스는 감정 AI 서비스와의 상호작용을 표준화합니다. Phase 2는 분석, 인증, 오류 처리를 위한 일관된 엔드포인트를 정의하여 공급업체 간 상호운용성을 보장합니다."</p>
+</blockquote>
+
+<hr>
+
+<h2>5.1 REST API 설계</h2>
+
+<h3>5.1.1 기본 URL 구조</h3>
+
+<pre>
+https://api.{provider}.com/wia/emotion/v1/
+</pre>
+
+<h3>5.1.2 API 버전 관리</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>버전</th>
+            <th>URL 경로</th>
+            <th>상태</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>v1</td>
+            <td>/wia/emotion/v1/</td>
+            <td>현재 (안정)</td>
+        </tr>
+        <tr>
+            <td>v1-beta</td>
+            <td>/wia/emotion/v1-beta/</td>
+            <td>베타 기능</td>
+        </tr>
+        <tr>
+            <td>v2</td>
+            <td>/wia/emotion/v2/</td>
+            <td>예정</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>5.1.3 공통 헤더</h3>
+
+<pre>
+# 요청 헤더
+Authorization: Bearer {access_token}
+Content-Type: application/json
+Accept: application/json
+X-WIA-Version: 1.0.0
+X-Request-ID: {uuid}
+Accept-Language: ko-KR
+
+# 응답 헤더
+Content-Type: application/json
+X-WIA-Version: 1.0.0
+X-Request-ID: {uuid}
+X-Processing-Time-Ms: 45
+X-Rate-Limit-Remaining: 99
+X-Rate-Limit-Reset: 1705329600
+</pre>
+
+<h3>5.1.4 인증 방식</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>방식</th>
+            <th>용도</th>
+            <th>헤더</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Bearer Token</td>
+            <td>서버 간 통신</td>
+            <td>Authorization: Bearer {token}</td>
+        </tr>
+        <tr>
+            <td>API Key</td>
+            <td>클라이언트 애플리케이션</td>
+            <td>X-API-Key: {api_key}</td>
+        </tr>
+        <tr>
+            <td>OAuth 2.0</td>
+            <td>사용자 대신 접근</td>
+            <td>Authorization: Bearer {oauth_token}</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>5.2 표정 감정 분석 엔드포인트</h2>
+
+<h3>5.2.1 이미지 분석</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/facial/image
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "image": {
+        "content": "{base64_encoded_image}",
+        "format": "jpeg"
+    },
+    "options": {
+        "detect_action_units": true,
+        "detect_landmarks": true,
+        "detect_head_pose": true,
+        "detect_gaze": false,
+        "cultural_context": "ko-KR",
+        "confidence_threshold": 0.5
+    }
+}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "request_id": "req-12345-abcde",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "processing_time_ms": 125,
+    "faces": [
+        {
+            "face_id": 1,
+            "bounding_box": {
+                "x": 120,
+                "y": 80,
+                "width": 200,
+                "height": 250
+            },
+            "emotions": [
+                {
+                    "category": "happiness",
+                    "intensity": 0.82,
+                    "confidence": 0.94
+                },
+                {
+                    "category": "surprise",
+                    "intensity": 0.15,
+                    "confidence": 0.71
+                }
+            ],
+            "action_units": [
+                {
+                    "au": "AU6",
+                    "name": "Cheek Raiser",
+                    "intensity": 0.75,
+                    "confidence": 0.92
+                },
+                {
+                    "au": "AU12",
+                    "name": "Lip Corner Puller",
+                    "intensity": 0.85,
+                    "confidence": 0.95
+                }
+            ],
+            "dimensional": {
+                "valence": 0.78,
+                "arousal": 0.55,
+                "dominance": 0.68
+            },
+            "head_pose": {
+                "pitch": -5.2,
+                "yaw": 3.1,
+                "roll": 1.5
+            }
+        }
+    ]
+}
+</pre>
+
+<h3>5.2.2 비디오 분석</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/facial/video
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "video": {
+        "url": "https://storage.example.com/video.mp4",
+        "format": "mp4"
+    },
+    "options": {
+        "frame_rate": 5,
+        "detect_micro_expressions": true,
+        "temporal_smoothing": true,
+        "aggregate_results": true
+    },
+    "callback": {
+        "url": "https://your-server.com/webhook",
+        "method": "POST"
+    }
+}
+</pre>
+
+<p><strong>응답 (비동기 작업 생성):</strong></p>
+
+<pre>
+{
+    "job_id": "job-67890-fghij",
+    "status": "processing",
+    "estimated_completion_seconds": 120,
+    "status_url": "/wia/emotion/v1/jobs/job-67890-fghij"
+}
+</pre>
+
+<h3>5.2.3 작업 상태 확인</h3>
+
+<pre>
+GET /wia/emotion/v1/jobs/{job_id}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "job_id": "job-67890-fghij",
+    "status": "completed",
+    "created_at": "2025-01-15T14:30:00.000Z",
+    "completed_at": "2025-01-15T14:32:05.000Z",
+    "result_url": "/wia/emotion/v1/jobs/job-67890-fghij/result"
+}
+</pre>
+
+<hr>
+
+<h2>5.3 음성 감정 분석 엔드포인트</h2>
+
+<h3>5.3.1 오디오 분석</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/voice/audio
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "audio": {
+        "content": "{base64_encoded_audio}",
+        "format": "wav",
+        "sample_rate": 16000
+    },
+    "options": {
+        "language": "ko-KR",
+        "extract_prosody": true,
+        "extract_voice_quality": true,
+        "segment_by_speaker": false
+    }
+}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "request_id": "req-voice-12345",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "duration_seconds": 5.2,
+    "segments": [
+        {
+            "start_time": 0.0,
+            "end_time": 5.2,
+            "emotions": [
+                {
+                    "category": "happiness",
+                    "intensity": 0.72,
+                    "confidence": 0.85
+                }
+            ],
+            "prosody": {
+                "pitch": {
+                    "mean": 185.5,
+                    "std": 28.3,
+                    "min": 120.0,
+                    "max": 280.0
+                },
+                "intensity": {
+                    "mean": 65.2,
+                    "std": 12.5
+                },
+                "speech_rate": 4.5,
+                "pause_ratio": 0.15
+            },
+            "voice_quality": {
+                "jitter": 0.012,
+                "shimmer": 0.035,
+                "hnr": 18.5
+            },
+            "dimensional": {
+                "valence": 0.65,
+                "arousal": 0.58
+            }
+        }
+    ],
+    "aggregate": {
+        "dominant_emotion": "happiness",
+        "average_valence": 0.65,
+        "average_arousal": 0.58
+    }
+}
+</pre>
+
+<h3>5.3.2 스트리밍 오디오 세션</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/voice/stream/start
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "session_config": {
+        "sample_rate": 16000,
+        "encoding": "LINEAR16",
+        "language": "ko-KR",
+        "interim_results": true
+    }
+}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "session_id": "voice-session-12345",
+    "websocket_url": "wss://api.provider.com/wia/emotion/v1/voice/stream/voice-session-12345",
+    "expires_at": "2025-01-15T15:30:00.000Z"
+}
+</pre>
+
+<hr>
+
+<h2>5.4 텍스트 감성 분석 엔드포인트</h2>
+
+<h3>5.4.1 텍스트 분석</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/text
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "text": "오늘 정말 좋은 하루였어요! 새로운 프로젝트가 성공적으로 완료되어 너무 기뻐요.",
+    "options": {
+        "language": "ko",
+        "detect_sarcasm": true,
+        "analyze_emoji": true,
+        "extract_emotion_words": true,
+        "context_window": 3
+    }
+}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "request_id": "req-text-12345",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "text_analysis": {
+        "language": "ko",
+        "word_count": 12,
+        "emotions": [
+            {
+                "category": "happiness",
+                "intensity": 0.88,
+                "confidence": 0.92
+            },
+            {
+                "category": "excitement",
+                "intensity": 0.65,
+                "confidence": 0.78
+            }
+        ],
+        "sentiment": {
+            "score": 0.85,
+            "magnitude": 0.92,
+            "label": "positive"
+        },
+        "dimensional": {
+            "valence": 0.82,
+            "arousal": 0.68
+        },
+        "emotion_words": [
+            {
+                "word": "좋은",
+                "emotion": "happiness",
+                "position": 2
+            },
+            {
+                "word": "기뻐요",
+                "emotion": "happiness",
+                "position": 11
+            }
+        ],
+        "sarcasm_detected": false
+    }
+}
+</pre>
+
+<h3>5.4.2 대화 분석</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/text/conversation
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "messages": [
+        {
+            "role": "user",
+            "content": "이 제품 정말 실망스러워요",
+            "timestamp": "2025-01-15T14:28:00.000Z"
+        },
+        {
+            "role": "agent",
+            "content": "불편을 드려 죄송합니다. 어떤 점이 문제였나요?",
+            "timestamp": "2025-01-15T14:28:30.000Z"
+        },
+        {
+            "role": "user",
+            "content": "배송이 3일이나 늦었어요",
+            "timestamp": "2025-01-15T14:29:00.000Z"
+        }
+    ],
+    "options": {
+        "track_emotional_trajectory": true,
+        "identify_escalation": true
+    }
+}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "request_id": "req-conv-12345",
+    "conversation_analysis": {
+        "overall_sentiment": -0.45,
+        "escalation_risk": 0.35,
+        "emotional_trajectory": [
+            {
+                "message_index": 0,
+                "emotion": "frustration",
+                "intensity": 0.72,
+                "valence": -0.65
+            },
+            {
+                "message_index": 2,
+                "emotion": "anger",
+                "intensity": 0.55,
+                "valence": -0.48
+            }
+        ],
+        "resolution_recommendation": "empathy_acknowledgment"
+    }
+}
+</pre>
+
+<hr>
+
+<h2>5.5 생체신호 분석 엔드포인트</h2>
+
+<h3>5.5.1 생체신호 데이터 분석</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/biosignal
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "biosignals": {
+        "heart_rate": {
+            "values": [72, 75, 78, 82, 85, 88, 92],
+            "sample_rate": 1,
+            "unit": "bpm"
+        },
+        "eda": {
+            "values": [2.5, 2.8, 3.2, 4.1, 5.2, 6.0, 5.5],
+            "sample_rate": 4,
+            "unit": "microsiemens"
+        },
+        "respiration": {
+            "values": [14, 15, 16, 18, 20, 19, 17],
+            "sample_rate": 1,
+            "unit": "breaths_per_minute"
+        }
+    },
+    "options": {
+        "compute_hrv": true,
+        "detect_stress": true,
+        "baseline_period_seconds": 60
+    }
+}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "request_id": "req-bio-12345",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "analysis": {
+        "emotions": [
+            {
+                "category": "anxiety",
+                "intensity": 0.68,
+                "confidence": 0.75
+            }
+        ],
+        "dimensional": {
+            "valence": -0.35,
+            "arousal": 0.72
+        },
+        "physiological_state": {
+            "stress_level": 0.65,
+            "relaxation_level": 0.25,
+            "engagement_level": 0.70
+        },
+        "hrv_metrics": {
+            "sdnn": 42.5,
+            "rmssd": 35.2,
+            "lf_hf_ratio": 2.8
+        },
+        "eda_metrics": {
+            "scl_mean": 4.19,
+            "scr_count": 3,
+            "scr_amplitude_mean": 1.2
+        }
+    }
+}
+</pre>
+
+<h3>5.5.2 지원 센서 타입</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>센서 타입</th>
+            <th>측정 항목</th>
+            <th>단위</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>PPG/ECG</td>
+            <td>심박수, HRV</td>
+            <td>bpm, ms</td>
+        </tr>
+        <tr>
+            <td>EDA/GSR</td>
+            <td>피부 전도도</td>
+            <td>μS (microsiemens)</td>
+        </tr>
+        <tr>
+            <td>호흡</td>
+            <td>호흡률, 깊이</td>
+            <td>breaths/min</td>
+        </tr>
+        <tr>
+            <td>체온</td>
+            <td>피부 온도</td>
+            <td>°C</td>
+        </tr>
+        <tr>
+            <td>EEG</td>
+            <td>뇌파 패턴</td>
+            <td>μV, Hz</td>
+        </tr>
+        <tr>
+            <td>EMG</td>
+            <td>근전도</td>
+            <td>μV</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>5.6 멀티모달 융합 엔드포인트</h2>
+
+<h3>5.6.1 멀티모달 분석</h3>
+
+<pre>
+POST /wia/emotion/v1/analyze/multimodal
+</pre>
+
+<p><strong>요청 본문:</strong></p>
+
+<pre>
+{
+    "modalities": {
+        "facial": {
+            "image": "{base64_encoded_image}"
+        },
+        "voice": {
+            "audio": "{base64_encoded_audio}",
+            "format": "wav"
+        },
+        "text": {
+            "content": "네, 정말 좋습니다"
+        }
+    },
+    "options": {
+        "fusion_strategy": "late_fusion",
+        "modality_weights": {
+            "facial": 0.4,
+            "voice": 0.35,
+            "text": 0.25
+        },
+        "conflict_resolution": "weighted_average",
+        "require_agreement": false
+    }
+}
+</pre>
+
+<p><strong>응답:</strong></p>
+
+<pre>
+{
+    "request_id": "req-multi-12345",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "fused_result": {
+        "emotions": [
+            {
+                "category": "happiness",
+                "intensity": 0.78,
+                "confidence": 0.91
+            }
+        ],
+        "dimensional": {
+            "valence": 0.72,
+            "arousal": 0.58,
+            "dominance": 0.65
+        }
+    },
+    "modality_results": {
+        "facial": {
+            "dominant_emotion": "happiness",
+            "confidence": 0.92,
+            "valence": 0.75
+        },
+        "voice": {
+            "dominant_emotion": "happiness",
+            "confidence": 0.85,
+            "valence": 0.68
+        },
+        "text": {
+            "dominant_emotion": "happiness",
+            "confidence": 0.88,
+            "valence": 0.72
+        }
+    },
+    "agreement_score": 0.95,
+    "conflict_detected": false
+}
+</pre>
+
+<hr>
+
+<h2>5.7 오류 처리</h2>
+
+<h3>5.7.1 표준 오류 응답</h3>
+
+<pre>
+{
+    "error": {
+        "code": "INVALID_INPUT",
+        "message": "이미지 형식이 지원되지 않습니다",
+        "details": {
+            "field": "image.format",
+            "provided": "bmp",
+            "supported": ["jpeg", "png", "webp"]
+        },
+        "request_id": "req-12345-abcde",
+        "documentation_url": "https://docs.wiastandards.com/errors/INVALID_INPUT"
+    }
+}
+</pre>
+
+<h3>5.7.2 오류 코드</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>HTTP 코드</th>
+            <th>오류 코드</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>400</td>
+            <td>INVALID_INPUT</td>
+            <td>잘못된 요청 형식</td>
+        </tr>
+        <tr>
+            <td>401</td>
+            <td>UNAUTHORIZED</td>
+            <td>인증 실패</td>
+        </tr>
+        <tr>
+            <td>403</td>
+            <td>FORBIDDEN</td>
+            <td>접근 권한 없음</td>
+        </tr>
+        <tr>
+            <td>404</td>
+            <td>NOT_FOUND</td>
+            <td>리소스를 찾을 수 없음</td>
+        </tr>
+        <tr>
+            <td>413</td>
+            <td>PAYLOAD_TOO_LARGE</td>
+            <td>요청 크기 초과</td>
+        </tr>
+        <tr>
+            <td>422</td>
+            <td>UNPROCESSABLE</td>
+            <td>처리할 수 없는 콘텐츠</td>
+        </tr>
+        <tr>
+            <td>429</td>
+            <td>RATE_LIMITED</td>
+            <td>요청 속도 제한</td>
+        </tr>
+        <tr>
+            <td>500</td>
+            <td>INTERNAL_ERROR</td>
+            <td>서버 내부 오류</td>
+        </tr>
+        <tr>
+            <td>503</td>
+            <td>SERVICE_UNAVAILABLE</td>
+            <td>서비스 일시 중단</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>5.7.3 속도 제한</h3>
+
+<pre>
+# 속도 제한 응답 헤더
+X-Rate-Limit-Limit: 100
+X-Rate-Limit-Remaining: 0
+X-Rate-Limit-Reset: 1705329600
+Retry-After: 60
+</pre>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>플랜</th>
+            <th>분당 요청</th>
+            <th>일일 요청</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Free</td>
+            <td>10</td>
+            <td>1,000</td>
+        </tr>
+        <tr>
+            <td>Basic</td>
+            <td>60</td>
+            <td>10,000</td>
+        </tr>
+        <tr>
+            <td>Pro</td>
+            <td>300</td>
+            <td>100,000</td>
+        </tr>
+        <tr>
+            <td>Enterprise</td>
+            <td>무제한</td>
+            <td>무제한</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>5.8 요약</h2>
+
+<p>Phase 2는 감정 AI 서비스를 위한 포괄적인 REST API 인터페이스를 정의합니다:</p>
+
+<ul>
+    <li><strong>표정 분석</strong>: 이미지 및 비디오 감정 분석</li>
+    <li><strong>음성 분석</strong>: 오디오 및 스트리밍 음성 분석</li>
+    <li><strong>텍스트 분석</strong>: 텍스트 및 대화 감성 분석</li>
+    <li><strong>생체신호 분석</strong>: 다양한 생체 센서 데이터 분석</li>
+    <li><strong>멀티모달 융합</strong>: 여러 모달리티 통합 분석</li>
+</ul>
+
+<blockquote>
+<p><strong>홍익인간 (弘益人間)</strong>: 널리 인간을 이롭게 하라</p>
+<p>표준화된 API는 개발자가 쉽게 감정 AI를 통합할 수 있게 하여, 더 많은 사람들이 기술의 혜택을 받을 수 있습니다.</p>
+</blockquote>
+
+<hr>
+
+<p><a href="chapter-04.html">← 이전: 제4장 - Phase 1: 감정 데이터 형식</a> | <a href="chapter-06.html">다음: 제6장 - Phase 3: 스트리밍 프로토콜 →</a></p>
+</body>
+</html>

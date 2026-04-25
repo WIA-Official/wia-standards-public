@@ -925,7 +925,6 @@ Required accuracy:
 ### 12.2 Scientific Papers
 
 1. Kessler, D.J. & Cour-Palais, B.G. (1978). "Collision Frequency of Artificial Satellites"
-2. 선행 연구. "Probability of Collision Error Analysis"
 3. Chan, F.K. (2008). "Spacecraft Collision Probability"
 4. Vallado, D.A. (2013). "Fundamentals of Astrodynamics and Applications"
 5. Hoots, F.R. & Roehrich, R.L. (1980). "Spacetrack Report No. 3: SGP4/SDP4"

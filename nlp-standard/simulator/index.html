@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NLP Simulator - WIA-AI-023</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--primary), #34D399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header p {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* Language Switch */
+        .lang-switch {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .tab:hover {
+            border-color: var(--primary);
+        }
+        .tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* Panel */
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+        }
+        .panel.active { display: block; }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        textarea, input, select {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        textarea:focus, input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Button Center */
+        .btn-center {
+            display: flex;
+            justify-content: center;
+            margin: 25px 0;
+        }
+        .btn {
+            padding: 12px 32px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Result Box */
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            min-height: 100px;
+        }
+        .result h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
+        .result pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* Token */
+        .token {
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 4px;
+            background: var(--primary);
+            color: white;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        /* Entity */
+        .entity {
+            display: inline-block;
+            padding: 6px 12px;
+            margin: 8px 4px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        .entity-person { background: #3B82F6; color: white; }
+        .entity-org { background: #10B981; color: white; }
+        .entity-loc { background: #F59E0B; color: white; }
+        .entity-date { background: #EC4899; color: white; }
+
+        /* Sentiment Badge */
+        .sentiment-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin: 10px 0;
+        }
+        .sentiment-positive { background: #10B981; color: white; }
+        .sentiment-negative { background: #EF4444; color: white; }
+        .sentiment-neutral { background: #6B7280; color: white; }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: var(--bg);
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            transition: width 0.3s;
+        }
+
+        /* Category Badge */
+        .category-badge {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
+        /* Summary Box */
+        .summary-box {
+            padding: 15px;
+            background: var(--bg);
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 0 20px;
+            margin-top: 60px;
+            border-top: 1px solid var(--border);
+        }
+        .philosophy {
+            font-size: 1.1rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        footer p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin: 5px 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.8rem; }
+            .tabs {
+                flex-direction: column;
+                align-items: center;
+            }
+            .tab {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Nlp Standard</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📝 NLP Simulator</h1>
+            <p data-en="WIA-AI-023 Natural Language Processing Standard"
+               data-ko="WIA-AI-023 자연어 처리 표준">WIA-AI-023 Natural Language Processing Standard</p>
+        </div>
+
+        <!-- Language Switch -->
+        <div class="lang-switch">
+            <button class="lang-btn active" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" onclick="setLang('ko')">KO</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)"
+                 data-en="📊 Tokenization" data-ko="📊 토큰화">📊 Tokenization</div>
+            <div class="tab" onclick="showPanel(1)"
+                 data-en="🏷️ NER Demo" data-ko="🏷️ 개체명 인식">🏷️ NER Demo</div>
+            <div class="tab" onclick="showPanel(2)"
+                 data-en="😊 Sentiment Analysis" data-ko="😊 감정 분석">😊 Sentiment Analysis</div>
+            <div class="tab" onclick="showPanel(3)"
+                 data-en="📑 Text Classification" data-ko="📑 텍스트 분류">📑 Text Classification</div>
+            <div class="tab" onclick="showPanel(4)"
+                 data-en="📝 Summarization" data-ko="📝 요약">📝 Summarization</div>
+        </div>
+
+        <!-- Panel 0: Tokenization -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="Text Tokenization" data-ko="텍스트 토큰화">Text Tokenization</h2>
+            <div class="form-group">
+                <label data-en="Enter text to tokenize:" data-ko="토큰화할 텍스트를 입력하세요:">Enter text to tokenize:</label>
+                <textarea id="tokenize-input" placeholder="Natural Language Processing is amazing!">Natural Language Processing is amazing!</textarea>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="tokenize()">
+                    <span data-en="Tokenize" data-ko="토큰화">Tokenize</span>
+                </button>
+            </div>
+            <div class="result" id="tokenize-result"></div>
+        </div>
+
+        <!-- Panel 1: NER Demo -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="Named Entity Recognition" data-ko="개체명 인식">Named Entity Recognition</h2>
+            <div class="form-group">
+                <label data-en="Enter text for NER:" data-ko="개체명 인식할 텍스트 입력:">Enter text for NER:</label>
+                <textarea id="ner-input" placeholder="Apple CEO Tim Cook announced new products in Cupertino on January 15th.">Apple CEO Tim Cook announced new products in Cupertino on January 15th.</textarea>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="performNER()">
+                    <span data-en="Detect Entities" data-ko="개체 인식">Detect Entities</span>
+                </button>
+            </div>
+            <div class="result" id="ner-result"></div>
+        </div>
+
+        <!-- Panel 2: Sentiment Analysis -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="Sentiment Analysis" data-ko="감정 분석">Sentiment Analysis</h2>
+            <div class="form-group">
+                <label data-en="Enter text to analyze sentiment:" data-ko="감정 분석할 텍스트 입력:">Enter text to analyze sentiment:</label>
+                <textarea id="sentiment-input" placeholder="This is an absolutely wonderful product!">This is an absolutely wonderful product!</textarea>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="analyzeSentiment()">
+                    <span data-en="Analyze" data-ko="분석">Analyze</span>
+                </button>
+            </div>
+            <div class="result" id="sentiment-result"></div>
+        </div>
+
+        <!-- Panel 3: Text Classification -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="Text Classification" data-ko="텍스트 분류">Text Classification</h2>
+            <div class="form-group">
+                <label data-en="Enter text to classify:" data-ko="분류할 텍스트 입력:">Enter text to classify:</label>
+                <textarea id="classify-input" placeholder="Scientists discovered a new exoplanet orbiting a distant star.">Scientists discovered a new exoplanet orbiting a distant star.</textarea>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="classifyText()">
+                    <span data-en="Classify" data-ko="분류">Classify</span>
+                </button>
+            </div>
+            <div class="result" id="classify-result"></div>
+        </div>
+
+        <!-- Panel 4: Summarization -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="Text Summarization" data-ko="텍스트 요약">Text Summarization</h2>
+            <div class="form-group">
+                <label data-en="Enter text to summarize:" data-ko="요약할 텍스트 입력:">Enter text to summarize:</label>
+                <textarea id="summarize-input" style="min-height: 150px;" placeholder="Natural language processing (NLP) is a subfield of linguistics, computer science, and artificial intelligence concerned with the interactions between computers and human language, in particular how to program computers to process and analyze large amounts of natural language data. The goal is a computer capable of understanding the contents of documents, including the contextual nuances of the language within them.">Natural language processing (NLP) is a subfield of linguistics, computer science, and artificial intelligence concerned with the interactions between computers and human language, in particular how to program computers to process and analyze large amounts of natural language data. The goal is a computer capable of understanding the contents of documents, including the contextual nuances of the language within them.</textarea>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="summarizeText()">
+                    <span data-en="Summarize" data-ko="요약">Summarize</span>
+                </button>
+            </div>
+            <div class="result" id="summarize-result"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity"
+               data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>WIA - World Certification Industry Association</p>
+            <p>© 2025 MIT License</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        function tokenize() {
+            const text = document.getElementById('tokenize-input').value;
+            const tokens = text.match(/\b[\w']+\b|[.,!?;]/g) || [];
+
+            const resultDiv = document.getElementById('tokenize-result');
+            resultDiv.innerHTML = `
+                <h3>${currentLang === 'en' ? 'Tokens' : '토큰'} (${tokens.length})</h3>
+                <div>
+                    ${tokens.map(token => `<span class="token">${token}</span>`).join('')}
+                </div>
+            `;
+        }
+
+        function performNER() {
+            const text = document.getElementById('ner-input').value;
+
+            // Simple NER simulation
+            const entities = {
+                'Apple': 'ORG',
+                'Tim Cook': 'PERSON',
+                'Cupertino': 'LOC',
+                'January 15th': 'DATE'
+            };
+
+            let annotated = text;
+            const detectedEntities = [];
+
+            Object.keys(entities).forEach(entity => {
+                if (text.includes(entity)) {
+                    const type = entities[entity];
+                    const className = `entity-${type.toLowerCase()}`;
+                    annotated = annotated.replace(entity, `<span class="entity ${className}">${entity} [${type}]</span>`);
+                    detectedEntities.push({ entity, type });
+                }
+            });
+
+            const resultDiv = document.getElementById('ner-result');
+            resultDiv.innerHTML = `
+                <h3>${currentLang === 'en' ? 'Detected Entities' : '인식된 개체'}</h3>
+                <p>${annotated}</p>
+                <h3 style="margin-top: 20px;">${currentLang === 'en' ? 'Entity List' : '개체 목록'}</h3>
+                <ul>
+                    ${detectedEntities.map(e => `<li><strong>${e.entity}</strong>: ${e.type}</li>`).join('')}
+                </ul>
+            `;
+        }
+
+        function analyzeSentiment() {
+            const text = document.getElementById('sentiment-input').value.toLowerCase();
+
+            // Simple sentiment analysis
+            const positiveWords = ['wonderful', 'amazing', 'great', 'excellent', 'love', 'fantastic', 'good', 'best', 'happy'];
+            const negativeWords = ['terrible', 'awful', 'bad', 'worst', 'hate', 'horrible', 'poor', 'disappointing', 'sad'];
+
+            let score = 0;
+            positiveWords.forEach(word => {
+                if (text.includes(word)) score += 1;
+            });
+            negativeWords.forEach(word => {
+                if (text.includes(word)) score -= 1;
+            });
+
+            let sentiment = 'Neutral';
+            let className = 'sentiment-neutral';
+            let confidence = 50;
+
+            if (score > 0) {
+                sentiment = 'Positive';
+                className = 'sentiment-positive';
+                confidence = Math.min(50 + score * 20, 95);
+            } else if (score < 0) {
+                sentiment = 'Negative';
+                className = 'sentiment-negative';
+                confidence = Math.min(50 + Math.abs(score) * 20, 95);
+            }
+
+            const resultDiv = document.getElementById('sentiment-result');
+            resultDiv.innerHTML = `
+                <h3>${currentLang === 'en' ? 'Sentiment Analysis Result' : '감정 분석 결과'}</h3>
+                <div class="sentiment-badge ${className}">${sentiment}</div>
+                <h3 style="margin-top: 20px;">${currentLang === 'en' ? 'Confidence' : '신뢰도'}</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${confidence}%">${confidence}%</div>
+                </div>
+            `;
+        }
+
+        function classifyText() {
+            const text = document.getElementById('classify-input').value.toLowerCase();
+
+            // Simple classification
+            const categories = {
+                'Science': ['scientist', 'research', 'study', 'planet', 'star', 'discovery', 'experiment'],
+                'Technology': ['computer', 'software', 'algorithm', 'ai', 'robot', 'digital', 'tech'],
+                'Sports': ['game', 'team', 'player', 'score', 'match', 'championship'],
+                'Business': ['company', 'market', 'stock', 'profit', 'revenue', 'investment'],
+                'Politics': ['government', 'election', 'president', 'policy', 'vote', 'congress']
+            };
+
+            let bestCategory = 'General';
+            let maxScore = 0;
+            const scores = {};
+
+            Object.keys(categories).forEach(category => {
+                let score = 0;
+                categories[category].forEach(keyword => {
+                    if (text.includes(keyword)) score += 1;
+                });
+                scores[category] = score;
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestCategory = category;
+                }
+            });
+
+            const resultDiv = document.getElementById('classify-result');
+            resultDiv.innerHTML = `
+                <h3>${currentLang === 'en' ? 'Classification Result' : '분류 결과'}</h3>
+                <div class="category-badge">${bestCategory}</div>
+                <h3 style="margin-top: 20px;">${currentLang === 'en' ? 'Category Scores' : '카테고리 점수'}</h3>
+                ${Object.keys(scores).map(cat => `
+                    <div style="margin: 10px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>${cat}</span>
+                            <span>${scores[cat]} ${currentLang === 'en' ? 'matches' : '일치'}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${scores[cat] * 25}%">${scores[cat] * 25}%</div>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function summarizeText() {
+            const text = document.getElementById('summarize-input').value;
+            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+
+            // Simple extractive summarization - take first 2 sentences
+            const summary = sentences.slice(0, 2).join(' ').trim();
+
+            const resultDiv = document.getElementById('summarize-result');
+            resultDiv.innerHTML = `
+                <h3>${currentLang === 'en' ? 'Original Text' : '원본 텍스트'}</h3>
+                <p>${text}</p>
+                <h3 style="margin-top: 20px;">${currentLang === 'en' ? 'Summary' : '요약'}</h3>
+                <div class="summary-box">
+                    ${summary}
+                </div>
+                <p style="margin-top: 15px; color: var(--text-muted);">
+                    ${currentLang === 'en' ? 'Compression ratio' : '압축률'}: ${Math.round((summary.length / text.length) * 100)}%
+                </p>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Security Protocols and Encryption - WIA-ACCESS_CONTROL</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-success {
+            border-left-color: var(--success);
+        }
+        .highlight-warning {
+            border-left-color: var(--warning);
+        }
+        .highlight-error {
+            border-left-color: var(--error);
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Security Protocols and Encryption</h1>
+
+    <p>Security protocols and encryption form the cryptographic foundation of access control systems. They protect credentials, secure communications, and ensure the integrity of authorization decisions. This chapter explores the security mechanisms that underpin the WIA-ACCESS_CONTROL standard, from transport security to comprehensive audit trails.</p>
+
+    <h2>Transport Layer Security</h2>
+
+    <p>All access control communications must be protected in transit. The WIA-ACCESS_CONTROL standard mandates the use of TLS 1.3 or higher for all network communications between access control components.</p>
+
+    <h3>TLS Configuration Requirements</h3>
+
+    <pre>
+// WIA-ACCESS_CONTROL TLS Configuration
+const tlsConfiguration = {
+    minVersion: 'TLSv1.3',
+    maxVersion: 'TLSv1.3',
+
+    // Allowed cipher suites (TLS 1.3)
+    cipherSuites: [
+        'TLS_AES_256_GCM_SHA384',
+        'TLS_CHACHA20_POLY1305_SHA256',
+        'TLS_AES_128_GCM_SHA256'
+    ],
+
+    // Certificate requirements
+    certificates: {
+        keyType: 'ECDSA',
+        curve: 'P-384',
+        signatureAlgorithm: 'ECDSA-SHA384',
+        minKeySize: 384,
+        validityPeriod: '365d',
+        renewBefore: '30d'
+    },
+
+    // OCSP stapling for revocation checking
+    ocspStapling: true,
+
+    // Certificate transparency
+    certificateTransparency: 'enforce',
+
+    // Strict certificate validation
+    verification: {
+        verifyPeer: true,
+        verifyHostname: true,
+        allowSelfSigned: false,
+        trustedCAs: '/etc/wia/ca-certificates.crt'
+    }
+};
+    </pre>
+
+    <h3>Mutual TLS (mTLS)</h3>
+
+    <p>For service-to-service communication within the access control infrastructure, mutual TLS provides bidirectional authentication. Both client and server present certificates, ensuring that only authorized services can communicate.</p>
+
+    <pre>
+// mTLS Service Configuration
+class MTLSService {
+    private server: tls.Server;
+    private clientCert: tls.Certificate;
+
+    async initialize(config: MTLSConfig): Promise&lt;void&gt; {
+        this.server = tls.createServer({
+            key: await this.loadPrivateKey(config.keyPath),
+            cert: await this.loadCertificate(config.certPath),
+            ca: await this.loadCA(config.caPath),
+
+            // Require client certificate
+            requestCert: true,
+            rejectUnauthorized: true,
+
+            // TLS 1.3 only
+            minVersion: 'TLSv1.3',
+            maxVersion: 'TLSv1.3',
+
+            // Session configuration
+            sessionTimeout: 300,
+            sessionIdContext: 'wia-access-control'
+        });
+
+        this.server.on('secureConnection', (socket) => {
+            this.validateClientCertificate(socket);
+        });
+    }
+
+    private validateClientCertificate(socket: tls.TLSSocket): void {
+        const cert = socket.getPeerCertificate(true);
+
+        // Verify certificate chain
+        if (!cert || !cert.subject) {
+            socket.destroy(new Error('No client certificate'));
+            return;
+        }
+
+        // Check certificate against allowlist
+        const fingerprint = cert.fingerprint256;
+        if (!this.isAuthorizedService(fingerprint)) {
+            socket.destroy(new Error('Unauthorized service'));
+            return;
+        }
+
+        // Log successful connection
+        this.auditLog.log({
+            event: 'mtls_connection',
+            service: cert.subject.CN,
+            fingerprint: fingerprint,
+            timestamp: new Date()
+        });
+    }
+}
+    </pre>
+
+    <h2>Cryptographic Standards</h2>
+
+    <p>The WIA-ACCESS_CONTROL standard specifies cryptographic algorithms and parameters for various security functions.</p>
+
+    <table>
+        <tr>
+            <th>Function</th>
+            <th>Algorithm</th>
+            <th>Key Size</th>
+            <th>Notes</th>
+        </tr>
+        <tr>
+            <td>Symmetric Encryption</td>
+            <td>AES-256-GCM</td>
+            <td>256 bits</td>
+            <td>Authenticated encryption</td>
+        </tr>
+        <tr>
+            <td>Key Exchange</td>
+            <td>X25519, ECDH P-384</td>
+            <td>256/384 bits</td>
+            <td>Forward secrecy</td>
+        </tr>
+        <tr>
+            <td>Digital Signatures</td>
+            <td>Ed25519, ECDSA P-384</td>
+            <td>256/384 bits</td>
+            <td>Non-repudiation</td>
+        </tr>
+        <tr>
+            <td>Password Hashing</td>
+            <td>Argon2id</td>
+            <td>256 bits</td>
+            <td>Memory-hard</td>
+        </tr>
+        <tr>
+            <td>Key Derivation</td>
+            <td>HKDF-SHA256</td>
+            <td>Variable</td>
+            <td>From shared secrets</td>
+        </tr>
+        <tr>
+            <td>Message Authentication</td>
+            <td>HMAC-SHA256</td>
+            <td>256 bits</td>
+            <td>Integrity verification</td>
+        </tr>
+    </table>
+
+    <div class="highlight highlight-warning">
+        <strong>Cryptographic Agility:</strong> The WIA-ACCESS_CONTROL standard supports cryptographic agility to facilitate algorithm transitions. All cryptographic operations include algorithm identifiers, and the system supports graceful migration when algorithms need to be updated.
+    </div>
+
+    <h2>Key Management</h2>
+
+    <p>Effective key management is essential for maintaining the security of cryptographic operations. The WIA-ACCESS_CONTROL standard defines a comprehensive key management lifecycle.</p>
+
+    <pre>
+// Key Management Service
+class KeyManagementService {
+    private keyStore: SecureKeyStore;
+    private hsm: HardwareSecurityModule;
+
+    // Key lifecycle states
+    private readonly keyStates = {
+        PENDING_ACTIVATION: 'pending_activation',
+        ACTIVE: 'active',
+        SUSPENDED: 'suspended',
+        DEACTIVATED: 'deactivated',
+        COMPROMISED: 'compromised',
+        DESTROYED: 'destroyed'
+    };
+
+    async generateKey(params: KeyGenerationParams): Promise&lt;KeyMetadata&gt; {
+        // Generate key in HSM
+        const keyId = await this.hsm.generateKey({
+            algorithm: params.algorithm,
+            keySize: params.keySize,
+            extractable: false,
+            usages: params.usages
+        });
+
+        // Store key metadata
+        const metadata: KeyMetadata = {
+            id: keyId,
+            algorithm: params.algorithm,
+            keySize: params.keySize,
+            state: this.keyStates.PENDING_ACTIVATION,
+            createdAt: new Date(),
+            activationDate: params.activationDate || new Date(),
+            expirationDate: this.calculateExpiration(params),
+            usages: params.usages,
+            owner: params.owner
+        };
+
+        await this.keyStore.saveMetadata(metadata);
+        await this.auditKeyOperation('generate', metadata);
+
+        return metadata;
+    }
+
+    async rotateKey(keyId: string): Promise&lt;KeyRotationResult&gt; {
+        const currentKey = await this.keyStore.getMetadata(keyId);
+
+        if (currentKey.state !== this.keyStates.ACTIVE) {
+            throw new Error('Can only rotate active keys');
+        }
+
+        // Generate new key with same parameters
+        const newKey = await this.generateKey({
+            algorithm: currentKey.algorithm,
+            keySize: currentKey.keySize,
+            usages: currentKey.usages,
+            owner: currentKey.owner
+        });
+
+        // Activate new key
+        await this.activateKey(newKey.id);
+
+        // Mark old key for deactivation
+        await this.scheduleDeactivation(currentKey.id, {
+            reason: 'rotation',
+            successor: newKey.id,
+            gracePreriod: '7d'
+        });
+
+        await this.auditKeyOperation('rotate', {
+            oldKeyId: currentKey.id,
+            newKeyId: newKey.id
+        });
+
+        return {
+            previousKeyId: currentKey.id,
+            newKeyId: newKey.id,
+            rotatedAt: new Date()
+        };
+    }
+
+    async destroyKey(keyId: string, reason: string): Promise&lt;void&gt; {
+        const key = await this.keyStore.getMetadata(keyId);
+
+        // Verify key can be destroyed
+        if (key.state === this.keyStates.DESTROYED) {
+            throw new Error('Key already destroyed');
+        }
+
+        // Destroy key material in HSM
+        await this.hsm.destroyKey(keyId);
+
+        // Update metadata
+        key.state = this.keyStates.DESTROYED;
+        key.destroyedAt = new Date();
+        key.destroyReason = reason;
+
+        await this.keyStore.saveMetadata(key);
+        await this.auditKeyOperation('destroy', key);
+    }
+}
+    </pre>
+
+    <h2>Token Security</h2>
+
+    <p>Access tokens and credentials must be protected throughout their lifecycle. The WIA-ACCESS_CONTROL standard specifies security requirements for token generation, storage, and validation.</p>
+
+    <h3>Secure Token Generation</h3>
+
+    <pre>
+// Secure Token Generator
+class SecureTokenGenerator {
+    private readonly entropySource: crypto.RandomGenerator;
+
+    generateAccessToken(claims: TokenClaims): string {
+        const header = {
+            alg: 'EdDSA',
+            typ: 'JWT',
+            kid: this.currentKeyId
+        };
+
+        const payload = {
+            ...claims,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + claims.ttl,
+            jti: this.generateTokenId(),
+            iss: 'wia-access-control',
+            aud: claims.audience
+        };
+
+        // Sign with Ed25519
+        const signature = this.sign(
+            this.encodeBase64Url(header) + '.' + this.encodeBase64Url(payload)
+        );
+
+        return `${this.encodeBase64Url(header)}.${this.encodeBase64Url(payload)}.${signature}`;
+    }
+
+    generateOpaqueToken(length: number = 32): string {
+        // Generate cryptographically secure random bytes
+        const bytes = crypto.randomBytes(length);
+
+        // Encode as URL-safe base64
+        return bytes.toString('base64url');
+    }
+
+    private generateTokenId(): string {
+        // UUID v7 for time-ordered, unique identifiers
+        return this.generateUUIDv7();
+    }
+
+    private generateUUIDv7(): string {
+        const timestamp = BigInt(Date.now());
+        const random = crypto.randomBytes(10);
+
+        // Construct UUID v7
+        const bytes = Buffer.alloc(16);
+
+        // Timestamp (48 bits)
+        bytes.writeBigUInt64BE(timestamp << 16n, 0);
+
+        // Version (4 bits) = 7
+        bytes[6] = (bytes[6] & 0x0f) | 0x70;
+
+        // Random (12 bits)
+        bytes[6] = (bytes[6] & 0xf0) | (random[0] & 0x0f);
+        bytes[7] = random[1];
+
+        // Variant (2 bits) = 10
+        bytes[8] = (random[2] & 0x3f) | 0x80;
+
+        // Random (62 bits)
+        random.copy(bytes, 9, 3, 10);
+
+        return this.formatUUID(bytes);
+    }
+}
+    </pre>
+
+    <h2>Audit Trail Management</h2>
+
+    <p>Comprehensive audit trails are essential for security monitoring, incident investigation, and compliance. The WIA-ACCESS_CONTROL standard mandates detailed logging of all access control events.</p>
+
+    <div class="highlight">
+        <strong>Audit Requirements:</strong> All authentication attempts, authorization decisions, policy changes, and administrative actions must be logged with sufficient detail for forensic analysis. Audit logs must be tamper-evident and retained according to compliance requirements.
+    </div>
+
+    <h3>Audit Event Structure</h3>
+
+    <pre>
+// Audit Event Schema
+interface AuditEvent {
+    // Event identification
+    eventId: string;           // Unique event identifier
+    eventType: AuditEventType; // Category of event
+    eventTime: Date;           // When event occurred
+
+    // Subject information
+    subject: {
+        id: string;
+        type: 'user' | 'service' | 'system';
+        name: string;
+        attributes: Record&lt;string, any&gt;;
+    };
+
+    // Action information
+    action: {
+        type: string;          // What was attempted
+        status: 'success' | 'failure' | 'error';
+        reason?: string;       // Failure/error reason
+    };
+
+    // Resource information
+    resource?: {
+        id: string;
+        type: string;
+        name: string;
+        attributes: Record&lt;string, any&gt;;
+    };
+
+    // Context
+    context: {
+        sessionId?: string;
+        requestId: string;
+        sourceIp: string;
+        userAgent?: string;
+        geolocation?: GeoLocation;
+        deviceId?: string;
+    };
+
+    // Policy evaluation details
+    policyDetails?: {
+        policiesEvaluated: string[];
+        matchingPolicy?: string;
+        decision: 'Permit' | 'Deny' | 'NotApplicable' | 'Indeterminate';
+        obligations?: Obligation[];
+    };
+
+    // Integrity
+    previousEventHash: string;
+    eventHash: string;
+}
+
+// Audit Event Types
+enum AuditEventType {
+    // Authentication events
+    AUTH_LOGIN_SUCCESS = 'auth.login.success',
+    AUTH_LOGIN_FAILURE = 'auth.login.failure',
+    AUTH_LOGOUT = 'auth.logout',
+    AUTH_MFA_CHALLENGE = 'auth.mfa.challenge',
+    AUTH_MFA_SUCCESS = 'auth.mfa.success',
+    AUTH_MFA_FAILURE = 'auth.mfa.failure',
+    AUTH_TOKEN_ISSUED = 'auth.token.issued',
+    AUTH_TOKEN_REVOKED = 'auth.token.revoked',
+
+    // Authorization events
+    AUTHZ_ACCESS_GRANTED = 'authz.access.granted',
+    AUTHZ_ACCESS_DENIED = 'authz.access.denied',
+    AUTHZ_POLICY_EVALUATED = 'authz.policy.evaluated',
+
+    // Administrative events
+    ADMIN_USER_CREATED = 'admin.user.created',
+    ADMIN_USER_MODIFIED = 'admin.user.modified',
+    ADMIN_ROLE_ASSIGNED = 'admin.role.assigned',
+    ADMIN_POLICY_CREATED = 'admin.policy.created',
+    ADMIN_POLICY_MODIFIED = 'admin.policy.modified',
+
+    // Security events
+    SECURITY_THREAT_DETECTED = 'security.threat.detected',
+    SECURITY_ANOMALY = 'security.anomaly',
+    SECURITY_KEY_ROTATED = 'security.key.rotated'
+}
+    </pre>
+
+    <h3>Tamper-Evident Logging</h3>
+
+    <pre>
+// Tamper-Evident Audit Log
+class TamperEvidentAuditLog {
+    private currentHash: string;
+    private logStore: AuditLogStore;
+    private signingKey: crypto.KeyObject;
+
+    async appendEvent(event: Omit&lt;AuditEvent, 'previousEventHash' | 'eventHash'&gt;): Promise&lt;string&gt; {
+        // Get previous hash
+        const previousHash = this.currentHash;
+
+        // Create complete event
+        const completeEvent: AuditEvent = {
+            ...event,
+            previousEventHash: previousHash,
+            eventHash: '' // Will be calculated
+        };
+
+        // Calculate event hash
+        const eventData = this.canonicalize(completeEvent);
+        const eventHash = crypto
+            .createHash('sha256')
+            .update(eventData)
+            .digest('hex');
+
+        completeEvent.eventHash = eventHash;
+
+        // Sign the event
+        const signature = crypto.sign(
+            'sha256',
+            Buffer.from(eventHash),
+            this.signingKey
+        );
+
+        // Store event with signature
+        await this.logStore.append({
+            event: completeEvent,
+            signature: signature.toString('base64'),
+            timestamp: new Date()
+        });
+
+        // Update current hash
+        this.currentHash = eventHash;
+
+        return eventHash;
+    }
+
+    async verifyIntegrity(startEventId?: string): Promise&lt;IntegrityReport&gt; {
+        const events = await this.logStore.getEvents(startEventId);
+
+        let expectedPreviousHash = startEventId
+            ? (await this.logStore.getEvent(startEventId)).eventHash
+            : '0'.repeat(64); // Genesis hash
+
+        const issues: IntegrityIssue[] = [];
+
+        for (const entry of events) {
+            // Verify chain continuity
+            if (entry.event.previousEventHash !== expectedPreviousHash) {
+                issues.push({
+                    eventId: entry.event.eventId,
+                    type: 'chain_break',
+                    expected: expectedPreviousHash,
+                    actual: entry.event.previousEventHash
+                });
+            }
+
+            // Verify event hash
+            const calculatedHash = this.calculateEventHash(entry.event);
+            if (calculatedHash !== entry.event.eventHash) {
+                issues.push({
+                    eventId: entry.event.eventId,
+                    type: 'hash_mismatch',
+                    expected: entry.event.eventHash,
+                    actual: calculatedHash
+                });
+            }
+
+            // Verify signature
+            const signatureValid = crypto.verify(
+                'sha256',
+                Buffer.from(entry.event.eventHash),
+                this.signingKey,
+                Buffer.from(entry.signature, 'base64')
+            );
+
+            if (!signatureValid) {
+                issues.push({
+                    eventId: entry.event.eventId,
+                    type: 'invalid_signature'
+                });
+            }
+
+            expectedPreviousHash = entry.event.eventHash;
+        }
+
+        return {
+            verified: issues.length === 0,
+            eventsChecked: events.length,
+            issues: issues
+        };
+    }
+}
+    </pre>
+
+    <h2>Secure Communication Patterns</h2>
+
+    <p>Access control components must communicate securely. The WIA-ACCESS_CONTROL standard defines patterns for secure inter-component communication.</p>
+
+    <pre>
+// Secure Message Exchange
+class SecureMessageChannel {
+    private encryptionKey: crypto.KeyObject;
+    private signingKey: crypto.KeyObject;
+
+    async sendMessage(recipient: string, payload: any): Promise&lt;void&gt; {
+        // Generate ephemeral key for this message
+        const ephemeralKey = crypto.generateKeyPairSync('x25519');
+
+        // Derive shared secret
+        const recipientPublicKey = await this.getRecipientPublicKey(recipient);
+        const sharedSecret = crypto.diffieHellman({
+            privateKey: ephemeralKey.privateKey,
+            publicKey: recipientPublicKey
+        });
+
+        // Derive encryption key using HKDF
+        const encKey = crypto.hkdfSync(
+            'sha256',
+            sharedSecret,
+            Buffer.from('wia-access-control'),
+            Buffer.from('encryption'),
+            32
+        );
+
+        // Encrypt payload
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', encKey, iv);
+
+        const plaintext = JSON.stringify(payload);
+        const ciphertext = Buffer.concat([
+            cipher.update(plaintext, 'utf8'),
+            cipher.final()
+        ]);
+        const authTag = cipher.getAuthTag();
+
+        // Create message envelope
+        const envelope = {
+            version: 1,
+            sender: this.identity,
+            recipient: recipient,
+            ephemeralPublicKey: ephemeralKey.publicKey.export({ type: 'spki', format: 'der' }),
+            iv: iv.toString('base64'),
+            ciphertext: ciphertext.toString('base64'),
+            authTag: authTag.toString('base64'),
+            timestamp: new Date().toISOString()
+        };
+
+        // Sign envelope
+        const signature = crypto.sign(
+            'sha256',
+            Buffer.from(JSON.stringify(envelope)),
+            this.signingKey
+        );
+
+        envelope.signature = signature.toString('base64');
+
+        await this.transport.send(recipient, envelope);
+    }
+}
+    </pre>
+
+    <h2>Summary</h2>
+
+    <p>This chapter has covered the security protocols and encryption mechanisms that protect the WIA-ACCESS_CONTROL infrastructure. From transport layer security with TLS 1.3 to comprehensive key management and tamper-evident audit trails, these mechanisms ensure the confidentiality, integrity, and accountability of access control operations.</p>
+
+    <div class="highlight highlight-success">
+        <strong>Key Takeaways:</strong>
+        <ul>
+            <li>TLS 1.3 with strong cipher suites protects all communications</li>
+            <li>Mutual TLS provides bidirectional service authentication</li>
+            <li>Modern cryptographic algorithms ensure data protection</li>
+            <li>Comprehensive key management covers the entire key lifecycle</li>
+            <li>Tamper-evident audit trails enable forensic analysis</li>
+            <li>Secure communication patterns protect inter-component messaging</li>
+        </ul>
+    </div>
+
+</body>
+</html>

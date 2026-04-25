@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 열 관리 및 신뢰성 | WIA-SEMI-PKG-001</title>
+    <meta name="description" content="첨단 패키징의 열 관리 솔루션, 고장 메커니즘, 신뢰성 설계 및 인증">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a25;
+            --text-primary: #e8e8f0;
+            --text-secondary: #a0a0b0;
+            --text-muted: #6a6a7a;
+            --accent-primary: #00d4aa;
+            --accent-secondary: #0099ff;
+            --border-color: #2a2a3a;
+            --gradient-1: linear-gradient(135deg, #00d4aa 0%, #0099ff 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.8; min-height: 100vh; }
+
+        .bg-animation { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        .bg-animation::before { content: ''; position: absolute; width: 200%; height: 200%; background: radial-gradient(ellipse 800px 600px at 20% 30%, rgba(0, 212, 170, 0.08) 0%, transparent 50%), radial-gradient(ellipse 600px 500px at 80% 70%, rgba(0, 153, 255, 0.06) 0%, transparent 50%); animation: bgMove 30s ease-in-out infinite; }
+        @keyframes bgMove { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-5%, -5%); } }
+
+        header { background: linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%); padding: 20px 0; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 1200px; margin: 0 auto; padding: 0 40px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 15px; text-decoration: none; }
+        .logo-icon { width: 50px; height: 50px; background: var(--gradient-1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: #000; }
+        .logo-text { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+        .logo-subtitle { font-size: 0.75rem; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 2px; }
+
+        nav ul { display: flex; gap: 30px; list-style: none; }
+        nav a { color: var(--text-secondary); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.3s; }
+        nav a:hover { color: var(--accent-primary); }
+
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-switch a { padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-decoration: none; transition: all 0.3s; }
+        .lang-switch a.active { background: var(--gradient-1); color: #000; }
+        .lang-switch a:not(.active) { color: var(--text-secondary); border: 1px solid var(--border-color); }
+
+        .chapter-hero { padding: 80px 40px 60px; max-width: 1200px; margin: 0 auto; }
+        .chapter-badge { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--accent-primary); color: var(--accent-primary); padding: 8px 20px; border-radius: 50px; font-size: 0.85rem; font-weight: 600; letter-spacing: 2px; margin-bottom: 20px; }
+        .chapter-hero h1 { font-size: 3rem; font-weight: 800; line-height: 1.2; margin-bottom: 20px; background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .chapter-meta { display: flex; gap: 30px; color: var(--text-muted); font-size: 0.9rem; }
+
+        .chapter-content { max-width: 900px; margin: 0 auto; padding: 0 40px 100px; }
+        .content-section { margin-bottom: 60px; }
+        .content-section h2 { font-size: 2rem; font-weight: 700; margin-bottom: 25px; color: var(--text-primary); padding-bottom: 15px; border-bottom: 2px solid var(--border-color); }
+        .content-section h3 { font-size: 1.5rem; font-weight: 600; margin: 35px 0 20px; color: var(--accent-primary); }
+        .content-section h4 { font-size: 1.2rem; font-weight: 600; margin: 25px 0 15px; color: var(--text-primary); }
+        .content-section p { color: var(--text-secondary); margin-bottom: 20px; font-size: 1.05rem; line-height: 1.9; }
+        .content-section ul, .content-section ol { color: var(--text-secondary); margin: 20px 0 20px 30px; }
+        .content-section li { margin-bottom: 12px; line-height: 1.7; }
+
+        .info-box { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; padding: 30px; margin: 30px 0; }
+        .info-box.highlight { border-color: var(--accent-primary); background: linear-gradient(135deg, rgba(0, 212, 170, 0.1) 0%, rgba(0, 153, 255, 0.05) 100%); }
+        .info-box h4 { color: var(--accent-primary); font-size: 1.1rem; margin-bottom: 15px; }
+        .info-box p, .info-box ul { margin-bottom: 0; }
+
+        .tech-table { width: 100%; border-collapse: collapse; margin: 30px 0; background: var(--bg-secondary); border-radius: 12px; overflow: hidden; }
+        .tech-table th, .tech-table td { padding: 16px 20px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .tech-table th { background: var(--bg-tertiary); color: var(--accent-primary); font-weight: 600; font-size: 0.85rem; letter-spacing: 1px; }
+        .tech-table td { color: var(--text-secondary); }
+        .tech-table tr:last-child td { border-bottom: none; }
+        .tech-table tr:hover td { background: var(--bg-tertiary); }
+
+        .chapter-nav { display: flex; justify-content: space-between; padding: 40px; max-width: 900px; margin: 0 auto; border-top: 1px solid var(--border-color); }
+        .nav-btn { display: flex; align-items: center; gap: 10px; padding: 15px 30px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-primary); text-decoration: none; font-weight: 500; transition: all 0.3s; }
+        .nav-btn:hover { border-color: var(--accent-primary); background: var(--bg-tertiary); }
+        .nav-btn.next { background: var(--gradient-1); color: #000; border: none; }
+
+        footer { background: var(--bg-secondary); padding: 40px; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+        footer a { color: var(--accent-primary); text-decoration: none; }
+        .philosophy { text-align: center; padding: 20px; color: #ffd700; font-size: 1.2rem; }
+
+        @media (max-width: 768px) {
+            .chapter-hero h1 { font-size: 2rem; }
+            .header-content { flex-direction: column; gap: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">W</div>
+                <div>
+                    <div class="logo-text">WIA 표준</div>
+                    <div class="logo-subtitle">반도체 패키징</div>
+                </div>
+            </a>
+            <div class="lang-switch">
+                <a href="../en/chapter-07.html">EN</a>
+                <a href="chapter-07.html" class="active">KO</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="chapter-hero">
+        <span class="chapter-badge">제7장</span>
+        <h1>열 관리 및 신뢰성</h1>
+        <div class="chapter-meta">
+            <span>읽기 시간: 20분</span>
+            <span>최종 업데이트: 2026년 1월</span>
+            <span>WIA-SEMI-PKG-001</span>
+        </div>
+    </section>
+
+    <main class="chapter-content">
+        <section class="content-section">
+            <h2>7.1 열 관리의 중요성</h2>
+            <p>
+                반도체의 열 관리는 성능, 신뢰성, 수명을 결정하는 핵심 요소입니다. 
+                트랜지스터 동작 시 발생하는 열은 패키지를 통해 외부로 방출되어야 하며, 
+                접합 온도(junction temperature)가 허용 범위를 초과하면 성능 저하, 
+                타이밍 오류, 영구적 손상이 발생할 수 있습니다.
+            </p>
+            <p>
+                첨단 패키징에서 열 관리의 중요성은 더욱 높아지고 있습니다. AI 가속기의 TDP는 
+                700W를 초과하고, 다이 적층으로 열 경로가 복잡해지며, HBM과 같은 
+                온도 민감 소자가 고발열 로직과 함께 패키지에 통합됩니다.
+            </p>
+
+            <h3>열 설계의 핵심 파라미터</h3>
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>파라미터</th>
+                        <th>정의</th>
+                        <th>단위</th>
+                        <th>의미</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Tj (접합 온도)</td>
+                        <td>트랜지스터 접합부 온도</td>
+                        <td>°C</td>
+                        <td>최대 허용 온도 준수</td>
+                    </tr>
+                    <tr>
+                        <td>Tc (케이스 온도)</td>
+                        <td>패키지 표면 온도</td>
+                        <td>°C</td>
+                        <td>측정 가능한 온도</td>
+                    </tr>
+                    <tr>
+                        <td>Ta (주변 온도)</td>
+                        <td>주변 공기 온도</td>
+                        <td>°C</td>
+                        <td>작동 환경</td>
+                    </tr>
+                    <tr>
+                        <td>TDP (Thermal Design Power)</td>
+                        <td>열 설계 전력</td>
+                        <td>W</td>
+                        <td>냉각 시스템 설계 기준</td>
+                    </tr>
+                    <tr>
+                        <td>Rth (열저항)</td>
+                        <td>온도차/열류</td>
+                        <td>°C/W</td>
+                        <td>열 경로 효율</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>열 경로 (Thermal Path)</h3>
+            <p>
+                열은 전도, 대류, 복사를 통해 전달됩니다. 패키지에서 주요 열 경로는 
+                다이 → TIM1 → 히트스프레더 → TIM2 → 히트싱크 → 공기입니다.
+            </p>
+            <ul>
+                <li><strong>다이 → TIM1:</strong> 다이 후면과 히트스프레더 사이, 고품질 TIM 필요</li>
+                <li><strong>히트스프레더:</strong> 열을 수평으로 확산, Cu 또는 베이퍼 챔버</li>
+                <li><strong>TIM2:</strong> 히트스프레더와 히트싱크 사이</li>
+                <li><strong>히트싱크:</strong> 대류로 열을 공기로 전달</li>
+                <li><strong>2차 경로:</strong> 패키지 기판 → PCB (20-30% 기여)</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>7.2 열계면재료 (TIM)</h2>
+            <p>
+                TIM(Thermal Interface Material)은 열 경로의 계면에서 공극을 채워 
+                열 전달을 개선하는 재료입니다. 두 표면이 아무리 평탄해도 미세한 
+                공극이 존재하며, 공기의 낮은 열전도율(~0.025 W/m·K)은 
+                열 병목을 유발합니다.
+            </p>
+
+            <h3>TIM 유형</h3>
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>유형</th>
+                        <th>열전도율 (W/m·K)</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>열 그리스</td>
+                        <td>3-8</td>
+                        <td>적용 용이, 저비용</td>
+                        <td>펌프아웃, 건조</td>
+                    </tr>
+                    <tr>
+                        <td>열 패드</td>
+                        <td>3-6</td>
+                        <td>취급 용이, 재작업 가능</td>
+                        <td>두께 제한, 중간 성능</td>
+                    </tr>
+                    <tr>
+                        <td>PCM (상변화물질)</td>
+                        <td>4-10</td>
+                        <td>얇은 BLT, 안정적</td>
+                        <td>높은 비용</td>
+                    </tr>
+                    <tr>
+                        <td>솔더 TIM</td>
+                        <td>30-60</td>
+                        <td>매우 높은 성능</td>
+                        <td>리워크 어려움</td>
+                    </tr>
+                    <tr>
+                        <td>액체 금속</td>
+                        <td>20-70</td>
+                        <td>극히 높은 열전도</td>
+                        <td>부식, 취급 어려움</td>
+                    </tr>
+                    <tr>
+                        <td>그래핀/CNT 복합체</td>
+                        <td>10-50</td>
+                        <td>고성능, 경량</td>
+                        <td>높은 비용, 신기술</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box highlight">
+                <h4>TIM1의 중요성</h4>
+                <p>
+                    TIM1(다이-히트스프레더)은 열 경로에서 가장 중요한 계면입니다. 
+                    고성능 패키지에서는 솔더 TIM이나 액체 금속 TIM을 사용하여 
+                    Rth-jc를 0.1°C/W 이하로 낮춥니다. NVIDIA H100의 경우 
+                    솔더 기반 TIM1을 사용하여 700W 이상의 TDP를 관리합니다.
+                </p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>7.3 냉각 솔루션</h2>
+            <p>
+                패키지에서 방출된 열을 최종적으로 외부로 제거하는 냉각 솔루션의 선택은 
+                TDP, 폼팩터, 비용, 소음 등을 고려하여 결정됩니다.
+            </p>
+
+            <h3>공냉 (Air Cooling)</h3>
+            <p>
+                가장 일반적인 냉각 방식입니다. 히트싱크와 팬을 조합하여 
+                대류로 열을 제거합니다.
+            </p>
+            <ul>
+                <li><strong>히트싱크:</strong> 알루미늄/구리 핀, 표면적 극대화</li>
+                <li><strong>팬:</strong> 강제 대류로 열 전달 계수 향상</li>
+                <li><strong>한계:</strong> TDP 300-400W 정도에서 한계</li>
+                <li><strong>응용:</strong> 소비자 PC, 대부분의 서버</li>
+            </ul>
+
+            <h3>수냉 (Liquid Cooling)</h3>
+            <p>
+                물이나 냉매의 높은 열용량을 활용하여 대용량 열을 효과적으로 제거합니다.
+            </p>
+            <ul>
+                <li><strong>간접 수냉:</strong> 콜드 플레이트가 히트싱크 역할, 배관으로 열 전달</li>
+                <li><strong>직접 수냉:</strong> 냉각수가 패키지에 직접 접촉 (침지 냉각)</li>
+                <li><strong>성능:</strong> TDP 1000W 이상 대응 가능</li>
+                <li><strong>응용:</strong> HPC, AI 가속기, 데이터센터</li>
+            </ul>
+
+            <h3>침지 냉각 (Immersion Cooling)</h3>
+            <p>
+                서버 전체를 유전성 냉매에 담가 냉각하는 방식입니다. 
+                단상(single-phase) 또는 이상(two-phase) 침지가 있습니다.
+            </p>
+            <ul>
+                <li><strong>단상:</strong> 냉매가 액체 상태 유지, 간단한 시스템</li>
+                <li><strong>이상:</strong> 냉매 증발로 잠열 활용, 더 높은 효율</li>
+                <li><strong>장점:</strong> 높은 열 제거, 무소음, 공간 효율</li>
+                <li><strong>과제:</strong> 인프라, 유지보수, 누출 관리</li>
+            </ul>
+
+            <h3>마이크로채널 쿨링</h3>
+            <p>
+                실리콘 다이나 인터포저 내부에 미세한 유로를 형성하여 
+                냉각수를 직접 순환시키는 첨단 기술입니다.
+            </p>
+            <ul>
+                <li><strong>채널 크기:</strong> 수십 ~ 수백 마이크로미터</li>
+                <li><strong>열유속:</strong> kW/cm² 수준 대응 가능</li>
+                <li><strong>과제:</strong> 신뢰성, 누출, 통합 복잡성</li>
+                <li><strong>연구:</strong> Intel, TSMC, IMEC 등에서 연구 중</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>7.4 2.5D/3D 패키징의 열 과제</h2>
+            <p>
+                2.5D/3D 패키징은 고유한 열 관리 과제를 제시합니다. 다이가 밀집되고 
+                적층됨에 따라 열 경로가 복잡해지고 핫스팟이 발생하기 쉽습니다.
+            </p>
+
+            <h3>HBM 열 관리</h3>
+            <p>
+                HBM은 DRAM으로서 로직보다 낮은 온도 한계(85-95°C)를 가집니다. 
+                그러나 고발열 로직 다이와 같은 인터포저 위에 배치되므로 
+                열적으로 취약합니다.
+            </p>
+            <ul>
+                <li><strong>과제:</strong> 로직 발열이 HBM에 영향, HBM 자체 발열</li>
+                <li><strong>대응:</strong> HBM 위치 최적화, 열 차폐, 개별 냉각 경로</li>
+                <li><strong>HBM3E:</strong> 스택당 ~20W, 여러 스택이면 100W 이상</li>
+            </ul>
+
+            <h3>3D 적층의 열 축적</h3>
+            <p>
+                3D 적층에서 상부 다이의 열은 하부 다이를 통과해야 방출됩니다. 
+                이로 인해 상부 다이의 온도가 더 높아지는 열 축적 문제가 발생합니다.
+            </p>
+            <ul>
+                <li><strong>열 TSV:</strong> 전기 신호 없이 열 전도만을 위한 전용 TSV</li>
+                <li><strong>다이 박화:</strong> 열 경로 단축을 위한 다이 두께 감소</li>
+                <li><strong>전력 배분:</strong> 적층 다이 간 전력 밀도 분산</li>
+                <li><strong>백사이드 냉각:</strong> 상부 다이 후면 직접 냉각</li>
+            </ul>
+
+            <div class="info-box">
+                <h4>시뮬레이션의 중요성</h4>
+                <p>
+                    첨단 패키징의 열 설계는 시뮬레이션 없이는 불가능합니다. 
+                    FEA(유한요소해석) 기반 열 시뮬레이션으로 온도 분포, 핫스팟, 
+                    열저항을 예측하고 설계를 최적화합니다. CFD(전산유체역학)는 
+                    냉각 시스템 레벨 분석에 사용됩니다.
+                </p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>7.5 패키지 신뢰성과 고장 메커니즘</h2>
+            <p>
+                패키지 신뢰성은 제품 수명 동안 정상 기능을 유지하는 능력입니다. 
+                다양한 물리적, 화학적 고장 메커니즘이 패키지 신뢰성을 위협합니다.
+            </p>
+
+            <h3>주요 고장 메커니즘</h3>
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>메커니즘</th>
+                        <th>원인</th>
+                        <th>영향</th>
+                        <th>대응</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>솔더 피로</td>
+                        <td>CTE 미스매치, 온도 사이클</td>
+                        <td>균열, 단선</td>
+                        <td>언더필, 저응력 설계</td>
+                    </tr>
+                    <tr>
+                        <td>전기이동 (EM)</td>
+                        <td>고전류 밀도</td>
+                        <td>보이드, 힐록 형성</td>
+                        <td>전류 밀도 제한, Cu/배리어</td>
+                    </tr>
+                    <tr>
+                        <td>열 이동 (TM)</td>
+                        <td>온도 기울기</td>
+                        <td>금속 이동</td>
+                        <td>균일 온도 분포</td>
+                    </tr>
+                    <tr>
+                        <td>스트레스 이동 (SM)</td>
+                        <td>기계적 응력</td>
+                        <td>보이드 성장</td>
+                        <td>저응력 설계</td>
+                    </tr>
+                    <tr>
+                        <td>부식</td>
+                        <td>수분, 오염</td>
+                        <td>금속 열화, 단락</td>
+                        <td>패시베이션, 밀봉</td>
+                    </tr>
+                    <tr>
+                        <td>박리 (Delamination)</td>
+                        <td>CTE 미스매치, 수분</td>
+                        <td>계면 분리</td>
+                        <td>접착력 개선</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>전기이동 (Electromigration)</h3>
+            <p>
+                전기이동은 고전류 밀도에서 전자의 운동량이 금속 원자를 이동시키는 현상입니다. 
+                전자 유입부에서 보이드가, 유출부에서 힐록이 형성됩니다.
+            </p>
+            <ul>
+                <li><strong>임계 전류 밀도:</strong> Cu 배선 약 10^6 A/cm², 솔더 약 10^4 A/cm²</li>
+                <li><strong>가속 인자:</strong> 온도, 전류 밀도 (Black's equation)</li>
+                <li><strong>설계 규칙:</strong> 최대 전류 밀도 제한, 배리어 금속 적용</li>
+            </ul>
+
+            <h3>솔더 피로</h3>
+            <p>
+                반복되는 온도 사이클로 솔더 조인트에 기계적 스트레스가 누적되어 
+                균열이 발생하고 전파됩니다.
+            </p>
+            <ul>
+                <li><strong>원인:</strong> 실리콘-기판 CTE 미스매치, 온/오프 사이클</li>
+                <li><strong>취약부:</strong> 패키지 코너의 범프, DNP(Distance to Neutral Point) 최대 위치</li>
+                <li><strong>대응:</strong> 언더필로 스트레스 분산, 저CTE 기판, 범프 구조 최적화</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>7.6 신뢰성 모델링과 수명 예측</h2>
+            <p>
+                신뢰성 모델링은 가속 테스트 데이터를 기반으로 실사용 환경에서의 
+                수명을 예측합니다. 물리적 고장 메커니즘에 기반한 모델이 사용됩니다.
+            </p>
+
+            <h3>가속 인자 모델</h3>
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>고장 메커니즘</th>
+                        <th>모델</th>
+                        <th>주요 파라미터</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>전기이동</td>
+                        <td>Black's Equation</td>
+                        <td>전류밀도, 온도, 활성화에너지</td>
+                    </tr>
+                    <tr>
+                        <td>솔더 피로</td>
+                        <td>Coffin-Manson</td>
+                        <td>변형률, 온도 범위, 사이클</td>
+                    </tr>
+                    <tr>
+                        <td>화학 반응</td>
+                        <td>Arrhenius</td>
+                        <td>온도, 활성화에너지</td>
+                    </tr>
+                    <tr>
+                        <td>수분 영향</td>
+                        <td>Peck's Model</td>
+                        <td>습도, 온도</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>수명 예측 예시: Black's Equation</h3>
+            <p>
+                전기이동 수명은 Black's equation으로 예측됩니다:
+            </p>
+            <p style="text-align: center; font-family: monospace; font-size: 1.1rem; color: var(--accent-primary);">
+                MTTF = A × J^(-n) × exp(Ea / kT)
+            </p>
+            <ul>
+                <li><strong>A:</strong> 재료/공정 상수</li>
+                <li><strong>J:</strong> 전류 밀도</li>
+                <li><strong>n:</strong> 전류 밀도 지수 (보통 1-2)</li>
+                <li><strong>Ea:</strong> 활성화 에너지</li>
+                <li><strong>k:</strong> 볼츠만 상수</li>
+                <li><strong>T:</strong> 절대 온도</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>7.7 Design for Reliability (DfR)</h2>
+            <p>
+                신뢰성을 위한 설계(DfR)는 개발 초기 단계부터 신뢰성을 고려하여 
+                설계하는 접근 방식입니다. 사후 분석이 아닌 사전 예방적 설계가 핵심입니다.
+            </p>
+
+            <h3>DfR 원칙</h3>
+            <ul>
+                <li><strong>스트레스 최소화:</strong> 열, 기계, 전기 스트레스 감소 설계</li>
+                <li><strong>마진 확보:</strong> 설계 파라미터에 충분한 여유 확보</li>
+                <li><strong>열 관리:</strong> 접합 온도 허용 범위 내 유지</li>
+                <li><strong>재료 선택:</strong> 신뢰성 검증된 재료 사용</li>
+                <li><strong>중복성:</strong> 중요 경로의 이중화</li>
+            </ul>
+
+            <h3>시뮬레이션 기반 DfR</h3>
+            <ul>
+                <li><strong>열 시뮬레이션:</strong> 온도 분포, 핫스팟 예측</li>
+                <li><strong>응력 해석:</strong> CTE 미스매치에 의한 응력/변형</li>
+                <li><strong>피로 분석:</strong> 솔더 조인트 수명 예측</li>
+                <li><strong>전기 시뮬레이션:</strong> 전류 밀도 분포, EM 마진</li>
+                <li><strong>수분 확산:</strong> 패키지 내 수분 침투 분석</li>
+            </ul>
+
+            <div class="info-box highlight">
+                <h4>첨단 패키징 DfR의 과제</h4>
+                <p>
+                    2.5D/3D 패키징에서는 새로운 구조와 재료로 인해 기존 신뢰성 모델의 
+                    적용이 제한적일 수 있습니다. TSV 주변 응력, 하이브리드 본딩 계면, 
+                    칩렛 간 열팽창 차이 등은 새로운 연구와 모델 개발이 필요합니다. 
+                    물리적 고장 분석(PFA)과 시뮬레이션의 상호 검증이 중요합니다.
+                </p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>7.8 자동차/우주 등급 신뢰성</h2>
+            <p>
+                자동차, 항공우주, 의료, 산업 등 미션 크리티컬 응용에서는 
+                일반 소비자 전자제품보다 훨씬 엄격한 신뢰성 요구사항이 적용됩니다.
+            </p>
+
+            <h3>자동차 반도체 요구사항 (AEC-Q100)</h3>
+            <table class="tech-table">
+                <thead>
+                    <tr>
+                        <th>항목</th>
+                        <th>소비자</th>
+                        <th>자동차 Grade 1</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>작동 온도</td>
+                        <td>0~70°C</td>
+                        <td>-40~125°C</td>
+                    </tr>
+                    <tr>
+                        <td>온도 사이클</td>
+                        <td>500 cyc</td>
+                        <td>1000+ cyc</td>
+                    </tr>
+                    <tr>
+                        <td>수명</td>
+                        <td>3-5년</td>
+                        <td>15년 이상</td>
+                    </tr>
+                    <tr>
+                        <td>ppm 불량률</td>
+                        <td>수백 ppm</td>
+                        <td>< 1 ppm</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>우주 등급</h3>
+            <p>
+                우주 응용은 방사선 내성, 진공, 극한 온도 등 추가적인 요구사항이 있습니다.
+            </p>
+            <ul>
+                <li><strong>방사선:</strong> TID(Total Ionizing Dose), SEE(Single Event Effect) 내성</li>
+                <li><strong>아웃개싱:</strong> 진공에서 재료 증발 최소화</li>
+                <li><strong>열 사이클:</strong> -150°C ~ +150°C 극한 범위</li>
+                <li><strong>이력 관리:</strong> 모든 재료와 공정의 완전한 추적성</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>요약</h2>
+            <p>
+                열 관리와 신뢰성은 첨단 패키징의 성공을 결정하는 핵심 요소입니다. 
+                TDP 증가와 다이 집적화로 열 관리의 중요성은 더욱 높아지고 있으며, 
+                새로운 구조에 대한 신뢰성 모델 개발이 계속되고 있습니다.
+            </p>
+
+            <div class="info-box highlight">
+                <h4>핵심 요점</h4>
+                <ul>
+                    <li>열저항(Rth): 다이-환경 열 경로의 효율 지표</li>
+                    <li>TIM: 계면 열저항 감소의 핵심, 솔더/액체금속 TIM 고성능</li>
+                    <li>냉각: 공냉 한계 → 수냉, 침지, 마이크로채널로 진화</li>
+                    <li>고장 메커니즘: 솔더피로, 전기이동, 부식, 박리 등</li>
+                    <li>DfR: 설계 초기부터 신뢰성 고려, 시뮬레이션 기반</li>
+                    <li>자동차/우주: 극한 환경, 장수명 요구, 낮은 불량률</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

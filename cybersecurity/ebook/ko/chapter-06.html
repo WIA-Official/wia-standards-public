@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: ID 및 접근 관리 | WIA-SEC-015</title>
+    <style>
+        :root { --primary-color: #10B981; --secondary-color: #34d399; --accent-color: #6ee7b7; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(52,211,153,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(52,211,153,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>제6장: ID 및 접근 관리</h1>
+
+    <div class="objectives-box">
+        <h3>🎯 학습 목표</h3>
+        <ul>
+            <li>강력한 인증 메커니즘 구현</li>
+            <li>다중 요소 인증(MFA) 배포</li>
+            <li>SSO(Single Sign-On) 구성</li>
+            <li>역할 기반 접근 통제(RBAC) 적용</li>
+            <li>권한 접근 관리(PAM)</li>
+        </ul>
+    </div>
+
+    <h2>6.1 인증 메커니즘</h2>
+
+    <p>인증은 접근 권한을 부여하기 전에 사용자, 장치, 시스템의 ID를 검증합니다. WIA-SEC-015는 단순한 비밀번호를 넘어서는 강력한 인증을 요구합니다.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>요소 유형</th>
+                <th>설명</th>
+                <th>예시</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>지식</td>
+                <td>알고 있는 것</td>
+                <td>비밀번호, PIN, 보안 질문</td>
+            </tr>
+            <tr>
+                <td>소유</td>
+                <td>가지고 있는 것</td>
+                <td>보안 키, 스마트 카드, 휴대폰</td>
+            </tr>
+            <tr>
+                <td>고유</td>
+                <td>당신인 것</td>
+                <td>지문, 얼굴, 홍채</td>
+            </tr>
+            <tr>
+                <td>위치</td>
+                <td>어디에 있는지</td>
+                <td>GPS, IP 위치 정보</td>
+            </tr>
+            <tr>
+                <td>행동</td>
+                <td>어떻게 행동하는지</td>
+                <td>타이핑 패턴, 장치 사용</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>6.2 다중 요소 인증 (MFA)</h2>
+
+    <pre><code>// MFA 요구사항
+{
+  "wia_요구사항": {
+    "필수_대상": [
+      "관리자 계정",
+      "원격 접근",
+      "권한 작업",
+      "클라우드 콘솔 접근",
+      "이메일 계정"
+    ],
+    "최소_요소": 2,
+    "피싱_방지": {
+      "권장": ["FIDO2/WebAuthn", "하드웨어 키"],
+      "허용": ["푸시 알림", "TOTP"],
+      "권장안함": ["SMS OTP", "음성 OTP"]
+    }
+  },
+  "구현": {
+    "fido2_webauthn": {
+      "description": "비밀번호 없음, 피싱 방지",
+      "devices": ["보안 키", "플랫폼 인증기"]
+    },
+    "push_notification": {
+      "description": "모바일 앱 승인",
+      "considerations": "번호 매칭, 지리 검증"
+    },
+    "totp": {
+      "description": "시간 기반 일회용 비밀번호",
+      "apps": ["인증 앱"]
+    }
+  }
+}</code></pre>
+
+    <h2>6.3 SSO (Single Sign-On)</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>프로토콜</th>
+                <th>사용 사례</th>
+                <th>특징</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>SAML 2.0</td>
+                <td>엔터프라이즈 웹 앱</td>
+                <td>XML 기반, 브라우저 리다이렉트</td>
+            </tr>
+            <tr>
+                <td>OAuth 2.0</td>
+                <td>API 권한 부여</td>
+                <td>토큰 기반, 위임된 접근</td>
+            </tr>
+            <tr>
+                <td>OpenID Connect</td>
+                <td>현대 SSO</td>
+                <td>OAuth 2.0 + ID 계층</td>
+            </tr>
+            <tr>
+                <td>Kerberos</td>
+                <td>온프레미스</td>
+                <td>티켓 기반, AD 통합</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>6.3.1 SSO 이점</h3>
+
+    <ul>
+        <li><strong>사용자 경험:</strong> 모든 애플리케이션에 단일 로그인</li>
+        <li><strong>보안:</strong> 중앙 집중식 인증, 일관된 정책</li>
+        <li><strong>관리:</strong> 단일 사용자 관리 지점</li>
+        <li><strong>규정 준수:</strong> 통합 감사 추적</li>
+    </ul>
+
+    <h2>6.4 접근 통제 모델</h2>
+
+    <pre><code>// 접근 통제 모델
+{
+  "RBAC": {
+    "name": "역할 기반 접근 통제",
+    "description": "역할에 권한 할당, 사용자에 역할 할당",
+    "example": {
+      "roles": ["관리자", "분석가", "뷰어"],
+      "permissions": ["읽기", "쓰기", "삭제", "관리"]
+    }
+  },
+  "ABAC": {
+    "name": "속성 기반 접근 통제",
+    "description": "속성 기반 접근 결정",
+    "attributes": {
+      "subject": ["역할", "부서", "보안 등급"],
+      "resource": ["분류", "소유자", "유형"],
+      "action": ["읽기", "쓰기", "실행"],
+      "environment": ["시간", "위치", "장치"]
+    }
+  },
+  "PBAC": {
+    "name": "정책 기반 접근 통제",
+    "description": "여러 요소를 결합한 복잡한 정책",
+    "languages": ["XACML", "Cedar", "Rego"]
+  }
+}</code></pre>
+
+    <h2>6.5 권한 접근 관리 (PAM)</h2>
+
+    <blockquote>
+        <h3>PAM의 중요성</h3>
+        <p>권한 계정은 왕국의 열쇠입니다. 침해된 권한 자격 증명은 보안 침해의 80%에 관련됩니다. PAM은 이러한 중요 계정을 보호하기 위한 통제를 제공합니다.</p>
+    </blockquote>
+
+    <table>
+        <thead>
+            <tr>
+                <th>PAM 기능</th>
+                <th>설명</th>
+                <th>구현</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>자격 증명 볼트</td>
+                <td>권한 자격 증명의 안전한 저장</td>
+                <td>암호화 볼트, 순환</td>
+            </tr>
+            <tr>
+                <td>세션 관리</td>
+                <td>권한 세션 제어 및 모니터링</td>
+                <td>녹화, 실시간 모니터링</td>
+            </tr>
+            <tr>
+                <td>Just-In-Time 접근</td>
+                <td>임시 권한 접근</td>
+                <td>시간 제한 권한 상승</td>
+            </tr>
+            <tr>
+                <td>최소 권한</td>
+                <td>필요한 최소 접근</td>
+                <td>역할 분리, 제한</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>6.6 ID 수명 주기</h2>
+
+    <ul>
+        <li><strong>프로비저닝:</strong> 적절한 접근 권한으로 계정 생성</li>
+        <li><strong>관리:</strong> 정확한 ID 속성 유지</li>
+        <li><strong>접근 검토:</strong> 정기적인 접근 권한 인증</li>
+        <li><strong>디프로비저닝:</strong> 퇴사 시 신속한 접근 제거</li>
+    </ul>
+
+    <h2>6.7 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>강력한 인증은 다중 요소 필요</li>
+            <li>FIDO2/WebAuthn이 피싱 방지 MFA 제공</li>
+            <li>SSO가 보안과 사용자 경험 개선</li>
+            <li>RBAC와 ABAC가 유연한 접근 통제 제공</li>
+            <li>PAM이 중요 권한 계정 보호</li>
+        </ul>
+    </blockquote>
+
+    <h2>6.8 복습 문제</h2>
+
+    <ol>
+        <li>5가지 인증 요소 유형은?</li>
+        <li>FIDO2/WebAuthn이 MFA에 선호되는 이유는?</li>
+        <li>주요 SSO 프로토콜과 사용 사례는?</li>
+        <li>RBAC와 ABAC의 차이점은?</li>
+        <li>PAM 솔루션이 제공해야 할 기능은?</li>
+    </ol>
+
+    <h2>6.9 다음 장 미리보기</h2>
+
+    <p>제7장에서는 팀 구조, 모니터링, 사고 대응 워크플로우, 위협 헌팅, SOC 지표를 포함하는 보안 운영 센터(SOC) 운영을 다룹니다.</p>
+</body>
+</html>

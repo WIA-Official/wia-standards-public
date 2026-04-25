@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-URB-001 Urban Planning - Interactive Simulator</title>
+    <style>
+        :root { --primary: #10B981; --primary-dark: #059669; --secondary: #34D399; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+        header { padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; background: var(--primary); color: white; font-weight: 500; transition: all 0.3s; }
+        .btn:hover { background: var(--primary-dark); }
+        .btn-center { display: flex; justify-content: center; margin-top: 20px; }
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; }
+        .map-canvas { width: 100%; height: 400px; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; position: relative; margin-top: 20px; }
+        .zone-block { position: absolute; border: 2px solid; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+        .zone-block:hover { transform: scale(1.05); opacity: 0.9; }
+        .zone-residential { background: #10B98180; border-color: #10B981; }
+        .zone-commercial { background: #3B82F680; border-color: #3B82F6; }
+        .zone-industrial { background: #F5971680; border-color: #F59716; }
+        .zone-green { background: #22C55E80; border-color: #22C55E; }
+        .zone-mixed { background: #8B5CF680; border-color: #8B5CF6; }
+        .legend { display: flex; gap: 15px; margin-top: 15px; flex-wrap: wrap; justify-content: center; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+        .legend-color { width: 24px; height: 24px; border-radius: 4px; border: 2px solid; }
+        .density-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 20px; }
+        .density-cell { aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+        .density-cell:hover { transform: scale(1.1); }
+        .density-low { background: #10B98140; }
+        .density-medium { background: #F5971680; }
+        .density-high { background: #EF444480; }
+        .infrastructure-list { display: grid; gap: 15px; margin-top: 20px; }
+        .infra-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; }
+        .infra-icon { font-size: 2rem; }
+        .infra-details { flex: 1; }
+        .infra-name { font-weight: bold; color: var(--primary); margin-bottom: 5px; }
+        .infra-status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+        .status-operational { background: #10B98140; color: #10B981; }
+        .status-planned { background: #3B82F640; color: #3B82F6; }
+        .status-maintenance { background: #F5971640; color: #F59716; }
+        .green-space-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 15px 0; }
+        .green-space-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .green-space-title { font-weight: bold; color: var(--primary); font-size: 1.1rem; }
+        .green-space-area { color: var(--text-muted); font-size: 0.9rem; }
+        .green-space-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
+        .metric { text-align: center; padding: 10px; background: var(--bg-card); border-radius: 6px; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+        .project-timeline { margin-top: 20px; }
+        .project-item { background: var(--bg); border-left: 4px solid var(--primary); padding: 15px; margin-bottom: 15px; border-radius: 4px; }
+        .project-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .project-name { font-weight: bold; color: var(--primary); font-size: 1.1rem; }
+        .project-phase { padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+        .phase-planning { background: #3B82F640; color: #3B82F6; }
+        .phase-construction { background: #F5971640; color: #F59716; }
+        .phase-completed { background: #10B98140; color: #10B981; }
+        .progress-bar { width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: width 0.3s; }
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; text-align: center; }
+            .nav-left { flex-direction: column; gap: 10px; }
+            .nav-links { flex-wrap: wrap; justify-content: center; gap: 10px; }
+            .tabs { flex-direction: column; align-items: center; }
+            .tab { width: 100%; text-align: center; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .map-canvas { height: 300px; }
+            .density-grid { grid-template-columns: repeat(5, 1fr); }
+            .green-space-metrics { grid-template-columns: 1fr; }
+            footer .links { flex-direction: column; gap: 10px; }
+            footer .links a { display: block; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Urban Planning</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a><span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a><span class="sep">›</span>
+                    <span class="current">Urban-Planning</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+        <header><div class="logo">🏗️ WIA-URB-001</div></header>
+        <section class="hero">
+            <h1 data-en="Urban Planning Standard" data-ko="도시 계획 표준">Urban Planning Standard</h1>
+            <p data-en="Design sustainable cities with smart zoning, infrastructure, and green spaces" data-ko="스마트 조닝, 인프라, 녹지 공간으로 지속 가능한 도시 설계">Design sustainable cities with smart zoning, infrastructure, and green spaces</p>
+        </section>
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🗺️ Zoning Map" data-ko="🗺️ 용도 지역도">🗺️ Zoning Map</div>
+            <div class="tab" onclick="showPanel(1)" data-en="👥 Population Density" data-ko="👥 인구 밀도">👥 Population Density</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🚇 Infrastructure" data-ko="🚇 인프라">🚇 Infrastructure</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🌳 Green Spaces" data-ko="🌳 녹지 공간">🌳 Green Spaces</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🏗️ Development Projects" data-ko="🏗️ 개발 프로젝트">🏗️ Development Projects</div>
+        </div>
+
+        <!-- Tab 1: Zoning Map -->
+        <div class="panel active">
+            <h2 data-en="🗺️ City Zoning Map" data-ko="🗺️ 도시 용도 지역도">🗺️ City Zoning Map</h2>
+
+            <div class="sub-section">
+                <h4 data-en="🏙️ Zoning Configuration" data-ko="🏙️ 조닝 설정">🏙️ Zoning Configuration</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="City Name" data-ko="도시명">City Name</label>
+                        <input type="text" id="cityName" placeholder="Seoul Metropolitan Area">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Total Area (km²)" data-ko="총 면적 (km²)">Total Area (km²)</label>
+                        <input type="number" id="totalArea" placeholder="605">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Residential Zones (%)" data-ko="주거 지역 (%)">Residential Zones (%)</label>
+                        <input type="number" id="residentialPercent" placeholder="40" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Commercial Zones (%)" data-ko="상업 지역 (%)">Commercial Zones (%)</label>
+                        <input type="number" id="commercialPercent" placeholder="20" min="0" max="100">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Industrial Zones (%)" data-ko="산업 지역 (%)">Industrial Zones (%)</label>
+                        <input type="number" id="industrialPercent" placeholder="15" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Green Spaces (%)" data-ko="녹지 (%)">Green Spaces (%)</label>
+                        <input type="number" id="greenPercent" placeholder="25" min="0" max="100">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="generateZoningMap()">
+                    <span data-en="🗺️ Generate Zoning Map" data-ko="🗺️ 지역도 생성">🗺️ Generate Zoning Map</span>
+                </button>
+            </div>
+
+            <div id="zoningMapCanvas" class="map-canvas"></div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color zone-residential"></div>
+                    <span data-en="Residential" data-ko="주거">Residential</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color zone-commercial"></div>
+                    <span data-en="Commercial" data-ko="상업">Commercial</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color zone-industrial"></div>
+                    <span data-en="Industrial" data-ko="산업">Industrial</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color zone-green"></div>
+                    <span data-en="Green Space" data-ko="녹지">Green Space</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color zone-mixed"></div>
+                    <span data-en="Mixed Use" data-ko="복합">Mixed Use</span>
+                </div>
+            </div>
+
+            <div class="output" id="zoningOutput"></div>
+        </div>
+
+        <!-- Tab 2: Population Density -->
+        <div class="panel">
+            <h2 data-en="👥 Population Density Analysis" data-ko="👥 인구 밀도 분석">👥 Population Density Analysis</h2>
+
+            <div class="sub-section">
+                <h4 data-en="📊 Demographic Data" data-ko="📊 인구 통계 데이터">📊 Demographic Data</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Total Population" data-ko="총 인구">Total Population</label>
+                        <input type="number" id="totalPopulation" placeholder="9700000">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Growth Rate (%/year)" data-ko="성장률 (%/년)">Growth Rate (%/year)</label>
+                        <input type="number" id="growthRate" step="0.1" placeholder="0.5">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Average Density (people/km²)" data-ko="평균 밀도 (명/km²)">Average Density (people/km²)</label>
+                        <input type="number" id="avgDensity" placeholder="16000">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Optimal Density (people/km²)" data-ko="최적 밀도 (명/km²)">Optimal Density (people/km²)</label>
+                        <input type="number" id="optimalDensity" placeholder="12000">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="generateDensityMap()">
+                    <span data-en="📊 Generate Density Map" data-ko="📊 밀도 지도 생성">📊 Generate Density Map</span>
+                </button>
+            </div>
+
+            <div id="densityGrid" class="density-grid"></div>
+
+            <div class="sub-section" style="margin-top: 30px;">
+                <h4 data-en="📈 Density Analysis" data-ko="📈 밀도 분석">📈 Density Analysis</h4>
+                <div class="green-space-metrics">
+                    <div class="metric">
+                        <div class="metric-value" id="avgDensityValue">0</div>
+                        <div class="metric-label" data-en="Avg Density" data-ko="평균 밀도">Avg Density</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="maxDensityValue">0</div>
+                        <div class="metric-label" data-en="Peak Density" data-ko="최고 밀도">Peak Density</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="optimalRatio">0%</div>
+                        <div class="metric-label" data-en="Optimal Ratio" data-ko="최적 비율">Optimal Ratio</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="output" id="densityOutput"></div>
+        </div>
+
+        <!-- Tab 3: Infrastructure -->
+        <div class="panel">
+            <h2 data-en="🚇 City Infrastructure" data-ko="🚇 도시 인프라">🚇 City Infrastructure</h2>
+
+            <div class="sub-section">
+                <h4 data-en="🏗️ Add Infrastructure" data-ko="🏗️ 인프라 추가">🏗️ Add Infrastructure</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Infrastructure Type" data-ko="인프라 유형">Infrastructure Type</label>
+                        <select id="infraType">
+                            <option value="metro">🚇 Metro/Subway</option>
+                            <option value="road">🛣️ Highway</option>
+                            <option value="water">💧 Water System</option>
+                            <option value="power">⚡ Power Grid</option>
+                            <option value="hospital">🏥 Hospital</option>
+                            <option value="school">🏫 School</option>
+                            <option value="park">🌳 Park</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Name" data-ko="이름">Name</label>
+                        <input type="text" id="infraName" placeholder="Line 2 Extension">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Status" data-ko="상태">Status</label>
+                        <select id="infraStatus">
+                            <option value="operational">Operational</option>
+                            <option value="planned">Planned</option>
+                            <option value="maintenance">Under Maintenance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Capacity" data-ko="용량">Capacity</label>
+                        <input type="text" id="infraCapacity" placeholder="500,000 passengers/day">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="addInfrastructure()">
+                    <span data-en="➕ Add Infrastructure" data-ko="➕ 인프라 추가">➕ Add Infrastructure</span>
+                </button>
+            </div>
+
+            <div class="infrastructure-list" id="infraList"></div>
+
+            <div class="output" id="infraOutput"></div>
+        </div>
+
+        <!-- Tab 4: Green Spaces -->
+        <div class="panel">
+            <h2 data-en="🌳 Urban Green Spaces" data-ko="🌳 도시 녹지 공간">🌳 Urban Green Spaces</h2>
+
+            <div class="sub-section">
+                <h4 data-en="🌿 Green Space Planning" data-ko="🌿 녹지 계획">🌿 Green Space Planning</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Park Name" data-ko="공원명">Park Name</label>
+                        <input type="text" id="parkName" placeholder="Central Park">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Area (hectares)" data-ko="면적 (헥타르)">Area (hectares)</label>
+                        <input type="number" id="parkArea" placeholder="100">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Green Space Type" data-ko="녹지 유형">Green Space Type</label>
+                        <select id="greenType">
+                            <option value="urban-park">Urban Park</option>
+                            <option value="forest">Urban Forest</option>
+                            <option value="riverside">Riverside Park</option>
+                            <option value="botanical">Botanical Garden</option>
+                            <option value="pocket">Pocket Park</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Trees Planted" data-ko="식재 나무 수">Trees Planted</label>
+                        <input type="number" id="treesPlanted" placeholder="5000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="CO2 Absorption (tons/year)" data-ko="CO2 흡수량 (톤/년)">CO2 Absorption (tons/year)</label>
+                        <input type="number" id="co2Absorption" placeholder="150">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Visitors/day" data-ko="일일 방문객">Visitors/day</label>
+                        <input type="number" id="visitors" placeholder="10000">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="addGreenSpace()">
+                    <span data-en="🌳 Add Green Space" data-ko="🌳 녹지 추가">🌳 Add Green Space</span>
+                </button>
+            </div>
+
+            <div id="greenSpacesList"></div>
+
+            <div class="output" id="greenOutput"></div>
+        </div>
+
+        <!-- Tab 5: Development Projects -->
+        <div class="panel">
+            <h2 data-en="🏗️ Urban Development Projects" data-ko="🏗️ 도시 개발 프로젝트">🏗️ Urban Development Projects</h2>
+
+            <div class="sub-section">
+                <h4 data-en="📋 New Development Project" data-ko="📋 신규 개발 프로젝트">📋 New Development Project</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Project Name" data-ko="프로젝트명">Project Name</label>
+                        <input type="text" id="projectName" placeholder="Smart City District">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Project Type" data-ko="프로젝트 유형">Project Type</label>
+                        <select id="projectType">
+                            <option value="mixed-use">Mixed-Use Development</option>
+                            <option value="transit">Transit-Oriented Development</option>
+                            <option value="residential">Residential Complex</option>
+                            <option value="commercial">Commercial Center</option>
+                            <option value="smart-city">Smart City</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Budget (Million USD)" data-ko="예산 (백만 USD)">Budget (Million USD)</label>
+                        <input type="number" id="projectBudget" placeholder="500">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Phase" data-ko="단계">Phase</label>
+                        <select id="projectPhase">
+                            <option value="planning">Planning</option>
+                            <option value="construction">Construction</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Start Date" data-ko="시작일">Start Date</label>
+                        <input type="date" id="projectStart">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Completion %" data-ko="진행률 %">Completion %</label>
+                        <input type="number" id="projectProgress" placeholder="65" min="0" max="100">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-en="Project Description" data-ko="프로젝트 설명">Project Description</label>
+                    <textarea id="projectDescription" rows="3" placeholder="Smart city district with integrated IoT infrastructure, sustainable buildings, and green transportation..."></textarea>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="addDevelopmentProject()">
+                    <span data-en="🏗️ Add Project" data-ko="🏗️ 프로젝트 추가">🏗️ Add Project</span>
+                </button>
+            </div>
+
+            <div class="project-timeline" id="projectTimeline"></div>
+
+            <div class="output" id="projectOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>WIA - World Certification Industry Association</p>
+            <p>© 2025 MIT License</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank">🏠 Home</a>
+                <a href="../" target="_blank">📋 Standard</a>
+                <a href="https://wiabook.com" target="_blank">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        let infrastructureList = [];
+        let greenSpacesList = [];
+        let projectsList = [];
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => {
+                p.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateZoningMap() {
+            const cityName = document.getElementById('cityName').value || 'Seoul Metropolitan Area';
+            const totalArea = parseFloat(document.getElementById('totalArea').value || 605);
+            const residential = parseFloat(document.getElementById('residentialPercent').value || 40);
+            const commercial = parseFloat(document.getElementById('commercialPercent').value || 20);
+            const industrial = parseFloat(document.getElementById('industrialPercent').value || 15);
+            const green = parseFloat(document.getElementById('greenPercent').value || 25);
+
+            const canvas = document.getElementById('zoningMapCanvas');
+            canvas.innerHTML = '';
+
+            const zones = [
+                { type: 'residential', percent: residential, class: 'zone-residential', label: 'R' },
+                { type: 'commercial', percent: commercial, class: 'zone-commercial', label: 'C' },
+                { type: 'industrial', percent: industrial, class: 'zone-industrial', label: 'I' },
+                { type: 'green', percent: green, class: 'zone-green', label: 'G' },
+                { type: 'mixed', percent: 100 - (residential + commercial + industrial + green), class: 'zone-mixed', label: 'M' }
+            ];
+
+            let currentX = 0;
+            zones.forEach(zone => {
+                if (zone.percent > 0) {
+                    const width = (zone.percent / 100) * 100;
+                    const height = 60 + Math.random() * 30;
+                    const top = Math.random() * 30;
+
+                    const block = document.createElement('div');
+                    block.className = `zone-block ${zone.class}`;
+                    block.style.left = currentX + '%';
+                    block.style.top = top + '%';
+                    block.style.width = width + '%';
+                    block.style.height = height + '%';
+                    block.textContent = `${zone.label} ${zone.percent.toFixed(1)}%`;
+                    block.title = `${zone.type}: ${zone.percent.toFixed(1)}% (${(totalArea * zone.percent / 100).toFixed(1)} km²)`;
+                    canvas.appendChild(block);
+
+                    currentX += width;
+                }
+            });
+
+            const data = {
+                "standardId": "WIA-URB-001",
+                "version": "1.0.0",
+                "timestamp": new Date().toISOString(),
+                "city": {
+                    "name": cityName,
+                    "totalArea": totalArea,
+                    "unit": "km²"
+                },
+                "zoning": {
+                    "residential": {
+                        "percentage": residential,
+                        "area": (totalArea * residential / 100).toFixed(2),
+                        "landUse": "Housing, apartments, residential complexes"
+                    },
+                    "commercial": {
+                        "percentage": commercial,
+                        "area": (totalArea * commercial / 100).toFixed(2),
+                        "landUse": "Retail, offices, business districts"
+                    },
+                    "industrial": {
+                        "percentage": industrial,
+                        "area": (totalArea * industrial / 100).toFixed(2),
+                        "landUse": "Manufacturing, warehouses, logistics"
+                    },
+                    "greenSpace": {
+                        "percentage": green,
+                        "area": (totalArea * green / 100).toFixed(2),
+                        "landUse": "Parks, forests, recreational areas"
+                    },
+                    "mixedUse": {
+                        "percentage": (100 - residential - commercial - industrial - green).toFixed(2),
+                        "area": (totalArea * (100 - residential - commercial - industrial - green) / 100).toFixed(2),
+                        "landUse": "Integrated residential-commercial zones"
+                    }
+                },
+                "sustainabilityMetrics": {
+                    "greenSpacePerCapita": "25 m²/person (WHO recommendation: 9 m²/person)",
+                    "mixedUseScore": "High - promotes walkability and reduces commute",
+                    "compactCityIndex": 0.75
+                }
+            };
+
+            document.getElementById('zoningOutput').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function generateDensityMap() {
+            const totalPop = parseFloat(document.getElementById('totalPopulation').value || 9700000);
+            const avgDensity = parseFloat(document.getElementById('avgDensity').value || 16000);
+            const optimalDensity = parseFloat(document.getElementById('optimalDensity').value || 12000);
+
+            const grid = document.getElementById('densityGrid');
+            grid.innerHTML = '';
+
+            let maxDensity = 0;
+            const densities = [];
+
+            for (let i = 0; i < 100; i++) {
+                const variance = (Math.random() - 0.5) * avgDensity * 0.8;
+                const density = Math.max(1000, avgDensity + variance);
+                densities.push(density);
+                if (density > maxDensity) maxDensity = density;
+
+                const cell = document.createElement('div');
+                cell.className = 'density-cell';
+
+                if (density < optimalDensity * 0.7) {
+                    cell.classList.add('density-low');
+                } else if (density < optimalDensity * 1.3) {
+                    cell.classList.add('density-medium');
+                } else {
+                    cell.classList.add('density-high');
+                }
+
+                cell.textContent = Math.round(density / 1000) + 'k';
+                cell.title = `${Math.round(density)} people/km²`;
+                grid.appendChild(cell);
+            }
+
+            const avgCalc = densities.reduce((a, b) => a + b, 0) / densities.length;
+            const optimalRatio = (optimalDensity / avgCalc * 100).toFixed(0);
+
+            document.getElementById('avgDensityValue').textContent = Math.round(avgCalc).toLocaleString();
+            document.getElementById('maxDensityValue').textContent = Math.round(maxDensity).toLocaleString();
+            document.getElementById('optimalRatio').textContent = optimalRatio + '%';
+
+            const data = {
+                "standardId": "WIA-URB-001",
+                "densityAnalysis": {
+                    "totalPopulation": totalPop,
+                    "averageDensity": Math.round(avgCalc),
+                    "peakDensity": Math.round(maxDensity),
+                    "optimalDensity": optimalDensity,
+                    "unit": "people/km²",
+                    "sustainabilityScore": avgCalc <= optimalDensity * 1.2 ? "Good" : "Needs improvement"
+                },
+                "recommendations": [
+                    "Expand public transportation to high-density areas",
+                    "Create more green spaces in dense districts",
+                    "Promote mixed-use development to reduce commute",
+                    "Implement smart city technologies for better resource management"
+                ]
+            };
+
+            document.getElementById('densityOutput').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function addInfrastructure() {
+            const type = document.getElementById('infraType').value;
+            const name = document.getElementById('infraName').value || 'New Infrastructure';
+            const status = document.getElementById('infraStatus').value;
+            const capacity = document.getElementById('infraCapacity').value || 'N/A';
+
+            const icons = {
+                'metro': '🚇', 'road': '🛣️', 'water': '💧', 'power': '⚡',
+                'hospital': '🏥', 'school': '🏫', 'park': '🌳'
+            };
+
+            const infrastructure = {
+                type, name, status, capacity,
+                icon: icons[type] || '🏗️',
+                id: Date.now()
+            };
+
+            infrastructureList.push(infrastructure);
+            renderInfrastructureList();
+
+            document.getElementById('infraOutput').textContent = JSON.stringify({
+                "standardId": "WIA-URB-001",
+                "infrastructure": infrastructureList
+            }, null, 2);
+        }
+
+        function renderInfrastructureList() {
+            const list = document.getElementById('infraList');
+            list.innerHTML = infrastructureList.map(infra => `
+                <div class="infra-item">
+                    <div class="infra-icon">${infra.icon}</div>
+                    <div class="infra-details">
+                        <div class="infra-name">${infra.name}</div>
+                        <div style="color: var(--text-muted); font-size: 0.9rem;">
+                            Capacity: ${infra.capacity}
+                        </div>
+                    </div>
+                    <span class="infra-status status-${infra.status}">${infra.status.toUpperCase()}</span>
+                </div>
+            `).join('');
+        }
+
+        function addGreenSpace() {
+            const name = document.getElementById('parkName').value || 'Green Space';
+            const area = parseFloat(document.getElementById('parkArea').value || 100);
+            const type = document.getElementById('greenType').value;
+            const trees = parseFloat(document.getElementById('treesPlanted').value || 5000);
+            const co2 = parseFloat(document.getElementById('co2Absorption').value || 150);
+            const visitors = parseFloat(document.getElementById('visitors').value || 10000);
+
+            const greenSpace = {
+                name, area, type, trees, co2, visitors,
+                id: Date.now()
+            };
+
+            greenSpacesList.push(greenSpace);
+            renderGreenSpaces();
+
+            document.getElementById('greenOutput').textContent = JSON.stringify({
+                "standardId": "WIA-URB-001",
+                "greenSpaces": greenSpacesList,
+                "totalGreenArea": greenSpacesList.reduce((sum, gs) => sum + gs.area, 0),
+                "totalCO2Absorption": greenSpacesList.reduce((sum, gs) => sum + gs.co2, 0)
+            }, null, 2);
+        }
+
+        function renderGreenSpaces() {
+            const container = document.getElementById('greenSpacesList');
+            container.innerHTML = greenSpacesList.map(gs => `
+                <div class="green-space-card">
+                    <div class="green-space-header">
+                        <span class="green-space-title">🌳 ${gs.name}</span>
+                        <span class="green-space-area">${gs.area} hectares</span>
+                    </div>
+                    <div style="color: var(--text-muted); margin-bottom: 10px;">
+                        Type: ${gs.type.replace('-', ' ').toUpperCase()}
+                    </div>
+                    <div class="green-space-metrics">
+                        <div class="metric">
+                            <div class="metric-value">${gs.trees.toLocaleString()}</div>
+                            <div class="metric-label">Trees</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${gs.co2}</div>
+                            <div class="metric-label">CO2/year (tons)</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${(gs.visitors/1000).toFixed(1)}k</div>
+                            <div class="metric-label">Visitors/day</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addDevelopmentProject() {
+            const name = document.getElementById('projectName').value || 'Development Project';
+            const type = document.getElementById('projectType').value;
+            const budget = parseFloat(document.getElementById('projectBudget').value || 500);
+            const phase = document.getElementById('projectPhase').value;
+            const start = document.getElementById('projectStart').value || new Date().toISOString().split('T')[0];
+            const progress = parseFloat(document.getElementById('projectProgress').value || 0);
+            const description = document.getElementById('projectDescription').value || 'Urban development project';
+
+            const project = {
+                name, type, budget, phase, start, progress, description,
+                id: Date.now()
+            };
+
+            projectsList.push(project);
+            renderProjects();
+
+            document.getElementById('projectOutput').textContent = JSON.stringify({
+                "standardId": "WIA-URB-001",
+                "developmentProjects": projectsList,
+                "totalInvestment": projectsList.reduce((sum, p) => sum + p.budget, 0) + " Million USD"
+            }, null, 2);
+        }
+
+        function renderProjects() {
+            const timeline = document.getElementById('projectTimeline');
+            timeline.innerHTML = projectsList.map(project => `
+                <div class="project-item">
+                    <div class="project-header">
+                        <span class="project-name">${project.name}</span>
+                        <span class="project-phase phase-${project.phase}">${project.phase.toUpperCase()}</span>
+                    </div>
+                    <div style="color: var(--text-muted); margin-bottom: 8px;">
+                        ${project.type.replace('-', ' ').toUpperCase()} | Budget: $${project.budget}M | Start: ${project.start}
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 10px;">
+                        ${project.description}
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${project.progress}%"></div>
+                    </div>
+                    <div style="text-align: right; color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;">
+                        ${project.progress}% Complete
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang(currentLang));
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 8: Implementation Guide - WIA-PET-LEGACY</title>
+</head>
+<body>
+<h1>Chapter 8: Implementation Guide</h1>
+
+<blockquote>
+"Hong-ik Ingan: Careful implementation ensures that memories are preserved with the care they deserve."
+</blockquote>
+
+<hr>
+
+<h2>8.1 System Architecture</h2>
+
+<pre>
+SERVICE ARCHITECTURE
+====================
+
++------------------+
+|   API Gateway    |
++------------------+
+        |
++-------+-------+-------+-------+
+|       |       |       |       |
+v       v       v       v       v
+Legacy  Media   Memorial Archive Notification
+Service Service Service Service Service
+|       |       |       |       |
++-------+-------+-------+-------+
+        |
++-------+-------+
+|               |
+v               v
+PostgreSQL   Object Storage
+             (Hot + Cold)
+</pre>
+
+<hr>
+
+<h2>8.2 Core Services</h2>
+
+<table border="1">
+<tr>
+<th>Service</th>
+<th>Responsibility</th>
+<th>Technology</th>
+</tr>
+<tr>
+<td>Legacy Service</td>
+<td>Profile, biography, timeline</td>
+<td>Rust/Go</td>
+</tr>
+<tr>
+<td>Media Service</td>
+<td>Upload, process, store media</td>
+<td>Rust + FFmpeg</td>
+</tr>
+<tr>
+<td>Memorial Service</td>
+<td>Generate memorial pages</td>
+<td>Node.js/Rust</td>
+</tr>
+<tr>
+<td>Archive Service</td>
+<td>Long-term storage</td>
+<td>Go + Cloud APIs</td>
+</tr>
+<tr>
+<td>Notification Service</td>
+<td>Email, push, SMS</td>
+<td>Node.js</td>
+</tr>
+<tr>
+<td>Book Generator</td>
+<td>Memory book PDF</td>
+<td>Python + ReportLab</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>8.3 Database Schema</h2>
+
+<pre>
+CORE TABLES
+===========
+
+-- Legacy profiles
+CREATE TABLE legacy_profiles (
+  legacy_id UUID PRIMARY KEY,
+  pet_id UUID NOT NULL,
+  owner_id UUID NOT NULL,
+  pet_info JSONB NOT NULL,
+  status VARCHAR(20) DEFAULT 'PLANNING',
+  memorial_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  activated_at TIMESTAMPTZ
+);
+
+-- Life events
+CREATE TABLE life_events (
+  event_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  event_type VARCHAR(30) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  event_date DATE NOT NULL,
+  significance SMALLINT DEFAULT 3
+);
+
+-- Media
+CREATE TABLE media_attachments (
+  media_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  media_type VARCHAR(20) NOT NULL,
+  original_url TEXT NOT NULL,
+  archive_url TEXT,
+  visibility VARCHAR(20) DEFAULT 'FAMILY'
+);
+
+-- Tributes
+CREATE TABLE tributes (
+  tribute_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  author_name VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(20) DEFAULT 'PENDING'
+);
+
+-- Archives
+CREATE TABLE legacy_archives (
+  archive_id UUID PRIMARY KEY,
+  legacy_id UUID REFERENCES legacy_profiles,
+  storage_location TEXT NOT NULL,
+  checksum VARCHAR(64) NOT NULL,
+  retention_years INTEGER DEFAULT 100
+);
+</pre>
+
+<hr>
+
+<h2>8.4 API Endpoints</h2>
+
+<pre>
+API ROUTES
+==========
+
+Legacy:
+  POST   /api/v1/legacy           Create
+  GET    /api/v1/legacy           List
+  GET    /api/v1/legacy/{id}      Get
+  PUT    /api/v1/legacy/{id}      Update
+  POST   /api/v1/legacy/{id}/activate  Activate
+
+Timeline:
+  GET    /api/v1/legacy/{id}/timeline  Get timeline
+  GET    /api/v1/legacy/{id}/events    List events
+  POST   /api/v1/legacy/{id}/events    Add event
+
+Media:
+  GET    /api/v1/legacy/{id}/media     List media
+  POST   /api/v1/legacy/{id}/media     Upload
+  GET    /api/v1/legacy/{id}/media/featured  AI selection
+
+Memorial:
+  GET    /memorial/{id}           Public page
+  GET    /api/v1/legacy/{id}/memorial/config  Config
+  PUT    /api/v1/legacy/{id}/memorial/config  Update
+
+Tributes:
+  GET    /memorial/{id}/tributes  List approved
+  POST   /memorial/{id}/tributes  Submit
+  POST   /api/v1/legacy/{id}/tributes/{tid}/approve
+
+Archive:
+  POST   /api/v1/legacy/{id}/archive   Create
+  GET    /api/v1/legacy/{id}/archive   Status
+  POST   /api/v1/legacy/{id}/export    Export
+</pre>
+
+<hr>
+
+<h2>8.5 Media Processing</h2>
+
+<pre>
+MEDIA PIPELINE
+==============
+
+Upload:
+  1. Receive file
+  2. Validate format and size
+  3. Store original
+  4. Queue for processing
+
+Processing:
+  1. Extract metadata
+  2. Generate thumbnails
+  3. Create display versions
+  4. Run AI analysis
+  5. Create archive copy
+
+Storage:
+  Original   -> Hot storage
+  Display    -> CDN
+  Thumbnail  -> CDN
+  Archive    -> Cold storage
+
+AI Analysis:
+  - Pet detection
+  - Emotion recognition
+  - Scene classification
+  - Auto-tagging
+</pre>
+
+<hr>
+
+<h2>8.6 Memorial Generation</h2>
+
+<pre>
+MEMORIAL BUILD PROCESS
+======================
+
+1. Fetch Data
+   - Load legacy profile
+   - Get biography
+   - Retrieve timeline
+   - Select featured photos
+
+2. Render Sections
+   For each enabled section:
+   - Hero: Main tribute
+   - Bio: Narrative
+   - Timeline: Events
+   - Gallery: Photos
+   - Tributes: Messages
+   - Candles: Offerings
+
+3. Apply Theme
+   - Load theme config
+   - Apply colors, fonts
+   - Set layout
+
+4. Deploy
+   - Generate HTML
+   - Upload to CDN
+   - Update DNS/routing
+   - Notify family
+</pre>
+
+<hr>
+
+<h2>8.7 Deployment</h2>
+
+<pre>
+DOCKER COMPOSE
+==============
+
+version: '3.8'
+services:
+  legacy-api:
+    image: wia/legacy-api:latest
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://db:5432/legacy
+    depends_on:
+      - db
+
+  media-service:
+    image: wia/media-service:latest
+    environment:
+      STORAGE_BUCKET: wia-legacy-media
+      ARCHIVE_BUCKET: wia-legacy-archive
+    volumes:
+      - media_temp:/tmp/media
+
+  memorial-service:
+    image: wia/memorial-service:latest
+    environment:
+      CDN_BUCKET: wia-memorial-cdn
+
+  archive-worker:
+    image: wia/archive-worker:latest
+    environment:
+      GLACIER_VAULT: wia-legacy-glacier
+
+  db:
+    image: postgres:15
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+  media_temp:
+</pre>
+
+<hr>
+
+<h2>8.8 Security</h2>
+
+<table border="1">
+<tr>
+<th>Layer</th>
+<th>Protection</th>
+</tr>
+<tr>
+<td>Transport</td>
+<td>TLS 1.3 everywhere</td>
+</tr>
+<tr>
+<td>Authentication</td>
+<td>OAuth 2.0 / JWT</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>RBAC per legacy</td>
+</tr>
+<tr>
+<td>Data at Rest</td>
+<td>AES-256 encryption</td>
+</tr>
+<tr>
+<td>Archives</td>
+<td>Customer-managed keys</td>
+</tr>
+<tr>
+<td>Audit</td>
+<td>Complete access logging</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>8.9 Compliance Checklist</h2>
+
+<pre>
+IMPLEMENTATION CHECKLIST
+========================
+
+Data Format:
+  [ ] Legacy profile schema
+  [ ] Biography structure
+  [ ] Life events
+  [ ] Media attachments
+  [ ] Tributes
+
+Features:
+  [ ] Photo AI selection
+  [ ] Timeline generation
+  [ ] Memorial page rendering
+  [ ] Tribute moderation
+  [ ] Virtual offerings
+  [ ] Memory book generation
+
+Storage:
+  [ ] Hot/warm/cold tiers
+  [ ] Archive encryption
+  [ ] Integrity verification
+  [ ] Retention policies
+
+Access:
+  [ ] Family sharing
+  [ ] Inheritance system
+  [ ] Export functionality
+  [ ] Recovery procedures
+
+Privacy:
+  [ ] Visibility controls
+  [ ] Moderation tools
+  [ ] Consent management
+  [ ] Right to deletion
+</pre>
+
+<hr>
+
+<h2>8.10 Support Integration</h2>
+
+<pre>
+GRIEF SUPPORT RESOURCES
+=======================
+
+Integration Points:
+  - After activation notification
+  - In memorial footer
+  - In app help section
+
+Resource Types:
+  - Hotline numbers
+  - Online support groups
+  - Local counseling
+  - Pet loss literature
+
+Timing:
+  - Immediate after activation
+  - Weekly check-ins (optional)
+  - Anniversary reminders
+  - Holiday support
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] Microservices architecture for scalability</li>
+<li>[OK] PostgreSQL with JSONB for flexibility</li>
+<li>[OK] Multi-stage media processing pipeline</li>
+<li>[OK] Template-based memorial generation</li>
+<li>[OK] Docker-based deployment</li>
+<li>[OK] Comprehensive security measures</li>
+</ul>
+
+<hr>
+
+<h2>Document Information</h2>
+
+<table border="1">
+<tr><td>Standard</td><td>WIA-PET-LEGACY Version 1.0.0</td></tr>
+<tr><td>Document</td><td>Implementation Ebook</td></tr>
+<tr><td>Status</td><td>Active</td></tr>
+<tr><td>Philosophy</td><td>Hong-ik Ingan</td></tr>
+</table>
+
+<hr>
+
+<p><a href="chapter-07.html">Previous: Chapter 7 - Archive</a> | <a href="index.html">Back to Table of Contents</a></p>
+</body>
+</html>

@@ -1,0 +1,545 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wia.live/schemas/ai/message.schema.json",
+  "title": "WIA AI Protocol Message",
+  "description": "Schema for WIA AI communication protocol messages",
+  "type": "object",
+  "required": ["protocol", "version", "message_id", "timestamp", "type"],
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "const": "wia-ai",
+      "description": "Protocol identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Protocol version (semver)"
+    },
+    "message_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9-]+$",
+      "description": "Unique message identifier (UUID v4 recommended)"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp in milliseconds"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "connect",
+        "connect_ack",
+        "disconnect",
+        "ping",
+        "pong",
+        "message",
+        "stream_start",
+        "stream_delta",
+        "stream_end",
+        "tool_call",
+        "tool_result",
+        "handoff",
+        "handoff_ack",
+        "broadcast",
+        "state_sync",
+        "error"
+      ],
+      "description": "Message type"
+    },
+    "source": {
+      "$ref": "#/definitions/entityReference",
+      "description": "Message sender"
+    },
+    "target": {
+      "$ref": "#/definitions/entityReference",
+      "description": "Message recipient"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Message payload"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "connect" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/connectPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "connect_ack" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/connectAckPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "disconnect" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/disconnectPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "message" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/messagePayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "stream_start" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/streamStartPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "stream_delta" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/streamDeltaPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "stream_end" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/streamEndPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "tool_call" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/toolCallPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "tool_result" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/toolResultPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "handoff" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/handoffPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "handoff_ack" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/handoffAckPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "error" } }
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/definitions/errorPayload" }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "entityReference": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Entity identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["agent", "client", "server", "tool", "orchestrator"],
+          "description": "Entity type"
+        },
+        "name": {
+          "type": "string",
+          "description": "Entity name"
+        },
+        "version": {
+          "type": "string",
+          "description": "Entity version"
+        }
+      }
+    },
+    "connectPayload": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Supported capabilities"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Agent ID to connect to"
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["bearer", "api_key"]
+            },
+            "token": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "connectAckPayload": {
+      "type": "object",
+      "required": ["session_id"],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "Session identifier"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "disconnectPayload": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": ["normal", "error", "timeout", "shutdown"]
+        },
+        "code": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "messagePayload": {
+      "type": "object",
+      "required": ["role", "content"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant", "system", "tool"]
+        },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/contentBlock" }
+        }
+      }
+    },
+    "contentBlock": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["text", "image", "tool_use", "tool_result"]
+        },
+        "text": {
+          "type": "string"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "media_type": { "type": "string" },
+            "data": { "type": "string" }
+          }
+        }
+      }
+    },
+    "streamStartPayload": {
+      "type": "object",
+      "required": ["stream_id"],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "description": "Stream identifier"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model used"
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "streamDeltaPayload": {
+      "type": "object",
+      "required": ["stream_id", "delta"],
+      "properties": {
+        "stream_id": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "delta": {
+          "$ref": "#/definitions/delta"
+        }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["text_delta", "tool_use_delta", "thinking_delta"]
+        },
+        "text": {
+          "type": "string"
+        },
+        "partial_json": {
+          "type": "string"
+        }
+      }
+    },
+    "streamEndPayload": {
+      "type": "object",
+      "required": ["stream_id"],
+      "properties": {
+        "stream_id": {
+          "type": "string"
+        },
+        "stop_reason": {
+          "type": "string",
+          "enum": ["end_turn", "max_tokens", "stop_sequence", "tool_use", "error"]
+        },
+        "usage": {
+          "$ref": "#/definitions/usage"
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_read_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_creation_tokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "toolCallPayload": {
+      "type": "object",
+      "required": ["call_id", "tool_name", "arguments"],
+      "properties": {
+        "call_id": {
+          "type": "string",
+          "description": "Unique call identifier"
+        },
+        "tool_name": {
+          "type": "string",
+          "description": "Name of the tool to call"
+        },
+        "arguments": {
+          "type": "object",
+          "description": "Tool arguments"
+        }
+      }
+    },
+    "toolResultPayload": {
+      "type": "object",
+      "required": ["call_id", "status"],
+      "properties": {
+        "call_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "timeout", "cancelled"]
+        },
+        "result": {
+          "description": "Tool execution result"
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        },
+        "execution_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "handoffPayload": {
+      "type": "object",
+      "required": ["handoff_id", "reason"],
+      "properties": {
+        "handoff_id": {
+          "type": "string",
+          "description": "Unique handoff identifier"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason for handoff"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "normal", "low"],
+          "default": "normal"
+        },
+        "context": {
+          "$ref": "#/definitions/handoffContext"
+        },
+        "deadline_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "handoffContext": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string",
+          "description": "Task description"
+        },
+        "requirements": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "conversation_history": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/messagePayload" }
+        },
+        "metadata": {
+          "type": "object"
+        }
+      }
+    },
+    "handoffAckPayload": {
+      "type": "object",
+      "required": ["handoff_id", "accepted"],
+      "properties": {
+        "handoff_id": {
+          "type": "string"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason for rejection if not accepted"
+        },
+        "estimated_duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "errorPayload": {
+      "type": "object",
+      "required": ["error_code", "error_name", "message"],
+      "properties": {
+        "error_code": {
+          "type": "integer",
+          "description": "Numeric error code"
+        },
+        "error_name": {
+          "type": "string",
+          "description": "Error name constant"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional error details"
+        },
+        "retryable": {
+          "type": "boolean",
+          "default": false
+        },
+        "retry_after_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⏰ Universal Timestamp Simulator | WIA-CORE-009</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #6B7280;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            background: transparent;
+            color: #94a3b8;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            color: #6B7280;
+        }
+
+        .tab.active {
+            color: #6B7280;
+            border-bottom: 3px solid #6B7280;
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(15, 23, 42, 0.6);
+            border: 2px solid #6B7280;
+            border-radius: 15px;
+            padding: 2rem;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            color: #9CA3AF;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: #1e293b;
+            border: 1px solid #6B7280;
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 1rem;
+        }
+
+        textarea {
+            min-height: 100px;
+            font-family: 'Courier New', monospace;
+        }
+
+        button {
+            padding: 0.75rem 2rem;
+            background: #6B7280;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #9CA3AF;
+            transform: translateY(-2px);
+        }
+
+        .output-box {
+            background: #1e293b;
+            border: 1px solid #6B7280;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            font-family: 'Courier New', monospace;
+            color: #94a3b8;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .live-clock {
+            text-align: center;
+            font-size: 2rem;
+            color: #6B7280;
+            margin: 2rem 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .precision-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .precision-item {
+            background: #1e293b;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #6B7280;
+        }
+
+        .precision-label {
+            color: #9CA3AF;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .precision-value {
+            color: #6B7280;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .language-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .language-item {
+            background: #1e293b;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #6B7280;
+        }
+
+        .language-name {
+            color: #9CA3AF;
+            font-size: 0.85rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .language-output {
+            color: #6B7280;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-valid { background: #10b981; }
+        .status-invalid { background: #ef4444; }
+        .status-warning { background: #f59e0b; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Universal Timestamp</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>⏰ Universal Timestamp Simulator</h1>
+            <p style="color: #94a3b8;">WIA-CORE-009 Interactive Testing Environment</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('generator')"> Generator</button>
+            <button class="tab" onclick="switchTab('converter')">🔄 Converter</button>
+            <button class="tab" onclick="switchTab('validator')">✅ Validator</button>
+            <button class="tab" onclick="switchTab('precision')"> Precision Levels</button>
+            <button class="tab" onclick="switchTab('localization')"> 99 Languages</button>
+        </div>
+
+        <!-- Tab 1: Generator -->
+        <div id="generator" class="tab-content active">
+            <h2 style="color: #6B7280; margin-bottom: 1.5rem;">Timestamp Generator</h2>
+
+            <div class="live-clock" id="liveClock">Loading...</div>
+
+            <div class="grid-2">
+                <div class="control-group">
+                    <label>Precision Level</label>
+                    <select id="genPrecision">
+                        <option value="second">Second</option>
+                        <option value="millisecond" selected>Millisecond</option>
+                        <option value="microsecond">Microsecond</option>
+                        <option value="nanosecond">Nanosecond</option>
+                        <option value="picosecond">Picosecond</option>
+                        <option value="femtosecond">Femtosecond</option>
+                        <option value="attosecond">Attosecond</option>
+                        <option value="planck">Planck Time</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Timezone</label>
+                    <select id="genTimezone">
+                        <option value="UTC">UTC</option>
+                        <option value="America/New_York">America/New_York (EST/EDT)</option>
+                        <option value="Europe/London">Europe/London (GMT/BST)</option>
+                        <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                        <option value="Asia/Seoul">Asia/Seoul (KST)</option>
+                        <option value="Australia/Sydney">Australia/Sydney (AEDT)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Temporal Context</label>
+                    <select id="genContext">
+                        <option value="present" selected>Present</option>
+                        <option value="past">Past (Historical)</option>
+                        <option value="future">Future (Predicted)</option>
+                        <option value="simulated">Simulated</option>
+                        <option value="quantum">Quantum Superposition</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Include Hash</label>
+                    <select id="genHash">
+                        <option value="true" selected>Yes (SHA-256)</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="generateTimestamp()" style="margin-top: 1rem;"> Generate Timestamp</button>
+
+            <div class="output-box" id="genOutput">Click "Generate Timestamp" to create a new timestamp</div>
+        </div>
+
+        <!-- Tab 2: Converter -->
+        <div id="converter" class="tab-content">
+            <h2 style="color: #6B7280; margin-bottom: 1.5rem;">Format Converter</h2>
+
+            <div class="control-group">
+                <label>Input Format</label>
+                <select id="convertFrom">
+                    <option value="unix">Unix Timestamp</option>
+                    <option value="iso8601">ISO 8601</option>
+                    <option value="wia">WIA Format</option>
+                    <option value="rfc3339">RFC 3339</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Input Value</label>
+                <textarea id="convertInput" placeholder="Enter timestamp to convert...">1735308896789</textarea>
+            </div>
+
+            <div class="control-group">
+                <label>Output Format</label>
+                <select id="convertTo">
+                    <option value="all" selected>All Formats</option>
+                    <option value="unix">Unix Timestamp</option>
+                    <option value="iso8601">ISO 8601</option>
+                    <option value="wia">WIA Format</option>
+                    <option value="rfc3339">RFC 3339</option>
+                </select>
+            </div>
+
+            <button onclick="convertTimestamp()">🔄 Convert</button>
+
+            <div class="output-box" id="convertOutput">Conversion results will appear here</div>
+        </div>
+
+        <!-- Tab 3: Validator -->
+        <div id="validator" class="tab-content">
+            <h2 style="color: #6B7280; margin-bottom: 1.5rem;">Timestamp Validator</h2>
+
+            <div class="control-group">
+                <label>Timestamp to Validate</label>
+                <textarea id="validateInput" placeholder="Enter timestamp to validate...">2025-12-27T12:34:56.789123456Z[UTC]{context:present}</textarea>
+            </div>
+
+            <div class="control-group">
+                <label>Validation Level</label>
+                <select id="validateLevel">
+                    <option value="basic">Basic (Syntax)</option>
+                    <option value="strict" selected>Strict (Full Validation)</option>
+                    <option value="pedantic">Pedantic (WIA Compliance)</option>
+                </select>
+            </div>
+
+            <button onclick="validateTimestamp()">✅ Validate</button>
+
+            <div class="output-box" id="validateOutput">Validation results will appear here</div>
+        </div>
+
+        <!-- Tab 4: Precision Levels -->
+        <div id="precision" class="tab-content">
+            <h2 style="color: #6B7280; margin-bottom: 1.5rem;">Precision Levels Demonstration</h2>
+            <p style="color: #94a3b8; margin-bottom: 2rem;">
+                Current timestamp across all supported precision levels (10⁰ to 10⁻⁴⁴ seconds):
+            </p>
+
+            <div class="precision-grid" id="precisionGrid">
+                <!-- Will be populated dynamically -->
+            </div>
+
+            <button onclick="updatePrecisionLevels()" style="margin-top: 1.5rem;"> Refresh All Precision Levels</button>
+        </div>
+
+        <!-- Tab 5: 99 Languages -->
+        <div id="localization" class="tab-content">
+            <h2 style="color: #6B7280; margin-bottom: 1.5rem;">99 Language Localization</h2>
+            <p style="color: #94a3b8; margin-bottom: 1rem;">
+                Current timestamp formatted in 99 different languages:
+            </p>
+
+            <div class="control-group">
+                <label>Date/Time Format Style</label>
+                <select id="langFormat">
+                    <option value="full">Full (Date + Time)</option>
+                    <option value="long">Long</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="short">Short</option>
+                </select>
+            </div>
+
+            <button onclick="updateLanguages()" style="margin-bottom: 1rem;"> Refresh Languages</button>
+
+            <div class="language-grid" id="languageGrid">
+                <!-- Will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Current active tab
+        let currentTab = 'generator';
+
+        // Switch tabs
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            currentTab = tabName;
+
+            // Auto-update certain tabs
+            if (tabName === 'precision') updatePrecisionLevels();
+            if (tabName === 'localization') updateLanguages();
+        }
+
+        // Live clock
+        function updateLiveClock() {
+            const now = new Date();
+            const timestamp = formatWIATimestamp(now, 'millisecond', 'UTC', 'present', false);
+            document.getElementById('liveClock').textContent = timestamp;
+        }
+        setInterval(updateLiveClock, 100);
+        updateLiveClock();
+
+        // Format WIA timestamp
+        function formatWIATimestamp(date, precision, timezone, context, includeHash) {
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            const hour = String(date.getUTCHours()).padStart(2, '0');
+            const minute = String(date.getUTCMinutes()).padStart(2, '0');
+            const second = String(date.getUTCSeconds()).padStart(2, '0');
+
+            let fractional = '';
+            const ms = date.getMilliseconds();
+
+            switch(precision) {
+                case 'millisecond': fractional = `.${String(ms).padStart(3, '0')}`; break;
+                case 'microsecond': fractional = `.${String(ms).padStart(3, '0')}${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`; break;
+                case 'nanosecond': fractional = `.${String(ms).padStart(3, '0')}${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`; break;
+                case 'picosecond': fractional = `.${String(ms).padStart(3, '0')}${String(Math.floor(Math.random() * 1000000000)).padStart(9, '0')}`; break;
+                case 'femtosecond': fractional = `.${String(ms).padStart(3, '0')}${'000000000000'.substring(0, 12)}`; break;
+                case 'attosecond': fractional = `.${String(ms).padStart(3, '0')}${'000000000000000'.substring(0, 15)}`; break;
+                case 'planck': fractional = `.${String(ms).padStart(3, '0')}${'000000000000000000000000000000000000000000'.substring(0, 41)}`; break;
+            }
+
+            let result = `${year}-${month}-${day}T${hour}:${minute}:${second}${fractional}Z[${timezone}]{context:${context}}`;
+
+            if (includeHash) {
+                result += `#${generateSimpleHash(result)}`;
+            }
+
+            return result;
+        }
+
+        // Simple hash generator (mock SHA-256)
+        function generateSimpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & hash;
+            }
+            return Math.abs(hash).toString(16).padStart(16, '0').substring(0, 16);
+        }
+
+        // Generate timestamp
+        function generateTimestamp() {
+            const precision = document.getElementById('genPrecision').value;
+            const timezone = document.getElementById('genTimezone').value;
+            const context = document.getElementById('genContext').value;
+            const includeHash = document.getElementById('genHash').value === 'true';
+
+            const now = new Date();
+            const timestamp = formatWIATimestamp(now, precision, timezone, context, includeHash);
+
+            const output = `Generated Timestamp:
+${timestamp}
+
+Details:
+- Precision: ${precision}
+- Timezone: ${timezone}
+- Context: ${context}
+- Hash: ${includeHash ? 'Included' : 'Not included'}
+- Unix: ${Math.floor(now.getTime() / 1000)}
+- ISO 8601: ${now.toISOString()}`;
+
+            document.getElementById('genOutput').textContent = output;
+        }
+
+        // Convert timestamp
+        function convertTimestamp() {
+            const from = document.getElementById('convertFrom').value;
+            const input = document.getElementById('convertInput').value.trim();
+            const to = document.getElementById('convertTo').value;
+
+            try {
+                let date;
+
+                // Parse input
+                if (from === 'unix') {
+                    date = new Date(parseInt(input));
+                } else {
+                    date = new Date(input);
+                }
+
+                if (isNaN(date.getTime())) {
+                    throw new Error('Invalid timestamp');
+                }
+
+                // Convert to requested format(s)
+                let output = 'Conversion Results:\n\n';
+
+                if (to === 'all' || to === 'unix') {
+                    output += `Unix Timestamp:\n${Math.floor(date.getTime() / 1000)}\n\n`;
+                }
+                if (to === 'all' || to === 'iso8601') {
+                    output += `ISO 8601:\n${date.toISOString()}\n\n`;
+                }
+                if (to === 'all' || to === 'wia') {
+                    output += `WIA Format:\n${formatWIATimestamp(date, 'millisecond', 'UTC', 'present', true)}\n\n`;
+                }
+                if (to === 'all' || to === 'rfc3339') {
+                    output += `RFC 3339:\n${date.toISOString()}\n\n`;
+                }
+
+                document.getElementById('convertOutput').textContent = output;
+            } catch (e) {
+                document.getElementById('convertOutput').textContent = `Error: ${e.message}`;
+            }
+        }
+
+        // Validate timestamp
+        function validateTimestamp() {
+            const input = document.getElementById('validateInput').value.trim();
+            const level = document.getElementById('validateLevel').value;
+
+            let output = 'Validation Results:\n\n';
+            let isValid = true;
+            let warnings = [];
+
+            // Basic syntax check
+            const wiaRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+            if (!wiaRegex.test(input)) {
+                isValid = false;
+                output += '❌ INVALID: Does not match basic WIA timestamp format\n';
+            } else {
+                output += '✅ Valid: Basic syntax check passed\n';
+            }
+
+            // Check for timezone
+            if (input.includes('[') && input.includes(']')) {
+                output += '✅ Valid: Timezone information present\n';
+            } else {
+                if (level === 'strict' || level === 'pedantic') {
+                    warnings.push('⚠️  Warning: No timezone information');
+                }
+            }
+
+            // Check for context
+            if (input.includes('{context:')) {
+                output += '✅ Valid: Temporal context present\n';
+            } else {
+                if (level === 'pedantic') {
+                    warnings.push('⚠️  Warning: No temporal context');
+                }
+            }
+
+            // Check for hash
+            if (input.includes('#')) {
+                output += '✅ Valid: Cryptographic hash present\n';
+            } else {
+                warnings.push('ℹ️  Info: No hash included (optional)');
+            }
+
+            if (warnings.length > 0) {
+                output += '\nWarnings:\n' + warnings.join('\n');
+            }
+
+            output += '\n\nValidation Level: ' + level.toUpperCase();
+            output += '\nOverall Status: ' + (isValid ? '✅ VALID' : '❌ INVALID');
+
+            document.getElementById('validateOutput').textContent = output;
+        }
+
+        // Update precision levels
+        function updatePrecisionLevels() {
+            const precisions = [
+                { name: 'Second', value: 'second', scale: '10⁰ s' },
+                { name: 'Millisecond', value: 'millisecond', scale: '10⁻³ s' },
+                { name: 'Microsecond', value: 'microsecond', scale: '10⁻⁶ s' },
+                { name: 'Nanosecond', value: 'nanosecond', scale: '10⁻⁹ s' },
+                { name: 'Picosecond', value: 'picosecond', scale: '10⁻¹² s' },
+                { name: 'Femtosecond', value: 'femtosecond', scale: '10⁻¹⁵ s' },
+                { name: 'Attosecond', value: 'attosecond', scale: '10⁻¹⁸ s' },
+                { name: 'Planck Time', value: 'planck', scale: '10⁻⁴⁴ s' }
+            ];
+
+            const now = new Date();
+            const grid = document.getElementById('precisionGrid');
+            grid.innerHTML = '';
+
+            precisions.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'precision-item';
+                item.innerHTML = `
+                    <div class="precision-label">${p.name} (${p.scale})</div>
+                    <div class="precision-value">${formatWIATimestamp(now, p.value, 'UTC', 'present', false)}</div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+
+        // 99 Languages
+        const languages = [
+            { code: 'en', name: 'English' },
+            { code: 'ko', name: '한국어 (Korean)' },
+            { code: 'ja', name: '日本語 (Japanese)' },
+            { code: 'zh', name: '中文 (Chinese)' },
+            { code: 'es', name: 'Español (Spanish)' },
+            { code: 'fr', name: 'Français (French)' },
+            { code: 'de', name: 'Deutsch (German)' },
+            { code: 'it', name: 'Italiano (Italian)' },
+            { code: 'pt', name: 'Português (Portuguese)' },
+            { code: 'ru', name: 'Русский (Russian)' },
+            { code: 'ar', name: 'العربية (Arabic)' },
+            { code: 'hi', name: 'हिन्दी (Hindi)' },
+            { code: 'bn', name: 'বাংলা (Bengali)' },
+            { code: 'pa', name: 'ਪੰਜਾਬੀ (Punjabi)' },
+            { code: 'jv', name: 'Javanese' },
+            { code: 'vi', name: 'Tiếng Việt (Vietnamese)' },
+            { code: 'tr', name: 'Türkçe (Turkish)' },
+            { code: 'th', name: 'ไทย (Thai)' },
+            { code: 'pl', name: 'Polski (Polish)' },
+            { code: 'nl', name: 'Nederlands (Dutch)' },
+            { code: 'sv', name: 'Svenska (Swedish)' },
+            { code: 'da', name: 'Dansk (Danish)' },
+            { code: 'no', name: 'Norsk (Norwegian)' },
+            { code: 'fi', name: 'Suomi (Finnish)' },
+            { code: 'cs', name: 'Čeština (Czech)' },
+            { code: 'hu', name: 'Magyar (Hungarian)' },
+            { code: 'ro', name: 'Română (Romanian)' },
+            { code: 'el', name: 'Ελληνικά (Greek)' },
+            { code: 'he', name: 'עברית (Hebrew)' },
+            { code: 'id', name: 'Bahasa Indonesia' },
+            { code: 'ms', name: 'Bahasa Melayu (Malay)' },
+            { code: 'tl', name: 'Tagalog (Filipino)' },
+            { code: 'sw', name: 'Kiswahili (Swahili)' },
+            { code: 'uk', name: 'Українська (Ukrainian)' },
+            { code: 'fa', name: 'فارسی (Persian)' },
+            { code: 'ur', name: 'اردو (Urdu)' },
+            { code: 'ta', name: 'தமிழ் (Tamil)' },
+            { code: 'te', name: 'తెలుగు (Telugu)' },
+            { code: 'mr', name: 'मराठी (Marathi)' },
+            { code: 'gu', name: 'ગુજરાતી (Gujarati)' },
+            { code: 'kn', name: 'ಕನ್ನಡ (Kannada)' },
+            { code: 'ml', name: 'മലയാളം (Malayalam)' },
+            { code: 'si', name: 'සිංහල (Sinhala)' },
+            { code: 'my', name: 'မြန်မာဘာသာ (Burmese)' },
+            { code: 'km', name: 'ភាសាខ្មែរ (Khmer)' },
+            { code: 'lo', name: 'ລາວ (Lao)' },
+            { code: 'am', name: 'አማርኛ (Amharic)' },
+            { code: 'ne', name: 'नेपाली (Nepali)' },
+            { code: 'az', name: 'Azərbaycan (Azerbaijani)' },
+            { code: 'kk', name: 'Қазақша (Kazakh)' },
+            { code: 'uz', name: 'Oʻzbekcha (Uzbek)' },
+            { code: 'sq', name: 'Shqip (Albanian)' },
+            { code: 'sr', name: 'Српски (Serbian)' },
+            { code: 'hr', name: 'Hrvatski (Croatian)' },
+            { code: 'bs', name: 'Bosanski (Bosnian)' },
+            { code: 'mk', name: 'Македонски (Macedonian)' },
+            { code: 'bg', name: 'Български (Bulgarian)' },
+            { code: 'sk', name: 'Slovenčina (Slovak)' },
+            { code: 'sl', name: 'Slovenščina (Slovenian)' },
+            { code: 'lt', name: 'Lietuvių (Lithuanian)' },
+            { code: 'lv', name: 'Latviešu (Latvian)' },
+            { code: 'et', name: 'Eesti (Estonian)' },
+            { code: 'is', name: 'Íslenska (Icelandic)' },
+            { code: 'ga', name: 'Gaeilge (Irish)' },
+            { code: 'cy', name: 'Cymraeg (Welsh)' },
+            { code: 'eu', name: 'Euskara (Basque)' },
+            { code: 'ca', name: 'Català (Catalan)' },
+            { code: 'gl', name: 'Galego (Galician)' },
+            { code: 'af', name: 'Afrikaans' },
+            { code: 'zu', name: 'isiZulu (Zulu)' },
+            { code: 'xh', name: 'isiXhosa (Xhosa)' },
+            { code: 'ha', name: 'Hausa' },
+            { code: 'yo', name: 'Yorùbá (Yoruba)' },
+            { code: 'ig', name: 'Igbo' },
+            { code: 'so', name: 'Soomaali (Somali)' },
+            { code: 'mg', name: 'Malagasy' },
+            { code: 'rw', name: 'Kinyarwanda' },
+            { code: 'sn', name: 'ChiShona (Shona)' },
+            { code: 'ny', name: 'Chichewa' },
+            { code: 'st', name: 'Sesotho' },
+            { code: 'tn', name: 'Setswana (Tswana)' },
+            { code: 'mt', name: 'Malti (Maltese)' },
+            { code: 'lb', name: 'Lëtzebuergesch (Luxembourgish)' },
+            { code: 'fy', name: 'Frysk (Frisian)' },
+            { code: 'gd', name: 'Gàidhlig (Scottish Gaelic)' },
+            { code: 'mn', name: 'Монгол (Mongolian)' },
+            { code: 'ky', name: 'Кыргызча (Kyrgyz)' },
+            { code: 'tg', name: 'Тоҷикӣ (Tajik)' },
+            { code: 'tk', name: 'Türkmençe (Turkmen)' },
+            { code: 'ps', name: 'پښتو (Pashto)' },
+            { code: 'ku', name: 'Kurdî (Kurdish)' },
+            { code: 'hy', name: 'Հայերեն (Armenian)' },
+            { code: 'ka', name: 'ქართული (Georgian)' },
+            { code: 'be', name: 'Беларуская (Belarusian)' },
+            { code: 'yi', name: 'ייִדיש (Yiddish)' },
+            { code: 'la', name: 'Latina (Latin)' },
+            { code: 'eo', name: 'Esperanto' },
+            { code: 'jw', name: 'Basa Jawa (Javanese)' }
+        ];
+
+        // Update languages display
+        function updateLanguages() {
+            const format = document.getElementById('langFormat').value;
+            const now = new Date();
+            const grid = document.getElementById('languageGrid');
+            grid.innerHTML = '';
+
+            languages.forEach(lang => {
+                try {
+                    let formatted;
+                    const options = format === 'full'
+                        ? { dateStyle: 'full', timeStyle: 'full' }
+                        : format === 'long'
+                        ? { dateStyle: 'long', timeStyle: 'long' }
+                        : format === 'medium'
+                        ? { dateStyle: 'medium', timeStyle: 'medium' }
+                        : { dateStyle: 'short', timeStyle: 'short' };
+
+                    formatted = new Intl.DateTimeFormat(lang.code, options).format(now);
+
+                    const item = document.createElement('div');
+                    item.className = 'language-item';
+                    item.innerHTML = `
+                        <div class="language-name">${lang.name}</div>
+                        <div class="language-output">${formatted}</div>
+                    `;
+                    grid.appendChild(item);
+                } catch (e) {
+                    // Skip unsupported locales
+                }
+            });
+        }
+
+        // Initialize
+        updatePrecisionLevels();
+        updateLanguages();
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 보안 및 암호화 검증 | WIA-SOCIAL</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #EC4899; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { padding: 0; }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--text-secondary); }
+        .philosophy { color: var(--primary); font-size: 1.2rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">제6장</p>
+        <h1>보안 및 암호화 검증</h1>
+
+        <h2>6.1 디지털 서명 체계</h2>
+
+        <p>
+            디지털 서명은 공공문서의 진위성, 무결성, 부인 방지를 보장하는 핵심 메커니즘입니다. WIA-SOCIAL은 RSA, ECDSA, EdDSA 등 다양한 서명 알고리즘을 지원하며, 각 문서 유형과 보안 요구사항에 따라 적절한 알고리즘을 선택할 수 있습니다.
+        </p>
+
+        <h3>지원 서명 알고리즘</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>알고리즘</th>
+                    <th>키 크기</th>
+                    <th>보안 강도</th>
+                    <th>성능</th>
+                    <th>권장 용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>RSA-SHA256</td>
+                    <td>2048-4096 bit</td>
+                    <td>높음</td>
+                    <td>느림</td>
+                    <td>여권, 출생증명서 등 장기 보관 문서</td>
+                </tr>
+                <tr>
+                    <td>ECDSA P-256</td>
+                    <td>256 bit</td>
+                    <td>높음</td>
+                    <td>빠름</td>
+                    <td>운전면허증, 일반 행정 문서</td>
+                </tr>
+                <tr>
+                    <td>EdDSA (Ed25519)</td>
+                    <td>256 bit</td>
+                    <td>매우 높음</td>
+                    <td>매우 빠름</td>
+                    <td>실시간 검증이 필요한 모바일 문서</td>
+                </tr>
+                <tr>
+                    <td>RSA-PSS</td>
+                    <td>2048-4096 bit</td>
+                    <td>매우 높음</td>
+                    <td>느림</td>
+                    <td>국가 중요 문서, 법적 계약서</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>디지털 서명 생성 및 검증 (Node.js)</h3>
+
+        <pre><code>import crypto from 'crypto';
+import fs from 'fs';
+
+class DocumentSigner {
+  private privateKey: crypto.KeyObject;
+  private publicKey: crypto.KeyObject;
+
+  constructor(privateKeyPath: string, publicKeyPath: string) {
+    this.privateKey = crypto.createPrivateKey(
+      fs.readFileSync(privateKeyPath, 'utf8')
+    );
+    this.publicKey = crypto.createPublicKey(
+      fs.readFileSync(publicKeyPath, 'utf8')
+    );
+  }
+
+  signDocument(documentData: any): string {
+    // 문서를 정규화된 JSON으로 변환 (순서 보장)
+    const canonicalJson = JSON.stringify(documentData, Object.keys(documentData).sort());
+
+    // SHA-256 해시 생성
+    const hash = crypto.createHash('sha256').update(canonicalJson).digest();
+
+    // RSA-SHA256 서명 생성
+    const signature = crypto.sign('sha256', hash, {
+      key: this.privateKey,
+      padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+    });
+
+    return signature.toString('base64');
+  }
+
+  verifySignature(documentData: any, signature: string): boolean {
+    const canonicalJson = JSON.stringify(documentData, Object.keys(documentData).sort());
+    const hash = crypto.createHash('sha256').update(canonicalJson).digest();
+
+    const signatureBuffer = Buffer.from(signature, 'base64');
+
+    try {
+      return crypto.verify(
+        'sha256',
+        hash,
+        {
+          key: this.publicKey,
+          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+        },
+        signatureBuffer
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // 타임스탬프 포함 서명 (RFC 3161)
+  signWithTimestamp(documentData: any, tsaUrl: string): {
+    signature: string;
+    timestamp: string;
+    tsaSignature: string;
+  } {
+    const signature = this.signDocument(documentData);
+    const timestamp = new Date().toISOString();
+
+    // TSA (Time Stamping Authority)에 타임스탬프 요청
+    // 실제 구현에서는 TSA 서버와 통신
+    const tsaSignature = this.requestTimestamp(signature, tsaUrl);
+
+    return { signature, timestamp, tsaSignature };
+  }
+
+  private requestTimestamp(signature: string, tsaUrl: string): string {
+    // RFC 3161 타임스탬프 요청 구현
+    // 여기서는 간략화
+    return 'tsa_signature_placeholder';
+  }
+}
+
+// 사용 예시
+const signer = new DocumentSigner(
+  '/path/to/private_key.pem',
+  '/path/to/public_key.pem'
+);
+
+const birthCertificate = {
+  documentId: 'WIA-DOC-2025-0123456789',
+  documentType: 'BIRTH_CERTIFICATE',
+  fullName: '홍길동',
+  dateOfBirth: '2025-01-10',
+  issuingAuthority: 'Seoul City Government'
+};
+
+// 서명 생성
+const signature = signer.signDocument(birthCertificate);
+console.log('서명:', signature);
+
+// 서명 검증
+const isValid = signer.verifySignature(birthCertificate, signature);
+console.log('서명 유효:', isValid);
+</code></pre>
+
+        <h2>6.2 공개 키 인프라 (PKI)</h2>
+
+        <p>
+            PKI는 디지털 인증서를 발급, 관리, 폐기하는 시스템입니다. WIA-SOCIAL PKI는 계층적 인증 기관 구조를 사용하여 신뢰 체인을 구축합니다.
+        </p>
+
+        <h3>PKI 계층 구조</h3>
+
+        <div class="highlight-box">
+            <pre><code>Root CA (최상위 인증 기관)
+ ├─ WIA Root Certificate Authority
+ │
+ ├─ Intermediate CA Level 1 (국가별)
+ │   ├─ Korea CA
+ │   ├─ Singapore CA
+ │   └─ Estonia CA
+ │
+ └─ Intermediate CA Level 2 (기관별)
+     ├─ Seoul City Government CA
+     ├─ Busan City Government CA
+     └─ Ministry of Interior CA
+         │
+         └─ End Entity Certificates (실제 서명 인증서)
+             ├─ Officer Kim (발급 담당자)
+             ├─ Officer Lee (검증 담당자)
+             └─ System Certificate (자동화 시스템)</code></pre>
+        </div>
+
+        <h3>인증서 발급 및 관리</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>인증서 유형</th>
+                    <th>유효 기간</th>
+                    <th>갱신 주기</th>
+                    <th>사용 목적</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Root CA</td>
+                    <td>20년</td>
+                    <td>거의 안 함</td>
+                    <td>최상위 신뢰 앵커</td>
+                </tr>
+                <tr>
+                    <td>Intermediate CA</td>
+                    <td>10년</td>
+                    <td>5년마다</td>
+                    <td>하위 CA 서명</td>
+                </tr>
+                <tr>
+                    <td>End Entity (발급 담당자)</td>
+                    <td>2년</td>
+                    <td>1년마다</td>
+                    <td>문서 서명</td>
+                </tr>
+                <tr>
+                    <td>End Entity (시스템)</td>
+                    <td>1년</td>
+                    <td>6개월마다</td>
+                    <td>자동화 서명</td>
+                </tr>
+                <tr>
+                    <td>시민 인증서</td>
+                    <td>3년</td>
+                    <td>2년마다</td>
+                    <td>문서 접근 및 검증</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 암호화 및 키 관리</h2>
+
+        <p>
+            민감한 개인 정보를 포함하는 공공문서는 저장 및 전송 시 암호화되어야 합니다. WIA-SOCIAL은 AES-256-GCM을 사용한 대칭 암호화와 RSA/ECDH를 사용한 비대칭 암호화를 결합합니다.
+        </p>
+
+        <h3>하이브리드 암호화 구현</h3>
+
+        <pre><code>import crypto from 'crypto';
+
+class DocumentEncryption {
+  // 문서 암호화 (하이브리드 방식)
+  encryptDocument(
+    documentData: any,
+    recipientPublicKey: crypto.KeyObject
+  ): {
+    encryptedData: string;
+    encryptedKey: string;
+    iv: string;
+    authTag: string;
+  } {
+    // 1. AES-256-GCM 대칭 키 생성 (랜덤)
+    const aesKey = crypto.randomBytes(32); // 256 bits
+    const iv = crypto.randomBytes(12); // 96 bits (GCM 권장)
+
+    // 2. 문서를 AES-256-GCM으로 암호화
+    const cipher = crypto.createCipheriv('aes-256-gcm', aesKey, iv);
+    const documentJson = JSON.stringify(documentData);
+
+    let encryptedData = cipher.update(documentJson, 'utf8', 'base64');
+    encryptedData += cipher.final('base64');
+
+    const authTag = cipher.getAuthTag();
+
+    // 3. AES 키를 수신자의 공개 키로 RSA 암호화
+    const encryptedKey = crypto.publicEncrypt(
+      {
+        key: recipientPublicKey,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256'
+      },
+      aesKey
+    );
+
+    return {
+      encryptedData,
+      encryptedKey: encryptedKey.toString('base64'),
+      iv: iv.toString('base64'),
+      authTag: authTag.toString('base64')
+    };
+  }
+
+  // 문서 복호화
+  decryptDocument(
+    encryptedData: string,
+    encryptedKey: string,
+    iv: string,
+    authTag: string,
+    privateKey: crypto.KeyObject
+  ): any {
+    // 1. RSA 개인 키로 AES 키 복호화
+    const aesKey = crypto.privateDecrypt(
+      {
+        key: privateKey,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256'
+      },
+      Buffer.from(encryptedKey, 'base64')
+    );
+
+    // 2. AES-256-GCM으로 문서 복호화
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      aesKey,
+      Buffer.from(iv, 'base64')
+    );
+
+    decipher.setAuthTag(Buffer.from(authTag, 'base64'));
+
+    let decryptedData = decipher.update(encryptedData, 'base64', 'utf8');
+    decryptedData += decipher.final('utf8');
+
+    return JSON.parse(decryptedData);
+  }
+
+  // 필드 수준 암호화 (특정 필드만 암호화)
+  encryptSensitiveFields(
+    documentData: any,
+    sensitiveFields: string[],
+    key: Buffer
+  ): any {
+    const result = { ...documentData };
+
+    sensitiveFields.forEach(field => {
+      if (result[field]) {
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+        let encrypted = cipher.update(
+          JSON.stringify(result[field]),
+          'utf8',
+          'base64'
+        );
+        encrypted += cipher.final('base64');
+
+        result[field] = {
+          encrypted: true,
+          data: encrypted,
+          iv: iv.toString('base64'),
+          authTag: cipher.getAuthTag().toString('base64')
+        };
+      }
+    });
+
+    return result;
+  }
+}
+
+// 사용 예시
+const encryption = new DocumentEncryption();
+
+// 수신자의 공개 키 로드
+const recipientPublicKey = crypto.createPublicKey(
+  fs.readFileSync('/path/to/recipient_public_key.pem')
+);
+
+const document = {
+  documentId: 'WIA-DOC-2025-0123456789',
+  fullName: '홍길동',
+  nationalID: '900520-1234567',
+  address: '서울시 강남구 테헤란로 123'
+};
+
+// 문서 암호화
+const encrypted = encryption.encryptDocument(document, recipientPublicKey);
+
+// 복호화 (수신자 측)
+const recipientPrivateKey = crypto.createPrivateKey(
+  fs.readFileSync('/path/to/recipient_private_key.pem')
+);
+
+const decrypted = encryption.decryptDocument(
+  encrypted.encryptedData,
+  encrypted.encryptedKey,
+  encrypted.iv,
+  encrypted.authTag,
+  recipientPrivateKey
+);
+</code></pre>
+
+        <h2>6.4 접근 제어 및 권한 관리</h2>
+
+        <p>
+            공공문서는 엄격한 접근 제어가 필요합니다. WIA-SOCIAL은 역할 기반 접근 제어(RBAC)와 속성 기반 접근 제어(ABAC)를 결합한 하이브리드 모델을 사용합니다.
+        </p>
+
+        <h3>접근 제어 정책</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>문서 유형</th>
+                    <th>소유자 권한</th>
+                    <th>가족 권한</th>
+                    <th>정부 기관 권한</th>
+                    <th>제3자 권한</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>출생증명서</td>
+                    <td>읽기, 공유</td>
+                    <td>읽기 (부모/보호자)</td>
+                    <td>읽기, 수정, 취소</td>
+                    <td>읽기 (승인 시)</td>
+                </tr>
+                <tr>
+                    <td>운전면허증</td>
+                    <td>읽기, 갱신</td>
+                    <td>없음</td>
+                    <td>읽기, 수정, 정지</td>
+                    <td>검증만</td>
+                </tr>
+                <tr>
+                    <td>여권</td>
+                    <td>읽기</td>
+                    <td>없음</td>
+                    <td>읽기, 발급, 취소</td>
+                    <td>검증만</td>
+                </tr>
+                <tr>
+                    <td>재산 증서</td>
+                    <td>읽기, 이전</td>
+                    <td>읽기 (배우자)</td>
+                    <td>읽기, 등기</td>
+                    <td>검증만</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.5 GDPR 및 개인정보 보호</h2>
+
+        <p>
+            WIA-SOCIAL은 GDPR, CCPA 등 국제 개인정보 보호 규정을 준수합니다. 주요 준수 사항은 다음과 같습니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>🔒 개인정보 보호 원칙</h3>
+            <ul>
+                <li><strong>목적 제한:</strong> 수집된 개인정보는 명시된 목적으로만 사용</li>
+                <li><strong>데이터 최소화:</strong> 필요한 최소한의 정보만 수집</li>
+                <li><strong>정확성:</strong> 개인정보의 정확성을 유지하고 최신 상태로 업데이트</li>
+                <li><strong>저장 제한:</strong> 필요 기간 동안만 보관, 이후 안전하게 삭제</li>
+                <li><strong>무결성 및 기밀성:</strong> 적절한 보안 조치로 보호</li>
+                <li><strong>책임성:</strong> GDPR 준수를 입증할 수 있어야 함</li>
+                <li><strong>잊힐 권리:</strong> 요청 시 개인정보 삭제 (법적 의무 제외)</li>
+                <li><strong>데이터 이동권:</strong> 개인정보를 기계 판독 가능한 형식으로 제공</li>
+            </ul>
+        </div>
+
+        <h2>6.6 보안 감사 및 모니터링</h2>
+
+        <p>
+            모든 문서 접근 및 수정 활동은 감사 로그에 기록되며, 이상 행위 탐지 시스템이 실시간으로 모니터링합니다.
+        </p>
+
+        <h3>감사 로그 예시</h3>
+
+        <pre><code>{
+  "auditId": "AUDIT-2025-01-15-ABC123",
+  "timestamp": "2025-01-15T10:30:00.123Z",
+  "eventType": "DOCUMENT_ACCESSED",
+  "actor": {
+    "userId": "user-123456",
+    "name": "김철수",
+    "role": "CITIZEN",
+    "ipAddress": "203.0.113.42",
+    "userAgent": "Mozilla/5.0...",
+    "location": {
+      "country": "KR",
+      "city": "Seoul"
+    }
+  },
+  "resource": {
+    "documentId": "WIA-DOC-2025-0123456789",
+    "documentType": "BIRTH_CERTIFICATE",
+    "owner": "홍길동"
+  },
+  "action": "READ",
+  "result": "SUCCESS",
+  "accessMethod": "WEB_PORTAL",
+  "authenticationMethod": "TWO_FACTOR",
+  "sessionId": "sess-789012",
+  "riskScore": 0.1,
+  "anomalyDetected": false
+}</code></pre>
+
+        <h2>요약</h2>
+
+        <p>
+            공공문서 시스템의 보안은 디지털 서명, PKI, 암호화, 접근 제어, 개인정보 보호, 감사 추적이 통합된 다계층 방어 체계로 구성됩니다. 이러한 보안 메커니즘은 문서의 진위성과 무결성을 보장하고, 개인정보를 보호하며, 법적 요구사항을 충족합니다. 다음 장에서는 실제 시스템 통합 및 배포 전략을 살펴봅니다.
+        </p>
+
+        <div class="info-box">
+            <h3>🤔 복습 질문</h3>
+            <ol>
+                <li>RSA-SHA256과 ECDSA P-256의 차이점과 각각의 사용 사례를 설명하세요.</li>
+                <li>PKI의 인증서 체인이 어떻게 신뢰를 구축하는지 설명하세요.</li>
+                <li>하이브리드 암호화가 순수 비대칭 암호화보다 효율적인 이유는 무엇인가요?</li>
+                <li>RBAC와 ABAC의 차이점을 설명하고, 공공문서 시스템에서 어떻게 활용되는지 논의하세요.</li>
+                <li>GDPR의 '잊힐 권리'를 공공문서 시스템에서 어떻게 구현할 수 있나요?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

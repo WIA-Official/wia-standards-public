@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 모니터링 및 감사 | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="chapter-number">6장</div>
+            <h1>모니터링 및 감사</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            공정성은 일회성 성취가 아닙니다—지속적인 모니터링과 정기적인 감사가 필요합니다. 이 장에서는
+            弘益人間 원칙에 따라 운영 중인 공정한 AI를 유지하기 위한 시스템과 관행을 다룹니다.
+        </p>
+
+        <h2>지속적인 모니터링이 중요한 이유</h2>
+        <p>
+            데이터 분포가 변화하고, 사용자 모집단이 진화하며, 사회적 규범이 변화함에 따라 AI 시스템은
+            시간이 지남에 따라 드리프트할 수 있습니다. 지속적인 모니터링 없이는 배포 시 공정했던 시스템이
+            시간이 지남에 따라 편향될 수 있습니다.
+        </p>
+
+        <h2>모니터링 인프라 설정</h2>
+
+        <h3>1. 실시간 공정성 지표</h3>
+        <p>
+            전통적인 성능 지표와 함께 공정성 지표를 지속적으로 추적합니다.
+        </p>
+
+        <pre><code># 공정성 모니터링 대시보드
+import numpy as np
+from datetime import datetime, timedelta
+
+class FairnessMonitor:
+    """
+    실시간 공정성 모니터링 시스템
+    """
+    def __init__(self, protected_attributes, fairness_thresholds):
+        self.protected_attributes = protected_attributes
+        self.fairness_thresholds = fairness_thresholds
+        self.metrics_history = []
+        self.alerts = []
+
+    def log_prediction(self, features, prediction, true_label=None, timestamp=None):
+        """
+        모니터링을 위한 개별 예측 로그
+        """
+        if timestamp is None:
+            timestamp = datetime.now()
+
+        record = {
+            'timestamp': timestamp,
+            'features': features,
+            'prediction': prediction,
+            'true_label': true_label,
+            'protected_attrs': {
+                attr: features.get(attr) for attr in self.protected_attributes
+            }
+        }
+
+        self.metrics_history.append(record)
+
+    def compute_realtime_metrics(self, window_hours=24):
+        """
+        최근 예측에 대한 공정성 지표 계산
+        """
+        cutoff_time = datetime.now() - timedelta(hours=window_hours)
+        recent_records = [r for r in self.metrics_history
+                         if r['timestamp'] > cutoff_time]
+
+        if not recent_records:
+            return {}
+
+        # 데이터 추출
+        predictions = np.array([r['prediction'] for r in recent_records])
+
+        metrics = {}
+        for attr in self.protected_attributes:
+            groups = {}
+            for record in recent_records:
+                group = record['protected_attrs'][attr]
+                if group not in groups:
+                    groups[group] = []
+                groups[group].append(record['prediction'])
+
+            # 인구통계학적 균등성 계산
+            positive_rates = {}
+            for group, preds in groups.items():
+                positive_rates[group] = np.mean(preds)
+
+            if len(positive_rates) > 1:
+                max_rate = max(positive_rates.values())
+                min_rate = min(positive_rates.values())
+                disparity = max_rate - min_rate
+
+                metrics[attr] = {
+                    'positive_rates': positive_rates,
+                    'disparity': disparity,
+                    'status': '정상' if disparity < self.fairness_thresholds.get(attr, 0.1) else '경고'
+                }
+
+                if disparity >= self.fairness_thresholds.get(attr, 0.1):
+                    self.raise_alert(attr, disparity, positive_rates)
+
+        return metrics
+
+    def raise_alert(self, attribute, disparity, rates):
+        """
+        공정성 경고 발생
+        """
+        alert = {
+            'timestamp': datetime.now(),
+            'attribute': attribute,
+            'disparity': disparity,
+            'rates': rates,
+            'severity': '높음' if disparity > 0.2 else '중간'
+        }
+        self.alerts.append(alert)
+        print(f"⚠️ 공정성 경고: {attribute} 불균형 = {disparity:.3f}")
+
+    def generate_report(self):
+        """
+        모니터링 보고서 생성
+        """
+        print("공정성 모니터링 보고서")
+        print("=" * 70)
+        print(f"보고 시간: {datetime.now()}")
+        print(f"전체 로그된 예측: {len(self.metrics_history)}")
+        print(f"활성 경고: {len([a for a in self.alerts if (datetime.now() - a['timestamp']).seconds < 86400])}")
+
+        current_metrics = self.compute_realtime_metrics()
+
+        print("\n현재 공정성 상태:")
+        print("-" * 70)
+        for attr, data in current_metrics.items():
+            print(f"\n{attr}:")
+            print(f"  불균형: {data['disparity']:.3f} [{data['status']}]")
+            for group, rate in data['positive_rates'].items():
+                print(f"    {group}: {rate:.3f}")
+
+        print("\n弘益人間 - 모든 사용자를 위한 공정성 유지")
+        print("=" * 70)
+
+# 사용
+monitor = FairnessMonitor(
+    protected_attributes=['gender', 'race'],
+    fairness_thresholds={'gender': 0.1, 'race': 0.1}
+)
+</code></pre>
+
+        <h3>2. 드리프트 탐지</h3>
+        <p>
+            데이터 분포 또는 모델 동작이 크게 변경되는 시기를 탐지합니다.
+        </p>
+
+        <pre><code># 분포 드리프트 탐지
+from scipy import stats
+
+class DriftDetector:
+    """
+    피처 및 예측의 분포 드리프트 탐지
+    """
+    def __init__(self, reference_data, significance_level=0.05):
+        self.reference_data = reference_data
+        self.significance_level = significance_level
+
+    def detect_feature_drift(self, current_data, feature_name):
+        """
+        Kolmogorov-Smirnov 테스트를 사용하여 피처 드리프트 탐지
+        """
+        reference_values = self.reference_data[feature_name]
+        current_values = current_data[feature_name]
+
+        # KS 테스트
+        statistic, p_value = stats.ks_2samp(reference_values, current_values)
+
+        drift_detected = p_value < self.significance_level
+
+        result = {
+            'feature': feature_name,
+            'statistic': statistic,
+            'p_value': p_value,
+            'drift_detected': drift_detected
+        }
+
+        if drift_detected:
+            print(f"⚠️ {feature_name}에서 드리프트 탐지됨")
+            print(f"   KS 통계: {statistic:.4f}, p-값: {p_value:.4f}")
+
+        return result
+
+    def detect_prediction_drift(self, current_predictions):
+        """
+        예측 분포의 드리프트 탐지
+        """
+        reference_predictions = self.reference_data['predictions']
+
+        # 분포 비교
+        ref_mean = reference_predictions.mean()
+        curr_mean = current_predictions.mean()
+
+        ref_std = reference_predictions.std()
+        curr_std = current_predictions.std()
+
+        # 평균 차이에 대한 Z-테스트
+        z_score = (curr_mean - ref_mean) / (ref_std / np.sqrt(len(current_predictions)))
+        p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
+
+        drift_detected = p_value < self.significance_level
+
+        print(f"예측 드리프트 분석:")
+        print(f"  참조 평균: {ref_mean:.3f}")
+        print(f"  현재 평균: {curr_mean:.3f}")
+        print(f"  Z-점수: {z_score:.3f}")
+        print(f"  드리프트 탐지됨: {drift_detected}")
+
+        return drift_detected
+
+    def comprehensive_drift_check(self, current_data, protected_attrs):
+        """
+        모든 피처와 그룹에 대한 드리프트 확인
+        """
+        print("\n포괄적인 드리프트 확인")
+        print("=" * 70)
+
+        drift_report = {'features': {}, 'groups': {}}
+
+        # 각 피처 확인
+        for feature in current_data.columns:
+            if feature in protected_attrs:
+                continue
+            result = self.detect_feature_drift(current_data, feature)
+            drift_report['features'][feature] = result
+
+        # 그룹별 드리프트 확인
+        for attr in protected_attrs:
+            for group in current_data[attr].unique():
+                mask = current_data[attr] == group
+                group_predictions = current_data[mask]['predictions']
+
+                ref_mask = self.reference_data[attr] == group
+                ref_group_predictions = self.reference_data[ref_mask]['predictions']
+
+                # 그룹 분포 비교
+                statistic, p_value = stats.ks_2samp(ref_group_predictions, group_predictions)
+
+                drift_report['groups'][f"{attr}_{group}"] = {
+                    'statistic': statistic,
+                    'p_value': p_value,
+                    'drift_detected': p_value < self.significance_level
+                }
+
+        return drift_report
+</code></pre>
+
+        <h2>자동화된 감사 시스템</h2>
+
+        <h3>예약된 공정성 감사</h3>
+        <p>
+            정기적으로 포괄적인 공정성 감사를 실행합니다.
+        </p>
+
+        <pre><code># 자동화된 감사 스케줄러
+import schedule
+import time
+from datetime import datetime
+
+class AutomatedAuditor:
+    """
+    자동화된 공정성 감사 시스템
+    """
+    def __init__(self, model, data_source, protected_attrs):
+        self.model = model
+        self.data_source = data_source
+        self.protected_attrs = protected_attrs
+        self.audit_history = []
+
+    def run_audit(self):
+        """
+        포괄적인 공정성 감사 실행
+        """
+        print(f"\n{'='*70}")
+        print(f"자동화된 공정성 감사 - {datetime.now()}")
+        print(f"{'='*70}")
+
+        # 최근 데이터 가져오기
+        data = self.data_source.get_recent_data()
+        X = data[self.model.feature_names]
+        y_true = data['label']
+
+        # 예측 생성
+        y_pred = self.model.predict(X)
+
+        audit_results = {
+            'timestamp': datetime.now(),
+            'sample_size': len(data),
+            'overall_accuracy': np.mean(y_true == y_pred),
+            'group_metrics': {},
+            'alerts': []
+        }
+
+        # 각 보호 속성에 대한 공정성 평가
+        for attr in self.protected_attrs:
+            groups = data[attr].unique()
+
+            group_metrics = {}
+            for group in groups:
+                mask = data[attr] == group
+
+                accuracy = np.mean(y_true[mask] == y_pred[mask])
+                positive_rate = np.mean(y_pred[mask])
+
+                group_metrics[group] = {
+                    'accuracy': accuracy,
+                    'positive_rate': positive_rate,
+                    'sample_size': mask.sum()
+                }
+
+            # 불균형 확인
+            accuracies = [m['accuracy'] for m in group_metrics.values()]
+            acc_disparity = max(accuracies) - min(accuracies)
+
+            rates = [m['positive_rate'] for m in group_metrics.values()]
+            rate_disparity = max(rates) - min(rates)
+
+            audit_results['group_metrics'][attr] = {
+                'metrics': group_metrics,
+                'accuracy_disparity': acc_disparity,
+                'rate_disparity': rate_disparity
+            }
+
+            # 경고 생성
+            if acc_disparity > 0.1:
+                audit_results['alerts'].append({
+                    'type': 'accuracy_disparity',
+                    'attribute': attr,
+                    'severity': '높음',
+                    'value': acc_disparity
+                })
+
+            if rate_disparity > 0.1:
+                audit_results['alerts'].append({
+                    'type': 'demographic_parity',
+                    'attribute': attr,
+                    'severity': '중간',
+                    'value': rate_disparity
+                })
+
+        # 감사 결과 저장
+        self.audit_history.append(audit_results)
+
+        # 요약 출력
+        self.print_audit_summary(audit_results)
+
+        # 필요시 경고 전송
+        if audit_results['alerts']:
+            self.send_alerts(audit_results['alerts'])
+
+        return audit_results
+
+    def print_audit_summary(self, results):
+        """
+        감사 결과 요약 출력
+        """
+        print(f"\n감사 요약:")
+        print(f"  샘플 크기: {results['sample_size']}")
+        print(f"  전체 정확도: {results['overall_accuracy']:.3f}")
+        print(f"  생성된 경고: {len(results['alerts'])}")
+
+        for attr, data in results['group_metrics'].items():
+            print(f"\n{attr}:")
+            print(f"  정확도 불균형: {data['accuracy_disparity']:.3f}")
+            print(f"  비율 불균형: {data['rate_disparity']:.3f}")
+
+        print("\n弘益人間 - 정기적인 감사는 지속적인 공정성을 보장합니다")
+
+    def send_alerts(self, alerts):
+        """
+        이해관계자에게 경고 전송
+        """
+        for alert in alerts:
+            print(f"\n🚨 경고: {alert['type']} - {alert['severity']}")
+            print(f"   속성: {alert['attribute']}")
+            print(f"   값: {alert['value']:.3f}")
+
+    def schedule_audits(self, frequency='daily'):
+        """
+        정기 감사 예약
+        """
+        if frequency == 'daily':
+            schedule.every().day.at("02:00").do(self.run_audit)
+        elif frequency == 'weekly':
+            schedule.every().monday.at("02:00").do(self.run_audit)
+        elif frequency == 'hourly':
+            schedule.every().hour.do(self.run_audit)
+
+        print(f"자동화된 감사 예약됨: {frequency}")
+
+        # 스케줄러 실행
+        while True:
+            schedule.run_pending()
+            time.sleep(60)
+
+# 사용
+# auditor = AutomatedAuditor(model, data_source, ['gender', 'race'])
+# auditor.schedule_audits('daily')
+</code></pre>
+
+        <h2>성능 저하 탐지</h2>
+
+        <pre><code># 성능 저하 모니터
+class PerformanceDegradationDetector:
+    """
+    시간이 지남에 따른 점진적인 성능 저하 탐지
+    """
+    def __init__(self, baseline_metrics, degradation_threshold=0.05):
+        self.baseline_metrics = baseline_metrics
+        self.degradation_threshold = degradation_threshold
+        self.metric_history = []
+
+    def check_degradation(self, current_metrics):
+        """
+        기준선 대비 현재 지표 비교
+        """
+        degradations = {}
+
+        for metric_name, baseline_value in self.baseline_metrics.items():
+            current_value = current_metrics.get(metric_name)
+
+            if current_value is None:
+                continue
+
+            degradation = baseline_value - current_value
+            degradation_pct = (degradation / baseline_value) * 100
+
+            degradations[metric_name] = {
+                'baseline': baseline_value,
+                'current': current_value,
+                'degradation': degradation,
+                'degradation_pct': degradation_pct,
+                'threshold_exceeded': degradation > self.degradation_threshold
+            }
+
+        # 지표 로그
+        self.metric_history.append({
+            'timestamp': datetime.now(),
+            'metrics': current_metrics,
+            'degradations': degradations
+        })
+
+        # 유의미한 저하 보고
+        significant_degradations = {
+            k: v for k, v in degradations.items()
+            if v['threshold_exceeded']
+        }
+
+        if significant_degradations:
+            print("⚠️ 성능 저하 탐지됨")
+            for metric, data in significant_degradations.items():
+                print(f"  {metric}: {data['baseline']:.3f} → {data['current']:.3f} "
+                      f"({data['degradation_pct']:+.1f}%)")
+
+        return degradations
+
+    def analyze_trends(self, window_size=30):
+        """
+        시간이 지남에 따른 성능 추세 분석
+        """
+        if len(self.metric_history) < window_size:
+            print("추세 분석을 위한 이력 부족")
+            return
+
+        recent_history = self.metric_history[-window_size:]
+
+        print("\n성능 추세 분석")
+        print("=" * 70)
+
+        for metric_name in self.baseline_metrics.keys():
+            values = [h['metrics'].get(metric_name, 0) for h in recent_history]
+
+            # 추세 탐지를 위한 선형 회귀
+            x = np.arange(len(values))
+            slope, intercept = np.polyfit(x, values, 1)
+
+            trend = "개선" if slope > 0 else "저하"
+            trend_strength = abs(slope) * window_size
+
+            print(f"\n{metric_name}:")
+            print(f"  추세: {trend}")
+            print(f"  기울기: {slope:.6f}")
+            print(f"  {window_size}주기 동안 예상 변화: {trend_strength:.3f}")
+
+            if slope < -0.001:
+                print(f"  ⚠️ 저하 추세 탐지됨")
+
+        return True
+</code></pre>
+
+        <h2>이해관계자 보고</h2>
+
+        <pre><code># 이해관계자 보고서 생성기
+class StakeholderReportGenerator:
+    """
+    이해관계자를 위한 포괄적인 공정성 보고서 생성
+    """
+    def __init__(self, monitor, auditor):
+        self.monitor = monitor
+        self.auditor = auditor
+
+    def generate_executive_summary(self):
+        """
+        공정성 상태에 대한 요약 보고서 생성
+        """
+        print("\n" + "=" * 70)
+        print("요약 보고서 - AI 공정성 상태")
+        print("=" * 70)
+        print(f"보고 날짜: {datetime.now().strftime('%Y-%m-%d')}")
+
+        # 최신 감사 가져오기
+        if self.auditor.audit_history:
+            latest_audit = self.auditor.audit_history[-1]
+
+            print(f"\n전체 상태: ", end="")
+            if not latest_audit['alerts']:
+                print("✓ 준수")
+            else:
+                high_alerts = [a for a in latest_audit['alerts'] if a['severity'] == '높음']
+                if high_alerts:
+                    print("✗ 중대 문제")
+                else:
+                    print("⚠ 주의 필요")
+
+            print(f"\n주요 지표:")
+            print(f"  전체 예측: {latest_audit['sample_size']:,}")
+            print(f"  전체 정확도: {latest_audit['overall_accuracy']:.1%}")
+            print(f"  활성 경고: {len(latest_audit['alerts'])}")
+
+            print(f"\n보호 속성별 공정성 평가:")
+            for attr, data in latest_audit['group_metrics'].items():
+                print(f"\n{attr}:")
+                print(f"  최대 정확도 불균형: {data['accuracy_disparity']:.1%}")
+                print(f"  최대 비율 불균형: {data['rate_disparity']:.1%}")
+
+                status = "✓" if (data['accuracy_disparity'] < 0.1 and
+                               data['rate_disparity'] < 0.1) else "⚠"
+                print(f"  상태: {status}")
+
+        print("\n" + "=" * 70)
+        print("弘益人間 - 모든 사용자에게 공정하게 서비스하겠다는 약속")
+        print("=" * 70)
+
+    def generate_detailed_report(self, output_file):
+        """
+        시각화가 포함된 상세 보고서 생성
+        """
+        # 프로덕션에서는 차트, 표 등을 생성함
+        with open(output_file, 'w') as f:
+            f.write("상세 공정성 감사 보고서\n")
+            f.write("=" * 70 + "\n\n")
+
+            # 모든 감사 데이터 포함
+            for audit in self.auditor.audit_history[-10:]:  # 마지막 10개 감사
+                f.write(f"\n감사 날짜: {audit['timestamp']}\n")
+                f.write(f"정확도: {audit['overall_accuracy']:.3f}\n")
+                f.write(f"경고: {len(audit['alerts'])}\n")
+                f.write("-" * 70 + "\n")
+
+        print(f"상세 보고서 저장됨: {output_file}")
+
+# 사용
+# report_gen = StakeholderReportGenerator(monitor, auditor)
+# report_gen.generate_executive_summary()
+</code></pre>
+
+        <h2>지속적인 모니터링 모범 사례</h2>
+
+        <div class="callout">
+            <h3>弘益人間 모니터링 원칙</h3>
+            <ul>
+                <li><strong>지속적인 경계:</strong> 성능 지표와 함께 실시간으로 공정성 지표 모니터링</li>
+                <li><strong>사전 경고:</strong> 공정성 위반에 대한 자동 경고 설정</li>
+                <li><strong>정기 감사:</strong> 고정 일정에 따라 포괄적인 감사 수행</li>
+                <li><strong>드리프트 탐지:</strong> 새로운 편향을 나타낼 수 있는 데이터 및 예측 드리프트 모니터링</li>
+                <li><strong>투명한 보고:</strong> 이해관계자에게 명확하고 접근 가능한 공정성 보고서 제공</li>
+                <li><strong>신속한 대응:</strong> 탐지된 문제를 신속하게 해결하기 위한 프로세스 마련</li>
+                <li><strong>문서화:</strong> 모든 모니터링 활동에 대한 상세한 기록 유지</li>
+                <li><strong>이해관계자 참여:</strong> 공정성 요구 사항 정의에 영향을 받는 커뮤니티 참여</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">장 요약</h2>
+            <ul>
+                <li>지속적인 모니터링이 필수입니다—공정성은 일회성 성취가 아님</li>
+                <li>실시간 공정성 지표는 전통적인 성능 지표와 함께 추적되어야 함</li>
+                <li>드리프트 탐지는 데이터 분포 또는 모델 동작의 변화를 식별함</li>
+                <li>자동화된 감사 시스템은 정기적이고 포괄적인 공정성 평가를 가능하게 함</li>
+                <li>성능 저하 탐지는 공정성 또는 정확도의 점진적 감소를 포착함</li>
+                <li>이해관계자 보고는 투명성과 책임성을 보장함</li>
+                <li>경고 시스템은 새로운 공정성 문제에 대한 신속한 대응을 가능하게 함</li>
+                <li>추세 분석은 중대해지기 전에 체계적 문제를 식별하는 데 도움이 됨</li>
+                <li>모범 사례에는 지속적인 경계, 사전 경고, 투명한 보고가 포함됨</li>
+                <li>弘益人間은 모든 사용자에 대한 공정성에 대한 지속적인 약속을 요구함</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">복습 질문</h2>
+            <ol>
+                <li>배포 시 공정했던 시스템에도 지속적인 모니터링이 필요한 이유는 무엇입니까?</li>
+                <li>실시간으로 추적해야 하는 공정성 지표는 무엇입니까? 일괄 평가와 어떻게 다릅니까?</li>
+                <li>드리프트 탐지가 어떻게 작동하는지 설명하세요. 공정성에 가장 우려되는 드리프트 유형은 무엇입니까?</li>
+                <li>프로덕션 AI 시스템을 위한 경고 전략을 설계하세요. 어떤 임계값을 설정하시겠습니까?</li>
+                <li>포괄적인 공정성 감사는 얼마나 자주 수행해야 합니까? 이 결정에 영향을 미치는 요인은 무엇입니까?</li>
+                <li>이해관계자를 위한 요약 보고서에 어떤 정보가 포함되어야 합니까?</li>
+                <li>추세 분석이 중대해지기 전에 공정성 문제를 예방하는 데 어떻게 도움이 될 수 있습니까?</li>
+                <li>공정성 경고에 대응하기 위해 어떤 프로세스를 마련해야 합니까?</li>
+                <li>철저한 공정성 평가의 필요성과 모니터링 비용의 균형을 어떻게 맞추시겠습니까?</li>
+                <li>弘益人間 원칙에 따라 채용 AI를 위한 모니터링 시스템을 설계하세요. 무엇을 우선시하시겠습니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-05.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-07.html" class="nav-button">다음 장 →</a>
+        </div>
+    </div>
+</body>
+</html>

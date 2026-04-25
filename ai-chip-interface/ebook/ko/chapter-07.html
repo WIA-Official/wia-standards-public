@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>7장: 프레임워크 통합 | WIA-AI-011</title>
+    <style>
+        body { font-family: 'Noto Sans KR'; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { font-size: 2.5em; margin: 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; line-height: 2; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        .summary, .review-questions { padding: 30px; border-radius: 8px; margin: 40px 0; }
+        .summary { background: #f0fdf4; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #10B981; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="color: #10B981; font-weight: bold; border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px;">
+            <div>7장</div><h1>프레임워크 통합</h1>
+        </div>
+
+        <h2>7.1 프레임워크 통합의 중요성</h2>
+        <p>WIA-AI-011의 진정한 가치는 모든 주요 딥러닝 프레임워크와의 원활한 통합에 있습니다. 개발자는 PyTorch, TensorFlow, JAX, ONNX Runtime 등 선호하는 프레임워크를 계속 사용하면서 WIA 표준 호환 가속기의 이점을 누릴 수 있습니다.</p>
+
+        <table>
+            <tr>
+                <th>프레임워크</th>
+                <th>시장 점유율</th>
+                <th>주요 사용 사례</th>
+                <th>WIA 통합 방식</th>
+            </tr>
+            <tr>
+                <td>PyTorch</td>
+                <td>~60%</td>
+                <td>연구, 프로토타이핑</td>
+                <td>Custom Device + Dispatcher</td>
+            </tr>
+            <tr>
+                <td>TensorFlow</td>
+                <td>~25%</td>
+                <td>프로덕션, 배포</td>
+                <td>Custom Device + XLA</td>
+            </tr>
+            <tr>
+                <td>JAX</td>
+                <td>~10%</td>
+                <td>연구, 수치 계산</td>
+                <td>Custom Backend + XLA</td>
+            </tr>
+            <tr>
+                <td>ONNX Runtime</td>
+                <td>~5%</td>
+                <td>크로스 플랫폼 배포</td>
+                <td>Execution Provider</td>
+            </tr>
+        </table>
+
+        <h2>7.2 PyTorch 통합</h2>
+        <p>PyTorch는 연구 커뮤니티에서 가장 인기 있는 프레임워크입니다. WIA-AI-011은 PyTorch의 사용자 정의 디바이스 메커니즘을 통해 완벽하게 통합됩니다.</p>
+
+        <h3>7.2.1 사용자 정의 디바이스 등록</h3>
+        <pre>// PyTorch C++ 확장으로 WIA 디바이스 등록
+#include <torch/extension.h>
+#include <wia/wia.h>
+
+class WIADeviceGuard {
+    wia_context_t* ctx;
+    wia_device_t* device;
+
+public:
+    WIADeviceGuard(int device_id) {
+        device = wia_get_device(device_id);
+        ctx = wia_create_context(device);
+    }
+
+    ~WIADeviceGuard() {
+        wia_destroy_context(ctx);
+    }
+
+    wia_context_t* get_context() { return ctx; }
+};
+
+// 텐서를 WIA 디바이스로 이동
+at::Tensor to_wia_device(const at::Tensor& tensor, int device_id) {
+    WIADeviceGuard guard(device_id);
+
+    // 1. WIA 텐서 생성
+    wia_tensor_t* wia_tensor = wia_create_tensor(
+        guard.get_context(),
+        tensor.sizes().data(),
+        tensor.dim(),
+        to_wia_dtype(tensor.dtype())
+    );
+
+    // 2. 데이터 복사 (H2D)
+    wia_copy_h2d(
+        wia_tensor_data(wia_tensor),
+        tensor.data_ptr(),
+        tensor.numel() * tensor.element_size()
+    );
+
+    // 3. PyTorch 텐서로 래핑
+    return at::from_blob(
+        wia_tensor_data(wia_tensor),
+        tensor.sizes(),
+        [wia_tensor](void*) { wia_release_tensor(wia_tensor); },
+        at::device("wia:" + std::to_string(device_id))
+            .dtype(tensor.dtype())
+    );
+}
+
+// Python 바인딩
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+    m.def("to_wia_device", &to_wia_device,
+          "WIA 디바이스로 텐서 이동");
+}</pre>
+
+        <h3>7.2.2 연산자 등록</h3>
+        <pre>// PyTorch 디스패처에 WIA 연산자 등록
+#include <torch/library.h>
+
+// 행렬 곱셈 구현
+at::Tensor wia_matmul(const at::Tensor& a, const at::Tensor& b) {
+    WIADeviceGuard guard(a.device().index());
+
+    // WIA API 호출
+    wia_tensor_t* wia_a = unwrap_tensor(a);
+    wia_tensor_t* wia_b = unwrap_tensor(b);
+
+    wia_tensor_t* result = wia_matmul(wia_a, wia_b, guard.get_context());
+
+    return wrap_tensor(result);
+}
+
+// 컨볼루션 구현
+at::Tensor wia_conv2d(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding
+) {
+    WIADeviceGuard guard(input.device().index());
+
+    wia_conv_config_t config = {
+        .stride = {stride[0], stride[1]},
+        .padding = {padding[0], padding[1]},
+        .dilation = {1, 1},
+        .groups = 1
+    };
+
+    wia_tensor_t* wia_input = unwrap_tensor(input);
+    wia_tensor_t* wia_weight = unwrap_tensor(weight);
+    wia_tensor_t* wia_bias = unwrap_tensor(bias);
+
+    wia_tensor_t* result = wia_conv2d(
+        wia_input, wia_weight, wia_bias, &config, guard.get_context()
+    );
+
+    return wrap_tensor(result);
+}
+
+// 연산자 등록
+TORCH_LIBRARY_IMPL(aten, WIA, m) {
+    m.impl("matmul", &wia_matmul);
+    m.impl("conv2d", &wia_conv2d);
+    m.impl("relu", &wia_relu);
+    m.impl("add", &wia_add);
+    m.impl("mul", &wia_mul);
+    // ... 더 많은 연산자들
+}</pre>
+
+        <h3>7.2.3 Python API 사용</h3>
+        <pre># PyTorch에서 WIA 디바이스 사용
+import torch
+import torch_wia  # WIA 확장 로드
+
+# WIA 디바이스 선택
+device = torch.device("wia:0")
+
+# 모델을 WIA 디바이스로 이동
+model = torchvision.models.resnet50().to(device)
+
+# 데이터도 WIA 디바이스로
+data = torch.randn(32, 3, 224, 224).to(device)
+
+# 추론 (모든 연산이 WIA에서 실행)
+with torch.no_grad():
+    output = model(data)
+
+# WIA와 CUDA 간 호환성
+cuda_tensor = torch.randn(10, 10).cuda()
+wia_tensor = cuda_tensor.to(device)  # CUDA → WIA
+result = torch.matmul(wia_tensor, wia_tensor.t())
+cuda_result = result.cpu()  # WIA → CPU</pre>
+
+        <h2>7.3 TensorFlow 통합</h2>
+        <p>TensorFlow는 프로덕션 배포에 강력합니다. WIA-AI-011은 TensorFlow의 사용자 정의 디바이스와 XLA 컴파일러 백엔드를 통해 통합됩니다.</p>
+
+        <h3>7.3.1 사용자 정의 디바이스 플러그인</h3>
+        <pre>// TensorFlow Custom Device Plugin
+#include "tensorflow/c/c_api.h"
+#include "tensorflow/c/experimental/pluggable_device/c_api.h"
+#include <wia/wia.h>
+
+// 디바이스 정보
+void TF_WIA_GetDeviceInfo(TF_PluggableDeviceInfo* info) {
+    info->device_name = "WIA";
+    info->device_type = "WIA";
+    info->vendor_name = "WIA Official";
+}
+
+// 메모리 할당
+void* TF_WIA_AllocateMemory(size_t size, int device_id) {
+    wia_device_t* device = wia_get_device(device_id);
+    wia_context_t* ctx = wia_create_context(device);
+    return wia_alloc_device(ctx, size);
+}
+
+// 메모리 해제
+void TF_WIA_DeallocateMemory(void* ptr) {
+    wia_free_device(ptr);
+}
+
+// 메모리 복사 (H2D)
+void TF_WIA_CopyMemoryH2D(
+    void* dst, const void* src, size_t size
+) {
+    wia_copy_h2d(dst, src, size);
+    wia_synchronize();
+}
+
+// 메모리 복사 (D2H)
+void TF_WIA_CopyMemoryD2H(
+    void* dst, const void* src, size_t size
+) {
+    wia_copy_d2h(dst, src, size);
+    wia_synchronize();
+}
+
+// 플러그인 등록
+void RegisterPlugin(TF_PluggableDeviceFunctions* functions) {
+    functions->get_device_info = TF_WIA_GetDeviceInfo;
+    functions->allocate_memory = TF_WIA_AllocateMemory;
+    functions->deallocate_memory = TF_WIA_DeallocateMemory;
+    functions->copy_h2d = TF_WIA_CopyMemoryH2D;
+    functions->copy_d2h = TF_WIA_CopyMemoryD2H;
+    // ... 더 많은 함수들
+}</pre>
+
+        <h3>7.3.2 XLA 컴파일러 백엔드</h3>
+        <pre>// WIA XLA 백엔드 구현
+class WIAExecutable : public xla::Executable {
+    wia_kernel_t* compiled_kernel;
+
+public:
+    StatusOr<ExecutionOutput> ExecuteAsyncOnStream(
+        const ServiceExecutableRunOptions* run_options,
+        std::vector<ExecutionInput> arguments
+    ) override {
+        // 1. 인자 준비
+        std::vector<wia_tensor_t*> wia_inputs;
+        for (const auto& arg : arguments) {
+            wia_inputs.push_back(
+                buffer_to_wia_tensor(arg.Buffer({}))
+            );
+        }
+
+        // 2. 커널 실행
+        std::vector<wia_tensor_t*> wia_outputs = wia_execute_kernel(
+            compiled_kernel,
+            wia_inputs.data(),
+            wia_inputs.size()
+        );
+
+        // 3. 출력 변환
+        ExecutionOutput output;
+        for (auto* wia_out : wia_outputs) {
+            output.AddResult(wia_tensor_to_buffer(wia_out));
+        }
+
+        return output;
+    }
+};
+
+// XLA 백엔드 등록
+class WIACompiler : public xla::Compiler {
+public:
+    StatusOr<std::unique_ptr<HloModule>> RunHloPasses(
+        std::unique_ptr<HloModule> module,
+        se::StreamExecutor* stream_exec,
+        se::DeviceMemoryAllocator* device_allocator
+    ) override {
+        // HLO 최적화 (연산자 융합, 레이아웃 최적화 등)
+        WIAHloOptimizer optimizer;
+        return optimizer.Optimize(std::move(module));
+    }
+
+    StatusOr<std::unique_ptr<Executable>> RunBackend(
+        std::unique_ptr<HloModule> module,
+        se::StreamExecutor* stream_exec,
+        se::DeviceMemoryAllocator* device_allocator
+    ) override {
+        // WIA 커널로 컴파일
+        WIAKernelCompiler compiler;
+        wia_kernel_t* kernel = compiler.Compile(module.get());
+
+        return std::make_unique<WIAExecutable>(kernel);
+    }
+};</pre>
+
+        <h3>7.3.3 TensorFlow Python API</h3>
+        <pre># TensorFlow with WIA
+import tensorflow as tf
+import tensorflow_wia  # WIA 플러그인 로드
+
+# WIA 디바이스 사용
+with tf.device('/WIA:0'):
+    # 모델 정의
+    model = tf.keras.applications.ResNet50()
+
+    # 데이터 준비
+    data = tf.random.normal([32, 224, 224, 3])
+
+    # 추론 (XLA 컴파일 + WIA 실행)
+    @tf.function(jit_compile=True)
+    def inference(x):
+        return model(x, training=False)
+
+    output = inference(data)
+
+# 분산 훈련 (다중 WIA 디바이스)
+strategy = tf.distribute.MirroredStrategy(
+    devices=['/WIA:0', '/WIA:1', '/WIA:2', '/WIA:3']
+)
+
+with strategy.scope():
+    distributed_model = tf.keras.applications.ResNet50()
+    distributed_model.compile(
+        optimizer='adam',
+        loss='categorical_crossentropy'
+    )
+
+# 훈련 (자동으로 데이터 병렬화)
+distributed_model.fit(train_dataset, epochs=10)</pre>
+
+        <h2>7.4 JAX 통합</h2>
+        <p>JAX는 고성능 수치 계산과 자동 미분에 강력합니다. WIA-AI-011은 JAX의 사용자 정의 프리미티브와 XLA 백엔드를 통해 통합됩니다.</p>
+
+        <pre>// JAX Custom Backend
+#include "jaxlib/cpu/cpu_kernel_helpers.h"
+#include <wia/wia.h>
+
+// WIA 프리미티브 정의
+void wia_matmul_impl(void** buffers, const char* opaque, size_t opaque_len) {
+    // 1. 버퍼 언패킹
+    float* a = reinterpret_cast<float*>(buffers[0]);
+    float* b = reinterpret_cast<float*>(buffers[1]);
+    float* c = reinterpret_cast<float*>(buffers[2]);
+
+    // 2. 형상 정보 디코딩
+    MatmulDescriptor* desc = decode_descriptor(opaque, opaque_len);
+
+    // 3. WIA API 호출
+    wia_tensor_t* wia_a = wrap_buffer(a, desc->shape_a);
+    wia_tensor_t* wia_b = wrap_buffer(b, desc->shape_b);
+
+    wia_tensor_t* result = wia_matmul(wia_a, wia_b, get_wia_context());
+
+    // 4. 결과 복사
+    memcpy(c, wia_tensor_data(result), desc->output_bytes);
+
+    wia_release_tensor(result);
+}
+
+// XLA Custom Call 등록
+XLA_REGISTER_CUSTOM_CALL_TARGET("wia_matmul", wia_matmul_impl, "WIA");
+
+# JAX Python 코드
+import jax
+import jax.numpy as jnp
+from jaxlib import xla_client
+
+# WIA 백엔드 등록
+xla_client.register_custom_call_target(
+    "wia_matmul",
+    wia_matmul_impl,
+    platform="WIA"
+)
+
+# WIA 프리미티브 사용
+def wia_matmul_jax(a, b):
+    result_shape = jax.ShapeDtypeStruct(
+        shape=(a.shape[0], b.shape[1]),
+        dtype=a.dtype
+    )
+
+    return jax.experimental.custom_call(
+        "wia_matmul",
+        result_shape,
+        inputs=[a, b],
+        backend_config=b""  # 메타데이터
+    )
+
+# JIT 컴파일 및 실행
+@jax.jit
+def compute(a, b):
+    return wia_matmul_jax(a, b)
+
+# 자동 미분 지원
+grad_fn = jax.grad(lambda a: jnp.sum(compute(a, b)))
+gradients = grad_fn(a)</pre>
+
+        <h2>7.5 ONNX Runtime 통합</h2>
+        <p>ONNX Runtime은 프레임워크 독립적 배포를 가능하게 합니다. WIA-AI-011은 Execution Provider를 통해 통합됩니다.</p>
+
+        <pre>// ONNX Runtime Execution Provider
+class WIAExecutionProvider : public IExecutionProvider {
+    wia_context_t* ctx;
+    std::unique_ptr<KernelRegistry> kernel_registry;
+
+public:
+    WIAExecutionProvider(const WIAExecutionProviderInfo& info) {
+        ctx = wia_create_context(wia_get_device(info.device_id));
+        kernel_registry = std::make_unique<KernelRegistry>();
+
+        // 커널 등록
+        RegisterKernels();
+    }
+
+    std::vector<std::unique_ptr<ComputeCapability>>
+    GetCapability(
+        const onnxruntime::GraphViewer& graph,
+        const std::vector<const KernelRegistry*>& kernel_registries
+    ) const override {
+        // WIA가 지원하는 노드 식별
+        std::vector<std::unique_ptr<ComputeCapability>> result;
+
+        for (const auto& node : graph.Nodes()) {
+            if (CanRunOnWIA(node)) {
+                auto capability = std::make_unique<ComputeCapability>();
+                capability->sub_graph = CreateSubGraph(node);
+                result.push_back(std::move(capability));
+            }
+        }
+
+        return result;
+    }
+
+    common::Status Compile(
+        const std::vector<onnxruntime::Node*>& nodes,
+        std::vector<NodeComputeInfo>& node_compute_funcs
+    ) override {
+        // ONNX 그래프를 WIA 커널로 컴파일
+        for (const auto* node : nodes) {
+            wia_kernel_t* kernel = CompileNode(node);
+
+            NodeComputeInfo compute_info;
+            compute_info.create_state_func = [kernel](
+                ComputeContext* context,
+                FunctionState* state
+            ) {
+                *state = kernel;
+                return Status::OK();
+            };
+
+            compute_info.compute_func = [](
+                FunctionState state,
+                const OrtApi* api,
+                OrtKernelContext* context
+            ) {
+                wia_kernel_t* kernel =
+                    reinterpret_cast<wia_kernel_t*>(state);
+                return ExecuteKernel(kernel, context);
+            };
+
+            compute_info.release_state_func = [](FunctionState state) {
+                wia_kernel_t* kernel =
+                    reinterpret_cast<wia_kernel_t*>(state);
+                wia_destroy_kernel(kernel);
+            };
+
+            node_compute_funcs.push_back(compute_info);
+        }
+
+        return Status::OK();
+    }
+};
+
+// Python에서 사용
+import onnxruntime as ort
+import numpy as np
+
+# WIA Execution Provider 설정
+session_options = ort.SessionOptions()
+session = ort.InferenceSession(
+    "model.onnx",
+    providers=[
+        ('WIAExecutionProvider', {
+            'device_id': 0,
+            'enable_fp16': True
+        })
+    ]
+)
+
+# 추론
+input_data = np.random.randn(1, 3, 224, 224).astype(np.float32)
+outputs = session.run(None, {'input': input_data})
+
+# 지원되는 연산자 확인
+providers = session.get_providers()
+print("사용 가능한 프로바이더:", providers)</pre>
+
+        <h2>7.6 모델 서빙 통합</h2>
+        <p>WIA-AI-011은 주요 모델 서빙 프레임워크와 통합되어 프로덕션 배포를 지원합니다.</p>
+
+        <h3>7.6.1 TorchServe 통합</h3>
+        <pre># TorchServe Handler with WIA
+import torch
+from ts.torch_handler.base_handler import BaseHandler
+
+class WIAHandler(BaseHandler):
+    def initialize(self, context):
+        # 모델을 WIA 디바이스로 로드
+        self.device = torch.device("wia:0")
+        self.model = torch.jit.load(context.model_yaml['model_file'])
+        self.model.to(self.device)
+        self.model.eval()
+
+    def preprocess(self, data):
+        # 전처리 및 WIA 디바이스로 이동
+        images = [self.transform(item.get("data")) for item in data]
+        return torch.stack(images).to(self.device)
+
+    def inference(self, data):
+        # WIA에서 추론
+        with torch.no_grad():
+            return self.model(data)
+
+    def postprocess(self, data):
+        # 결과를 CPU로 이동 및 후처리
+        return data.cpu().numpy().tolist()</pre>
+
+        <h3>7.6.2 TensorFlow Serving</h3>
+        <pre>// TensorFlow Serving with WIA
+// saved_model.pb 로드 시 WIA 디바이스 사용
+
+tensorflow::SessionOptions session_options;
+session_options.config.mutable_device_count()->insert({"WIA", 1});
+
+// WIA 디바이스 설정
+tensorflow::ConfigProto& config = session_options.config;
+auto* device_options = config.mutable_gpu_options();
+device_options->set_visible_device_list("0");  // WIA:0
+
+// 모델 로드
+tensorflow::SavedModelBundle bundle;
+tensorflow::LoadSavedModel(
+    session_options,
+    run_options,
+    model_path,
+    {"serve"},  // tags
+    &bundle
+);
+
+// 추론 요청 처리
+Tensor input = ...; // 입력 데이터
+
+std::vector<std::pair<string, Tensor>> inputs = {
+    {"input", input}
+};
+
+std::vector<Tensor> outputs;
+bundle.session->Run(inputs, {"output"}, {}, &outputs);</pre>
+
+        <h3>7.6.3 NVIDIA Triton Inference Server</h3>
+        <pre>// Triton Backend for WIA
+#include "triton/backend/backend_common.h"
+#include <wia/wia.h>
+
+class WIABackend : public TRITONBACKEND_Backend {
+    wia_context_t* ctx;
+
+public:
+    TRITONSERVER_Error* Init() override {
+        // WIA 초기화
+        ctx = wia_create_context(wia_get_device(0));
+        return nullptr;  // 성공
+    }
+
+    TRITONSERVER_Error* Execute(
+        TRITONBACKEND_Request** requests,
+        const uint32_t request_count
+    ) override {
+        // 배치 처리
+        std::vector<wia_tensor_t*> batch_inputs;
+
+        for (uint32_t i = 0; i < request_count; ++i) {
+            auto* request = requests[i];
+
+            // 입력 수집
+            TRITONBACKEND_Input* input;
+            TRITONBACKEND_RequestInput(request, "input", &input);
+
+            const void* data;
+            size_t data_size;
+            TRITONBACKEND_InputBuffer(input, 0, &data, &data_size, ...);
+
+            // WIA 텐서로 변환
+            wia_tensor_t* wia_input = create_wia_tensor(data, shape);
+            batch_inputs.push_back(wia_input);
+        }
+
+        // 배치 추론
+        std::vector<wia_tensor_t*> batch_outputs =
+            wia_batch_inference(model, batch_inputs);
+
+        // 응답 전송
+        for (uint32_t i = 0; i < request_count; ++i) {
+            TRITONBACKEND_Response* response;
+            TRITONBACKEND_ResponseNew(&response, requests[i]);
+
+            // 출력 설정
+            TRITONBACKEND_Output* output;
+            TRITONBACKEND_ResponseOutput(response, "output", ..., &output);
+
+            void* buffer;
+            TRITONBACKEND_OutputBuffer(output, &buffer, output_size, ...);
+
+            // 데이터 복사
+            wia_copy_d2h(buffer, wia_tensor_data(batch_outputs[i]), ...);
+
+            TRITONBACKEND_ResponseSend(response, ...);
+        }
+
+        return nullptr;
+    }
+};
+
+TRITONBACKEND_REGISTER("wia", WIABackend);</pre>
+
+        <h2>7.7 양자화 및 최적화 도구 통합</h2>
+        <p>WIA-AI-011은 프레임워크별 양자화 도구와 호환됩니다.</p>
+
+        <pre># PyTorch Quantization with WIA
+import torch.quantization as quantization
+
+# 1. 양자화 인식 훈련
+model = torchvision.models.resnet50()
+model.to('wia:0')
+
+# QAT 설정
+model.qconfig = quantization.get_default_qat_qconfig('wia')
+quantization.prepare_qat(model, inplace=True)
+
+# 훈련
+for epoch in range(num_epochs):
+    train_one_epoch(model, train_loader)
+
+# 양자화
+quantization.convert(model, inplace=True)
+
+# 2. 사후 훈련 양자화 (PTQ)
+model = torchvision.models.resnet50(pretrained=True)
+model.to('wia:0')
+model.eval()
+
+# 캘리브레이션
+quantization.quantize_dynamic(
+    model,
+    {torch.nn.Linear},
+    dtype=torch.qint8
+)
+
+# TensorFlow Quantization
+import tensorflow_model_optimization as tfmot
+
+# 양자화 인식 훈련
+quantize_model = tfmot.quantization.keras.quantize_model
+q_aware_model = quantize_model(model)
+
+# WIA 디바이스에서 훈련
+with tf.device('/WIA:0'):
+    q_aware_model.fit(train_dataset, epochs=10)
+
+# INT8 양자화 모델 저장
+converter = tf.lite.TFLiteConverter.from_keras_model(q_aware_model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+quantized_tflite_model = converter.convert()</pre>
+
+        <h2>7.8 분산 훈련 프레임워크 통합</h2>
+        <p>WIA-AI-011은 주요 분산 훈련 프레임워크와 원활하게 작동합니다.</p>
+
+        <pre># PyTorch DDP with WIA
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+def train_ddp(rank, world_size):
+    # 1. 프로세스 그룹 초기화
+    dist.init_process_group(
+        backend='wia',  # WIA 백엔드
+        init_method='tcp://localhost:12355',
+        world_size=world_size,
+        rank=rank
+    )
+
+    # 2. 모델을 WIA 디바이스로
+    model = create_model().to(f'wia:{rank}')
+
+    # 3. DDP로 래핑
+    ddp_model = DDP(model, device_ids=[rank])
+
+    # 4. 훈련
+    for epoch in range(num_epochs):
+        for batch in train_loader:
+            batch = batch.to(f'wia:{rank}')
+            loss = ddp_model(batch)
+            loss.backward()
+            optimizer.step()
+
+    # 5. 정리
+    dist.destroy_process_group()
+
+# 다중 프로세스 실행
+if __name__ == '__main__':
+    world_size = 4
+    mp.spawn(train_ddp, args=(world_size,), nprocs=world_size)
+
+# Horovod with WIA
+import horovod.torch as hvd
+
+hvd.init()
+
+# 로컬 랭크에 맞는 WIA 디바이스 할당
+torch.cuda.set_device(f'wia:{hvd.local_rank()}')
+
+model = create_model().to(f'wia:{hvd.local_rank()}')
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+
+# Horovod 분산 옵티마이저
+optimizer = hvd.DistributedOptimizer(optimizer)
+
+# 초기 가중치 브로드캐스트
+hvd.broadcast_parameters(model.state_dict(), root_rank=0)
+
+# 훈련 루프
+for epoch in range(num_epochs):
+    for batch in train_loader:
+        optimizer.zero_grad()
+        loss = model(batch)
+        loss.backward()
+        optimizer.step()  # All-Reduce 자동 실행</pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>WIA-AI-011은 PyTorch, TensorFlow, JAX, ONNX Runtime 등 주요 프레임워크와 완벽 통합</li>
+                <li>PyTorch는 Custom Device와 Dispatcher로 통합, 사용자 정의 연산자 등록 지원</li>
+                <li>TensorFlow는 Custom Device Plugin과 XLA 백엔드로 통합, JIT 컴파일 지원</li>
+                <li>JAX는 Custom Primitive와 XLA 백엔드로 통합, 자동 미분 완벽 지원</li>
+                <li>ONNX Runtime은 Execution Provider로 통합, 프레임워크 독립적 배포</li>
+                <li>TorchServe, TF Serving, Triton 등 모델 서빙 플랫폼과 통합</li>
+                <li>프레임워크별 양자화 도구 (QAT, PTQ) 완벽 호환</li>
+                <li>DDP, Horovod 등 분산 훈련 프레임워크와 원활하게 작동</li>
+                <li>개발자는 선호하는 프레임워크를 계속 사용하며 WIA 가속기 이점 활용</li>
+                <li>XLA 통합으로 자동 최적화와 컴파일 가속 제공</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>주요 4개 프레임워크(PyTorch, TensorFlow, JAX, ONNX Runtime)의 시장 점유율과 주요 사용 사례를 비교하십시오.</li>
+                <li>PyTorch Custom Device 메커니즘을 설명하고 WIA 디바이스 등록 과정을 서술하십시오.</li>
+                <li>PyTorch Dispatcher에 WIA 연산자를 등록하는 방법을 설명하십시오. TORCH_LIBRARY_IMPL 매크로의 역할은?</li>
+                <li>TensorFlow Custom Device Plugin의 주요 함수들을 나열하고 각 함수의 역할을 설명하십시오.</li>
+                <li>XLA 컴파일러 백엔드가 성능을 향상시키는 원리를 설명하십시오. WIA XLA 백엔드의 구현 단계는?</li>
+                <li>JAX Custom Primitive와 XLA Custom Call의 차이점을 설명하고 WIA 통합에서의 역할을 서술하십시오.</li>
+                <li>ONNX Runtime Execution Provider의 GetCapability와 Compile 메서드의 역할을 설명하십시오.</li>
+                <li>TorchServe Handler를 WIA 디바이스용으로 작성하는 방법을 단계별로 설명하십시오.</li>
+                <li>NVIDIA Triton Inference Server에서 WIA Backend를 구현할 때 배치 추론을 지원하는 방법을 설명하십시오.</li>
+                <li>양자화 인식 훈련(QAT)과 사후 훈련 양자화(PTQ)의 차이를 설명하고 각각의 WIA 통합 방법을 서술하십시오.</li>
+                <li>PyTorch DDP를 WIA 백엔드와 함께 사용하는 방법을 설명하십시오. 프로세스 그룹 초기화 과정은?</li>
+                <li>Horovod와 WIA를 함께 사용할 때 분산 옵티마이저가 All-Reduce를 자동으로 수행하는 원리를 설명하십시오.</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+            <span style="font-size: 0.9em; color: #6b7280;">모든 프레임워크에서 WIA 가속기를 원활하게 사용할 수 있도록</span>
+        </div>
+    </div>
+</body>
+</html>

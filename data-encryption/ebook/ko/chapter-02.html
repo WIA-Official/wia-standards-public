@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 대칭 암호화 | WIA-SEC-011</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #10b981; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .warning-box { background: linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #ef4444; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+    </style>
+</head>
+<body>
+    <h1>제2장: 대칭 암호화</h1>
+
+    <div class="objectives-box">
+        <h3>학습 목표</h3>
+        <ul>
+            <li>대칭 암호화 원리 이해</li>
+            <li>AES 알고리즘과 작동 방식 학습</li>
+            <li>GCM vs CBC 모드 비교</li>
+            <li>안전한 AES-256-GCM 구현</li>
+            <li>일반적인 실수와 모범 사례 파악</li>
+        </ul>
+    </div>
+
+    <h2>2.1 대칭 암호화란?</h2>
+
+    <p>대칭 암호화는 암호화와 복호화에 동일한 키를 사용합니다. 빠르고 효율적이며, 대용량 데이터 암호화에 이상적입니다.</p>
+
+    <blockquote>
+        <h3>핵심 개념</h3>
+        <p>암호화 키 = 복호화 키. 양쪽 모두 비밀 키를 알아야 합니다. 키 분배가 주요 과제입니다.</p>
+    </blockquote>
+
+    <h2>2.2 AES (Advanced Encryption Standard)</h2>
+
+    <p>AES는 2001년 NIST가 선정한 표준 대칭 암호화 알고리즘입니다:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>속성</th>
+                <th>값</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>블록 크기</td>
+                <td>128비트 (16바이트)</td>
+            </tr>
+            <tr>
+                <td>키 크기</td>
+                <td>128, 192, 256비트</td>
+            </tr>
+            <tr>
+                <td>유형</td>
+                <td>블록 암호</td>
+            </tr>
+            <tr>
+                <td>라운드</td>
+                <td>10 (128b), 12 (192b), 14 (256b)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>2.2.1 WIA 권장 사항</h3>
+
+    <ul>
+        <li><strong>AES-256:</strong> 모든 민감한 데이터에 사용</li>
+        <li><strong>AES-128:</strong> 성능이 중요한 경우 허용</li>
+        <li><strong>AES-192:</strong> 거의 사용되지 않음</li>
+    </ul>
+
+    <h2>2.3 운영 모드</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>모드</th>
+                <th>인증</th>
+                <th>추천</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>GCM</td>
+                <td>✅ 내장</td>
+                <td>✅ 권장</td>
+            </tr>
+            <tr>
+                <td>CBC</td>
+                <td>❌ 별도 필요</td>
+                <td>⚠️ 레거시</td>
+            </tr>
+            <tr>
+                <td>CTR</td>
+                <td>❌ 없음</td>
+                <td>⚠️ 주의 필요</td>
+            </tr>
+            <tr>
+                <td>ECB</td>
+                <td>❌ 없음</td>
+                <td>❌ 사용 금지</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="warning-box">
+        <h3>⚠️ ECB 모드 사용 금지</h3>
+        <p>ECB (Electronic Codebook) 모드는 동일한 평문 블록을 동일한 암호문으로 암호화합니다. 이로 인해 패턴이 노출되어 치명적인 보안 취약점이 발생합니다.</p>
+    </div>
+
+    <h2>2.4 AES-256-GCM 구현</h2>
+
+    <pre><code>// Node.js에서 AES-256-GCM 구현
+const crypto = require('crypto');
+
+function encrypt(plaintext, key) {
+  // 12바이트 IV 생성 (GCM에 최적)
+  const iv = crypto.randomBytes(12);
+
+  // 암호화 객체 생성
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+  // 암호화 수행
+  let ciphertext = cipher.update(plaintext, 'utf8', 'base64');
+  ciphertext += cipher.final('base64');
+
+  // 인증 태그 획득
+  const authTag = cipher.getAuthTag();
+
+  return { ciphertext, iv, authTag };
+}
+
+function decrypt(ciphertext, key, iv, authTag) {
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+
+  let plaintext = decipher.update(ciphertext, 'base64', 'utf8');
+  plaintext += decipher.final('utf8');
+
+  return plaintext;
+}</code></pre>
+
+    <h2>2.5 IV/Nonce 요구사항</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>속성</th>
+                <th>요구사항</th>
+                <th>이유</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>길이</td>
+                <td>12바이트 (96비트)</td>
+                <td>GCM에 최적화</td>
+            </tr>
+            <tr>
+                <td>고유성</td>
+                <td>절대 재사용 금지</td>
+                <td>재사용 시 완전 노출</td>
+            </tr>
+            <tr>
+                <td>생성</td>
+                <td>CSRNG 사용</td>
+                <td>예측 불가능해야 함</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>2.6 일반적인 실수</h2>
+
+    <ul>
+        <li><strong>IV 재사용:</strong> GCM에서 치명적, 키 노출 가능</li>
+        <li><strong>인증 태그 무시:</strong> 데이터 변조 공격 허용</li>
+        <li><strong>약한 키:</strong> 암호학적으로 안전한 난수 사용 필수</li>
+        <li><strong>ECB 모드:</strong> 패턴 노출로 보안 붕괴</li>
+    </ul>
+
+    <h2>2.7 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>대칭 암호화는 동일한 키로 암호화/복호화</li>
+            <li>AES-256-GCM이 WIA 권장 표준</li>
+            <li>GCM은 암호화와 인증을 동시에 제공</li>
+            <li>IV는 반드시 고유해야 하며 재사용 금지</li>
+            <li>ECB 모드는 절대 사용하지 말 것</li>
+        </ul>
+    </blockquote>
+
+    <h2>2.8 복습 문제</h2>
+
+    <ol>
+        <li>대칭 암호화의 주요 특징은 무엇인가?</li>
+        <li>AES-256의 키 크기와 라운드 수는?</li>
+        <li>GCM 모드가 CBC보다 권장되는 이유는?</li>
+        <li>IV 재사용이 위험한 이유는?</li>
+        <li>ECB 모드가 안전하지 않은 이유는?</li>
+    </ol>
+
+    <h2>2.9 다음 장 미리보기</h2>
+
+    <p>제3장에서는 비대칭 암호화를 탐구합니다. RSA와 타원 곡선 암호화의 작동 원리, 디지털 서명, 키 분배 문제 해결 방법을 배웁니다.</p>
+</body>
+</html>

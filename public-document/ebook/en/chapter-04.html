@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: API Implementation Guide | WIA-SOCIAL</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --primary: #EC4899;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-secondary);
+            padding: 3rem;
+            border-radius: 10px;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2.5rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        h3 {
+            color: var(--primary);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+        }
+
+        .chapter-number {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        p {
+            margin: 1rem 0;
+            text-align: justify;
+        }
+
+        .highlight-box {
+            background: var(--bg-tertiary);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 5px;
+        }
+
+        .info-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 5px;
+        }
+
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+
+        li {
+            margin: 0.5rem 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin: 3rem 0;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: var(--bg);
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: var(--success);
+            transform: translateY(-2px);
+        }
+
+        code {
+            background: var(--bg);
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-family: 'Monaco', monospace;
+            color: var(--success);
+        }
+
+        pre {
+            background: var(--bg);
+            padding: 1.5rem;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        pre code {
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 4</p>
+        <h1>API Implementation Guide</h1>
+
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Practical implementation examples and patterns for integrating public document APIs into applications, with complete code samples in TypeScript, Python, and Java demonstrating real-world usage scenarios.
+        </p>
+
+        <h2>SDK Architecture and Design</h2>
+
+        <p>
+            Software Development Kits (SDKs) provide developer-friendly interfaces to APIs, abstracting HTTP details and providing language-idiomatic patterns. Well-designed SDKs dramatically reduce integration effort, handle authentication complexity, implement retry logic, and manage errors gracefully. The WIA-SOCIAL standard provides reference SDKs in TypeScript, Python, and Java, covering the most common government technology stacks.
+        </p>
+
+        <h3>TypeScript/JavaScript SDK</h3>
+
+        <p>
+            The TypeScript SDK targets web applications, Node.js services, and cross-platform mobile apps built with React Native. TypeScript's strong typing provides compile-time safety while maintaining JavaScript's flexibility. The SDK uses modern async/await patterns for handling asynchronous operations cleanly. Axios provides the HTTP client foundation, offering request/response interceptors for authentication and error handling.
+        </p>
+
+        <div class="info-box">
+            <h3 style="margin-top: 0; color: var(--primary);">TypeScript SDK - Installation and Setup</h3>
+            <pre><code>// Install via npm
+npm install @wia-social/public-document-sdk
+
+// Initialize SDK
+import { PublicDocumentClient } from '@wia-social/public-document-sdk';
+
+const client = new PublicDocumentClient({
+  baseUrl: 'https://api.gov.ee/v2',
+  apiKey: process.env.GOV_API_KEY,
+  timeout: 30000,
+  retryAttempts: 3,
+  logLevel: 'info'
+});
+
+// Authenticate with OAuth
+await client.authenticate({
+  clientId: 'your-client-id',
+  clientSecret: 'your-client-secret',
+  grantType: 'client_credentials',
+  scope: 'read:documents write:documents'
+});</code></pre>
+        </div>
+
+        <h3>SDK Core Components</h3>
+
+        <p>
+            SDKs are typically organized into modules corresponding to API resource types. A Documents module handles document CRUD operations. A Verification module provides authenticity checking. A Search module wraps query and filter capabilities. A Signatures module manages cryptographic operations. Each module encapsulates related functionality with a consistent interface pattern.
+        </p>
+
+        <p>
+            Configuration management allows customization of base URLs, timeouts, retry behavior, and logging. Authentication handlers abstract OAuth flows, token storage, and automatic refresh. Error handlers translate HTTP errors into language-idiomatic exceptions. Interceptors enable cross-cutting concerns like logging, metrics, and custom headers.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>SDK Module</th>
+                    <th>Primary Operations</th>
+                    <th>Key Methods</th>
+                    <th>Return Types</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Documents</strong></td>
+                    <td>CRUD operations</td>
+                    <td>create(), get(), update(), delete(), list()</td>
+                    <td>Document, DocumentList</td>
+                </tr>
+                <tr>
+                    <td><strong>Verification</strong></td>
+                    <td>Authenticity checking</td>
+                    <td>verify(), checkSignature(), getStatus()</td>
+                    <td>VerificationResult</td>
+                </tr>
+                <tr>
+                    <td><strong>Search</strong></td>
+                    <td>Query and filter</td>
+                    <td>search(), filter(), facet()</td>
+                    <td>SearchResults</td>
+                </tr>
+                <tr>
+                    <td><strong>Signatures</strong></td>
+                    <td>Cryptographic ops</td>
+                    <td>sign(), validateSignature(), getCertificate()</td>
+                    <td>Signature, Certificate</td>
+                </tr>
+                <tr>
+                    <td><strong>Templates</strong></td>
+                    <td>Document generation</td>
+                    <td>getTemplate(), renderDocument()</td>
+                    <td>Template, RenderedDocument</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Document Retrieval Implementation</h2>
+
+        <p>
+            Document retrieval is the most common operation, used by citizen portals, agency systems, and third-party applications. The implementation must handle authentication, error cases, caching, and format negotiation.
+        </p>
+
+        <h3>Basic Document Retrieval</h3>
+
+        <div class="highlight-box">
+            <strong>TypeScript Example:</strong>
+            <pre><code>// Retrieve a single document
+async function getDocument(documentId: string): Promise<Document> {
+  try {
+    const document = await client.documents.get(documentId);
+
+    console.log(`Retrieved document: ${document.documentType}`);
+    console.log(`Issued by: ${document.issuer.organizationName}`);
+    console.log(`Status: ${document.status}`);
+
+    return document;
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      console.error(`Document ${documentId} not found`);
+    } else if (error instanceof UnauthorizedError) {
+      console.error('Authentication required or invalid');
+    } else if (error instanceof ForbiddenError) {
+      console.error('Insufficient permissions to access document');
+    } else {
+      console.error('Unexpected error:', error);
+    }
+    throw error;
+  }
+}
+
+// Retrieve with specific format
+const pdfDocument = await client.documents.get(documentId, {
+  format: 'pdf'
+});
+
+// Save PDF to file
+await fs.promises.writeFile('document.pdf', pdfDocument);</code></pre>
+        </div>
+
+        <h3>Batch Document Retrieval</h3>
+
+        <p>
+            For scenarios requiring multiple documents, batch operations reduce round trips and improve performance. The SDK should support batch retrieval with appropriate error handling for partial failures.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Python Example:</strong>
+            <pre><code>from wia_social import PublicDocumentClient
+from wia_social.exceptions import DocumentError
+
+client = PublicDocumentClient(
+    base_url='https://api.gov.ee/v2',
+    api_key=os.environ['GOV_API_KEY']
+)
+
+# Batch retrieval
+document_ids = ['DOC-001', 'DOC-002', 'DOC-003']
+
+results = client.documents.get_batch(document_ids)
+
+for result in results:
+    if result.success:
+        doc = result.document
+        print(f"✓ Retrieved {doc.document_id}: {doc.document_type}")
+    else:
+        print(f"✗ Failed to retrieve {result.document_id}: {result.error}")
+
+# List documents with pagination
+documents = client.documents.list(
+    document_type='passport',
+    status='active',
+    issued_after='2024-01-01',
+    limit=50
+)
+
+print(f"Found {documents.total_count} documents")
+print(f"Retrieved {len(documents.items)} in this page")
+
+# Iterate through all pages
+for document in client.documents.iterate(filters={'type': 'passport'}):
+    process_document(document)</code></pre>
+        </div>
+
+        <h2>Document Creation and Issuance</h2>
+
+        <p>
+            Document creation involves data validation, workflow orchestration, digital signature application, and secure storage. The SDK should provide high-level interfaces that handle complexity while allowing customization for specific document types.
+        </p>
+
+        <h3>Birth Certificate Issuance</h3>
+
+        <div class="info-box">
+            <h3 style="margin-top: 0; color: var(--primary);">Java Implementation Example</h3>
+            <pre><code>import com.wia.social.PublicDocumentClient;
+import com.wia.social.model.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+PublicDocumentClient client = new PublicDocumentClient.Builder()
+    .baseUrl("https://api.gov.ee/v2")
+    .apiKey(System.getenv("GOV_API_KEY"))
+    .timeout(Duration.ofSeconds(30))
+    .build();
+
+// Create birth certificate
+BirthCertificate certificate = BirthCertificate.builder()
+    .documentType("BirthCertificate")
+    .issuer(Issuer.builder()
+        .countryCode("EE")
+        .organizationName("Estonian Ministry of Interior")
+        .organizationId("70000329")
+        .signerName("Maria Tamm")
+        .signerTitle("Chief Registrar")
+        .build())
+    .issuedDate(LocalDateTime.now())
+    .validFrom(LocalDate.of(2025, 1, 10))
+    .subject(Person.builder()
+        .fullName("Anna Kask")
+        .dateOfBirth(LocalDate.of(2025, 1, 10))
+        .placeOfBirth("Tallinn, Estonia")
+        .gender(Gender.FEMALE)
+        .personalCode("52501104567")
+        .build())
+    .parents(Arrays.asList(
+        Parent.builder()
+            .fullName("Maria Kask")
+            .personalCode("48905144321")
+            .relationship(ParentRelationship.MOTHER)
+            .build(),
+        Parent.builder()
+            .fullName("Jaan Kask")
+            .personalCode("48702103214")
+            .relationship(ParentRelationship.FATHER)
+            .build()
+    ))
+    .birthDetails(BirthDetails.builder()
+        .hospital("Tallinn Children's Hospital")
+        .weight(3450)  // grams
+        .length(51)    // centimeters
+        .attendingPhysician("Dr. Eva Mets")
+        .build())
+    .build();
+
+try {
+    // Submit for issuance
+    IssuanceRequest request = client.documents.submitForIssuance(certificate);
+
+    System.out.println("Issuance request submitted: " + request.getRequestId());
+
+    // Poll for completion (alternatively use webhooks)
+    IssuanceStatus status;
+    do {
+        Thread.sleep(2000);
+        status = client.documents.getIssuanceStatus(request.getRequestId());
+        System.out.println("Status: " + status.getState());
+    } while (!status.isTerminal());
+
+    if (status.getState() == IssuanceState.COMPLETED) {
+        Document issued = status.getDocument();
+        System.out.println("Document issued: " + issued.getDocumentId());
+        System.out.println("Signature: " + issued.getSignature().getSignatureValue());
+    } else {
+        System.err.println("Issuance failed: " + status.getErrorMessage());
+    }
+
+} catch (ValidationException e) {
+    System.err.println("Validation failed:");
+    e.getErrors().forEach(error ->
+        System.err.println("  - " + error.getField() + ": " + error.getMessage())
+    );
+} catch (ApiException e) {
+    System.err.println("API error: " + e.getMessage());
+}</code></pre>
+        </div>
+
+        <h2>Document Verification Implementation</h2>
+
+        <p>
+            Verification confirms document authenticity, validity, and current status. This is crucial for relying parties like employers, educational institutions, border control, and financial services. Verification must be fast (sub-second for most cases) and reliable.
+        </p>
+
+        <h3>QR Code Verification</h3>
+
+        <p>
+            Modern documents include QR codes containing either full document data with cryptographic signatures or URLs to verification services. Mobile applications can scan QR codes and verify documents instantly, even offline if the document includes embedded signatures.
+        </p>
+
+        <div class="highlight-box">
+            <strong>TypeScript Mobile Verification:</strong>
+            <pre><code>import { PublicDocumentClient } from '@wia-social/public-document-sdk';
+import { QRScanner } from 'react-native-qr-scanner';
+
+// Initialize verifier (can work offline with embedded public keys)
+const verifier = new DocumentVerifier({
+  trustedIssuers: await client.verification.getTrustedIssuers(),
+  offlineMode: true
+});
+
+// Scan QR code
+const qrData = await QRScanner.scan();
+
+try {
+  // Parse and verify
+  const result = await verifier.verifyQRCode(qrData);
+
+  if (result.valid) {
+    console.log('✓ Document is authentic');
+    console.log(`Type: ${result.document.documentType}`);
+    console.log(`Holder: ${result.document.subject.fullName}`);
+    console.log(`Issued by: ${result.document.issuer.organizationName}`);
+    console.log(`Valid until: ${result.document.validUntil || 'No expiration'}`);
+
+    // Check specific attributes
+    if (result.document.documentType === 'DriversLicense') {
+      const license = result.document as DriversLicense;
+      console.log(`Vehicle classes: ${license.vehicleClasses.join(', ')}`);
+      console.log(`Restrictions: ${license.restrictions || 'None'}`);
+    }
+
+    // Display verification UI
+    showVerificationSuccess(result);
+
+  } else {
+    console.error('✗ Document verification failed');
+    console.error(`Reason: ${result.failureReason}`);
+
+    showVerificationFailure(result);
+  }
+
+} catch (error) {
+  console.error('Verification error:', error);
+  showVerificationError(error);
+}</code></pre>
+        </div>
+
+        <h3>Online Verification with API</h3>
+
+        <p>
+            For maximum security and real-time status checking, online verification queries the issuing authority's systems. This detects revoked or suspended documents that might pass offline cryptographic checks.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Python API Verification:</strong>
+            <pre><code>from wia_social import PublicDocumentClient
+from wia_social.models import VerificationLevel
+
+client = PublicDocumentClient(api_key=os.environ['GOV_API_KEY'])
+
+def verify_document(document_id: str, verification_level: str = 'full'):
+    """
+    Verify document authenticity and status.
+
+    Verification levels:
+    - 'basic': Check signature and format only
+    - 'standard': Include revocation check
+    - 'full': Include issuer confirmation and attribute validation
+    """
+
+    result = client.verification.verify(
+        document_id=document_id,
+        level=VerificationLevel[verification_level.upper()],
+        include_history=True
+    )
+
+    print(f"Verification Level: {result.level}")
+    print(f"Overall Status: {'VALID' if result.valid else 'INVALID'}")
+    print(f"Confidence: {result.confidence_score}/100")
+    print()
+
+    # Check individual validation results
+    checks = result.checks
+    print("Validation Checks:")
+    print(f"  Signature Valid: {'✓' if checks.signature_valid else '✗'}")
+    print(f"  Not Revoked: {'✓' if checks.not_revoked else '✗'}")
+    print(f"  Not Expired: {'✓' if checks.not_expired else '✗'}")
+    print(f"  Issuer Confirmed: {'✓' if checks.issuer_confirmed else '✗'}")
+
+    if not result.valid:
+        print(f"\nFailure Reasons:")
+        for reason in result.failure_reasons:
+            print(f"  - {reason}")
+
+    # Check verification history
+    if result.verification_history:
+        print(f"\nPrevious Verifications: {len(result.verification_history)}")
+        for entry in result.verification_history[:5]:
+            print(f"  {entry.timestamp}: {entry.verifier} - {entry.result}")
+
+    return result
+
+# Example usage
+result = verify_document('EE-PASS-2024-987654', verification_level='full')
+
+if result.valid:
+    print("\n✓ Document is authentic and currently valid")
+else:
+    print("\n✗ Document verification failed")
+    print("Do not accept this document")</code></pre>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Verification Level</th>
+                    <th>Checks Performed</th>
+                    <th>Response Time</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Basic</strong></td>
+                    <td>Signature, format validation</td>
+                    <td>&lt;100ms</td>
+                    <td>Offline mobile verification</td>
+                </tr>
+                <tr>
+                    <td><strong>Standard</strong></td>
+                    <td>Basic + revocation check</td>
+                    <td>&lt;500ms</td>
+                    <td>General business verification</td>
+                </tr>
+                <tr>
+                    <td><strong>Full</strong></td>
+                    <td>Standard + issuer confirmation + attributes</td>
+                    <td>&lt;2s</td>
+                    <td>High-security applications</td>
+                </tr>
+                <tr>
+                    <td><strong>Forensic</strong></td>
+                    <td>Full + biometric matching + audit trail</td>
+                    <td>&lt;10s</td>
+                    <td>Law enforcement, border control</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Error Handling and Retry Logic</h2>
+
+        <p>
+            Robust applications must handle various error conditions gracefully. Network failures, rate limiting, temporary service unavailability, and invalid data all require appropriate handling strategies.
+        </p>
+
+        <h3>Exponential Backoff</h3>
+
+        <p>
+            When encountering retryable errors (network timeouts, 503 Service Unavailable, 429 Too Many Requests), SDKs should implement exponential backoff with jitter. The delay between retries increases exponentially (1s, 2s, 4s, 8s), with random jitter preventing thundering herds when many clients retry simultaneously.
+        </p>
+
+        <h3>Circuit Breaker Pattern</h3>
+
+        <p>
+            For critical dependencies, circuit breakers prevent cascading failures. After a threshold of consecutive failures, the circuit "opens," immediately failing requests without attempting the operation. After a timeout, the circuit enters "half-open" state, allowing a test request. Success closes the circuit; failure reopens it. This prevents overwhelming failing services with repeated requests.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>HTTP Status Code</th>
+                    <th>Meaning</th>
+                    <th>Retry Strategy</th>
+                    <th>Action Required</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>400 Bad Request</strong></td>
+                    <td>Invalid request format</td>
+                    <td>Do not retry</td>
+                    <td>Fix request parameters</td>
+                </tr>
+                <tr>
+                    <td><strong>401 Unauthorized</strong></td>
+                    <td>Authentication failed</td>
+                    <td>Do not retry</td>
+                    <td>Refresh access token, re-authenticate</td>
+                </tr>
+                <tr>
+                    <td><strong>403 Forbidden</strong></td>
+                    <td>Insufficient permissions</td>
+                    <td>Do not retry</td>
+                    <td>Request proper authorization</td>
+                </tr>
+                <tr>
+                    <td><strong>404 Not Found</strong></td>
+                    <td>Resource doesn't exist</td>
+                    <td>Do not retry</td>
+                    <td>Verify document ID or endpoint</td>
+                </tr>
+                <tr>
+                    <td><strong>429 Too Many Requests</strong></td>
+                    <td>Rate limit exceeded</td>
+                    <td>Retry with backoff</td>
+                    <td>Respect Retry-After header</td>
+                </tr>
+                <tr>
+                    <td><strong>500 Internal Server Error</strong></td>
+                    <td>Server error</td>
+                    <td>Retry with backoff</td>
+                    <td>Report if persistent</td>
+                </tr>
+                <tr>
+                    <td><strong>503 Service Unavailable</strong></td>
+                    <td>Temporary unavailability</td>
+                    <td>Retry with backoff</td>
+                    <td>Implement circuit breaker</td>
+                </tr>
+                <tr>
+                    <td><strong>504 Gateway Timeout</strong></td>
+                    <td>Upstream timeout</td>
+                    <td>Retry with backoff</td>
+                    <td>Consider increasing client timeout</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box">
+            <h3 style="margin-top: 0; color: var(--primary);">TypeScript Retry with Exponential Backoff</h3>
+            <pre><code>async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxAttempts: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      // Don't retry on client errors (4xx except 429)
+      if (error.status >= 400 && error.status < 500 && error.status !== 429) {
+        throw error;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        // Calculate delay with exponential backoff and jitter
+        const exponentialDelay = baseDelay * Math.pow(2, attempt);
+        const jitter = Math.random() * 1000;
+        const delay = exponentialDelay + jitter;
+
+        console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+        await sleep(delay);
+      }
+    }
+  }
+
+  throw new Error(`Operation failed after ${maxAttempts} attempts: ${lastError.message}`);
+}
+
+// Usage
+const document = await retryWithBackoff(
+  () => client.documents.get(documentId),
+  maxAttempts: 3,
+  baseDelay: 1000
+);</code></pre>
+        </div>
+
+        <h2>Webhooks and Event Notifications</h2>
+
+        <p>
+            For long-running operations or event-driven workflows, webhooks provide real-time notifications without polling. When document status changes (issuance completed, revocation, expiration warning), the system posts notifications to client-specified URLs.
+        </p>
+
+        <h3>Webhook Registration</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Event Type</th>
+                    <th>Trigger</th>
+                    <th>Payload Data</th>
+                    <th>Typical Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>document.issued</strong></td>
+                    <td>New document created</td>
+                    <td>documentId, type, issuedDate, holder</td>
+                    <td>Send notification to document holder</td>
+                </tr>
+                <tr>
+                    <td><strong>document.revoked</strong></td>
+                    <td>Document invalidated</td>
+                    <td>documentId, revocationDate, reason</td>
+                    <td>Update verification systems immediately</td>
+                </tr>
+                <tr>
+                    <td><strong>document.expiring</strong></td>
+                    <td>30 days before expiration</td>
+                    <td>documentId, expirationDate</td>
+                    <td>Remind holder to renew document</td>
+                </tr>
+                <tr>
+                    <td><strong>document.expired</strong></td>
+                    <td>Document past expiration</td>
+                    <td>documentId, expiredDate</td>
+                    <td>Disable access, archive document</td>
+                </tr>
+                <tr>
+                    <td><strong>verification.completed</strong></td>
+                    <td>Async verification finished</td>
+                    <td>verificationId, result, confidence</td>
+                    <td>Continue workflow after verification</td>
+                </tr>
+                <tr>
+                    <td><strong>biometric.matched</strong></td>
+                    <td>Biometric verification success</td>
+                    <td>matchScore, biometricType</td>
+                    <td>Authorize high-security transaction</td>
+                </tr>
+                <tr>
+                    <td><strong>audit.flagged</strong></td>
+                    <td>Suspicious activity detected</td>
+                    <td>activityType, riskScore, details</td>
+                    <td>Alert security team for review</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <strong>Webhook Setup Example:</strong>
+            <pre><code>// Register webhook endpoint
+await client.webhooks.register({
+  url: 'https://myapp.com/webhooks/documents',
+  events: [
+    'document.issued',
+    'document.revoked',
+    'document.expiring',
+    'verification.completed'
+  ],
+  secret: 'webhook-signing-secret',
+  retryPolicy: {
+    maxAttempts: 5,
+    backoffMultiplier: 2
+  }
+});
+
+// Webhook handler (Express.js example)
+app.post('/webhooks/documents', async (req, res) => {
+  const signature = req.headers['x-webhook-signature'];
+  const payload = req.body;
+
+  // Verify webhook signature
+  if (!verifyWebhookSignature(payload, signature, webhookSecret)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // Process event
+  switch (payload.event) {
+    case 'document.issued':
+      await handleDocumentIssued(payload.data);
+      break;
+
+    case 'document.revoked':
+      await handleDocumentRevoked(payload.data);
+      break;
+
+    case 'document.expiring':
+      await handleDocumentExpiring(payload.data);
+      break;
+  }
+
+  // Acknowledge receipt
+  res.status(200).json({ received: true });
+});</code></pre>
+        </div>
+
+        <h2>Testing and Mocking</h2>
+
+        <p>
+            SDKs should provide testing utilities including mock clients, fixture data, and sandbox environments. This enables developers to build and test integrations without accessing production systems or real citizen data.
+        </p>
+
+        <h3>Mock Client for Unit Testing</h3>
+
+        <div class="highlight-box">
+            <strong>Python Testing Example:</strong>
+            <pre><code>import pytest
+from wia_social import PublicDocumentClient
+from wia_social.testing import MockDocumentClient, create_mock_document
+
+# Use mock client in tests
+@pytest.fixture
+def client():
+    mock = MockDocumentClient()
+
+    # Pre-load mock data
+    mock.add_document(create_mock_document(
+        document_id='TEST-001',
+        document_type='BirthCertificate',
+        status='active'
+    ))
+
+    return mock
+
+def test_document_retrieval(client):
+    # Test retrieves from mock
+    doc = client.documents.get('TEST-001')
+
+    assert doc.document_id == 'TEST-001'
+    assert doc.document_type == 'BirthCertificate'
+    assert doc.status == 'active'
+
+def test_document_not_found(client):
+    with pytest.raises(NotFoundError):
+        client.documents.get('NON-EXISTENT')
+
+def test_verification_success(client):
+    result = client.verification.verify('TEST-001')
+
+    assert result.valid == True
+    assert result.confidence_score >= 95</code></pre>
+        </div>
+
+        <h2>Summary</h2>
+
+        <div class="highlight-box">
+            <h3 style="margin-top:0">Key Takeaways:</h3>
+            <ul>
+                <li><strong>Multi-Language SDKs:</strong> TypeScript, Python, and Java SDKs provide developer-friendly interfaces with language-idiomatic patterns.</li>
+                <li><strong>Comprehensive Document Operations:</strong> Create, retrieve, update, delete, and batch operations with proper error handling.</li>
+                <li><strong>Multi-Level Verification:</strong> From basic offline checks to full forensic verification with biometric matching.</li>
+                <li><strong>Robust Error Handling:</strong> Exponential backoff, circuit breakers, and retry logic ensure resilience.</li>
+                <li><strong>Event-Driven Architecture:</strong> Webhooks enable real-time notifications for document lifecycle events.</li>
+                <li><strong>Testing Support:</strong> Mock clients and fixture data enable development without production access.</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li><strong>Why are SDKs important for API adoption? What problems do they solve compared to direct HTTP calls?</strong></li>
+            <li><strong>Explain the difference between batch retrieval and pagination. When would you use each?</strong></li>
+            <li><strong>Describe the document issuance workflow. What validation occurs before a document is signed?</strong></li>
+            <li><strong>Compare offline QR code verification to online API verification. What are the trade-offs?</strong></li>
+            <li><strong>What is exponential backoff and why is jitter important? How does it prevent thundering herds?</strong></li>
+            <li><strong>Explain the circuit breaker pattern. How does it protect systems from cascading failures?</strong></li>
+            <li><strong>Why is webhook signature verification critical? What attack does it prevent?</strong></li>
+            <li><strong>How do mock clients improve development velocity? What testing challenges do they address?</strong></li>
+        </ol>
+
+        </div>
+</body>
+</html>

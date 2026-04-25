@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 실제 구현 | WIA-SEC-011</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #10b981; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .warning-box { background: linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #ef4444; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+    </style>
+</head>
+<body>
+    <h1>제6장: 실제 구현</h1>
+
+    <div class="objectives-box">
+        <h3>학습 목표</h3>
+        <ul>
+            <li>완전한 암호화 시스템 설계</li>
+            <li>일반적인 구현 함정 회피</li>
+            <li>적절한 테스트 전략 구현</li>
+            <li>성능 최적화</li>
+            <li>보안 코딩 관행 적용</li>
+        </ul>
+    </div>
+
+    <h2>6.1 완전한 시스템 설계</h2>
+
+    <p>완전한 암호화 메시징 시스템을 설계해봅시다:</p>
+
+    <h3>6.1.1 요구사항</h3>
+    <ul>
+        <li>종단간 암호화</li>
+        <li>완전 순방향 비밀성</li>
+        <li>메시지 인증</li>
+        <li>사용자 친화적 키 관리</li>
+    </ul>
+
+    <h3>6.1.2 아키텍처</h3>
+
+    <pre><code>// 보안 메시징 아키텍처
+{
+  "key_exchange": {
+    "algorithm": "ECDH (P-384)",
+    "purpose": "공유 비밀 설정"
+  },
+  "message_encryption": {
+    "algorithm": "AES-256-GCM",
+    "key_derivation": "HKDF-SHA256"
+  },
+  "authentication": {
+    "algorithm": "ECDSA (P-384)",
+    "purpose": "발신자 신원 확인"
+  },
+  "key_rotation": {
+    "ratchet": "Double Ratchet Protocol",
+    "frequency": "메시지마다"
+  }
+}</code></pre>
+
+    <h2>6.2 일반적인 함정</h2>
+
+    <div class="warning-box">
+        <h3>❌ 절대 하지 말 것</h3>
+        <ul>
+            <li><strong>IV/Nonce 재사용:</strong> 보안 완전 붕괴</li>
+            <li><strong>인증 태그 무시:</strong> 변조 공격 허용</li>
+            <li><strong>키 하드코딩:</strong> 소스 컨트롤에 키 노출</li>
+            <li><strong>ECB 모드 사용:</strong> 데이터 패턴 노출</li>
+            <li><strong>자체 암호화 개발:</strong> 검증된 라이브러리 사용</li>
+        </ul>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>함정</th>
+                <th>위험</th>
+                <th>해결책</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>IV 재사용</td>
+                <td>완전한 노출</td>
+                <td>암호화마다 랜덤 IV</td>
+            </tr>
+            <tr>
+                <td>인증 태그 없음</td>
+                <td>데이터 변조</td>
+                <td>항상 태그 검증</td>
+            </tr>
+            <tr>
+                <td>하드코딩된 키</td>
+                <td>키 노출</td>
+                <td>환경 변수 또는 KMS 사용</td>
+            </tr>
+            <tr>
+                <td>타이밍 공격</td>
+                <td>키 복구</td>
+                <td>상수 시간 비교</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>6.3 테스트 전략</h2>
+
+    <pre><code>// 테스트: 암호화 및 복호화
+function testEncryption() {
+  const plaintext = Buffer.from('테스트 메시지');
+  const key = crypto.randomBytes(32);
+
+  const encrypted = encryptAES(plaintext, key);
+  const decrypted = decryptAES(encrypted, key);
+
+  assert(plaintext.equals(decrypted));
+  console.log('✓ 암호화 테스트 통과');
+}
+
+// 테스트: IV 고유성
+function testIVUniqueness() {
+  const plaintext = Buffer.from('동일한 메시지');
+  const key = crypto.randomBytes(32);
+
+  const enc1 = encryptAES(plaintext, key);
+  const enc2 = encryptAES(plaintext, key);
+
+  // 암호문이 달라야 함
+  assert(!enc1.ciphertext.equals(enc2.ciphertext));
+  console.log('✓ IV 고유성 테스트 통과');
+}
+
+// 테스트: 변조 감지
+function testTamperDetection() {
+  const encrypted = encryptAES('메시지', key);
+  encrypted.ciphertext[0] ^= 0xFF; // 변조
+
+  assert.throws(() => decryptAES(encrypted, key));
+  console.log('✓ 변조 감지 테스트 통과');
+}</code></pre>
+
+    <h2>6.4 성능 최적화</h2>
+
+    <h3>6.4.1 하드웨어 가속</h3>
+
+    <ul>
+        <li><strong>AES-NI:</strong> Intel/AMD 명령어 세트 (10배+ 속도 향상)</li>
+        <li><strong>ARM Crypto Extensions:</strong> 모바일/임베디드 가속</li>
+        <li><strong>GPU 가속:</strong> 대용량 데이터셋 병렬 암호화</li>
+    </ul>
+
+    <h3>6.4.2 모범 사례</h3>
+
+    <ul>
+        <li>대용량 파일에는 스트리밍 암호화 사용</li>
+        <li>가능한 경우 하드웨어 가속 활성화</li>
+        <li>적절한 버퍼링 (16KB-64KB 청크)</li>
+        <li>독립적인 데이터는 병렬 암호화 고려</li>
+    </ul>
+
+    <h2>6.5 보안 코딩 관행</h2>
+
+    <ul>
+        <li><strong>민감한 메모리 정리:</strong> 사용 후 키 제로화</li>
+        <li><strong>상수 시간 연산:</strong> 타이밍 공격 방지</li>
+        <li><strong>입력 유효성 검사:</strong> 처리 전 모든 입력 검증</li>
+        <li><strong>에러 처리:</strong> 에러에서 정보 누출 금지</li>
+        <li><strong>코드 리뷰:</strong> 모든 암호화 코드에 보안 중심 리뷰</li>
+    </ul>
+
+    <h2>6.6 에러 처리 모범 사례</h2>
+
+    <pre><code>// 나쁜 예 - 정보 누출
+function badDecrypt(ciphertext, key) {
+  try {
+    return decrypt(ciphertext, key);
+  } catch (e) {
+    throw new Error(`복호화 실패: ${e.message}`);
+    // 공격자에게 유용한 정보 제공
+  }
+}
+
+// 좋은 예 - 일반적인 에러
+function goodDecrypt(ciphertext, key) {
+  try {
+    return decrypt(ciphertext, key);
+  } catch (e) {
+    log.error('복호화 실패', { errorId: generateId() });
+    throw new Error('복호화 실패');
+    // 최소한의 정보만 노출
+  }
+}</code></pre>
+
+    <h2>6.7 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>종단간 암호화와 PFS로 시스템 설계</li>
+            <li>IV 재사용이나 인증 태그 무시 절대 금지</li>
+            <li>암호화, IV 고유성, 변조 감지 테스트</li>
+            <li>가능한 경우 하드웨어 가속 사용</li>
+            <li>보안 코딩 관행을 일관되게 따르기</li>
+        </ul>
+    </blockquote>
+
+    <h2>6.8 복습 문제</h2>
+
+    <ol>
+        <li>보안 메시징 시스템의 4가지 요구사항은?</li>
+        <li>IV 재사용이 위험한 이유는?</li>
+        <li>암호화 코드에 어떤 테스트를 작성해야 하는가?</li>
+        <li>AES-NI가 성능을 어떻게 개선하는가?</li>
+        <li>상수 시간 비교가 중요한 이유는?</li>
+    </ol>
+
+    <h2>6.9 다음 장 미리보기</h2>
+
+    <p>제7장에서는 포스트 양자 암호화, 영지식 증명, 동형 암호화 등 고급 주제를 탐구합니다.</p>
+</body>
+</html>

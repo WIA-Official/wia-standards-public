@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 05 - 디지털 소멸 API 인터페이스</title>
+    <style>:root{--primary:#f59e0b;--primary-dark:#d97706}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:#475569;margin:25px 0 15px;font-size:1.3em}.content p{margin:15px 0}.content ul,.content ol{margin:15px 0 15px 30px;line-height:2}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:#fef3c7;border-left:5px solid #f59e0b;padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin:25px 0;background:white;box-shadow:0 2px 8px rgba(0,0,0,.1)}th{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:15px;text-align:left;font-weight:600}td{padding:12px 15px;border-bottom:1px solid #e2e8f0}tr:hover{background:#f8fafc}pre{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-size:0.85em;line-height:1.5}code{font-family:'Courier New',monospace;font-size:0.9em}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:background 0.3s}.nav-button:hover{background:var(--primary-dark)}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Chapter 05</h1>
+            <h2 style="font-size:1.8em;font-weight:400;margin-top:20px">디지털 소멸 API 인터페이스</h2>
+            <p style="margin-top:15px;font-size:1.1em">WIA-DIGITAL_ERASURE API Standards</p>
+        </div>
+
+        <div class="content">
+            <h2>1. API 인터페이스 개요</h2>
+            <p>WIA-DIGITAL_ERASURE API는 개인정보 삭제 요청을 표준화된 방식으로 처리하기 위한 RESTful API 인터페이스입니다. 이 표준은 네이버, 카카오, 구글 등 주요 플랫폼이 채택할 수 있도록 설계되었으며, 개인정보보호법 제21조(개인정보의 파기)를 기술적으로 구현합니다.</p>
+
+            <div class="info-box">
+                <h4>📌 학습 목표</h4>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>WIA-DIGITAL_ERASURE API의 핵심 엔드포인트 이해</li>
+                    <li>삭제 요청 생명주기(Request Lifecycle) 관리</li>
+                    <li>인증 및 권한 부여 메커니즘</li>
+                    <li>네이버/카카오 등 국내 플랫폼 적용 사례</li>
+                    <li>GDPR Article 17 준수를 위한 API 설계</li>
+                </ul>
+            </div>
+
+            <h2>2. API 아키텍처</h2>
+            <p>WIA-DIGITAL_ERASURE API는 3-Layer 아키텍처를 기반으로 합니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>계층</th>
+                        <th>역할</th>
+                        <th>기술 스택</th>
+                        <th>책임</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Presentation Layer</strong></td>
+                        <td>API Gateway</td>
+                        <td>REST API, OAuth 2.0</td>
+                        <td>요청 검증, 인증, 라우팅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Business Logic Layer</strong></td>
+                        <td>Erasure Orchestrator</td>
+                        <td>Node.js, TypeScript</td>
+                        <td>삭제 로직, 상태 관리, 검증</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Layer</strong></td>
+                        <td>Storage Manager</td>
+                        <td>PostgreSQL, Redis</td>
+                        <td>데이터 영구 삭제, 로그 보관</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>2.1 아키텍처 다이어그램</h3>
+            <pre><code>┌──────────────────────────────────────────────────────────┐
+│                     API Gateway (HTTPS)                   │
+│         ┌──────────┬──────────┬──────────┬──────────┐    │
+│         │ /request │ /status  │ /verify  │ /cancel  │    │
+│         └──────────┴──────────┴──────────┴──────────┘    │
+└───────────────────────┬──────────────────────────────────┘
+                        │
+          ┌─────────────┴─────────────┐
+          │   Authentication Service   │
+          │   (OAuth 2.0 / OIDC)      │
+          └─────────────┬─────────────┘
+                        │
+┌───────────────────────┴──────────────────────────────────┐
+│              Erasure Orchestration Engine                 │
+│  ┌─────────────┬─────────────┬─────────────┬──────────┐ │
+│  │  Validator  │   Executor  │   Monitor   │  Logger  │ │
+│  └─────────────┴─────────────┴─────────────┴──────────┘ │
+└───────────────────────┬──────────────────────────────────┘
+                        │
+          ┌─────────────┼─────────────┐
+          │             │             │
+    ┌─────▼─────┐ ┌────▼────┐ ┌─────▼─────┐
+    │  Primary  │ │ Backups │ │ Analytics │
+    │    DB     │ │   DB    │ │    DB     │
+    └───────────┘ └─────────┘ └───────────┘</code></pre>
+
+            <h2>3. 핵심 API 엔드포인트</h2>
+
+            <h3>3.1 POST /api/v1/erasure/request - 삭제 요청 생성</h3>
+            <p>개인정보 삭제 요청을 생성합니다. 개인정보보호법 제21조에 따라 사용자는 언제든지 자신의 정보 삭제를 요청할 수 있습니다.</p>
+
+            <pre><code>/**
+ * 삭제 요청 생성 API
+ * @endpoint POST /api/v1/erasure/request
+ * @auth Bearer Token (OAuth 2.0)
+ * @compliance 개인정보보호법 제21조, GDPR Article 17
+ */
+
+// Request Body
+{
+  "version": "1.0.0",
+  "userId": "user@example.com",
+  "userIdType": "EMAIL",  // EMAIL | PHONE | SSN | USER_ID
+
+  // 삭제 범위 지정
+  "scope": {
+    "dataCategories": [
+      "PROFILE",           // 프로필 정보
+      "POSTS",             // 게시물
+      "COMMENTS",          // 댓글
+      "MESSAGES",          // 메시지
+      "SEARCH_HISTORY",    // 검색 기록
+      "PURCHASE_HISTORY",  // 구매 기록
+      "LOCATION_DATA",     // 위치 정보
+      "ANALYTICS"          // 분석 데이터
+    ],
+
+    // 플랫폼별 세부 설정
+    "platforms": {
+      "web": true,
+      "mobile": true,
+      "api": true
+    },
+
+    // 백업 및 파생 데이터 포함 여부
+    "includeBackups": true,
+    "includeAnalytics": true,
+    "includeThirdParty": true  // 제3자 제공 데이터
+  },
+
+  // 법적 근거
+  "legalBasis": {
+    "regulation": "PIPA_ARTICLE_21",  // 개인정보보호법 제21조
+    "reason": "WITHDRAWAL_OF_CONSENT", // 동의 철회
+    "additionalInfo": "계정 탈퇴를 원합니다."
+  },
+
+  // 본인 인증
+  "verification": {
+    "method": "EMAIL_OTP",  // EMAIL_OTP | SMS_OTP | CERTIFICATE
+    "value": "123456",
+    "timestamp": "2025-01-07T14:30:00+09:00"
+  },
+
+  // 예외 처리
+  "exceptions": {
+    "legalHold": false,           // 법적 보존 의무
+    "activeContracts": [],        // 진행 중인 계약
+    "ongoingInvestigation": false // 조사 진행 중
+  },
+
+  // 통지 설정
+  "notification": {
+    "email": "user@example.com",
+    "sms": "+82-10-1234-5678",
+    "preferredMethod": "EMAIL"
+  }
+}
+
+// Response (201 Created)
+{
+  "success": true,
+  "requestId": "ER-2025-0107-001234",
+  "status": "PENDING_VERIFICATION",
+  "estimatedCompletionDate": "2025-01-17T23:59:59+09:00",
+
+  "verification": {
+    "method": "EMAIL_OTP",
+    "sentTo": "u***@example.com",
+    "expiresIn": 300  // 5분
+  },
+
+  "timeline": {
+    "received": "2025-01-07T14:30:00+09:00",
+    "verificationDeadline": "2025-01-07T14:35:00+09:00",
+    "deletionStartDate": "2025-01-08T00:00:00+09:00",
+    "completionDate": "2025-01-17T23:59:59+09:00"
+  },
+
+  "scope": {
+    "totalDataSize": "2.4 GB",
+    "affectedSystems": 12,
+    "thirdPartyPartners": 3
+  },
+
+  "_links": {
+    "self": "/api/v1/erasure/request/ER-2025-0107-001234",
+    "verify": "/api/v1/erasure/verify/ER-2025-0107-001234",
+    "status": "/api/v1/erasure/status/ER-2025-0107-001234",
+    "cancel": "/api/v1/erasure/cancel/ER-2025-0107-001234"
+  }
+}</code></pre>
+
+            <h3>3.2 GET /api/v1/erasure/status/{requestId} - 삭제 진행 상태 조회</h3>
+            <pre><code>/**
+ * 삭제 요청 상태 조회
+ * @endpoint GET /api/v1/erasure/status/{requestId}
+ */
+
+// Response (200 OK)
+{
+  "requestId": "ER-2025-0107-001234",
+  "status": "IN_PROGRESS",  // PENDING_VERIFICATION | VERIFIED | IN_PROGRESS | COMPLETED | FAILED | CANCELLED
+  "progress": {
+    "percentage": 67,
+    "currentPhase": "BACKUP_DELETION",
+    "completedPhases": [
+      "PRIMARY_DATABASE",
+      "SEARCH_INDEX",
+      "CDN_CACHE"
+    ],
+    "pendingPhases": [
+      "BACKUP_DELETION",
+      "ANALYTICS_DATABASE",
+      "THIRD_PARTY_NOTIFICATION"
+    ]
+  },
+
+  "details": {
+    "startedAt": "2025-01-08T00:00:00+09:00",
+    "lastUpdated": "2025-01-12T10:30:00+09:00",
+    "estimatedCompletion": "2025-01-17T23:59:59+09:00",
+
+    "deletedData": {
+      "profiles": 1,
+      "posts": 234,
+      "comments": 567,
+      "messages": 1203,
+      "files": {
+        "count": 842,
+        "size": "2.1 GB"
+      }
+    },
+
+    "systemStatus": [
+      {
+        "system": "Primary Database",
+        "status": "COMPLETED",
+        "completedAt": "2025-01-08T02:30:00+09:00"
+      },
+      {
+        "system": "Backup Storage",
+        "status": "IN_PROGRESS",
+        "startedAt": "2025-01-10T00:00:00+09:00",
+        "progress": 45
+      },
+      {
+        "system": "Analytics DB",
+        "status": "PENDING",
+        "scheduledStart": "2025-01-15T00:00:00+09:00"
+      }
+    ]
+  },
+
+  "compliance": {
+    "regulation": "PIPA_ARTICLE_21",
+    "deadline": "2025-01-17T23:59:59+09:00",
+    "remainingDays": 5,
+    "isCompliant": true
+  }
+}</code></pre>
+
+            <h2>4. 인증 및 권한 부여</h2>
+
+            <h3>4.1 OAuth 2.0 인증 흐름</h3>
+            <p>WIA-DIGITAL_ERASURE API는 OAuth 2.0 표준을 따르며, 다음과 같은 인증 방식을 지원합니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>인증 방식</th>
+                        <th>사용 시나리오</th>
+                        <th>보안 수준</th>
+                        <th>국내 지원</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Authorization Code</strong></td>
+                        <td>웹 애플리케이션</td>
+                        <td>⭐⭐⭐⭐⭐</td>
+                        <td>네이버, 카카오</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PKCE Extension</strong></td>
+                        <td>모바일 앱</td>
+                        <td>⭐⭐⭐⭐⭐</td>
+                        <td>전체 지원</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Device Code</strong></td>
+                        <td>스마트 TV, IoT</td>
+                        <td>⭐⭐⭐⭐</td>
+                        <td>제한적</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Public Key Certificate</strong></td>
+                        <td>정부/금융 서비스</td>
+                        <td>⭐⭐⭐⭐⭐</td>
+                        <td>행정안전부 인증</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>4.2 본인 인증 레벨</h3>
+            <pre><code>/**
+ * 본인 인증 레벨 정의
+ * @compliance 전자서명법, 개인정보보호법
+ */
+
+enum VerificationLevel {
+  LEVEL_1 = 1,  // 이메일/SMS 인증
+  LEVEL_2 = 2,  // 2단계 인증 (MFA)
+  LEVEL_3 = 3,  // 공인인증서 (구)
+  LEVEL_4 = 4   // 금융인증서 / 간편인증
+}
+
+// 삭제 범위에 따른 필요 인증 레벨
+const requiredVerificationLevel = (scope: ErasureScope): VerificationLevel => {
+  if (scope.includes('FINANCIAL_DATA')) {
+    return VerificationLevel.LEVEL_4;  // 금융 데이터는 최고 등급 필요
+  }
+
+  if (scope.includes('SENSITIVE_PERSONAL_INFO')) {
+    return VerificationLevel.LEVEL_3;  // 민감정보는 공인인증
+  }
+
+  if (scope.includes('POSTS') || scope.includes('COMMENTS')) {
+    return VerificationLevel.LEVEL_2;  // 일반 콘텐츠는 2단계 인증
+  }
+
+  return VerificationLevel.LEVEL_1;  // 기본 데이터는 이메일 인증
+};
+
+// 네이버 적용 사례
+const naverVerification = {
+  email: VerificationLevel.LEVEL_1,
+  sms: VerificationLevel.LEVEL_1,
+  naverAuth: VerificationLevel.LEVEL_2,  // 네이버 OTP
+  certificate: VerificationLevel.LEVEL_4  // 금융인증서
+};
+
+// 카카오 적용 사례
+const kakaoVerification = {
+  kakaoTalk: VerificationLevel.LEVEL_2,   // 카카오톡 본인인증
+  kakaoPass: VerificationLevel.LEVEL_4,   // 카카오페이 인증
+  biometric: VerificationLevel.LEVEL_3    // 생체인증
+};</code></pre>
+
+            <h2>5. 에러 처리 및 상태 코드</h2>
+
+            <h3>5.1 HTTP 상태 코드 매핑</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>HTTP 코드</th>
+                        <th>WIA 에러 코드</th>
+                        <th>설명</th>
+                        <th>사용자 조치</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>200 OK</strong></td>
+                        <td>-</td>
+                        <td>성공</td>
+                        <td>없음</td>
+                    </tr>
+                    <tr>
+                        <td><strong>201 Created</strong></td>
+                        <td>-</td>
+                        <td>삭제 요청 생성됨</td>
+                        <td>인증 진행</td>
+                    </tr>
+                    <tr>
+                        <td><strong>400 Bad Request</strong></td>
+                        <td>ER-4001</td>
+                        <td>잘못된 요청 형식</td>
+                        <td>요청 데이터 확인</td>
+                    </tr>
+                    <tr>
+                        <td><strong>401 Unauthorized</strong></td>
+                        <td>ER-4011</td>
+                        <td>인증 실패</td>
+                        <td>로그인 재시도</td>
+                    </tr>
+                    <tr>
+                        <td><strong>403 Forbidden</strong></td>
+                        <td>ER-4031</td>
+                        <td>권한 부족</td>
+                        <td>계정 소유자 확인</td>
+                    </tr>
+                    <tr>
+                        <td><strong>409 Conflict</strong></td>
+                        <td>ER-4091</td>
+                        <td>중복된 삭제 요청</td>
+                        <td>기존 요청 확인</td>
+                    </tr>
+                    <tr>
+                        <td><strong>423 Locked</strong></td>
+                        <td>ER-4231</td>
+                        <td>법적 보존 의무</td>
+                        <td>보존 기간 경과 후 재요청</td>
+                    </tr>
+                    <tr>
+                        <td><strong>429 Too Many Requests</strong></td>
+                        <td>ER-4291</td>
+                        <td>요청 제한 초과</td>
+                        <td>일정 시간 후 재시도</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 에러 응답 형식</h3>
+            <pre><code>// 에러 응답 표준 형식
+{
+  "success": false,
+  "error": {
+    "code": "ER-4231",
+    "type": "LEGAL_HOLD",
+    "message": "현재 법적 보존 의무로 인해 삭제가 불가능합니다.",
+    "message_en": "Data deletion is currently blocked due to legal hold.",
+
+    "details": {
+      "reason": "금융거래법에 따른 5년 보존 의무",
+      "regulation": "전자금융거래법 제22조",
+      "holdUntil": "2027-03-15T23:59:59+09:00",
+      "remainingDays": 812
+    },
+
+    "actions": [
+      {
+        "title": "법적 보존 기간 확인",
+        "link": "/legal/data-retention-policy"
+      },
+      {
+        "title": "개인정보보호위원회 문의",
+        "link": "https://www.pipc.go.kr"
+      }
+    ],
+
+    "timestamp": "2025-01-07T14:30:00+09:00",
+    "requestId": "ER-2025-0107-001234",
+    "traceId": "7f8a9b2c-3d4e-5f6g-7h8i-9j0k1l2m3n4o"
+  }
+}</code></pre>
+
+            <h2>6. 삭제 요청 생명주기</h2>
+
+            <div class="info-box">
+                <h4>🔄 Erasure Request Lifecycle</h4>
+                <pre style="background:white;color:#334155;padding:15px;border-radius:5px"><code>1. CREATED (생성됨)
+   ↓ 본인 인증 대기
+2. PENDING_VERIFICATION (인증 대기)
+   ↓ OTP/인증서 확인
+3. VERIFIED (인증 완료)
+   ↓ 삭제 예약
+4. SCHEDULED (삭제 예정)
+   ↓ 삭제 시작
+5. IN_PROGRESS (진행 중)
+   ├─→ PRIMARY_DB_DELETION (주 데이터베이스 삭제)
+   ├─→ BACKUP_DELETION (백업 삭제)
+   ├─→ CACHE_INVALIDATION (캐시 무효화)
+   ├─→ SEARCH_INDEX_REMOVAL (검색 인덱스 제거)
+   └─→ THIRD_PARTY_NOTIFICATION (제3자 통지)
+   ↓ 검증
+6. VERIFICATION (검증 중)
+   ↓ 완료 확인
+7. COMPLETED (완료)
+
+// 예외 상태
+- FAILED (실패): 시스템 오류
+- CANCELLED (취소됨): 사용자 취소
+- EXPIRED (만료됨): 인증 시간 초과
+- BLOCKED (차단됨): 법적 보존 의무</code></pre>
+            </div>
+
+            <h2>7. 국내 플랫폼 적용 사례</h2>
+
+            <h3>7.1 네이버 통합 예제</h3>
+            <pre><code>/**
+ * 네이버 플랫폼 WIA-DIGITAL_ERASURE 적용
+ * @platform Naver
+ * @compliance 개인정보보호법 제21조
+ */
+
+import { WIAErasureClient } from '@wia/digital-erasure';
+
+const client = new WIAErasureClient({
+  platform: 'NAVER',
+  apiKey: process.env.NAVER_API_KEY,
+  endpoint: 'https://api.naver.com/wia/erasure/v1'
+});
+
+// 네이버 계정 삭제 요청
+async function deleteNaverAccount(userId: string) {
+  try {
+    // 1. 삭제 요청 생성
+    const request = await client.createErasureRequest({
+      userId: userId,
+      userIdType: 'NAVER_ID',
+      scope: {
+        dataCategories: [
+          'PROFILE',          // 프로필
+          'NAVER_BLOG',       // 블로그
+          'NAVER_CAFE',       // 카페
+          'NAVER_MAIL',       // 메일
+          'NAVER_CLOUD',      // 클라우드
+          'NAVER_PAY',        // 네이버페이
+          'LINE',             // 라인 (연동 계정)
+          'SHOPPING_HISTORY'  // 쇼핑 내역
+        ],
+        includeBackups: true,
+        includeThirdParty: true  // 제휴사 포함
+      },
+      legalBasis: {
+        regulation: 'PIPA_ARTICLE_21',
+        reason: 'WITHDRAWAL_OF_CONSENT'
+      },
+      verification: {
+        method: 'NAVER_OTP'  // 네이버 OTP
+      }
+    });
+
+    console.log(`삭제 요청 생성: ${request.requestId}`);
+    console.log(`인증 방법: ${request.verification.method}`);
+
+    // 2. 인증 진행 (네이버 OTP)
+    const otpCode = await getNaverOTP();  // 사용자로부터 OTP 입력 받기
+
+    const verified = await client.verifyRequest(request.requestId, {
+      method: 'NAVER_OTP',
+      value: otpCode
+    });
+
+    if (!verified.success) {
+      throw new Error('인증 실패');
+    }
+
+    // 3. 진행 상황 모니터링
+    const interval = setInterval(async () => {
+      const status = await client.getStatus(request.requestId);
+
+      console.log(`진행률: ${status.progress.percentage}%`);
+      console.log(`현재 단계: ${status.progress.currentPhase}`);
+
+      if (status.status === 'COMPLETED') {
+        clearInterval(interval);
+        console.log('✅ 네이버 계정 삭제 완료');
+
+        // 4. 삭제 완료 보고서
+        const report = await client.getCompletionReport(request.requestId);
+        console.log(`삭제된 데이터: ${report.deletedData.totalSize}`);
+        console.log(`처리 시간: ${report.duration}`);
+      }
+
+      if (status.status === 'FAILED') {
+        clearInterval(interval);
+        console.error('❌ 삭제 실패:', status.error);
+      }
+    }, 5000);  // 5초마다 확인
+
+  } catch (error) {
+    console.error('네이버 계정 삭제 오류:', error);
+    throw error;
+  }
+}
+
+// 실행
+deleteNaverAccount('user@naver.com');</code></pre>
+
+            <h3>7.2 카카오 통합 예제</h3>
+            <pre><code>/**
+ * 카카오 플랫폼 WIA-DIGITAL_ERASURE 적용
+ * @platform Kakao
+ */
+
+import { WIAErasureClient } from '@wia/digital-erasure';
+
+const kakaoClient = new WIAErasureClient({
+  platform: 'KAKAO',
+  apiKey: process.env.KAKAO_API_KEY,
+  endpoint: 'https://kapi.kakao.com/wia/erasure/v1'
+});
+
+// 카카오 계정 삭제 (카카오톡 포함)
+async function deleteKakaoAccount(userId: string) {
+  const request = await kakaoClient.createErasureRequest({
+    userId: userId,
+    userIdType: 'KAKAO_ID',
+    scope: {
+      dataCategories: [
+        'PROFILE',           // 프로필
+        'KAKAOTALK',         // 카카오톡 대화내용
+        'KAKAO_STORY',       // 스토리
+        'KAKAO_PAY',         // 카카오페이 (금융정보)
+        'KAKAO_T',           // 카카오 T
+        'DAUM_MAIL',         // 다음 메일
+        'DAUM_CAFE'          // 다음 카페
+      ],
+      includeBackups: true
+    },
+    verification: {
+      method: 'KAKAO_TALK_AUTH'  // 카카오톡 본인인증
+    }
+  });
+
+  // 카카오톡으로 본인인증 메시지 전송
+  console.log('카카오톡으로 본인인증 메시지가 전송되었습니다.');
+
+  return request;
+}</code></pre>
+
+            <h2>8. 성능 및 보안 고려사항</h2>
+
+            <h3>8.1 성능 최적화</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>항목</th>
+                        <th>목표 지표</th>
+                        <th>구현 방법</th>
+                        <th>모니터링</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>API 응답 시간</strong></td>
+                        <td>&lt; 200ms</td>
+                        <td>Redis 캐싱, CDN</td>
+                        <td>New Relic, Datadog</td>
+                    </tr>
+                    <tr>
+                        <td><strong>삭제 완료 시간</strong></td>
+                        <td>&lt; 10일 (법정 기한)</td>
+                        <td>비동기 처리, 배치 작업</td>
+                        <td>ELK Stack</td>
+                    </tr>
+                    <tr>
+                        <td><strong>동시 처리 요청</strong></td>
+                        <td>10,000 req/sec</td>
+                        <td>Kubernetes HPA, 로드밸런싱</td>
+                        <td>Prometheus</td>
+                    </tr>
+                    <tr>
+                        <td><strong>데이터 삭제율</strong></td>
+                        <td>99.99%</td>
+                        <td>다중 검증, 재시도 로직</td>
+                        <td>커스텀 대시보드</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>8.2 보안 체크리스트</h3>
+            <div class="warning-box">
+                <h4>🔒 보안 필수 요구사항</h4>
+                <ul style="margin:10px 0 0 20px;line-height:2">
+                    <li>☑️ <strong>전송 암호화</strong>: TLS 1.3 이상 사용</li>
+                    <li>☑️ <strong>저장 암호화</strong>: AES-256-GCM</li>
+                    <li>☑️ <strong>인증 토큰</strong>: JWT, 만료시간 15분</li>
+                    <li>☑️ <strong>Rate Limiting</strong>: IP당 100 req/min</li>
+                    <li>☑️ <strong>CSRF 보호</strong>: Double Submit Cookie</li>
+                    <li>☑️ <strong>XSS 방어</strong>: CSP 헤더 적용</li>
+                    <li>☑️ <strong>SQL Injection 방어</strong>: Prepared Statement</li>
+                    <li>☑️ <strong>감사 로그</strong>: 모든 API 호출 기록 (최소 3년 보관)</li>
+                    <li>☑️ <strong>GDPR Article 32</strong>: 기술적·관리적 보호조치</li>
+                    <li>☑️ <strong>개인정보보호법 제29조</strong>: 안전성 확보조치</li>
+                </ul>
+            </div>
+
+            <h2>9. 테스트 및 검증</h2>
+
+            <h3>9.1 통합 테스트 시나리오</h3>
+            <pre><code>/**
+ * WIA-DIGITAL_ERASURE API 통합 테스트
+ * @test-framework Jest + Supertest
+ */
+
+import { describe, it, expect } from '@jest/globals';
+import { WIAErasureClient } from '@wia/digital-erasure';
+
+describe('WIA-DIGITAL_ERASURE API Integration Test', () => {
+
+  it('정상적인 삭제 요청 생성', async () => {
+    const response = await client.createErasureRequest({
+      userId: 'test@example.com',
+      scope: { dataCategories: ['PROFILE'] },
+      verification: { method: 'EMAIL_OTP' }
+    });
+
+    expect(response.success).toBe(true);
+    expect(response.requestId).toMatch(/^ER-\d{4}-\d{4}-\d{6}$/);
+    expect(response.status).toBe('PENDING_VERIFICATION');
+  });
+
+  it('중복 요청 시 409 Conflict', async () => {
+    await expect(
+      client.createErasureRequest({ userId: 'test@example.com' })
+    ).rejects.toThrow('ER-4091');
+  });
+
+  it('법적 보존 기간 중인 데이터 삭제 시도', async () => {
+    const response = await client.createErasureRequest({
+      userId: 'user-with-legal-hold@example.com',
+      scope: { dataCategories: ['FINANCIAL_DATA'] }
+    });
+
+    expect(response.success).toBe(false);
+    expect(response.error.code).toBe('ER-4231');
+    expect(response.error.type).toBe('LEGAL_HOLD');
+  });
+
+  it('10일 이내 삭제 완료 (SLA 준수)', async () => {
+    const request = await client.createErasureRequest({
+      userId: 'test-sla@example.com'
+    });
+
+    // 최대 10일 대기 (개인정보보호법 준수)
+    const startTime = Date.now();
+    await client.waitForCompletion(request.requestId, { timeout: 10 * 24 * 60 * 60 * 1000 });
+    const duration = Date.now() - startTime;
+
+    expect(duration).toBeLessThan(10 * 24 * 60 * 60 * 1000);  // 10일
+  });
+});</code></pre>
+
+            <h2>10. 요약 정리</h2>
+
+            <div class="key-takeaways">
+                <h3>🎯 Chapter 05 핵심 요점</h3>
+                <ul style="line-height:2">
+                    <li><strong>API 아키텍처</strong>: Presentation, Business Logic, Data Layer 3계층 구조</li>
+                    <li><strong>핵심 엔드포인트</strong>: /request (생성), /status (조회), /verify (인증), /cancel (취소)</li>
+                    <li><strong>인증 메커니즘</strong>: OAuth 2.0 기반, 4단계 본인인증 레벨</li>
+                    <li><strong>삭제 생명주기</strong>: 7단계 (생성 → 인증 → 예약 → 진행 → 검증 → 완료)</li>
+                    <li><strong>에러 처리</strong>: 표준화된 에러 코드 및 HTTP 상태 코드 매핑</li>
+                    <li><strong>국내 플랫폼</strong>: 네이버, 카카오 통합 예제 제공</li>
+                    <li><strong>성능 목표</strong>: API 응답 200ms, 삭제 완료 10일 이내</li>
+                    <li><strong>보안</strong>: TLS 1.3, AES-256, JWT, Rate Limiting 적용</li>
+                    <li><strong>법적 준수</strong>: 개인정보보호법 제21조, GDPR Article 17 완벽 지원</li>
+                    <li><strong>弘益人間</strong>: 표준화된 API로 모든 플랫폼에서 쉽게 개인정보를 관리하여 널리 이롭게 하라 🌍</li>
+                </ul>
+            </div>
+
+            <h2>11. 학습 점검 질문</h2>
+
+            <div class="info-box">
+                <h4>❓ Self-Check Questions</h4>
+                <ol style="margin:10px 0 0 20px;line-height:2">
+                    <li>WIA-DIGITAL_ERASURE API의 3계층 아키텍처를 설명하시오.</li>
+                    <li>삭제 요청 생명주기의 7단계를 순서대로 나열하시오.</li>
+                    <li>본인 인증 레벨 4단계의 차이점은 무엇인가?</li>
+                    <li>HTTP 423 Locked 상태 코드는 어떤 경우에 반환되는가?</li>
+                    <li>네이버와 카카오의 본인인증 방식의 차이는?</li>
+                    <li>개인정보보호법상 삭제 완료 기한은 며칠인가?</li>
+                    <li>API 응답 시간 목표는 얼마이며, 어떻게 달성하는가?</li>
+                    <li>법적 보존 의무가 있는 데이터의 에러 코드는?</li>
+                </ol>
+            </div>
+
+            <h2>12. 다음 장 예고</h2>
+
+            <p><strong>Chapter 06: 디지털 소멸 프로토콜</strong>에서는 API를 넘어 프로토콜 수준의 표준화를 다룹니다:</p>
+            <ul>
+                <li>WIA-ERASURE-PROTOCOL (WEP) 명세</li>
+                <li>시스템 간 통신 프로토콜 설계</li>
+                <li>블록체인 기반 삭제 검증</li>
+                <li>제3자 플랫폼 연동 프로토콜</li>
+                <li>국제 상호운용성 보장</li>
+            </ul>
+
+            <div class="navigation">
+                <a href="chapter-04.html" class="nav-button">← 이전 장</a>
+                <a href="chapter-06.html" class="nav-button">다음 장: Protocol →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

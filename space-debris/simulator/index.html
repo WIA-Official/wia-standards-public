@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SPACE-010: Space Debris Simulator</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --bg-dark: #0f172a;
+            --bg-surface: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --accent: #a78bfa;
+            --border: #334155;
+        }
+
+        * {margin: 0;padding: 0;box-sizing: border-box;}
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1f3a 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-surface) 0%, #2d1b4e 100%);
+            padding: 2rem;
+            text-align: center;
+            border-bottom: 2px solid var(--primary);
+            position: relative;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        h1 {font-size: 2rem;margin-bottom: 0.5rem;}
+
+        .philosophy {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid var(--primary);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .language-selector {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+
+        .lang-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .lang-button {
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 10px rgba(139, 92, 246, 0);
+            }
+        }
+
+        .lang-button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .lang-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-surface);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+            width: 250px;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .lang-list.show {display: block;}
+
+        .lang-list::-webkit-scrollbar {width: 8px;}
+        .lang-list::-webkit-scrollbar-track {background: var(--bg-dark);}
+        .lang-list::-webkit-scrollbar-thumb {background: var(--primary);border-radius: 4px;}
+
+        .lang-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .lang-item:last-child {border-bottom: none;}
+
+        .lang-item:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .sim-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .sim-panel {
+            background: var(--bg-surface);
+            border-radius: 15px;
+            padding: 2rem;
+            border: 2px solid var(--border);
+        }
+
+        .sim-panel h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .canvas-container {
+            grid-column: 1 / -1;
+            background: var(--bg-dark);
+            border-radius: 15px;
+            padding: 2rem;
+            border: 2px solid var(--primary);
+            text-align: center;
+        }
+
+        canvas {
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            background: #000;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .controls {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-box {
+            background: var(--bg-dark);
+            padding: 1.5rem;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-section {
+            background: var(--bg-surface);
+            padding: 2rem;
+            border-radius: 15px;
+            margin-top: 2rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .info-section h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .info-section p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            margin-top: 3rem;
+            border-top: 2px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .sim-grid {grid-template-columns: 1fr;}
+            .language-selector {position: static;margin-bottom: 1rem;}
+            .lang-button {width: 100%;}
+        }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Space Debris</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="header">
+        <div class="language-selector">
+            <div class="lang-dropdown">
+                <button class="lang-button" onclick="toggleLangMenu()">
+                    🌍 <span id="current-lang">English</span> ▼
+                </button>
+                <div class="lang-list" id="lang-menu">
+                    <div class="lang-item" onclick="setLang('English')">🇬🇧 English</div>
+                    <div class="lang-item" onclick="setLang('한국어')">🇰🇷 한국어 (Korean)</div>
+                    <div class="lang-item" onclick="setLang('中文')">🇨🇳 中文 (Chinese)</div>
+                    <div class="lang-item" onclick="setLang('日本語')">🇯🇵 日本語 (Japanese)</div>
+                    <div class="lang-item" onclick="setLang('Español')">🇪🇸 Español (Spanish)</div>
+                    <div class="lang-item" onclick="setLang('Français')">🇫🇷 Français (French)</div>
+                    <div class="lang-item" onclick="setLang('Deutsch')">🇩🇪 Deutsch (German)</div>
+                    <div class="lang-item" onclick="setLang('Русский')">🇷🇺 Русский (Russian)</div>
+                    <div class="lang-item" onclick="setLang('Português')">🇵🇹 Português (Portuguese)</div>
+                    <div class="lang-item" onclick="setLang('Italiano')">🇮🇹 Italiano (Italian)</div>
+                    <div class="lang-item" onclick="setLang('العربية')">🇸🇦 العربية (Arabic)</div>
+                    <div class="lang-item" onclick="setLang('हिन्दी')">🇮🇳 हिन्दी (Hindi)</div>
+                    <div class="lang-item" onclick="setLang('বাংলা')">🇧🇩 বাংলা (Bengali)</div>
+                    <div class="lang-item" onclick="setLang('Türkçe')">🇹🇷 Türkçe (Turkish)</div>
+                    <div class="lang-item" onclick="setLang('Polski')">🇵🇱 Polski (Polish)</div>
+                    <div class="lang-item" onclick="setLang('Nederlands')">🇳🇱 Nederlands (Dutch)</div>
+                    <div class="lang-item" onclick="setLang('Українська')">🇺🇦 Українська (Ukrainian)</div>
+                    <div class="lang-item" onclick="setLang('ไทย')">🇹🇭 ไทย (Thai)</div>
+                    <div class="lang-item" onclick="setLang('Tiếng Việt')">🇻🇳 Tiếng Việt (Vietnamese)</div>
+                    <div class="lang-item" onclick="setLang('Bahasa Indonesia')">🇮🇩 Bahasa Indonesia</div>
+                    <div class="lang-item" onclick="setLang('Bahasa Melayu')">🇲🇾 Bahasa Melayu (Malay)</div>
+                    <div class="lang-item" onclick="setLang('فارسی')">🇮🇷 فارسی (Persian)</div>
+                    <div class="lang-item" onclick="setLang('Suomi')">🇫🇮 Suomi (Finnish)</div>
+                    <div class="lang-item" onclick="setLang('Svenska')">🇸🇪 Svenska (Swedish)</div>
+                    <div class="lang-item" onclick="setLang('Norsk')">🇳🇴 Norsk (Norwegian)</div>
+                    <div class="lang-item" onclick="setLang('Dansk')">🇩🇰 Dansk (Danish)</div>
+                    <div class="lang-item" onclick="setLang('Čeština')">🇨🇿 Čeština (Czech)</div>
+                    <div class="lang-item" onclick="setLang('Magyar')">🇭🇺 Magyar (Hungarian)</div>
+                    <div class="lang-item" onclick="setLang('Română')">🇷🇴 Română (Romanian)</div>
+                    <div class="lang-item" onclick="setLang('Ελληνικά')">🇬🇷 Ελληνικά (Greek)</div>
+                    <div class="lang-item" onclick="setLang('עברית')">🇮🇱 עברית (Hebrew)</div>
+                    <div class="lang-item" onclick="setLang('Afrikaans')">🇿🇦 Afrikaans</div>
+                    <div class="lang-item" onclick="setLang('አማርኛ')">🇪🇹 አማርኛ (Amharic)</div>
+                    <div class="lang-item" onclick="setLang('Azərbaycan')">🇦🇿 Azərbaycan</div>
+                    <div class="lang-item" onclick="setLang('Беларуская')">🇧🇾 Беларуская (Belarusian)</div>
+                    <div class="lang-item" onclick="setLang('Български')">🇧🇬 Български (Bulgarian)</div>
+                    <div class="lang-item" onclick="setLang('Bosanski')">🇧🇦 Bosanski (Bosnian)</div>
+                    <div class="lang-item" onclick="setLang('Català')">🇦🇩 Català (Catalan)</div>
+                    <div class="lang-item" onclick="setLang('Hrvatski')">🇭🇷 Hrvatski (Croatian)</div>
+                    <div class="lang-item" onclick="setLang('Eesti')">🇪🇪 Eesti (Estonian)</div>
+                    <div class="lang-item" onclick="setLang('Filipino')">🇵🇭 Filipino</div>
+                    <div class="lang-item" onclick="setLang('ქართული')">🇬🇪 ქართული (Georgian)</div>
+                    <div class="lang-item" onclick="setLang('ગુજરાતી')">🇮🇳 ગુજરાતી (Gujarati)</div>
+                    <div class="lang-item" onclick="setLang('Hausa')">🇳🇬 Hausa</div>
+                    <div class="lang-item" onclick="setLang('Íslenska')">🇮🇸 Íslenska (Icelandic)</div>
+                    <div class="lang-item" onclick="setLang('ಕನ್ನಡ')">🇮🇳 ಕನ್ನಡ (Kannada)</div>
+                    <div class="lang-item" onclick="setLang('Қазақ')">🇰🇿 Қазақ (Kazakh)</div>
+                    <div class="lang-item" onclick="setLang('ខ្មែរ')">🇰🇭 ខ្មែរ (Khmer)</div>
+                    <div class="lang-item" onclick="setLang('Kurdî')">🌍 Kurdî (Kurdish)</div>
+                    <div class="lang-item" onclick="setLang('ລາວ')">🇱🇦 ລາວ (Lao)</div>
+                    <div class="lang-item" onclick="setLang('Latviešu')">🇱🇻 Latviešu (Latvian)</div>
+                    <div class="lang-item" onclick="setLang('Lietuvių')">🇱🇹 Lietuvių (Lithuanian)</div>
+                    <div class="lang-item" onclick="setLang('Македонски')">🇲🇰 Македонски (Macedonian)</div>
+                    <div class="lang-item" onclick="setLang('മലയാളം')">🇮🇳 മലയാളം (Malayalam)</div>
+                    <div class="lang-item" onclick="setLang('मराठी')">🇮🇳 मराठी (Marathi)</div>
+                    <div class="lang-item" onclick="setLang('Монгол')">🇲🇳 Монгол (Mongolian)</div>
+                    <div class="lang-item" onclick="setLang('မြန်မာ')">🇲🇲 မြန်မာ (Burmese)</div>
+                    <div class="lang-item" onclick="setLang('नेपाली')">🇳🇵 नेपाली (Nepali)</div>
+                    <div class="lang-item" onclick="setLang('ਪੰਜਾਬੀ')">🇮🇳 ਪੰਜਾਬੀ (Punjabi)</div>
+                    <div class="lang-item" onclick="setLang('پښتو')">🇦🇫 پښتو (Pashto)</div>
+                    <div class="lang-item" onclick="setLang('Српски')">🇷🇸 Српски (Serbian)</div>
+                    <div class="lang-item" onclick="setLang('සිංහල')">🇱🇰 සිංහල (Sinhala)</div>
+                    <div class="lang-item" onclick="setLang('Slovenčina')">🇸🇰 Slovenčina (Slovak)</div>
+                    <div class="lang-item" onclick="setLang('Slovenščina')">🇸🇮 Slovenščina (Slovenian)</div>
+                    <div class="lang-item" onclick="setLang('Soomaaliga')">🇸🇴 Soomaaliga (Somali)</div>
+                    <div class="lang-item" onclick="setLang('Kiswahili')">🇰🇪 Kiswahili (Swahili)</div>
+                    <div class="lang-item" onclick="setLang('தமிழ்')">🇮🇳 தமிழ் (Tamil)</div>
+                    <div class="lang-item" onclick="setLang('తెలుగు')">🇮🇳 తెలుగు (Telugu)</div>
+                    <div class="lang-item" onclick="setLang('Тоҷикӣ')">🇹🇯 Тоҷикӣ (Tajik)</div>
+                    <div class="lang-item" onclick="setLang('Türkmen')">🇹🇲 Türkmen (Turkmen)</div>
+                    <div class="lang-item" onclick="setLang('اردو')">🇵🇰 اردو (Urdu)</div>
+                    <div class="lang-item" onclick="setLang('Ўзбек')">🇺🇿 Ўзбек (Uzbek)</div>
+                    <div class="lang-item" onclick="setLang('Yorùbá')">🇳🇬 Yorùbá</div>
+                    <div class="lang-item" onclick="setLang('isiZulu')">🇿🇦 isiZulu (Zulu)</div>
+                    <div class="lang-item" onclick="setLang('Shqip')">🇦🇱 Shqip (Albanian)</div>
+                    <div class="lang-item" onclick="setLang('հայերեն')">🇦🇲 հայերեն (Armenian)</div>
+                    <div class="lang-item" onclick="setLang('Galego')">🇪🇸 Galego (Galician)</div>
+                    <div class="lang-item" onclick="setLang('Euskara')">🇪🇸 Euskara (Basque)</div>
+                    <div class="lang-item" onclick="setLang('Malti')">🇲🇹 Malti (Maltese)</div>
+                    <div class="lang-item" onclick="setLang('isiXhosa')">🇿🇦 isiXhosa (Xhosa)</div>
+                    <div class="lang-item" onclick="setLang('Cymraeg')">🏴󠁧󠁢󠁷󠁬󠁳󠁿 Cymraeg (Welsh)</div>
+                    <div class="lang-item" onclick="setLang('Gaeilge')">🇮🇪 Gaeilge (Irish)</div>
+                    <div class="lang-item" onclick="setLang('Gàidhlig')">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Gàidhlig (Scottish Gaelic)</div>
+                    <div class="lang-item" onclick="setLang('Esperanto')">🌍 Esperanto</div>
+                    <div class="lang-item" onclick="setLang('Latina')">🏛️ Latina (Latin)</div>
+                    <div class="lang-item" onclick="setLang('Luganda')">🇺🇬 Luganda</div>
+                    <div class="lang-item" onclick="setLang('Malagasy')">🇲🇬 Malagasy</div>
+                    <div class="lang-item" onclick="setLang('Samoa')">🇼🇸 Samoa</div>
+                    <div class="lang-item" onclick="setLang('Sesotho')">🇱🇸 Sesotho</div>
+                    <div class="lang-item" onclick="setLang('Setswana')">🇧🇼 Setswana (Tswana)</div>
+                    <div class="lang-item" onclick="setLang('chiShona')">🇿🇼 chiShona (Shona)</div>
+                    <div class="lang-item" onclick="setLang('Reo Tahiti')">🇵🇫 Reo Tahiti (Tahitian)</div>
+                    <div class="lang-item" onclick="setLang('isiXhosa')">🇿🇦 isiXhosa</div>
+                    <div class="lang-item" onclick="setLang('Sesotho')">🇱🇸 Sesotho</div>
+                    <div class="lang-item" onclick="setLang('Samoan')">🇼🇸 Samoan</div>
+                    <div class="lang-item" onclick="setLang('Hawaiian')">🇺🇸 Hawaiian</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="logo">🛰️ WIA-SPACE-010</div>
+        <h1>Space Debris Simulator</h1>
+        <div class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</div>
+    </div>
+
+    <div class="container">
+        <div class="sim-grid">
+            <div class="sim-panel">
+                <h2>📊 Real-Time Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value" id="tracked-objects">34,120</div>
+                        <div class="stat-label">Tracked Objects</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="active-sats">9,247</div>
+                        <div class="stat-label">Active Satellites</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="debris-pieces">130M+</div>
+                        <div class="stat-label">Debris >1mm</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="avg-speed">17,500</div>
+                        <div class="stat-label">Avg Speed (km/h)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sim-panel">
+                <h2>🎮 Simulation Controls</h2>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="startSim()">▶️ Start</button>
+                    <button class="btn btn-secondary" onclick="pauseSim()">⏸️ Pause</button>
+                    <button class="btn btn-secondary" onclick="resetSim()">🔄 Reset</button>
+                    <button class="btn btn-primary" onclick="addDebris()">➕ Add Debris</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">🌍 Orbital Visualization</h2>
+            <canvas id="debris-canvas"></canvas>
+            <div class="controls">
+                <button class="btn btn-secondary" onclick="toggleView('LEO')">LEO View</button>
+                <button class="btn btn-secondary" onclick="toggleView('GEO')">GEO View</button>
+                <button class="btn btn-secondary" onclick="toggleView('ALL')">All Orbits</button>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>🎯 About This Simulator</h3>
+            <p>
+                This interactive simulator visualizes space debris in Earth orbit based on real data from ESA, NASA, and IADC.
+                Explore the distribution of debris across different orbital regimes, see collision risks in action, and understand
+                why debris mitigation is critical for sustainable space operations.
+            </p>
+            <p>
+                Following the WIA principle of 弘益人間 (Benefit All Humanity), this tool helps educate about the space debris
+                challenge and promotes awareness of responsible space stewardship.
+            </p>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 SmileStory Inc. / WIA (World Certification Industry Association)</p>
+        <p><strong>弘益人間 (홍익인간)</strong> · Benefit All Humanity</p>
+        <p>WIA-SPACE-010 Space Debris Standards · Version 1.0</p>
+    </footer>
+
+    <script>
+        let simRunning = false;
+        let debris = [];
+        const canvas = document.getElementById('debris-canvas');
+        const ctx = canvas.getContext('2d');
+        let animationId = null;
+
+        // Initialize canvas
+        function initCanvas() {
+            canvas.width = 800;
+            canvas.height = 600;
+            generateDebris(100);
+        }
+
+        function generateDebris(count) {
+            debris = [];
+            for (let i = 0; i < count; i++) {
+                debris.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2 + 1,
+                    angle: Math.random() * Math.PI * 2,
+                    speed: Math.random() * 0.5 + 0.2,
+                    orbitRadius: 100 + Math.random() * 200
+                });
+            }
+        }
+
+        function drawEarth() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const earthRadius = 50;
+
+            // Earth
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, earthRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Glow
+            const gradient = ctx.createRadialGradient(centerX, centerY, earthRadius, centerX, centerY, earthRadius + 20);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+            gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, earthRadius + 20, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawDebris() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            debris.forEach(d => {
+                d.angle += d.speed * 0.01;
+                d.x = centerX + Math.cos(d.angle) * d.orbitRadius;
+                d.y = centerY + Math.sin(d.angle) * d.orbitRadius;
+
+                ctx.fillStyle = '#8B5CF6';
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function animate() {
+            if (!simRunning) return;
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawEarth();
+            drawDebris();
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function startSim() {
+            if (!simRunning) {
+                simRunning = true;
+                animate();
+            }
+        }
+
+        function pauseSim() {
+            simRunning = false;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        }
+
+        function resetSim() {
+            pauseSim();
+            generateDebris(100);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawEarth();
+            drawDebris();
+        }
+
+        function addDebris() {
+            for (let i = 0; i < 10; i++) {
+                debris.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2 + 1,
+                    angle: Math.random() * Math.PI * 2,
+                    speed: Math.random() * 0.5 + 0.2,
+                    orbitRadius: 100 + Math.random() * 200
+                });
+            }
+            document.getElementById('tracked-objects').textContent = (parseInt(document.getElementById('tracked-objects').textContent.replace(',', '')) + 10).toLocaleString();
+        }
+
+        function toggleView(view) {
+            console.log('Switching to ' + view + ' view');
+        }
+
+        function toggleLangMenu() {
+            document.getElementById('lang-menu').classList.toggle('show');
+        }
+
+        function setLang(lang) {
+            document.getElementById('current-lang').textContent = lang;
+            document.getElementById('lang-menu').classList.remove('show');
+            console.log('Language set to: ' + lang);
+        }
+
+        // Close dropdown when clicking outside
+        window.onclick = function(event) {
+            if (!event.target.matches('.lang-button') && !event.target.matches('.lang-button *')) {
+                const dropdown = document.getElementById('lang-menu');
+                if (dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            initCanvas();
+            resetSim();
+        };
+    </script>
+</body>
+</html>

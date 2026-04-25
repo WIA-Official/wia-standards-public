@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 08: 구현 및 인증 | WIA-DIGITAL_ERASURE</title>
+    <meta name="description" content="WIA-DIGITAL_ERASURE 구현 가이드, 테스트, 인증 절차">
+    <style>
+        :root { --primary: #f59e0b; --primary-dark: #d97706; --primary-light: #fbbf24; --bg: #0f172a; --bg-light: #1e293b; --text: #e2e8f0; --text-muted: #94a3b8; --accent: #ef4444; --code-bg: #1e293b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.8; color: var(--text); background: var(--bg); font-size: 17px; }
+        .container { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+        .header { background: linear-gradient(135deg, var(--primary-dark), var(--primary)); padding: 60px 20px; text-align: center; position: relative; }
+        .header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--accent), var(--primary-light)); }
+        .header h1 { font-size: 2.5em; margin-bottom: 15px; color: white; }
+        .header .subtitle { font-size: 1.2em; color: rgba(255,255,255,0.9); }
+        .lang-toggle { position: absolute; top: 20px; right: 20px; }
+        .lang-toggle a { color: white; text-decoration: none; padding: 8px 16px; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; }
+        .content { padding: 60px 0; }
+        .content h2 { color: var(--primary); font-size: 1.8em; margin: 50px 0 25px; padding-bottom: 15px; border-bottom: 3px solid var(--primary); }
+        .content h3 { color: var(--primary-light); font-size: 1.4em; margin: 35px 0 20px; }
+        .content p { margin: 20px 0; }
+        .content ul, .content ol { margin: 20px 0 20px 30px; }
+        .content li { margin: 12px 0; }
+        .info-box { background: var(--bg-light); border-left: 4px solid var(--primary); padding: 25px; margin: 30px 0; border-radius: 0 12px 12px 0; }
+        .info-box h4 { color: var(--primary); margin-top: 0; margin-bottom: 15px; }
+        pre { background: var(--code-bg); border: 1px solid #334155; border-radius: 12px; padding: 25px; overflow-x: auto; margin: 25px 0; }
+        code { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: var(--primary-light); }
+        pre code { color: var(--text); }
+        table { width: 100%; border-collapse: collapse; margin: 30px 0; background: var(--bg-light); border-radius: 12px; overflow: hidden; }
+        th, td { padding: 15px 20px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: var(--primary-dark); color: white; }
+        tr:hover { background: rgba(245, 158, 11, 0.1); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2)); border: 1px solid var(--primary); padding: 35px; margin: 50px 0; border-radius: 16px; }
+        .key-takeaways h3 { color: var(--primary); margin-top: 0; }
+        .review-questions { background: var(--bg-light); padding: 35px; margin: 50px 0; border-radius: 16px; border: 1px solid #334155; }
+        .review-questions h3 { color: var(--accent); margin-top: 0; margin-bottom: 25px; }
+        .cta-box { background: linear-gradient(135deg, var(--primary-dark), var(--primary)); padding: 40px; border-radius: 16px; text-align: center; margin: 50px 0; }
+        .cta-box h3 { color: white; margin-bottom: 15px; }
+        .cta-box a { display: inline-block; background: white; color: var(--primary-dark); padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: 600; margin-top: 20px; }
+        .chapter-nav { display: flex; justify-content: space-between; margin: 60px 0; padding: 30px; background: var(--bg-light); border-radius: 16px; }
+        .chapter-nav a { color: var(--primary); text-decoration: none; padding: 12px 24px; border: 2px solid var(--primary); border-radius: 8px; }
+        .footer { background: var(--bg-light); padding: 40px 20px; text-align: center; border-top: 1px solid #334155; }
+        .footer p { margin: 10px 0; color: var(--text-muted); }
+        .footer .philosophy { font-size: 1.2em; color: var(--primary); margin-top: 20px; }
+        .cert-badge { display: inline-block; padding: 10px 20px; border-radius: 8px; font-weight: 600; margin: 5px; }
+        .cert-bronze { background: #cd7f32; color: white; }
+        .cert-silver { background: #c0c0c0; color: #333; }
+        .cert-gold { background: #ffd700; color: #333; }
+        .cert-platinum { background: #e5e4e2; color: #333; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="lang-toggle"><a href="../en/chapter-08.html">EN</a></div>
+        <h1>Chapter 08: 구현 및 인증</h1>
+        <p class="subtitle">구현 체크리스트, 테스트, WIA 인증 획득</p>
+    </header>
+
+    <main class="content">
+        <div class="container">
+            <div class="info-box">
+                <h4>학습 목표</h4>
+                <ul>
+                    <li>WIA-DIGITAL_ERASURE 구현 체크리스트를 확인합니다</li>
+                    <li>테스트 전략과 검증 방법을 학습합니다</li>
+                    <li>WIA 인증 레벨과 획득 절차를 이해합니다</li>
+                    <li>컴플라이언스 리포팅 및 감사 대응을 준비합니다</li>
+                </ul>
+            </div>
+
+            <h2>1. 구현 체크리스트</h2>
+
+            <h3>1.1 Phase 1 (데이터 포맷) 체크리스트</h3>
+
+            <pre><code>Phase 1 구현 체크리스트:
+
+□ 삭제 요청 스키마 구현
+  ├─ □ JSON Schema 정의
+  ├─ □ 필수 필드 검증
+  ├─ □ 버전 관리 지원
+  └─ □ 에러 코드 체계
+
+□ 대상 식별자 체계
+  ├─ □ URN 형식 지원
+  ├─ □ 다중 식별자 매핑
+  └─ □ 범위 지정 (시스템, 기간)
+
+□ 검증 인증서
+  ├─ □ JWT/X.509 형식
+  ├─ □ 디지털 서명
+  └─ □ Merkle Root 포함
+
+□ 감사 로그
+  ├─ □ 구조화 로그 형식
+  ├─ □ 해시 체인 연결
+  ├─ □ 타임스탬프 검증
+  └─ □ 변조 방지</code></pre>
+
+            <h3>1.2 Phase 2 (API) 체크리스트</h3>
+
+            <pre><code>Phase 2 구현 체크리스트:
+
+□ REST API 엔드포인트
+  ├─ □ POST /erasure/requests
+  ├─ □ GET /erasure/requests/{id}
+  ├─ □ GET /erasure/verifications/{id}
+  ├─ □ GET /erasure/audit/{id}
+  └─ □ GET /erasure/certificates/{id}
+
+□ 인증/인가
+  ├─ □ OAuth 2.0 토큰 검증
+  ├─ □ Scope 기반 권한 제어
+  └─ □ API Key 지원
+
+□ Webhook
+  ├─ □ 이벤트 알림 전송
+  ├─ □ 서명 검증
+  └─ □ 재전송 로직
+
+□ Rate Limiting
+  ├─ □ 요청 제한 구현
+  └─ □ 429 응답 처리</code></pre>
+
+            <h3>1.3 Phase 3 (프로토콜) 체크리스트</h3>
+
+            <pre><code>Phase 3 구현 체크리스트:
+
+□ 분산 삭제 프로토콜
+  ├─ □ PREPARE 단계
+  ├─ □ EXECUTE 단계
+  ├─ □ VERIFY 단계
+  └─ □ FINALIZE 단계
+
+□ 합의 메커니즘
+  ├─ □ 투표 로직
+  ├─ □ 타임아웃 처리
+  └─ □ 정족수 계산
+
+□ 장애 복구
+  ├─ □ Coordinator 페일오버
+  ├─ □ 재시도 로직
+  └─ □ 롤백 처리
+
+□ 메시지 포맷
+  ├─ □ 서명 검증
+  └─ □ 버전 호환성</code></pre>
+
+            <h2>2. 테스트 전략</h2>
+
+            <h3>2.1 테스트 유형</h3>
+
+            <table>
+                <tr>
+                    <th>테스트 유형</th>
+                    <th>범위</th>
+                    <th>목적</th>
+                </tr>
+                <tr>
+                    <td>단위 테스트</td>
+                    <td>개별 컴포넌트</td>
+                    <td>로직 정확성</td>
+                </tr>
+                <tr>
+                    <td>통합 테스트</td>
+                    <td>어댑터 연동</td>
+                    <td>시스템 간 상호작용</td>
+                </tr>
+                <tr>
+                    <td>E2E 테스트</td>
+                    <td>전체 삭제 흐름</td>
+                    <td>비즈니스 시나리오</td>
+                </tr>
+                <tr>
+                    <td>부하 테스트</td>
+                    <td>대량 삭제</td>
+                    <td>성능 및 확장성</td>
+                </tr>
+                <tr>
+                    <td>카오스 테스트</td>
+                    <td>장애 시나리오</td>
+                    <td>복원력</td>
+                </tr>
+            </table>
+
+            <h3>2.2 테스트 시나리오</h3>
+
+            <pre><code>// E2E 테스트 예시
+describe('WIA-DIGITAL_ERASURE E2E Tests', () => {
+  it('should complete full erasure within deadline', async () => {
+    // 1. 삭제 요청 생성
+    const request = await client.createErasureRequest({
+      type: 'full',
+      subject: { email: 'test@example.com' }
+    });
+    expect(request.status).toBe('pending');
+
+    // 2. 상태 확인 (완료까지 대기)
+    const completed = await waitForCompletion(request.id, {
+      timeout: 60000,
+      pollInterval: 1000
+    });
+    expect(completed.status).toBe('verified');
+
+    // 3. 검증 - 데이터가 실제로 삭제되었는지
+    const userData = await database.query(
+      'SELECT * FROM users WHERE email = ?',
+      ['test@example.com']
+    );
+    expect(userData).toHaveLength(0);
+
+    // 4. 인증서 발급 확인
+    const certificate = await client.getCertificate(request.id);
+    expect(certificate.level).toBe('gold');
+  });
+
+  it('should handle participant failure gracefully', async () => {
+    // 참여자 하나 강제 종료
+    await stopParticipant('backup-system');
+
+    const request = await client.createErasureRequest({
+      type: 'full',
+      subject: { email: 'test2@example.com' }
+    });
+
+    // 부분 완료 상태 확인
+    const result = await waitForCompletion(request.id);
+    expect(result.status).toBe('partial_complete');
+    expect(result.failedSystems).toContain('backup-system');
+  });
+});</code></pre>
+
+            <h2>3. WIA 인증</h2>
+
+            <h3>3.1 인증 레벨</h3>
+
+            <p>WIA-DIGITAL_ERASURE 표준 준수 인증은 4단계 레벨로 제공됩니다:</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <span class="cert-badge cert-bronze">Bronze</span>
+                <span class="cert-badge cert-silver">Silver</span>
+                <span class="cert-badge cert-gold">Gold</span>
+                <span class="cert-badge cert-platinum">Platinum</span>
+            </div>
+
+            <table>
+                <tr>
+                    <th>레벨</th>
+                    <th>요구사항</th>
+                    <th>검증 방식</th>
+                </tr>
+                <tr>
+                    <td><span class="cert-badge cert-bronze">Bronze</span></td>
+                    <td>기본 삭제 API, 자체 증명</td>
+                    <td>자체 평가</td>
+                </tr>
+                <tr>
+                    <td><span class="cert-badge cert-silver">Silver</span></td>
+                    <td>4-Phase 프로토콜, 감사 로그</td>
+                    <td>자동화 테스트</td>
+                </tr>
+                <tr>
+                    <td><span class="cert-badge cert-gold">Gold</span></td>
+                    <td>제3자 통합, 백업 삭제</td>
+                    <td>제3자 감사</td>
+                </tr>
+                <tr>
+                    <td><span class="cert-badge cert-platinum">Platinum</span></td>
+                    <td>Merkle Proof, 암호학적 검증</td>
+                    <td>공인 감사기관</td>
+                </tr>
+            </table>
+
+            <h3>3.2 인증 절차</h3>
+
+            <pre><code>WIA-DIGITAL_ERASURE 인증 절차:
+
+1단계: 자체 평가 (Self-Assessment)
+┌─────────────────────────────────────────────────────┐
+│ • 체크리스트 기반 자체 점검                          │
+│ • 구현 문서 작성                                     │
+│ • 테스트 결과 수집                                   │
+│ 소요 기간: 2-4주                                     │
+└─────────────────────────────────────────────────────┘
+
+2단계: 기술 검토 (Technical Review)
+┌─────────────────────────────────────────────────────┐
+│ • WIA 기술팀 코드 리뷰                               │
+│ • 아키텍처 검토                                      │
+│ • 보안 취약점 스캔                                   │
+│ 소요 기간: 1-2주                                     │
+└─────────────────────────────────────────────────────┘
+
+3단계: 검증 테스트 (Verification Testing)
+┌─────────────────────────────────────────────────────┐
+│ • 샌드박스 환경 테스트                               │
+│ • 삭제 시나리오 실행                                 │
+│ • 장애 복구 테스트                                   │
+│ 소요 기간: 1-2주                                     │
+└─────────────────────────────────────────────────────┘
+
+4단계: 인증서 발급 (Certification)
+┌─────────────────────────────────────────────────────┐
+│ • 인증 레벨 결정                                     │
+│ • 인증서 발급                                        │
+│ • 레지스트리 등록                                    │
+│ 유효 기간: 1년 (갱신 가능)                           │
+└─────────────────────────────────────────────────────┘</code></pre>
+
+            <h2>4. 컴플라이언스 리포팅</h2>
+
+            <h3>4.1 주기별 리포트</h3>
+
+            <table>
+                <tr>
+                    <th>리포트 유형</th>
+                    <th>주기</th>
+                    <th>포함 내용</th>
+                </tr>
+                <tr>
+                    <td>일간 운영 리포트</td>
+                    <td>매일</td>
+                    <td>삭제 요청 수, 완료율, 오류</td>
+                </tr>
+                <tr>
+                    <td>주간 요약</td>
+                    <td>매주</td>
+                    <td>트렌드, SLA 준수율</td>
+                </tr>
+                <tr>
+                    <td>월간 컴플라이언스</td>
+                    <td>매월</td>
+                    <td>규제 준수 현황, 감사 로그</td>
+                </tr>
+                <tr>
+                    <td>연간 감사 보고서</td>
+                    <td>매년</td>
+                    <td>전체 현황, 개선 사항</td>
+                </tr>
+            </table>
+
+            <h3>4.2 자동화된 리포트 생성</h3>
+            <pre><code>// 컴플라이언스 리포트 자동 생성
+interface ComplianceReport {
+  period: { start: Date; end: Date };
+  metrics: {
+    totalRequests: number;
+    completedOnTime: number;
+    slaCompliance: number; // 백분율
+    averageCompletionTime: number; // 시간
+  };
+  breakdown: {
+    byRegulation: Record&lt;string, number&gt;; // GDPR, CCPA 등
+    byType: Record&lt;string, number&gt;; // full, partial
+    byStatus: Record&lt;string, number&gt;;
+  };
+  incidents: Incident[];
+  recommendations: string[];
+}
+
+async function generateMonthlyReport(
+  month: Date
+): Promise&lt;ComplianceReport&gt; {
+  const start = startOfMonth(month);
+  const end = endOfMonth(month);
+
+  // 메트릭 수집
+  const requests = await db.erasureRequests.findMany({
+    where: {
+      createdAt: { gte: start, lte: end }
+    }
+  });
+
+  const completedOnTime = requests.filter(r =>
+    r.status === 'completed' &&
+    r.completedAt <= r.deadline
+  ).length;
+
+  // SLA 계산 (30일 이내 완료)
+  const slaCompliance = (completedOnTime / requests.length) * 100;
+
+  // 개선 권고사항 생성
+  const recommendations = generateRecommendations({
+    slaCompliance,
+    incidents: await getMonthlyIncidents(start, end)
+  });
+
+  return {
+    period: { start, end },
+    metrics: {
+      totalRequests: requests.length,
+      completedOnTime,
+      slaCompliance,
+      averageCompletionTime: calculateAvgTime(requests)
+    },
+    breakdown: {
+      byRegulation: groupBy(requests, 'legalBasis.regulation'),
+      byType: groupBy(requests, 'type'),
+      byStatus: groupBy(requests, 'status')
+    },
+    incidents: await getMonthlyIncidents(start, end),
+    recommendations
+  };
+}</code></pre>
+
+            <h2>5. 규제별 요구사항</h2>
+            <h3>5.1 규제 비교표</h3>
+            <table>
+                <tr>
+                    <th>규제</th>
+                    <th>지역</th>
+                    <th>응답 기한</th>
+                    <th>예외 조항</th>
+                </tr>
+                <tr>
+                    <td>GDPR (Article 17)</td>
+                    <td>EU/EEA</td>
+                    <td>30일</td>
+                    <td>법적 의무, 공익, 법적 청구</td>
+                </tr>
+                <tr>
+                    <td>CCPA/CPRA</td>
+                    <td>캘리포니아</td>
+                    <td>45일 (연장 가능)</td>
+                    <td>거래 완료, 법적 의무</td>
+                </tr>
+                <tr>
+                    <td>LGPD</td>
+                    <td>브라질</td>
+                    <td>15일</td>
+                    <td>법적 의무, 계약 이행</td>
+                </tr>
+                <tr>
+                    <td>POPIA</td>
+                    <td>남아프리카</td>
+                    <td>합리적 시간</td>
+                    <td>법적 의무, 제3자 권리</td>
+                </tr>
+                <tr>
+                    <td>PDPA</td>
+                    <td>싱가포르</td>
+                    <td>30일</td>
+                    <td>법적 의무, 비즈니스 목적</td>
+                </tr>
+                <tr>
+                    <td>개인정보보호법</td>
+                    <td>한국</td>
+                    <td>10일</td>
+                    <td>법률 규정, 업무 수행</td>
+                </tr>
+            </table>
+
+            <h3>5.2 규제별 구현 체크리스트</h3>
+            <pre><code>// 규제별 요구사항 검증
+const regulationRequirements = {
+  GDPR: {
+    maxResponseDays: 30,
+    requiredVerification: ['identity'],
+    mandatoryFields: ['legalBasis', 'dataCategories'],
+    retentionProof: true,
+    thirdPartyNotification: true
+  },
+  CCPA: {
+    maxResponseDays: 45,
+    requiredVerification: ['identity', 'authorization'],
+    mandatoryFields: ['requestType'],
+    retentionProof: false,
+    thirdPartyNotification: false
+  },
+  LGPD: {
+    maxResponseDays: 15,
+    requiredVerification: ['identity'],
+    mandatoryFields: ['legalBasis'],
+    retentionProof: true,
+    thirdPartyNotification: true
+  }
+};
+
+function validateRequest(
+  request: ErasureRequest,
+  regulation: string
+): ValidationResult {
+  const req = regulationRequirements[regulation];
+  const errors: string[] = [];
+
+  // 필수 필드 검증
+  for (const field of req.mandatoryFields) {
+    if (!request[field]) {
+      errors.push(`Missing required field: ${field}`);
+    }
+  }
+
+  // 기한 검증
+  const daysSinceRequest = daysBetween(
+    request.createdAt,
+    new Date()
+  );
+  if (daysSinceRequest > req.maxResponseDays) {
+    errors.push(`Deadline exceeded: ${daysSinceRequest} days`);
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    regulation,
+    requirements: req
+  };
+}</code></pre>
+
+            <h3>4.2 규제 기관 대응</h3>
+
+            <pre><code>규제 기관 감사 대응 체크리스트:
+
+□ 삭제 요청 처리 기록
+  ├─ □ 요청 접수 일시
+  ├─ □ 처리 완료 일시
+  ├─ □ 응답 기한 준수 여부
+  └─ □ 예외 처리 사유
+
+□ 기술적 증거
+  ├─ □ 감사 로그 (변조 방지)
+  ├─ □ 삭제 인증서
+  ├─ □ Merkle Proof (해당 시)
+  └─ □ 시스템 로그
+
+□ 프로세스 문서
+  ├─ □ 삭제 처리 절차서
+  ├─ □ 장애 대응 계획
+  ├─ □ 교육 이수 기록
+  └─ □ 정기 테스트 결과
+
+□ 제3자 관리
+  ├─ □ DPA (Data Processing Agreement)
+  ├─ □ 제3자 삭제 확인서
+  └─ □ 공급업체 평가 기록</code></pre>
+
+            <h2>5. 베스트 프랙티스</h2>
+
+            <div class="info-box">
+                <h4>WIA-DIGITAL_ERASURE 구현 베스트 프랙티스</h4>
+                <ol>
+                    <li><strong>설계 시점부터 고려</strong>: 데이터 저장 시 삭제 경로도 함께 설계</li>
+                    <li><strong>데이터 인벤토리 유지</strong>: 모든 데이터 저장 위치를 문서화</li>
+                    <li><strong>자동화 우선</strong>: 수동 개입 최소화, 자동 삭제 파이프라인 구축</li>
+                    <li><strong>테스트 철저히</strong>: 정기적인 삭제 테스트로 프로세스 검증</li>
+                    <li><strong>모니터링 필수</strong>: 삭제 요청 처리 현황 실시간 모니터링</li>
+                    <li><strong>문서화</strong>: 모든 과정을 문서화하여 감사 대비</li>
+                </ol>
+            </div>
+
+            <div class="key-takeaways">
+                <h3>핵심 요약</h3>
+                <ul>
+                    <li><strong>체크리스트</strong>: 4개 Phase별 구현 항목 점검</li>
+                    <li><strong>테스트</strong>: 단위, 통합, E2E, 부하, 카오스 테스트 수행</li>
+                    <li><strong>인증 레벨</strong>: Bronze, Silver, Gold, Platinum 4단계</li>
+                    <li><strong>인증 절차</strong>: 자체 평가 → 기술 검토 → 검증 테스트 → 발급</li>
+                    <li><strong>리포팅</strong>: 일간/주간/월간/연간 컴플라이언스 리포트 자동화</li>
+                    <li><strong>규제 대응</strong>: GDPR, CCPA, LGPD 등 규제별 요구사항 충족</li>
+                    <li><strong>글로벌 준수</strong>: 지역별 응답 기한 및 예외 조항 관리</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h3>복습 문제</h3>
+                <ol>
+                    <li>WIA-DIGITAL_ERASURE 인증 4단계 레벨의 차이점을 설명하시오.
+                        <br><em>힌트: Bronze (자체 평가), Silver (자동화 테스트), Gold (제3자 감사), Platinum (공인 감사기관)의 요구사항을 비교하세요.</em>
+                    </li>
+                    <li>GDPR과 한국 개인정보보호법의 삭제 요청 응답 기한 차이를 설명하시오.
+                        <br><em>힌트: GDPR 30일, 한국 10일의 차이와 기한 연장 조건을 분석하세요.</em>
+                    </li>
+                    <li>컴플라이언스 리포트의 SLA 준수율 계산 방법을 설명하시오.
+                        <br><em>힌트: 기한 내 완료된 요청 수와 전체 요청 수의 비율 계산을 참고하세요.</em>
+                    </li>
+                    <li>규제별 필수 필드와 검증 요구사항을 비교하시오.
+                        <br><em>힌트: GDPR의 legalBasis, CCPA의 authorization 등 각 규제의 mandatoryFields를 분석하세요.</em>
+                    </li>
+                    <li>카오스 테스트에서 참여자 장애 시나리오의 예상 결과와 복구 방법을 설명하시오.
+                        <br><em>힌트: partial_complete 상태와 failedSystems 처리를 포함하세요.</em>
+                    </li>
+                    <li>다중 규제 환경에서 가장 엄격한 기준 적용 전략을 설계하시오.
+                        <br><em>힌트: LGPD의 15일 기한이 GDPR 30일보다 짧으므로, 글로벌 서비스에서 가장 짧은 기한을 기준으로 설계하세요.</em>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="cta-box">
+                <h3>WIA-DIGITAL_ERASURE 학습 완료</h3>
+                <p>축하합니다! WIA-DIGITAL_ERASURE 표준의 모든 내용을 학습했습니다. 이제 디지털 삭제 시스템을 구현하고 WIA 인증을 획득할 준비가 되었습니다.</p></div>
+
+            </div>
+    </main>
+</body>
+</html>

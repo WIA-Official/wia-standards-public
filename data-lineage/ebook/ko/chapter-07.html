@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: OpenLineage 표준 | WIA-DATA-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        .highlight-box strong { color: #10B981; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .example { background: #0f1729; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; margin: 2rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">7장</div>
+            <h1>OpenLineage 표준</h1>
+        </header>
+        <p>OpenLineage는 계보 메타데이터 수집을 위한 개방형 표준으로, 중요한 문제를 해결하도록 설계되었습니다: 데이터 계보 도구의 공급업체 종속 및 상호 운용성 부족.</p>
+
+        <h2>상호 운용성 문제</h2>
+
+        <p>OpenLineage 이전에는 각 데이터 도구가 자체 독점 계보 형식을 유지했습니다:</p>
+
+        <ul>
+            <li>Airflow는 메타데이터 데이터베이스에서 작업 계보를 추적했습니다</li>
+            <li>dbt는 매니페스트 파일에서 모델 계보를 캡처했습니다</li>
+            <li>Spark는 실행 그래프를 내부적으로 유지했습니다</li>
+            <li>BI 도구는 보고서 의존성을 별도로 추적했습니다</li>
+        </ul>
+
+        <p>결과: 이질적인 시스템 전반에 걸친 통합 뷰가 없는 <strong>파편화된 계보</strong>.</p>
+
+        <div class="highlight-box">
+            <strong>OpenLineage 솔루션:</strong> 모든 도구가 내보낼 수 있고 모든 계보 백엔드가 사용할 수 있는 공통 사양으로, 이질적인 시스템 전반에 걸친 엔드투엔드 계보를 가능하게 합니다.
+        </div>
+
+        <h2>OpenLineage 아키텍처</h2>
+
+        <h3>핵심 구성 요소</h3>
+
+        <ol>
+            <li><strong>이벤트 사양:</strong> 계보 이벤트를 위한 JSON 스키마</li>
+            <li><strong>클라이언트 라이브러리:</strong> 이벤트 내보내기를 위한 SDK (Python, Java 등)</li>
+            <li><strong>통합:</strong> 인기 있는 도구를 위한 사전 구축된 이미터</li>
+            <li><strong>백엔드:</strong> 계보를 수집하고 저장하는 시스템</li>
+        </ol>
+
+        <h2>OpenLineage 이벤트 모델</h2>
+
+        <h3>이벤트 구조</h3>
+
+        <p>모든 OpenLineage 이벤트에는 다음이 포함됩니다:</p>
+
+        <ul>
+            <li><strong>이벤트 유형:</strong> START, COMPLETE, FAIL, ABORT</li>
+            <li><strong>이벤트 시간:</strong> 이벤트가 발생한 시간</li>
+            <li><strong>실행:</strong> 고유한 실행 인스턴스</li>
+            <li><strong>작업:</strong> 프로세스 또는 변환</li>
+            <li><strong>입력:</strong> 소스 데이터셋</li>
+            <li><strong>출력:</strong> 목적지 데이터셋</li>
+        </ul>
+
+        <h2>패싯: 확장 가능한 메타데이터</h2>
+
+        <p>패싯은 OpenLineage 유연성의 핵심입니다. 핵심 사양을 손상시키지 않고 사용자 정의 메타데이터를 추가할 수 있습니다.</p>
+
+        <h3>표준 패싯</h3>
+
+        <h4>실행 패싯</h4>
+        <ul>
+            <li><strong>nominalTime:</strong> 예약된 실행 시간</li>
+            <li><strong>parent:</strong> 중첩된 워크플로우의 부모 작업</li>
+            <li><strong>errorMessage:</strong> 실패 세부 정보</li>
+        </ul>
+
+        <h4>작업 패싯</h4>
+        <ul>
+            <li><strong>documentation:</strong> 작업 설명</li>
+            <li><strong>sourceCode:</strong> 변환 로직</li>
+            <li><strong>sql:</strong> SQL 쿼리 텍스트</li>
+            <li><strong>ownership:</strong> 책임 팀</li>
+        </ul>
+
+        <h4>데이터셋 패싯</h4>
+        <ul>
+            <li><strong>schema:</strong> 컬럼 정의</li>
+            <li><strong>dataSource:</strong> 연결 세부 정보</li>
+            <li><strong>lifecycleStateChange:</strong> CREATE, ALTER, DROP 이벤트</li>
+            <li><strong>dataQuality:</strong> 메트릭 및 검증 결과</li>
+            <li><strong>columnLineage:</strong> 컬럼 레벨 의존성</li>
+        </ul>
+
+        <h2>통합 예시</h2>
+
+        <h3>Python 클라이언트</h3>
+        <p>Python에서 OpenLineage 이벤트를 내보내는 것은 간단합니다.</p>
+
+        <h3>Airflow 통합</h3>
+        <p>Airflow는 OpenLineage를 기본적으로 지원하여 모든 작업에 대한 계보를 자동으로 캡처합니다.</p>
+
+        <h2>OpenLineage 백엔드</h2>
+
+        <h3>Marquez</h3>
+        <p>OpenLineage 백엔드의 참조 구현:</p>
+        <ul>
+            <li>계보 이벤트 수집 및 저장</li>
+            <li>쿼리를 위한 REST API 제공</li>
+            <li>시각화를 위한 웹 UI</li>
+            <li>PostgreSQL 스토리지</li>
+        </ul>
+
+        <h3>상용 옵션</h3>
+        <ul>
+            <li>Atlan</li>
+            <li>Datafold</li>
+            <li>Monte Carlo</li>
+            <li>Metaphor</li>
+        </ul>
+
+        <h2>OpenLineage의 이점</h2>
+
+        <ol>
+            <li><strong>공급업체 중립성:</strong> 독점 형식에 종속되지 않음</li>
+            <li><strong>생태계 성장:</strong> 더 많은 도구가 지원 추가</li>
+            <li><strong>모범 사례:</strong> 계보에 대한 표준화된 접근 방식</li>
+            <li><strong>커뮤니티 지원:</strong> 활발한 오픈 소스 커뮤니티</li>
+            <li><strong>미래 보장:</strong> 데이터 스택이 발전함에 따라 적응</li>
+        </ol>
+
+        <h2>6. 사용자 정의 패싯 생성</h2>
+
+        <p>OpenLineage의 진정한 힘은 확장성입니다. 조직의 특정 요구사항에 맞는 사용자 정의 패싯을 만들 수 있습니다.</p>
+
+        <div class="example">
+            <div class="example-title">사용자 정의 패싯 정의</div>
+            <pre><code># 사용자 정의 패싯 스키마 정의 (JSON Schema)
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "_producer": {
+      "type": "string"
+    },
+    "_schemaURL": {
+      "type": "string",
+      "format": "uri"
+    },
+    "costCenter": {
+      "type": "string",
+      "description": "데이터 처리 비용이 청구될 비용 센터"
+    },
+    "dataClassification": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"]
+    },
+    "retentionPolicy": {
+      "type": "object",
+      "properties": {
+        "days": { "type": "integer" },
+        "reason": { "type": "string" }
+      }
+    },
+    "slaRequirements": {
+      "type": "object",
+      "properties": {
+        "maxLatencyMinutes": { "type": "integer" },
+        "availability": { "type": "number" },
+        "freshnessHours": { "type": "integer" }
+      }
+    }
+  }
+}
+
+# Python에서 사용자 정의 패싯 사용
+from openlineage.client.run import Dataset, Run, Job
+from openlineage.client.facet import DatasetFacet
+
+# 사용자 정의 패싯 클래스
+class CustomGovernanceFacet(DatasetFacet):
+    costCenter: str
+    dataClassification: str
+    retentionPolicy: dict
+    slaRequirements: dict
+
+# OpenLineage 이벤트에 추가
+dataset = Dataset(
+    namespace="production",
+    name="warehouse.sensitive_data",
+    facets={
+        "customGovernance": CustomGovernanceFacet(
+            costCenter="DATA-PLATFORM",
+            dataClassification="restricted",
+            retentionPolicy={
+                "days": 2555,  # 7 years
+                "reason": "GDPR Article 17"
+            },
+            slaRequirements={
+                "maxLatencyMinutes": 30,
+                "availability": 99.9,
+                "freshnessHours": 2
+            }
+        )
+    }
+)</code></pre>
+        </div>
+
+        <h2>7. 도구별 OpenLineage 통합</h2>
+
+        <p>주요 데이터 도구들의 OpenLineage 통합 방법:</p>
+
+        <h3>통합 매트릭스</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0;">
+            <thead>
+                <tr style="background: #1e293b; border-bottom: 2px solid #10B981;">
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">도구</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">통합 방법</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">성숙도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">Apache Airflow</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">기본 제공 플러그인</td>
+                    <td style="padding: 0.75rem; color: #10B981;">안정</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">Apache Spark</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">SparkListener 에이전트</td>
+                    <td style="padding: 0.75rem; color: #10B981;">안정</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">dbt</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">dbt-ol 패키지</td>
+                    <td style="padding: 0.75rem; color: #10B981;">안정</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">Apache Flink</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">Flink 리스너</td>
+                    <td style="padding: 0.75rem; color: #fbbf24;">베타</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">Dagster</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">커뮤니티 통합</td>
+                    <td style="padding: 0.75rem; color: #fbbf24;">베타</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">Great Expectations</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">데이터 품질 패싯</td>
+                    <td style="padding: 0.75rem; color: #10B981;">안정</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">SQLAlchemy</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">이벤트 리스너</td>
+                    <td style="padding: 0.75rem; color: #fbbf24;">실험</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>dbt 통합 예시</h3>
+        <div class="example">
+            <div class="example-title">dbt에서 OpenLineage 활성화</div>
+            <pre><code># dbt 프로젝트에서 OpenLineage 설정
+
+# 1. dbt-ol 패키지 설치
+pip install dbt-ol
+
+# 2. dbt profiles.yml 구성
+my_project:
+  outputs:
+    prod:
+      type: snowflake
+      account: my_account
+      # ... 기타 연결 설정
+
+      # OpenLineage 구성 추가
+      openlineage:
+        transport:
+          type: http
+          url: http://marquez:5000
+          endpoint: /api/v1/lineage
+        namespace: production
+        job_name: dbt_daily_transform
+
+# 3. dbt 실행 시 자동으로 계보 이벤트 전송
+dbt run --models +customers
+
+# 생성되는 OpenLineage 이벤트:
+# - 각 모델에 대한 RUN 이벤트
+# - 소스 테이블 READ 이벤트
+# - 변환된 테이블 WRITE 이벤트
+# - SQL 변환 로직 (패싯)
+# - 컬럼 레벨 계보 (패싯)</code></pre>
+        </div>
+
+        <h2>8. Marquez 백엔드 구축</h2>
+
+        <p>Marquez는 OpenLineage의 참조 구현 백엔드입니다. 프로덕션 환경에서 설정하는 방법:</p>
+
+        <div class="example">
+            <div class="example-title">Docker Compose로 Marquez 배포</div>
+            <pre><code># docker-compose.yml
+version: '3.8'
+
+services:
+  # PostgreSQL 데이터베이스
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: marquez
+      POSTGRES_PASSWORD: marquez
+      POSTGRES_DB: marquez
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marquez"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Marquez API 서버
+  marquez:
+    image: marquezproject/marquez:latest
+    environment:
+      MARQUEZ_PORT: 5000
+      MARQUEZ_DB_HOST: postgres
+      MARQUEZ_DB_PORT: 5432
+      MARQUEZ_DB_NAME: marquez
+      MARQUEZ_DB_USER: marquez
+      MARQUEZ_DB_PASSWORD: marquez
+    ports:
+      - "5000:5000"
+      - "5001:5001"  # Admin API
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/namespaces"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Marquez Web UI
+  marquez-web:
+    image: marquezproject/marquez-web:latest
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: 5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - marquez
+
+volumes:
+  postgres-data:
+
+# 배포
+docker-compose up -d
+
+# 상태 확인
+curl http://localhost:5000/api/v1/namespaces
+
+# Web UI 접속
+# http://localhost:3000</code></pre>
+        </div>
+
+        <h3>Marquez API 사용</h3>
+        <div class="example">
+            <div class="example-title">Marquez REST API</div>
+            <pre><code># 1. 네임스페이스 조회
+GET http://localhost:5000/api/v1/namespaces
+
+# 2. 특정 데이터셋의 계보 가져오기
+GET http://localhost:5000/api/v1/lineage?
+    nodeId=dataset:production:warehouse.customers
+
+# 3. 작업 실행 이력 조회
+GET http://localhost:5000/api/v1/namespaces/production/jobs/etl_customer_daily/runs
+
+# 4. 데이터셋 메타데이터 조회
+GET http://localhost:5000/api/v1/namespaces/production/datasets/warehouse.customers
+
+# 5. 검색
+GET http://localhost:5000/api/v1/search?q=customer&filter=DATASET
+
+# Python 클라이언트 사용
+from marquez_client import MarquezClient
+
+client = MarquezClient(url="http://localhost:5000")
+
+# 계보 조회
+lineage = client.get_lineage(
+    node_id="dataset:production:warehouse.customers",
+    depth=5
+)
+
+# 그래프 탐색
+for node in lineage.graph:
+    print(f"{node.type}: {node.data.name}")
+    print(f"  업스트림: {len(node.in_edges)}")
+    print(f"  다운스트림: {len(node.out_edges)}")</code></pre>
+        </div>
+
+        <h2>9. Apache Egeria 통합</h2>
+
+        <p>Apache Egeria는 엔터프라이즈 메타데이터 관리 플랫폼입니다. OpenLineage와 통합하여 포괄적인 거버넌스를 구현할 수 있습니다.</p>
+
+        <div class="example">
+            <div class="example-title">Egeria-OpenLineage 브리지</div>
+            <pre><code># OpenLineage 이벤트를 Egeria로 전송
+
+from pyegeria import EgeriaClient
+from openlineage.client import OpenLineageClient
+
+class EgeriaLineageBridge:
+    """OpenLineage 이벤트를 Egeria 메타데이터로 변환"""
+
+    def __init__(self, egeria_url, ol_client):
+        self.egeria = EgeriaClient(egeria_url)
+        self.ol_client = ol_client
+
+    def sync_lineage_to_egeria(self, ol_event):
+        """OpenLineage 이벤트를 Egeria 엔티티로 변환"""
+
+        # 1. 데이터셋 → Egeria DataSet 엔티티
+        for input_dataset in ol_event.inputs:
+            self.create_or_update_dataset(input_dataset)
+
+        for output_dataset in ol_event.outputs:
+            self.create_or_update_dataset(output_dataset)
+
+        # 2. 작업 → Egeria Process 엔티티
+        process_guid = self.create_or_update_process(ol_event.job, ol_event.run)
+
+        # 3. 계보 관계 생성
+        for input_ds in ol_event.inputs:
+            self.create_lineage_relationship(
+                source=input_ds.name,
+                target=process_guid,
+                relationship_type="DataFlow"
+            )
+
+        for output_ds in ol_event.outputs:
+            self.create_lineage_relationship(
+                source=process_guid,
+                target=output_ds.name,
+                relationship_type="DataFlow"
+            )
+
+    def create_or_update_dataset(self, dataset):
+        """Egeria에 데이터셋 등록"""
+        entity = {
+            "typeName": "DataSet",
+            "attributes": {
+                "qualifiedName": f"{dataset.namespace}/{dataset.name}",
+                "displayName": dataset.name,
+                "description": dataset.facets.get("documentation", {}).get("description")
+            }
+        }
+
+        # 스키마 정보 추가
+        if "schema" in dataset.facets:
+            entity["schemaType"] = self.convert_schema_facet(
+                dataset.facets["schema"]
+            )
+
+        return self.egeria.create_entity(entity)
+
+    def create_lineage_relationship(self, source, target, relationship_type):
+        """계보 관계 생성"""
+        return self.egeria.create_relationship(
+            relationship_type,
+            source_guid=source,
+            target_guid=target
+        )</code></pre>
+        </div>
+
+        <h2>10. 모니터링 및 관찰성</h2>
+
+        <p>OpenLineage 인프라 자체도 모니터링해야 합니다.</p>
+
+        <h3>주요 메트릭</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0;">
+            <thead>
+                <tr style="background: #1e293b; border-bottom: 2px solid #10B981;">
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">메트릭</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">의미</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">임계값</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0;">이벤트 수집 속도</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">초당 처리된 계보 이벤트</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">&gt; 100 events/sec</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0;">수집 지연시간</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">이벤트 생성부터 저장까지 시간</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">&lt; 5 seconds p95</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0;">API 응답 시간</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">계보 쿼리 응답 속도</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">&lt; 500ms p95</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0;">실패율</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">수집 실패한 이벤트 비율</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">&lt; 0.1%</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem; color: #e2e8f0;">커버리지</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">계보 추적 중인 데이터 자산 %</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">&gt; 80%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="example">
+            <div class="example-title">Prometheus 메트릭 수집</div>
+            <pre><code># Marquez Prometheus 메트릭 엔드포인트
+GET http://localhost:5001/metrics
+
+# 주요 메트릭:
+# - marquez_events_total{type="RUN"}
+# - marquez_events_latency_seconds
+# - marquez_api_requests_total{endpoint="/lineage"}
+# - marquez_db_connections_active
+# - marquez_storage_bytes_total
+
+# Grafana 대시보드 쿼리 예시
+# 이벤트 수집 속도
+rate(marquez_events_total[5m])
+
+# p95 지연시간
+histogram_quantile(0.95, marquez_events_latency_seconds_bucket)
+
+# API 오류율
+rate(marquez_api_requests_total{status=~"5.."}[5m])
+/ rate(marquez_api_requests_total[5m])</code></pre>
+        </div>
+
+        <h2>11. 채택 전략</h2>
+
+        <ol>
+            <li><strong>작게 시작:</strong> 하나의 파이프라인 또는 도구</li>
+            <li><strong>백엔드 선택:</strong> Marquez 또는 상용 옵션</li>
+            <li><strong>작업 계측:</strong> OpenLineage 이미터 추가</li>
+            <li><strong>이벤트 검증:</strong> 품질 메타데이터 보장</li>
+            <li><strong>커버리지 확장:</strong> 더 많은 통합 추가</li>
+            <li><strong>상위에 구축:</strong> 영향 분석, 시각화 등</li>
+            <li><strong>팀 온보딩:</strong> 문서화 및 교육</li>
+            <li><strong>성능 최적화:</strong> 병목 현상 식별 및 해결</li>
+            <li><strong>거버넌스 통합:</strong> 정책 및 프로세스 연결</li>
+            <li><strong>지속적 개선:</strong> 피드백 수집 및 반복</li>
+        </ol>
+
+        <h2>12. 실제 사용 사례</h2>
+
+        <div class="example">
+            <div class="example-title">엔드투엔드 계보 추적 시나리오</div>
+            <pre><code>사례: 전자상거래 플랫폼의 일일 매출 보고서
+
+1. 원본 데이터 (Kafka)
+   - 주제: user_events, transactions
+   - OpenLineage 이벤트: Kafka Connect로 자동 생성
+   - 패싯: 스키마, 파티션, 오프셋
+
+2. 스트림 처리 (Spark Streaming)
+   - 입력: Kafka 주제
+   - 처리: 필터링, 집계, 조인
+   - 출력: S3에 Parquet
+   - OpenLineage 이벤트: SparkListener로 자동 생성
+   - 패싯: Spark 설정, 처리 메트릭
+
+3. 배치 변환 (dbt)
+   - 입력: S3 Parquet 파일
+   - 변환: SQL 모델 (고객 세그먼트, 제품 분석)
+   - 출력: Snowflake 테이블
+   - OpenLineage 이벤트: dbt-ol로 자동 생성
+   - 패싯: SQL 로직, 컬럼 계보
+
+4. 데이터 품질 (Great Expectations)
+   - 검증: 행 수, NULL 검사, 범위 검사
+   - OpenLineage 이벤트: GE 통합으로 생성
+   - 패싯: 검증 결과, 품질 메트릭
+
+5. 오케스트레이션 (Airflow)
+   - DAG: daily_revenue_report
+   - 작업: extract → transform → validate → load
+   - OpenLineage 이벤트: Airflow 플러그인으로 생성
+   - 패싯: 작업 의존성, 스케줄, 소유자
+
+6. BI 도구 (Tableau)
+   - 데이터 소스: Snowflake warehouse.daily_revenue
+   - OpenLineage 이벤트: 사용자 정의 커넥터
+   - 패싯: 대시보드 메타데이터, 사용 통계
+
+최종 결과:
+- 완전한 엔드투엔드 계보: Kafka → Spark → S3 → dbt → Snowflake → Tableau
+- 각 단계의 메타데이터 캡처
+- 자동화된 품질 추적
+- 영향 분석 가능
+- 규정 준수 감사 추적</code></pre>
+        </div>
+
+        <h2>13. 장 요약</h2>
+
+        <p>이 장에서는 OpenLineage 표준의 포괄적인 측면을 다루었습니다:</p>
+
+        <ul>
+            <li><strong>표준화 필요성:</strong> 도구 간 계보 상호 운용성</li>
+            <li><strong>핵심 개념:</strong> 이벤트, 실행, 작업, 데이터셋, 패싯</li>
+            <li><strong>패싯 시스템:</strong> 확장 가능한 메타데이터 모델</li>
+            <li><strong>통합:</strong> Airflow, Spark, dbt, Flink 등</li>
+            <li><strong>백엔드:</strong> Marquez, 상용 옵션</li>
+            <li><strong>사용자 정의:</strong> 조직별 패싯 및 확장</li>
+            <li><strong>모니터링:</strong> 계보 인프라 관찰성</li>
+        </ul>
+
+        <p>OpenLineage는 데이터 계보를 공급업체 독립적이고 표준화된 방식으로 구현할 수 있게 하여, 이질적인 데이터 스택 전반에 걸친 통합 계보를 가능하게 합니다.</p>
+
+        <h2>14. 복습 질문</h2>
+
+        <ol>
+            <li><strong>OpenLineage가 해결하는 핵심 문제는 무엇인가요?</strong>
+                <br><em>답변 힌트: 상호 운용성, 공급업체 종속, 표준화</em>
+            </li>
+            <li><strong>패싯이란 무엇이며 왜 중요한가요?</strong>
+                <br><em>답변 힌트: 확장 가능한 메타데이터, 사용자 정의, 호환성</em>
+            </li>
+            <li><strong>OpenLineage 이벤트의 필수 구성 요소는 무엇인가요?</strong>
+                <br><em>답변 힌트: 이벤트 타입, 실행, 작업, 입력/출력</em>
+            </li>
+            <li><strong>Marquez와 다른 상용 백엔드의 차이점은 무엇인가요?</strong>
+                <br><em>답변 힌트: 오픈소스, 기능, 지원, 통합</em>
+            </li>
+            <li><strong>조직에서 OpenLineage 채택을 시작하는 가장 좋은 방법은?</strong>
+                <br><em>답변 힌트: 파일럿, 점진적 확장, 검증</em>
+            </li>
+        </ol>
+
+        <div class="highlight-box">
+            <strong>핵심 요점:</strong> OpenLineage는 계보를 독점적인 사후 고려 사항에서 일류 상호 운용 가능한 데이터 제품으로 변환합니다. 데이터 계보의 TCP/IP입니다.
+        </div>
+
+        </div>
+</body>
+</html>

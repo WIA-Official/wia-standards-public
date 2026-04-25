@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 03: ETL/ELT 프로세스 - WIA-DATA_WAREHOUSE</title>
+    <style>:root{--primary:#6366f1;--primary-dark:#4f46e5;--primary-light:#818cf8;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--dark:#1e293b;--light:#f8fafc;--border:#e2e8f0;--text:#334155;--text-light:#64748b}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.6;color:var(--text);background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,.2)}.header p{font-size:1.2em;opacity:.95}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:var(--primary);margin:25px 0 15px}.content p{margin:15px 0;text-align:justify}.content ul,.content ol{margin:15px 0 15px 30px}.content li{margin:8px 0}.info-box{background:linear-gradient(135deg,#e0e7ff,#e0f2fe);border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:linear-gradient(135deg,#fef3c7,#fed7aa);border-left:5px solid var(--warning);padding:20px;margin:25px 0;border-radius:8px}.success-box{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-left:5px solid var(--success);padding:20px;margin:25px 0;border-radius:8px}.code-block{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border-left:4px solid var(--primary)}.code-block code{font-family:"Courier New",monospace;font-size:.9em;line-height:1.5}table{width:100%;border-collapse:collapse;margin:20px 0;box-shadow:0 2px 8px rgba(0,0,0,.1)}table th{background:var(--primary);color:white;padding:15px;text-align:left;font-weight:600}table td{padding:12px 15px;border-bottom:1px solid var(--border)}table tr:hover{background:var(--light)}.review-section{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--warning)}.review-section h3{color:#92400e;margin-bottom:20px}.review-section ol{margin-left:25px}.review-section li{margin:12px 0;color:#78350f}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--success)}.key-takeaways h3{color:#065f46;margin-bottom:20px}.key-takeaways ul{margin-left:25px}.key-takeaways li{margin:12px 0;color:#064e3b}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid var(--border)}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:all .3s;display:inline-block}.nav-button:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 12px rgba(99,102,241,.4)}.footer{background:var(--dark);color:white;text-align:center;padding:30px;font-size:.9em}.footer p{margin:5px 0}.diagram{background:white;border:2px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;text-align:center}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Chapter 03</h1>
+            <p>ETL/ELT 프로세스: 데이터의 여정</p>
+        </div>
+
+        <div class="content">
+            <h2>1. ETL vs ELT: 패러다임의 전환</h2>
+            <p>
+                ETL(Extract, Transform, Load)과 ELT(Extract, Load, Transform)는 데이터 웨어하우스에 데이터를 적재하는 두 가지 접근 방식입니다.
+                클라우드 시대의 도래로 <strong>ETL에서 ELT로의 패러다임 전환</strong>이 일어나고 있습니다.
+            </p>
+
+            <h3>1.1 ETL (Extract, Transform, Load)</h3>
+            <p>
+                전통적인 방식으로, 데이터를 원천 시스템에서 추출하고, <strong>별도의 ETL 서버</strong>에서 변환한 후, DW에 적재합니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.85em;text-align:left;line-height:1.3;">
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│   원천 DB   │──(1)─▶│  ETL 서버   │──(3)─▶│  DW (목표)  │
+│  (MySQL)    │Extract│ (Talend,    │ Load  │ (Oracle)    │
+│             │       │  Informatica│       │             │
+└─────────────┘       │  ⬇️ (2)     │       └─────────────┘
+                      │  Transform  │
+                      │  - 정제     │
+                      │  - 조인     │
+                      │  - 집계     │
+                      └─────────────┘
+                </pre>
+            </div>
+
+            <h3>1.2 ELT (Extract, Load, Transform)</h3>
+            <p>
+                현대적인 방식으로, 데이터를 추출하여 <strong>DW에 먼저 적재</strong>하고, DW의 강력한 컴퓨팅 파워로 변환합니다.
+            </p>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.85em;text-align:left;line-height:1.3;">
+┌─────────────┐       ┌──────────────────────────────┐
+│   원천 DB   │──(1)─▶│   클라우드 DW (Snowflake)    │
+│  (MySQL)    │Extract│                              │
+│             │  (2)  │  ┌────────────────────────┐  │
+└─────────────┘  Load │  │   Raw Data (Staging)   │  │
+                      │  └──────────┬─────────────┘  │
+                      │             │(3) Transform   │
+                      │             ▼   (dbt, SQL)   │
+                      │  ┌────────────────────────┐  │
+                      │  │  Transformed Tables    │  │
+                      │  │  - dim_customer        │  │
+                      │  │  - fact_sales          │  │
+                      │  └────────────────────────┘  │
+                      └──────────────────────────────┘
+                </pre>
+            </div>
+
+            <h3>1.3 ETL vs ELT 상세 비교</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>비교 항목</th>
+                        <th>ETL (전통적)</th>
+                        <th>ELT (현대적)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>변환 위치</strong></td>
+                        <td>별도 ETL 서버</td>
+                        <td>목표 DW 내부</td>
+                    </tr>
+                    <tr>
+                        <td><strong>적합한 DW</strong></td>
+                        <td>On-Premise (Oracle, Teradata)</td>
+                        <td>클라우드 (Snowflake, BigQuery, Redshift)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>인프라 비용</strong></td>
+                        <td>고가의 ETL 서버 필요</td>
+                        <td>DW 컴퓨팅 리소스 활용</td>
+                    </tr>
+                    <tr>
+                        <td><strong>확장성</strong></td>
+                        <td>ETL 서버 한계</td>
+                        <td>클라우드 자동 스케일링</td>
+                    </tr>
+                    <tr>
+                        <td><strong>처리 속도</strong></td>
+                        <td>느림 (네트워크 병목)</td>
+                        <td>빠름 (데이터 이동 최소화)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>데이터 보존</strong></td>
+                        <td>원본 데이터 폐기</td>
+                        <td>Raw 데이터 보존 (재처리 가능)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>스킬셋</strong></td>
+                        <td>GUI 도구 (Talend, SSIS)</td>
+                        <td>SQL, Python (코드 기반)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>버전 관리</strong></td>
+                        <td>어려움</td>
+                        <td>쉬움 (Git으로 SQL 관리)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>주요 도구</strong></td>
+                        <td>Informatica, Talend, SSIS</td>
+                        <td>dbt, Airflow, Fivetran</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box">
+                <h3>🚀 ELT가 대세가 된 이유</h3>
+                <ul>
+                    <li><strong>클라우드 DW의 폭발적 성능</strong>: Snowflake는 페타바이트 데이터를 초 단위로 처리</li>
+                    <li><strong>저렴한 스토리지</strong>: S3는 TB당 월 $23 (2024년 기준)</li>
+                    <li><strong>탄력적 컴퓨팅</strong>: 필요할 때만 리소스 사용, 비용 최적화</li>
+                    <li><strong>애자일 분석</strong>: Raw 데이터를 보존해 새로운 요구사항에 빠르게 대응</li>
+                    <li><strong>데이터 과학 친화적</strong>: 데이터 레이크와 통합 용이</li>
+                </ul>
+            </div>
+
+            <h2>2. Apache Airflow: 워크플로우 오케스트레이션</h2>
+            <p>
+                Apache Airflow는 <strong>데이터 파이프라인을 코드로 정의</strong>하고 스케줄링하는 오픈소스 플랫폼입니다.
+                Airbnb에서 개발했으며, 현재 가장 인기 있는 워크플로우 도구입니다.
+            </p>
+
+            <h3>2.1 Airflow의 핵심 개념</h3>
+            <ul>
+                <li><strong>DAG (Directed Acyclic Graph)</strong>: 태스크 간의 의존성을 정의한 워크플로우</li>
+                <li><strong>Operator</strong>: 실제 작업을 수행하는 단위 (PythonOperator, BashOperator, SQLOperator 등)</li>
+                <li><strong>Task</strong>: Operator의 인스턴스</li>
+                <li><strong>Scheduler</strong>: DAG를 언제 실행할지 결정</li>
+                <li><strong>Executor</strong>: 태스크를 어디서 실행할지 결정 (Local, Celery, Kubernetes)</li>
+            </ul>
+
+            <div class="code-block">
+<code>from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
+from datetime import datetime, timedelta
+import pandas as pd
+
+# Default arguments
+default_args = {
+    'owner': 'data-team',
+    'depends_on_past': False,
+    'email': ['data-alerts@company.com'],
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+}
+
+# DAG 정의
+dag = DAG(
+    'daily_sales_etl',
+    default_args=default_args,
+    description='Daily sales data pipeline',
+    schedule_interval='0 2 * * *',  # 매일 새벽 2시
+    start_date=datetime(2024, 1, 1),
+    catchup=False,
+    tags=['sales', 'daily'],
+)
+
+# Task 1: MySQL에서 데이터 추출
+def extract_from_mysql(**context):
+    """Extract sales data from MySQL"""
+    import mysql.connector
+
+    conn = mysql.connector.connect(
+        host='mysql.prod.company.com',
+        user='etl_user',
+        password='{{ var.value.mysql_password }}',
+        database='sales'
+    )
+
+    # 어제 날짜 데이터만 추출
+    yesterday = context['ds']  # Airflow의 execution_date
+
+    query = f"""
+        SELECT * FROM orders
+        WHERE DATE(order_date) = '{yesterday}'
+    """
+
+    df = pd.read_sql(query, conn)
+
+    # S3에 임시 저장
+    s3_path = f's3://data-lake/staging/sales/{yesterday}.parquet'
+    df.to_parquet(s3_path, index=False)
+
+    return s3_path
+
+extract_task = PythonOperator(
+    task_id='extract_from_mysql',
+    python_callable=extract_from_mysql,
+    dag=dag,
+)
+
+# Task 2: Snowflake에 Raw 데이터 적재
+load_to_snowflake = SnowflakeOperator(
+    task_id='load_to_snowflake',
+    snowflake_conn_id='snowflake_default',
+    sql="""
+        COPY INTO raw.sales_orders
+        FROM @sales_stage/{{ ds }}.parquet
+        FILE_FORMAT = (TYPE = 'PARQUET')
+        ON_ERROR = 'CONTINUE';
+    """,
+    dag=dag,
+)
+
+# Task 3: dbt로 변환
+from airflow.operators.bash import BashOperator
+
+transform_with_dbt = BashOperator(
+    task_id='transform_with_dbt',
+    bash_command='cd /opt/dbt && dbt run --models tag:daily',
+    dag=dag,
+)
+
+# Task 4: 데이터 품질 검사
+def data_quality_check(**context):
+    """Check data quality"""
+    from snowflake.connector import connect
+
+    conn = connect(
+        account='company.snowflakecomputing.com',
+        user='etl_user',
+        warehouse='COMPUTE_WH',
+    )
+
+    # 중복 체크
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*) - COUNT(DISTINCT order_id)
+        FROM analytics.fact_sales
+        WHERE DATE(order_date) = '{{ ds }}'
+    """)
+
+    duplicates = cursor.fetchone()[0]
+
+    if duplicates > 0:
+        raise ValueError(f"Found {duplicates} duplicate orders!")
+
+    # NULL 체크
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM analytics.fact_sales
+        WHERE DATE(order_date) = '{{ ds }}'
+          AND (customer_key IS NULL OR product_key IS NULL)
+    """)
+
+    nulls = cursor.fetchone()[0]
+
+    if nulls > 0:
+        raise ValueError(f"Found {nulls} rows with NULL keys!")
+
+    return "Quality checks passed!"
+
+quality_check_task = PythonOperator(
+    task_id='data_quality_check',
+    python_callable=data_quality_check,
+    dag=dag,
+)
+
+# Task 의존성 정의
+extract_task >> load_to_snowflake >> transform_with_dbt >> quality_check_task</code>
+            </div>
+
+            <div class="success-box">
+                <h3>✅ Airflow의 장점</h3>
+                <ul>
+                    <li><strong>코드 기반</strong>: 파이프라인을 Python 코드로 정의 (버전 관리 가능)</li>
+                    <li><strong>풍부한 Operator</strong>: 200+ 통합 (AWS, GCP, Azure, Snowflake, dbt...)</li>
+                    <li><strong>동적 파이프라인</strong>: 런타임에 DAG 생성 가능</li>
+                    <li><strong>강력한 UI</strong>: DAG 시각화, 로그 조회, 재실행</li>
+                    <li><strong>백필(Backfill)</strong>: 과거 데이터 재처리 자동화</li>
+                    <li><strong>SLA 모니터링</strong>: 파이프라인 지연 시 알림</li>
+                </ul>
+            </div>
+
+            <h2>3. dbt (data build tool): SQL 기반 변환</h2>
+            <p>
+                dbt는 <strong>T(Transform)</strong>에 특화된 도구로, SQL로 데이터 변환을 정의합니다.
+                "Analytics Engineers"를 위한 도구로, 소프트웨어 엔지니어링 모범 사례를 데이터 세계에 도입했습니다.
+            </p>
+
+            <h3>3.1 dbt의 핵심 개념</h3>
+            <ul>
+                <li><strong>Models</strong>: SELECT 문으로 정의된 테이블/뷰</li>
+                <li><strong>Materialization</strong>: 모델을 어떻게 저장할지 (table, view, incremental, ephemeral)</li>
+                <li><strong>Tests</strong>: 데이터 품질 검증 (unique, not_null, relationships, accepted_values)</li>
+                <li><strong>Documentation</strong>: 자동 문서 생성 및 데이터 계보(Lineage) 시각화</li>
+                <li><strong>Packages</strong>: 재사용 가능한 모델 라이브러리</li>
+            </ul>
+
+            <div class="code-block">
+<code>-- models/staging/stg_orders.sql
+-- Staging 모델: Raw 데이터를 정제
+
+{{
+    config(
+        materialized='view',
+        tags=['staging', 'daily']
+    )
+}}
+
+WITH source AS (
+    SELECT * FROM {{ source('raw', 'sales_orders') }}
+),
+
+cleaned AS (
+    SELECT
+        -- 비즈니스 키
+        order_id,
+        customer_id,
+
+        -- 날짜 변환
+        CAST(order_date AS DATE) AS order_date,
+
+        -- 금액 정제 (NULL 처리)
+        COALESCE(total_amount, 0) AS total_amount,
+        COALESCE(tax_amount, 0) AS tax_amount,
+
+        -- 상태 정규화
+        UPPER(TRIM(order_status)) AS order_status,
+
+        -- 메타데이터
+        _loaded_at
+
+    FROM source
+
+    -- 데이터 품질 필터
+    WHERE order_id IS NOT NULL
+      AND customer_id IS NOT NULL
+      AND order_date >= '2020-01-01'
+)
+
+SELECT * FROM cleaned</code>
+            </div>
+
+            <div class="code-block">
+<code>-- models/marts/fact_sales.sql
+-- Mart 모델: 비즈니스 로직 적용
+
+{{
+    config(
+        materialized='incremental',
+        unique_key='sale_key',
+        on_schema_change='fail',
+        tags=['mart', 'daily']
+    )
+}}
+
+WITH orders AS (
+    SELECT * FROM {{ ref('stg_orders') }}
+
+    {% if is_incremental() %}
+        -- Incremental 로직: 새 데이터만 처리
+        WHERE order_date > (SELECT MAX(order_date) FROM {{ this }})
+    {% endif %}
+),
+
+customers AS (
+    SELECT * FROM {{ ref('dim_customer') }}
+),
+
+products AS (
+    SELECT * FROM {{ ref('dim_product') }}
+),
+
+dates AS (
+    SELECT * FROM {{ ref('dim_date') }}
+)
+
+SELECT
+    -- Surrogate Key 생성
+    {{ dbt_utils.surrogate_key(['o.order_id', 'ol.line_number']) }} AS sale_key,
+
+    -- 차원 외래 키
+    d.date_key,
+    c.customer_key,
+    p.product_key,
+
+    -- 비즈니스 키
+    o.order_id,
+    ol.line_number,
+
+    -- 측정값
+    ol.quantity,
+    ol.unit_price,
+    ol.discount_amount,
+    ol.line_total,
+    p.standard_cost * ol.quantity AS cost_of_goods,
+    ol.line_total - (p.standard_cost * ol.quantity) AS gross_profit,
+
+    -- 메타데이터
+    CURRENT_TIMESTAMP() AS dbt_updated_at
+
+FROM orders o
+JOIN {{ ref('stg_order_lines') }} ol ON o.order_id = ol.order_id
+JOIN dates d ON o.order_date = d.full_date
+JOIN customers c ON o.customer_id = c.customer_id
+JOIN products p ON ol.product_id = p.product_id</code>
+            </div>
+
+            <div class="code-block">
+<code>-- models/schema.yml
+-- 테스트 및 문서 정의
+
+version: 2
+
+models:
+  - name: fact_sales
+    description: "일별 판매 팩트 테이블"
+
+    columns:
+      - name: sale_key
+        description: "판매 라인 아이템의 Surrogate Key"
+        tests:
+          - unique
+          - not_null
+
+      - name: date_key
+        description: "날짜 차원 외래 키"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+
+      - name: customer_key
+        description: "고객 차원 외래 키"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_key
+
+      - name: line_total
+        description: "라인 아이템 총액 (할인 후, 세금 제외)"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: gross_profit
+        description: "매출 총이익 (매출 - 원가)"
+        tests:
+          - not_null
+
+# 커스텀 테스트
+tests:
+  - name: positive_profit_margin
+    description: "이익률이 -100% ~ 100% 범위인지 확인"
+    sql: |
+      SELECT *
+      FROM {{ ref('fact_sales') }}
+      WHERE gross_profit / NULLIF(line_total, 0) NOT BETWEEN -1 AND 1</code>
+            </div>
+
+            <h3>3.2 dbt 실행</h3>
+            <div class="code-block">
+<code># 모든 모델 실행
+dbt run
+
+# 특정 모델만 실행
+dbt run --models fact_sales
+
+# 태그로 필터링
+dbt run --models tag:daily
+
+# 다운스트림 모델 포함
+dbt run --models stg_orders+
+
+# 테스트 실행
+dbt test
+
+# 문서 생성
+dbt docs generate
+dbt docs serve  # http://localhost:8080에서 확인
+
+# Fresh 데이터 체크
+dbt source freshness</code>
+            </div>
+
+            <div class="info-box">
+                <h3>🎯 dbt가 혁신적인 이유</h3>
+                <ul>
+                    <li><strong>Git 기반 워크플로우</strong>: Pull Request, Code Review, CI/CD</li>
+                    <li><strong>모듈화</strong>: {{ ref() }} 매크로로 모델 간 의존성 자동 관리</li>
+                    <li><strong>Incremental 처리</strong>: 새 데이터만 처리하여 비용 절감</li>
+                    <li><strong>자동 계보(Lineage)</strong>: 데이터가 어디서 왔는지 시각화</li>
+                    <li><strong>테스트 주도 개발</strong>: 데이터 품질을 코드로 보장</li>
+                    <li><strong>재사용성</strong>: Jinja 템플릿으로 DRY (Don't Repeat Yourself) 원칙</li>
+                </ul>
+            </div>
+
+            <h2>4. 전통적인 ETL 도구</h2>
+            <p>
+                클라우드 시대에도 여전히 사용되는 전통적인 ETL 도구들이 있습니다.
+                특히 대기업과 금융권에서는 레거시 시스템과의 호환성으로 계속 활용됩니다.
+            </p>
+
+            <h3>4.1 주요 ETL 도구 비교</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>도구</th>
+                        <th>제조사</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                        <th>가격</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Informatica PowerCenter</strong></td>
+                        <td>Informatica</td>
+                        <td>엔터프라이즈급 안정성, 풍부한 커넥터</td>
+                        <td>비싼 라이선스, 복잡한 설정</td>
+                        <td>$$$$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Talend Open Studio</strong></td>
+                        <td>Talend</td>
+                        <td>오픈소스 버전 제공, Java 코드 생성</td>
+                        <td>성능 이슈, UI가 무거움</td>
+                        <td>$ (오픈소스), $$ (유료)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Microsoft SSIS</strong></td>
+                        <td>Microsoft</td>
+                        <td>SQL Server와 완벽한 통합, 저렴</td>
+                        <td>Windows 종속, 버전 관리 어려움</td>
+                        <td>$$ (SQL Server 포함)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Oracle Data Integrator</strong></td>
+                        <td>Oracle</td>
+                        <td>ELT 방식 지원, Oracle DB 최적화</td>
+                        <td>Oracle 생태계 종속</td>
+                        <td>$$$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pentaho Data Integration</strong></td>
+                        <td>Hitachi Vantara</td>
+                        <td>오픈소스, 커뮤니티 활성화</td>
+                        <td>엔터프라이즈 기능 부족</td>
+                        <td>$ (오픈소스), $$ (유료)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5. CDC (Change Data Capture): 실시간 데이터 동기화</h2>
+            <p>
+                CDC는 원천 시스템의 <strong>변경사항만 추출</strong>하여 DW에 반영하는 기술입니다.
+                전체 데이터를 매번 추출하는 것보다 효율적이며, 실시간에 가까운 동기화를 가능하게 합니다.
+            </p>
+
+            <h3>5.1 CDC 구현 방식</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>방식</th>
+                        <th>설명</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Timestamp 기반</strong></td>
+                        <td>updated_at 컬럼 활용</td>
+                        <td>구현 간단, 성능 영향 최소</td>
+                        <td>삭제 감지 불가, 타임스탬프 필수</td>
+                    </tr>
+                    <tr>
+                        <td><strong>트리거 기반</strong></td>
+                        <td>DB 트리거로 변경 로그 기록</td>
+                        <td>모든 변경 감지 (INSERT/UPDATE/DELETE)</td>
+                        <td>성능 오버헤드, 원천 DB 수정 필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>로그 기반 (CDC)</strong></td>
+                        <td>DB 트랜잭션 로그 파싱</td>
+                        <td>성능 영향 없음, 실시간</td>
+                        <td>복잡한 설정, DB별 전용 도구 필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>스냅샷 비교</strong></td>
+                        <td>전체 데이터 해시 비교</td>
+                        <td>구현 간단</td>
+                        <td>대량 데이터에 부적합</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 로그 기반 CDC 예시 (Debezium)</h3>
+            <div class="code-block">
+<code># Debezium MySQL Connector 설정 (Kafka Connect)
+{
+  "name": "mysql-source-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+    "database.hostname": "mysql.prod.company.com",
+    "database.port": "3306",
+    "database.user": "debezium",
+    "database.password": "secret",
+    "database.server.id": "184054",
+    "database.server.name": "prod_mysql",
+
+    "database.include.list": "sales",
+    "table.include.list": "sales.orders,sales.customers",
+
+    "database.history.kafka.bootstrap.servers": "kafka:9092",
+    "database.history.kafka.topic": "schema-changes.sales",
+
+    "snapshot.mode": "initial",
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:9092",
+    "schema.history.internal.kafka.topic": "schema-changes.sales"
+  }
+}
+
+# 결과: Kafka 토픽에 실시간 변경 이벤트 발행
+# Topic: prod_mysql.sales.orders
+{
+  "before": null,  # INSERT는 before가 null
+  "after": {
+    "order_id": 12345,
+    "customer_id": 67890,
+    "total_amount": 99.99,
+    "order_date": "2024-03-15"
+  },
+  "source": {
+    "version": "2.1.0.Final",
+    "connector": "mysql",
+    "name": "prod_mysql",
+    "ts_ms": 1710489600000,
+    "snapshot": "false",
+    "db": "sales",
+    "table": "orders",
+    "server_id": 184054,
+    "gtid": null,
+    "file": "mysql-bin.000003",
+    "pos": 154,
+    "row": 0
+  },
+  "op": "c",  # c=create, u=update, d=delete
+  "ts_ms": 1710489600123
+}</code>
+            </div>
+
+            <div class="success-box">
+                <h3>✅ 로그 기반 CDC의 장점</h3>
+                <ul>
+                    <li><strong>실시간성</strong>: 변경 발생 즉시 (수 밀리초 내) 감지</li>
+                    <li><strong>성능 영향 없음</strong>: 애플리케이션 DB에 부하 없음</li>
+                    <li><strong>완전한 감지</strong>: INSERT, UPDATE, DELETE 모두 포착</li>
+                    <li><strong>과거 상태 보존</strong>: before/after 값으로 감사(Audit) 가능</li>
+                    <li><strong>순서 보장</strong>: 트랜잭션 순서대로 이벤트 발행</li>
+                </ul>
+            </div>
+
+            <h2>6. 데이터 품질 검증</h2>
+            <p>
+                ETL/ELT 파이프라인에서 <strong>데이터 품질</strong>은 가장 중요한 요소입니다.
+                "Garbage In, Garbage Out" - 잘못된 데이터는 잘못된 의사결정으로 이어집니다.
+            </p>
+
+            <h3>6.1 데이터 품질 6가지 차원</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>차원</th>
+                        <th>설명</th>
+                        <th>검증 방법</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>완전성 (Completeness)</strong></td>
+                        <td>필수 데이터가 누락되지 않았는가?</td>
+                        <td>NOT NULL 체크, 레코드 수 비교</td>
+                    </tr>
+                    <tr>
+                        <td><strong>유일성 (Uniqueness)</strong></td>
+                        <td>중복이 없는가?</td>
+                        <td>UNIQUE 제약, COUNT vs COUNT DISTINCT</td>
+                    </tr>
+                    <tr>
+                        <td><strong>정확성 (Accuracy)</strong></td>
+                        <td>데이터가 현실을 정확히 반영하는가?</td>
+                        <td>원천 시스템과 비교, 샘플링 검증</td>
+                    </tr>
+                    <tr>
+                        <td><strong>일관성 (Consistency)</strong></td>
+                        <td>다른 데이터셋과 모순되지 않는가?</td>
+                        <td>참조 무결성, 크로스 체크</td>
+                    </tr>
+                    <tr>
+                        <td><strong>적시성 (Timeliness)</strong></td>
+                        <td>데이터가 최신인가?</td>
+                        <td>Freshness 체크, SLA 모니터링</td>
+                    </tr>
+                    <tr>
+                        <td><strong>유효성 (Validity)</strong></td>
+                        <td>비즈니스 규칙에 부합하는가?</td>
+                        <td>범위 체크, 패턴 매칭, Enum 검증</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>6.2 Great Expectations로 데이터 품질 자동화</h3>
+            <div class="code-block">
+<code>import great_expectations as gx
+
+# Great Expectations 컨텍스트 초기화
+context = gx.get_context()
+
+# 데이터 소스 연결
+datasource = context.sources.add_pandas(name="sales_data")
+data_asset = datasource.add_dataframe_asset(name="orders")
+
+# Expectation Suite 생성
+suite = context.add_expectation_suite(expectation_suite_name="orders_quality")
+
+# Expectations 정의
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToNotBeNull(column="order_id")
+)
+
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToBeUnique(column="order_id")
+)
+
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToBeBetween(
+        column="total_amount",
+        min_value=0,
+        max_value=1000000
+    )
+)
+
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToBeInSet(
+        column="order_status",
+        value_set=["pending", "processing", "shipped", "delivered", "cancelled"]
+    )
+)
+
+suite.add_expectation(
+    gx.expectations.ExpectColumnValuesToMatchRegex(
+        column="email",
+        regex=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+    )
+)
+
+# 배치 검증
+batch = data_asset.add_batch_definition_whole_dataframe("daily_batch")
+results = batch.validate(suite)
+
+# 결과 확인
+if not results["success"]:
+    print(f"❌ Data quality check failed!")
+    for check in results["results"]:
+        if not check["success"]:
+            print(f"  - {check['expectation_config']['expectation_type']}")
+else:
+    print("✅ All quality checks passed!")</code>
+            </div>
+
+            <div class="review-section">
+                <h3>📝 복습 질문</h3>
+                <ol>
+                    <li>ETL과 ELT의 차이는 무엇이며, 왜 클라우드 시대에는 ELT가 선호되나요?</li>
+                    <li>Apache Airflow의 DAG란 무엇이며, Operator와 Task의 관계를 설명하세요.</li>
+                    <li>dbt의 핵심 가치는 무엇이며, 전통적인 ETL 도구와 어떻게 다른가요?</li>
+                    <li>dbt에서 {{ ref() }} 매크로의 역할은 무엇인가요?</li>
+                    <li>CDC의 4가지 구현 방식을 비교하고, 로그 기반 CDC의 장점을 설명하세요.</li>
+                    <li>데이터 품질의 6가지 차원을 나열하고 각각을 간단히 설명하세요.</li>
+                    <li>Incremental Materialization이란 무엇이며, 언제 사용하나요?</li>
+                    <li>Debezium 같은 CDC 도구가 Kafka를 사용하는 이유는 무엇인가요?</li>
+                    <li>dbt test 명령어는 무엇을 검증하며, 왜 중요한가요?</li>
+                    <li>"Garbage In, Garbage Out"의 의미와 데이터 파이프라인에서의 중요성을 설명하세요.</li>
+                </ol>
+            </div>
+
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>ELT가 현대 DW의 표준</strong>: 클라우드 DW의 강력한 컴퓨팅으로 변환 수행</li>
+                    <li><strong>Airflow는 오케스트레이터</strong>: 워크플로우를 Python 코드로 정의하고 스케줄링</li>
+                    <li><strong>dbt는 Analytics Engineer의 도구</strong>: SQL + Git으로 변환 로직을 관리</li>
+                    <li><strong>{{ ref() }}로 의존성 자동 관리</strong>: 모델 간 계보(Lineage) 자동 생성</li>
+                    <li><strong>CDC로 실시간 동기화</strong>: 로그 기반 CDC가 가장 효율적 (Debezium, Kafka)</li>
+                    <li><strong>데이터 품질은 필수</strong>: 완전성, 유일성, 정확성, 일관성, 적시성, 유효성</li>
+                    <li><strong>Incremental 처리로 비용 절감</strong>: 새 데이터만 처리하여 효율성 극대화</li>
+                    <li><strong>테스트 주도 데이터 개발</strong>: dbt test, Great Expectations로 자동 검증</li>
+                    <li><strong>코드 기반 파이프라인</strong>: Git으로 버전 관리, CI/CD로 자동 배포</li>
+                    <li>弘益人間: 신뢰할 수 있는 데이터 파이프라인이 올바른 의사결정을 가능하게 함 🌍</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-02.html" class="nav-button">← 02. 차원 모델링</a>
+                <a href="chapter-04.html" class="nav-button">04. OLAP 및 큐브 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

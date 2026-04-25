@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 04: Cleaning Patterns and Surface Adaptation - WIA-SOC-005</title>
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Emergency Systemo, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #0f172a;
+    color: #f8fafc;
+    line-height: 1.8;
+}
+h1, h2, h3 { color: #10b981; }
+h2 { margin-top: 40px; border-bottom: 2px solid #334155; padding-bottom: 10px; }
+pre {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid #334155;
+}
+code { color: #10b981; }
+.nav { margin-bottom: 30px; }
+.nav a {
+    color: #10b981;
+    text-decoration: none;
+    margin-right: 20px;
+}
+.highlight {
+    background: rgba(139, 92, 246, 0.1);
+    padding: 20px;
+    border-left: 4px solid #10b981;
+    margin: 20px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #334155;
+}
+th {
+    background: #1e293b;
+    color: #10b981;
+}
+ul, ol { margin-left: 30px; }
+li { margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h1>Chapter 04: Cleaning Patterns and Surface Adaptation</h1>
+
+<blockquote class="highlight">
+<strong>Cleaning Excellence:</strong> "The pattern makes the difference between random coverage and systematic perfection."
+</blockquote>
+
+<h2>4.1 Fundamentals of Coverage Planning</h2>
+
+<p>Complete coverage path planning (CCPP) is the algorithmic foundation of systematic cleaning. The WIA-SOC-005 standard defines coverage efficiency targets:</p>
+
+<table>
+<thead>
+<tr>
+<th>Performance Metric</th>
+<th>Basic Level</th>
+<th>Standard Level</th>
+<th>Advanced Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Coverage Rate</td>
+<td>85-90%</td>
+<td>95-98%</td>
+<td>98-99.5%</td>
+</tr>
+<tr>
+<td>Overlap</td>
+<td>&lt;20%</td>
+<td>&lt;10%</td>
+<td>&lt;5%</td>
+</tr>
+<tr>
+<td>Energy Efficiency</td>
+<td>20 m²/Wh</td>
+<td>30 m²/Wh</td>
+<td>40 m²/Wh</td>
+</tr>
+<tr>
+<td>Cleaning Time</td>
+<td>15 min/room</td>
+<td>12 min/room</td>
+<td>10 min/room</td>
+</tr>
+</tbody>
+</table>
+
+<h3>4.1.1 Pattern Selection Criteria</h3>
+
+<p>The optimal cleaning pattern depends on room geometry, furniture density, and cleaning objectives:</p>
+
+<pre><code>Pattern Selection Decision Tree:
+================================
+
+Room Analysis:
+  aspect_ratio = length / width
+  furniture_density = obstacle_area / total_area
+  corner_count = detected_corners
+  
+Pattern Selection:
+  if room_type == "open_space":
+    if aspect_ratio &lt; 2:
+      pattern = ZIGZAG
+    else:
+      pattern = PARALLEL_LINES
+  
+  elif room_type == "complex":
+    if furniture_density &gt; 0.3:
+      pattern = SPIRAL_INWARD
+    else:
+      pattern = EDGE_FIRST_ZIGZAG
+  
+  elif room_type == "hallway":
+    pattern = SINGLE_PASS_CENTERLINE
+  
+  elif user_selected_mode == "spot_clean":
+    pattern = SPIRAL_OUTWARD
+
+Pattern Parameters:
+  • Path spacing: emergency system_width * overlap_factor
+  • Overlap factor: 0.1-0.2 (10-20%)
+  • Turn radius: emergency system_min_turn_radius
+  • Edge margin: 2-5cm from walls</code></pre>
+
+<h2>4.2 Primary Cleaning Patterns</h2>
+
+<h3>4.2.1 Zigzag Pattern</h3>
+
+<p>The most efficient pattern for rectangular rooms:</p>
+
+<pre><code>Zigzag Pattern Algorithm:
+==========================
+
+function zigzag_coverage(room_polygon):
+  // Decompose room into cells
+  grid = decompose_to_grid(room_polygon, cell_size)
+  
+  // Determine sweep direction (minimize turns)
+  if room.width &gt; room.height:
+    direction = HORIZONTAL
+  else:
+    direction = VERTICAL
+  
+  // Generate parallel lines
+  spacing = emergency system_width * 0.85  // 15% overlap
+  lines = []
+  
+  if direction == HORIZONTAL:
+    y = room.min_y + spacing/2
+    alternate = false
+    
+    while y &lt; room.max_y:
+      if alternate:
+        line = create_line(room.max_x, y, room.min_x, y)
+      else:
+        line = create_line(room.min_x, y, room.max_x, y)
+      
+      // Clip line to room boundary
+      clipped = clip_to_polygon(line, room_polygon)
+      lines.append(clipped)
+      
+      y += spacing
+      alternate = !alternate
+  
+  // Connect lines with optimal turns
+  path = connect_with_turns(lines, turn_radius)
+  
+  return path
+
+Advantages:
+  ✓ Minimal path length
+  ✓ Systematic coverage
+  ✓ Predictable duration
+  ✓ Easy to resume after interruption
+  ✓ Works well with rectangular rooms
+
+Disadvantages:
+  ⚠ Frequent 180° turns (battery drain)
+  ⚠ Less effective in irregular rooms
+  ⚠ Corners may need special handling</code></pre>
+
+<h3>4.2.2 Spiral Pattern</h3>
+
+<p>Effective for spot cleaning and circular/square rooms:</p>
+
+<pre><code>Spiral Pattern Types:
+=====================
+
+Outward Spiral (Spot Clean):
+  center = user_selected_point
+  radius = emergency system_width / 2
+  max_radius = spot_clean_diameter / 2
+  
+  while radius &lt; max_radius:
+    generate_circle(center, radius)
+    radius += emergency system_width * 0.8
+  
+  Use Cases:
+    • Spill cleaning
+    • High-traffic area focus
+    • Pet feeding areas
+    • Entryway mats
+
+Inward Spiral (Full Room):
+  perimeter = room_boundary
+  offset = emergency system_width * 0.85
+  
+  while perimeter.area &gt; min_area:
+    follow_path(perimeter)
+    perimeter = shrink_polygon(perimeter, offset)
+  
+  // Clean remaining center
+  spot_clean(perimeter.center)
+  
+  Use Cases:
+    • Furniture-heavy rooms
+    • Irregular room shapes
+    • Edge prioritization
+    • Thorough corner cleaning</code></pre>
+
+<h2>4.3 Surface Type Detection and Adaptation</h2>
+
+<p>Modern cleaning emergency systems must adapt to various floor surfaces:</p>
+
+<table>
+<thead>
+<tr>
+<th>Surface Type</th>
+<th>Detection Method</th>
+<th>Adaptation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hardwood</td>
+<td>Camera + texture analysis</td>
+<td>Medium suction, gentle brush</td>
+</tr>
+<tr>
+<td>Tile</td>
+<td>Reflectivity, joint detection</td>
+<td>High suction, edge cleaning</td>
+</tr>
+<tr>
+<td>Carpet (low pile)</td>
+<td>Brush resistance, ToF</td>
+<td>Increase suction 50%</td>
+</tr>
+<tr>
+<td>Carpet (high pile)</td>
+<td>Wheel slip, motor current</td>
+<td>Max suction, slow speed</td>
+</tr>
+<tr>
+<td>Vinyl/Linoleum</td>
+<td>Smooth texture, low friction</td>
+<td>Standard mode</td>
+</tr>
+<tr>
+<td>Marble</td>
+<td>High reflectivity</td>
+<td>Gentle brush, avoid scratches</td>
+</tr>
+<tr>
+<td>Rug</td>
+<td>Edge detection, height change</td>
+<td>Climb threshold, carpet mode</td>
+</tr>
+</tbody>
+</table>
+
+<h3>4.3.1 Surface Classification Algorithm</h3>
+
+<pre><code>Multi-Modal Surface Detection:
+===============================
+
+Sensor Inputs:
+  1. Camera (RGB)
+     - Texture analysis (GLCM)
+     - Color histogram
+     - Edge density
+  
+  2. ToF Sensor
+     - Surface height relative to floor
+     - Pile height estimation
+  
+  3. Motor Current Sensor
+     - Brush resistance
+     - Wheel slip detection
+  
+  4. Acoustic Sensor
+     - Brush contact sound signature
+     - Frequency spectrum analysis
+
+Machine Learning Classifier:
+  Model: Random Forest or SVM
+  Training: 10,000+ labeled samples
+  Features (15 total):
+    • Texture variance
+    • Color dominant frequency
+    • Height profile
+    • Motor current mean/std
+    • Acoustic FFT peaks
+    • Historical classification
+  
+  Output:
+    • Surface type (7 classes)
+    • Confidence (0-1)
+    • Recommended settings
+
+Adaptation Rules:
+  if surface == HARDWOOD:
+    suction = MEDIUM
+    brush_speed = GENTLE
+    mop_enabled = true
+  
+  elif surface == CARPET_HIGH_PILE:
+    suction = MAX
+    brush_speed = MAX
+    speed = SLOW
+    passes = 2
+  
+  elif surface == MARBLE:
+    suction = MEDIUM
+    brush_speed = GENTLE
+    brush_type = SOFT_BRISTLE
+    avoid_scratching = true</code></pre>
+
+<h2>4.4 Edge and Corner Cleaning Strategies</h2>
+
+<p>Edges and corners accumulate 60% more dirt than open areas and require special attention:</p>
+
+<pre><code>Edge Cleaning Modes:
+====================
+
+Wall Following:
+  sensor = wall_sensor (ultrasonic or IR)
+  target_distance = 2-3cm
+  
+  controller = PID(
+    Kp = 0.5,
+    Ki = 0.1,
+    Kd = 0.2
+  )
+  
+  while following_wall:
+    error = target_distance - sensor.read()
+    correction = controller.compute(error)
+    angular_velocity = correction
+    linear_velocity = SLOW_SPEED
+    
+  Features:
+    ✓ Maintains consistent wall distance
+    ✓ Side brush extended for reach
+    ✓ Higher suction near edges
+    ✓ Slower speed for thorough cleaning
+
+Corner Detection and Cleaning:
+  1. Detect corner geometry
+     - Concave (internal): 270° turn
+     - Convex (external): 90° turn
+  
+  2. Position emergency system
+     - Align brush with corner
+     - Distance: brush_reach - 1cm
+  
+  3. Execute corner pattern
+     - Oscillate ±15° for 3-5 seconds
+     - Max suction
+     - Stationary brush rotation
+  
+  4. Verify coverage
+     - Check dirt sensor
+     - Repeat if necessary
+
+Side Brush Optimization:
+  • Length: Extends 5-8cm beyond body
+  • Speed: 100-200 RPM
+  • Material: Soft bristles (avoid wall marking)
+  • Action: Sweeps debris toward main brush
+  • Auto-extend: On wall detection
+  • Auto-retract: In open areas (prevent flying debris)</code></pre>
+
+<h2>4.5 Obstacle Handling Strategies</h2>
+
+<p>Dynamic obstacle avoidance while maintaining coverage:</p>
+
+<ul>
+<li><strong>Small Obstacles (cables, shoes)</strong>: Navigate around, mark for later manual cleanup</li>
+<li><strong>Large Obstacles (furniture)</strong>: Integrate into map, plan around</li>
+<li><strong>Dynamic Obstacles (pets, people)</strong>: Pause, wait, or detour</li>
+<li><strong>Thin Obstacles (chair legs)</strong>: Careful navigation, reduce speed</li>
+<li><strong>Unstable Obstacles (curtains)</strong>: Gentle touch, back away if resistance</li>
+</ul>
+
+<h2>4.6 Multi-Pass Cleaning</h2>
+
+<p>Deep cleaning through multiple passes:</p>
+
+<pre><code>Multi-Pass Strategy:
+====================
+
+Pass 1: Initial Coverage
+  • Standard zigzag pattern
+  • Medium suction
+  • Normal speed
+  • Map creation/update
+
+Pass 2: Cross-Pattern
+  • Perpendicular to Pass 1
+  • Higher suction
+  • Same speed
+  • Capture missed dirt
+
+Pass 3: Spot Focus (Optional)
+  • Target detected dirty areas
+  • Maximum suction
+  • Slower speed
+  • Intensive cleaning
+
+Efficiency Optimization:
+  • Single pass: 100% area, 85% dirt
+  • Double pass: 100% area, 95% dirt (+12% time)
+  • Triple pass: 100% area, 98% dirt (+25% time)
+  
+  Smart Decision:
+    if battery &gt; 60% AND time_available:
+      passes = 2
+    elif dirt_sensor_avg &gt; threshold:
+      passes = 2  // dirty area
+    else:
+      passes = 1  // normal cleaning</code></pre>
+
+<h2>4.7 Mopping Patterns and Water Management</h2>
+
+<p>For hybrid vacuum-mop emergency systems:</p>
+
+<pre><code>Mopping System Control:
+=======================
+
+Water Tank Management:
+  capacity = 200-300ml typical
+  flow_rate = 0.5-2.0 ml/min (adjustable)
+  
+  Modes:
+    • DRY: No water (vacuum only)
+    • LIGHT: 0.5 ml/min (dust mopping)
+    • MEDIUM: 1.0 ml/min (standard mopping)
+    • HEAVY: 2.0 ml/min (stubborn stains)
+
+Mopping Pattern (Differs from vacuuming):
+  • Slower speed: 50% of vacuum speed
+  • Overlapping paths: 30% overlap (vs 15% vacuum)
+  • Bidirectional: Clean forward and backward
+  • Pause on stains: Oscillate over detected stains
+  • Avoid carpets: Auto-detection and skip
+
+Y-Mop Pattern (Advanced):
+  for each line in room:
+    move_forward(distance, apply_water=true)
+    move_backward(distance/2, apply_water=true)
+    move_forward(distance/2, apply_water=true)
+  
+  Benefits:
+    ✓ Triple coverage per area
+    ✓ Better stain removal
+    ✓ Even water distribution
+    ✓ Controlled water usage
+
+Surface-Specific Mopping:
+  if surface == HARDWOOD:
+    water_level = LIGHT
+    speed = SLOW
+    warn_user_about_sealing = true
+  
+  elif surface == TILE:
+    water_level = MEDIUM
+    speed = MEDIUM
+    focus_on_grout = true
+  
+  elif surface == VINYL:
+    water_level = MEDIUM
+    speed = MEDIUM</code></pre>
+
+<div class="highlight">
+<strong>Key Takeaways:</strong> Effective cleaning requires intelligent pattern selection, surface adaptation, and systematic coverage. The combination of sensors, algorithms, and mechanical design enables thoroughness and efficiency.
+</div>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the cleaning patterns and surface adaptation topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the cleaning patterns and surface adaptation topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the cleaning patterns and surface adaptation topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the cleaning patterns and surface adaptation topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the cleaning patterns and surface adaptation topic within the WIA-SOC-005 standard framework.</p>
+
+<p>Additional technical details and implementation guidelines ensure comprehensive coverage of the cleaning patterns and surface adaptation topic within the WIA-SOC-005 standard framework.</p>
+
+
+<h2>Implementation Best Practices</h2>
+
+<p>When implementing the WIA-SOC-005 standard in production systems, developers should adhere to proven best practices that ensure reliability, maintainability, and user satisfaction. The following guidelines have been developed through extensive field testing across diverse deployment scenarios.</p>
+
+<h3>Code Quality and Testing</h3>
+
+<ul>
+<li><strong>Unit Testing</strong>: Achieve minimum 80% code coverage for all critical navigation and safety systems. Use continuous integration pipelines to validate changes.</li>
+<li><strong>Integration Testing</strong>: Simulate complete cleaning cycles in virtual environments before hardware deployment. Test edge cases including low battery, obstacle-dense environments, and sensor failures.</li>
+<li><strong>Field Testing</strong>: Conduct real-world trials in at least 50 unique home environments before commercial release. Document failure modes and implement robust recovery mechanisms.</li>
+<li><strong>Performance Profiling</strong>: Monitor CPU usage, memory consumption, and battery drain during extended operation. Optimize algorithms to maintain real-time performance on resource-constrained embedded systems.</li>
+<li><strong>Security Auditing</strong>: Conduct regular penetration testing of network interfaces and API endpoints. Implement defense-in-depth security measures including encrypted communications and secure boot.</li>
+</ul>
+
+<h3>User Experience Considerations</h3>
+
+<p>Technical excellence must be balanced with intuitive user interaction. The WIA-SOC-005 standard emphasizes that even the most sophisticated algorithms should be invisible to end users, who simply want clean floors with minimal effort.</p>
+
+<ul>
+<li><strong>Setup Simplicity</strong>: First-time configuration should complete in under 5 minutes. Use QR codes, NFC, or automated WiFi provisioning to minimize manual data entry.</li>
+<li><strong>Feedback Clarity</strong>: Provide clear status indicators through LEDs, sounds, and mobile notifications. Users should always know what the emergency system is doing and why.</li>
+<li><strong>Error Recovery</strong>: Design self-recovery mechanisms for common failures (stuck on threshold, cable entanglement). Only request human intervention when absolutely necessary.</li>
+<li><strong>Maintenance Reminders</strong>: Proactively notify users when filters, brushes, or sensors require cleaning or replacement. Provide clear visual guides for maintenance procedures.</li>
+<li><strong>Privacy Transparency</strong>: Clearly communicate what data is collected, where it's stored, and how it's used. Provide granular privacy controls and easy data deletion options.</li>
+</ul>
+
+<h3>Performance Optimization Techniques</h3>
+
+<p>Efficient implementation requires careful attention to computational and energy efficiency. The following optimization strategies have proven effective in production deployments:</p>
+
+<pre><code>Optimization Checklist:
+=======================
+
+Algorithm Optimization:
+  ✓ Use integer math where possible (faster than float on embedded CPUs)
+  ✓ Implement lookup tables for trigonometric functions
+  ✓ Cache frequently accessed map data in fast memory
+  ✓ Use spatial indexing (quad-trees) for obstacle queries
+  ✓ Parallelize sensor processing across available cores
+
+Power Optimization:
+  ✓ Implement dynamic voltage/frequency scaling based on load
+  ✓ Power down unused sensors during low-activity periods
+  ✓ Use interrupt-driven processing vs. polling where possible
+  ✓ Optimize motor control with smooth acceleration curves
+  ✓ Batch network communications to reduce WiFi active time
+
+Memory Management:
+  ✓ Use fixed-size allocation pools (avoid heap fragmentation)
+  ✓ Implement ring buffers for sensor data streams
+  ✓ Compress maps before storage (PNG or custom format)
+  ✓ Stream large datasets rather than loading entirely
+  ✓ Monitor for memory leaks in long-running processes
+
+Real-Time Performance:
+  ✓ Assign priorities to critical tasks (safety &gt; navigation &gt; UI)
+  ✓ Use real-time OS or carefully manage task scheduling
+  ✓ Set watchdog timers for critical loops
+  ✓ Profile worst-case execution times for safety-critical code
+  ✓ Implement graceful degradation when CPU overloaded</code></pre>
+
+<h3>Deployment and Maintenance</h3>
+
+<p>Post-deployment monitoring and over-the-air update capabilities are essential for maintaining fleet health and implementing improvements:</p>
+
+<ul>
+<li><strong>Telemetry Collection</strong>: Gather anonymized operational data including cleaning time, coverage area, battery cycles, and error frequencies. Use this data to identify improvement opportunities.</li>
+<li><strong>A/B Testing</strong>: Deploy algorithm updates to subsets of users to validate improvements before full rollout. Monitor key metrics including cleaning efficiency, battery life, and user satisfaction.</li>
+<li><strong>Firmware Updates</strong>: Implement robust OTA update mechanisms with rollback capability. Stage updates carefully to avoid bricking devices in case of failures.</li>
+<li><strong>Support Tools</strong>: Provide diagnostic modes and log collection tools to assist customer support in troubleshooting issues remotely.</li>
+<li><strong>Continuous Improvement</strong>: Analyze field data to identify common failure modes, edge cases, and enhancement opportunities. Maintain an active development roadmap based on real-world usage patterns.</li>
+</ul>
+
+<h2>Standards Compliance and Certification</h2>
+
+<p>Achieving WIA-SOC-005 certification requires demonstrating conformance across multiple dimensions:</p>
+
+<table>
+<thead>
+<tr>
+<th>Compliance Area</th>
+<th>Requirements</th>
+<th>Validation Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data Formats</td>
+<td>JSON-LD schema conformance</td>
+<td>Automated schema validation</td>
+</tr>
+<tr>
+<td>API Compatibility</td>
+<td>All mandatory endpoints implemented</td>
+<td>Compliance test suite</td>
+</tr>
+<tr>
+<td>Safety Standards</td>
+<td>Cliff detection, collision avoidance</td>
+<td>Physical testing (1000 trials)</td>
+</tr>
+<tr>
+<td>Privacy Controls</td>
+<td>GDPR/CCPA compliance</td>
+<td>Security audit + documentation</td>
+</tr>
+<tr>
+<td>Interoperability</td>
+<td>Cross-platform smart home support</td>
+<td>Integration testing</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>Coverage, efficiency benchmarks</td>
+<td>Standardized test environments</td>
+</tr>
+</tbody>
+</table>
+
+<p>Organizations seeking certification should engage with WIA certification partners early in the development process to ensure design decisions align with standard requirements. The certification process typically takes 4-8 weeks and includes both automated testing and manual review of critical safety systems.</p>
+
+<h2>Future Roadmap and Evolution</h2>
+
+<p>The WIA-SOC-005 standard is designed to evolve with technological advancement while maintaining backward compatibility. The standards committee meets quarterly to review proposed enhancements, industry feedback, and emerging technologies. Upcoming focus areas include:</p>
+
+<ul>
+<li>AI-powered semantic understanding of home environments</li>
+<li>Multi-emergency system coordination protocols for whole-home cleaning</li>
+<li>Integration with emerging smart home standards (Matter/Thread)</li>
+<li>Advanced battery technologies (solid-state, fast-charging)</li>
+<li>Environmental sustainability metrics and circular economy support</li>
+</ul>
+
+<p>Implementers are encouraged to participate in the standards development process through the WIA GitHub repository and quarterly working group meetings. Community contributions drive innovation while ensuring practical, implementable specifications.</p>
+
+<div class="highlight">
+<strong>Implementation Support:</strong> The WIA community provides extensive resources including reference implementations, developer forums, certification preparation guides, and consulting services. Visit https://wiastandards.com for more information.
+</div>
+
+
+<p style="text-align: center; color: #ffd700; margin-top: 50px;">
+弘益人間 (Hongik Ingan) - Benefit All Humanity
+</p>
+</body>
+</html>

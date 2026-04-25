@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SEMI-005 Quantum Chip Simulator | Qubit Specs, Gate Fidelity & Calibration</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #8B5CF6;
+            --secondary: #8b5cf6;
+            --accent: #f59e0b;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --success: #10b981;
+            --border: rgba(6, 182, 212, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--surface);
+            border-bottom: 2px solid var(--border);
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header-title {
+            font-size: 1.8rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .lang-selector {
+            background: var(--bg);
+            color: var(--text);
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .tab {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            white-space: nowrap;
+            font-size: 1rem;
+        }
+
+        .tab:hover {
+            border-color: var(--primary);
+            color: var(--text);
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: var(--bg);
+            border-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        input, select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: var(--bg);
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #0891b2;
+            transform: translateY(-2px);
+        }
+
+        .results {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            color: var(--text-dim);
+        }
+
+        .result-value {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .chip-type-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .chip-type {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .chip-type:hover {
+            border-color: var(--primary);
+        }
+
+        .chip-type.selected {
+            border-color: var(--primary);
+            background: rgba(6, 182, 212, 0.1);
+        }
+
+        .chip-type-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-box {
+            background: rgba(6, 182, 212, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .table th, .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table th {
+            background: var(--bg);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .status-good {
+            color: var(--success);
+        }
+
+        .status-warning {
+            color: var(--accent);
+        }
+
+        .status-error {
+            color: #ef4444;
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Quantum Chip</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="header">
+        <div class="header-title">
+            <span>💠</span>
+            <span data-i18n="title">WIA-SEMI-005 Quantum Chip Simulator</span>
+        </div>
+        <select class="lang-selector" id="langSelector" onchange="changeLanguage()">
+            <option value="en">English</option>
+            <option value="ko">한국어</option>
+            <option value="ja">日本語</option>
+            <option value="zh">中文</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Português</option>
+            <option value="ru">Русский</option>
+            <option value="ar">العربية</option>
+            <option value="hi">हिन्दी</option>
+            <option value="bn">বাংলা</option>
+            <option value="pa">ਪੰਜਾਬੀ</option>
+            <option value="jv">Basa Jawa</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="tr">Türkçe</option>
+            <option value="pl">Polski</option>
+            <option value="uk">Українська</option>
+            <option value="ro">Română</option>
+            <option value="nl">Nederlands</option>
+            <option value="el">Ελληνικά</option>
+            <option value="cs">Čeština</option>
+            <option value="sv">Svenska</option>
+            <option value="hu">Magyar</option>
+            <option value="fi">Suomi</option>
+            <option value="no">Norsk</option>
+            <option value="da">Dansk</option>
+            <option value="he">עברית</option>
+            <option value="th">ไทย</option>
+            <option value="ms">Bahasa Melayu</option>
+            <option value="id">Bahasa Indonesia</option>
+            <option value="tl">Tagalog</option>
+            <option value="sw">Kiswahili</option>
+            <option value="fa">فارسی</option>
+            <option value="ur">اردو</option>
+            <option value="ta">தமிழ்</option>
+            <option value="te">తెలుగు</option>
+            <option value="mr">मराठी</option>
+            <option value="gu">ગુજરાતી</option>
+            <option value="kn">ಕನ್ನಡ</option>
+            <option value="ml">മലയാളം</option>
+            <option value="si">සිංහල</option>
+            <option value="my">မြန်မာဘာသာ</option>
+            <option value="km">ខ្មែរ</option>
+            <option value="lo">ລາວ</option>
+            <option value="ka">ქართული</option>
+            <option value="hy">Հայերեն</option>
+            <option value="az">Azərbaycan</option>
+            <option value="kk">Қазақ</option>
+            <option value="uz">O'zbek</option>
+            <option value="mn">Монгол</option>
+            <option value="ne">नेपाली</option>
+            <option value="am">አማርኛ</option>
+            <option value="ti">ትግርኛ</option>
+            <option value="so">Soomaali</option>
+            <option value="zu">isiZulu</option>
+            <option value="xh">isiXhosa</option>
+            <option value="af">Afrikaans</option>
+            <option value="sq">Shqip</option>
+            <option value="bs">Bosanski</option>
+            <option value="hr">Hrvatski</option>
+            <option value="sr">Српски</option>
+            <option value="mk">Македонски</option>
+            <option value="bg">Български</option>
+            <option value="sk">Slovenčina</option>
+            <option value="sl">Slovenščina</option>
+            <option value="et">Eesti</option>
+            <option value="lv">Latviešu</option>
+            <option value="lt">Lietuvių</option>
+            <option value="is">Íslenska</option>
+            <option value="ga">Gaeilge</option>
+            <option value="cy">Cymraeg</option>
+            <option value="mt">Malti</option>
+            <option value="lb">Lëtzebuergesch</option>
+            <option value="ca">Català</option>
+            <option value="eu">Euskara</option>
+            <option value="gl">Galego</option>
+            <option value="br">Brezhoneg</option>
+            <option value="gd">Gàidhlig</option>
+            <option value="yi">ייִדיש</option>
+            <option value="ku">Kurdî</option>
+            <option value="ps">پښتو</option>
+            <option value="sd">سنڌي</option>
+            <option value="ug">ئۇيغۇر</option>
+            <option value="bo">བོད་སྐད་</option>
+            <option value="dz">རྫོང་ཁ</option>
+            <option value="ky">Кыргыз</option>
+            <option value="tg">Тоҷикӣ</option>
+            <option value="tk">Türkmen</option>
+            <option value="tt">Татар</option>
+            <option value="ba">Башҡорт</option>
+            <option value="cv">Чӑваш</option>
+            <option value="sah">Саха</option>
+            <option value="tyv">Тыва</option>
+            <option value="os">Ирон</option>
+            <option value="ce">Нохчийн</option>
+            <option value="av">Авар</option>
+            <option value="kbd">Адыгэбзэ</option>
+        </select>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="showTab(0)">
+                <span></span> <span data-i18n="tab1">Qubit Specifications</span>
+            </div>
+            <div class="tab" onclick="showTab(1)">
+                <span>🔢</span> <span data-i18n="tab2">Gate Fidelity</span>
+            </div>
+            <div class="tab" onclick="showTab(2)">
+                <span>📡</span> <span data-i18n="tab3">Control Protocols</span>
+            </div>
+            <div class="tab" onclick="showTab(3)">
+                <span>🔗</span> <span data-i18n="tab4">Quantum-Classical</span>
+            </div>
+            <div class="tab" onclick="showTab(4)">
+                <span>🧪</span> <span data-i18n="tab5">Calibration</span>
+            </div>
+        </div>
+
+        <!-- Tab 1: Qubit Specifications -->
+        <div class="tab-content active" id="tab0">
+            <h2 class="section-title">
+                <span></span>
+                <span data-i18n="tab1_title">Qubit Specifications & Coherence Times</span>
+            </h2>
+
+            <div class="chip-type-selector">
+                <div class="chip-type selected" onclick="selectChipType('superconducting')">
+                    <div class="chip-type-icon">❄️</div>
+                    <div data-i18n="chip_supercon">Superconducting</div>
+                </div>
+                <div class="chip-type" onclick="selectChipType('iontrap')">
+                    <div class="chip-type-icon">⚛️</div>
+                    <div data-i18n="chip_ion">Ion Trap</div>
+                </div>
+                <div class="chip-type" onclick="selectChipType('photonic')">
+                    <div class="chip-type-icon"></div>
+                    <div data-i18n="chip_photonic">Photonic</div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-i18n="qubit_count">Qubit Count:</label>
+                    <input type="number" id="qubitCount" value="50" min="1" max="10000">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="topology">Topology:</label>
+                    <select id="topology">
+                        <option value="square">Square Lattice</option>
+                        <option value="heavy-hex">Heavy-Hex</option>
+                        <option value="linear">Linear Chain</option>
+                        <option value="all-to-all">All-to-All</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="t1_time">T1 Relaxation Time (μs):</label>
+                    <input type="number" id="t1Time" value="100" min="1" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="t2_time">T2 Coherence Time (μs):</label>
+                    <input type="number" id="t2Time" value="80" min="1" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="freq_range">Frequency Range (GHz):</label>
+                    <input type="text" id="freqRange" value="4.5 - 5.5">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="readout_fid">Readout Fidelity (%):</label>
+                    <input type="number" id="readoutFid" value="99.2" min="0" max="100" step="0.1">
+                </div>
+            </div>
+
+            <button class="btn" onclick="calculateQubitMetrics()" data-i18n="calculate">Calculate Metrics</button>
+
+            <div class="results" id="qubitResults" style="display:none;">
+                <h3 data-i18n="results">Results:</h3>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="total_qubits">Total Qubits:</span>
+                    <span class="result-value" id="totalQubits">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="coherence_limit">Coherence Limited Depth:</span>
+                    <span class="result-value" id="coherenceLimit">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="quality_factor">Quality Factor (T2/Gate Time):</span>
+                    <span class="result-value" id="qualityFactor">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="connectivity">Connectivity:</span>
+                    <span class="result-value" id="connectivity">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Gate Fidelity -->
+        <div class="tab-content" id="tab1">
+            <h2 class="section-title">
+                <span>🔢</span>
+                <span data-i18n="tab2_title">Quantum Gate Fidelity Calculations</span>
+            </h2>
+
+            <div class="info-box">
+                <strong data-i18n="gate_info">Gate Fidelity Information:</strong>
+                <span data-i18n="gate_info_desc">Measures the accuracy of quantum gate operations. Higher fidelity means lower error rates.</span>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-i18n="single_gate_fid">Single-Qubit Gate Fidelity (%):</label>
+                    <input type="number" id="singleGateFid" value="99.95" min="0" max="100" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="two_gate_fid">Two-Qubit Gate Fidelity (%):</label>
+                    <input type="number" id="twoGateFid" value="99.5" min="0" max="100" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="gate_time">Gate Time (ns):</label>
+                    <input type="number" id="gateTime" value="20" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="circuit_depth">Circuit Depth:</label>
+                    <input type="number" id="circuitDepth" value="100" min="1" step="1">
+                </div>
+            </div>
+
+            <button class="btn" onclick="calculateGateFidelity()" data-i18n="calculate">Calculate Metrics</button>
+
+            <div class="results" id="gateResults" style="display:none;">
+                <h3 data-i18n="results">Results:</h3>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="circuit_fidelity">Circuit Fidelity:</span>
+                    <span class="result-value" id="circuitFidelity">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="error_rate">Error Rate per Gate:</span>
+                    <span class="result-value" id="errorRate">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="total_time">Total Circuit Time:</span>
+                    <span class="result-value" id="totalTime">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="quantum_volume">Estimated Quantum Volume:</span>
+                    <span class="result-value" id="quantumVolume">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Control Protocols -->
+        <div class="tab-content" id="tab2">
+            <h2 class="section-title">
+                <span>📡</span>
+                <span data-i18n="tab3_title">Quantum Control Protocols</span>
+            </h2>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-i18n="pulse_type">Pulse Type:</label>
+                    <select id="pulseType">
+                        <option value="gaussian">Gaussian</option>
+                        <option value="drag">DRAG</option>
+                        <option value="rect">Rectangular</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="pulse_duration">Pulse Duration (ns):</label>
+                    <input type="number" id="pulseDuration" value="20" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="rabi_freq">Rabi Frequency (MHz):</label>
+                    <input type="number" id="rabiFreq" value="10" min="0.1" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="crosstalk">Crosstalk Level (%):</label>
+                    <input type="number" id="crosstalk" value="2.5" min="0" max="100" step="0.1">
+                </div>
+            </div>
+
+            <button class="btn" onclick="calculateControlMetrics()" data-i18n="calculate">Calculate Metrics</button>
+
+            <div class="results" id="controlResults" style="display:none;">
+                <h3 data-i18n="results">Results:</h3>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="rotation_angle">Rotation Angle:</span>
+                    <span class="result-value" id="rotationAngle">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="crosstalk_impact">Crosstalk Impact:</span>
+                    <span class="result-value" id="crosstalkImpact">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="bandwidth">Pulse Bandwidth:</span>
+                    <span class="result-value" id="bandwidth">-</span>
+                </div>
+            </div>
+
+            <div class="warning-box">
+                <strong data-i18n="control_warning">Note:</strong>
+                <span data-i18n="control_warning_desc">Crosstalk must be minimized for high-fidelity operations. Consider frequency detuning and pulse shaping.</span>
+            </div>
+        </div>
+
+        <!-- Tab 4: Quantum-Classical Integration -->
+        <div class="tab-content" id="tab3">
+            <h2 class="section-title">
+                <span>🔗</span>
+                <span data-i18n="tab4_title">Quantum-Classical Integration</span>
+            </h2>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-i18n="classical_latency">Classical Processing Latency (μs):</label>
+                    <input type="number" id="classicalLatency" value="100" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="feedback_cycles">Feedback Cycles:</label>
+                    <input type="number" id="feedbackCycles" value="10" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="temp_kelvin">Operating Temperature (mK):</label>
+                    <input type="number" id="tempKelvin" value="15" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="cooling_power">Cooling Power (mW):</label>
+                    <input type="number" id="coolingPower" value="1" min="0.1" step="0.1">
+                </div>
+            </div>
+
+            <button class="btn" onclick="calculateIntegration()" data-i18n="calculate">Calculate Metrics</button>
+
+            <div class="results" id="integrationResults" style="display:none;">
+                <h3 data-i18n="results">Results:</h3>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="total_latency">Total Feedback Latency:</span>
+                    <span class="result-value" id="totalLatency">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="thermal_photons">Thermal Photon Number:</span>
+                    <span class="result-value" id="thermalPhotons">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="heat_load">Heat Load Capacity:</span>
+                    <span class="result-value" id="heatLoad">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Calibration -->
+        <div class="tab-content" id="tab4">
+            <h2 class="section-title">
+                <span>🧪</span>
+                <span data-i18n="tab5_title">Quantum Chip Calibration</span>
+            </h2>
+
+            <div class="info-box">
+                <strong data-i18n="calib_info">Calibration Protocol:</strong>
+                <span data-i18n="calib_info_desc">Regular calibration ensures optimal performance. Frequency drift and amplitude errors must be corrected.</span>
+            </div>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th data-i18n="parameter">Parameter</th>
+                        <th data-i18n="target">Target</th>
+                        <th data-i18n="measured">Measured</th>
+                        <th data-i18n="status">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td data-i18n="qubit_freq">Qubit Frequency</td>
+                        <td>5.000 GHz</td>
+                        <td id="measFreq">4.998 GHz</td>
+                        <td class="status-good" id="statusFreq">✓ Good</td>
+                    </tr>
+                    <tr>
+                        <td data-i18n="readout_res">Readout Resonator</td>
+                        <td>6.500 GHz</td>
+                        <td id="measRes">6.502 GHz</td>
+                        <td class="status-good" id="statusRes">✓ Good</td>
+                    </tr>
+                    <tr>
+                        <td data-i18n="pi_amplitude">π Pulse Amplitude</td>
+                        <td>0.500 V</td>
+                        <td id="measAmp">0.498 V</td>
+                        <td class="status-good" id="statusAmp">✓ Good</td>
+                    </tr>
+                    <tr>
+                        <td data-i18n="drag_param">DRAG Parameter</td>
+                        <td>-0.350</td>
+                        <td id="measDrag">-0.355</td>
+                        <td class="status-warning" id="statusDrag">⚠ Check</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <button class="btn" onclick="runCalibration()" data-i18n="run_calib">Run Auto-Calibration</button>
+
+            <div class="results" id="calibResults" style="display:none;">
+                <h3 data-i18n="calib_complete">Calibration Complete!</h3>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="time_elapsed">Time Elapsed:</span>
+                    <span class="result-value" id="calibTime">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label" data-i18n="improvements">Improvements Made:</span>
+                    <span class="result-value" id="improvements">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            en: {
+                title: "WIA-SEMI-005 Quantum Chip Simulator",
+                tab1: "Qubit Specifications",
+                tab2: "Gate Fidelity",
+                tab3: "Control Protocols",
+                tab4: "Quantum-Classical",
+                tab5: "Calibration",
+                calculate: "Calculate Metrics",
+                results: "Results:"
+            },
+            ko: {
+                title: "WIA-SEMI-005 양자 칩 시뮬레이터",
+                tab1: "큐비트 사양",
+                tab2: "게이트 충실도",
+                tab3: "제어 프로토콜",
+                tab4: "양자-고전",
+                tab5: "보정",
+                calculate: "계산하기",
+                results: "결과:"
+            },
+            ja: {
+                title: "WIA-SEMI-005 量子チップシミュレータ",
+                tab1: "量子ビット仕様",
+                tab2: "ゲート忠実度",
+                tab3: "制御プロトコル",
+                tab4: "量子古典",
+                tab5: "キャリブレーション",
+                calculate: "計算する",
+                results: "結果:"
+            },
+            zh: {
+                title: "WIA-SEMI-005 量子芯片模拟器",
+                tab1: "量子比特规格",
+                tab2: "门保真度",
+                tab3: "控制协议",
+                tab4: "量子经典",
+                tab5: "校准",
+                calculate: "计算指标",
+                results: "结果："
+            }
+        };
+
+        let currentLang = 'en';
+        let selectedChipType = 'superconducting';
+
+        function changeLanguage() {
+            const lang = document.getElementById('langSelector').value;
+            currentLang = lang;
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[lang] && translations[lang][key]) {
+                    el.textContent = translations[lang][key];
+                }
+            });
+        }
+
+        function showTab(index) {
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab-content').forEach((content, i) => {
+                content.classList.toggle('active', i === index);
+            });
+        }
+
+        function selectChipType(type) {
+            selectedChipType = type;
+            document.querySelectorAll('.chip-type').forEach(el => {
+                el.classList.remove('selected');
+            });
+            event.target.closest('.chip-type').classList.add('selected');
+        }
+
+        function calculateQubitMetrics() {
+            const qubits = parseInt(document.getElementById('qubitCount').value);
+            const t1 = parseFloat(document.getElementById('t1Time').value);
+            const t2 = parseFloat(document.getElementById('t2Time').value);
+            const topology = document.getElementById('topology').value;
+
+            const gateTime = 0.02; // 20ns in microseconds
+            const coherenceLimit = Math.floor(t2 / gateTime);
+            const qualityFactor = (t2 / gateTime).toFixed(0);
+
+            let connectivity;
+            switch(topology) {
+                case 'square': connectivity = '4-neighbor'; break;
+                case 'heavy-hex': connectivity = '3-neighbor'; break;
+                case 'linear': connectivity = '2-neighbor'; break;
+                case 'all-to-all': connectivity = 'Full'; break;
+            }
+
+            document.getElementById('totalQubits').textContent = qubits;
+            document.getElementById('coherenceLimit').textContent = coherenceLimit + ' gates';
+            document.getElementById('qualityFactor').textContent = qualityFactor;
+            document.getElementById('connectivity').textContent = connectivity;
+            document.getElementById('qubitResults').style.display = 'block';
+        }
+
+        function calculateGateFidelity() {
+            const singleFid = parseFloat(document.getElementById('singleGateFid').value) / 100;
+            const twoFid = parseFloat(document.getElementById('twoGateFid').value) / 100;
+            const depth = parseInt(document.getElementById('circuitDepth').value);
+            const gateTime = parseFloat(document.getElementById('gateTime').value);
+
+            const avgFidelity = (singleFid + twoFid) / 2;
+            const circuitFid = Math.pow(avgFidelity, depth);
+            const errorRate = 1 - avgFidelity;
+            const totalTime = depth * gateTime;
+            const qv = Math.min(depth, 128);
+
+            document.getElementById('circuitFidelity').textContent = (circuitFid * 100).toFixed(2) + '%';
+            document.getElementById('errorRate').textContent = (errorRate * 100).toFixed(4) + '%';
+            document.getElementById('totalTime').textContent = totalTime + ' ns';
+            document.getElementById('quantumVolume').textContent = qv;
+            document.getElementById('gateResults').style.display = 'block';
+        }
+
+        function calculateControlMetrics() {
+            const pulseDur = parseFloat(document.getElementById('pulseDuration').value);
+            const rabiFreq = parseFloat(document.getElementById('rabiFreq').value);
+            const crosstalk = parseFloat(document.getElementById('crosstalk').value);
+
+            const rotationAngle = (rabiFreq * pulseDur / 1000 * 2 * Math.PI).toFixed(2);
+            const bandwidth = (1 / pulseDur * 1000).toFixed(1);
+
+            document.getElementById('rotationAngle').textContent = rotationAngle + ' rad (≈' + (rotationAngle / Math.PI).toFixed(2) + 'π)';
+            document.getElementById('crosstalkImpact').textContent = crosstalk + '% error addition';
+            document.getElementById('bandwidth').textContent = bandwidth + ' MHz';
+            document.getElementById('controlResults').style.display = 'block';
+        }
+
+        function calculateIntegration() {
+            const latency = parseFloat(document.getElementById('classicalLatency').value);
+            const cycles = parseInt(document.getElementById('feedbackCycles').value);
+            const temp = parseFloat(document.getElementById('tempKelvin').value);
+            const power = parseFloat(document.getElementById('coolingPower').value);
+
+            const totalLatency = latency * cycles;
+            const kB = 1.38e-23;
+            const h = 6.626e-34;
+            const freq = 5e9;
+            const thermalPhotons = 1 / (Math.exp(h * freq / (kB * temp / 1000)) - 1);
+
+            document.getElementById('totalLatency').textContent = totalLatency.toFixed(1) + ' μs';
+            document.getElementById('thermalPhotons').textContent = thermalPhotons.toExponential(2);
+            document.getElementById('heatLoad').textContent = power + ' mW at ' + temp + ' mK';
+            document.getElementById('integrationResults').style.display = 'block';
+        }
+
+        function runCalibration() {
+            document.getElementById('measFreq').textContent = '5.000 GHz';
+            document.getElementById('measRes').textContent = '6.500 GHz';
+            document.getElementById('measAmp').textContent = '0.500 V';
+            document.getElementById('measDrag').textContent = '-0.350';
+
+            document.getElementById('statusFreq').textContent = '✓ Good';
+            document.getElementById('statusRes').textContent = '✓ Good';
+            document.getElementById('statusAmp').textContent = '✓ Good';
+            document.getElementById('statusDrag').textContent = '✓ Good';
+
+            document.getElementById('statusFreq').className = 'status-good';
+            document.getElementById('statusRes').className = 'status-good';
+            document.getElementById('statusAmp').className = 'status-good';
+            document.getElementById('statusDrag').className = 'status-good';
+
+            document.getElementById('calibTime').textContent = '45.2 seconds';
+            document.getElementById('improvements').textContent = '4 parameters optimized';
+            document.getElementById('calibResults').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

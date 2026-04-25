@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Symmetric Encryption | WIA-SEC-011</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #10b981; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: Symmetric Encryption</h1>
+
+    <div class="objectives-box">
+        <h3>Learning Objectives</h3>
+        <ul>
+            <li>Master AES as the gold standard</li>
+            <li>Understand modes of operation</li>
+            <li>Learn why GCM is recommended</li>
+            <li>Explore ChaCha20-Poly1305 alternative</li>
+            <li>Implement secure symmetric encryption</li>
+        </ul>
+    </div>
+
+    <h2>2.1 AES: The Gold Standard</h2>
+
+    <p>The Advanced Encryption Standard (AES) is the most widely used symmetric encryption algorithm. Selected by NIST in 2001 after a rigorous competition, AES has withstood decades of cryptanalysis.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Specification</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Block Size</td>
+                <td>128 bits (16 bytes)</td>
+            </tr>
+            <tr>
+                <td>Key Sizes</td>
+                <td>128, 192, or 256 bits</td>
+            </tr>
+            <tr>
+                <td>Rounds (AES-256)</td>
+                <td>14 rounds</td>
+            </tr>
+            <tr>
+                <td>Structure</td>
+                <td>Substitution-Permutation Network</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>2.2 Modes of Operation</h2>
+
+    <p>Block ciphers like AES encrypt fixed-size blocks. To encrypt larger data, we use modes of operation:</p>
+
+    <h3>2.2.1 GCM (Galois/Counter Mode) - Recommended</h3>
+
+    <blockquote>
+        <h3>Why GCM?</h3>
+        <ul>
+            <li>Provides encryption AND authentication in one operation</li>
+            <li>Parallelizable (fast with hardware acceleration)</li>
+            <li>Prevents tampering with authentication tag</li>
+            <li>Supports Additional Authenticated Data (AAD)</li>
+        </ul>
+    </blockquote>
+
+    <h3>2.2.2 Mode Comparison</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Mode</th>
+                <th>Authentication</th>
+                <th>Recommendation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>GCM</td>
+                <td>Built-in AEAD</td>
+                <td>✅ Recommended</td>
+            </tr>
+            <tr>
+                <td>CBC</td>
+                <td>Requires separate MAC</td>
+                <td>⚠️ Use with caution</td>
+            </tr>
+            <tr>
+                <td>CTR</td>
+                <td>Requires separate MAC</td>
+                <td>⚠️ Use with caution</td>
+            </tr>
+            <tr>
+                <td>ECB</td>
+                <td>None</td>
+                <td>❌ Never use</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>2.3 Implementation Example</h2>
+
+    <pre><code>// Node.js AES-256-GCM Example
+const crypto = require('crypto');
+
+function encryptAES(plaintext, key) {
+  // Generate random IV (NEVER reuse!)
+  const iv = crypto.randomBytes(16);
+
+  // Create cipher
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+  // Encrypt
+  let ciphertext = cipher.update(plaintext, 'utf8', 'hex');
+  ciphertext += cipher.final('hex');
+
+  // Get authentication tag
+  const authTag = cipher.getAuthTag();
+
+  return { ciphertext, iv, authTag };
+}</code></pre>
+
+    <h2>2.4 ChaCha20-Poly1305</h2>
+
+    <p>ChaCha20-Poly1305 is a modern alternative to AES-GCM:</p>
+
+    <ul>
+        <li><strong>Fast in software:</strong> Doesn't require special hardware</li>
+        <li><strong>Resistant to timing attacks:</strong> Constant-time operations</li>
+        <li><strong>Widely adopted:</strong> TLS 1.3, WireGuard VPN, Signal Protocol</li>
+        <li><strong>Recommended:</strong> When AES hardware acceleration is unavailable</li>
+    </ul>
+
+    <blockquote>
+        <h3>Rule of Thumb</h3>
+        <p>Use AES-256-GCM on systems with AES-NI support (modern Intel/AMD CPUs). Use ChaCha20-Poly1305 on mobile devices and embedded systems.</p>
+    </blockquote>
+
+    <h2>2.5 Chapter Summary</h2>
+
+    <blockquote>
+        <h3>Key Takeaways</h3>
+        <ul>
+            <li>AES-256 is the symmetric encryption standard</li>
+            <li>GCM mode provides both encryption and authentication</li>
+            <li>Never reuse IVs with the same key</li>
+            <li>ECB mode is insecure - never use it</li>
+            <li>ChaCha20-Poly1305 is a great alternative on mobile</li>
+        </ul>
+    </blockquote>
+
+    <h2>2.6 Review Questions</h2>
+
+    <ol>
+        <li>What are the key sizes supported by AES?</li>
+        <li>Why is GCM the recommended mode?</li>
+        <li>What happens if you reuse an IV?</li>
+        <li>When should you use ChaCha20-Poly1305 instead of AES?</li>
+        <li>Why is ECB mode insecure?</li>
+    </ol>
+
+    <h2>2.7 Next Chapter Preview</h2>
+
+    <p>Chapter 3 explores asymmetric encryption, covering RSA, Elliptic Curve Cryptography, and digital signatures for secure key exchange and authentication.</p>
+</body>
+</html>

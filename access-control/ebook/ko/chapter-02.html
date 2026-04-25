@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 접근 제어 모델과 아키텍처 | WIA-ACCESS_CONTROL</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>2장: 접근 제어 모델과 아키텍처</h1>
+
+    <h2>2.1 접근 제어 모델 개요</h2>
+    <p>접근 제어 모델은 시스템이 접근 결정을 내리는 방식을 정의하는 이론적 프레임워크입니다. 각 모델은 서로 다른 보안 요구사항과 운영 환경에 최적화되어 있으며, 현대 시스템에서는 여러 모델을 조합하여 사용하는 경우가 많습니다.</p>
+
+    <div class="highlight">
+        <strong>모델 선택의 중요성:</strong> 잘못된 접근 제어 모델의 선택은 보안 취약점을 만들거나, 과도한 제한으로 업무 효율성을 저해할 수 있습니다. 조직의 규모, 산업 특성, 규제 요구사항을 고려하여 적절한 모델을 선택해야 합니다.
+    </div>
+
+    <h2>2.2 임의적 접근 제어 (DAC)</h2>
+    <p>임의적 접근 제어(Discretionary Access Control)는 리소스 소유자가 다른 사용자에게 접근 권한을 부여하거나 제거할 수 있는 모델입니다. 유닉스/리눅스 파일 시스템이 대표적인 예입니다.</p>
+
+    <h3>2.2.1 DAC의 특징</h3>
+    <ul>
+        <li>리소스 소유자에게 권한 관리 권한 위임</li>
+        <li>유연하고 관리가 간단</li>
+        <li>사용자 간 권한 전이 가능</li>
+        <li>정보 유출 위험 존재</li>
+    </ul>
+
+    <pre><code>// DAC 구현 예시 (Unix 스타일)
+interface DACPermission {
+    owner: string;
+    group: string;
+    permissions: {
+        owner: { read: boolean; write: boolean; execute: boolean };
+        group: { read: boolean; write: boolean; execute: boolean };
+        others: { read: boolean; write: boolean; execute: boolean };
+    };
+}
+
+class DACController {
+    checkAccess(user: User, resource: Resource, action: Action): boolean {
+        const perm = resource.permissions;
+
+        if (user.id === perm.owner) {
+            return perm.permissions.owner[action];
+        } else if (user.groups.includes(perm.group)) {
+            return perm.permissions.group[action];
+        } else {
+            return perm.permissions.others[action];
+        }
+    }
+
+    // 소유자가 권한 변경 가능
+    changePermissions(owner: User, resource: Resource, newPerm: DACPermission): void {
+        if (resource.permissions.owner !== owner.id) {
+            throw new Error('소유자만 권한을 변경할 수 있습니다');
+        }
+        resource.permissions = newPerm;
+    }
+}</code></pre>
+
+    <h2>2.3 강제적 접근 제어 (MAC)</h2>
+    <p>강제적 접근 제어(Mandatory Access Control)는 중앙 기관이 정의한 보안 정책에 따라 접근이 결정됩니다. 사용자나 리소스 소유자가 정책을 변경할 수 없습니다.</p>
+
+    <h3>2.3.1 Bell-LaPadula 모델</h3>
+    <p>기밀성을 중시하는 군사/정부 환경에서 사용되는 모델입니다.</p>
+
+    <table>
+        <tr>
+            <th>규칙</th>
+            <th>설명</th>
+        </tr>
+        <tr>
+            <td>No Read Up (Simple Security)</td>
+            <td>낮은 보안 등급의 주체는 높은 등급의 객체를 읽을 수 없음</td>
+        </tr>
+        <tr>
+            <td>No Write Down (*-Property)</td>
+            <td>높은 보안 등급의 주체는 낮은 등급의 객체에 쓸 수 없음</td>
+        </tr>
+    </table>
+
+    <pre><code>// Bell-LaPadula 모델 구현
+enum SecurityLevel {
+    UNCLASSIFIED = 0,
+    CONFIDENTIAL = 1,
+    SECRET = 2,
+    TOP_SECRET = 3
+}
+
+class BellLaPadula {
+    canRead(subject: Subject, object: Resource): boolean {
+        // No Read Up: 주체의 클리어런스가 객체의 분류 등급 이상이어야 함
+        return subject.clearance >= object.classification;
+    }
+
+    canWrite(subject: Subject, object: Resource): boolean {
+        // No Write Down: 주체의 클리어런스가 객체의 분류 등급 이하여야 함
+        return subject.clearance <= object.classification;
+    }
+
+    checkAccess(subject: Subject, object: Resource, action: Action): boolean {
+        if (action === 'read') {
+            return this.canRead(subject, object);
+        } else if (action === 'write') {
+            return this.canWrite(subject, object);
+        }
+        return false;
+    }
+}</code></pre>
+
+    <h3>2.3.2 Biba 무결성 모델</h3>
+    <p>데이터 무결성을 중시하는 상업 환경에 적합한 모델입니다.</p>
+
+    <div class="highlight">
+        <strong>Biba의 규칙:</strong> Bell-LaPadula와 반대로 "No Read Down" (신뢰할 수 없는 데이터 읽기 금지)과 "No Write Up" (높은 무결성 등급 데이터 수정 금지) 규칙을 적용합니다.
+    </div>
+
+    <h2>2.4 역할 기반 접근 제어 (RBAC)</h2>
+    <p>역할 기반 접근 제어(Role-Based Access Control)는 개별 사용자가 아닌 역할에 권한을 할당하고, 사용자를 역할에 매핑하는 모델입니다. 대규모 조직에서 권한 관리를 단순화합니다.</p>
+
+    <h3>2.4.1 RBAC 핵심 구성요소</h3>
+    <pre><code>// RBAC 핵심 구조
+interface RBACSystem {
+    // 사용자 집합
+    users: Set&lt;User&gt;;
+
+    // 역할 집합
+    roles: Set&lt;Role&gt;;
+
+    // 권한 집합
+    permissions: Set&lt;Permission&gt;;
+
+    // 사용자-역할 매핑
+    userRoleAssignment: Map&lt;User, Set&lt;Role&gt;&gt;;
+
+    // 역할-권한 매핑
+    rolePermissionAssignment: Map&lt;Role, Set&lt;Permission&gt;&gt;;
+
+    // 역할 계층 (선택적)
+    roleHierarchy: Map&lt;Role, Set&lt;Role&gt;&gt;;
+}
+
+class RBACController {
+    // 사용자의 유효 권한 계산
+    getEffectivePermissions(user: User): Set&lt;Permission&gt; {
+        const permissions = new Set&lt;Permission&gt;();
+        const userRoles = this.userRoleAssignment.get(user) || new Set();
+
+        for (const role of userRoles) {
+            // 직접 할당된 권한
+            const rolePerms = this.rolePermissionAssignment.get(role);
+            rolePerms?.forEach(p => permissions.add(p));
+
+            // 역할 계층을 통한 상속된 권한
+            const inheritedRoles = this.getInheritedRoles(role);
+            for (const inheritedRole of inheritedRoles) {
+                const inheritedPerms = this.rolePermissionAssignment.get(inheritedRole);
+                inheritedPerms?.forEach(p => permissions.add(p));
+            }
+        }
+
+        return permissions;
+    }
+
+    checkAccess(user: User, permission: Permission): boolean {
+        const effectivePerms = this.getEffectivePermissions(user);
+        return effectivePerms.has(permission);
+    }
+}</code></pre>
+
+    <h3>2.4.2 RBAC 레벨</h3>
+    <table>
+        <tr>
+            <th>레벨</th>
+            <th>이름</th>
+            <th>특징</th>
+        </tr>
+        <tr>
+            <td>RBAC0</td>
+            <td>Core RBAC</td>
+            <td>기본 사용자-역할-권한 매핑</td>
+        </tr>
+        <tr>
+            <td>RBAC1</td>
+            <td>Hierarchical RBAC</td>
+            <td>역할 계층 지원</td>
+        </tr>
+        <tr>
+            <td>RBAC2</td>
+            <td>Constrained RBAC</td>
+            <td>상호 배타적 역할, 역할 수 제한 등</td>
+        </tr>
+        <tr>
+            <td>RBAC3</td>
+            <td>Symmetric RBAC</td>
+            <td>RBAC1 + RBAC2 결합</td>
+        </tr>
+    </table>
+
+    <h2>2.5 속성 기반 접근 제어 (ABAC)</h2>
+    <p>속성 기반 접근 제어(Attribute-Based Access Control)는 주체, 객체, 환경의 속성을 기반으로 동적인 접근 결정을 내립니다. 가장 유연하고 강력한 모델입니다.</p>
+
+    <pre><code>// ABAC 정책 구현
+interface ABACPolicy {
+    id: string;
+    description: string;
+    target: {
+        subjectAttributes?: AttributeCondition[];
+        resourceAttributes?: AttributeCondition[];
+        actionAttributes?: AttributeCondition[];
+    };
+    condition: Expression;
+    effect: 'permit' | 'deny';
+}
+
+class ABACEngine {
+    policies: ABACPolicy[];
+
+    evaluateAccess(request: AccessRequest): AccessDecision {
+        const context = {
+            subject: request.subject.attributes,
+            resource: request.resource.attributes,
+            action: request.action,
+            environment: {
+                currentTime: new Date(),
+                ipAddress: request.clientIP,
+                deviceType: request.deviceType,
+                location: request.geoLocation
+            }
+        };
+
+        // 모든 적용 가능한 정책 평가
+        const applicablePolicies = this.policies.filter(p =>
+            this.matchesTarget(p.target, context)
+        );
+
+        // 정책 결합 알고리즘 적용
+        return this.combineDecisions(applicablePolicies, context);
+    }
+
+    private evaluateCondition(condition: Expression, context: Context): boolean {
+        // 조건식 평가 (예: subject.department === 'engineering' && time.hour >= 9)
+        return this.expressionEvaluator.evaluate(condition, context);
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>ABAC의 장점:</strong> ABAC는 "오전 9시부터 오후 6시 사이에 회사 네트워크에서 접속한 정규직 엔지니어만 소스 코드에 접근 가능"과 같은 복잡하고 세분화된 정책을 표현할 수 있습니다.
+    </div>
+
+    <h2>2.6 관계 기반 접근 제어 (ReBAC)</h2>
+    <p>관계 기반 접근 제어(Relationship-Based Access Control)는 엔티티 간의 관계를 기반으로 접근을 결정합니다. 소셜 미디어, 협업 도구에서 널리 사용됩니다.</p>
+
+    <pre><code>// ReBAC 구현 (Google Zanzibar 스타일)
+interface Tuple {
+    object: string;      // 리소스 (예: "document:budget-2024")
+    relation: string;    // 관계 (예: "viewer", "editor", "owner")
+    subject: string;     // 사용자 또는 그룹 (예: "user:alice")
+}
+
+class ReBACEngine {
+    tuples: Tuple[];
+
+    // 직접 관계 확인
+    check(object: string, relation: string, subject: string): boolean {
+        // 직접 매칭
+        if (this.tuples.some(t =>
+            t.object === object &&
+            t.relation === relation &&
+            t.subject === subject
+        )) {
+            return true;
+        }
+
+        // 간접 관계 (그룹 멤버십, 관계 상속 등) 확인
+        return this.checkIndirect(object, relation, subject);
+    }
+
+    // 예: viewer는 editor를 포함, editor는 owner를 포함
+    private checkIndirect(object: string, relation: string, subject: string): boolean {
+        const relationHierarchy = {
+            'viewer': ['editor', 'owner'],
+            'editor': ['owner']
+        };
+
+        const higherRelations = relationHierarchy[relation] || [];
+        return higherRelations.some(r => this.check(object, r, subject));
+    }
+}</code></pre>
+
+    <h2>2.7 WIA-ACCESS_CONTROL 아키텍처</h2>
+    <p>WIA-ACCESS_CONTROL 표준은 XACML 기반의 정책 결정 아키텍처를 채택합니다:</p>
+
+    <pre><code>// WIA-ACCESS_CONTROL 아키텍처 구성요소
+const architecture = {
+    PEP: {
+        name: '정책 시행 지점 (Policy Enforcement Point)',
+        role: '접근 요청을 가로채고 PDP의 결정을 시행',
+        location: 'API Gateway, 애플리케이션, 미들웨어'
+    },
+    PDP: {
+        name: '정책 결정 지점 (Policy Decision Point)',
+        role: '정책을 평가하고 접근 결정을 내림',
+        location: '중앙 정책 서버, 분산 평가 엔진'
+    },
+    PAP: {
+        name: '정책 관리 지점 (Policy Administration Point)',
+        role: '정책을 생성, 관리, 배포',
+        location: '관리 콘솔, 정책 저장소'
+    },
+    PIP: {
+        name: '정책 정보 지점 (Policy Information Point)',
+        role: '결정에 필요한 속성 정보 제공',
+        location: '디렉토리 서비스, 데이터베이스, 외부 API'
+    }
+};</code></pre>
+
+    <h2>2.8 모델 선택 가이드</h2>
+    <table>
+        <tr>
+            <th>시나리오</th>
+            <th>권장 모델</th>
+        </tr>
+        <tr>
+            <td>소규모 팀, 간단한 파일 공유</td>
+            <td>DAC</td>
+        </tr>
+        <tr>
+            <td>군사/정부, 고도의 기밀 정보</td>
+            <td>MAC</td>
+        </tr>
+        <tr>
+            <td>중대규모 기업, 명확한 조직 구조</td>
+            <td>RBAC</td>
+        </tr>
+        <tr>
+            <td>복잡한 정책, 동적 환경</td>
+            <td>ABAC</td>
+        </tr>
+        <tr>
+            <td>소셜 플랫폼, 협업 도구</td>
+            <td>ReBAC</td>
+        </tr>
+        <tr>
+            <td>클라우드 네이티브, 마이크로서비스</td>
+            <td>ABAC + ReBAC 하이브리드</td>
+        </tr>
+    </table>
+</body>
+</html>

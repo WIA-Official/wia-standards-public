@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 영향 분석 | WIA-DATA-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        .highlight-box strong { color: #10B981; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .example { background: #0f1729; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; margin: 2rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">4장</div>
+            <h1>영향 분석</h1>
+        </header>
+        <p>영향 분석은 중요한 질문에 답합니다: "이 변경을 하면 무엇이 깨질까요?" 데이터 계보를 활용하여 팀은 다운스트림 의존성을 사전에 식별하고 치명적인 장애가 발생하기 전에 방지할 수 있습니다.</p>
+
+        <h2>영향 분석이란?</h2>
+
+        <p>영향 분석은 계보 그래프를 사용하여 데이터 자산의 모든 다운스트림 소비자를 추적합니다. 테이블, 컬럼 또는 변환을 수정하려는 경우, 영향 분석은 그것에 의존하는 모든 보고서, 대시보드, ML 모델 및 데이터 파이프라인을 보여줍니다.</p>
+
+        <div class="highlight-box">
+            <strong>핵심 원칙:</strong> 새벽 3시 프로덕션 중단 중에 발견하는 것보다 계획 단계에서 손상 변경을 발견하는 것이 좋습니다.
+        </div>
+
+        <h2>분석할 변경 유형</h2>
+
+        <h3>1. 스키마 변경</h3>
+        <ul>
+            <li><strong>컬럼 이름 변경:</strong> 모든 다운스트림 참조 업데이트</li>
+            <li><strong>컬럼 삭제:</strong> 무엇이 깨질지 식별</li>
+            <li><strong>데이터 타입 변경:</strong> 호환되지 않는 사용 찾기</li>
+            <li><strong>테이블 이름 변경/이동:</strong> 모든 소비자 업데이트</li>
+        </ul>
+
+        <h3>2. 비즈니스 로직 변경</h3>
+        <ul>
+            <li>SQL 변환 로직 수정</li>
+            <li>집계 방법 변경</li>
+            <li>계산 공식 업데이트</li>
+            <li>필터링 조건 변경</li>
+        </ul>
+
+        <h3>3. 인프라 변경</h3>
+        <ul>
+            <li>데이터 웨어하우스 마이그레이션</li>
+            <li>데이터베이스 엔진 업그레이드</li>
+            <li>API 버전 변경</li>
+            <li>스토리지 형식 변환</li>
+        </ul>
+
+        <h2>영향 분석 수행</h2>
+
+        <h3>1단계: 변경 식별</h3>
+        <pre><code>대상: warehouse.customers.email_address
+변경 유형: 컬럼 이름 변경
+새 이름: contact_email
+이유: 표준화</code></pre>
+
+        <h3>2단계: 계보 그래프 쿼리</h3>
+        <p>업스트림 및 다운스트림 의존성을 조회합니다.</p>
+
+        <h3>3단계: 결과 분석</h3>
+        <pre><code>23개의 다운스트림 의존성 발견:
+
+직접 의존성 (Depth 1):
+  ✓ analytics.customer_summary.email
+  ✓ reports.marketing_list.contact_email
+  ✓ ml_features.customer_attributes.email_domain
+
+간접 의존성 (Depth 2):
+  ⚠ dashboards.executive_overview
+  ⚠ ml_models.churn_predictor
+
+중요 의존성:
+  ⛔ real_time_api.customer_lookup (SLA: <100ms)</code></pre>
+
+        <h3>4단계: 위험 평가</h3>
+        <ul>
+            <li><strong>높은 위험:</strong> 실시간 API, 경영진 대시보드</li>
+            <li><strong>중간 위험:</strong> 일일 보고서, ML 모델</li>
+            <li><strong>낮은 위험:</strong> 보관된 데이터셋, 탐색적 노트북</li>
+        </ul>
+
+        <h3>5단계: 마이그레이션 계획</h3>
+        <ol>
+            <li>이전 컬럼을 유지하면서 새 컬럼 추가 (폐기 기간)</li>
+            <li>먼저 중요하지 않은 소비자 업데이트</li>
+            <li>유지 관리 기간 동안 중요 시스템 업데이트</li>
+            <li>검증 기간 후 이전 컬럼 제거</li>
+        </ol>
+
+        <h2>자동화된 영향 분석</h2>
+
+        <p>CI/CD 파이프라인에 영향 분석을 통합하여 배포 전에 손상 변경을 자동으로 감지할 수 있습니다.</p>
+
+        <h2>6. 다운스트림 종속성 관리</h2>
+
+        <p>효과적인 영향 분석의 핵심은 다운스트림 종속성을 체계적으로 관리하는 것입니다.</p>
+
+        <h3>종속성 분류</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0;">
+            <thead>
+                <tr style="background: #1e293b; border-bottom: 2px solid #10B981;">
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">종속성 유형</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">특징</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">우선순위</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">직접 종속성</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">즉시 다운스트림 소비자, 1단계 떨어짐</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">높음</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">간접 종속성</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">2단계 이상 떨어진 다운스트림</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">중간</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">순환 종속성</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">데이터가 다시 업스트림으로 흐름</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">위험 - 리팩토링 필요</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">약한 종속성</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">선택적 또는 조건부 사용</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">낮음</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem; color: #e2e8f0; font-weight: 600;">강한 종속성</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">필수적, 항상 필요함</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">매우 높음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>종속성 그래프 시각화</h3>
+        <p>영향 분석 결과를 시각화하면 복잡한 종속성을 이해하기 쉽습니다:</p>
+
+        <div class="example">
+            <div class="example-title">종속성 그래프 표현</div>
+            <pre><code>원본 테이블: warehouse.products
+│
+├─ [DEPTH 1] analytics.product_summary
+│  ├─ [DEPTH 2] dashboards.sales_overview (HIGH PRIORITY)
+│  ├─ [DEPTH 2] reports.monthly_revenue (HIGH PRIORITY)
+│  └─ [DEPTH 2] ml_models.demand_forecast (MEDIUM PRIORITY)
+│
+├─ [DEPTH 1] exports.product_catalog_api (CRITICAL - SLA: 99.9%)
+│  ├─ [DEPTH 2] mobile_app.product_listing
+│  └─ [DEPTH 2] website.search_results
+│
+└─ [DEPTH 1] staging.product_enrichment
+   └─ [DEPTH 2] warehouse.products_360 (CIRCULAR - WARNING!)
+
+영향 요약:
+- 직접 소비자: 3개
+- 간접 소비자: 5개
+- 중요 시스템: 2개
+- 순환 종속성: 1개 (해결 필요)</code></pre>
+        </div>
+
+        <h2>7. 비용 분석 및 위험 평가</h2>
+
+        <p>변경의 영향을 평가할 때는 기술적 영향뿐만 아니라 비즈니스 비용과 위험도 고려해야 합니다.</p>
+
+        <h3>영향 비용 계산</h3>
+        <p>각 다운스트림 종속성에 대한 변경 비용을 추정합니다:</p>
+
+        <div class="example">
+            <div class="example-title">비용 분석 예시</div>
+            <pre><code>변경: customers.email → customers.contact_email
+
+영향받는 자산별 비용:
+
+1. analytics.customer_summary
+   - 수정 시간: 2시간 (SQL 업데이트)
+   - 테스트 시간: 4시간
+   - 배포 창: 1시간
+   - 총 비용: 7 엔지니어-시간
+   - 비즈니스 영향: 낮음 (일일 배치)
+
+2. real_time_api.customer_lookup
+   - 수정 시간: 4시간 (API 코드, 스키마)
+   - 테스트 시간: 8시간 (통합 테스트)
+   - 배포 창: 30분 (블루-그린 배포)
+   - 다운타임 위험: 5분
+   - 총 비용: 12.5 엔지니어-시간
+   - 비즈니스 영향: 높음 (실시간 서비스)
+   - SLA 위험: $10,000/시간 잠재적 수익 손실
+
+3. dashboards.executive_overview
+   - 수정 시간: 1시간 (Tableau 업데이트)
+   - 테스트 시간: 2시간
+   - 총 비용: 3 엔지니어-시간
+   - 비즈니스 영향: 중간 (경영진 가시성)
+
+전체 변경 비용 추정:
+- 총 엔지니어-시간: 22.5시간
+- 조정 오버헤드: 4시간
+- 위험 버퍼: 8시간
+- **총 프로젝트 비용: 34.5 엔지니어-시간 (4.3 인-일)**</code></pre>
+        </div>
+
+        <h3>위험 매트릭스</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0;">
+            <thead>
+                <tr style="background: #1e293b; border-bottom: 2px solid #10B981;">
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">위험 수준</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">조건</th>
+                    <th style="padding: 1rem; text-align: left; color: #10B981;">필요 조치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #10B981; font-weight: 600;">낮음</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">&lt; 5개 종속성, 중요하지 않은 시스템</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">표준 검토, 팀 승인</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #fbbf24; font-weight: 600;">중간</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">5-20개 종속성, 일부 중요 시스템</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">영향 분석 보고서, 이해관계자 검토</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td style="padding: 0.75rem; color: #f97316; font-weight: 600;">높음</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">20-50개 종속성, 여러 중요 시스템</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">상세 마이그레이션 계획, 단계별 롤아웃</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem; color: #ef4444; font-weight: 600;">치명적</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">&gt; 50개 종속성, 핵심 인프라</td>
+                    <td style="padding: 0.75rem; color: #cbd5e1;">경영진 승인, 전담 프로젝트 팀, 롤백 계획</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>8. CI/CD 파이프라인 통합</h2>
+
+        <p>영향 분석을 CI/CD 프로세스에 통합하면 배포 전에 자동으로 손상 변경을 감지할 수 있습니다.</p>
+
+        <div class="example">
+            <div class="example-title">GitHub Actions 영향 분석 워크플로우</div>
+            <pre><code>name: Data Impact Analysis
+
+on:
+  pull_request:
+    paths:
+      - 'sql/**'
+      - 'dbt/**'
+      - 'airflow/**'
+
+jobs:
+  impact-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Extract Changed Tables
+        id: changes
+        run: |
+          # PR에서 변경된 테이블 식별
+          python scripts/extract_schema_changes.py > changes.json
+
+      - name: Run Impact Analysis
+        id: impact
+        run: |
+          # 계보 API를 통해 영향 분석 실행
+          curl -X POST $LINEAGE_API/analyze \
+            -H "Content-Type: application/json" \
+            -d @changes.json > impact_report.json
+
+      - name: Evaluate Impact
+        run: |
+          # 영향이 임계값을 초과하면 실패
+          python scripts/evaluate_impact.py impact_report.json
+
+      - name: Comment on PR
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const impact = require('./impact_report.json');
+            const comment = `
+            ## 영향 분석 결과
+
+            **변경된 테이블:** ${impact.changedTables.join(', ')}
+
+            **영향받는 자산:**
+            - 직접 종속성: ${impact.directDependencies}개
+            - 간접 종속성: ${impact.indirectDependencies}개
+            - 중요 시스템: ${impact.criticalSystems}개
+
+            **위험 수준:** ${impact.riskLevel}
+
+            ${impact.riskLevel === 'HIGH' ? '⚠️ 이 변경은 높은 영향을 미칩니다. 승인이 필요합니다.' : '✅ 영향이 허용 범위 내입니다.'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });</code></pre>
+        </div>
+
+        <h2>9. 변경 전파 시뮬레이션</h2>
+
+        <p>실제로 변경을 적용하기 전에 영향을 시뮬레이션할 수 있습니다.</p>
+
+        <h3>What-If 분석</h3>
+        <div class="example">
+            <div class="example-title">변경 시뮬레이션 API</div>
+            <pre><code># Python 클라이언트로 시뮬레이션 실행
+from lineage_client import LineageAPI
+
+api = LineageAPI(endpoint="https://lineage.company.com")
+
+# 시나리오 1: 컬럼 삭제
+simulation1 = api.simulate_change(
+    change_type="DROP_COLUMN",
+    target="warehouse.customers.deprecated_field",
+    options={
+        "analyze_depth": 5,
+        "include_cost_estimate": True
+    }
+)
+
+print(f"영향받는 자산: {simulation1.affected_count}")
+print(f"예상 비용: {simulation1.cost_hours} 엔지니어-시간")
+print(f"위험 수준: {simulation1.risk_level}")
+
+# 시나리오 2: 테이블 이름 변경
+simulation2 = api.simulate_change(
+    change_type="RENAME_TABLE",
+    target="warehouse.old_table_name",
+    new_name="warehouse.new_table_name",
+    options={
+        "migration_strategy": "DUAL_WRITE",  # 이중 쓰기 기간
+        "deprecation_days": 90
+    }
+)
+
+# 마이그레이션 타임라인 생성
+timeline = simulation2.generate_migration_plan()
+for phase in timeline:
+    print(f"{phase.date}: {phase.action}")
+
+# 예상 출력:
+# 2025-01-26: 새 테이블 생성, 이중 쓰기 시작
+# 2025-02-02: 비중요 소비자 마이그레이션
+# 2025-02-16: 중요 소비자 마이그레이션
+# 2025-04-26: 이전 테이블 폐기</code></pre>
+        </div>
+
+        <h2>10. 실시간 영향 모니터링</h2>
+
+        <p>변경을 배포한 후에는 실제 영향을 모니터링하여 예상과 일치하는지 확인합니다.</p>
+
+        <div class="example">
+            <div class="example-title">변경 모니터링 대시보드</div>
+            <pre><code>변경 ID: CHG-2025-0126-001
+변경 유형: 컬럼 추가
+대상: warehouse.customers.loyalty_tier
+배포 시간: 2025-01-26 14:30 UTC
+
+실시간 영향 추적:
+┌─────────────────────────────────────────┐
+│ 예상 영향    vs    실제 영향              │
+├─────────────────────────────────────────┤
+│ 23개 자산          22개 자산 영향받음     │
+│ 0건 오류           1건 경고 (쿼리 타임아웃)│
+│ 5분 예상 다운타임   3분 실제 다운타임      │
+│ 0건 SLA 위반       0건 SLA 위반           │
+└─────────────────────────────────────────┘
+
+영향받은 자산:
+✓ analytics.customer_summary - 성공 (2초)
+✓ reports.marketing_list - 성공 (5초)
+⚠ ml_features.customer_360 - 경고 (타임아웃, 재시도 성공)
+✓ dashboards.executive_overview - 성공 (1초)
+✗ legacy_report.monthly - 실패 (오래된 스키마, 예상됨)
+
+권장 조치:
+1. ml_features.customer_360 쿼리 최적화 검토
+2. legacy_report.monthly 폐기 프로세스 진행</code></pre>
+        </div>
+
+        <h2>11. 모범 사례</h2>
+
+        <ol>
+            <li><strong>영향 분석을 일찍 실행:</strong> 배포 직전이 아닌 설계 중에</li>
+            <li><strong>가능한 자동화:</strong> CI/CD 파이프라인과 통합</li>
+            <li><strong>임계값 설정:</strong> 허용 가능한 영향 수준 정의</li>
+            <li><strong>승인 요구:</strong> 영향이 큰 변경은 이해관계자 승인 필요</li>
+            <li><strong>결정 문서화:</strong> 변경이 허용 가능한 이유 기록</li>
+            <li><strong>롤백 계획:</strong> 항상 변경을 되돌릴 방법 마련</li>
+            <li><strong>사전 커뮤니케이션:</strong> 영향받는 팀에 미리 알림</li>
+            <li><strong>단계적 롤아웃:</strong> 대규모 변경은 여러 단계로 분할</li>
+            <li><strong>모니터링 설정:</strong> 배포 후 실제 영향 추적</li>
+            <li><strong>사후 분석:</strong> 예상과 실제 비교하여 학습</li>
+        </ol>
+
+        <h2>12. 장 요약</h2>
+
+        <p>이 장에서는 영향 분석의 중요성과 실제 적용 방법을 다루었습니다:</p>
+
+        <ul>
+            <li><strong>영향 분석의 목적:</strong> 변경 전에 잠재적 문제 식별</li>
+            <li><strong>분석 프로세스:</strong> 변경 식별, 계보 쿼리, 위험 평가, 마이그레이션 계획</li>
+            <li><strong>종속성 관리:</strong> 직접/간접, 강한/약한 종속성 분류</li>
+            <li><strong>비용 분석:</strong> 엔지니어 시간과 비즈니스 영향 추정</li>
+            <li><strong>자동화:</strong> CI/CD 파이프라인에 영향 분석 통합</li>
+            <li><strong>시뮬레이션:</strong> 실제 변경 전 What-If 분석</li>
+            <li><strong>모니터링:</strong> 배포 후 실시간 영향 추적</li>
+        </ul>
+
+        <p>영향 분석은 사전 예방적 데이터 관리의 핵심입니다. 적절히 구현하면 프로덕션 중단을 방지하고, 팀 간 조정을 개선하며, 데이터 시스템의 안정성을 높일 수 있습니다.</p>
+
+        <h2>13. 복습 질문</h2>
+
+        <ol>
+            <li><strong>영향 분석의 5단계 프로세스를 설명하세요.</strong>
+                <br><em>답변 힌트: 변경 식별, 계보 쿼리, 결과 분석, 위험 평가, 마이그레이션 계획</em>
+            </li>
+            <li><strong>직접 종속성과 간접 종속성의 차이는 무엇인가요? 각각을 어떻게 관리해야 하나요?</strong>
+                <br><em>답변 힌트: 깊이, 우선순위, 영향 범위 고려</em>
+            </li>
+            <li><strong>CI/CD 파이프라인에 영향 분석을 통합하는 이점은 무엇인가요?</strong>
+                <br><em>답변 힌트: 자동화, 조기 발견, 일관성</em>
+            </li>
+            <li><strong>변경 비용을 계산할 때 고려해야 할 요소는 무엇인가요?</strong>
+                <br><em>답변 힌트: 엔지니어 시간, 테스트, 비즈니스 영향, SLA 위험</em>
+            </li>
+            <li><strong>순환 종속성이 발견되면 어떻게 해야 하나요?</strong>
+                <br><em>답변 힌트: 위험 식별, 리팩토링 계획, 아키텍처 개선</em>
+            </li>
+        </ol>
+
+        <div class="highlight-box">
+            <strong>핵심 요점:</strong> 영향 분석은 데이터 계보를 문서에서 사전 위험 관리 도구로 변환합니다. 반응적 소방 활동과 계획되고 조정된 변경의 차이입니다.
+        </div>
+
+        </div>
+</body>
+</html>

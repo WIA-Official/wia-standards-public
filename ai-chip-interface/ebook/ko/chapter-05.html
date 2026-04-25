@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>5장: 커널 컴파일 및 최적화 | WIA-AI-011</title>
+    <style>
+        body { font-family: 'Noto Sans KR'; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { font-size: 2.5em; margin: 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        .summary, .review-questions { padding: 30px; border-radius: 8px; margin: 40px 0; }
+        .summary { background: #f0fdf4; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #10B981; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="color: #10B981; font-weight: bold; border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px;">
+            <div>5장</div><h1>커널 컴파일 및 최적화</h1>
+        </div>
+
+        <h2>5.1 컴파일 파이프라인 개요</h2>
+        <p>고수준 작업을 효율적인 가속기 코드로 변환하려면 정교한 컴파일 파이프라인이 필요합니다. WIA-AI-011은 프런트엔드 파싱, IR 생성, 최적화 패스, 백엔드 코드 생성 및 디바이스별 어셈블리를 포함하는 다단계 컴파일 프로세스를 정의합니다.</p>
+
+        <pre>// WIA-AI-011 컴파일 파이프라인
+┌─────────────┐
+│  고수준 코드 │ (Python, C++, WIA DSL)
+└──────┬──────┘
+       │ 프런트엔드 파싱
+       ↓
+┌─────────────┐
+│  고수준 IR   │ (텐서 연산, 제어 흐름)
+└──────┬──────┘
+       │ 최적화 패스 (연산자 융합, 상수 전파)
+       ↓
+┌─────────────┐
+│  중간 IR     │ (디바이스 독립적)
+└──────┬──────┘
+       │ 백엔드 선택 (GPU, TPU, NPU)
+       ↓
+┌─────────────┐
+│  저수준 IR   │ (디바이스별 명령어)
+└──────┬──────┘
+       │ 코드 생성 & 최적화
+       ↓
+┌─────────────┐
+│ 기계 코드/PTX│
+└─────────────┘</pre>
+
+        <h3>5.1.1 프런트엔드: 소스에서 IR로</h3>
+        <pre>// WIA DSL 예제
+kernel matmul_kernel(
+    input A: tensor<float, [M, K]>,
+    input B: tensor<float, [K, N]>,
+    output C: tensor<float, [M, N]>
+) {
+    // 고수준 텐서 표기법
+    C = A @ B;  // 행렬 곱셈
+}
+
+// 컴파일러가 생성하는 고수준 IR
+func @matmul_kernel(
+    %A: tensor<f32, [M, K]>,
+    %B: tensor<f32, [K, N]>
+) -> tensor<f32, [M, N]> {
+    %C = tensor.matmul %A, %B : (tensor<f32, [M, K]>, tensor<f32, [K, N]>)
+                                -> tensor<f32, [M, N]>
+    return %C
+}</pre>
+
+        <h2>5.2 중간 표현 (IR) 설계</h2>
+        <p>잘 설계된 IR은 하드웨어 세부 정보를 추상화하면서 이식 가능한 최적화를 가능하게 합니다. WIA-AI-011은 다중 레벨 IR 접근 방식을 채택합니다.</p>
+
+        <h3>5.2.1 SSA 형식과 제어 흐름</h3>
+        <pre>// SSA (Static Single Assignment) 형식
+func @forward_pass(%input: tensor<f32, [N, C, H, W]>) -> tensor<f32, [N, 10]> {
+    // 각 값은 정확히 한 번만 할당
+    %0 = conv2d(%input, %weight1)       // 컨볼루션
+    %1 = batch_norm(%0, %bn1_params)    // 배치 정규화
+    %2 = relu(%1)                       // 활성화
+    %3 = max_pool(%2, kernel=2)         // 풀링
+    %4 = conv2d(%3, %weight2)           // 두 번째 레이어
+    %5 = batch_norm(%4, %bn2_params)
+    %6 = relu(%5)
+    %7 = flatten(%6)                    // 평탄화
+    %8 = matmul(%7, %fc_weight)         // 완전 연결
+    %9 = softmax(%8)                    // 출력
+    return %9
+}
+
+// 조건부 실행
+func @conditional_compute(%x: tensor<f32>, %threshold: f32) {
+    %norm = reduce_sum(abs(%x))
+
+    // 제어 흐름
+    cond_br %norm > %threshold, ^compute, ^skip
+
+^compute:
+    %result = expensive_operation(%x)
+    br ^exit(%result)
+
+^skip:
+    br ^exit(%x)
+
+^exit(%final: tensor<f32>):
+    return %final
+}</pre>
+
+        <h2>5.3 연산자 융합 (Operator Fusion)</h2>
+        <p>여러 작업을 단일 커널로 융합하면 메모리 트래픽과 시작 오버헤드가 줄어듭니다.</p>
+
+        <pre>// 융합 전: 3개의 별도 커널
+%0 = conv2d(%input, %weight)    // 커널 1: 컨볼루션
+%1 = add(%0, %bias)              // 커널 2: 바이어스 추가
+%2 = relu(%1)                    // 커널 3: 활성화
+
+// 문제점:
+// - 3번의 글로벌 메모리 쓰기/읽기
+// - 3번의 커널 시작 오버헤드
+
+// 융합 후: 1개의 커널
+%result = fused_conv_bias_relu(%input, %weight, %bias)
+
+// 이점:
+// - 1번의 글로벌 메모리 쓰기
+// - 1번의 커널 시작
+// - 중간 결과가 레지스터에 유지
+
+// 융합 패턴 인식
+pattern ConvBiasRelu {
+    match:
+        %conv = conv2d(%input, %weight)
+        %bias_add = add(%conv, %bias)
+        %output = relu(%bias_add)
+
+    rewrite:
+        %output = fused_conv_bias_relu(%input, %weight, %bias)
+}</pre>
+
+        <h3>5.3.1 고급 융합 전략</h3>
+        <pre>// 수직 융합: 프로듀서-컨슈머 체인
+%a = op1(%input)
+%b = op2(%a)
+%c = op3(%b)
+// → fused_op123(%input)
+
+// 수평 융합: 독립적 연산 병합
+%x = op_a(%input1)
+%y = op_b(%input2)
+// → fused_op_ab(%input1, %input2)
+
+// 융합 가능성 분석
+bool can_fuse(Operation* producer, Operation* consumer) {
+    // 1. 메모리 풋프린트 확인
+    if (intermediate_size(producer) > register_capacity()) {
+        return false;  // 레지스터에 맞지 않음
+    }
+
+    // 2. 데이터 의존성 확인
+    if (has_other_consumers(producer)) {
+        return false;  // 다른 소비자가 중간 결과 필요
+    }
+
+    // 3. 융합 이득 추정
+    float benefit = saved_memory_bandwidth(producer, consumer);
+    float cost = increased_register_pressure();
+
+    return benefit > cost * 1.5;  // 50% 이상 이득 필요
+}</pre>
+
+        <h2>5.4 자동 튜닝 및 커널 선택</h2>
+        <p>최적의 커널 매개변수는 문제 크기, 데이터 레이아웃 및 하드웨어 특성에 따라 다릅니다.</p>
+
+        <pre>// 행렬 곱셈 커널 구성 공간
+struct MatmulConfig {
+    int tile_M;        // 16, 32, 64, 128
+    int tile_N;        // 16, 32, 64, 128
+    int tile_K;        // 8, 16, 32
+    int thread_M;      // 4, 8, 16
+    int thread_N;      // 4, 8, 16
+    int warp_M;        // 2, 4
+    int warp_N;        // 2, 4
+    bool use_tensor_cores;  // true, false
+};
+
+// 자동 튜닝 프로세스
+class AutoTuner {
+    vector<MatmulConfig> search_space;
+
+    MatmulConfig tune(int M, int N, int K) {
+        // 1. 검색 공간 생성
+        generate_search_space();
+
+        // 2. 유효하지 않은 구성 제거
+        prune_invalid_configs(M, N, K);
+
+        // 3. 성능 모델로 후보 필터링
+        auto candidates = filter_by_model(search_space, M, N, K);
+
+        // 4. 상위 K개 구성 벤치마크
+        MatmulConfig best_config;
+        float best_time = INFINITY;
+
+        for (auto& config : candidates) {
+            auto kernel = compile_kernel(config);
+            float time = benchmark(kernel, M, N, K, num_runs=100);
+
+            if (time < best_time) {
+                best_time = time;
+                best_config = config;
+            }
+        }
+
+        return best_config;
+    }
+
+    // 성능 모델 (기계 학습 기반)
+    float predict_performance(MatmulConfig& config, int M, int N, int K) {
+        // GBT 모델로 성능 예측
+        float features[] = {
+            M, N, K,
+            config.tile_M, config.tile_N, config.tile_K,
+            config.thread_M, config.thread_N,
+            // ... 더 많은 특성들
+        };
+        return ml_model.predict(features);
+    }
+};</pre>
+
+        <h2>5.5 메모리 액세스 최적화</h2>
+        <p>메모리 대역폭은 종종 컴퓨팅 처리량보다 성능을 더 많이 제한합니다.</p>
+
+        <h3>5.5.1 타일링 (Tiling)</h3>
+        <pre>// 타일링 전: 캐시 비효율적
+for (int i = 0; i < M; i++) {
+    for (int j = 0; j < N; j++) {
+        float sum = 0;
+        for (int k = 0; k < K; k++) {
+            sum += A[i][k] * B[k][j];  // B 접근이 스트라이드됨
+        }
+        C[i][j] = sum;
+    }
+}
+
+// 타일링 후: 캐시 친화적
+#define TILE 32
+for (int ii = 0; ii < M; ii += TILE) {
+    for (int jj = 0; jj < N; jj += TILE) {
+        // 타일을 캐시로 로드
+        for (int i = ii; i < min(ii + TILE, M); i++) {
+            for (int j = jj; j < min(jj + TILE, N); j++) {
+                float sum = 0;
+                for (int kk = 0; kk < K; kk += TILE) {
+                    for (int k = kk; k < min(kk + TILE, K); k++) {
+                        sum += A[i][k] * B[k][j];
+                    }
+                }
+                C[i][j] = sum;
+            }
+        }
+    }
+}
+
+// 3단계 타일링 (레지스터, 공유 메모리, 글로벌 메모리)
+__kernel void optimized_matmul() {
+    // 1. 글로벌 → 공유 메모리 (타일 크기: 128x128)
+    __local float tile_A[128][128];
+    __local float tile_B[128][128];
+
+    // 2. 공유 메모리 → 레지스터 (타일 크기: 8x8)
+    float reg_A[8];
+    float reg_B[8];
+    float reg_C[8][8] = {0};  // 누적기
+
+    // 계산
+    for (int k_tile = 0; k_tile < K; k_tile += 128) {
+        load_tile_to_shared(tile_A, tile_B, k_tile);
+        barrier();
+
+        for (int k = 0; k < 128; k += 8) {
+            load_tile_to_registers(reg_A, reg_B, tile_A, tile_B, k);
+
+            // 레지스터에서 행렬 곱셈
+            for (int i = 0; i < 8; i++) {
+                for (int j = 0; j < 8; j++) {
+                    reg_C[i][j] += reg_A[i] * reg_B[j];
+                }
+            }
+        }
+    }
+}</pre>
+
+        <h3>5.5.2 프리페칭 (Prefetching)</h3>
+        <pre>// 소프트웨어 프리페칭
+__kernel void prefetching_example(__global float* data, int N) {
+    int gid = get_global_id(0);
+
+    // 다음 반복의 데이터 미리 로드
+    float next_value = data[gid + 32];  // 32워프 앞서 프리페치
+
+    for (int i = gid; i < N; i += get_global_size(0)) {
+        float current = next_value;  // 프리페치된 값 사용
+
+        // 다음 값 프리페치
+        if (i + get_global_size(0) < N) {
+            next_value = data[i + get_global_size(0)];
+        }
+
+        // 계산
+        float result = compute(current);
+        data[i] = result;
+    }
+}</pre>
+
+        <h2>5.6 명령어 수준 병렬성 (ILP)</h2>
+        <p>현대 가속기는 여러 명령어를 동시에 실행합니다.</p>
+
+        <pre>// 루프 언롤링
+// 언롤링 전
+for (int i = 0; i < N; i++) {
+    c[i] = a[i] + b[i];
+}
+
+// 4배 언롤링
+for (int i = 0; i < N; i += 4) {
+    c[i+0] = a[i+0] + b[i+0];  // 독립적 - 병렬 실행 가능
+    c[i+1] = a[i+1] + b[i+1];
+    c[i+2] = a[i+2] + b[i+2];
+    c[i+3] = a[i+3] + b[i+3];
+}
+
+// 소프트웨어 파이프라이닝
+void software_pipelining() {
+    // 파이프라인 시작 (프롤로그)
+    load(chunk_0);
+
+    for (int i = 1; i < N; i++) {
+        load(chunk_i);         // 다음 청크 로드
+        compute(chunk_{i-1});  // 이전 청크 계산 (중복!)
+
+        // 로드와 계산이 파이프라인됨
+    }
+
+    // 파이프라인 종료 (에필로그)
+    compute(chunk_{N-1});
+}
+
+// 의존성 체인 분리
+// 나쁨: 긴 의존성 체인
+float sum = 0;
+for (int i = 0; i < N; i++) {
+    sum += array[i];  // sum에 의존, 순차적
+}
+
+// 좋음: 독립적 누적기
+float sum0 = 0, sum1 = 0, sum2 = 0, sum3 = 0;
+for (int i = 0; i < N; i += 4) {
+    sum0 += array[i+0];  // 4개 누적기가 독립적
+    sum1 += array[i+1];  // 병렬 실행 가능
+    sum2 += array[i+2];
+    sum3 += array[i+3];
+}
+float sum = sum0 + sum1 + sum2 + sum3;</pre>
+
+        <h2>5.7 양자화 및 혼합 정밀도</h2>
+        <p>낮은 정밀도(INT8, FP16)는 더 빠른 계산과 감소된 메모리 사용을 가능하게 합니다.</p>
+
+        <pre>// 혼합 정밀도 훈련
+void mixed_precision_training() {
+    // 1. 모델 가중치를 FP16으로 변환
+    half* fp16_weights = convert_to_fp16(fp32_weights);
+
+    // 2. FP16으로 순전파
+    half* fp16_activations = forward_pass_fp16(fp16_weights, input);
+
+    // 3. FP32로 손실 계산 (수치 안정성)
+    float loss = compute_loss_fp32(fp16_activations, labels);
+
+    // 4. FP16으로 역전파
+    half* fp16_gradients = backward_pass_fp16(fp16_activations);
+
+    // 5. FP32 마스터 가중치 업데이트
+    for (int i = 0; i < num_params; i++) {
+        fp32_weights[i] -= learning_rate * float(fp16_gradients[i]);
+        fp16_weights[i] = half(fp32_weights[i]);  // 다시 FP16으로
+    }
+}
+
+// INT8 양자화 인식 훈련
+void quantization_aware_training() {
+    // 순전파 중 가짜 양자화 (fake quantization)
+    Tensor forward_with_fake_quant(Tensor x, QuantParams params) {
+        // 양자화 시뮬레이션
+        float scale = params.scale;
+        int zero_point = params.zero_point;
+
+        // FP32 → INT8 → FP32 (그래디언트 흐름 유지)
+        Tensor quantized = round(x / scale) + zero_point;
+        quantized = clamp(quantized, -128, 127);
+        Tensor dequantized = (quantized - zero_point) * scale;
+
+        return dequantized;
+    }
+
+    // 추론 시 실제 INT8 사용
+    int8_t* quantized_weights = quantize_to_int8(trained_weights, params);
+}</pre>
+
+        <h2>5.8 백엔드 코드 생성</h2>
+        <p>백엔드는 최적화된 IR을 디바이스별 어셈블리 또는 기계 코드로 변환합니다.</p>
+
+        <pre>// GPU 백엔드 (SIMT 모델)
+// IR:
+func @vector_add(%a: tensor<1024, f32>, %b: tensor<1024, f32>)
+    -> tensor<1024, f32>
+
+// 생성된 PTX (NVIDIA GPU):
+.entry vector_add_kernel (
+    .param .u64 ptr_a,
+    .param .u64 ptr_b,
+    .param .u64 ptr_c
+) {
+    // 스레드 인덱스 계산
+    mov.u32 %tid, %tid.x;
+    mov.u32 %ntid, %ntid.x;
+    mov.u32 %ctaid, %ctaid.x;
+    mad.lo.u32 %r0, %ctaid, %ntid, %tid;
+
+    // 데이터 로드
+    ld.global.f32 %f0, [ptr_a + %r0*4];
+    ld.global.f32 %f1, [ptr_b + %r0*4];
+
+    // 계산
+    add.f32 %f2, %f0, %f1;
+
+    // 저장
+    st.global.f32 [ptr_c + %r0*4], %f2;
+    ret;
+}
+
+// TPU 백엔드 (시스톨릭 어레이)
+// 행렬 곱셈을 시스톨릭 어레이 명령어로 변환
+IR: C = matmul(A, B)
+
+TPU Assembly:
+    // 가중치를 어레이로 로드
+    load_weights A, weight_buffer
+
+    // 입력 스트림
+    stream_input B, input_buffer
+
+    // 시스톨릭 실행 (128x128 어레이)
+    systolic_execute 128x128
+
+    // 결과 저장
+    store_output C, output_buffer</pre>
+
+        <h2>5.9 JIT 컴파일 및 캐싱</h2>
+        <p>JIT(Just-In-Time) 컴파일은 실제 입력 형상 및 속성을 기반으로 런타임 특수화를 가능하게 합니다.</p>
+
+        <pre>// JIT 컴파일 캐시
+class JITCache {
+    unordered_map<string, CompiledKernel*> cache;
+
+    CompiledKernel* get_or_compile(
+        Operation* op,
+        vector<int> input_shapes,
+        vector<DataType> dtypes
+    ) {
+        // 1. 캐시 키 생성
+        string key = generate_cache_key(op, input_shapes, dtypes);
+
+        // 2. 캐시 조회
+        if (cache.find(key) != cache.end()) {
+            return cache[key];  // 캐시 적중
+        }
+
+        // 3. 컴파일 (캐시 미스)
+        auto start = high_resolution_clock::now();
+        CompiledKernel* kernel = compile_kernel(op, input_shapes, dtypes);
+        auto compile_time = duration_cast<milliseconds>(
+            high_resolution_clock::now() - start
+        ).count();
+
+        printf("JIT 컴파일: %s (%.1f ms)\n", key.c_str(), compile_time);
+
+        // 4. 캐시에 저장
+        cache[key] = kernel;
+
+        // 5. 디스크에 영구 저장
+        save_to_disk(key, kernel);
+
+        return kernel;
+    }
+
+    string generate_cache_key(Operation* op, ...) {
+        // SHA256(operation_type + shapes + dtypes + compiler_flags)
+        return sha256(serialize(op, input_shapes, dtypes, flags));
+    }
+};</pre>
+
+        <h2>5.10 성능 프로파일링 및 분석</h2>
+        <p>최적화 노력이 집중되어야 할 곳을 이해하려면 상세한 프로파일링이 필요합니다.</p>
+
+        <pre>// 루프라인 분석
+struct LooplineMetrics {
+    float arithmetic_intensity;  // FLOP / Byte
+    float peak_flops;            // 이론적 최대 FLOPS
+    float peak_bandwidth;        // 이론적 최대 대역폭
+    float measured_flops;        // 실제 FLOPS
+    float measured_bandwidth;    // 실제 대역폭
+};
+
+void roofline_analysis(Kernel* kernel) {
+    auto metrics = profile_kernel(kernel);
+
+    // 산술 강도 계산
+    metrics.arithmetic_intensity =
+        metrics.total_flops / metrics.total_bytes;
+
+    // 병목 현상 식별
+    float compute_roof = metrics.peak_flops;
+    float memory_roof = metrics.peak_bandwidth * metrics.arithmetic_intensity;
+
+    if (compute_roof < memory_roof) {
+        printf("컴퓨팅 제한 (%.1f%% 피크 활용)\n",
+               metrics.measured_flops / metrics.peak_flops * 100);
+    } else {
+        printf("메모리 제한 (%.1f%% 대역폭 활용)\n",
+               metrics.measured_bandwidth / metrics.peak_bandwidth * 100);
+    }
+}
+
+// 커널 프로파일링
+void profile_kernel_detailed(Kernel* kernel) {
+    ProfileData data = {0};
+
+    // 하드웨어 카운터 설정
+    enable_counter("instructions_executed");
+    enable_counter("memory_transactions");
+    enable_counter("warp_divergence");
+    enable_counter("shared_memory_bank_conflicts");
+
+    // 커널 실행
+    launch_kernel(kernel);
+
+    // 메트릭 수집
+    data.instructions = read_counter("instructions_executed");
+    data.memory_txns = read_counter("memory_transactions");
+    data.divergence = read_counter("warp_divergence");
+    data.bank_conflicts = read_counter("shared_memory_bank_conflicts");
+
+    // 분석 및 제안
+    if (data.divergence > 0.1 * data.instructions) {
+        printf("경고: 높은 워프 분기 (%.1f%%)\n",
+               data.divergence / data.instructions * 100);
+        printf("제안: 조건문 최소화 또는 마스크 연산 사용\n");
+    }
+
+    if (data.bank_conflicts > 0) {
+        printf("경고: 공유 메모리 뱅크 충돌 감지\n");
+        printf("제안: 패딩 추가 또는 액세스 패턴 재구성\n");
+    }
+}</pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>WIA-AI-011 컴파일 파이프라인은 다단계 IR을 통해 고수준 코드를 최적화된 기계 코드로 변환</li>
+                <li>SSA 형식 IR은 최적화를 용이하게 하고 제어 흐름 분석 지원</li>
+                <li>연산자 융합은 메모리 트래픽과 커널 시작 오버헤드를 제거하여 성능 향상</li>
+                <li>자동 튜닝은 검색 공간 탐색과 기계 학습 모델로 최적 커널 구성 발견</li>
+                <li>타일링은 3단계 메모리 계층(레지스터, 공유 메모리, 글로벌)을 효율적으로 활용</li>
+                <li>프리페칭과 소프트웨어 파이프라이닝으로 메모리 지연 숨김</li>
+                <li>루프 언롤링과 의존성 체인 분리로 명령어 수준 병렬성 극대화</li>
+                <li>혼합 정밀도와 양자화로 계산 속도 향상 및 메모리 사용 감소</li>
+                <li>백엔드는 디바이스별 특성(SIMT, 시스톨릭)에 맞춘 코드 생성</li>
+                <li>JIT 컴파일과 디스크 캐싱으로 런타임 특수화와 재사용 달성</li>
+                <li>루프라인 분석과 하드웨어 카운터로 병목 현상 식별 및 최적화 방향 제시</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>WIA-AI-011 컴파일 파이프라인의 주요 단계를 순서대로 나열하고 각 단계의 역할을 설명하십시오.</li>
+                <li>SSA (Static Single Assignment) 형식이 최적화에 유리한 이유를 설명하십시오.</li>
+                <li>연산자 융합의 이점을 메모리 트래픽과 커널 시작 관점에서 설명하고 구체적인 예를 제시하십시오.</li>
+                <li>자동 튜닝에서 검색 공간을 효율적으로 탐색하는 방법을 설명하십시오. 성능 모델의 역할은?</li>
+                <li>3단계 타일링 (레지스터, 공유 메모리, 글로벌 메모리)이 캐시 성능을 향상시키는 원리를 설명하십시오.</li>
+                <li>소프트웨어 프리페칭과 소프트웨어 파이프라이닝의 차이점을 설명하고 각각의 예를 작성하십시오.</li>
+                <li>루프 언롤링이 명령어 수준 병렬성을 어떻게 향상시킵니까? 의존성 체인 분리와의 관계는?</li>
+                <li>혼합 정밀도 훈련에서 FP16과 FP32를 어떻게 조합합니까? 각 정밀도를 사용하는 단계와 이유를 설명하십시오.</li>
+                <li>양자화 인식 훈련의 가짜 양자화(fake quantization)가 무엇이며 왜 필요한지 설명하십시오.</li>
+                <li>GPU의 SIMT 모델과 TPU의 시스톨릭 어레이 모델의 차이를 코드 생성 관점에서 설명하십시오.</li>
+                <li>JIT 컴파일 캐시가 성능에 미치는 영향을 설명하고 캐시 키 생성 방법을 서술하십시오.</li>
+                <li>루프라인 분석을 사용하여 커널이 컴퓨팅 제한인지 메모리 제한인지 판단하는 방법을 설명하십시오.</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+            <span style="font-size: 0.9em; color: #6b7280;">컴파일러 최적화를 통해 모든 개발자가 하드웨어 성능을 극대화</span>
+        </div>
+    </div>
+</body>
+</html>

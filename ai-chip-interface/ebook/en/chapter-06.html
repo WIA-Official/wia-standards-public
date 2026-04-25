@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Multi-Device Communication Protocols | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .chapter-header { border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px; }
+        h1 { font-size: 2.5em; color: #1c1917; margin: 10px 0 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; text-align: justify; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .summary { background: #f0fdf4; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #059669; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div style="color: #10B981; font-weight: bold;">Chapter 6</div>
+            <h1>Multi-Device Communication Protocols</h1>
+        </div>
+
+        <h2>6.1 Scaling Beyond Single Devices</h2>
+        <p>Modern AI workloads frequently exceed the capacity of single accelerators. Large language models with hundreds of billions of parameters require distributing computation across dozens or hundreds of devices. High-throughput inference services utilize multiple accelerators for parallelism. Training state-of-the-art models demands coordinating thousands of GPUs across hundreds of nodes. WIA-AI-011 Phase 3 establishes comprehensive protocols for efficient multi-device coordination and communication.</p>
+
+        <p>The scaling challenge encompasses multiple dimensions: computational requirements grow with model size, memory constraints demand distributing parameters and activations, and latency requirements necessitate parallel processing. Effective multi-device systems must minimize communication overhead while maximizing compute utilization. This chapter explores WIA-AI-011's approach to distributed computing for AI workloads.</p>
+
+        <div class="note">
+            <strong>Scale Context:</strong> GPT-3 (175B parameters) requires ~350 GB for FP16 weights alone, necessitating distribution across multiple devices. Training at scale involves synchronizing gradients across thousands of accelerators every iteration.
+        </div>
+
+        <h2>6.2 Topology Discovery and Characterization</h2>
+        <p>Understanding the physical interconnect topology enables optimal communication strategies. Devices may connect via PCIe, NVLink, InfiniBand, Ethernet, or proprietary fabrics. Each interconnect technology offers different bandwidth and latency characteristics. WIA-AI-011 provides comprehensive APIs to discover topology, measure performance characteristics, and adapt communication strategies accordingly.</p>
+
+        <pre>wia_topology_t topology;
+wia_discover_topology(&topology);
+
+printf("Discovered %d devices in topology\n", topology.num_devices);
+printf("Interconnect type: %s\n", topology.interconnect_name);
+
+for (int i = 0; i < topology.num_devices; i++) {
+    for (int j = 0; j < topology.num_devices; j++) {
+        if (i == j) continue;
+
+        printf("Device %d -> Device %d:\n", i, j);
+        printf("  Bandwidth: %.2f GB/s\n", topology.bandwidth_gbps[i][j]);
+        printf("  Latency: %.2f μs\n", topology.latency_us[i][j]);
+        printf("  Hops: %d\n", topology.hop_count[i][j]);
+        printf("  Link type: %s\n", topology.link_type[i][j]);
+        printf("  P2P capable: %s\n", topology.p2p_capable[i][j] ? "Yes" : "No");
+    }
+}</pre>
+
+        <h3>6.2.1 Topology-Aware Placement</h3>
+        <p>Understanding topology enables intelligent placement of computation and data to minimize communication costs. Devices with faster interconnects should handle tightly-coupled operations.</p>
+
+        <pre>// Example topology analysis
+wia_topology_analysis_t analysis;
+wia_analyze_topology(&topology, &analysis);
+
+printf("Topology Summary:\n");
+printf("  Type: %s\n", analysis.topology_type);  // "single_node", "multi_node"
+printf("  Diameter: %d hops\n", analysis.diameter);
+printf("  Bisection bandwidth: %.2f GB/s\n", analysis.bisection_bandwidth);
+printf("  Recommended parallelism strategy: %s\n",
+       analysis.recommended_strategy);  // "data_parallel", "pipeline_parallel"
+
+// Use topology info for placement
+wia_placement_config_t placement = {
+    .strategy = WIA_PLACEMENT_BANDWIDTH_OPTIMAL,
+    .topology = &topology,
+    .minimize_cross_node_traffic = true
+};
+
+wia_place_model(model, &placement);
+</pre>
+
+        <h3>6.2.2 Bandwidth Benchmarking</h3>
+        <p>Measuring actual achieved bandwidth helps validate topology assumptions and detect performance issues.</p>
+
+        <pre>// Benchmark inter-device bandwidth
+for (int i = 0; i < num_devices; i++) {
+    for (int j = 0; j < num_devices; j++) {
+        if (i == j) continue;
+
+        wia_bandwidth_benchmark_t bench;
+        wia_benchmark_bandwidth(devices[i], devices[j], &bench);
+
+        printf("Bandwidth %d->%d:\n", i, j);
+        printf("  Unidirectional: %.2f GB/s\n", bench.unidirectional_gbps);
+        printf("  Bidirectional: %.2f GB/s\n", bench.bidirectional_gbps);
+        printf("  Latency (4KB): %.2f μs\n", bench.latency_small);
+        printf("  Latency (1MB): %.2f μs\n", bench.latency_large);
+    }
+}
+</pre>
+
+        <table>
+            <tr>
+                <th>Interconnect</th>
+                <th>Bandwidth</th>
+                <th>Latency</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td>PCIe 4.0 x16</td>
+                <td>~32 GB/s</td>
+                <td>~5-10 μs</td>
+                <td>CPU-GPU, multi-GPU (limited)</td>
+            </tr>
+            <tr>
+                <td>NVLink 3.0</td>
+                <td>~300 GB/s</td>
+                <td>~1-2 μs</td>
+                <td>GPU-GPU within node</td>
+            </tr>
+            <tr>
+                <td>InfiniBand HDR</td>
+                <td>~200 Gb/s (25 GB/s)</td>
+                <td>~1-2 μs</td>
+                <td>Multi-node clusters</td>
+            </tr>
+            <tr>
+                <td>100GbE</td>
+                <td>~12.5 GB/s</td>
+                <td>~10-50 μs</td>
+                <td>Multi-node (cost-effective)</td>
+            </tr>
+        </table>
+
+        <h2>6.3 Peer-to-Peer Communication</h2>
+        <p>Direct device-to-device transfers bypass the host CPU, reducing latency and freeing host bandwidth for other tasks. NVLink, XGMI, and similar technologies enable GPUs to directly access peer GPU memory. WIA-AI-011 abstracts these capabilities through a uniform P2P API that gracefully falls back to host-staged transfers when direct access is unavailable.</p>
+
+        <pre>// Enable P2P between devices
+wia_enable_peer_access(device0, device1);
+wia_enable_peer_access(device1, device0);
+
+// Verify P2P capability
+if (wia_can_access_peer(device0, device1)) {
+    printf("P2P access enabled: device0 <-> device1\n");
+} else {
+    printf("P2P not available, will use host staging\n");
+}
+
+// Direct P2P copy (zero CPU involvement)
+wia_memcpy_peer(dst_on_device1, src_on_device0, size, stream);
+
+// Asynchronous P2P with event synchronization
+wia_event_t copy_complete;
+wia_create_event(&copy_complete);
+
+wia_memcpy_peer_async(dst_on_device1, src_on_device0, size, stream);
+wia_event_record(copy_complete, stream);
+
+// Launch computation on destination device
+wia_set_device(device1);
+wia_stream_wait_event(compute_stream, copy_complete);
+wia_launch_kernel(kernel, compute_stream);
+
+// Verify completion
+wia_stream_synchronize(stream);</pre>
+
+        <h3>6.3.1 P2P Performance Optimization</h3>
+        <p>P2P transfers benefit from the same optimizations as regular memory operations: coalescing, batching, and asynchrony.</p>
+
+        <pre>// Inefficient: Many small P2P transfers
+for (int i = 0; i < 1000; i++) {
+    wia_memcpy_peer(dst[i], src[i], 4096, stream);  // 4KB each
+}
+// Total overhead: 1000 launches × ~2μs = 2ms overhead
+
+// Efficient: Batch into single large transfer
+wia_memcpy_peer(dst, src, 4096 * 1000, stream);  // 4MB total
+// Total overhead: 1 launch × ~2μs = 2μs overhead (1000x better!)
+
+// For non-contiguous data, use batched API
+wia_memcpy_peer_batched_t batch[1000];
+for (int i = 0; i < 1000; i++) {
+    batch[i].dst = dst[i];
+    batch[i].src = src[i];
+    batch[i].size = 4096;
+}
+wia_memcpy_peer_batched(batch, 1000, stream);
+</pre>
+
+        <h2>6.4 Collective Communication Primitives</h2>
+        <p>Distributed training and inference rely on collective operations that coordinate data across all devices. WIA-AI-011 defines standard collectives matching those in MPI and NCCL: broadcast, reduce, all-reduce, all-gather, reduce-scatter, and all-to-all. These primitives form the foundation of distributed algorithms and are heavily optimized for AI workloads.</p>
+
+        <h3>6.4.1 All-Reduce</h3>
+        <p>All-reduce combines (typically sums) values from all devices and distributes the result back to all devices. This is the most critical primitive for data-parallel training, used to average gradients across workers. Every training iteration performs at least one all-reduce per layer.</p>
+
+        <pre>// Sum gradients across 8 devices
+wia_collective_config_t config = {
+    .operation = WIA_COLLECTIVE_ALLREDUCE,
+    .reduction_op = WIA_REDUCE_SUM,
+    .datatype = WIA_FLOAT32,
+    .algorithm = WIA_ALLREDUCE_RING,  // or TREE, RABENSEIFNER
+    .num_chunks = 8  // Pipeline parameter
+};
+
+// Each device has local gradients
+float* local_gradients = allocate_gradients(num_params);
+
+// All-reduce sums gradients across all devices
+float* summed_gradients = allocate_gradients(num_params);
+wia_all_reduce(communicator, local_gradients, summed_gradients,
+               num_params, &config, stream);
+
+// Now each device has the sum, compute average
+wia_scale(summed_gradients, 1.0 / num_devices, num_params, stream);
+
+// Update model parameters
+wia_optimizer_step(optimizer, model_params, summed_gradients, stream);
+</pre>
+
+        <h3>6.4.2 Broadcast</h3>
+        <p>Broadcast sends data from one root device to all other devices. This distributes model parameters, configuration data, or inputs efficiently. Broadcasting is essential for model parallelism initialization and inference distribution.</p>
+
+        <pre>// Broadcast model weights from device 0 to all devices
+wia_device_t root = devices[0];
+wia_set_device(root);
+
+// Root device has the model
+float* model_weights = load_model_weights();
+
+// Broadcast to all devices in communicator
+wia_broadcast(communicator, model_weights, num_weights,
+              /*root_rank=*/0, WIA_FLOAT32, stream);
+
+// All devices now have identical model weights
+wia_stream_synchronize(stream);
+
+// Verify consistency across devices
+for (int i = 1; i < num_devices; i++) {
+    wia_set_device(devices[i]);
+    if (!verify_weights_match(model_weights, num_weights)) {
+        fprintf(stderr, "Broadcast verification failed on device %d\n", i);
+    }
+}
+</pre>
+
+        <h3>6.4.3 All-Gather</h3>
+        <p>All-gather collects data from all devices and concatenates it, making the complete dataset available to each device. This is useful for gathering predictions, activations, or distributed dataset assembly.</p>
+
+        <pre>// Each device processes a batch shard
+int local_batch_size = global_batch_size / num_devices;
+float* local_predictions = process_batch_shard(local_batch_size);
+
+// Gather all predictions to all devices
+float* all_predictions = allocate(global_batch_size);
+wia_all_gather(communicator, local_predictions, all_predictions,
+               local_batch_size, WIA_FLOAT32, stream);
+
+// Now each device has predictions for entire batch
+wia_stream_synchronize(stream);
+
+// Can compute global metrics
+float global_accuracy = compute_accuracy(all_predictions, labels,
+                                          global_batch_size);
+</pre>
+
+        <h3>6.4.4 Reduce-Scatter</h3>
+        <p>Reduce-scatter performs reduction across devices, then scatters different parts of the result to different devices. This is the inverse of all-gather and is useful for distributing reduced results.</p>
+
+        <pre>// Reduce-scatter: Each device gets a slice of the reduced result
+wia_collective_config_t rs_config = {
+    .operation = WIA_COLLECTIVE_REDUCE_SCATTER,
+    .reduction_op = WIA_REDUCE_SUM,
+    .datatype = WIA_FLOAT32
+};
+
+// Each device contributes full array
+float* full_input = allocate(total_size);
+populate_input(full_input, total_size);
+
+// Each device receives a slice of the reduced result
+int slice_size = total_size / num_devices;
+float* my_slice = allocate(slice_size);
+
+wia_reduce_scatter(communicator, full_input, my_slice, slice_size,
+                   &rs_config, stream);
+
+// Device i now has reduced values for slice [i*slice_size:(i+1)*slice_size]
+</pre>
+
+        <h3>6.4.5 All-to-All</h3>
+        <p>All-to-all is a personalized communication where each device sends unique data to every other device. This supports tensor redistribution for different parallelism strategies.</p>
+
+        <pre>// All-to-all for resharding data
+wia_collective_config_t a2a_config = {
+    .operation = WIA_COLLECTIVE_ALLTOALL,
+    .datatype = WIA_FLOAT32
+};
+
+// Each device has data sharded one way
+float* input_shards[num_devices];
+float* output_shards[num_devices];
+
+int shard_size = total_size / num_devices;
+for (int i = 0; i < num_devices; i++) {
+    input_shards[i] = allocate(shard_size);
+    output_shards[i] = allocate(shard_size);
+}
+
+// Transpose sharding: device i sends shard j to device j
+wia_all_to_all(communicator, input_shards, output_shards,
+               shard_size, &a2a_config, stream);
+
+// Now data is resharded according to different dimension
+</pre>
+
+        <h2>6.5 Communication Algorithms and Optimization</h2>
+        <p>Different collective algorithms have different performance characteristics depending on message size, device count, and network topology. Ring all-reduce scales to many devices with consistent performance. Tree-based algorithms minimize latency for smaller messages. WIA-AI-011 implementations select algorithms automatically based on heuristics or allow manual override for expert users.</p>
+
+        <h3>6.5.1 Ring All-Reduce</h3>
+        <p>Ring all-reduce arranges devices in a logical ring. In the reduce-scatter phase, each device sends different chunks to its neighbor. In the all-gather phase, chunks circulate around the ring. This algorithm scales well to large device counts.</p>
+
+        <pre>// Ring all-reduce algorithm characteristics
+wia_algorithm_profile_t ring_profile = {
+    .name = "Ring All-Reduce",
+    .latency = alpha * (2 * (num_devices - 1)),  // Linear in num_devices
+    .bandwidth_cost = beta * size * 2 * ((num_devices - 1) / num_devices),
+    .optimal_for = "Large messages, many devices",
+    .algorithm = WIA_ALLREDUCE_RING
+};
+
+// Configuration for ring algorithm
+wia_collective_config_t ring_cfg = {
+    .operation = WIA_COLLECTIVE_ALLREDUCE,
+    .reduction_op = WIA_REDUCE_SUM,
+    .datatype = WIA_FLOAT32,
+    .algorithm = WIA_ALLREDUCE_RING,
+    .num_chunks = num_devices * 2  // More chunks = better pipelining
+};
+
+wia_all_reduce(comm, send_buf, recv_buf, count, &ring_cfg, stream);
+</pre>
+
+        <h3>6.5.2 Tree-Based All-Reduce</h3>
+        <p>Tree algorithms (binary tree, binomial tree) organize devices hierarchically. Reduction goes up the tree, broadcast comes down. Lower latency for small messages, but bandwidth utilization decreases with device count.</p>
+
+        <pre>// Tree all-reduce characteristics
+wia_algorithm_profile_t tree_profile = {
+    .name = "Binary Tree All-Reduce",
+    .latency = alpha * (2 * log2(num_devices)),  // Logarithmic latency
+    .bandwidth_cost = beta * size * 2,
+    .optimal_for = "Small messages, latency-sensitive",
+    .algorithm = WIA_ALLREDUCE_TREE
+};
+
+// Use tree for small messages
+if (message_size < 64 * 1024) {  // < 64KB
+    config.algorithm = WIA_ALLREDUCE_TREE;
+} else {
+    config.algorithm = WIA_ALLREDUCE_RING;
+}
+
+wia_all_reduce(comm, send_buf, recv_buf, count, &config, stream);
+</pre>
+
+        <h3>6.5.3 Rabenseifner's Algorithm</h3>
+        <p>Rabenseifner's algorithm combines reduce-scatter and all-gather phases, optimal for power-of-two device counts and medium messages.</p>
+
+        <pre>// Rabenseifner characteristics
+wia_algorithm_profile_t rab_profile = {
+    .name = "Rabenseifner All-Reduce",
+    .latency = alpha * (2 * log2(num_devices)),
+    .bandwidth_cost = beta * size * 2 * ((num_devices - 1) / num_devices),
+    .optimal_for = "Medium messages, power-of-2 devices",
+    .algorithm = WIA_ALLREDUCE_RABENSEIFNER
+};
+
+// Automatic algorithm selection
+wia_collective_config_t auto_cfg = {
+    .operation = WIA_COLLECTIVE_ALLREDUCE,
+    .reduction_op = WIA_REDUCE_SUM,
+    .datatype = WIA_FLOAT32,
+    .algorithm = WIA_ALGORITHM_AUTO  // Let library choose
+};
+
+wia_all_reduce(comm, send_buf, recv_buf, count, &auto_cfg, stream);
+
+// Query which algorithm was selected
+wia_algorithm_t selected = wia_get_selected_algorithm(comm);
+printf("Auto-selected algorithm: %s\n", selected.name);
+printf("Expected time: %.3f ms\n", selected.estimated_time_ms);
+</pre>
+
+        <h2>6.6 Communicator Management</h2>
+        <p>Communicators define groups of devices participating in collective operations. Creating communicators involves coordination across devices to establish shared context. WIA-AI-011 supports both process-based (MPI-style) and device-based communicators, enabling flexible parallelism strategies.</p>
+
+        <pre>// Create communicator for devices 0-7
+wia_device_t devices[8] = {dev0, dev1, dev2, dev3, dev4, dev5, dev6, dev7};
+wia_communicator_t comm;
+wia_create_communicator(devices, 8, &comm);
+
+printf("Created communicator with %d devices\n",
+       wia_comm_size(comm));
+printf("My rank: %d\n", wia_comm_rank(comm));
+
+// Create sub-communicators for pipeline parallelism
+// Stage 0: devices 0-3
+wia_device_t stage_0_devices[4] = {dev0, dev1, dev2, dev3};
+wia_communicator_t stage_0_comm;
+wia_create_communicator(stage_0_devices, 4, &stage_0_comm);
+
+// Stage 1: devices 4-7
+wia_device_t stage_1_devices[4] = {dev4, dev5, dev6, dev7};
+wia_communicator_t stage_1_comm;
+wia_create_communicator(stage_1_devices, 4, &stage_1_comm);
+
+// Each stage can now perform independent collectives
+wia_all_reduce(stage_0_comm, stage_0_grads, stage_0_grads_reduced,
+               count, &config, stream);
+wia_all_reduce(stage_1_comm, stage_1_grads, stage_1_grads_reduced,
+               count, &config, stream);
+</pre>
+
+        <h3>6.6.1 Hierarchical Communicators</h3>
+        <p>Complex distributed systems benefit from hierarchical communicators: intra-node communicators for fast NVLink communication, inter-node communicators for cross-node coordination.</p>
+
+        <pre>// Create hierarchical communicator structure
+wia_comm_hierarchy_t hierarchy;
+
+// Create intra-node communicators (devices within same physical node)
+for (int node = 0; node < num_nodes; node++) {
+    wia_device_t* node_devices = get_devices_on_node(node);
+    wia_create_communicator(node_devices, devices_per_node,
+                            &hierarchy.node_comms[node]);
+}
+
+// Create inter-node communicator (one representative per node)
+wia_device_t* node_representatives = allocate_representatives(num_nodes);
+wia_create_communicator(node_representatives, num_nodes,
+                        &hierarchy.inter_node_comm);
+
+// Two-stage hierarchical all-reduce
+// 1. Reduce within each node
+wia_all_reduce(hierarchy.node_comms[my_node], local_buf, node_buf,
+               count, &config, node_stream);
+
+// 2. Reduce across nodes (only representatives participate)
+if (is_node_representative) {
+    wia_all_reduce(hierarchy.inter_node_comm, node_buf, global_buf,
+                   count, &config, inter_stream);
+}
+
+// 3. Broadcast within node
+wia_broadcast(hierarchy.node_comms[my_node], global_buf, count,
+              representative_rank, datatype, node_stream);
+</pre>
+
+        <h2>6.7 Asynchronous Communication</h2>
+        <p>Overlapping communication with computation hides network latency and maximizes resource utilization. WIA-AI-011 collectives are inherently asynchronous, returning immediately and executing on streams. Applications can launch computation on other streams while communication proceeds, synchronizing only when results are needed.</p>
+
+        <pre>// Launch communication asynchronously
+wia_all_reduce(comm, gradients, reduced_gradients, count, &cfg, comm_stream);
+
+// Overlap with computation on different layer
+wia_matmul(ctx, A, B, C, &matmul_cfg, compute_stream);
+
+// Computation continues while communication progresses...
+wia_conv2d(ctx, input, kernel, output, &conv_cfg, compute_stream);
+
+// Only synchronize when gradient is actually needed
+wia_stream_synchronize(comm_stream);
+wia_optimizer_step(ctx, reduced_gradients, params, lr, update_stream);
+</pre>
+
+        <h3>6.7.1 Computation-Communication Overlap Strategies</h3>
+        <p>Maximizing overlap requires careful orchestration of independent operations.</p>
+
+        <pre>// Example: Transformer layer with gradient communication overlap
+void backward_transformer_layer_overlapped(transformer_layer* layer) {
+    // Backward through attention (produces attention_grad)
+    wia_attention_backward(layer->attention, &attention_grad, compute_stream);
+
+    // Start all-reduce for attention gradients (asynchronous)
+    wia_all_reduce(comm, attention_grad, attention_grad_reduced,
+                   attention_grad_size, &config, comm_stream);
+
+    // Overlap: Backward through FFN while attention all-reduce runs
+    wia_ffn_backward(layer->ffn, &ffn_grad, compute_stream);
+
+    // Wait for attention all-reduce to complete
+    wia_stream_wait_stream(compute_stream, comm_stream);
+
+    // Update attention parameters with reduced gradients
+    wia_update_params(layer->attention_params, attention_grad_reduced,
+                      lr, compute_stream);
+
+    // Start FFN gradient all-reduce
+    wia_all_reduce(comm, ffn_grad, ffn_grad_reduced,
+                   ffn_grad_size, &config, comm_stream);
+
+    // Overlap: Prepare next layer backward while FFN all-reduce runs
+    setup_next_layer_backward(compute_stream);
+
+    // Wait for FFN all-reduce
+    wia_stream_wait_stream(compute_stream, comm_stream);
+
+    // Update FFN parameters
+    wia_update_params(layer->ffn_params, ffn_grad_reduced, lr, compute_stream);
+}
+</pre>
+
+        <h2>6.8 Gradient Compression</h2>
+        <p>Communication bandwidth limits distributed training scaling, especially across multiple nodes. Gradient compression reduces communication volume through quantization, sparsification, or low-rank approximation. WIA-AI-011 supports built-in compression schemes and allows custom compressors with error feedback to maintain convergence.</p>
+
+        <pre>wia_compression_config_t compression = {
+    .method = WIA_COMPRESS_TOPK,
+    .parameters = {.topk = {.k_ratio = 0.01}},  // Send top 1% gradients
+    .error_feedback = true,  // Accumulate residuals for next iteration
+    .compression_stream = compression_stream
+};
+
+// Compressed all-reduce
+wia_all_reduce_compressed(comm, gradients, reduced_gradients,
+                           count, &compression, stream);
+
+// Communication volume reduced by 99%, with minimal accuracy impact
+</pre>
+
+        <h3>6.8.1 Compression Methods</h3>
+        <p>Different compression methods trade off compression ratio, accuracy impact, and computational overhead.</p>
+
+        <pre>// Top-K sparsification: Send only largest K gradients
+wia_compression_config_t topk = {
+    .method = WIA_COMPRESS_TOPK,
+    .parameters = {.topk = {
+        .k_ratio = 0.01,  // 1% of gradients
+        .use_magnitude = true
+    }},
+    .compression_ratio = 100,  // ~100x compression
+    .accuracy_impact = "minimal"
+};
+
+// Random-K sparsification: Send random K gradients (unbiased)
+wia_compression_config_t randomk = {
+    .method = WIA_COMPRESS_RANDOMK,
+    .parameters = {.randomk = {
+        .k_ratio = 0.1,  // 10% of gradients
+        .seed = 42
+    }},
+    .compression_ratio = 10,
+    .accuracy_impact = "very low"
+};
+
+// Quantization: Reduce precision
+wia_compression_config_t quant = {
+    .method = WIA_COMPRESS_QUANTIZE,
+    .parameters = {.quantize = {
+        .num_bits = 8,  // 8-bit quantization
+        .use_dynamic_range = true
+    }},
+    .compression_ratio = 4,  // FP32 -> INT8
+    .accuracy_impact = "low"
+};
+
+// 1-bit compression: Sign-based
+wia_compression_config_t onebit = {
+    .method = WIA_COMPRESS_ONEBIT,
+    .parameters = {.onebit = {
+        .use_error_feedback = true,
+        .scaling_factor_precision = WIA_FLOAT32
+    }},
+    .compression_ratio = 32,  // FP32 -> 1-bit + scaling
+    .accuracy_impact = "moderate, compensated by error feedback"
+};
+
+// Select compression based on bandwidth availability
+if (network_bandwidth < 10.0) {  // GB/s
+    compression_config = topk;  // Aggressive compression
+} else if (network_bandwidth < 50.0) {
+    compression_config = quant;  // Moderate compression
+} else {
+    compression_config.method = WIA_COMPRESS_NONE;  // No compression
+}
+</pre>
+
+        <h3>6.8.2 Error Feedback</h3>
+        <p>Error feedback accumulates compression errors and adds them to future gradients, maintaining convergence despite lossy compression.</p>
+
+        <pre>// Error feedback mechanism
+float* error_accumulator = allocate(gradient_size);
+zero_initialize(error_accumulator, gradient_size);
+
+for (int iteration = 0; iteration < num_iterations; iteration++) {
+    // Compute gradients
+    compute_gradients(model, batch, gradients);
+
+    // Add accumulated error from previous iterations
+    vector_add(gradients, error_accumulator, gradients, gradient_size);
+
+    // Compress gradients
+    float* compressed = compress_topk(gradients, k_ratio, &indices);
+
+    // All-reduce compressed gradients
+    wia_all_reduce_sparse(comm, compressed, indices, k_count, stream);
+
+    // Update error accumulator: error = original - compressed
+    compute_compression_error(gradients, compressed, indices,
+                               error_accumulator, gradient_size);
+
+    // Update model with compressed gradients
+    update_model(model, compressed, indices);
+}
+
+// Error feedback ensures:
+// - Unbiased updates over time
+// - Convergence guarantees preserved
+// - Compression errors don't accumulate
+</pre>
+
+        <h2>6.9 Fault Tolerance and Recovery</h2>
+        <p>In large-scale deployments with hundreds or thousands of devices, hardware failures become inevitable. Mean time between failures (MTBF) for a 1000-GPU cluster might be measured in days or hours. WIA-AI-011 provides checkpointing APIs for saving/restoring state and supports collective operations that can tolerate device failures through redundancy or reconfiguration.</p>
+
+        <pre>// Checkpoint configuration
+wia_checkpoint_config_t ckpt_cfg = {
+    .checkpoint_dir = "/shared/checkpoints",
+    .checkpoint_interval = 100,  // iterations
+    .async_checkpointing = true,
+    .compression = WIA_CKPT_COMPRESS_LZ4
+};
+
+// Training loop with checkpointing
+for (int iter = 0; iter < num_iterations; iter++) {
+    // Regular training step
+    train_step(model, batch, iter);
+
+    // Periodic checkpointing
+    if (iter % ckpt_cfg.checkpoint_interval == 0) {
+        wia_checkpoint_t* ckpt = wia_create_checkpoint();
+
+        // Save model state
+        wia_checkpoint_add_model(ckpt, model);
+        wia_checkpoint_add_optimizer(ckpt, optimizer);
+        wia_checkpoint_add_metadata(ckpt, "iteration", &iter);
+
+        // Asynchronous save (doesn't block training)
+        wia_save_checkpoint_async(ckpt, &ckpt_cfg, save_stream);
+    }
+
+    // Error detection
+    if (wia_detect_device_failure(comm)) {
+        fprintf(stderr, "Device failure detected at iteration %d\n", iter);
+
+        // Load latest checkpoint
+        wia_checkpoint_t* latest = wia_load_latest_checkpoint(&ckpt_cfg);
+
+        // Restore state
+        wia_restore_model(model, latest);
+        wia_restore_optimizer(optimizer, latest);
+        wia_get_checkpoint_metadata(latest, "iteration", &iter);
+
+        // Reconfigure communicator (exclude failed device)
+        wia_communicator_t new_comm;
+        wia_create_communicator_fault_tolerant(&new_comm, comm);
+
+        comm = new_comm;
+        fprintf(stderr, "Recovered from checkpoint, resuming at iteration %d\n",
+                iter);
+    }
+}
+</pre>
+
+        <h3>6.9.1 Redundant Gradient Computation</h3>
+        <p>For critical training runs, redundant computation can enable instant recovery from failures.</p>
+
+        <pre>// Redundant gradient computation
+wia_redundancy_config_t redundancy = {
+    .redundancy_factor = 2,  // Each gradient computed by 2 devices
+    .failure_recovery = WIA_RECOVERY_INSTANT
+};
+
+// Device pairs compute same gradient
+int partner_device = (my_rank + num_devices / 2) % num_devices;
+
+// Both devices compute gradient for assigned data
+compute_gradients(model, my_data_shard, gradients);
+
+// Cross-check with partner
+wia_send_receive_gradients(partner_device, gradients, partner_gradients);
+
+if (!gradients_match(gradients, partner_gradients, tolerance)) {
+    // Mismatch detected - one device faulty
+    wia_report_failure(comm, my_rank, partner_device);
+}
+
+// If one device fails, partner continues with same gradient
+</pre>
+
+        <h2>6.10 Cross-Node Communication</h2>
+        <p>Scaling to multiple physical nodes requires network communication over Ethernet, InfiniBand, or other fabrics. WIA-AI-011 integrates with RDMA (Remote Direct Memory Access) capable networks like InfiniBand and RoCE for high-performance inter-node transfers. The API abstracts intra-node and inter-node communication uniformly.</p>
+
+        <pre>// Multi-node communicator spanning 4 nodes, 8 GPUs each
+wia_distributed_config_t dist_cfg = {
+    .num_nodes = 4,
+    .devices_per_node = 8,
+    .network_backend = WIA_NET_RDMA,
+    .rdma_device = "mlx5_0",
+    .rdma_port = 1,
+
+    .use_gpu_direct_rdma = true,  // RDMA directly to/from GPU memory
+    .compression = WIA_NET_COMPRESS_AUTO
+};
+
+wia_communicator_t global_comm;
+wia_create_distributed_communicator(&dist_cfg, &global_comm);
+
+printf("Created distributed communicator:\n");
+printf("  Total devices: %d\n", wia_comm_size(global_comm));
+printf("  My global rank: %d\n", wia_comm_rank(global_comm));
+printf("  My node: %d\n", wia_comm_node_rank(global_comm));
+printf("  My local rank: %d\n", wia_comm_local_rank(global_comm));
+
+// Collective operates seamlessly across nodes
+wia_all_reduce(global_comm, gradients, reduced_gradients,
+               count, &config, stream);
+</pre>
+
+        <h3>6.10.1 GPUDirect RDMA</h3>
+        <p>GPUDirect RDMA eliminates CPU involvement in GPU-to-GPU transfers across nodes, dramatically reducing latency and CPU overhead.</p>
+
+        <pre>// Traditional path (without GPUDirect RDMA):
+// GPU0 -> CPU0 memory -> NIC0 -> Network -> NIC1 -> CPU1 memory -> GPU1
+// Latency: ~50-100μs, CPU overhead: significant
+
+// GPUDirect RDMA path:
+// GPU0 -> NIC0 -> Network -> NIC1 -> GPU1
+// Latency: ~10-20μs, CPU overhead: minimal
+
+// Enable GPUDirect RDMA
+wia_gpudirect_config_t gpudirect = {
+    .enable_rdma = true,
+    .enable_async_copy = true,
+    .max_inline_size = 256,  // bytes
+    .use_write_semantics = true
+};
+
+wia_enable_gpudirect_rdma(&dist_cfg, &gpudirect);
+
+// Transfers automatically use GPUDirect when available
+wia_send(dst_node, dst_device, gpu_buffer, size, stream);
+
+// Performance comparison
+printf("Traditional transfer: %.2f μs\n", measure_cpu_staged_transfer());
+printf("GPUDirect RDMA: %.2f μs\n", measure_gpudirect_transfer());
+printf("Speedup: %.2fx\n", traditional / gpudirect);
+// Typical: 3-5x faster for small messages, 2x for large
+</pre>
+
+        <h2>6.11 Performance Monitoring and Tuning</h2>
+        <p>Understanding communication performance is essential for optimization. WIA-AI-011 provides comprehensive monitoring of bandwidth utilization, latency, and overlap efficiency.</p>
+
+        <pre>// Enable communication profiling
+wia_comm_profiling_t prof = {
+    .enable_bandwidth_tracking = true,
+    .enable_latency_tracking = true,
+    .enable_overlap_analysis = true
+};
+
+wia_enable_comm_profiling(comm, &prof);
+
+// Run workload
+run_distributed_training(model, dataset, num_iterations);
+
+// Analyze communication performance
+wia_comm_profile_report_t* report = wia_get_comm_profile(comm);
+
+printf("Communication Profile:\n");
+printf("  Total comm time: %.2f s\n", report->total_comm_time);
+printf("  Total compute time: %.2f s\n", report->total_compute_time);
+printf("  Overlap efficiency: %.1f%%\n", report->overlap_efficiency * 100);
+printf("  Average bandwidth utilization: %.1f%%\n",
+       report->avg_bandwidth_utilization * 100);
+
+printf("\nCollective Breakdown:\n");
+for (int i = 0; i < report->num_collectives; i++) {
+    wia_collective_profile_t* cp = &report->collectives[i];
+    printf("  %s:\n", cp->name);
+    printf("    Count: %d\n", cp->invocation_count);
+    printf("    Total time: %.2f s\n", cp->total_time);
+    printf("    Avg time: %.3f ms\n", cp->avg_time * 1000);
+    printf("    Bandwidth: %.2f GB/s\n", cp->avg_bandwidth);
+}
+
+// Optimization recommendations
+printf("\nOptimization Suggestions:\n");
+for (int i = 0; i < report->num_suggestions; i++) {
+    printf("  %s\n", report->suggestions[i]);
+}
+// Example suggestions:
+// - "Use compression for all-reduce (estimated 2.3x speedup)"
+// - "Increase overlap by splitting large all-reduce into chunks"
+// - "Switch to ring algorithm for large message sizes"
+</pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>Multi-device coordination essential for large models requiring distribution across dozens to thousands of accelerators</li>
+                <li>Topology discovery and characterization enables bandwidth-aware placement and communication strategies</li>
+                <li>Peer-to-peer communication bypasses host CPU for low-latency direct device-to-device transfers (NVLink, XGMI)</li>
+                <li>Collective primitives (all-reduce, broadcast, all-gather, reduce-scatter, all-to-all) form distributed computing foundation</li>
+                <li>Algorithm selection (ring, tree, Rabenseifner) optimizes for message size, device count, and topology</li>
+                <li>Communicator hierarchies (intra-node, inter-node) enable multi-level optimization strategies</li>
+                <li>Asynchronous communication with computation-communication overlap hides network latency</li>
+                <li>Gradient compression (Top-K, quantization, 1-bit) reduces bandwidth requirements by 10-100x with error feedback</li>
+                <li>Fault tolerance through checkpointing and redundancy handles inevitable failures in large clusters</li>
+                <li>GPUDirect RDMA enables direct GPU-to-GPU communication across nodes (3-5x lower latency)</li>
+                <li>Performance monitoring and profiling guide communication optimization and identify bottlenecks</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Why is topology discovery important for multi-device applications? What characteristics should be measured?</li>
+                <li>Explain the benefits of peer-to-peer communication over host-staged transfers. What are the limitations?</li>
+                <li>Describe the all-reduce collective and its critical role in distributed training. How does it differ from reduce?</li>
+                <li>Compare ring and tree algorithms for all-reduce. Under what conditions is each optimal?</li>
+                <li>What is Rabenseifner's algorithm and why is it efficient for power-of-two device counts?</li>
+                <li>Explain hierarchical communicators. How do they enable two-stage reduction strategies?</li>
+                <li>How does asynchronous communication enable overlap with computation? Provide a concrete example.</li>
+                <li>Describe Top-K gradient compression. How does error feedback maintain convergence despite lossy compression?</li>
+                <li>Why is fault tolerance critical in large-scale deployments? Explain checkpoint-based recovery.</li>
+                <li>What is GPUDirect RDMA and how does it improve cross-node communication performance?</li>
+                <li>How can communication profiling identify optimization opportunities?</li>
+                <li>Compare data parallelism, model parallelism, and pipeline parallelism in terms of communication patterns.</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · Benefit All Humanity</strong>
+            <p style="margin-top: 10px; font-size: 0.9em; color: #64748b;">Efficient multi-device communication enables large-scale AI training and inference, democratizing access to powerful models that benefit society.</p>
+        </div>
+    </div>
+</body>
+</html>

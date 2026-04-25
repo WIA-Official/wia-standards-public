@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 7: Framework Integration | WIA-AI-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .chapter-header { border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px; }
+        h1 { font-size: 2.5em; color: #1c1917; margin: 10px 0 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; text-align: justify; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .summary { background: #f0fdf4; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #059669; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div style="color: #10B981; font-weight: bold;">Chapter 7</div>
+            <h1>Framework Integration</h1>
+        </div>
+
+        <h2>7.1 The Framework Landscape</h2>
+        <p>Modern deep learning development relies heavily on high-level frameworks that abstract low-level hardware details. PyTorch, TensorFlow, JAX, and ONNX Runtime dominate the ecosystem, each with distinct philosophies and architectures. Successfully integrating WIA-AI-011 with these frameworks requires understanding their internal designs, extension mechanisms, and performance characteristics.</p>
+
+        <p>The framework landscape presents both opportunities and challenges. Each framework targets different use cases: PyTorch excels in research flexibility, TensorFlow in production deployment, JAX in high-performance computing, and ONNX in cross-framework interoperability. WIA-AI-011's integration strategy must respect these differences while providing consistent accelerator access across all frameworks.</p>
+
+        <table>
+            <tr>
+                <th>Framework</th>
+                <th>Primary Strength</th>
+                <th>Execution Model</th>
+                <th>Integration Approach</th>
+            </tr>
+            <tr>
+                <td>PyTorch</td>
+                <td>Research flexibility</td>
+                <td>Eager (dynamic graph)</td>
+                <td>Custom device backend</td>
+            </tr>
+            <tr>
+                <td>TensorFlow</td>
+                <td>Production deployment</td>
+                <td>Graph + Eager</td>
+                <td>Device plugin + XLA</td>
+            </tr>
+            <tr>
+                <td>JAX</td>
+                <td>HPC and composability</td>
+                <td>JIT compilation</td>
+                <td>Custom backend</td>
+            </tr>
+            <tr>
+                <td>ONNX Runtime</td>
+                <td>Interoperability</td>
+                <td>Optimizing runtime</td>
+                <td>Execution provider</td>
+            </tr>
+        </table>
+
+        <h2>7.2 PyTorch Integration</h2>
+        <p>PyTorch's dynamic computation graph and imperative programming model make it popular for research and rapid prototyping. The framework provides backend extension points through custom device types and dispatcher mechanisms. WIA-AI-011 integration creates a new device type "wia" that routes operations to WIA-compliant accelerators while maintaining PyTorch's ergonomic API.</p>
+
+        <pre>import torch
+import torch_wia  # WIA-AI-011 PyTorch extension
+
+# Discover WIA devices
+print(f"WIA devices available: {torch_wia.device_count()}")  # Output: 4
+print(f"Current device: {torch_wia.current_device()}")
+print(f"Device name: {torch_wia.get_device_name(0)}")  # "WIA NPU-X1"
+
+# Move model to WIA device
+device = torch.device('wia:0')
+model = ResNet50().to(device)
+
+# Verify device placement
+print(f"Model on device: {next(model.parameters()).device}")  # wia:0
+
+# Run inference
+input_tensor = torch.randn(32, 3, 224, 224, device=device)
+with torch.inference_mode():
+    output = model(input_tensor)
+
+print(f"Output shape: {output.shape}")  # torch.Size([32, 1000])
+print(f"Output device: {output.device}")  # wia:0
+
+# Training example
+model.train()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+for epoch in range(num_epochs):
+    for batch in dataloader:
+        # Move batch to WIA device
+        images, labels = batch
+        images = images.to(device)
+        labels = labels.to(device)
+
+        # Forward pass
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
+</pre>
+
+        <h3>7.2.1 Custom Operators</h3>
+        <p>PyTorch's operator registration system allows frameworks to provide implementations for built-in operations. WIA-AI-011 registers optimized kernels for all standard torch operations, automatically dispatching to appropriate accelerators. The registration system supports both C++ and Python implementations.</p>
+
+        <pre>// C++ operator implementation
+#include <torch/extension.h>
+#include <wia/wia.h>
+
+// WIA matmul implementation
+at::Tensor wia_matmul(const at::Tensor& self, const at::Tensor& other) {
+    // Convert PyTorch tensors to WIA tensors
+    wia_tensor_t a = convert_to_wia(self);
+    wia_tensor_t b = convert_to_wia(other);
+
+    // Allocate output tensor
+    auto output_shape = infer_matmul_shape(self, other);
+    wia_tensor_t c = wia_allocate_tensor(output_shape, WIA_FLOAT32);
+
+    // Execute WIA matmul kernel
+    wia_matmul(get_wia_context(), a, b, c, nullptr, get_wia_stream());
+
+    // Convert back to PyTorch tensor
+    return convert_from_wia(c);
+}
+
+// Register operator with PyTorch dispatcher
+TORCH_LIBRARY_IMPL(aten, WIA, m) {
+    m.impl("matmul", wia_matmul);
+    m.impl("addmm", wia_addmm);
+    m.impl("conv2d", wia_conv2d);
+    m.impl("linear", wia_linear);
+    m.impl("relu", wia_relu);
+    m.impl("softmax", wia_softmax);
+    m.impl("layer_norm", wia_layer_norm);
+    m.impl("batch_norm", wia_batch_norm);
+    // ... hundreds more operators
+}
+
+// Advanced operator with tuning
+at::Tensor wia_conv2d(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups)
+{
+    // Select optimal algorithm based on input characteristics
+    wia_conv_algorithm_t algo = select_conv_algorithm(
+        input.sizes(), weight.sizes(), stride, padding);
+
+    // Execute with optimal configuration
+    wia_conv_config_t config = {
+        .algorithm = algo,
+        .workspace_size = compute_workspace_size(algo, input.sizes()),
+        .use_tensor_cores = should_use_tensor_cores(input.dtype()),
+        .fusion = detect_fusion_opportunity(input)
+    };
+
+    return execute_wia_conv2d(input, weight, bias, config);
+}
+</pre>
+
+        <h3>7.2.2 Autograd Support</h3>
+        <p>PyTorch's automatic differentiation requires backward pass implementations for all operations. WIA-AI-011 provides gradient formulas for all operations, enabling seamless training on WIA devices. The autograd engine automatically calls backward implementations during backpropagation.</p>
+
+        <pre>// Autograd function for custom WIA operator
+class WIAMatmul : public torch::autograd::Function<WIAMatmul> {
+public:
+    static torch::Tensor forward(
+        torch::autograd::AutogradContext* ctx,
+        torch::Tensor A,
+        torch::Tensor B)
+    {
+        // Save tensors for backward
+        ctx->save_for_backward({A, B});
+
+        // Forward computation
+        return wia_matmul_forward(A, B);
+    }
+
+    static std::vector<torch::Tensor> backward(
+        torch::autograd::AutogradContext* ctx,
+        std::vector<torch::Tensor> grad_outputs)
+    {
+        // Retrieve saved tensors
+        auto saved = ctx->get_saved_variables();
+        auto A = saved[0];
+        auto B = saved[1];
+        auto grad_output = grad_outputs[0];
+
+        // Compute gradients
+        // d(AB)/dA = grad_output @ B^T
+        // d(AB)/dB = A^T @ grad_output
+        torch::Tensor grad_A = torch::matmul(grad_output, B.t());
+        torch::Tensor grad_B = torch::matmul(A.t(), grad_output);
+
+        return {grad_A, grad_B};
+    }
+};
+
+// Python wrapper
+torch::Tensor wia_matmul_autograd(torch::Tensor A, torch::Tensor B) {
+    return WIAMatmul::apply(A, B);
+}
+</pre>
+
+        <h3>7.2.3 Memory Management Integration</h3>
+        <p>PyTorch's caching allocator must integrate with WIA's memory management for optimal performance.</p>
+
+        <pre>// Custom allocator for WIA devices
+class WIAAllocator : public c10::Allocator {
+public:
+    c10::DataPtr allocate(size_t nbytes) const override {
+        void* ptr = nullptr;
+        wia_malloc(&ptr, nbytes, get_current_wia_device());
+
+        return {ptr, ptr, &WIAAllocator::deleter, c10::Device(c10::DeviceType::WIA, 0)};
+    }
+
+    static void deleter(void* ptr) {
+        wia_free(ptr);
+    }
+
+    c10::DeleterFnPtr raw_deleter() const override {
+        return &WIAAllocator::deleter;
+    }
+};
+
+// Register allocator with PyTorch
+at::globalContext().lazyInitWIA();
+at::DeviceGuard device_guard(at::Device(at::DeviceType::WIA, 0));
+c10::SetAllocator(c10::DeviceType::WIA, std::make_unique<WIAAllocator>());
+</pre>
+
+        <h2>7.3 TensorFlow Integration</h2>
+        <p>TensorFlow uses static computation graphs (in graph mode) compiled into optimized executables. WIA-AI-011 integrates through custom devices and kernel libraries, with XLA (Accelerated Linear Algebra) compiler integration for optimal performance. The integration supports both TensorFlow 2.x eager execution and graph mode.</p>
+
+        <pre>import tensorflow as tf
+import tensorflow_wia
+
+# List available WIA devices
+wia_devices = tensorflow_wia.list_physical_devices('WIA')
+print(f"Available WIA devices: {len(wia_devices)}")
+for i, device in enumerate(wia_devices):
+    print(f"  Device {i}: {device.name}")
+
+# Configure WIA device
+tf.config.experimental.set_visible_devices(wia_devices[0], 'WIA')
+tf.config.experimental.set_memory_growth(wia_devices[0], True)
+
+# Build model with explicit device placement
+with tf.device('/WIA:0'):
+    model = tf.keras.applications.ResNet50(weights=None, classes=1000)
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(0.001),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        metrics=['accuracy'])
+
+# Train model
+history = model.fit(
+    train_dataset,
+    epochs=10,
+    validation_data=val_dataset,
+    callbacks=[
+        tf.keras.callbacks.ModelCheckpoint('best_model.h5'),
+        tf.keras.callbacks.TensorBoard(log_dir='./logs')
+    ])
+
+# Inference with explicit device
+with tf.device('/WIA:0'):
+    sample_input = tf.random.normal([1, 224, 224, 3])
+    predictions = model(sample_input, training=False)
+    print(f"Predictions shape: {predictions.shape}")
+</pre>
+
+        <h3>7.3.1 XLA Integration</h3>
+        <p>XLA compiles TensorFlow graphs into optimized kernels. WIA-AI-011 provides an XLA backend that generates WIA-compatible code, enabling graph-level optimizations like fusion and layout optimization.</p>
+
+        <pre>// XLA WIA backend implementation
+#include "tensorflow/compiler/xla/service/custom_call_target_registry.h"
+#include <wia/wia.h>
+
+// Custom call implementation for WIA matmul
+void WiaXlaMatmul(void* stream, void** buffers, const char* opaque, size_t opaque_len) {
+    // Parse configuration from opaque data
+    WiaMatmulConfig config;
+    deserialize_config(opaque, opaque_len, &config);
+
+    // Extract input/output buffers
+    float* a = static_cast<float*>(buffers[0]);
+    float* b = static_cast<float*>(buffers[1]);
+    float* c = static_cast<float*>(buffers[2]);
+
+    // Execute WIA matmul
+    wia_context_t* ctx = get_wia_context();
+    wia_stream_t* wia_stream = static_cast<wia_stream_t*>(stream);
+
+    wia_matmul_strided(ctx, a, b, c, &config.dims, wia_stream);
+}
+
+// Register custom calls
+XLA_REGISTER_CUSTOM_CALL_TARGET(WiaXlaMatmul);
+XLA_REGISTER_CUSTOM_CALL_TARGET(WiaXlaConv2d);
+XLA_REGISTER_CUSTOM_CALL_TARGET(WiaXlaBatchNorm);
+
+// XLA compilation with WIA target
+auto xla_computation = BuildMatmulComputation();
+auto wia_executable = wia_xla_backend.Compile(xla_computation);
+
+// Execute compiled XLA program
+auto result = wia_executable.Execute(arguments);
+</pre>
+
+        <h3>7.3.2 Kernel Implementation</h3>
+        <p>TensorFlow kernels implement operations for specific devices. WIA kernels leverage the standard TensorFlow kernel interface.</p>
+
+        <pre>// TensorFlow WIA kernel registration
+#include "tensorflow/core/framework/op_kernel.h"
+
+class WiaMatMulOp : public OpKernel {
+public:
+    explicit WiaMatMulOp(OpKernelConstruction* context) : OpKernel(context) {
+        // Parse attributes
+        OP_REQUIRES_OK(context, context->GetAttr("transpose_a", &transpose_a_));
+        OP_REQUIRES_OK(context, context->GetAttr("transpose_b", &transpose_b_));
+    }
+
+    void Compute(OpKernelContext* context) override {
+        // Get input tensors
+        const Tensor& a = context->input(0);
+        const Tensor& b = context->input(1);
+
+        // Validate shapes
+        OP_REQUIRES(context, a.dims() == 2, errors::InvalidArgument("A must be 2D"));
+        OP_REQUIRES(context, b.dims() == 2, errors::InvalidArgument("B must be 2D"));
+
+        // Allocate output
+        TensorShape output_shape({a.dim_size(0), b.dim_size(1)});
+        Tensor* output = nullptr;
+        OP_REQUIRES_OK(context, context->allocate_output(0, output_shape, &output));
+
+        // Execute WIA matmul
+        wia_tensor_t wia_a = convert_tf_to_wia(a);
+        wia_tensor_t wia_b = convert_tf_to_wia(b);
+        wia_tensor_t wia_c = convert_tf_to_wia(*output);
+
+        wia_matmul_config_t config = {
+            .transpose_a = transpose_a_,
+            .transpose_b = transpose_b_,
+            .alpha = 1.0f,
+            .beta = 0.0f
+        };
+
+        wia_matmul(get_wia_context(), wia_a, wia_b, wia_c, &config,
+                   context->eigen_device<WIADevice>().stream());
+    }
+
+private:
+    bool transpose_a_;
+    bool transpose_b_;
+};
+
+// Register kernel
+REGISTER_KERNEL_BUILDER(Name("MatMul").Device("WIA"), WiaMatMulOp);
+</pre>
+
+        <h2>7.4 JAX Integration</h2>
+        <p>JAX brings functional programming and composable transformations (jit, grad, vmap, pmap) to numerical computing. Its design around pure functions and explicit transformations aligns well with WIA-AI-011's explicit device model. JAX's XLA integration provides a natural path for WIA backend support.</p>
+
+        <pre>import jax
+import jax.numpy as jnp
+from jax_wia import wia_backend
+
+# Set WIA as default platform
+jax.config.update('jax_platform_name', 'wia')
+jax.config.update('jax_wia_device', 0)
+
+# Verify WIA backend
+print(f"JAX backend: {jax.default_backend()}")  # wia
+print(f"Available devices: {jax.devices()}")
+
+# Define model
+def model(params, x):
+    w1, b1, w2, b2 = params
+    h = jnp.tanh(jnp.dot(x, w1) + b1)
+    return jnp.dot(h, w2) + b2
+
+# JIT compile for WIA
+@jax.jit
+def train_step(params, batch):
+    def loss_fn(params):
+        predictions = model(params, batch['image'])
+        return jnp.mean((predictions - batch['label'])**2)
+
+    loss, grads = jax.value_and_grad(loss_fn)(params)
+    return loss, grads
+
+# Automatically compiled and optimized for WIA device
+params = initialize_params()
+for epoch in range(num_epochs):
+    for batch in data_iter:
+        loss, grads = train_step(params, batch)
+        params = update_params(params, grads)
+        print(f"Epoch {epoch}, Loss: {loss:.4f}")
+
+# Vectorized map (vmap) for batch processing
+@jax.vmap
+def process_single_image(image):
+    return model(params, image)
+
+# Processes batch in parallel on WIA device
+batch_predictions = process_single_image(image_batch)
+
+# Parallel map (pmap) for multi-device
+@jax.pmap
+def parallel_train_step(params, batch):
+    loss, grads = train_step(params, batch)
+    # Automatically uses WIA all-reduce for gradient synchronization
+    return loss, grads
+
+# Runs on multiple WIA devices
+multi_device_loss, multi_device_grads = parallel_train_step(
+    replicated_params, sharded_batch)
+</pre>
+
+        <h3>7.4.1 Primitive Operations</h3>
+        <p>JAX's primitives (lax operations) form the basis of all computations. WIA-AI-011 implements these primitives directly, enabling optimal performance without high-level translation overhead.</p>
+
+        <pre>// JAX WIA primitive implementation
+#include "jax/wia_primitives.h"
+
+// Implement dot_general primitive
+void wia_dot_general(
+    void* out, void** args,
+    const WiaDotDimensionNumbers* dimension_numbers) {
+
+    wia_tensor_t lhs = static_cast<wia_tensor_t>(args[0]);
+    wia_tensor_t rhs = static_cast<wia_tensor_t>(args[1]);
+    wia_tensor_t result = static_cast<wia_tensor_t>(out);
+
+    // Convert JAX dimension numbers to WIA matmul config
+    wia_matmul_config_t config = convert_dot_dimensions(dimension_numbers);
+
+    // Execute optimized WIA matmul
+    wia_matmul(get_wia_context(), lhs, rhs, result, &config, get_stream());
+}
+
+// Register WIA implementations for all JAX primitives
+RegisterWiaPrimitive("dot_general", wia_dot_general);
+RegisterWiaPrimitive("conv_general_dilated", wia_conv_general);
+RegisterWiaPrimitive("reduce_sum", wia_reduce_sum);
+RegisterWiaPrimitive("reduce_max", wia_reduce_max);
+RegisterWiaPrimitive("broadcast_in_dim", wia_broadcast);
+RegisterWiaPrimitive("transpose", wia_transpose);
+RegisterWiaPrimitive("reshape", wia_reshape);
+// ... all JAX lax primitives
+</pre>
+
+        <h2>7.5 ONNX Runtime Integration</h2>
+        <p>ONNX Runtime executes models in the standardized ONNX format from any framework. Adding a WIA execution provider enables ONNX models to run on any WIA-compliant accelerator without modification, providing true framework-agnostic deployment.</p>
+
+        <pre>import onnxruntime as ort
+import numpy as np
+
+# Create session with WIA provider
+session_options = ort.SessionOptions()
+session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+session = ort.InferenceSession(
+    "model.onnx",
+    sess_options=session_options,
+    providers=[
+        ('WiaExecutionProvider', {
+            'device_id': 0,
+            'enable_fusion': True,
+            'enable_quantization': True,
+            'enable_fp16': True
+        }),
+        'CPUExecutionProvider'  # Fallback
+    ])
+
+# Query provider information
+print(f"Active provider: {session.get_providers()}")
+
+# Run inference
+input_name = session.get_inputs()[0].name
+output_name = session.get_outputs()[0].name
+
+input_data = np.random.randn(1, 3, 224, 224).astype(np.float32)
+outputs = session.run([output_name], {input_name: input_data})
+
+print(f"Output shape: {outputs[0].shape}")
+print(f"Predictions: {outputs[0][:5]}")
+
+# Benchmark performance
+import time
+
+warmup_runs = 10
+benchmark_runs = 100
+
+# Warmup
+for _ in range(warmup_runs):
+    session.run([output_name], {input_name: input_data})
+
+# Benchmark
+start = time.time()
+for _ in range(benchmark_runs):
+    session.run([output_name], {input_name: input_data})
+end = time.time()
+
+avg_time = (end - start) / benchmark_runs * 1000  # ms
+throughput = 1000.0 / avg_time  # inferences/sec
+
+print(f"Average inference time: {avg_time:.2f} ms")
+print(f"Throughput: {throughput:.1f} inferences/sec")
+</pre>
+
+        <h3>7.5.1 Execution Provider Implementation</h3>
+        <p>ONNX execution providers implement the IExecutionProvider interface, handling operator compilation and execution. The WIA provider translates ONNX operators to WIA operations, leveraging operator fusion and kernel caching.</p>
+
+        <pre>// WIA Execution Provider implementation
+class WIAExecutionProvider : public IExecutionProvider {
+public:
+    WIAExecutionProvider(const WIAExecutionProviderInfo& info)
+        : IExecutionProvider("WIAExecutionProvider"),
+          device_id_(info.device_id),
+          enable_fusion_(info.enable_fusion) {
+
+        wia_create_context(&context_, device_id_);
+        wia_create_stream(&stream_, context_);
+    }
+
+    std::vector<std::unique_ptr<ComputeCapability>>
+    GetCapability(const GraphViewer& graph,
+                  const std::vector<const KernelRegistry*>& registries) const override {
+
+        std::vector<std::unique_ptr<ComputeCapability>> capabilities;
+
+        // Identify subgraphs that can run on WIA
+        for (auto& node : graph.Nodes()) {
+            if (IsWIASupportedOp(node.OpType())) {
+                capabilities.push_back(
+                    CreateCapability(node, graph));
+            }
+        }
+
+        // Fuse compatible subgraphs
+        if (enable_fusion_) {
+            capabilities = FuseSubgraphs(capabilities, graph);
+        }
+
+        return capabilities;
+    }
+
+    Status Compile(const std::vector<Node*>& nodes,
+                   std::vector<NodeComputeInfo>& node_compute_funcs) override {
+
+        for (auto* node : nodes) {
+            // Compile ONNX op to WIA kernel
+            auto kernel = CompileNodeToWIA(node);
+
+            // Create compute function
+            NodeComputeInfo compute_info;
+            compute_info.create_state_func = [kernel](ComputeContext* ctx,
+                                                       FunctionState* state) {
+                *state = kernel;
+                return Status::OK();
+            };
+
+            compute_info.compute_func = [](FunctionState state,
+                                           const OrtApi* api,
+                                           OrtKernelContext* context) {
+                auto* kernel = static_cast<WIAKernel*>(state);
+                return kernel->Execute(api, context);
+            };
+
+            node_compute_funcs.push_back(compute_info);
+        }
+
+        return Status::OK();
+    }
+
+private:
+    wia_context_t* context_;
+    wia_stream_t* stream_;
+    int device_id_;
+    bool enable_fusion_;
+};
+</pre>
+
+        <h2>7.6 Model Deployment and Serving</h2>
+        <p>Production deployment requires efficient model serving infrastructure. WIA-AI-011 integrates with TorchServe, TensorFlow Serving, and Triton Inference Server, enabling high-throughput low-latency inference with features like dynamic batching, model versioning, and A/B testing.</p>
+
+        <pre>// Triton model configuration for WIA backend
+name: "resnet50_wia"
+platform: "wia"
+max_batch_size: 128
+default_model_filename: "model.onnx"
+
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+  }
+]
+
+instance_group [
+  {
+    count: 4
+    kind: KIND_WIA
+    gpus: [ 0, 1, 2, 3 ]
+  }
+]
+
+optimization {
+  priority: PRIORITY_MAX
+  graph: {
+    level: 1  # Enable graph optimizations
+  }
+
+  execution_accelerators {
+    wia_execution_accelerator {
+      parameters { key: "precision" value: "fp16" }
+      parameters { key: "enable_fusion" value: "true" }
+    }
+  }
+}
+
+dynamic_batching {
+  preferred_batch_size: [ 8, 16, 32, 64, 128 ]
+  max_queue_delay_microseconds: 1000
+  preserve_ordering: false
+}
+
+model_warmup [{
+  name: "random_sample"
+  batch_size: 32
+  inputs {
+    key: "input"
+    value: {
+      data_type: TYPE_FP32
+      dims: [ 3, 224, 224 ]
+      random_data: true
+    }
+  }
+}]
+</pre>
+
+        <h3>7.6.1 TorchServe Integration</h3>
+        <p>TorchServe provides a flexible serving solution for PyTorch models with WIA backend support.</p>
+
+        <pre># TorchServe handler for WIA models
+import torch
+import torch_wia
+from ts.torch_handler.base_handler import BaseHandler
+
+class WIAHandler(BaseHandler):
+    def initialize(self, context):
+        properties = context.system_properties
+        self.device = torch.device('wia:0')
+
+        # Load model
+        model_dir = properties.get("model_dir")
+        model_pt_path = os.path.join(model_dir, "model.pt")
+
+        self.model = torch.jit.load(model_pt_path, map_location=self.device)
+        self.model.eval()
+
+        # Optimize for inference
+        self.model = torch.jit.optimize_for_inference(self.model)
+
+        self.initialized = True
+
+    def preprocess(self, data):
+        images = []
+        for row in data:
+            image = row.get("data") or row.get("body")
+            images.append(preprocess_image(image))
+
+        return torch.stack(images).to(self.device)
+
+    def inference(self, data):
+        with torch.inference_mode():
+            outputs = self.model(data)
+        return outputs
+
+    def postprocess(self, data):
+        # Convert to probabilities
+        probs = torch.softmax(data, dim=1)
+        return probs.cpu().numpy().tolist()
+</pre>
+
+        <h2>7.7 Quantization and Model Optimization</h2>
+        <p>Framework integration includes support for quantization-aware training and post-training quantization. WIA-AI-011 provides quantization schemes compatible with each framework's approach, enabling efficient INT8/FP16 inference.</p>
+
+        <pre># PyTorch quantization for WIA
+import torch
+import torch.quantization as quant
+import torch_wia
+
+# Define model
+model = ResNet50()
+model.eval()
+
+# Set quantization configuration for WIA
+model.qconfig = torch.quantization.get_default_qconfig('wia')
+
+# Or custom configuration
+custom_qconfig = torch.quantization.QConfig(
+    activation=torch.quantization.observer.MovingAverageMinMaxObserver.with_args(
+        dtype=torch.qint8, qscheme=torch.per_tensor_affine),
+    weight=torch.quantization.observer.MovingAveragePerChannelMinMaxObserver.with_args(
+        dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
+
+model.qconfig = custom_qconfig
+
+# Prepare model for quantization
+quant.prepare(model, inplace=True)
+
+# Calibration
+with torch.no_grad():
+    for batch in calibration_dataloader:
+        model(batch)
+
+# Convert to quantized model
+quant.convert(model, inplace=True)
+
+# Move to WIA device
+model = model.to('wia:0')
+
+# Verify quantization
+print(f"Model quantized: {next(model.parameters()).dtype}")  # qint8
+
+# Benchmark
+input_tensor = torch.randn(1, 3, 224, 224, device='wia:0')
+
+# FP32 baseline
+model_fp32 = ResNet50().to('wia:0')
+fp32_time = benchmark_model(model_fp32, input_tensor)
+
+# INT8 quantized
+int8_time = benchmark_model(model, input_tensor)
+
+print(f"FP32 latency: {fp32_time:.2f} ms")
+print(f"INT8 latency: {int8_time:.2f} ms")
+print(f"Speedup: {fp32_time / int8_time:.2f}x")
+</pre>
+
+        <h2>7.8 Distributed Training Support</h2>
+        <p>Framework integration extends to distributed training APIs. PyTorch's DistributedDataParallel (DDP), TensorFlow's MultiWorkerMirroredStrategy, and JAX's pmap all work seamlessly with WIA devices, leveraging WIA-AI-011's collective communication primitives.</p>
+
+        <pre># PyTorch DDP with WIA backend
+import torch
+import torch.distributed as dist
+import torch_wia
+
+# Initialize process group with WIA backend
+def setup(rank, world_size):
+    dist.init_process_group(
+        backend='wia',  # Use WIA collective operations
+        init_method='env://',
+        world_size=world_size,
+        rank=rank)
+
+    # Set device for this process
+    torch.wia.set_device(rank)
+
+def cleanup():
+    dist.destroy_process_group()
+
+def train(rank, world_size):
+    setup(rank, world_size)
+
+    # Create model and move to WIA device
+    model = ResNet50().to(rank)
+
+    # Wrap with DDP
+    model = torch.nn.parallel.DistributedDataParallel(
+        model,
+        device_ids=[rank],
+        output_device=rank,
+        gradient_as_bucket_view=True)  # Optimization
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    # Training loop
+    for epoch in range(num_epochs):
+        for batch in distributed_sampler:
+            images, labels = batch
+            images = images.to(rank)
+            labels = labels.to(rank)
+
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
+            loss.backward()  # Automatically does all-reduce of gradients
+            optimizer.step()
+
+    cleanup()
+
+# Launch distributed training
+if __name__ == '__main__':
+    world_size = torch.wia.device_count()
+    torch.multiprocessing.spawn(
+        train,
+        args=(world_size,),
+        nprocs=world_size,
+        join=True)
+</pre>
+
+        <h3>7.8.1 TensorFlow Distributed Strategy</h3>
+        <p>TensorFlow's distribution strategies abstract multi-device training.</p>
+
+        <pre>import tensorflow as tf
+import tensorflow_wia
+
+# Multi-worker mirrored strategy with WIA
+strategy = tf.distribute.MultiWorkerMirroredStrategy(
+    communication_options=tf.distribute.CommunicationOptions(
+        implementation=tf.distribute.CommunicationImplementation.WIA,
+        timeout_seconds=300))
+
+print(f"Number of devices: {strategy.num_replicas_in_sync}")
+
+# Define model within strategy scope
+with strategy.scope():
+    model = create_model()
+    model.compile(
+        optimizer='adam',
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy'])
+
+# Distributed training
+model.fit(distributed_dataset, epochs=10)
+</pre>
+
+        <h2>7.9 Profiling and Debugging Integration</h2>
+        <p>Framework profilers integrate with WIA-AI-011's profiling infrastructure, providing unified views of performance across framework and hardware layers.</p>
+
+        <pre># PyTorch profiling with WIA
+import torch
+import torch.profiler
+import torch_wia
+
+model = ResNet50().to('wia:0')
+input_tensor = torch.randn(32, 3, 224, 224, device='wia:0')
+
+# Profile with WIA support
+with torch.profiler.profile(
+    activities=[
+        torch.profiler.ProfilerActivity.CPU,
+        torch.profiler.ProfilerActivity.WIA  # WIA device activity
+    ],
+    schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+    on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/wia_profile'),
+    record_shapes=True,
+    profile_memory=True,
+    with_stack=True
+) as prof:
+    for _ in range(10):
+        output = model(input_tensor)
+        prof.step()
+
+# Print profiling results
+print(prof.key_averages().table(sort_by="wia_time_total", row_limit=10))
+
+# Profiler output:
+# -------------------------  ------------  ------------  ------------
+# Name                       CPU time      WIA time      Memory
+# -------------------------  ------------  ------------  ------------
+# aten::conv2d              2.34ms         15.67ms       128.5 MB
+# aten::batch_norm          0.89ms         3.21ms        64.2 MB
+# aten::relu                0.12ms         0.54ms        32.1 MB
+# aten::adaptive_avg_pool2d 0.08ms         0.31ms        4.0 MB
+# aten::linear              0.45ms         2.12ms        8.0 MB
+# -------------------------  ------------  ------------  ------------
+</pre>
+
+        <h2>7.10 Migration Tools and Best Practices</h2>
+        <p>Migrating existing models to WIA devices should be straightforward. WIA-AI-011 provides migration tools that automatically detect device placement, suggest optimizations, and verify numerical accuracy after migration.</p>
+
+        <pre># Migration tool usage
+wia-migrate --input model.py \\
+            --output model_wia.py \\
+            --source-device cuda:0 \\
+            --target-device wia:0 \\
+            --verify \\
+            --benchmark \\
+            --optimize
+
+# Tool output:
+# Analyzing model...
+# Found 152 operations
+# - 145 operations supported on WIA
+# - 7 operations fallback to CPU
+#
+# Applying transformations:
+# - Replacing torch.device('cuda:0') with torch.device('wia:0')
+# - Updating model.to() calls
+# - Adding WIA-specific optimizations
+#
+# Verifying numerical accuracy:
+# - Running test inputs on both devices
+# - Max absolute difference: 1.2e-5 (within tolerance)
+# - Max relative difference: 3.4e-6 (within tolerance)
+#
+# Benchmarking performance:
+# - CUDA latency: 12.5 ms
+# - WIA latency: 8.3 ms
+# - Speedup: 1.5x
+#
+# Migration successful! Output written to model_wia.py
+</pre>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <ul>
+                <li>WIA-AI-011 integrates seamlessly with all major ML frameworks: PyTorch, TensorFlow, JAX, and ONNX Runtime</li>
+                <li>PyTorch integration via custom device type, operator registration, and autograd support enables transparent WIA acceleration</li>
+                <li>TensorFlow integration through device plugins and XLA compiler backend optimizes graph execution on WIA devices</li>
+                <li>JAX integration leverages primitive operations and JIT compilation for high-performance functional programming</li>
+                <li>ONNX Runtime execution provider enables framework-agnostic model deployment across any WIA-compliant hardware</li>
+                <li>Production serving integrates with TorchServe, TensorFlow Serving, and Triton for scalable inference deployments</li>
+                <li>Quantization support (PTQ and QAT) compatible with framework-specific approaches enables efficient INT8/FP16 inference</li>
+                <li>Distributed training APIs (DDP, MultiWorkerMirroredStrategy, pmap) work natively with WIA collective communications</li>
+                <li>Profiling integration provides unified performance views across framework and hardware layers for optimization</li>
+                <li>Migration tools automate porting, verify correctness, and benchmark performance for smooth transitions to WIA devices</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain how WIA-AI-011 integrates with PyTorch's operator dispatcher. What is the role of TORCH_LIBRARY_IMPL?</li>
+                <li>Why is autograd support critical for PyTorch integration? How are backward passes implemented for WIA operators?</li>
+                <li>What role does XLA play in TensorFlow's WIA integration? How does it enable graph-level optimizations?</li>
+                <li>Describe the execution provider pattern in ONNX Runtime. How does it enable framework-agnostic deployment?</li>
+                <li>Why is JAX's functional programming model well-suited to WIA-AI-011's architecture?</li>
+                <li>Compare TorchServe and Triton Inference Server for WIA model deployment. What are the key differences?</li>
+                <li>How does dynamic batching in Triton improve inference throughput? What are the latency trade-offs?</li>
+                <li>Explain the difference between post-training quantization and quantization-aware training for WIA devices.</li>
+                <li>How does PyTorch's DistributedDataParallel leverage WIA collective communications for gradient synchronization?</li>
+                <li>What information does WIA profiling integration provide that framework-only profiling would miss?</li>
+                <li>Describe the migration tool workflow. What verifications should be performed when porting models to WIA devices?</li>
+                <li>How can framework integration respect each framework's design philosophy while providing consistent WIA access?</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · Benefit All Humanity</strong>
+            <p style="margin-top: 10px; font-size: 0.9em; color: #64748b;">Framework integration democratizes AI acceleration, enabling researchers and developers to leverage specialized hardware without abandoning familiar tools.</p>
+        </div>
+    </div>
+</body>
+</html>

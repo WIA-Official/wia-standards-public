@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장 - 개체명 인식과 품사 태깅 | WIA-AI-023</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 40px 20px;
+        }
+        .container { max-width: 850px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 50px; padding-bottom: 30px; border-bottom: 2px solid var(--border); }
+        .chapter-num { color: var(--primary); font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+        h1 { font-size: 2.5rem; margin-bottom: 15px; color: var(--text); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 40px 0 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        h3 { color: var(--text); font-size: 1.4rem; margin: 30px 0 15px; }
+        p { margin: 15px 0; color: var(--text-muted); font-size: 1.05rem; }
+        .highlight { background: var(--bg-card); border-left: 4px solid var(--primary); padding: 20px; margin: 25px 0; border-radius: 8px; }
+        code { background: var(--bg-card); padding: 3px 8px; border-radius: 4px; font-family: 'Courier New', monospace; color: var(--primary); }
+        pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; color: var(--text); }
+        ul, ol { margin: 15px 0; padding-left: 30px; }
+        li { margin: 10px 0; color: var(--text-muted); }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--bg-card); color: var(--primary); font-weight: 600; }
+        .summary { background: var(--bg-card); border: 2px solid var(--primary); border-radius: 12px; padding: 30px; margin: 40px 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        .review { background: var(--bg-card); border-radius: 12px; padding: 30px; margin: 40px 0; }
+        .review h2 { border: none; margin-top: 0; }
+        footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 2px solid var(--border); }
+        .philosophy { color: var(--primary); font-size: 1.2rem; margin-bottom: 15px; font-weight: 600; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-btn { padding: 12px 24px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; transition: all 0.3s; }
+        .nav-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-num">5장</div>
+            <h1>개체명 인식과 품사 태깅</h1>
+        </div>
+
+        <h2>5.1 시퀀스 라벨링 소개</h2>
+        <p>
+            시퀀스 라벨링은 시퀀스의 각 요소에 라벨을 할당합니다. 개체명 인식(NER)과 품사(POS) 태깅은 비정형 텍스트에서 구조화된 정보를 추출하는 기본적인 시퀀스 라벨링 작업입니다. 이러한 작업은 정보 추출, 질의응답 및 지식 그래프 구축을 포함한 많은 후속 NLP 애플리케이션의 구성 요소 역할을 합니다.
+        </p>
+        <p>
+            전체 텍스트에 단일 라벨을 할당하는 분류 작업과 달리, 시퀀스 라벨링은 인접한 단어 간의 맥락과 관계를 이해해야 합니다. 현대 접근법은 문맥적 임베딩과 트랜스포머 모델을 사용하여 최첨단 성능을 달성합니다.
+        </p>
+
+        <h2>5.2 품사 태깅</h2>
+        <p>
+            POS 태깅은 각 단어에 문법적 범주(명사, 동사, 형용사 등)를 할당합니다. 품사를 이해하는 것은 구문 분석, 개체명 인식 및 의미 분석에 도움이 됩니다.
+        </p>
+
+        <h3>일반적인 POS 태그</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>태그</th>
+                    <th>설명</th>
+                    <th>예</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>NN</td><td>명사, 단수</td><td>고양이, 개, 컴퓨터</td></tr>
+                <tr><td>NNS</td><td>명사, 복수</td><td>고양이들, 개들, 컴퓨터들</td></tr>
+                <tr><td>VB</td><td>동사, 기본형</td><td>달리다, 먹다, 처리하다</td></tr>
+                <tr><td>VBD</td><td>동사, 과거형</td><td>달렸다, 먹었다, 처리했다</td></tr>
+                <tr><td>JJ</td><td>형용사</td><td>자연스러운, 빠른, 아름다운</td></tr>
+                <tr><td>RB</td><td>부사</td><td>빠르게, 자연스럽게</td></tr>
+                <tr><td>DT</td><td>관형사</td><td>그, 하나의, 어떤</td></tr>
+                <tr><td>IN</td><td>전치사</td><td>에, 의, 와, 로</td></tr>
+            </tbody>
+        </table>
+
+        <pre><code>import nltk
+from nltk import pos_tag, word_tokenize
+
+nltk.download('averaged_perceptron_tagger')
+nltk.download('punkt')
+
+text = "자연어 처리가 비정형 텍스트 데이터를 변환합니다"
+tokens = word_tokenize(text)
+pos_tags = pos_tag(tokens)
+
+print("POS 태그:")
+for word, tag in pos_tags:
+    print(f"{word:15} -> {tag}")
+
+# 출력:
+# 자연어           -> NNP
+# 처리가          -> NN
+# 비정형          -> JJ
+# 텍스트          -> NN
+# 데이터를        -> NN
+# 변환합니다      -> VBZ</code></pre>
+
+        <h2>5.3 개체명 인식 기초</h2>
+        <p>
+            NER은 텍스트에서 개체명(사람, 조직, 위치, 날짜 등)을 식별하고 분류합니다. 정확한 NER은 정보 추출, 질의응답 및 지식 베이스 구축에 중요합니다.
+        </p>
+
+        <div class="highlight">
+            <h3>일반적인 개체 유형</h3>
+            <ul>
+                <li><strong>PERSON:</strong> 사람, 등장인물 (예: "알버트 아인슈타인", "팀 쿡")</li>
+                <li><strong>ORGANIZATION:</strong> 회사, 기관 (예: "애플", "유엔")</li>
+                <li><strong>LOCATION:</strong> 국가, 도시, 랜드마크 (예: "파리", "태평양")</li>
+                <li><strong>DATE:</strong> 날짜 및 시간 (예: "2025년 1월", "월요일")</li>
+                <li><strong>MONEY:</strong> 금액 (예: "100달러", "50유로")</li>
+                <li><strong>PRODUCT:</strong> 제품 및 서비스 (예: "아이폰", "윈도우 11")</li>
+                <li><strong>EVENT:</strong> 명명된 이벤트 (예: "올림픽", "제2차 세계대전")</li>
+            </ul>
+        </div>
+
+        <h2>5.4 BIO 태깅 스킴</h2>
+        <p>
+            BIO(Begin, Inside, Outside) 태깅 스킴은 시퀀스 라벨링에서 개체 경계를 표현합니다. 이 스킴은 여러 단어로 된 개체를 처리하고 개체 범위의 모호성을 방지합니다.
+        </p>
+
+        <pre><code># BIO 태깅 예
+sentence = "애플 CEO 팀 쿡이 뉴욕을 방문했습니다"
+
+# 단어       태그
+# 애플      B-ORG
+# CEO       O
+# 팀        B-PER
+# 쿡        I-PER
+# 이        O
+# 뉴        B-LOC
+# 욕        I-LOC
+# 을        O
+# 방문      O
+# 했습니다  O
+
+# B- : 개체 시작
+# I- : 개체 내부 (연속)
+# O  : 개체 외부</code></pre>
+
+        <h3>대체 태깅 스킴</h3>
+        <ul>
+            <li><strong>IOB2:</strong> 더 엄격한 규칙을 가진 BIO의 변형</li>
+            <li><strong>BILOU:</strong> Begin, Inside, Last, Outside, Unit (단일 단어 개체)</li>
+            <li><strong>IOBES:</strong> Inside, Outside, Begin, End, Single</li>
+        </ul>
+
+        <h2>5.5 전통적 NER 접근법</h2>
+        <p>
+            딥러닝 이전에 NER은 규칙 기반 시스템, 지명 사전 및 은닉 마르코프 모델(HMM)과 조건부 무작위장(CRF)과 같은 통계 모델에 의존했습니다.
+        </p>
+
+        <h3>조건부 무작위장(CRF)</h3>
+        <p>
+            CRF는 라벨 간의 순차적 의존성을 모델링하여 구조화된 예측 작업에 효과적입니다. 단어 형태, 대문자 사용, 접두사, 접미사 및 POS 태그와 같은 특징을 고려합니다.
+        </p>
+
+        <pre><code>from sklearn_crfsuite import CRF
+from sklearn_crfsuite.metrics import flat_classification_report
+
+def word_features(sentence, i):
+    """위치 i의 단어에 대한 특징 추출"""
+    word = sentence[i]
+
+    features = {
+        'word.lower': word.lower(),
+        'word.isupper': word.isupper(),
+        'word.istitle': word.istitle(),
+        'word.isdigit': word.isdigit(),
+        'word.prefix-2': word[:2],
+        'word.prefix-3': word[:3],
+        'word.suffix-2': word[-2:],
+        'word.suffix-3': word[-3:],
+    }
+
+    if i > 0:
+        prev_word = sentence[i-1]
+        features.update({
+            'prev_word.lower': prev_word.lower(),
+            'prev_word.istitle': prev_word.istitle(),
+        })
+
+    if i < len(sentence) - 1:
+        next_word = sentence[i+1]
+        features.update({
+            'next_word.lower': next_word.lower(),
+            'next_word.istitle': next_word.istitle(),
+        })
+
+    return features
+
+# CRF 모델 학습
+crf = CRF(algorithm='lbfgs',
+          c1=0.1,
+          c2=0.1,
+          max_iterations=100)
+
+# crf.fit(X_train, y_train)
+# predictions = crf.predict(X_test)</code></pre>
+
+        <h2>5.6 딥러닝을 이용한 NER</h2>
+        <p>
+            딥러닝은 CRF 계층을 가진 양방향 LSTM(BiLSTM-CRF)을 통해 NER을 변환했으며, 최근에는 최첨단 결과를 달성하는 트랜스포머 기반 모델을 사용합니다.
+        </p>
+
+        <h3>BiLSTM-CRF 아키텍처</h3>
+        <pre><code>import torch
+import torch.nn as nn
+
+class BiLSTM_CRF(nn.Module):
+    def __init__(self, vocab_size, tag_size, embedding_dim, hidden_dim):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim // 2,
+                           num_layers=1, bidirectional=True, batch_first=True)
+        self.hidden2tag = nn.Linear(hidden_dim, tag_size)
+        self.crf = CRF(tag_size, batch_first=True)
+
+    def forward(self, sentence, tags=None, mask=None):
+        # 임베딩
+        embeds = self.embedding(sentence)
+
+        # BiLSTM
+        lstm_out, _ = self.lstm(embeds)
+
+        # 태그 공간으로 투영
+        emissions = self.hidden2tag(lstm_out)
+
+        if tags is not None:
+            # 학습: 손실 계산
+            loss = -self.crf(emissions, tags, mask=mask)
+            return loss
+        else:
+            # 추론: 디코딩
+            return self.crf.decode(emissions, mask=mask)</code></pre>
+
+        <h2>5.7 트랜스포머 기반 NER</h2>
+        <p>
+            BERT와 기타 트랜스포머 모델은 풍부한 문맥적 표현을 제공하여 NER을 혁신했습니다. NER 데이터셋에 대해 사전 학습된 트랜스포머를 미세 조정하면 상대적으로 작은 라벨링된 데이터셋으로 우수한 성능을 달성합니다.
+        </p>
+
+        <pre><code>from transformers import BertForTokenClassification, BertTokenizer
+import torch
+
+# 토큰 분류를 위한 사전 학습된 BERT 로드
+model = BertForTokenClassification.from_pretrained('bert-base-cased', num_labels=9)
+tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+
+# 예제 문장
+text = "애플 CEO 팀 쿡이 쿠퍼티노에서 새 제품을 발표했습니다"
+inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True,
+                  return_offsets_mapping=True)
+
+# 예측 가져오기
+with torch.no_grad():
+    outputs = model(**{k: v for k, v in inputs.items() if k != 'offset_mapping'})
+    predictions = torch.argmax(outputs.logits, dim=2)
+
+# 예측을 라벨로 매핑
+label_list = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-MISC', 'I-MISC']
+tokens = tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+
+print("NER 결과:")
+for token, pred in zip(tokens, predictions[0]):
+    if token not in ['[CLS]', '[SEP]', '[PAD]']:
+        print(f"{token:15} -> {label_list[pred]}")</code></pre>
+
+        <h2>5.8 NER 평가 메트릭</h2>
+        <p>
+            NER 시스템 평가는 개별 토큰 분류 정확도뿐만 아니라 정확한 개체 경계 일치를 고려하는 메트릭이 필요합니다.
+        </p>
+
+        <h3>주요 메트릭</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>메트릭</th>
+                    <th>설명</th>
+                    <th>공식</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>정밀도</td>
+                    <td>올바른 예측 / 총 예측</td>
+                    <td>TP / (TP + FP)</td>
+                </tr>
+                <tr>
+                    <td>재현율</td>
+                    <td>올바른 예측 / 총 실제값</td>
+                    <td>TP / (TP + FN)</td>
+                </tr>
+                <tr>
+                    <td>F1 점수</td>
+                    <td>정밀도와 재현율의 조화 평균</td>
+                    <td>2 * (P * R) / (P + R)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <pre><code>from seqeval.metrics import classification_report, f1_score
+
+y_true = [['O', 'O', 'B-PER', 'I-PER', 'O', 'B-LOC']]
+y_pred = [['O', 'O', 'B-PER', 'I-PER', 'O', 'O']]
+
+# 메트릭 계산 (정확한 개체 일치)
+print(classification_report(y_true, y_pred))
+
+f1 = f1_score(y_true, y_pred)
+print(f"F1 점수: {f1:.4f}")</code></pre>
+
+        <h2>5.9 도메인별 NER</h2>
+        <p>
+            일반 NER 모델은 일반적인 개체에 잘 작동하지만, 전문 도메인(의료, 법률, 과학)은 해당 도메인의 주석이 달린 데이터에 대해 학습된 도메인별 모델이 필요합니다.
+        </p>
+
+        <div class="highlight">
+            <h3>생의학 NER 예</h3>
+            <p>
+                의학 텍스트에는 질병, 약물, 단백질 및 유전자와 같은 전문 개체가 포함되어 있습니다. PubMed 초록에 대해 학습된 BioBERT와 같은 모델은 생의학 NER에서 뛰어납니다.
+            </p>
+            <ul>
+                <li><strong>DISEASE:</strong> "당뇨병", "고혈압", "COVID-19"</li>
+                <li><strong>DRUG:</strong> "아스피린", "메트포르민", "이부프로펜"</li>
+                <li><strong>GENE:</strong> "BRCA1", "TP53", "EGFR"</li>
+                <li><strong>PROTEIN:</strong> "헤모글로빈", "인슐린", "항체"</li>
+            </ul>
+        </div>
+
+        <h2>5.10 WIA-AI-023 NER 표준</h2>
+        <p>
+            WIA-AI-023 표준은 다양한 NER 시스템 간의 상호운용성을 보장하기 위해 NER 입력, 출력 및 개체 유형 계층에 대한 형식을 정의합니다.
+        </p>
+
+        <pre><code>{
+  "standard": "WIA-AI-023",
+  "version": "1.0",
+  "task": "named_entity_recognition",
+  "input": {
+    "text": "애플 CEO 팀 쿡이 1월 15일 쿠퍼티노에서 새 제품을 발표했습니다",
+    "language": "ko"
+  },
+  "output": {
+    "entities": [
+      {
+        "text": "애플",
+        "type": "ORGANIZATION",
+        "start": 0,
+        "end": 2,
+        "confidence": 0.98
+      },
+      {
+        "text": "팀 쿡",
+        "type": "PERSON",
+        "start": 7,
+        "end": 10,
+        "confidence": 0.99
+      },
+      {
+        "text": "쿠퍼티노",
+        "type": "LOCATION",
+        "start": 21,
+        "end": 25,
+        "confidence": 0.97
+      },
+      {
+        "text": "1월 15일",
+        "type": "DATE",
+        "start": 12,
+        "end": 18,
+        "confidence": 0.95
+      }
+    ],
+    "entity_count": 4
+  },
+  "metadata": {
+    "model": "transformer-bert-ner",
+    "processing_time_ms": 52
+  }
+}</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <p><strong>핵심 내용:</strong></p>
+            <ul>
+                <li>시퀀스 라벨링은 시퀀스의 각 요소에 라벨 할당</li>
+                <li>POS 태깅은 구문 분석을 위한 문법적 범주 식별</li>
+                <li>NER은 사람, 조직, 위치와 같은 개체명 식별 및 분류</li>
+                <li>BIO 태깅 스킴은 시퀀스 라벨링에서 개체 경계 표현</li>
+                <li>CRF는 구조화된 예측을 위한 순차적 의존성 모델링</li>
+                <li>BiLSTM-CRF는 딥러닝과 구조화된 예측 결합</li>
+                <li>트랜스포머 모델은 문맥적 임베딩을 통해 최첨단 NER 달성</li>
+                <li>WIA-AI-023 표준은 시스템 간 NER 상호운용성 보장</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>POS 태깅과 개체명 인식의 차이점은 무엇인가?</li>
+                <li>BIO 태깅 스킴을 설명하고 NER에 왜 필요한지 말하시오.</li>
+                <li>CRF가 시퀀스 라벨링에서 순차적 의존성을 어떻게 포착하는가?</li>
+                <li>트랜스포머 기반 모델이 전통적 NER 접근법보다 성능이 뛰어난 이유는?</li>
+                <li>NER 시스템에 가장 적합한 평가 메트릭은 무엇인가?</li>
+                <li>일반 모델 대신 도메인별 NER 모델이 필요한 경우는 언제인가?</li>
+            </ol>
+        </div>
+
+        <div class="highlight">
+            <h3>다음 장 안내</h3>
+            <p>
+                6장에서는 감정 분석과 텍스트 분류를 탐구합니다—텍스트에 범주 또는 감정 점수를 할당하는 작업. 전통적인 머신러닝에서 현대 트랜스포머에 이르는 다양한 분류 접근법을 배우게 됩니다.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 네트워크 분할 - WIA 의료기기 보안 표준</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { padding: 2rem 0; border-bottom: 2px solid #14B8A6; margin-bottom: 2rem; }
+        .chapter-number { font-size: 1rem; color: #14B8A6; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #f8fafc; margin-bottom: 1rem; }
+        h2 { color: #14B8A6; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(20, 184, 166, 0.3); }
+        h3 { color: #14B8A6; font-size: 1.3rem; margin: 2rem 0 1rem 0; }
+        p { margin-bottom: 1.2rem; color: #cbd5e1; }
+        .chapter-nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #334155; color: #14B8A6; text-decoration: none; border-radius: 6px; transition: all 0.3s ease; border: 1px solid #14B8A6; }
+        .nav-button:hover { background: #14B8A6; color: #0f172a; transform: translateY(-2px); }
+        .highlight-box { background: rgba(20, 184, 166, 0.1); border-left: 4px solid #14B8A6; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #14B8A6; color: #0f172a; font-weight: 600; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #334155; }
+        .code-block { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 2rem 0; overflow-x: auto; }
+        .code-header { color: #14B8A6; font-size: 0.9rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; }
+        pre { margin: 0; color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+        .stat-card { background: #1e293b; padding: 1.5rem; border-radius: 8px; border: 1px solid #334155; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #14B8A6; margin-bottom: 0.5rem; }
+        .stat-label { color: #94a3b8; font-size: 0.9rem; }
+        footer { margin-top: 4rem; padding: 2rem 0; text-align: center; border-top: 2px solid #334155; color: #64748b; }
+        .footer-tagline { font-size: 1.1rem; color: #14B8A6; margin-bottom: 0.5rem; }
+        .warning-box { background: rgba(251, 191, 36, 0.1); border-left: 4px solid #fbbf24; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .info-box { background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        @media (max-width: 768px) { h1 { font-size: 2rem; } .container { padding: 1rem; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">4장</div>
+            <h1>네트워크 분할</h1>
+        </header>
+
+        <div class="highlight-box">
+            <strong>장 개요:</strong> 이 장에서는 의료 네트워크 분할 아키텍처를 다룹니다. 의료기기는 종종 일반 IT 네트워크와 동일한 인프라를 공유하는데, 이는 심각한 보안 위험을 초래합니다. 네트워크 분할은 의료기기를 격리하여 공격 표면을 줄이고 환자 안전을 보장하는 핵심 방어 전략입니다.
+        </div>
+
+        <h2>네트워크 분할의 필요성</h2>
+
+        <p>의료 기관의 네트워크는 다양한 시스템이 혼재되어 있습니다. 전자의무기록(EMR), 사무용 PC, 의료기기, IoT 센서, 환자 Wi-Fi 등이 모두 동일한 네트워크에 연결되어 있으면, 한 시스템의 침해가 전체 네트워크로 확산될 수 있습니다.</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">75%</div>
+                <div class="stat-label">의료기기 네트워크 연결률</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">53%</div>
+                <div class="stat-label">병원 내 횡적 이동 공격</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">43일</div>
+                <div class="stat-label">평균 침해 탐지 시간</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">$10.1M</div>
+                <div class="stat-label">의료 데이터 침해 평균 비용</div>
+            </div>
+        </div>
+
+        <h3>WannaCry 랜섬웨어 사례 (2017)</h3>
+
+        <p>2017년 5월, WannaCry 랜섬웨어가 전 세계를 강타했습니다. 영국 국민보건서비스(NHS)는 가장 큰 피해를 입은 조직 중 하나였습니다. 네트워크 분할 부재로 인해:</p>
+
+        <ul>
+            <li><strong>80개 병원</strong>이 영향을 받음</li>
+            <li><strong>MRI, CT 스캐너</strong> 등 영상 장비가 감염되어 작동 중단</li>
+            <li><strong>19,000건의 예약</strong>이 취소됨</li>
+            <li><strong>$120M 이상</strong>의 피해 발생</li>
+            <li><strong>환자 치료 지연</strong>으로 인한 생명 위험</li>
+        </ul>
+
+        <div class="warning-box">
+            <strong>핵심 교훈:</strong> WannaCry는 Windows SMBv1 취약점(EternalBlue)을 악용했습니다. 만약 의료기기 네트워크가 일반 네트워크로부터 분할되어 있었다면, 감염이 사무용 PC에서 중요한 의료기기로 확산되는 것을 방지할 수 있었을 것입니다.
+        </div>
+
+        <h2>네트워크 분할 아키텍처</h2>
+
+        <h3>1. 물리적 분할 vs. 논리적 분할</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>분할 유형</th>
+                    <th>구현 방법</th>
+                    <th>장점</th>
+                    <th>단점</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>물리적 분할</strong></td>
+                    <td>별도의 물리적 네트워크 인프라</td>
+                    <td>• 최고 수준 격리<br>• 설정 간단<br>• 명확한 경계</td>
+                    <td>• 높은 비용<br>• 유연성 낮음<br>• 공간 필요</td>
+                </tr>
+                <tr>
+                    <td><strong>논리적 분할 (VLAN)</strong></td>
+                    <td>동일 물리 인프라, 가상 분할</td>
+                    <td>• 비용 효율적<br>• 유연한 관리<br>• 동적 재구성</td>
+                    <td>• 설정 복잡<br>• VLAN 호핑 위험<br>• 스위치 의존</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 의료 네트워크 세그먼트 설계</h3>
+
+        <p>전형적인 병원 네트워크는 다음과 같이 여러 세그먼트로 분할되어야 합니다:</p>
+
+        <div class="code-block">
+            <div class="code-header">네트워크 세그먼트 아키텍처</div>
+            <pre>
+┌─────────────────────────────────────────────────────────┐
+│                    인터넷 / WAN                          │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+             ┌────────▼────────┐
+             │  경계 방화벽     │  (외부 ↔ 내부)
+             └────────┬────────┘
+                      │
+        ┌─────────────┼─────────────┐
+        │                           │
+┌───────▼───────┐         ┌────────▼────────┐
+│  DMZ Zone     │         │  Internal Zone  │
+│  (VLAN 10)    │         │                 │
+├───────────────┤         └────────┬────────┘
+│ • 웹 서버     │                  │
+│ • 이메일      │         ┌────────┼────────┬─────────┐
+│ • VPN 게이트  │         │        │        │         │
+└───────────────┘   ┌─────▼───┐ ┌─▼────┐ ┌▼──────┐ ┌▼────────┐
+                    │ 의료기기 │ │ EMR  │ │ 업무용 │ │ 환자용  │
+                    │ (VLAN20)│ │(VL30)│ │(VL40) │ │ (VL50)  │
+                    └─────────┘ └──────┘ └───────┘ └─────────┘
+
+VLAN 20 - 의료기기 네트워크 (최우선 보호)
+  ├─ VLAN 21: 생명 유지 장치 (인공호흡기, 투석기)
+  ├─ VLAN 22: 영상 장비 (MRI, CT, X-ray)
+  ├─ VLAN 23: 환자 모니터링
+  └─ VLAN 24: 수술실 기기
+
+VLAN 30 - EMR 및 임상 시스템
+  ├─ VLAN 31: 데이터베이스 서버
+  ├─ VLAN 32: 애플리케이션 서버
+  └─ VLAN 33: 의료진 워크스테이션
+
+VLAN 40 - 업무용 네트워크
+  ├─ VLAN 41: 관리자 PC
+  ├─ VLAN 42: 재무/인사
+  └─ VLAN 43: 일반 직원
+
+VLAN 50 - 환자 및 게스트
+  ├─ VLAN 51: 환자 Wi-Fi (인터넷만)
+  └─ VLAN 52: 방문객 네트워크
+</pre>
+        </div>
+
+        <h3>3. 마이크로 세그먼테이션</h3>
+
+        <p>전통적인 VLAN 기반 분할을 넘어, 개별 의료기기 또는 기기 그룹을 격리하는 마이크로 세그먼테이션이 권장됩니다:</p>
+
+        <ul>
+            <li><strong>제로 트러스트 원칙:</strong> "신뢰하지 말고 항상 확인" - 동일 VLAN 내부에서도 기기 간 통신 제한</li>
+            <li><strong>SDN (Software-Defined Networking):</strong> 프로그래밍 가능한 네트워크 정책으로 세밀한 제어</li>
+            <li><strong>화이트리스트 기반:</strong> 명시적으로 허용된 통신만 가능, 모든 나머지는 거부</li>
+        </ul>
+
+        <div class="code-block">
+            <div class="code-header">마이크로 세그먼테이션 예시 - 인공호흡기</div>
+            <pre>
+디바이스: 인공호흡기 A (IP: 10.20.21.15)
+
+허용된 통신:
+  → EMR 서버 (10.30.31.10)    포트 TCP 443 (HTTPS)      용도: 환자 데이터 전송
+  → NTP 서버 (10.100.1.5)     포트 UDP 123 (NTP)        용도: 시간 동기화
+  → 간호사 스테이션 (10.30.33.20) 포트 TCP 5000 (모니터) 용도: 실시간 상태 표시
+  → 펌웨어 서버 (10.100.2.10) 포트 TCP 443 (HTTPS)      용도: 소프트웨어 업데이트
+
+거부된 통신:
+  ✗ 다른 인공호흡기 (10.20.21.16-30)  이유: 불필요한 기기 간 통신
+  ✗ 인터넷 (any)                    이유: 외부 연결 불필요
+  ✗ 환자 Wi-Fi (10.50.0.0/16)       이유: 보안 격리
+  ✗ 업무용 PC (10.40.0.0/16)        이유: 권한 없음
+
+로깅:
+  • 모든 연결 시도 기록
+  • 거부된 트래픽 알림
+  • 일일 감사 로그 생성
+</pre>
+        </div>
+
+        <h2>방화벽 정책 설계</h2>
+
+        <h3>1. 존 간 방화벽 규칙</h3>
+
+        <p>각 네트워크 존 사이에는 방화벽이 배치되어 트래픽을 제어합니다:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>출발지</th>
+                    <th>목적지</th>
+                    <th>허용 프로토콜</th>
+                    <th>정책</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>의료기기</td>
+                    <td>EMR</td>
+                    <td>HTTPS (443), HL7 (2575)</td>
+                    <td>허용 (화이트리스트)</td>
+                </tr>
+                <tr>
+                    <td>의료기기</td>
+                    <td>인터넷</td>
+                    <td>없음</td>
+                    <td>거부</td>
+                </tr>
+                <tr>
+                    <td>EMR</td>
+                    <td>의료기기</td>
+                    <td>없음</td>
+                    <td>거부 (단방향만)</td>
+                </tr>
+                <tr>
+                    <td>업무용</td>
+                    <td>의료기기</td>
+                    <td>없음</td>
+                    <td>거부</td>
+                </tr>
+                <tr>
+                    <td>환자 Wi-Fi</td>
+                    <td>내부</td>
+                    <td>없음</td>
+                    <td>거부 (인터넷만)</td>
+                </tr>
+                <tr>
+                    <td>관리자</td>
+                    <td>의료기기</td>
+                    <td>SSH (22), RDP (3389)</td>
+                    <td>허용 (MFA 필수)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 심층 패킷 검사 (DPI)</h3>
+
+        <p>차세대 방화벽(NGFW)은 단순히 포트를 확인하는 것을 넘어 패킷 내용을 분석합니다:</p>
+
+        <ul>
+            <li><strong>프로토콜 검증:</strong> HL7, DICOM 등 의료 프로토콜의 정상성 확인</li>
+            <li><strong>악성 코드 차단:</strong> 파일 전송 시 바이러스 스캔</li>
+            <li><strong>데이터 유출 방지:</strong> PHI가 허용되지 않은 경로로 전송되는지 탐지</li>
+            <li><strong>애플리케이션 인식:</strong> 포트 번호와 무관하게 실제 애플리케이션 식별</li>
+        </ul>
+
+        <h2>의료 프로토콜 보안</h2>
+
+        <h3>1. DICOM (Digital Imaging and Communications in Medicine)</h3>
+
+        <p>의료 영상 전송 표준인 DICOM은 원래 보안을 염두에 두고 설계되지 않았습니다:</p>
+
+        <div class="warning-box">
+            <strong>DICOM 보안 문제:</strong>
+            <ul style="margin-top: 1rem;">
+                <li>기본적으로 암호화 없음 (평문 전송)</li>
+                <li>인증 메커니즘 선택적 (많은 기기가 미구현)</li>
+                <li>환자 정보가 이미지 메타데이터에 포함</li>
+                <li>PACS (Picture Archiving and Communication System) 서버가 공격 표적</li>
+            </ul>
+        </div>
+
+        <p><strong>완화 조치:</strong></p>
+
+        <ul>
+            <li>DICOM TLS (암호화된 DICOM) 사용</li>
+            <li>PACS 서버를 별도 VLAN에 격리</li>
+            <li>VPN 터널을 통한 원격 접근만 허용</li>
+            <li>접근 제어 목록(ACL)으로 허가된 기기만 연결</li>
+        </ul>
+
+        <h3>2. HL7 (Health Level 7)</h3>
+
+        <p>병원 정보 시스템 간 데이터 교환 표준:</p>
+
+        <div class="code-block">
+            <div class="code-header">HL7 메시지 보안 구성</div>
+            <pre>
+# HL7 v2.x 보안 (레거시)
+기본 HL7: TCP 포트 2575 (평문)
+보안 HL7: TLS 포트 2576 (암호화)
+
+권장 설정:
+  • TLS 1.2 이상 강제
+  • 상호 인증 (클라이언트 인증서)
+  • 메시지 서명 (변조 방지)
+
+# FHIR (Fast Healthcare Interoperability Resources) - 최신 표준
+프로토콜: HTTPS (RESTful API)
+인증: OAuth 2.0 + SMART on FHIR
+암호화: TLS 1.3
+권한: RBAC (역할 기반 접근 제어)
+
+FHIR 보안 장점:
+  ✓ 기본적으로 HTTPS 사용
+  ✓ 표준화된 인증/권한 부여
+  ✓ JSON/XML 스키마 검증
+  ✓ 세밀한 권한 제어
+</pre>
+        </div>
+
+        <h2>무선 네트워크 보안</h2>
+
+        <h3>1. 의료기기 Wi-Fi 분리</h3>
+
+        <p>무선 의료기기는 증가하고 있지만, Wi-Fi 보안은 종종 간과됩니다:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Wi-Fi 네트워크</th>
+                    <th>SSID</th>
+                    <th>보안</th>
+                    <th>용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>의료기기 전용</strong></td>
+                    <td>MedDevice (숨김)</td>
+                    <td>WPA3-Enterprise + 802.1X</td>
+                    <td>생명 유지 장치, 모니터</td>
+                </tr>
+                <tr>
+                    <td><strong>의료진</strong></td>
+                    <td>MedStaff</td>
+                    <td>WPA3-Enterprise</td>
+                    <td>의사, 간호사 노트북/태블릿</td>
+                </tr>
+                <tr>
+                    <td><strong>관리자</strong></td>
+                    <td>AdminNet</td>
+                    <td>WPA3 + VPN</td>
+                    <td>IT 관리, 유지보수</td>
+                </tr>
+                <tr>
+                    <td><strong>환자/방문객</strong></td>
+                    <td>GuestWiFi</td>
+                    <td>WPA2 + Captive Portal</td>
+                    <td>인터넷 접속만 (격리)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 무선 침입 탐지 시스템 (WIDS)</h3>
+
+        <p>병원 무선 네트워크를 모니터링하여 이상 활동 탐지:</p>
+
+        <ul>
+            <li><strong>불법 AP (Rogue AP) 탐지:</strong> 허가받지 않은 무선 액세스 포인트 발견</li>
+            <li><strong>이블 트윈 공격 차단:</strong> 정상 SSID를 모방한 가짜 AP 식별</li>
+            <li><strong>디어소시에이션 공격 탐지:</strong> 무선 연결을 강제로 끊는 공격 감지</li>
+            <li><strong>클라이언트 격리:</strong> 감염된 기기를 자동으로 네트워크에서 격리</li>
+        </ul>
+
+        <h2>네트워크 접근 제어 (NAC)</h2>
+
+        <p>NAC 솔루션은 네트워크에 연결하려는 모든 기기를 검증합니다:</p>
+
+        <h3>1. 802.1X 인증</h3>
+
+        <div class="code-block">
+            <div class="code-header">802.1X 인증 프로세스</div>
+            <pre>
+┌─────────────┐      ┌───────────┐      ┌─────────────┐
+│ 의료기기     │      │ 스위치/AP  │      │ RADIUS 서버 │
+│ (Supplicant)│      │(Authenticator)│   │             │
+└──────┬──────┘      └─────┬─────┘      └──────┬──────┘
+       │                   │                   │
+       │ 1. EAPOL-Start    │                   │
+       ├──────────────────>│                   │
+       │                   │ 2. EAP-Request    │
+       │<──────────────────┤                   │
+       │ 3. EAP-Response   │                   │
+       │   (인증서)         │ 4. RADIUS Access  │
+       ├──────────────────>│    Request        │
+       │                   ├──────────────────>│
+       │                   │                   │ 5. 인증서 검증
+       │                   │                   │    + 정책 확인
+       │                   │ 6. RADIUS Access  │
+       │                   │    Accept         │
+       │                   │<──────────────────┤
+       │ 7. EAP-Success    │                   │
+       │<──────────────────┤                   │
+       │                   │ 8. VLAN 할당      │
+       │                   │    (예: VLAN 21)  │
+       │ 9. 네트워크 접근   │                   │
+       │    허용            │                   │
+
+인증 실패 시:
+  → 격리 VLAN으로 이동 (VLAN 99)
+  → 제한된 리소스만 접근 (패치 서버, WSUS)
+  → 관리자 알림
+</pre>
+        </div>
+
+        <h3>2. 기기 프로파일링</h3>
+
+        <p>NAC는 연결된 기기의 특성을 분석하여 자동으로 분류하고 적절한 VLAN에 할당합니다:</p>
+
+        <ul>
+            <li><strong>제조업체 식별:</strong> MAC 주소 OUI (Organizationally Unique Identifier) 분석</li>
+            <li><strong>트래픽 패턴 분석:</strong> 정상적인 의료기기 통신 행동 학습</li>
+            <li><strong>능동 핑거프린팅:</strong> SNMP, HTTP 헤더, DHCP 옵션으로 기기 유형 파악</li>
+            <li><strong>동적 VLAN 할당:</strong> 기기 유형에 따라 자동으로 적절한 VLAN 배정</li>
+        </ul>
+
+        <h2>제로 트러스트 아키텍처</h2>
+
+        <p>전통적인 성벽 모델("내부는 신뢰, 외부는 불신")을 넘어, 제로 트러스트는 모든 통신을 의심합니다:</p>
+
+        <h3>제로 트러스트 핵심 원칙</h3>
+
+        <ul>
+            <li><strong>Never Trust, Always Verify (절대 신뢰하지 말고, 항상 검증)</strong></li>
+            <li><strong>Least Privilege Access (최소 권한 원칙):</strong> 필요한 최소한의 권한만 부여</li>
+            <li><strong>Assume Breach (침해 전제):</strong> 이미 침투당했다고 가정하고 설계</li>
+            <li><strong>Micro-Segmentation (마이크로 세그먼테이션):</strong> 네트워크를 최대한 작은 단위로 분할</li>
+            <li><strong>Continuous Monitoring (지속 모니터링):</strong> 모든 활동을 실시간 감시</li>
+        </ul>
+
+        <div class="info-box">
+            <strong>의료 환경에서 제로 트러스트 구현:</strong>
+            <ul style="margin-top: 1rem;">
+                <li><strong>Step 1:</strong> 모든 의료기기와 데이터 흐름 가시화 (자산 인벤토리)</li>
+                <li><strong>Step 2:</strong> 기기 간 필요한 통신 정의 (화이트리스트 생성)</li>
+                <li><strong>Step 3:</strong> 마이크로 세그먼트 생성 및 방화벽 정책 적용</li>
+                <li><strong>Step 4:</strong> 모든 접근 시도에 대해 인증 및 권한 확인</li>
+                <li><strong>Step 5:</strong> 지속적 모니터링 및 이상 탐지</li>
+                <li><strong>Step 6:</strong> 정기적 정책 검토 및 업데이트</li>
+            </ul>
+        </div>
+
+        <h2>네트워크 모니터링 및 로깅</h2>
+
+        <p>분할된 네트워크는 지속적으로 모니터링되어야 합니다:</p>
+
+        <h3>1. SIEM (Security Information and Event Management)</h3>
+
+        <ul>
+            <li>모든 네트워크 장비, 방화벽, 기기에서 로그 수집</li>
+            <li>중앙 집중식 로그 분석 및 상관관계 분석</li>
+            <li>의심스러운 패턴 자동 탐지 (예: 야간 대량 데이터 전송)</li>
+            <li>실시간 알림 및 자동화된 대응</li>
+        </ul>
+
+        <h3>2. 네트워크 트래픽 분석 (NTA)</h3>
+
+        <ul>
+            <li>NetFlow, sFlow, IPFIX 데이터 수집</li>
+            <li>기준선(baseline) 행동 학습</li>
+            <li>이상 트래픽 탐지 (예: MRI 스캐너가 갑자기 인터넷에 접속)</li>
+            <li>APT (Advanced Persistent Threat) 탐지</li>
+        </ul>
+
+        <h2>레거시 기기 통합 문제</h2>
+
+        <p>많은 의료기기는 최신 보안 표준을 지원하지 않습니다:</p>
+
+        <div class="warning-box">
+            <strong>레거시 기기 보안 과제:</strong>
+            <ul style="margin-top: 1rem;">
+                <li>802.1X 인증 미지원</li>
+                <li>WPA3 또는 WPA2-Enterprise 불가</li>
+                <li>고정 IP 주소 요구</li>
+                <li>특정 포트만 사용 가능</li>
+                <li>펌웨어 업데이트 불가능 (제조업체 지원 종료)</li>
+            </ul>
+        </div>
+
+        <p><strong>보상 제어 (Compensating Controls):</strong></p>
+
+        <ul>
+            <li><strong>MAC 인증 우회 (MAB):</strong> 802.1X 미지원 기기를 MAC 주소로 인증</li>
+            <li><strong>전용 VLAN 격리:</strong> 레거시 기기만을 위한 고도로 제한된 네트워크</li>
+            <li><strong>인라인 방화벽:</strong> 레거시 기기 앞에 배치하여 트래픽 필터링</li>
+            <li><strong>물리적 격리:</strong> 가장 취약한 기기는 네트워크에서 완전히 분리</li>
+        </ul>
+
+        <h2>결론</h2>
+
+        <p>네트워크 분할은 의료기기 보안의 핵심 방어선입니다. 적절히 설계된 네트워크 아키텍처는 공격 표면을 크게 줄이고, 침해 발생 시 피해 확산을 제한하며, 환자 안전을 보호합니다.</p>
+
+        <p>의료 기관은 물리적 또는 논리적 분할, 방화벽 정책, 마이크로 세그먼테이션, 제로 트러스트 원칙을 조합하여 다층 방어를 구축해야 합니다. 또한 레거시 기기에 대한 현실적인 접근법을 마련하고, 지속적인 모니터링을 통해 이상 활동을 조기에 탐지해야 합니다.</p>
+
+        <p>다음 장에서는 의료기기 펌웨어 업데이트 관리와 보안 부팅 메커니즘을 살펴보겠습니다.</p>
+
+        </div>
+</body>
+</html>

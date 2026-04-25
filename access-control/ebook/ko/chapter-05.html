@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 보안 프로토콜과 암호화 | WIA-ACCESS_CONTROL</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>5장: 보안 프로토콜과 암호화</h1>
+
+    <h2>5.1 인증/인가 프로토콜 개요</h2>
+    <p>현대 분산 시스템에서 인증과 인가를 안전하게 처리하기 위한 표준 프로토콜들이 개발되었습니다. 이 프로토콜들은 서로 다른 시스템과 도메인 간의 안전한 접근 제어를 가능하게 합니다.</p>
+
+    <div class="highlight">
+        <strong>프로토콜 선택:</strong> 적절한 프로토콜 선택은 보안과 상호운용성의 핵심입니다. 각 프로토콜의 강점과 한계를 이해하고 사용 사례에 맞는 것을 선택해야 합니다.
+    </div>
+
+    <h2>5.2 OAuth 2.0</h2>
+    <p>OAuth 2.0은 인가를 위한 업계 표준 프로토콜입니다. 사용자가 자격 증명을 공유하지 않고도 제3자 애플리케이션에 리소스 접근 권한을 부여할 수 있게 합니다.</p>
+
+    <h3>5.2.1 OAuth 2.0 Grant Types</h3>
+    <table>
+        <tr>
+            <th>Grant Type</th>
+            <th>사용 사례</th>
+        </tr>
+        <tr>
+            <td>Authorization Code</td>
+            <td>서버 측 웹 애플리케이션</td>
+        </tr>
+        <tr>
+            <td>Authorization Code + PKCE</td>
+            <td>모바일/SPA 애플리케이션</td>
+        </tr>
+        <tr>
+            <td>Client Credentials</td>
+            <td>서비스 간 통신 (M2M)</td>
+        </tr>
+        <tr>
+            <td>Device Code</td>
+            <td>입력이 제한된 기기</td>
+        </tr>
+    </table>
+
+    <pre><code>// OAuth 2.0 Authorization Code Flow with PKCE
+class OAuth2Client {
+    private clientId: string;
+    private redirectUri: string;
+    private authServer: string;
+
+    // 1. 인가 요청 생성
+    async startAuthorization(): Promise&lt;string&gt; {
+        // PKCE 코드 검증기 및 챌린지 생성
+        const codeVerifier = this.generateCodeVerifier();
+        const codeChallenge = await this.generateCodeChallenge(codeVerifier);
+
+        // 상태 저장
+        sessionStorage.setItem('code_verifier', codeVerifier);
+        const state = this.generateState();
+        sessionStorage.setItem('oauth_state', state);
+
+        // 인가 URL 구성
+        const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: this.clientId,
+            redirect_uri: this.redirectUri,
+            scope: 'openid profile email',
+            state: state,
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256'
+        });
+
+        return `${this.authServer}/authorize?${params}`;
+    }
+
+    // 2. 토큰 교환
+    async exchangeCodeForTokens(code: string, state: string): Promise&lt;TokenResponse&gt; {
+        // 상태 검증
+        if (state !== sessionStorage.getItem('oauth_state')) {
+            throw new Error('Invalid state parameter');
+        }
+
+        const codeVerifier = sessionStorage.getItem('code_verifier');
+
+        const response = await fetch(`${this.authServer}/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: this.redirectUri,
+                client_id: this.clientId,
+                code_verifier: codeVerifier!
+            })
+        });
+
+        return response.json();
+    }
+
+    private generateCodeVerifier(): string {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return this.base64UrlEncode(array);
+    }
+
+    private async generateCodeChallenge(verifier: string): Promise&lt;string&gt; {
+        const hash = await crypto.subtle.digest('SHA-256',
+            new TextEncoder().encode(verifier));
+        return this.base64UrlEncode(new Uint8Array(hash));
+    }
+}</code></pre>
+
+    <h2>5.3 OpenID Connect</h2>
+    <p>OpenID Connect (OIDC)는 OAuth 2.0 위에 구축된 인증 계층으로, 사용자 신원 확인 기능을 추가합니다.</p>
+
+    <pre><code>// ID 토큰 검증
+interface IDToken {
+    iss: string;      // 발급자
+    sub: string;      // 주체 식별자
+    aud: string;      // 대상 (클라이언트 ID)
+    exp: number;      // 만료 시간
+    iat: number;      // 발급 시간
+    nonce?: string;   // 재생 공격 방지
+    auth_time?: number; // 인증 시간
+    // 추가 클레임
+    name?: string;
+    email?: string;
+    email_verified?: boolean;
+}
+
+class IDTokenValidator {
+    async validate(idToken: string, expectedNonce: string): Promise&lt;IDToken&gt; {
+        // JWT 파싱 및 서명 검증
+        const [headerB64, payloadB64, signatureB64] = idToken.split('.');
+
+        const header = JSON.parse(atob(headerB64));
+        const payload: IDToken = JSON.parse(atob(payloadB64));
+
+        // 1. 서명 검증
+        const jwks = await this.fetchJWKS();
+        const key = jwks.keys.find(k => k.kid === header.kid);
+        const isValid = await this.verifySignature(idToken, key);
+        if (!isValid) throw new Error('Invalid signature');
+
+        // 2. 발급자 검증
+        if (payload.iss !== this.expectedIssuer) {
+            throw new Error('Invalid issuer');
+        }
+
+        // 3. 대상 검증
+        if (payload.aud !== this.clientId) {
+            throw new Error('Invalid audience');
+        }
+
+        // 4. 만료 검증
+        if (payload.exp < Date.now() / 1000) {
+            throw new Error('Token expired');
+        }
+
+        // 5. Nonce 검증
+        if (payload.nonce !== expectedNonce) {
+            throw new Error('Invalid nonce');
+        }
+
+        return payload;
+    }
+}</code></pre>
+
+    <h2>5.4 SAML 2.0</h2>
+    <p>SAML(Security Assertion Markup Language)은 엔터프라이즈 환경에서 널리 사용되는 XML 기반 인증 표준입니다.</p>
+
+    <div class="highlight">
+        <strong>SAML vs OIDC:</strong> SAML은 엔터프라이즈 SSO에 성숙한 솔루션이지만 복잡합니다. OIDC는 더 간단하고 모바일 친화적입니다. 새 프로젝트는 OIDC를, 레거시 시스템은 SAML을 사용하는 경우가 많습니다.
+    </div>
+
+    <h2>5.5 토큰 보안</h2>
+    <p>인증/인가 토큰의 안전한 관리는 시스템 보안의 핵심입니다:</p>
+
+    <h3>5.5.1 JWT 보안 모범 사례</h3>
+    <pre><code>// JWT 보안 구현
+import { SignJWT, jwtVerify } from 'jose';
+
+class SecureJWTService {
+    private signingKey: CryptoKey;
+    private encryptionKey: CryptoKey;
+
+    async createAccessToken(claims: TokenClaims): Promise&lt;string&gt; {
+        return new SignJWT(claims)
+            .setProtectedHeader({ alg: 'ES256' })  // 비대칭 알고리즘 사용
+            .setIssuedAt()
+            .setExpirationTime('15m')  // 짧은 만료 시간
+            .setIssuer('https://auth.example.com')
+            .setAudience('https://api.example.com')
+            .setJti(crypto.randomUUID())  // 고유 토큰 ID
+            .sign(this.signingKey);
+    }
+
+    async verifyToken(token: string): Promise&lt;TokenClaims&gt; {
+        const { payload } = await jwtVerify(token, this.publicKey, {
+            issuer: 'https://auth.example.com',
+            audience: 'https://api.example.com',
+            algorithms: ['ES256']  // 허용 알고리즘 제한
+        });
+
+        // 추가 검증
+        if (await this.isRevoked(payload.jti)) {
+            throw new Error('Token has been revoked');
+        }
+
+        return payload as TokenClaims;
+    }
+}
+
+// 토큰 저장 보안
+const tokenStorage = {
+    // 브라우저: HttpOnly, Secure, SameSite 쿠키 사용
+    storeInCookie: (token: string) => {
+        document.cookie = `access_token=${token}; ` +
+            'HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=900';
+    },
+
+    // 모바일: 안전한 저장소 사용
+    storeSecurely: async (token: string) => {
+        await SecureStore.setItemAsync('access_token', token);
+    }
+};</code></pre>
+
+    <h2>5.6 전송 보안</h2>
+    <p>모든 인증/인가 통신은 암호화된 채널을 통해 이루어져야 합니다:</p>
+
+    <table>
+        <tr>
+            <th>요구사항</th>
+            <th>설정</th>
+        </tr>
+        <tr>
+            <td>TLS 버전</td>
+            <td>TLS 1.2 이상 (권장: TLS 1.3)</td>
+        </tr>
+        <tr>
+            <td>암호 스위트</td>
+            <td>AEAD 암호만 (AES-GCM, ChaCha20-Poly1305)</td>
+        </tr>
+        <tr>
+            <td>인증서</td>
+            <td>2048비트 RSA 또는 256비트 ECDSA 이상</td>
+        </tr>
+        <tr>
+            <td>HSTS</td>
+            <td>max-age=31536000; includeSubDomains</td>
+        </tr>
+    </table>
+
+    <h2>5.7 세션 관리</h2>
+    <pre><code>// 안전한 세션 관리
+class SessionManager {
+    private readonly SESSION_DURATION = 30 * 60 * 1000; // 30분
+    private readonly ABSOLUTE_TIMEOUT = 8 * 60 * 60 * 1000; // 8시간
+
+    async createSession(userId: string, context: SessionContext): Promise&lt;Session&gt; {
+        const session: Session = {
+            id: crypto.randomUUID(),
+            userId,
+            createdAt: Date.now(),
+            lastActivity: Date.now(),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+            deviceFingerprint: context.deviceFingerprint
+        };
+
+        await this.sessionStore.set(session.id, session);
+        return session;
+    }
+
+    async validateSession(sessionId: string, context: SessionContext): Promise&lt;boolean&gt; {
+        const session = await this.sessionStore.get(sessionId);
+        if (!session) return false;
+
+        // 절대 타임아웃 확인
+        if (Date.now() - session.createdAt > this.ABSOLUTE_TIMEOUT) {
+            await this.invalidateSession(sessionId);
+            return false;
+        }
+
+        // 비활성 타임아웃 확인
+        if (Date.now() - session.lastActivity > this.SESSION_DURATION) {
+            await this.invalidateSession(sessionId);
+            return false;
+        }
+
+        // 세션 고정 공격 방지: IP/기기 변경 확인
+        if (session.ipAddress !== context.ipAddress ||
+            session.deviceFingerprint !== context.deviceFingerprint) {
+            // 위험 플래그 설정, 재인증 요구
+            return false;
+        }
+
+        // 활동 시간 갱신
+        session.lastActivity = Date.now();
+        await this.sessionStore.set(sessionId, session);
+
+        return true;
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>세션 보안 원칙:</strong> 세션 ID는 예측 불가능해야 하고, HTTPS로만 전송되어야 하며, 로그아웃 시 서버와 클라이언트 모두에서 무효화되어야 합니다.
+    </div>
+
+    <h2>5.8 키 관리</h2>
+    <p>암호화 키의 안전한 생성, 저장, 순환은 보안의 기반입니다:</p>
+
+    <pre><code>// 키 관리 시스템
+class KeyManagementService {
+    private kms: CloudKMS;  // HSM 또는 클라우드 KMS
+
+    async generateSigningKey(): Promise&lt;KeyPair&gt; {
+        // HSM에서 키 생성
+        const keyPair = await this.kms.createKeyPair({
+            algorithm: 'ECDSA_P256',
+            purpose: 'SIGN_VERIFY',
+            rotationPeriod: '90d'
+        });
+
+        return keyPair;
+    }
+
+    async rotateKey(keyId: string): Promise&lt;void&gt; {
+        // 새 키 버전 생성
+        const newVersion = await this.kms.createKeyVersion(keyId);
+
+        // 새 키를 기본으로 설정
+        await this.kms.setPrimaryVersion(keyId, newVersion.id);
+
+        // 이전 키는 검증용으로 유지 (일정 기간 후 폐기)
+    }
+
+    async sign(keyId: string, data: Buffer): Promise&lt;Buffer&gt; {
+        // HSM에서 서명 수행 (개인 키가 HSM을 벗어나지 않음)
+        return this.kms.sign(keyId, data);
+    }
+}</code></pre>
+</body>
+</html>

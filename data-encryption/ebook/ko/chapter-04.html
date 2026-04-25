@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 하이브리드 암호화 | WIA-SEC-011</title>
+    <style>
+        :root { --primary-color: #8B5CF6; --secondary-color: #a78bfa; --accent-color: #c4b5fd; --background-color: #0f172a; --text-color: #f8fafc; --border-color: #334155; --card-bg: #1e293b; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: var(--text-color); background-color: var(--background-color); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        h1 { color: var(--primary-color); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 4px solid var(--accent-color); padding-bottom: 1rem; }
+        h2 { color: var(--primary-color); font-size: 1.8rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+        h3 { color: var(--secondary-color); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.25rem; text-align: justify; }
+        blockquote { background: linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(167,139,250,0.2) 100%); border-left: 4px solid var(--secondary-color); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        th, td { padding: 1rem; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: var(--card-bg); }
+        .objectives-box { background: linear-gradient(135deg, rgba(167,139,250,0.2) 0%, rgba(234,179,8,0.2) 100%); border: 2px solid #d69e2e; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; }
+        pre { background-color: #1a202c; color: #10b981; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border-color); }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--border-color); }
+        .nav-buttons a { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>제4장: 하이브리드 암호화</h1>
+
+    <div class="objectives-box">
+        <h3>학습 목표</h3>
+        <ul>
+            <li>하이브리드 암호화가 필요한 이유 이해</li>
+            <li>하이브리드 암호화 워크플로우 학습</li>
+            <li>TLS를 실제 사례로 탐구</li>
+            <li>하이브리드 암호화 구현</li>
+            <li>성능 이점 이해</li>
+        </ul>
+    </div>
+
+    <h2>4.1 양쪽의 장점 결합</h2>
+
+    <p>하이브리드 암호화는 대칭 암호화의 효율성과 비대칭 암호화의 편리함을 결합합니다:</p>
+
+    <ol>
+        <li>랜덤 대칭 키 생성 (AES-256)</li>
+        <li>대칭 키로 데이터 암호화 (빠름)</li>
+        <li>수신자의 공개키로 대칭 키 암호화</li>
+        <li>암호화된 데이터 + 암호화된 키 전송</li>
+    </ol>
+
+    <blockquote>
+        <h3>실제 사례: HTTPS</h3>
+        <p>HTTPS 웹사이트를 방문할 때 브라우저는 하이브리드 암호화를 사용합니다:</p>
+        <ul>
+            <li>RSA/ECC로 초기 키 교환</li>
+            <li>AES로 실제 웹 트래픽 암호화</li>
+            <li>이것이 TLS(Transport Layer Security)의 작동 방식</li>
+        </ul>
+    </blockquote>
+
+    <h2>4.2 구현</h2>
+
+    <pre><code>function hybridEncrypt(data, recipientPublicKey) {
+  // 1. 랜덤 AES 키 생성
+  const aesKey = crypto.randomBytes(32);
+
+  // 2. AES-GCM으로 데이터 암호화
+  const { ciphertext, iv, authTag } = encryptAES(data, aesKey);
+
+  // 3. RSA-OAEP로 AES 키 암호화
+  const encryptedKey = crypto.publicEncrypt(
+    {
+      key: recipientPublicKey,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING
+    },
+    aesKey
+  );
+
+  return { ciphertext, encryptedKey, iv, authTag };
+}
+
+function hybridDecrypt(encrypted, privateKey) {
+  // 1. 개인키로 AES 키 복호화
+  const aesKey = crypto.privateDecrypt(
+    {
+      key: privateKey,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING
+    },
+    encrypted.encryptedKey
+  );
+
+  // 2. AES 키로 데이터 복호화
+  return decryptAES(encrypted.ciphertext, aesKey,
+                    encrypted.iv, encrypted.authTag);
+}</code></pre>
+
+    <h2>4.3 성능 이점</h2>
+
+    <p>1GB 데이터 암호화 시 비교:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>방법</th>
+                <th>소요 시간</th>
+                <th>실용성</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>RSA-4096만</td>
+                <td>~92시간</td>
+                <td>❌ 비실용적</td>
+            </tr>
+            <tr>
+                <td>AES-256만</td>
+                <td>0.3초</td>
+                <td>⚠️ 키 분배 문제</td>
+            </tr>
+            <tr>
+                <td>하이브리드</td>
+                <td>~0.3초</td>
+                <td>✅ 최적의 접근</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.4 TLS 핸드셰이크</h2>
+
+    <p>TLS 핸드셰이크는 하이브리드 암호화의 완벽한 예시입니다:</p>
+
+    <pre><code>// TLS 1.3 간소화된 핸드셰이크
+1. 클라이언트 Hello
+   - 지원 암호 스위트
+   - 클라이언트 랜덤
+   - 키 공유 (ECDHE)
+
+2. 서버 Hello
+   - 선택된 암호 스위트
+   - 서버 랜덤
+   - 키 공유 (ECDHE)
+   - 인증서
+
+3. 키 도출
+   - ECDHE 공유 비밀
+   - 대칭 키 도출
+
+4. 암호화된 통신
+   - 모든 트래픽에 AES-256-GCM</code></pre>
+
+    <h2>4.5 완전 순방향 비밀성 (PFS)</h2>
+
+    <p>현대 하이브리드 시스템은 임시 키를 사용하여 완전 순방향 비밀성(PFS)을 달성합니다:</p>
+
+    <ul>
+        <li>각 세션마다 새로운 키 쌍 사용 (ECDHE)</li>
+        <li>장기 키가 유출되어도 과거 세션은 안전</li>
+        <li>TLS 1.3은 모든 연결에 PFS 필수</li>
+    </ul>
+
+    <blockquote>
+        <h3>PFS의 중요성</h3>
+        <p>공격자가 오늘 암호화된 트래픽을 저장해두고, 나중에 개인키를 획득하더라도 과거 통신은 복호화할 수 없습니다.</p>
+    </blockquote>
+
+    <h2>4.6 ECIES (통합 암호화 체계)</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>구성요소</th>
+                <th>알고리즘</th>
+                <th>목적</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>키 합의</td>
+                <td>ECDH</td>
+                <td>공유 비밀 생성</td>
+            </tr>
+            <tr>
+                <td>키 도출</td>
+                <td>HKDF</td>
+                <td>암호화 키 도출</td>
+            </tr>
+            <tr>
+                <td>암호화</td>
+                <td>AES-GCM</td>
+                <td>데이터 암호화</td>
+            </tr>
+            <tr>
+                <td>인증</td>
+                <td>GCM/HMAC</td>
+                <td>무결성 보장</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4.7 장 요약</h2>
+
+    <blockquote>
+        <h3>핵심 내용</h3>
+        <ul>
+            <li>하이브리드 암호화 = 대칭 속도 + 비대칭 편리함</li>
+            <li>TLS는 웹 트래픽에 하이브리드 암호화 사용</li>
+            <li>AES로 데이터 암호화, RSA/ECC로 AES 키 암호화</li>
+            <li>성능은 순수 대칭과 거의 동일</li>
+            <li>완전 순방향 비밀성이 과거 통신 보호</li>
+        </ul>
+    </blockquote>
+
+    <h2>4.8 복습 문제</h2>
+
+    <ol>
+        <li>하이브리드 암호화가 필요한 이유는?</li>
+        <li>하이브리드 암호화의 4단계는?</li>
+        <li>TLS는 하이브리드 암호화를 어떻게 사용하는가?</li>
+        <li>완전 순방향 비밀성이란 무엇인가?</li>
+        <li>키 교환에 ECDHE가 선호되는 이유는?</li>
+    </ol>
+
+    <h2>4.9 다음 장 미리보기</h2>
+
+    <p>제5장에서는 키 관리를 다룹니다. 모든 암호화 시스템에서 종종 간과되지만 중요한 측면인 키 수명주기, 저장소, 순환에 대해 배웁니다.</p>
+</body>
+</html>

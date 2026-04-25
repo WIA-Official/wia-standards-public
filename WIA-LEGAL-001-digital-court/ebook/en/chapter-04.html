@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: API Implementation Guide | WIA-LEGAL-001</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #64748B;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { padding: 0; }
+        .callout { background: rgba(100, 116, 139, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .philosophy { text-align: center; padding: 2rem; margin: 2rem 0; background: var(--bg); border-radius: 8px; }
+        .philosophy-text { font-size: 1.5rem; color: var(--primary); letter-spacing: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: API Implementation Guide</h1>
+
+        <h2>4.1 Getting Started with SDK Implementation</h2>
+
+        <p>The WIA-LEGAL-001 standard provides official Software Development Kits (SDKs) in multiple programming languages to accelerate integration with digital court systems. These SDKs abstract the complexities of HTTP communication, authentication management, error handling, and data serialization, allowing developers to focus on application logic rather than low-level API details.</p>
+
+        <p>The official SDK ecosystem includes libraries for JavaScript/TypeScript, Python, Java, C#, Ruby, PHP, and Go, each following language-specific conventions while maintaining consistent functionality across platforms. All SDKs are open source under the MIT license and actively maintained by the WIA community with regular updates, security patches, and feature enhancements.</p>
+
+        <h3>4.1.1 JavaScript/TypeScript SDK</h3>
+
+        <p>The JavaScript/TypeScript SDK provides first-class support for both Node.js server environments and browser-based applications, with full TypeScript type definitions enabling compile-time type checking and intelligent code completion in modern IDEs.</p>
+
+        <p><strong>Installation:</strong></p>
+
+        <pre><code>npm install @wia/legal-001
+# or
+yarn add @wia/legal-001
+# or
+pnpm add @wia/legal-001</code></pre>
+
+        <p><strong>Basic Client Setup:</strong></p>
+
+        <pre><code>import { DigitalCourtClient } from '@wia/legal-001';
+
+// Initialize client with API credentials
+const client = new DigitalCourtClient({
+  apiKey: process.env.WIA_API_KEY,
+  environment: 'production', // or 'staging', 'development', 'sandbox'
+  baseUrl: 'https://api.digitalcourt.wia.org/v1',
+  timeout: 30000, // Request timeout in milliseconds
+  retryPolicy: {
+    maxRetries: 3,
+    retryDelay: 1000,
+    retryableStatusCodes: [429, 500, 502, 503, 504]
+  }
+});
+
+// Authenticate with username and password
+const auth = await client.auth.login({
+  username: 'attorney@lawfirm.com',
+  password: 'SecurePassword123!',
+  mfaCode: '123456' // Optional if MFA enabled
+});
+
+console.log('Access token expires in:', auth.expiresIn, 'seconds');
+console.log('Granted scopes:', auth.scope.split(' '));</code></pre>
+
+        <h3>4.1.2 Complete Case Filing Workflow</h3>
+
+        <p>This comprehensive example demonstrates the complete workflow for filing a new civil case, including party registration, document filing, evidence submission, and hearing scheduling:</p>
+
+        <pre><code>async function fileNewCivilCase() {
+  try {
+    // Step 1: Create the case
+    const newCase = await client.cases.create({
+      caseNumber: '2025-CV-001234',
+      caseType: 'civil',
+      court: {
+        courtId: 'court-nysd-001',
+        jurisdiction: 'US-NY'
+      },
+      parties: {
+        plaintiffs: [{
+          name: 'Alice Johnson',
+          did: 'did:wia:legal:alicejohnson',
+          email: 'alice@example.com',
+          contact: {
+            phone: '+1-555-0100',
+            address: {
+              street: '456 Oak Avenue',
+              city: 'New York',
+              state: 'NY',
+              postalCode: '10002',
+              country: 'US'
+            }
+          }
+        }],
+        defendants: [{
+          name: 'Beta Corporation',
+          did: 'did:wia:legal:betacorp',
+          email: 'legal@betacorp.com',
+          type: 'corporation'
+        }]
+      },
+      description: 'Product liability claim for defective machinery',
+      claimAmount: {
+        value: 500000.00,
+        currency: 'USD'
+      }
+    });
+
+    console.log('Case filed successfully:', newCase.caseId);
+    console.log('Case number:', newCase.caseNumber);
+    console.log('Filing date:', newCase.filingDate);
+
+    // Step 2: File the complaint document
+    const complaint = await client.documents.file({
+      caseId: newCase.caseId,
+      type: 'pleading',
+      subtype: 'complaint',
+      title: 'Plaintiff\'s Complaint for Product Liability',
+      filedBy: newCase.parties.plaintiffs[0].partyId,
+      confidentiality: 'public',
+      file: await readFile('./documents/complaint.pdf'),
+      serveParties: [newCase.parties.defendants[0].partyId]
+    });
+
+    console.log('Complaint filed:', complaint.documentId);
+    console.log('SHA-256 hash:', complaint.hash);
+    console.log('Service deadline:', complaint.serveDeadline);
+
+    // Step 3: Submit supporting evidence
+    const evidence = await client.evidence.submit({
+      caseId: newCase.caseId,
+      type: 'document',
+      description: 'Product testing report from independent laboratory',
+      submittedBy: newCase.parties.plaintiffs[0].partyId,
+      file: await readFile('./evidence/test-report.pdf'),
+      chainOfCustody: [{
+        custodian: 'did:wia:legal:lab-technician-001',
+        custodianName: 'Dr. Robert Smith',
+        action: 'tested',
+        location: 'Acme Testing Laboratory',
+        timestamp: new Date('2025-11-15T14:00:00Z')
+      }]
+    });
+
+    console.log('Evidence submitted:', evidence.evidenceId);
+
+    // Step 4: Schedule preliminary hearing
+    const hearing = await client.hearings.schedule({
+      caseId: newCase.caseId,
+      type: 'preliminary',
+      scheduledDate: new Date('2026-03-15T14:00:00Z'),
+      duration: 90, // minutes
+      mode: 'virtual',
+      participants: [
+        {
+          partyId: newCase.parties.plaintiffs[0].partyId,
+          role: 'plaintiff'
+        },
+        {
+          partyId: newCase.parties.defendants[0].partyId,
+          role: 'defendant'
+        }
+      ],
+      recording: true,
+      transcription: true
+    });
+
+    console.log('Hearing scheduled:', hearing.hearingId);
+    console.log('Virtual room URL:', hearing.virtualRoomUrl);
+    console.log('Access code:', hearing.accessCode);
+
+    return {
+      case: newCase,
+      complaint: complaint,
+      evidence: evidence,
+      hearing: hearing
+    };
+
+  } catch (error) {
+    if (error.code === 'VALIDATION_ERROR') {
+      console.error('Validation failed:', error.details);
+    } else if (error.code === 'AUTHENTICATION_REQUIRED') {
+      console.error('Authentication expired, please login again');
+    } else {
+      console.error('Unexpected error:', error.message);
+    }
+    throw error;
+  }
+}
+
+// Execute the workflow
+const result = await fileNewCivilCase();
+console.log('Complete case filing result:', result);</code></pre>
+
+        <h2>4.2 Python SDK Implementation</h2>
+
+        <p>The Python SDK provides a Pythonic interface to the WIA-LEGAL-001 API, with support for both synchronous and asynchronous operations using asyncio. The SDK follows PEP 8 style guidelines and includes comprehensive type hints for static type checking with mypy.</p>
+
+        <p><strong>Installation:</strong></p>
+
+        <pre><code>pip install wia-legal-001
+# or with async support
+pip install wia-legal-001[async]</code></pre>
+
+        <p><strong>Synchronous Example:</strong></p>
+
+        <pre><code>from wia_legal_001 import DigitalCourtClient
+
+# Initialize client
+client = DigitalCourtClient(
+    api_key=os.environ['WIA_API_KEY'],
+    environment='production'
+)
+
+# Authenticate
+auth = client.auth.login(
+    username='attorney@lawfirm.com',
+    password='SecurePassword123!',
+    mfa_code='123456'
+)
+
+# Retrieve case details
+case = client.cases.get('550e8400-e29b-41d4-a716-446655440000')
+print(f"Case {case.case_number}: {case.status}")
+
+# List all documents for the case
+documents = client.documents.list(case_id=case.case_id)
+for doc in documents:
+    print(f"- {doc.title} (filed: {doc.filed_date})")</code></pre>
+
+        <p><strong>Asynchronous Example:</strong></p>
+
+        <pre><code>import asyncio
+from wia_legal_001 import AsyncDigitalCourtClient
+
+async def process_multiple_cases():
+    client = AsyncDigitalCourtClient(
+        api_key=os.environ['WIA_API_KEY'],
+        environment='production'
+    )
+
+    # Authenticate
+    await client.auth.login(
+        username='attorney@lawfirm.com',
+        password='SecurePassword123!'
+    )
+
+    # Fetch multiple cases concurrently
+    case_ids = [
+        '550e8400-e29b-41d4-a716-446655440000',
+        '660e8400-e29b-41d4-a716-446655440001',
+        '770e8400-e29b-41d4-a716-446655440002'
+    ]
+
+    cases = await asyncio.gather(*[
+        client.cases.get(case_id) for case_id in case_ids
+    ])
+
+    for case in cases:
+        print(f"Case {case.case_number}: {case.status}")
+
+    await client.close()
+
+# Run async function
+asyncio.run(process_multiple_cases())</code></pre>
+
+        <h2>4.3 Webhook Configuration for Real-Time Notifications</h2>
+
+        <p>Webhooks provide real-time push notifications for court system events, eliminating the need for continuous polling and enabling immediate responses to case developments. The webhook system uses HMAC signatures for authentication and supports automatic retry with exponential backoff for failed deliveries.</p>
+
+        <h3>4.3.1 Webhook Event Types</h3>
+
+        <table>
+            <caption>Table 4.1: Available Webhook Event Types</caption>
+            <thead>
+                <tr>
+                    <th>Event Type</th>
+                    <th>Trigger</th>
+                    <th>Payload Includes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>case.created</td>
+                    <td>New case filed</td>
+                    <td>Case ID, number, parties, filing date</td>
+                </tr>
+                <tr>
+                    <td>case.updated</td>
+                    <td>Case information modified</td>
+                    <td>Case ID, changed fields, update timestamp</td>
+                </tr>
+                <tr>
+                    <td>case.closed</td>
+                    <td>Case reaches final disposition</td>
+                    <td>Case ID, closure reason, final status</td>
+                </tr>
+                <tr>
+                    <td>document.filed</td>
+                    <td>Document electronically filed</td>
+                    <td>Document ID, case ID, type, filing party</td>
+                </tr>
+                <tr>
+                    <td>document.served</td>
+                    <td>Document served to parties</td>
+                    <td>Document ID, served parties, service timestamp</td>
+                </tr>
+                <tr>
+                    <td>hearing.scheduled</td>
+                    <td>Hearing date set</td>
+                    <td>Hearing ID, case ID, date, type, mode</td>
+                </tr>
+                <tr>
+                    <td>hearing.started</td>
+                    <td>Virtual hearing begins</td>
+                    <td>Hearing ID, start time, participants present</td>
+                </tr>
+                <tr>
+                    <td>hearing.completed</td>
+                    <td>Hearing concludes</td>
+                    <td>Hearing ID, end time, outcome, orders</td>
+                </tr>
+                <tr>
+                    <td>evidence.submitted</td>
+                    <td>Evidence filed with court</td>
+                    <td>Evidence ID, case ID, submitter, type</td>
+                </tr>
+                <tr>
+                    <td>order.issued</td>
+                    <td>Judge issues court order</td>
+                    <td>Order ID, case ID, order type, effective date</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.3.2 Webhook Registration</h3>
+
+        <pre><code>// Register webhook endpoint
+const webhook = await client.webhooks.create({
+  url: 'https://myapp.com/webhooks/court-events',
+  events: [
+    'document.filed',
+    'hearing.scheduled',
+    'order.issued'
+  ],
+  secret: generateWebhookSecret(), // For signature verification
+  active: true,
+  metadata: {
+    application: 'Case Management System',
+    environment: 'production'
+  }
+});
+
+console.log('Webhook ID:', webhook.webhookId);
+console.log('Secret:', webhook.secret); // Store securely!</code></pre>
+
+        <h3>4.3.3 Webhook Handler Implementation</h3>
+
+        <pre><code>const express = require('express');
+const crypto = require('crypto');
+
+const app = express();
+app.use(express.json());
+
+// Webhook endpoint
+app.post('/webhooks/court-events', (req, res) => {
+  // Verify webhook signature
+  const signature = req.headers['x-wia-signature'];
+  const timestamp = req.headers['x-wia-timestamp'];
+  const payload = JSON.stringify(req.body);
+
+  const expectedSignature = crypto
+    .createHmac('sha256', WEBHOOK_SECRET)
+    .update(timestamp + '.' + payload)
+    .digest('hex');
+
+  if (signature !== expectedSignature) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // Check timestamp to prevent replay attacks
+  const eventTime = parseInt(timestamp);
+  const currentTime = Math.floor(Date.now() / 1000);
+  if (Math.abs(currentTime - eventTime) > 300) { // 5 minutes
+    return res.status(400).json({ error: 'Timestamp too old' });
+  }
+
+  // Process webhook event
+  const event = req.body;
+  console.log('Received event:', event.event);
+
+  switch(event.event) {
+    case 'document.filed':
+      handleDocumentFiled(event.data);
+      break;
+    case 'hearing.scheduled':
+      handleHearingScheduled(event.data);
+      break;
+    case 'order.issued':
+      handleOrderIssued(event.data);
+      break;
+    default:
+      console.log('Unhandled event type:', event.event);
+  }
+
+  // Respond immediately to acknowledge receipt
+  res.status(200).json({ received: true });
+});
+
+async function handleDocumentFiled(data) {
+  console.log('New document filed:', data.documentId);
+
+  // Send notification to relevant attorneys
+  await notificationService.send({
+    to: getAttorneysForCase(data.caseId),
+    subject: `New Document Filed in Case ${data.caseNumber}`,
+    body: `${data.title} has been filed by ${data.filedBy}`
+  });
+
+  // Update case management system
+  await caseManagementDB.addDocument({
+    caseId: data.caseId,
+    documentId: data.documentId,
+    title: data.title,
+    filedDate: data.filedDate
+  });
+}
+
+async function handleHearingScheduled(data) {
+  console.log('Hearing scheduled:', data.hearingId);
+
+  // Add to calendars for all participants
+  for (const participant of data.participants) {
+    await calendarService.createEvent({
+      userId: participant.partyId,
+      title: `Court Hearing - Case ${data.caseNumber}`,
+      startTime: data.scheduledDate,
+      duration: data.duration,
+      location: data.virtualRoomUrl
+    });
+  }
+
+  // Send email reminders
+  await scheduleReminders(data.hearingId, data.scheduledDate);
+}
+
+async function handleOrderIssued(data) {
+  console.log('Court order issued:', data.orderId);
+
+  // Critical notification - requires immediate attention
+  await notificationService.sendUrgent({
+    to: getPartiesForCase(data.caseId),
+    subject: `URGENT: Court Order Issued in Case ${data.caseNumber}`,
+    body: `Judge has issued: ${data.orderType}`,
+    attachments: [{
+      name: 'court-order.pdf',
+      url: data.documentUrl
+    }]
+  });
+}
+
+app.listen(3000, () => {
+  console.log('Webhook server listening on port 3000');
+});</code></pre>
+
+        <h2>4.4 Batch Operations for High-Volume Filing</h2>
+
+        <p>For law firms and organizations handling high volumes of cases, the API supports batch operations that process multiple requests efficiently while respecting rate limits and maintaining data integrity.</p>
+
+        <h3>4.4.1 Batch Document Filing</h3>
+
+        <pre><code>async function batchFileDocuments(caseId, documents) {
+  const batchSize = 10; // Process 10 documents at a time
+  const results = [];
+
+  for (let i = 0; i < documents.length; i += batchSize) {
+    const batch = documents.slice(i, i + batchSize);
+
+    // File documents in parallel within batch
+    const batchResults = await Promise.allSettled(
+      batch.map(doc => client.documents.file({
+        caseId: caseId,
+        type: doc.type,
+        title: doc.title,
+        file: doc.file,
+        filedBy: doc.filedBy
+      }))
+    );
+
+    // Handle results
+    batchResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        console.log(`Document ${i + index + 1} filed:`, result.value.documentId);
+        results.push({ success: true, data: result.value });
+      } else {
+        console.error(`Document ${i + index + 1} failed:`, result.reason);
+        results.push({ success: false, error: result.reason });
+      }
+    });
+
+    // Wait before next batch to respect rate limits
+    if (i + batchSize < documents.length) {
+      await sleep(2000); // 2 second delay between batches
+    }
+  }
+
+  return results;
+}
+
+// Helper function
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}</code></pre>
+
+        <h2>4.5 GraphQL API Alternative</h2>
+
+        <p>For complex queries requiring data from multiple resources, the GraphQL API provides more efficient data fetching than multiple REST calls, reducing network overhead and improving performance.</p>
+
+        <h3>4.5.1 GraphQL Schema Overview</h3>
+
+        <pre><code>type Query {
+  case(id: ID!): Case
+  cases(
+    filter: CaseFilter
+    limit: Int = 20
+    offset: Int = 0
+    orderBy: CaseOrderBy
+  ): CaseConnection
+
+  document(id: ID!): Document
+  hearing(id: ID!): Hearing
+  evidence(id: ID!): Evidence
+}
+
+type Mutation {
+  createCase(input: CaseInput!): CasePayload
+  updateCase(id: ID!, input: CaseInput!): CasePayload
+  fileDocument(input: DocumentInput!): DocumentPayload
+  scheduleHearing(input: HearingInput!): HearingPayload
+  submitEvidence(input: EvidenceInput!): EvidencePayload
+}
+
+type Subscription {
+  caseUpdated(caseId: ID!): Case
+  documentFiled(caseId: ID!): Document
+  hearingScheduled(caseId: ID!): Hearing
+}</code></pre>
+
+        <h3>4.5.2 Complex Query Example</h3>
+
+        <pre><code>const query = `
+  query GetCompleteCase($caseId: ID!) {
+    case(id: $caseId) {
+      caseNumber
+      caseType
+      status
+      filingDate
+
+      parties {
+        plaintiffs {
+          name
+          did
+          email
+          representative {
+            name
+            barNumber
+            firmName
+          }
+        }
+        defendants {
+          name
+          did
+          email
+          representative {
+            name
+            barNumber
+            firmName
+          }
+        }
+      }
+
+      documents(orderBy: FILED_DATE_DESC) {
+        id
+        title
+        type
+        filedDate
+        filedBy {
+          name
+        }
+        pageCount
+      }
+
+      hearings(upcoming: true) {
+        id
+        type
+        scheduledDate
+        mode
+        virtualRoomUrl
+        participants {
+          name
+          role
+        }
+      }
+
+      evidence {
+        id
+        description
+        type
+        submittedDate
+        submittedBy {
+          name
+        }
+        admissibility {
+          status
+          rulingDate
+        }
+      }
+
+      timeline {
+        timestamp
+        event
+        description
+        actor {
+          name
+        }
+      }
+    }
+  }
+`;
+
+const variables = {
+  caseId: '550e8400-e29b-41d4-a716-446655440000'
+};
+
+const result = await client.graphql.query(query, variables);
+console.log('Complete case data:', result.data.case);</code></pre>
+
+        <h2>4.6 Error Handling Best Practices</h2>
+
+        <table>
+            <caption>Table 4.2: Error Handling Strategies</caption>
+            <thead>
+                <tr>
+                    <th>Error Type</th>
+                    <th>Recommended Action</th>
+                    <th>Retry Strategy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Network timeout</td>
+                    <td>Retry with exponential backoff</td>
+                    <td>Yes, up to 3 times</td>
+                </tr>
+                <tr>
+                    <td>401 Unauthorized</td>
+                    <td>Re-authenticate and retry</td>
+                    <td>Once after re-auth</td>
+                </tr>
+                <tr>
+                    <td>403 Forbidden</td>
+                    <td>Check permissions, notify user</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td>404 Not Found</td>
+                    <td>Verify resource ID, notify user</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td>422 Validation Error</td>
+                    <td>Display validation messages to user</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td>429 Rate Limit</td>
+                    <td>Wait for reset time, then retry</td>
+                    <td>Yes, after waiting</td>
+                </tr>
+                <tr>
+                    <td>500 Server Error</td>
+                    <td>Log error, retry with backoff</td>
+                    <td>Yes, up to 3 times</td>
+                </tr>
+                <tr>
+                    <td>503 Service Unavailable</td>
+                    <td>Wait and retry, check status page</td>
+                    <td>Yes, with longer backoff</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.6.1 Comprehensive Error Handling Implementation</h3>
+
+        <pre><code>class APIErrorHandler {
+  constructor(client) {
+    this.client = client;
+    this.maxRetries = 3;
+  }
+
+  async executeWithRetry(operation, retryCount = 0) {
+    try {
+      return await operation();
+    } catch (error) {
+      // Parse error details
+      const statusCode = error.statusCode;
+      const errorCode = error.code;
+
+      // Handle authentication errors
+      if (statusCode === 401) {
+        if (retryCount === 0) {
+          await this.client.auth.refresh();
+          return this.executeWithRetry(operation, retryCount + 1);
+        }
+        throw new Error('Authentication failed after refresh');
+      }
+
+      // Handle rate limiting
+      if (statusCode === 429) {
+        const retryAfter = error.headers['retry-after'] || 60;
+        console.log(`Rate limited. Waiting ${retryAfter} seconds...`);
+        await sleep(retryAfter * 1000);
+        return this.executeWithRetry(operation, retryCount + 1);
+      }
+
+      // Handle server errors with exponential backoff
+      if (statusCode >= 500 && retryCount < this.maxRetries) {
+        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+        console.log(`Server error. Retrying in ${delay}ms...`);
+        await sleep(delay);
+        return this.executeWithRetry(operation, retryCount + 1);
+      }
+
+      // Handle validation errors
+      if (statusCode === 422) {
+        throw new ValidationError(error.details);
+      }
+
+      // Handle permission errors
+      if (statusCode === 403) {
+        throw new PermissionError(error.message);
+      }
+
+      // Rethrow other errors
+      throw error;
+    }
+  }
+}
+
+// Usage
+const errorHandler = new APIErrorHandler(client);
+
+const result = await errorHandler.executeWithRetry(async () => {
+  return await client.documents.file({
+    caseId: '550e8400-e29b-41d4-a716-446655440000',
+    type: 'motion',
+    title: 'Motion for Summary Judgment',
+    file: documentBuffer
+  });
+});</code></pre>
+
+        <h2>4.7 Production Deployment Checklist</h2>
+
+        <table>
+            <caption>Table 4.3: Production Deployment Requirements</caption>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Requirement</th>
+                    <th>Status Check</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Security</td>
+                    <td>API keys stored in environment variables</td>
+                    <td>No hardcoded credentials in source</td>
+                </tr>
+                <tr>
+                    <td>Security</td>
+                    <td>Webhook signatures verified</td>
+                    <td>HMAC validation implemented</td>
+                </tr>
+                <tr>
+                    <td>Security</td>
+                    <td>HTTPS required for all API calls</td>
+                    <td>HTTP connections rejected</td>
+                </tr>
+                <tr>
+                    <td>Reliability</td>
+                    <td>Error handling implemented</td>
+                    <td>Retry logic with backoff</td>
+                </tr>
+                <tr>
+                    <td>Reliability</td>
+                    <td>Rate limiting respected</td>
+                    <td>Monitor rate limit headers</td>
+                </tr>
+                <tr>
+                    <td>Performance</td>
+                    <td>Connection pooling enabled</td>
+                    <td>Reuse HTTP connections</td>
+                </tr>
+                <tr>
+                    <td>Performance</td>
+                    <td>Timeout configured</td>
+                    <td>30-60 second timeouts set</td>
+                </tr>
+                <tr>
+                    <td>Monitoring</td>
+                    <td>Logging implemented</td>
+                    <td>Request/response logging active</td>
+                </tr>
+                <tr>
+                    <td>Monitoring</td>
+                    <td>Metrics collected</td>
+                    <td>Success rate, latency tracked</td>
+                </tr>
+                <tr>
+                    <td>Compliance</td>
+                    <td>Audit trails maintained</td>
+                    <td>All API calls logged with user info</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout">
+            <h3>弘益人間 (Hongik Ingan) in Practice</h3>
+            <p>Implementing the WIA-LEGAL-001 API embodies the principle of benefiting all humanity through:</p>
+            <ul>
+                <li><strong>Developer Empowerment:</strong> Well-documented SDKs and clear examples lower technical barriers, enabling small firms and solo practitioners to build sophisticated legal technology</li>
+                <li><strong>Open Source Libraries:</strong> MIT-licensed SDKs ensure anyone can use, modify, and improve the tools without licensing costs</li>
+                <li><strong>Multi-Language Support:</strong> SDKs in diverse programming languages ensure developers worldwide can work in their preferred technology stack</li>
+                <li><strong>Comprehensive Error Messages:</strong> Helpful error responses speed development and reduce frustration, making technology more accessible</li>
+                <li><strong>Real-Time Notifications:</strong> Webhooks enable immediate responses to court events, improving access to justice through faster communication</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li>Official SDKs in JavaScript/TypeScript, Python, Java, C#, Ruby, PHP, and Go provide language-specific interfaces to the WIA-LEGAL-001 API with consistent functionality across platforms.</li>
+                <li>Complete workflow implementations demonstrate case filing, document submission, evidence handling, and hearing scheduling through practical, production-ready code examples.</li>
+                <li>Webhooks enable real-time push notifications for court events, eliminating polling overhead and enabling immediate responses to case developments with signature verification for security.</li>
+                <li>Batch operations and GraphQL queries optimize performance for high-volume use cases, allowing efficient processing of multiple documents and complex multi-resource queries.</li>
+                <li>Comprehensive error handling with automatic retries, exponential backoff, and specific strategies for different error types ensures robust production deployments.</li>
+                <li>Production deployment checklists covering security, reliability, performance, monitoring, and compliance ensure systems meet enterprise requirements before going live.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Why does the JavaScript SDK support both synchronous and asynchronous operations? What scenarios benefit from each approach?</li>
+                <li>Explain the webhook signature verification process. Why is checking the timestamp important in addition to verifying the signature?</li>
+                <li>What advantages does GraphQL provide over REST for complex court system queries? Give a specific example.</li>
+                <li>Describe the exponential backoff retry strategy. Why is this better than fixed-interval retries?</li>
+                <li>When should you NOT retry a failed API request? List three HTTP status codes that should not trigger retries.</li>
+                <li>How do batch operations help respect rate limits while processing large volumes of documents?</li>
+                <li>What security measures should be implemented when deploying webhook handlers to production?</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 5 examines Phase 3: Protocol Specifications, covering WebRTC-based virtual hearings, end-to-end encrypted messaging, secure document transfer protocols, and blockchain integration for immutable record keeping.</p>
+        </div>
+
+        <div class="philosophy">
+            <p class="philosophy-text">弘益人間</p>
+            <p style="color: var(--text-dim); margin-top: 0.5rem;">Benefit All Humanity</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-03.html">← Previous Chapter</a>
+            <a href="chapter-05.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

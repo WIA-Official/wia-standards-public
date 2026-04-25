@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>6장: 다중 디바이스 통신 프로토콜 | WIA-AI-011</title>
+    <style>
+        body { font-family: 'Noto Sans KR'; background: #fafaf9; color: #1c1917; line-height: 1.8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { font-size: 2.5em; margin: 20px 0; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px; }
+        h3 { color: #059669; font-size: 1.3em; margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; line-height: 2; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; overflow-x: auto; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        .summary, .review-questions { padding: 30px; border-radius: 8px; margin: 40px 0; }
+        .summary { background: #f0fdf4; border: 2px solid #10B981; }
+        .review-questions { background: #fef3c7; border: 2px solid #f59e0b; }
+        .review-questions h2 { color: #f59e0b; margin-top: 0; }
+        .nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid #e2e8f0; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f0fdf4; color: #10B981; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="color: #10B981; font-weight: bold; border-bottom: 4px solid #10B981; padding-bottom: 20px; margin-bottom: 40px;">
+            <div>6장</div><h1>다중 디바이스 통신 프로토콜</h1>
+        </div>
+
+        <h2>6.1 다중 디바이스 조정의 필요성</h2>
+        <p>현대 AI 워크로드는 단일 가속기의 메모리와 계산 능력을 빠르게 초과합니다. GPT-3는 175B 파라미터로 350GB의 메모리를 요구하며, GPT-4는 더욱 큽니다. 이러한 모델을 훈련하고 배포하려면 여러 가속기 간의 효율적인 조정이 필수적입니다.</p>
+
+        <pre>// 대규모 모델의 메모리 요구사항
+모델         파라미터    FP32 메모리    FP16 메모리    필요 GPU (A100 80GB)
+GPT-3        175B        700 GB         350 GB         5개
+GPT-4        ~1.7T       6.8 TB         3.4 TB         43개
+LLaMA 65B    65B         260 GB         130 GB         2개
+PaLM         540B        2.16 TB        1.08 TB        14개</pre>
+
+        <h2>6.2 토폴로지 검색 및 특성화</h2>
+        <p>효율적인 통신을 위해서는 디바이스 간의 연결 토폴로지와 대역폭/지연시간 특성을 이해해야 합니다.</p>
+
+        <pre>// 토폴로지 검색 API
+typedef struct {
+    int source_device;
+    int target_device;
+    float bandwidth_gbps;      // 대역폭 (GB/s)
+    float latency_us;          // 지연시간 (마이크로초)
+    ConnectionType type;       // NVLINK, PCIE, NETWORK
+    bool supports_p2p;         // 피어 투 피어 지원
+} DeviceLink;
+
+// 전체 토폴로지 맵 생성
+void discover_topology() {
+    int num_devices = wia_get_device_count();
+    DeviceLink** topology = malloc(num_devices * num_devices * sizeof(DeviceLink*));
+
+    for (int i = 0; i < num_devices; i++) {
+        for (int j = 0; j < num_devices; j++) {
+            if (i == j) continue;
+
+            // 링크 특성 측정
+            DeviceLink* link = &topology[i][j];
+            link->source_device = i;
+            link->target_device = j;
+
+            // 대역폭 벤치마크
+            link->bandwidth_gbps = measure_bandwidth(i, j);
+
+            // 지연시간 측정
+            link->latency_us = measure_latency(i, j);
+
+            // 연결 유형 감지
+            link->type = detect_connection_type(i, j);
+
+            // P2P 지원 확인
+            link->supports_p2p = wia_can_access_peer(i, j);
+
+            printf("링크 %d → %d: %.1f GB/s, %.1f μs, %s\n",
+                   i, j, link->bandwidth_gbps, link->latency_us,
+                   connection_type_str(link->type));
+        }
+    }
+}
+
+// 대역폭 벤치마크
+float measure_bandwidth(int src, int dst) {
+    size_t sizes[] = {1MB, 10MB, 100MB, 1GB};
+    float best_bandwidth = 0;
+
+    for (int i = 0; i < 4; i++) {
+        void* src_mem = wia_alloc_device(src, sizes[i]);
+        void* dst_mem = wia_alloc_device(dst, sizes[i]);
+
+        // 워밍업
+        for (int w = 0; w < 5; w++) {
+            wia_copy_peer(dst_mem, src_mem, sizes[i]);
+        }
+
+        // 측정
+        double start = get_time();
+        for (int iter = 0; iter < 100; iter++) {
+            wia_copy_peer(dst_mem, src_mem, sizes[i]);
+        }
+        wia_synchronize();
+        double elapsed = get_time() - start;
+
+        float bandwidth = (sizes[i] * 100) / elapsed / 1e9;  // GB/s
+        if (bandwidth > best_bandwidth) {
+            best_bandwidth = bandwidth;
+        }
+
+        wia_free_device(src_mem);
+        wia_free_device(dst_mem);
+    }
+
+    return best_bandwidth;
+}</pre>
+
+        <h2>6.3 집합 통신 프리미티브 (Collective Communication)</h2>
+        <p>집합 통신은 분산 훈련과 추론의 기초입니다. WIA-AI-011은 모든 주요 집합 작업을 표준화합니다.</p>
+
+        <h3>6.3.1 All-Reduce</h3>
+        <pre>// All-Reduce: 모든 디바이스의 텐서를 합산하여 모든 디바이스에 결과 분배
+void all_reduce_example() {
+    // 각 디바이스의 그래디언트
+    wia_tensor_t* local_gradients = compute_gradients();
+
+    // All-Reduce로 그래디언트 합산
+    wia_tensor_t* summed_gradients = wia_allreduce(
+        local_gradients,
+        WIA_OP_SUM,        // 합산 연산
+        communicator       // 통신 그룹
+    );
+
+    // 모든 디바이스가 동일한 합산된 그래디언트 보유
+    update_weights(summed_gradients);
+}
+
+// Ring All-Reduce 알고리즘
+void ring_allreduce(Tensor* input, Communicator* comm) {
+    int rank = comm->rank;
+    int size = comm->size;
+    int chunks = size;
+
+    // 1단계: Reduce-Scatter
+    // 각 디바이스가 청크 단위로 이웃에게 전송하며 합산
+    for (int step = 0; step < size - 1; step++) {
+        int send_chunk = (rank - step + size) % size;
+        int recv_chunk = (rank - step - 1 + size) % size;
+
+        int send_to = (rank + 1) % size;
+        int recv_from = (rank - 1 + size) % size;
+
+        // 비동기 송수신
+        wia_send_async(input, send_chunk, send_to);
+        wia_recv_async(recv_buffer, recv_chunk, recv_from);
+        wia_synchronize();
+
+        // 수신한 데이터와 합산
+        add_inplace(input, recv_chunk, recv_buffer, recv_chunk);
+    }
+
+    // 2단계: All-Gather
+    // 합산된 청크를 모든 디바이스에 분배
+    for (int step = 0; step < size - 1; step++) {
+        int send_chunk = (rank - step + size) % size;
+        int recv_chunk = (rank - step - 1 + size) % size;
+
+        int send_to = (rank + 1) % size;
+        int recv_from = (rank - 1 + size) % size;
+
+        wia_send_async(input, send_chunk, send_to);
+        wia_recv_async(input, recv_chunk, recv_from);
+        wia_synchronize();
+    }
+}</pre>
+
+        <h3>6.3.2 Broadcast</h3>
+        <pre>// Broadcast: 한 디바이스의 데이터를 모든 디바이스에 복사
+void broadcast_example() {
+    wia_tensor_t* model_weights;
+
+    if (rank == 0) {
+        // 랭크 0이 가중치 로드
+        model_weights = load_pretrained_weights("model.pth");
+    }
+
+    // 모든 디바이스에 브로드캐스트
+    wia_broadcast(
+        model_weights,
+        0,              // 소스 랭크
+        communicator
+    );
+
+    // 모든 디바이스가 동일한 초기 가중치 보유
+}</pre>
+
+        <h3>6.3.3 Reduce-Scatter & All-Gather</h3>
+        <pre>// Reduce-Scatter: 합산 후 청크별로 분배
+void reduce_scatter_example() {
+    // 각 디바이스가 전체 그래디언트 보유
+    wia_tensor_t* full_gradients = compute_gradients();
+
+    // Reduce-Scatter: 합산 후 분할
+    wia_tensor_t* my_chunk = wia_reduce_scatter(
+        full_gradients,
+        WIA_OP_SUM,
+        communicator
+    );
+
+    // 각 디바이스가 서로 다른 청크의 합산 결과 보유
+}
+
+// All-Gather: 청크를 모아 전체 텐서 재구성
+void all_gather_example() {
+    wia_tensor_t* my_chunk = get_my_output_chunk();
+
+    // 모든 청크를 모아 완전한 텐서 생성
+    wia_tensor_t* full_tensor = wia_allgather(
+        my_chunk,
+        communicator
+    );
+
+    // 모든 디바이스가 완전한 출력 보유
+}</pre>
+
+        <h2>6.4 통신 알고리즘 최적화</h2>
+        <p>다양한 집합 알고리즘이 서로 다른 메시지 크기와 토폴로지에 최적화되어 있습니다.</p>
+
+        <table>
+            <tr>
+                <th>알고리즘</th>
+                <th>적합한 크기</th>
+                <th>통신 단계</th>
+                <th>대역폭 활용</th>
+                <th>특징</th>
+            </tr>
+            <tr>
+                <td>Ring All-Reduce</td>
+                <td>중대형</td>
+                <td>2(N-1)</td>
+                <td>최적</td>
+                <td>대역폭 효율적, 링 토폴로지</td>
+            </tr>
+            <tr>
+                <td>Tree All-Reduce</td>
+                <td>소형</td>
+                <td>2log(N)</td>
+                <td>중간</td>
+                <td>지연시간 최적화, 트리 토폴로지</td>
+            </tr>
+            <tr>
+                <td>Halving-Doubling</td>
+                <td>작은 메시지</td>
+                <td>2log(N)</td>
+                <td>중간</td>
+                <td>지연시간 민감 워크로드</td>
+            </tr>
+            <tr>
+                <td>Recursive Doubling</td>
+                <td>초소형</td>
+                <td>log(N)</td>
+                <td>낮음</td>
+                <td>최소 지연시간</td>
+            </tr>
+        </table>
+
+        <pre>// 자동 알고리즘 선택
+CollectiveAlgorithm select_algorithm(
+    size_t message_size,
+    int num_devices,
+    Topology* topology
+) {
+    // 1. 소형 메시지: 지연시간 최적화
+    if (message_size < 1KB) {
+        return RECURSIVE_DOUBLING;
+    }
+
+    // 2. 중형 메시지: 혼합 접근
+    if (message_size < 1MB) {
+        if (num_devices <= 8) {
+            return TREE_ALLREDUCE;
+        } else {
+            return HALVING_DOUBLING;
+        }
+    }
+
+    // 3. 대형 메시지: 대역폭 최적화
+    if (topology->is_ring_topology) {
+        return RING_ALLREDUCE;
+    } else if (topology->has_nvlink) {
+        return NVLINK_OPTIMIZED_RING;
+    } else {
+        return HIERARCHICAL_ALLREDUCE;  // 노드 내/간 최적화
+    }
+}</pre>
+
+        <h2>6.5 통신자 (Communicator) 관리</h2>
+        <p>통신자는 디바이스 그룹을 정의하고 집합 작업의 컨텍스트를 관리합니다.</p>
+
+        <pre>// 통신자 생성 및 관리
+typedef struct {
+    int num_ranks;
+    int* ranks;              // 디바이스 ID 배열
+    int my_rank;             // 현재 디바이스의 랭크
+    Topology* topology;      // 토폴로지 정보
+    void* backend_data;      // 백엔드별 데이터
+} wia_communicator_t;
+
+// 전역 통신자 생성
+wia_communicator_t* create_world_communicator() {
+    int num_devices = wia_get_device_count();
+    wia_communicator_t* comm = malloc(sizeof(wia_communicator_t));
+
+    comm->num_ranks = num_devices;
+    comm->ranks = malloc(num_devices * sizeof(int));
+
+    for (int i = 0; i < num_devices; i++) {
+        comm->ranks[i] = i;
+    }
+
+    comm->my_rank = get_my_device_id();
+    comm->topology = discover_topology();
+
+    return comm;
+}
+
+// 서브 통신자 생성 (모델 병렬화용)
+wia_communicator_t* create_sub_communicator(
+    wia_communicator_t* world,
+    int* selected_ranks,
+    int num_selected
+) {
+    wia_communicator_t* sub = malloc(sizeof(wia_communicator_t));
+
+    sub->num_ranks = num_selected;
+    sub->ranks = malloc(num_selected * sizeof(int));
+    memcpy(sub->ranks, selected_ranks, num_selected * sizeof(int));
+
+    // 새 랭크 할당
+    for (int i = 0; i < num_selected; i++) {
+        if (selected_ranks[i] == world->my_rank) {
+            sub->my_rank = i;
+            break;
+        }
+    }
+
+    return sub;
+}
+
+// 다중 통신자 예제: 데이터 병렬 + 모델 병렬
+void multi_communicator_example() {
+    // 8개 GPU: [0,1,2,3,4,5,6,7]
+    wia_communicator_t* world = create_world_communicator();
+
+    // 데이터 병렬 그룹 (각 2개 GPU)
+    int dp_group0[] = {0, 4};
+    int dp_group1[] = {1, 5};
+    int dp_group2[] = {2, 6};
+    int dp_group3[] = {3, 7};
+
+    wia_communicator_t* dp_comm = create_sub_communicator(
+        world, get_my_dp_group(), 2
+    );
+
+    // 모델 병렬 그룹 (각 4개 GPU)
+    int mp_group0[] = {0, 1, 2, 3};
+    int mp_group1[] = {4, 5, 6, 7};
+
+    wia_communicator_t* mp_comm = create_sub_communicator(
+        world, get_my_mp_group(), 4
+    );
+
+    // 데이터 병렬: 그래디언트 합산
+    wia_allreduce(gradients, WIA_OP_SUM, dp_comm);
+
+    // 모델 병렬: 활성화 전달
+    wia_send_recv(activations, mp_comm);
+}</pre>
+
+        <h2>6.6 비동기 통신과 계산 중복</h2>
+        <p>비동기 통신은 네트워크 지연시간을 숨기기 위해 계산과 중복됩니다.</p>
+
+        <pre>// 비동기 통신 예제
+void async_communication_overlap() {
+    // 순차적 실행 (느림)
+    compute_layer1();
+    all_reduce_sync(gradients_layer1);  // 계산 대기
+
+    compute_layer2();
+    all_reduce_sync(gradients_layer2);  // 계산 대기
+
+    // 비동기 중복 (빠름)
+    wia_request_t* req1 = wia_allreduce_async(
+        gradients_layer1, WIA_OP_SUM, comm
+    );
+    compute_layer2();  // 통신과 병렬 실행
+
+    wia_request_t* req2 = wia_allreduce_async(
+        gradients_layer2, WIA_OP_SUM, comm
+    );
+    compute_layer3();  // 통신과 병렬 실행
+
+    // 필요할 때만 대기
+    wia_wait(req1);
+    update_layer1_weights(gradients_layer1);
+
+    wia_wait(req2);
+    update_layer2_weights(gradients_layer2);
+}
+
+// 그래디언트 버킷팅 (Bucketing)
+void gradient_bucketing() {
+    // 그래디언트를 버킷으로 그룹화
+    const int BUCKET_SIZE = 25 * 1024 * 1024;  // 25MB
+    vector<Tensor*> bucket;
+    size_t bucket_bytes = 0;
+
+    for (int layer = num_layers - 1; layer >= 0; layer--) {
+        Tensor* grad = gradients[layer];
+        bucket.push_back(grad);
+        bucket_bytes += grad->size_bytes();
+
+        // 버킷이 충분히 크면 All-Reduce 시작
+        if (bucket_bytes >= BUCKET_SIZE) {
+            Tensor* merged = concatenate(bucket);
+            wia_request_t* req = wia_allreduce_async(
+                merged, WIA_OP_SUM, comm
+            );
+
+            // 다음 버킷 준비하는 동안 통신 진행
+            pending_requests.push_back(req);
+
+            bucket.clear();
+            bucket_bytes = 0;
+        }
+    }
+
+    // 남은 버킷 처리
+    if (!bucket.empty()) {
+        Tensor* merged = concatenate(bucket);
+        wia_allreduce_async(merged, WIA_OP_SUM, comm);
+    }
+}</pre>
+
+        <h2>6.7 그래디언트 압축</h2>
+        <p>그래디언트 압축은 양자화/희소화를 통해 대역폭 요구 사항을 줄입니다.</p>
+
+        <pre>// 그래디언트 압축 기법
+
+// 1. Top-K 희소화
+Tensor* topk_sparsification(Tensor* gradients, float sparsity) {
+    int k = (int)(gradients->numel() * (1.0 - sparsity));
+
+    // 상위 K개 그래디언트만 선택
+    auto [values, indices] = topk(abs(gradients), k);
+
+    // 희소 표현 생성
+    SparseTensor* sparse = create_sparse_tensor(
+        gradients->shape, values, indices
+    );
+
+    // 압축률: 원본의 (1 - sparsity) 크기
+    return sparse;
+}
+
+// 2. 1-bit 압축
+Tensor* onebit_compression(Tensor* gradients) {
+    // 부호와 스케일만 전송
+    float scale = mean(abs(gradients));
+    uint8_t* signs = sign_bits(gradients);  // 각 요소 1비트
+
+    Compressed* compressed = {
+        .scale = scale,
+        .signs = signs,
+        .size = gradients->numel() / 8  // 32배 압축
+    };
+
+    return compressed;
+}
+
+// 복원
+Tensor* onebit_decompress(Compressed* comp) {
+    Tensor* restored = create_tensor(shape);
+
+    for (int i = 0; i < comp->numel(); i++) {
+        int sign = (comp->signs[i/8] >> (i%8)) & 1;
+        restored->data[i] = (sign ? 1 : -1) * comp->scale;
+    }
+
+    return restored;
+}
+
+// 3. 오류 피드백 (Error Feedback)
+void compressed_allreduce_with_error_feedback() {
+    static Tensor* error_accumulator = zeros_like(gradients);
+
+    // 이전 오류 추가
+    gradients = add(gradients, error_accumulator);
+
+    // 압축
+    CompressedTensor* compressed = compress(gradients);
+
+    // All-Reduce
+    wia_allreduce(compressed, WIA_OP_SUM, comm);
+
+    // 압축 해제
+    Tensor* decompressed = decompress(compressed);
+
+    // 오류 누적 (다음 반복에 사용)
+    error_accumulator = sub(gradients, decompressed);
+
+    // 가중치 업데이트
+    update_weights(decompressed);
+}</pre>
+
+        <h2>6.8 내결함성 (Fault Tolerance)</h2>
+        <p>대규모 클러스터에서는 디바이스 장애가 불가피합니다. WIA-AI-011은 체크포인팅과 장애 복구를 지원합니다.</p>
+
+        <pre>// 체크포인팅 전략
+class CheckpointManager {
+    int checkpoint_interval;
+    int num_replicas;
+
+public:
+    void save_checkpoint(int iteration) {
+        if (iteration % checkpoint_interval != 0) {
+            return;
+        }
+
+        // 1. 모델 상태 수집
+        ModelState state = {
+            .iteration = iteration,
+            .model_weights = get_model_weights(),
+            .optimizer_state = get_optimizer_state(),
+            .rng_state = get_rng_state()
+        };
+
+        // 2. 랭크 0에서 저장 (또는 분산 저장)
+        if (comm->my_rank == 0) {
+            save_to_disk(state, format("checkpoint_%d.pt", iteration));
+
+            // 3. 중복 복제본 저장 (신뢰성)
+            for (int r = 1; r <= num_replicas; r++) {
+                copy_to_backup_location(r);
+            }
+        }
+
+        wia_barrier(comm);  // 모든 랭크 동기화
+    }
+
+    bool restore_checkpoint(int* iteration) {
+        // 최신 체크포인트 찾기
+        int latest = find_latest_checkpoint();
+        if (latest < 0) {
+            return false;  // 체크포인트 없음
+        }
+
+        // 체크포인트 로드
+        ModelState state = load_from_disk(
+            format("checkpoint_%d.pt", latest)
+        );
+
+        // 상태 복원
+        set_model_weights(state.model_weights);
+        set_optimizer_state(state.optimizer_state);
+        set_rng_state(state.rng_state);
+
+        *iteration = state.iteration;
+
+        printf("체크포인트 복원: iteration %d\n", latest);
+        return true;
+    }
+};
+
+// 장애 감지 및 복구
+void fault_tolerant_training() {
+    CheckpointManager ckpt;
+    int iteration = 0;
+
+    // 체크포인트에서 복원 시도
+    if (!ckpt.restore_checkpoint(&iteration)) {
+        printf("처음부터 훈련 시작\n");
+    }
+
+    while (iteration < max_iterations) {
+        try {
+            // 순전파 & 역전파
+            Tensor* loss = forward_backward();
+
+            // All-Reduce with timeout
+            wia_request_t* req = wia_allreduce_async(
+                gradients, WIA_OP_SUM, comm
+            );
+
+            if (!wia_wait_timeout(req, 30000)) {  // 30초 타임아웃
+                throw CommunicationTimeout();
+            }
+
+            // 가중치 업데이트
+            optimizer_step();
+
+            // 주기적 체크포인팅
+            ckpt.save_checkpoint(iteration);
+
+            iteration++;
+
+        } catch (DeviceFailure& e) {
+            // 디바이스 장애 - 체크포인트에서 복원
+            printf("장애 감지: %s, 복원 중...\n", e.what());
+
+            // 장애 디바이스 제거
+            remove_failed_device(e.device_id);
+
+            // 통신자 재구성
+            comm = rebuild_communicator(alive_devices);
+
+            // 체크포인트 복원
+            ckpt.restore_checkpoint(&iteration);
+
+            // 훈련 재개
+            continue;
+        }
+    }
+}</pre>
+
+        <h2>6.9 RDMA 및 고성능 네트워킹</h2>
+        <p>RDMA (Remote Direct Memory Access)는 CPU를 우회하여 고성능 노드 간 통신을 가능하게 합니다.</p>
+
+        <pre>// RDMA 통신 예제
+void rdma_communication_example() {
+    // 1. RDMA 메모리 등록
+    void* rdma_buffer = wia_alloc_rdma(ctx, buffer_size);
+
+    // 2. 메모리 키 교환
+    uint32_t my_rkey = wia_get_rkey(rdma_buffer);
+    uint32_t remote_rkey = exchange_keys(my_rkey, peer_rank);
+
+    // 3. One-sided RDMA Write (CPU 개입 없음)
+    wia_rdma_write(
+        local_buffer,           // 로컬 데이터
+        rdma_buffer,            // RDMA 버퍼
+        remote_addr,            // 원격 주소
+        remote_rkey,            // 원격 키
+        size                    // 크기
+    );
+
+    // 4. RDMA Read
+    wia_rdma_read(
+        rdma_buffer,            // 로컬 버퍼
+        remote_addr,            // 원격 주소
+        remote_rkey,            // 원격 키
+        size
+    );
+
+    // CPU는 전송에 관여하지 않음, GPU와 NIC 직접 통신
+}
+
+// GPUDirect RDMA (GPU 메모리 직접 전송)
+void gpu_direct_rdma() {
+    // GPU 메모리를 RDMA용으로 등록
+    wia_tensor_t* gpu_tensor = wia_create_tensor_device(shape);
+    void* gpu_ptr = wia_tensor_data(gpu_tensor);
+
+    uint32_t rkey = wia_register_rdma_memory(gpu_ptr, size);
+
+    // GPU 메모리 → 네트워크 → 원격 GPU 메모리
+    // 호스트 메모리 거치지 않음!
+    wia_rdma_write_gpu(
+        gpu_ptr,                // 로컬 GPU 메모리
+        remote_gpu_addr,        // 원격 GPU 메모리
+        remote_rkey,
+        size
+    );
+
+    // 대역폭: 100+ GB/s (InfiniBand EDR)
+    // 지연시간: 1-2 μs
+}</pre>
+
+        <h2>6.10 프로파일링 및 성능 분석</h2>
+        <p>통신 성능을 최적화하려면 상세한 프로파일링이 필요합니다.</p>
+
+        <pre>// 통신 프로파일링
+typedef struct {
+    CollectiveOp op;
+    size_t message_size;
+    double duration_ms;
+    double bandwidth_gbps;
+    int num_participants;
+} CommProfile;
+
+void profile_communication() {
+    CommProfile profiles[100];
+    int num_profiles = 0;
+
+    // 다양한 크기에 대해 All-Reduce 벤치마크
+    size_t sizes[] = {1KB, 10KB, 100KB, 1MB, 10MB, 100MB, 1GB};
+
+    for (int i = 0; i < 7; i++) {
+        Tensor* data = create_tensor_size(sizes[i]);
+
+        double start = get_time();
+
+        for (int iter = 0; iter < 100; iter++) {
+            wia_allreduce(data, WIA_OP_SUM, comm);
+        }
+
+        double elapsed = get_time() - start;
+
+        profiles[num_profiles++] = {
+            .op = ALL_REDUCE,
+            .message_size = sizes[i],
+            .duration_ms = elapsed / 100,
+            .bandwidth_gbps = sizes[i] / (elapsed / 100) / 1e6,
+            .num_participants = comm->num_ranks
+        };
+    }
+
+    // 결과 분석
+    printf("\n=== 통신 성능 프로파일 ===\n");
+    for (int i = 0; i < num_profiles; i++) {
+        printf("%10zu bytes: %.3f ms, %.2f GB/s\n",
+               profiles[i].message_size,
+               profiles[i].duration_ms,
+               profiles[i].bandwidth_gbps);
+    }
+}</pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>대규모 AI 모델은 다중 디바이스 조정 필수, GPT-3는 5개 이상의 GPU 필요</li>
+                <li>토폴로지 검색으로 디바이스 간 연결 특성 (대역폭, 지연시간, P2P) 파악</li>
+                <li>All-Reduce, Broadcast, Reduce-Scatter, All-Gather 등 집합 통신 프리미티브 표준화</li>
+                <li>Ring, Tree, Halving-Doubling 등 다양한 알고리즘이 메시지 크기와 토폴로지에 최적화</li>
+                <li>통신자는 디바이스 그룹 정의, 데이터/모델 병렬화에 다중 통신자 사용</li>
+                <li>비동기 통신으로 계산과 중복, 그래디언트 버킷팅으로 효율성 극대화</li>
+                <li>Top-K, 1-bit 압축으로 대역폭 요구사항 감소, 오류 피드백으로 정확도 유지</li>
+                <li>체크포인팅과 장애 복구로 대규모 클러스터의 내결함성 보장</li>
+                <li>RDMA와 GPUDirect로 CPU 우회, 100+ GB/s 대역폭과 1-2 μs 지연시간 달성</li>
+                <li>통신 프로파일링으로 병목 현상 식별 및 최적화</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>GPT-3 (175B 파라미터)를 FP16으로 훈련하려면 최소 몇 개의 A100 80GB GPU가 필요합니까? 계산 과정을 보이십시오.</li>
+                <li>토폴로지 검색에서 측정하는 주요 링크 특성 4가지를 나열하고 각각의 중요성을 설명하십시오.</li>
+                <li>All-Reduce의 개념과 분산 훈련에서의 역할을 설명하십시오. Ring All-Reduce 알고리즘의 2단계를 서술하십시오.</li>
+                <li>Ring, Tree, Halving-Doubling All-Reduce 알고리즘을 비교하십시오. 각각 어떤 상황에 적합합니까?</li>
+                <li>통신자(Communicator)의 역할을 설명하고 데이터 병렬과 모델 병렬에서 다중 통신자를 사용하는 예를 작성하십시오.</li>
+                <li>비동기 통신이 계산과 중복되는 원리를 설명하십시오. 그래디언트 버킷팅이 효율성을 높이는 방법은?</li>
+                <li>Top-K 희소화와 1-bit 압축의 차이점을 설명하십시오. 오류 피드백이 필요한 이유는?</li>
+                <li>체크포인팅 전략을 설명하고 장애 발생 시 복구 과정을 단계별로 서술하십시오.</li>
+                <li>RDMA와 일반 네트워크 통신의 차이를 설명하십시오. GPUDirect RDMA의 장점은?</li>
+                <li>All-Reduce의 통신 비용을 N(디바이스 수)과 M(메시지 크기)의 함수로 표현하고 Ring 알고리즘의 효율성을 설명하십시오.</li>
+                <li>8개 GPU를 사용하는 시스템에서 데이터 병렬 4개 그룹과 모델 병렬 2개 그룹을 구성하는 방법을 그림과 함께 설명하십시오.</li>
+                <li>1GB 그래디언트를 95% 희소화하여 압축할 때 전송 시간 절약을 계산하십시오 (대역폭 10 GB/s 가정).</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 2px solid #e2e8f0; color: #10B981;">
+            <strong>弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</strong><br>
+            <span style="font-size: 0.9em; color: #6b7280;">효율적인 다중 디바이스 통신으로 대규모 AI 모델 훈련 가능</span>
+        </div>
+    </div>
+</body>
+</html>

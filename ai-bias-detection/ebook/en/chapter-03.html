@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Data Bias Detection | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <a href="index.html" class="back-link">← Back to Table of Contents</a>
+            <div class="chapter-number">Chapter 3</div>
+            <h1>Data Bias Detection</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            Most bias in AI systems originates from biased training data. This chapter covers techniques for detecting
+            bias in datasets before they poison your models. 弘益人間 - Clean data leads to fair AI.
+        </p>
+
+        <h2>Understanding Data Bias</h2>
+        <p>
+            Data bias is systematic error in the data collection, sampling, or labeling process that results in
+            misrepresentation of the true population. Unlike random noise, data bias creates consistent patterns
+            that ML models will learn and amplify.
+        </p>
+
+        <h2>Types of Data Bias</h2>
+
+        <h3>1. Selection Bias</h3>
+        <p>
+            Selection bias occurs when the data collection process systematically excludes or underrepresents
+            certain groups. This is one of the most common and pernicious forms of data bias.
+        </p>
+
+        <pre><code># Detect Selection Bias
+import pandas as pd
+import numpy as np
+
+def detect_selection_bias(df, population_stats, protected_attr):
+    """
+    Compare dataset distribution to known population statistics
+    """
+    dataset_dist = df[protected_attr].value_counts(normalize=True)
+
+    print("Selection Bias Analysis")
+    print("=" * 60)
+    print(f"\n{'Group':<20} {'Dataset %':<15} {'Population %':<15} {'Bias'}")
+    print("-" * 60)
+
+    for group in population_stats.keys():
+        dataset_pct = dataset_dist.get(group, 0) * 100
+        population_pct = population_stats[group] * 100
+        bias = dataset_pct - population_pct
+
+        status = "⚠️" if abs(bias) > 5 else "✓"
+        print(f"{group:<20} {dataset_pct:<15.2f} {population_pct:<15.2f} {bias:+.2f}% {status}")
+
+    return dataset_dist
+
+# Example
+population = {'Group_A': 0.60, 'Group_B': 0.30, 'Group_C': 0.10}
+# detect_selection_bias(dataset, population, 'demographic')
+</code></pre>
+
+        <h3>2. Measurement Bias</h3>
+        <p>
+            Measurement bias arises when features are systematically measured differently across groups or
+            when measurement tools have different accuracy for different populations.
+        </p>
+
+        <pre><code># Detect Measurement Bias
+def analyze_measurement_quality(df, feature, protected_attr):
+    """
+    Analyze measurement consistency across groups
+    """
+    groups = df[protected_attr].unique()
+
+    print(f"Measurement Quality Analysis: {feature}")
+    print("=" * 60)
+
+    for group in groups:
+        group_data = df[df[protected_attr] == group][feature]
+
+        # Check for patterns suggesting measurement issues
+        missing_rate = group_data.isna().sum() / len(group_data)
+        outlier_rate = len(group_data[np.abs(group_data - group_data.mean()) > 3*group_data.std()]) / len(group_data)
+
+        print(f"\n{group}:")
+        print(f"  Missing rate: {missing_rate:.3f}")
+        print(f"  Outlier rate: {outlier_rate:.3f}")
+        print(f"  Mean: {group_data.mean():.3f}")
+        print(f"  Std: {group_data.std():.3f}")
+
+        if missing_rate > 0.05:
+            print(f"  ⚠️ High missing rate may indicate measurement bias")
+</code></pre>
+
+        <h3>3. Label Bias</h3>
+        <p>
+            Label bias occurs when the labeling process is inconsistent or biased. This is particularly
+            problematic in supervised learning where labels are the ground truth.
+        </p>
+
+        <pre><code># Detect Label Bias
+def detect_label_bias(df, label_col, protected_attr, feature_cols):
+    """
+    Look for cases where labels differ despite similar features
+    """
+    from sklearn.neighbors import NearestNeighbors
+
+    groups = df[protected_attr].unique()
+
+    # Find similar instances across groups
+    X = df[feature_cols].values
+    nbrs = NearestNeighbors(n_neighbors=5).fit(X)
+
+    disagreements = 0
+    total_pairs = 0
+
+    for i in range(len(df)):
+        distances, indices = nbrs.kneighbors([X[i]])
+
+        for idx in indices[0][1:]:  # Skip self
+            if df.iloc[i][protected_attr] != df.iloc[idx][protected_attr]:
+                total_pairs += 1
+                if df.iloc[i][label_col] != df.iloc[idx][label_col]:
+                    disagreements += 1
+
+    disagreement_rate = disagreements / total_pairs if total_pairs > 0 else 0
+    print(f"Label disagreement rate for similar cross-group pairs: {disagreement_rate:.3f}")
+
+    if disagreement_rate > 0.3:
+        print("⚠️ High disagreement suggests potential label bias")
+
+    return disagreement_rate
+</code></pre>
+
+        <h2>Dataset Auditing Techniques</h2>
+
+        <h3>Statistical Distribution Analysis</h3>
+        <p>
+            Comprehensive analysis of how data is distributed across protected groups.
+        </p>
+
+        <pre><code># Comprehensive Dataset Audit
+def audit_dataset(df, protected_attributes, target):
+    """
+    Perform comprehensive bias audit of dataset
+    """
+    print("DATASET BIAS AUDIT REPORT")
+    print("=" * 70)
+
+    # 1. Sample Size Analysis
+    print("\n1. SAMPLE SIZE BY GROUP")
+    print("-" * 70)
+    for attr in protected_attributes:
+        counts = df[attr].value_counts()
+        print(f"\n{attr}:")
+        for group, count in counts.items():
+            pct = count / len(df) * 100
+            warning = " ⚠️ UNDERREPRESENTED" if pct < 10 else ""
+            print(f"  {group}: {count} ({pct:.2f}%){warning}")
+
+    # 2. Label Distribution by Group
+    print("\n2. LABEL DISTRIBUTION BY GROUP")
+    print("-" * 70)
+    for attr in protected_attributes:
+        print(f"\n{attr}:")
+        cross_tab = pd.crosstab(df[attr], df[target], normalize='index') * 100
+        print(cross_tab.round(2))
+
+        # Check for significant disparities
+        positive_rates = cross_tab[1] if 1 in cross_tab.columns else cross_tab.iloc[:, 1]
+        if positive_rates.max() - positive_rates.min() > 20:
+            print("  ⚠️ Significant label imbalance detected across groups")
+
+    # 3. Missing Data Analysis
+    print("\n3. MISSING DATA BY GROUP")
+    print("-" * 70)
+    for attr in protected_attributes:
+        print(f"\n{attr}:")
+        for group in df[attr].unique():
+            group_df = df[df[attr] == group]
+            missing_pct = (group_df.isna().sum() / len(group_df) * 100).mean()
+            print(f"  {group}: {missing_pct:.2f}% average missing")
+
+    # 4. Feature Correlation with Protected Attributes
+    print("\n4. FEATURE CORRELATION WITH PROTECTED ATTRIBUTES")
+    print("-" * 70)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for attr in protected_attributes:
+        if attr in numeric_cols:
+            continue
+        print(f"\n{attr}:")
+        # One-hot encode for correlation
+        encoded = pd.get_dummies(df[attr], prefix=attr)
+        for col in numeric_cols:
+            if col != target:
+                corr = df[col].corr(encoded.iloc[:, 0])
+                if abs(corr) > 0.3:
+                    print(f"  {col}: {corr:.3f} ⚠️ HIGH CORRELATION")
+
+    print("\n" + "=" * 70)
+    print("AUDIT COMPLETE")
+    print("Review warnings above for potential bias issues")
+    print("=" * 70)
+</code></pre>
+
+        <h2>Proxy Discrimination Detection</h2>
+
+        <p>
+            Even when protected attributes are excluded, proxy features can enable discrimination.
+        </p>
+
+        <pre><code># Detect Proxy Features
+def detect_proxy_features(df, protected_attr, feature_cols, threshold=0.5):
+    """
+    Identify features that may serve as proxies for protected attributes
+    """
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import cross_val_score
+
+    print("PROXY FEATURE DETECTION")
+    print("=" * 60)
+
+    X = df[feature_cols]
+    y = df[protected_attr]
+
+    # Train model to predict protected attribute from features
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    scores = cross_val_score(clf, X, y, cv=5)
+    mean_score = scores.mean()
+
+    print(f"Can predict {protected_attr} from features: {mean_score:.3f} accuracy")
+
+    if mean_score > threshold:
+        print("⚠️ WARNING: Features may contain proxies for protected attribute")
+
+        # Get feature importance
+        clf.fit(X, y)
+        importance = pd.DataFrame({
+            'feature': feature_cols,
+            'importance': clf.feature_importances_
+        }).sort_values('importance', ascending=False)
+
+        print("\nMost predictive features (potential proxies):")
+        print(importance.head(10))
+
+    return mean_score
+
+# Example usage
+# detect_proxy_features(df, 'race', ['zipcode', 'income', 'education'])
+</code></pre>
+
+        <h2>Temporal Bias Detection</h2>
+
+        <p>
+            Data collected over time may reflect changing biases or become outdated.
+        </p>
+
+        <pre><code># Temporal Bias Analysis
+def analyze_temporal_bias(df, timestamp_col, protected_attr, target):
+    """
+    Analyze how bias evolves over time
+    """
+    df['year'] = pd.to_datetime(df[timestamp_col]).dt.year
+
+    print("TEMPORAL BIAS ANALYSIS")
+    print("=" * 60)
+
+    for group in df[protected_attr].unique():
+        group_df = df[df[protected_attr] == group]
+
+        yearly_stats = group_df.groupby('year').agg({
+            target: ['mean', 'count']
+        }).round(3)
+
+        print(f"\n{group}:")
+        print(yearly_stats)
+
+    # Check for trends
+    print("\n⚠️ Look for:")
+    print("  - Changing label distributions over time")
+    print("  - Varying representation across years")
+    print("  - Sudden shifts that may indicate data drift")
+</code></pre>
+
+        <h2>Intersectional Bias</h2>
+
+        <p>
+            Bias often compounds across multiple protected attributes. Intersectional analysis examines
+            combinations of attributes.
+        </p>
+
+        <pre><code># Intersectional Bias Analysis
+def intersectional_analysis(df, protected_attrs, target):
+    """
+    Analyze bias across intersections of multiple protected attributes
+    """
+    print("INTERSECTIONAL BIAS ANALYSIS")
+    print("=" * 70)
+
+    # Create intersection groups
+    df['intersection'] = df[protected_attrs].apply(
+        lambda x: '_'.join(x.astype(str)), axis=1
+    )
+
+    results = df.groupby('intersection').agg({
+        target: ['mean', 'count']
+    }).round(3)
+
+    results.columns = ['positive_rate', 'count']
+    results = results.sort_values('positive_rate')
+
+    print(results)
+
+    # Identify most disadvantaged intersections
+    min_rate = results['positive_rate'].min()
+    max_rate = results['positive_rate'].max()
+    disparity = max_rate - min_rate
+
+    print(f"\nPositive rate range: {min_rate:.3f} to {max_rate:.3f}")
+    print(f"Disparity: {disparity:.3f}")
+
+    if disparity > 0.2:
+        print("⚠️ Significant intersectional bias detected")
+
+        print("\nMost disadvantaged groups:")
+        print(results.head(3))
+
+    return results
+</code></pre>
+
+        <h2>Data Quality Checks</h2>
+
+        <h3>Completeness</h3>
+        <ul>
+            <li>Are all relevant groups adequately represented?</li>
+            <li>Is there sufficient data for each subgroup?</li>
+            <li>Are there systematic gaps in coverage?</li>
+        </ul>
+
+        <h3>Consistency</h3>
+        <ul>
+            <li>Are measurements standardized across groups?</li>
+            <li>Are labeling guidelines consistently applied?</li>
+            <li>Are data collection procedures uniform?</li>
+        </ul>
+
+        <h3>Validity</h3>
+        <ul>
+            <li>Do the features measure what they claim to measure?</li>
+            <li>Are labels accurate and unbiased?</li>
+            <li>Are measurement tools validated across populations?</li>
+        </ul>
+
+        <h2>Best Practices for Data Collection</h2>
+
+        <div class="callout">
+            <h3>弘益人間 Data Principles</h3>
+            <ul>
+                <li><strong>Inclusive Sampling:</strong> Ensure all populations are adequately represented</li>
+                <li><strong>Transparent Methodology:</strong> Document all data collection procedures</li>
+                <li><strong>Regular Audits:</strong> Continuously monitor data quality and representation</li>
+                <li><strong>Diverse Teams:</strong> Include diverse perspectives in data collection and labeling</li>
+                <li><strong>Ethical Review:</strong> Subject data collection to ethical review processes</li>
+            </ul>
+        </div>
+
+        <h2>Creating a Data Bias Report</h2>
+
+        <pre><code># Generate Comprehensive Data Bias Report
+def generate_data_bias_report(df, protected_attrs, target, feature_cols):
+    """
+    Generate comprehensive data bias assessment report
+    """
+    report = {
+        'timestamp': pd.Timestamp.now(),
+        'total_samples': len(df),
+        'issues': []
+    }
+
+    print("\n" + "=" * 70)
+    print("DATA BIAS DETECTION REPORT")
+    print("=" * 70)
+    print(f"Generated: {report['timestamp']}")
+    print(f"Total Samples: {report['total_samples']}")
+
+    # Run all checks
+    audit_dataset(df, protected_attrs, target)
+
+    for attr in protected_attrs:
+        proxy_score = detect_proxy_features(df, attr, feature_cols)
+        if proxy_score > 0.5:
+            report['issues'].append(f"Proxy features detected for {attr}")
+
+    # Intersectional analysis
+    if len(protected_attrs) > 1:
+        intersectional_analysis(df, protected_attrs, target)
+
+    print("\n" + "=" * 70)
+    print("RECOMMENDATIONS")
+    print("=" * 70)
+    print("1. Address underrepresented groups through additional data collection")
+    print("2. Review and standardize labeling procedures")
+    print("3. Investigate high-correlation features for proxy discrimination")
+    print("4. Consider stratified sampling for future data collection")
+    print("5. Implement continuous monitoring of data quality")
+    print("\n弘익人間 - Fair data is the foundation of fair AI")
+    print("=" * 70)
+
+    return report
+</code></pre>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">Chapter Summary</h2>
+            <ul>
+                <li>Data bias is the most common source of AI bias and must be addressed early</li>
+                <li>Key types include selection bias, measurement bias, and label bias</li>
+                <li>Statistical analysis can reveal underrepresentation and systematic errors</li>
+                <li>Proxy features can enable discrimination even when protected attributes are excluded</li>
+                <li>Temporal analysis reveals how bias changes over time and identifies data drift</li>
+                <li>Intersectional bias analysis examines compound discrimination across multiple attributes</li>
+                <li>Comprehensive audits should check completeness, consistency, and validity</li>
+                <li>Best practices include inclusive sampling, transparent methodology, and regular audits</li>
+                <li>弘益人間 principle emphasizes fair data collection benefiting all groups</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">Review Questions</h2>
+            <ol>
+                <li>What is the difference between selection bias and sampling bias? Provide examples of each.</li>
+                <li>How can you detect if a feature is serving as a proxy for a protected attribute?</li>
+                <li>Why is label bias particularly problematic in supervised learning? How can it be detected?</li>
+                <li>Describe a scenario where measurement bias could affect a facial recognition system.</li>
+                <li>What is intersectional bias and why is it important to analyze?</li>
+                <li>If a dataset has 90% representation from one demographic group, what problems might this cause?</li>
+                <li>How would you determine if your training data is representative of your deployment population?</li>
+                <li>What role does temporal analysis play in bias detection? What can change over time?</li>
+                <li>Design a data collection strategy for a hiring AI that follows 弘익人間 principles.</li>
+                <li>What should be included in a comprehensive data bias audit report?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← Previous Chapter</a>
+            <a href="chapter-04.html" class="nav-button">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

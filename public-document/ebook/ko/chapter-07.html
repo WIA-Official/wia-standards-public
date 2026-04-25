@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 통합 및 배포 | WIA-SOCIAL</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #EC4899; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; transition: all 0.3s ease; }
+        .btn:hover { background: var(--success); transform: translateY(-2px); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        pre { background: var(--bg); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { padding: 0; }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--text-secondary); }
+        .philosophy { color: var(--primary); font-size: 1.2rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">제7장</p>
+        <h1>통합 및 배포</h1>
+
+        <h2>7.1 정부 기관 시스템 통합</h2>
+
+        <p>
+            공공문서 시스템은 다양한 정부 기관의 레거시 시스템과 통합되어야 합니다. WIA-SOCIAL은 API 게이트웨이, 메시지 브로커, ETL 파이프라인을 사용하여 원활한 통합을 지원합니다.
+        </p>
+
+        <h3>통합 아키텍처</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>통합 계층</th>
+                    <th>기술</th>
+                    <th>역할</th>
+                    <th>예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>API 게이트웨이</td>
+                    <td>Kong, AWS API Gateway</td>
+                    <td>라우팅, 인증, 속도 제한</td>
+                    <td>모든 외부 API 요청의 단일 진입점</td>
+                </tr>
+                <tr>
+                    <td>서비스 메시</td>
+                    <td>Istio, Linkerd</td>
+                    <td>마이크로서비스 간 통신 관리</td>
+                    <td>서비스 디스커버리, 로드 밸런싱</td>
+                </tr>
+                <tr>
+                    <td>메시지 브로커</td>
+                    <td>RabbitMQ, Kafka</td>
+                    <td>비동기 메시징</td>
+                    <td>문서 발급 완료 알림</td>
+                </tr>
+                <tr>
+                    <td>ETL 파이프라인</td>
+                    <td>Apache NiFi, Airflow</td>
+                    <td>데이터 추출, 변환, 적재</td>
+                    <td>레거시 시스템 데이터 마이그레이션</td>
+                </tr>
+                <tr>
+                    <td>ESB</td>
+                    <td>Mule ESB, WSO2</td>
+                    <td>엔터프라이즈 통합</td>
+                    <td>복잡한 프로토콜 변환</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>레거시 시스템 통합 패턴</h3>
+
+        <pre><code>// API Gateway를 통한 레거시 시스템 통합
+import express from 'express';
+import axios from 'axios';
+
+const app = express();
+
+// 레거시 시스템 어댑터
+class LegacySystemAdapter {
+  private legacyEndpoint: string;
+
+  constructor(endpoint: string) {
+    this.legacyEndpoint = endpoint;
+  }
+
+  // WIA 형식을 레거시 형식으로 변환
+  async createBirthCertificate(wiaDocument: any): Promise<any> {
+    // WIA 형식을 레거시 SOAP 형식으로 변환
+    const soapRequest = `
+      <?xml version="1.0"?>
+      <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+          <CreateBirthCertificate>
+            <FullName>${wiaDocument.fullName}</FullName>
+            <DateOfBirth>${wiaDocument.dateOfBirth}</DateOfBirth>
+            <Gender>${wiaDocument.gender}</Gender>
+            <FatherName>${wiaDocument.parents[0].fullName}</FatherName>
+            <MotherName>${wiaDocument.parents[1].fullName}</MotherName>
+          </CreateBirthCertificate>
+        </soap:Body>
+      </soap:Envelope>
+    `;
+
+    // 레거시 시스템 호출
+    const response = await axios.post(this.legacyEndpoint, soapRequest, {
+      headers: { 'Content-Type': 'text/xml' }
+    });
+
+    // 레거시 응답을 WIA 형식으로 변환
+    return this.parseSoapResponse(response.data);
+  }
+
+  private parseSoapResponse(soapXml: string): any {
+    // XML 파싱 및 WIA 형식으로 변환
+    // 실제 구현에서는 XML 파서 사용
+    return {
+      documentId: 'LEGACY-123456',
+      status: 'CREATED',
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+// API 엔드포인트
+app.post('/api/v1/documents/birth-certificates', async (req, res) => {
+  const wiaDocument = req.body;
+
+  // 레거시 시스템에도 동기화
+  const adapter = new LegacySystemAdapter('http://legacy-system.gov/soap');
+  const legacyResult = await adapter.createBirthCertificate(wiaDocument);
+
+  // WIA 시스템에 저장
+  const wiaResult = await saveToWIASystem(wiaDocument);
+
+  // 양쪽 시스템의 ID를 매핑 테이블에 저장
+  await saveLegacyMapping(wiaResult.documentId, legacyResult.documentId);
+
+  res.json(wiaResult);
+});
+
+app.listen(3000);
+</code></pre>
+
+        <h2>7.2 국경 간 문서 검증</h2>
+
+        <p>
+            국제 이동 시 문서 검증이 필요합니다. WIA-SOCIAL은 국가 간 안전한 문서 교환 및 검증을 위한 프로토콜을 정의합니다.
+        </p>
+
+        <h3>국제 문서 검증 프로토콜</h3>
+
+        <div class="highlight-box">
+            <h3>🌍 상호 인정 협정 (Mutual Recognition Agreement)</h3>
+            <p>국가 간 디지털 문서를 상호 인정하기 위한 요구사항:</p>
+            <ul>
+                <li><strong>표준 준수:</strong> WIA-SOCIAL, ICAO 9303 등 국제 표준 준수</li>
+                <li><strong>PKI 상호 인증:</strong> 국가 간 Root CA 교차 인증</li>
+                <li><strong>데이터 보호:</strong> GDPR, APEC CBPR 등 개인정보 보호 규정 준수</li>
+                <li><strong>감사 투명성:</strong> 문서 사용 이력의 상호 공유</li>
+                <li><strong>기술 호환성:</strong> API 버전 및 프로토콜 호환성 보장</li>
+            </ul>
+        </div>
+
+        <h3>국경 간 검증 시나리오</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>시나리오</th>
+                    <th>발급국</th>
+                    <th>검증국</th>
+                    <th>검증 방법</th>
+                    <th>소요 시간</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>공항 입국 심사</td>
+                    <td>한국</td>
+                    <td>싱가포르</td>
+                    <td>QR 코드 + API 실시간 검증</td>
+                    <td>&lt; 5초</td>
+                </tr>
+                <tr>
+                    <td>해외 대학 입학</td>
+                    <td>한국</td>
+                    <td>미국</td>
+                    <td>졸업증명서 온라인 검증</td>
+                    <td>&lt; 1분</td>
+                </tr>
+                <tr>
+                    <td>해외 취업</td>
+                    <td>한국</td>
+                    <td>독일</td>
+                    <td>자격증 블록체인 검증</td>
+                    <td>&lt; 30초</td>
+                </tr>
+                <tr>
+                    <td>국제 결혼</td>
+                    <td>한국</td>
+                    <td>일본</td>
+                    <td>혼인신고서 공증 + 검증</td>
+                    <td>&lt; 24시간</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>7.3 모바일 애플리케이션</h2>
+
+        <p>
+            시민들이 언제 어디서나 자신의 문서에 접근할 수 있도록 모바일 애플리케이션을 제공합니다.
+        </p>
+
+        <h3>모바일 앱 주요 기능</h3>
+
+        <pre><code>// React Native 모바일 앱 예시
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, FlatList, TouchableOpacity } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
+import * as LocalAuthentication from 'expo-local-authentication';
+
+const DocumentListScreen = () => {
+  const [documents, setDocuments] = useState([]);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  const loadDocuments = async () => {
+    // 디바이스에 안전하게 저장된 문서 목록 로드
+    const docs = await SecureStorage.getDocuments();
+    setDocuments(docs);
+  };
+
+  const showDocument = async (doc) => {
+    // 생체 인증 요구
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: '문서를 보려면 인증하세요',
+      fallbackLabel: 'PIN 입력'
+    });
+
+    if (result.success) {
+      setSelectedDocument(doc);
+      // 감사 로그 기록
+      await logDocumentAccess(doc.documentId);
+    }
+  };
+
+  const shareDocument = async (doc) => {
+    // QR 코드 생성하여 제3자와 공유
+    const qrData = {
+      documentId: doc.documentId,
+      verificationUrl: `https://verify.wia-social.org/v/${doc.documentId}`,
+      expiresAt: Date.now() + 300000 // 5분 후 만료
+    };
+
+    return <QRCode value={JSON.stringify(qrData)} size={200} />;
+  };
+
+  return (
+    <View style={{ flex: 1, padding: 20 }}>
+      <Text style={{ fontSize: 24, marginBottom: 20 }}>내 문서</Text>
+      <FlatList
+        data={documents}
+        keyExtractor={(item) => item.documentId}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() => showDocument(item)}
+            style={{
+              padding: 15,
+              borderBottomWidth: 1,
+              borderBottomColor: '#ccc'
+            }}
+          >
+            <Text style={{ fontSize: 18 }}>{item.documentType}</Text>
+            <Text style={{ color: '#666' }}>{item.issueDate}</Text>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
+  );
+};
+
+// 오프라인 모드 지원
+class OfflineDocumentManager {
+  async syncDocuments() {
+    // 온라인 시 서버와 동기화
+    if (await isOnline()) {
+      const localDocs = await SecureStorage.getDocuments();
+      const serverDocs = await api.getDocuments();
+
+      // 충돌 해결 및 병합
+      const merged = mergeDocuments(localDocs, serverDocs);
+      await SecureStorage.saveDocuments(merged);
+    }
+  }
+
+  async verifyDocumentOffline(documentId: string): Promise<boolean> {
+    // 로컬에 저장된 디지털 서명 검증
+    const doc = await SecureStorage.getDocument(documentId);
+    const publicKey = await SecureStorage.getPublicKey(doc.issuingAuthority);
+
+    return verifySignature(doc.data, doc.signature, publicKey);
+  }
+}
+</code></pre>
+
+        <h2>7.4 시민 포털 및 사용자 경험</h2>
+
+        <p>
+            웹 기반 시민 포털은 문서 관리의 중심 인터페이스입니다. 접근성, 사용성, 다국어 지원을 고려하여 설계되었습니다.
+        </p>
+
+        <h3>포털 주요 기능</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>기능</th>
+                    <th>설명</th>
+                    <th>접근성 지원</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>대시보드</td>
+                    <td>모든 문서의 한눈에 보기</td>
+                    <td>스크린 리더, 고대비 모드</td>
+                </tr>
+                <tr>
+                    <td>문서 신청</td>
+                    <td>온라인 문서 발급 신청</td>
+                    <td>단계별 안내, 음성 도움말</td>
+                </tr>
+                <tr>
+                    <td>문서 검증</td>
+                    <td>QR 코드 또는 문서 ID로 검증</td>
+                    <td>카메라 접근성, 대체 입력</td>
+                </tr>
+                <tr>
+                    <td>알림 센터</td>
+                    <td>문서 만료, 갱신 알림</td>
+                    <td>이메일, SMS, 푸시 알림</td>
+                </tr>
+                <tr>
+                    <td>공유 관리</td>
+                    <td>문서 공유 권한 관리</td>
+                    <td>명확한 레이블, 키보드 탐색</td>
+                </tr>
+                <tr>
+                    <td>다운로드</td>
+                    <td>PDF, JSON 등 다양한 형식</td>
+                    <td>포맷 선택 가이드</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>7.5 실제 배포 사례 연구</h2>
+
+        <div class="highlight-box">
+            <h3>📋 사례 1: 서울시 출생증명서 디지털화</h3>
+            <p><strong>배경:</strong> 연간 50,000건의 출생증명서 발급, 평균 3일 소요</p>
+            <p><strong>목표:</strong> 당일 발급, 비용 50% 절감</p>
+            <p><strong>구현:</strong></p>
+            <ul>
+                <li>병원 시스템과 직접 연동하여 출생 정보 자동 전송</li>
+                <li>부모 동의 후 즉시 디지털 출생증명서 발급</li>
+                <li>QR 코드로 어디서나 검증 가능</li>
+            </ul>
+            <p><strong>결과:</strong></p>
+            <ul>
+                <li>발급 시간: 3일 → 2시간</li>
+                <li>비용 절감: 연간 2억 원</li>
+                <li>시민 만족도: 87%</li>
+            </ul>
+        </div>
+
+        <div class="highlight-box">
+            <h3>📋 사례 2: 에스토니아 e-Residency</h3>
+            <p><strong>배경:</strong> 비거주자에게 디지털 신원 제공</p>
+            <p><strong>구현:</strong></p>
+            <ul>
+                <li>전 세계 어디서나 온라인 신청</li>
+                <li>디지털 ID 카드 발급 (스마트카드)</li>
+                <li>EU 내 사업 등록, 은행 계좌 개설 가능</li>
+            </ul>
+            <p><strong>결과:</strong></p>
+            <ul>
+                <li>100,000+ e-residents (2021년 기준)</li>
+                <li>18,000+ 회사 설립</li>
+                <li>EU 시장 접근 용이</li>
+            </ul>
+        </div>
+
+        <h2>7.6 클라우드 배포 및 확장성</h2>
+
+        <p>
+            WIA-SOCIAL 시스템은 클라우드 네이티브 아키텍처로 설계되어 자동 확장과 고가용성을 제공합니다.
+        </p>
+
+        <h3>Kubernetes 배포 예시</h3>
+
+        <pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wia-document-api
+  namespace: wia-production
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: document-api
+  template:
+    metadata:
+      labels:
+        app: document-api
+    spec:
+      containers:
+      - name: api
+        image: wia/document-api:v1.2.3
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: wia-document-api-hpa
+  namespace: wia-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: wia-document-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+</code></pre>
+
+        <h2>요약</h2>
+
+        <p>
+            공공문서 시스템의 성공적인 배포는 레거시 시스템 통합, 국제 상호운용성, 사용자 친화적 인터페이스, 확장 가능한 인프라가 조화를 이루어야 합니다. 실제 사례 연구에서 보듯이, 잘 설계되고 구현된 시스템은 비용 절감, 효율성 향상, 시민 만족도 개선을 동시에 달성할 수 있습니다. 다음 장에서는 미래 기술 동향과 WIA 표준의 진화 방향을 살펴봅니다.
+        </p>
+
+        <div class="info-box">
+            <h3>🤔 복습 질문</h3>
+            <ol>
+                <li>레거시 시스템과 통합할 때 어댑터 패턴이 왜 유용한가요?</li>
+                <li>국경 간 문서 검증에서 상호 인정 협정(MRA)의 핵심 요소는 무엇인가요?</li>
+                <li>모바일 앱에서 문서 접근 시 생체 인증을 요구하는 이유는 무엇인가요?</li>
+                <li>Kubernetes의 HorizontalPodAutoscaler는 어떻게 작동하나요?</li>
+                <li>에스토니아 e-Residency 프로그램의 성공 요인을 분석하세요.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SEC-009: Identity Management - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Top Navigation */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        /* Tabs */
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panels */
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        /* Forms */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+
+        /* Checkboxes */
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 15px; margin: 15px 0; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; padding: 10px 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+        .checkbox-item:hover { border-color: var(--primary); }
+        .checkbox-item.checked { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .checkbox-item input { display: none; }
+
+        /* Buttons */
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        /* Output */
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        /* Sub-sections */
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        /* Cards */
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 20px 0; }
+        .card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; transition: all 0.2s; }
+        .card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .card.active { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .card .icon { font-size: 2.5rem; margin-bottom: 10px; text-align: center; }
+        .card .name { font-weight: 600; margin-bottom: 5px; text-align: center; }
+        .card .desc { font-size: 0.85rem; color: var(--text-muted); text-align: center; }
+
+        /* Table */
+        .styled-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .styled-table th, .styled-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        .styled-table th { background: var(--primary); color: white; font-weight: 600; }
+        .styled-table tr:hover { background: rgba(139, 92, 246, 0.05); }
+
+        /* QR Code */
+        .qr-container { display: flex; justify-content: center; margin: 20px 0; }
+        .qr-code { width: 200px; height: 200px; background: white; padding: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #333; }
+
+        /* Footer */
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="../">SEC-009</a>
+                    <span class="sep">›</span>
+                    <span class="current">Simulator</span>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="../" data-en="← Back to Main" data-ko="← 메인으로">← Back to Main</a>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo" data-en="🪪 Identity Management Simulator" data-ko="🪪 신원 관리 시뮬레이터">🪪 Identity Management Simulator</div>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                <button class="lang-btn" onclick="setLang('ko')">KO</button>
+            </div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Interactive Identity Management Simulator" data-ko="인터랙티브 신원 관리 시뮬레이터">Interactive Identity Management Simulator</h1>
+            <p data-en="Explore DID, Verifiable Credentials, IAM, and identity lifecycle management" data-ko="DID, 검증 가능한 자격증명, IAM 및 신원 수명주기 관리 탐색">Explore DID, Verifiable Credentials, IAM, and identity lifecycle management</p>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showTab(0)" data-en="📋 Data Format" data-ko="📋 데이터 형식">📋 Data Format</div>
+            <div class="tab" onclick="showTab(1)" data-en="🔐 Algorithms" data-ko="🔐 알고리즘">🔐 Algorithms</div>
+            <div class="tab" onclick="showTab(2)" data-en="🔄 Protocol" data-ko="🔄 프로토콜">🔄 Protocol</div>
+            <div class="tab" onclick="showTab(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showTab(4)" data-en="📱 QR & VC" data-ko="📱 QR & VC">📱 QR & VC</div>
+        </div>
+
+        <!-- Tab 1: Data Format -->
+        <div id="panel-0" class="panel active">
+            <h2 data-en="📋 Identity Data Format" data-ko="📋 신원 데이터 형식">📋 Identity Data Format</h2>
+
+            <div class="sub-section">
+                <h4 data-en="🆔 Decentralized Identifier (DID)" data-ko="🆔 분산 신원 식별자 (DID)">🆔 Decentralized Identifier (DID)</h4>
+                <div class="form-group">
+                    <label data-en="DID Method" data-ko="DID 메서드">DID Method</label>
+                    <select id="didMethod">
+                        <option value="web">did:web</option>
+                        <option value="key">did:key</option>
+                        <option value="ethr">did:ethr</option>
+                        <option value="ion">did:ion</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Identifier" data-ko="식별자">Identifier</label>
+                    <input type="text" id="didIdentifier" placeholder="example.com/users/alice">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateDID()" data-en="Generate DID" data-ko="DID 생성">Generate DID</button>
+                </div>
+                <div id="didOutput" class="output"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="📝 DID Document" data-ko="📝 DID 문서">📝 DID Document</h4>
+                <p data-en="A DID Document contains public keys, authentication methods, and service endpoints" data-ko="DID 문서는 공개 키, 인증 방법 및 서비스 엔드포인트를 포함합니다">A DID Document contains public keys, authentication methods, and service endpoints</p>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateDIDDocument()" data-en="Generate DID Document" data-ko="DID 문서 생성">Generate DID Document</button>
+                </div>
+                <div id="didDocOutput" class="output"></div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Algorithms -->
+        <div id="panel-1" class="panel">
+            <h2 data-en="🔐 Identity Verification Algorithms" data-ko="🔐 신원 검증 알고리즘">🔐 Identity Verification Algorithms</h2>
+
+            <div class="sub-section">
+                <h4 data-en="✅ Verifiable Credential Verification" data-ko="✅ 검증 가능한 자격증명 검증">✅ Verifiable Credential Verification</h4>
+                <div class="form-group">
+                    <label data-en="Credential Type" data-ko="자격증명 유형">Credential Type</label>
+                    <select id="credentialType">
+                        <option value="university">University Degree</option>
+                        <option value="passport">Passport</option>
+                        <option value="employment">Employment</option>
+                        <option value="license">Professional License</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Issuer DID" data-ko="발급자 DID">Issuer DID</label>
+                    <input type="text" id="issuerDID" placeholder="did:web:university.edu">
+                </div>
+                <div class="form-group">
+                    <label data-en="Subject DID" data-ko="주체 DID">Subject DID</label>
+                    <input type="text" id="subjectDID" placeholder="did:key:z6Mk...">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="verifyCredential()" data-en="Verify Credential" data-ko="자격증명 검증">Verify Credential</button>
+                </div>
+                <div id="verifyOutput" class="output"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="🎯 Attribute-Based Access Control (ABAC)" data-ko="🎯 속성 기반 접근 제어 (ABAC)">🎯 Attribute-Based Access Control (ABAC)</h4>
+                <div class="form-group">
+                    <label data-en="User Attributes (JSON)" data-ko="사용자 속성 (JSON)">User Attributes (JSON)</label>
+                    <textarea id="userAttributes" placeholder='{"role": "manager", "department": "IT", "clearance": "secret"}'></textarea>
+                </div>
+                <div class="form-group">
+                    <label data-en="Access Policy" data-ko="접근 정책">Access Policy</label>
+                    <textarea id="accessPolicy" placeholder='{"required": {"role": ["manager", "director"], "clearance": "secret"}}'></textarea>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="evaluateABAC()" data-en="Evaluate Access" data-ko="접근 평가">Evaluate Access</button>
+                </div>
+                <div id="abacOutput" class="output"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Protocol -->
+        <div id="panel-2" class="panel">
+            <h2 data-en="🔄 Identity Lifecycle Protocol" data-ko="🔄 신원 수명주기 프로토콜">🔄 Identity Lifecycle Protocol</h2>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="icon">➕</div>
+                    <div class="name" data-en="Provisioning" data-ko="프로비저닝">Provisioning</div>
+                    <div class="desc" data-en="Create new identity" data-ko="새 신원 생성">Create new identity</div>
+                </div>
+                <div class="card">
+                    <div class="icon">🔑</div>
+                    <div class="name" data-en="Authentication" data-ko="인증">Authentication</div>
+                    <div class="desc" data-en="Verify identity" data-ko="신원 확인">Verify identity</div>
+                </div>
+                <div class="card">
+                    <div class="icon">🔒</div>
+                    <div class="name" data-en="Authorization" data-ko="권한 부여">Authorization</div>
+                    <div class="desc" data-en="Grant permissions" data-ko="권한 부여">Grant permissions</div>
+                </div>
+                <div class="card">
+                    <div class="icon">📝</div>
+                    <div class="name" data-en="Modification" data-ko="수정">Modification</div>
+                    <div class="desc" data-en="Update attributes" data-ko="속성 업데이트">Update attributes</div>
+                </div>
+                <div class="card">
+                    <div class="icon">🔄</div>
+                    <div class="name" data-en="Lifecycle Mgmt" data-ko="수명주기 관리">Lifecycle Mgmt</div>
+                    <div class="desc" data-en="Manage identity state" data-ko="신원 상태 관리">Manage identity state</div>
+                </div>
+                <div class="card">
+                    <div class="icon">🗑️</div>
+                    <div class="name" data-en="Deprovisioning" data-ko="디프로비저닝">Deprovisioning</div>
+                    <div class="desc" data-en="Revoke and delete" data-ko="폐기 및 삭제">Revoke and delete</div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="🔄 Identity Registration Protocol" data-ko="🔄 신원 등록 프로토콜">🔄 Identity Registration Protocol</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="User ID" data-ko="사용자 ID">User ID</label>
+                        <input type="text" id="registerUserID" placeholder="alice@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Full Name" data-ko="전체 이름">Full Name</label>
+                        <input type="text" id="registerName" placeholder="Alice Johnson">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Role" data-ko="역할">Role</label>
+                        <select id="registerRole">
+                            <option value="user">User</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Department" data-ko="부서">Department</label>
+                        <input type="text" id="registerDept" placeholder="Engineering">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="registerIdentity()" data-en="Register Identity" data-ko="신원 등록">Register Identity</button>
+                </div>
+                <div id="registerOutput" class="output"></div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Integration -->
+        <div id="panel-3" class="panel">
+            <h2 data-en="🔗 IAM System Integration" data-ko="🔗 IAM 시스템 통합">🔗 IAM System Integration</h2>
+
+            <div class="sub-section">
+                <h4 data-en="🔐 LDAP Integration" data-ko="🔐 LDAP 통합">🔐 LDAP Integration</h4>
+                <div class="form-group">
+                    <label data-en="LDAP Server" data-ko="LDAP 서버">LDAP Server</label>
+                    <input type="text" id="ldapServer" placeholder="ldap://ldap.example.com:389">
+                </div>
+                <div class="form-group">
+                    <label data-en="Base DN" data-ko="기본 DN">Base DN</label>
+                    <input type="text" id="baseDN" placeholder="dc=example,dc=com">
+                </div>
+                <div class="form-group">
+                    <label data-en="Search Filter" data-ko="검색 필터">Search Filter</label>
+                    <input type="text" id="searchFilter" placeholder="(uid=alice)">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="testLDAPConnection()" data-en="Test LDAP Connection" data-ko="LDAP 연결 테스트">Test LDAP Connection</button>
+                </div>
+                <div id="ldapOutput" class="output"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="🔄 SCIM Provisioning" data-ko="🔄 SCIM 프로비저닝">🔄 SCIM Provisioning</h4>
+                <p data-en="System for Cross-domain Identity Management" data-ko="도메인 간 신원 관리 시스템">System for Cross-domain Identity Management</p>
+                <div class="form-group">
+                    <label data-en="SCIM Endpoint" data-ko="SCIM 엔드포인트">SCIM Endpoint</label>
+                    <input type="text" id="scimEndpoint" placeholder="https://api.example.com/scim/v2">
+                </div>
+                <div class="form-group">
+                    <label data-en="Operation" data-ko="작업">Operation</label>
+                    <select id="scimOperation">
+                        <option value="create">Create User</option>
+                        <option value="update">Update User</option>
+                        <option value="delete">Delete User</option>
+                        <option value="list">List Users</option>
+                    </select>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="executeSCIM()" data-en="Execute SCIM" data-ko="SCIM 실행">Execute SCIM</button>
+                </div>
+                <div id="scimOutput" class="output"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="🏢 Active Directory Integration" data-ko="🏢 Active Directory 통합">🏢 Active Directory Integration</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Domain" data-ko="도메인">Domain</label>
+                        <input type="text" id="adDomain" placeholder="EXAMPLE.COM">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="User Principal Name" data-ko="사용자 주체 이름">User Principal Name</label>
+                        <input type="text" id="adUPN" placeholder="alice@example.com">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="queryAD()" data-en="Query Active Directory" data-ko="Active Directory 쿼리">Query Active Directory</button>
+                </div>
+                <div id="adOutput" class="output"></div>
+            </div>
+        </div>
+
+        <!-- Tab 5: QR & VC -->
+        <div id="panel-4" class="panel">
+            <h2 data-en="📱 Digital Identity Credential" data-ko="📱 디지털 신원 증명서">📱 Digital Identity Credential</h2>
+
+            <div class="sub-section">
+                <h4 data-en="✅ Create Verifiable Credential" data-ko="✅ 검증 가능한 자격증명 생성">✅ Create Verifiable Credential</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Credential Type" data-ko="자격증명 유형">Credential Type</label>
+                        <select id="vcType">
+                            <option value="DriverLicense">Driver License</option>
+                            <option value="Passport">Passport</option>
+                            <option value="EmployeeID">Employee ID</option>
+                            <option value="StudentID">Student ID</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Holder Name" data-ko="소지자 이름">Holder Name</label>
+                        <input type="text" id="vcName" placeholder="Alice Johnson">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="ID Number" data-ko="ID 번호">ID Number</label>
+                        <input type="text" id="vcIDNumber" placeholder="123-45-6789">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Expiration Date" data-ko="만료 날짜">Expiration Date</label>
+                        <input type="date" id="vcExpiry">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="createVC()" data-en="Create Credential" data-ko="자격증명 생성">Create Credential</button>
+                </div>
+                <div id="vcOutput" class="output"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="📱 Generate QR Code" data-ko="📱 QR 코드 생성">📱 Generate QR Code</h4>
+                <p data-en="Generate a QR code containing the verifiable credential" data-ko="검증 가능한 자격증명이 포함된 QR 코드를 생성합니다">Generate a QR code containing the verifiable credential</p>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateQR()" data-en="Generate QR Code" data-ko="QR 코드 생성">Generate QR Code</button>
+                </div>
+                <div class="qr-container">
+                    <div id="qrCode" class="qr-code" data-en="QR Code will appear here" data-ko="QR 코드가 여기에 표시됩니다">QR Code will appear here</div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="🔍 Verify Credential from QR" data-ko="🔍 QR에서 자격증명 확인">🔍 Verify Credential from QR</h4>
+                <div class="form-group">
+                    <label data-en="Scanned QR Data (JSON)" data-ko="스캔된 QR 데이터 (JSON)">Scanned QR Data (JSON)</label>
+                    <textarea id="qrData" placeholder='{"type": "VerifiableCredential", ...}'></textarea>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="verifyQRCredential()" data-en="Verify QR Credential" data-ko="QR 자격증명 확인">Verify QR Credential</button>
+                </div>
+                <div id="qrVerifyOutput" class="output"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>© 2025 WIA Standards - Identity Management Simulator</p>
+            <div class="links">
+                <a href="../" data-en="🏠 Back to Main" data-ko="🏠 메인으로">🏠 Back to Main</a>
+                <a href="https://wiastandards.com" target="_blank">WIA Standards</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        let currentTab = 0;
+        let currentVC = null;
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang);
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = text;
+                } else {
+                    el.textContent = text;
+                }
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showTab(index) {
+            currentTab = index;
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+        }
+
+        // Tab 1: Data Format Functions
+        function generateDID() {
+            const method = document.getElementById('didMethod').value;
+            const identifier = document.getElementById('didIdentifier').value || 'example.com/users/alice';
+            const did = `did:${method}:${identifier}`;
+
+            const output = {
+                did: did,
+                method: method,
+                identifier: identifier,
+                created: new Date().toISOString(),
+                type: "Decentralized Identifier"
+            };
+
+            document.getElementById('didOutput').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function generateDIDDocument() {
+            const did = "did:web:example.com:users:alice";
+            const didDocument = {
+                "@context": ["https://www.w3.org/ns/did/v1"],
+                "id": did,
+                "verificationMethod": [{
+                    "id": did + "#keys-1",
+                    "type": "Ed25519VerificationKey2020",
+                    "controller": did,
+                    "publicKeyMultibase": "z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+                }],
+                "authentication": [did + "#keys-1"],
+                "assertionMethod": [did + "#keys-1"],
+                "service": [{
+                    "id": did + "#vcr",
+                    "type": "VerifiableCredentialRegistry",
+                    "serviceEndpoint": "https://example.com/vc"
+                }]
+            };
+
+            document.getElementById('didDocOutput').textContent = JSON.stringify(didDocument, null, 2);
+        }
+
+        // Tab 2: Algorithm Functions
+        function verifyCredential() {
+            const credType = document.getElementById('credentialType').value;
+            const issuerDID = document.getElementById('issuerDID').value || 'did:web:university.edu';
+            const subjectDID = document.getElementById('subjectDID').value || 'did:key:z6Mk...';
+
+            const verification = {
+                credentialType: credType,
+                issuer: issuerDID,
+                subject: subjectDID,
+                verified: true,
+                timestamp: new Date().toISOString(),
+                checks: {
+                    signatureValid: true,
+                    notExpired: true,
+                    issuerTrusted: true,
+                    notRevoked: true
+                },
+                result: "✅ Credential is valid and verified"
+            };
+
+            document.getElementById('verifyOutput').textContent = JSON.stringify(verification, null, 2);
+        }
+
+        function evaluateABAC() {
+            try {
+                const userAttrs = JSON.parse(document.getElementById('userAttributes').value || '{}');
+                const policy = JSON.parse(document.getElementById('accessPolicy').value || '{}');
+
+                let granted = true;
+                let reasons = [];
+
+                if (policy.required) {
+                    for (const [key, value] of Object.entries(policy.required)) {
+                        if (Array.isArray(value)) {
+                            if (!value.includes(userAttrs[key])) {
+                                granted = false;
+                                reasons.push(`${key} '${userAttrs[key]}' not in allowed values: [${value.join(', ')}]`);
+                            }
+                        } else {
+                            if (userAttrs[key] !== value) {
+                                granted = false;
+                                reasons.push(`${key} '${userAttrs[key]}' does not match required '${value}'`);
+                            }
+                        }
+                    }
+                }
+
+                const result = {
+                    accessGranted: granted,
+                    userAttributes: userAttrs,
+                    policy: policy,
+                    reasons: reasons.length > 0 ? reasons : ["All policy requirements met"],
+                    decision: granted ? "✅ ACCESS GRANTED" : "❌ ACCESS DENIED"
+                };
+
+                document.getElementById('abacOutput').textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                document.getElementById('abacOutput').textContent = "Error: Invalid JSON format\n" + e.message;
+            }
+        }
+
+        // Tab 3: Protocol Functions
+        function registerIdentity() {
+            const userID = document.getElementById('registerUserID').value;
+            const name = document.getElementById('registerName').value;
+            const role = document.getElementById('registerRole').value;
+            const dept = document.getElementById('registerDept').value;
+
+            const identity = {
+                operation: "REGISTER",
+                userID: userID,
+                profile: {
+                    name: name,
+                    role: role,
+                    department: dept
+                },
+                did: `did:web:example.com:users:${userID.split('@')[0]}`,
+                status: "active",
+                created: new Date().toISOString(),
+                credentials: [],
+                result: "✅ Identity registered successfully"
+            };
+
+            document.getElementById('registerOutput').textContent = JSON.stringify(identity, null, 2);
+        }
+
+        // Tab 4: Integration Functions
+        function testLDAPConnection() {
+            const server = document.getElementById('ldapServer').value;
+            const baseDN = document.getElementById('baseDN').value;
+            const filter = document.getElementById('searchFilter').value;
+
+            const result = {
+                server: server,
+                baseDN: baseDN,
+                searchFilter: filter,
+                connection: "✅ Connected",
+                results: [{
+                    dn: "uid=alice,ou=users," + baseDN,
+                    cn: "Alice Johnson",
+                    mail: "alice@example.com",
+                    department: "Engineering",
+                    title: "Senior Engineer"
+                }],
+                status: "Success"
+            };
+
+            document.getElementById('ldapOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function executeSCIM() {
+            const endpoint = document.getElementById('scimEndpoint').value;
+            const operation = document.getElementById('scimOperation').value;
+
+            const result = {
+                endpoint: endpoint,
+                operation: operation,
+                request: {
+                    method: operation === 'list' ? 'GET' : 'POST',
+                    url: endpoint + '/Users',
+                    headers: {
+                        'Content-Type': 'application/scim+json',
+                        'Authorization': 'Bearer <token>'
+                    }
+                },
+                response: {
+                    schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+                    totalResults: 1,
+                    Resources: [{
+                        id: "2819c223-7f76-453a-919d-413861904646",
+                        userName: "alice@example.com",
+                        name: {
+                            givenName: "Alice",
+                            familyName: "Johnson"
+                        },
+                        active: true
+                    }]
+                },
+                status: "✅ SCIM operation completed successfully"
+            };
+
+            document.getElementById('scimOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function queryAD() {
+            const domain = document.getElementById('adDomain').value;
+            const upn = document.getElementById('adUPN').value;
+
+            const result = {
+                domain: domain,
+                userPrincipalName: upn,
+                query: "✅ Query successful",
+                userInfo: {
+                    distinguishedName: `CN=Alice Johnson,OU=Users,DC=example,DC=com`,
+                    sAMAccountName: "alice",
+                    displayName: "Alice Johnson",
+                    mail: "alice@example.com",
+                    department: "Engineering",
+                    memberOf: [
+                        "CN=Engineers,OU=Groups,DC=example,DC=com",
+                        "CN=Managers,OU=Groups,DC=example,DC=com"
+                    ],
+                    whenCreated: "2024-01-15T10:30:00Z",
+                    accountEnabled: true
+                }
+            };
+
+            document.getElementById('adOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Tab 5: QR & VC Functions
+        function createVC() {
+            const type = document.getElementById('vcType').value;
+            const name = document.getElementById('vcName').value;
+            const idNumber = document.getElementById('vcIDNumber').value;
+            const expiry = document.getElementById('vcExpiry').value;
+
+            currentVC = {
+                "@context": ["https://www.w3.org/2018/credentials/v1"],
+                "type": ["VerifiableCredential", type],
+                "issuer": "did:web:government.example",
+                "issuanceDate": new Date().toISOString(),
+                "expirationDate": expiry ? new Date(expiry).toISOString() : new Date(Date.now() + 365*24*60*60*1000).toISOString(),
+                "credentialSubject": {
+                    "id": "did:key:z6Mk" + Math.random().toString(36).substr(2, 9),
+                    "type": type,
+                    "name": name,
+                    "idNumber": idNumber
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": new Date().toISOString(),
+                    "proofPurpose": "assertionMethod",
+                    "verificationMethod": "did:web:government.example#key-1",
+                    "proofValue": "z58D..." + Math.random().toString(36).substr(2, 20)
+                }
+            };
+
+            document.getElementById('vcOutput').textContent = JSON.stringify(currentVC, null, 2);
+        }
+
+        function generateQR() {
+            if (!currentVC) {
+                createVC();
+            }
+
+            const qrElement = document.getElementById('qrCode');
+            qrElement.textContent = "QR Code:\n" + JSON.stringify(currentVC, null, 2).substring(0, 100) + "...";
+            qrElement.style.fontSize = '0.7rem';
+            qrElement.style.textAlign = 'left';
+            qrElement.style.overflow = 'auto';
+        }
+
+        function verifyQRCredential() {
+            try {
+                const qrData = JSON.parse(document.getElementById('qrData').value || '{}');
+
+                const verification = {
+                    credential: qrData,
+                    verified: true,
+                    checks: {
+                        structureValid: true,
+                        signatureValid: true,
+                        notExpired: new Date(qrData.expirationDate) > new Date(),
+                        issuerTrusted: true
+                    },
+                    result: "✅ QR Credential verified successfully"
+                };
+
+                document.getElementById('qrVerifyOutput').textContent = JSON.stringify(verification, null, 2);
+            } catch (e) {
+                document.getElementById('qrVerifyOutput').textContent = "Error: Invalid credential format\n" + e.message;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+<!-- WIA AI Assistant -->
+<link rel="stylesheet" href="/ai-assistant/wia-ai-modal.css">
+<script src="/ai-assistant/wia-ai-modal.js"></script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

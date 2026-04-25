@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04: OLAP 및 큐브 - WIA-DATA_WAREHOUSE</title>
+    <style>:root{--primary:#6366f1;--primary-dark:#4f46e5;--primary-light:#818cf8;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--dark:#1e293b;--light:#f8fafc;--border:#e2e8f0;--text:#334155;--text-light:#64748b}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.6;color:var(--text);background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,.2)}.header p{font-size:1.2em;opacity:.95}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:var(--primary);margin:25px 0 15px}.content p{margin:15px 0;text-align:justify}.content ul,.content ol{margin:15px 0 15px 30px}.content li{margin:8px 0}.info-box{background:linear-gradient(135deg,#e0e7ff,#e0f2fe);border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:linear-gradient(135deg,#fef3c7,#fed7aa);border-left:5px solid var(--warning);padding:20px;margin:25px 0;border-radius:8px}.success-box{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-left:5px solid var(--success);padding:20px;margin:25px 0;border-radius:8px}.code-block{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border-left:4px solid var(--primary)}.code-block code{font-family:"Courier New",monospace;font-size:.9em;line-height:1.5}table{width:100%;border-collapse:collapse;margin:20px 0;box-shadow:0 2px 8px rgba(0,0,0,.1)}table th{background:var(--primary);color:white;padding:15px;text-align:left;font-weight:600}table td{padding:12px 15px;border-bottom:1px solid var(--border)}table tr:hover{background:var(--light)}.review-section{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--warning)}.review-section h3{color:#92400e;margin-bottom:20px}.review-section ol{margin-left:25px}.review-section li{margin:12px 0;color:#78350f}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--success)}.key-takeaways h3{color:#065f46;margin-bottom:20px}.key-takeaways ul{margin-left:25px}.key-takeaways li{margin:12px 0;color:#064e3b}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid var(--border)}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:all .3s;display:inline-block}.nav-button:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 12px rgba(99,102,241,.4)}.footer{background:var(--dark);color:white;text-align:center;padding:30px;font-size:.9em}.footer p{margin:5px 0}.diagram{background:white;border:2px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;text-align:center}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧊 Chapter 04</h1>
+            <p>OLAP 및 큐브: 다차원 분석의 세계</p>
+        </div>
+
+        <div class="content">
+            <h2>1. OLAP이란?</h2>
+            <p>
+                OLAP(Online Analytical Processing)은 <strong>다차원 데이터를 빠르게 분석</strong>하기 위한 기술입니다.
+                E.F. Codd가 1993년에 정의했으며, 비즈니스 인텔리전스(BI)의 핵심 구성 요소입니다.
+            </p>
+
+            <h3>1.1 OLAP vs OLTP (심화)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>비교 항목</th>
+                        <th>OLTP (Transactional)</th>
+                        <th>OLAP (Analytical)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>목적</strong></td>
+                        <td>일상적 비즈니스 운영</td>
+                        <td>의사결정 지원, 분석</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쿼리 패턴</strong></td>
+                        <td>단순, 빈번 (SELECT, INSERT, UPDATE)</td>
+                        <td>복잡, 애드혹 (JOIN, GROUP BY, 집계)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>데이터 범위</strong></td>
+                        <td>현재 데이터 (최근 몇 개월)</td>
+                        <td>과거 데이터 (수년~수십년)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>사용자</strong></td>
+                        <td>수천~수만명 (일반 직원)</td>
+                        <td>수십~수백명 (분석가, 경영진)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>응답 시간</strong></td>
+                        <td>밀리초 (즉각)</td>
+                        <td>초~분 (허용)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>데이터 모델</strong></td>
+                        <td>정규화 (3NF)</td>
+                        <td>비정규화 (Star Schema)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>읽기 vs 쓰기</strong></td>
+                        <td>균형 (50:50)</td>
+                        <td>읽기 중심 (99:1)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>예시 쿼리</strong></td>
+                        <td>"주문 #12345의 상태는?"</td>
+                        <td>"2024년 Q1 카테고리별 매출 추이는?"</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box">
+                <h3>🎯 Codd의 OLAP 12가지 규칙 (FASMI)</h3>
+                <p>E.F. Codd는 OLAP을 5가지 특성으로 요약했습니다:</p>
+                <ul>
+                    <li><strong>F (Fast)</strong>: 대부분의 쿼리가 5초 이내 응답</li>
+                    <li><strong>A (Analysis)</strong>: 복잡한 분석 쿼리 지원</li>
+                    <li><strong>S (Shared)</strong>: 다수 사용자의 동시 접근</li>
+                    <li><strong>M (Multidimensional)</strong>: 다차원 뷰 제공</li>
+                    <li><strong>I (Information)</strong>: 필요한 모든 데이터 접근</li>
+                </ul>
+            </div>
+
+            <h2>2. OLAP 큐브 (Cube)</h2>
+            <p>
+                OLAP 큐브는 데이터를 <strong>다차원 구조</strong>로 표현한 것입니다.
+                3차원 큐브가 가장 직관적이지만, 실제로는 4차원 이상의 "하이퍼큐브"를 사용합니다.
+            </p>
+
+            <h3>2.1 3차원 큐브 시각화</h3>
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.8em;text-align:left;line-height:1.3;">
+                    시간 (Time) ↑
+                         Q4 ┌─────────────────────────┐
+                            │ $850K  │ $920K  │ $780K │
+                         Q3 ├─────────────────────────┤
+                            │ $800K  │ $880K  │ $750K │
+                         Q2 ├─────────────────────────┤
+                            │ $780K  │ $860K  │ $720K │
+                         Q1 └─────────────────────────┘
+                              전자   의류    식품
+                              └───제품 카테고리 (Product)───┘
+                            /
+                           /
+                          / 지역 (Geography)
+                         /  서울, 부산, 대구...
+
+큐브의 각 셀 = 특정 조합의 측정값
+예: "2024 Q3, 전자제품, 서울 = $850K 매출"
+                </pre>
+            </div>
+
+            <h3>2.2 큐브의 구성 요소</h3>
+            <ul>
+                <li><strong>차원(Dimension)</strong>: 분석 축 (시간, 제품, 지역, 고객 등)</li>
+                <li><strong>계층(Hierarchy)</strong>: 차원 내 레벨 (연도 → 분기 → 월 → 일)</li>
+                <li><strong>측정값(Measure)</strong>: 분석 대상 숫자 (매출, 수량, 이익 등)</li>
+                <li><strong>셀(Cell)</strong>: 차원 조합의 측정값 (예: 2024-Q1, 전자, 서울 = $850K)</li>
+            </ul>
+
+            <div class="code-block">
+<code>-- SQL로 큐브 개념 이해
+-- 3차원 큐브: 시간 x 제품 x 지역
+SELECT
+    d.year,
+    d.quarter,
+    p.category,
+    s.region,
+    SUM(f.total_amount) AS total_sales
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_store s ON f.store_key = s.store_key
+WHERE d.year = 2024
+GROUP BY d.year, d.quarter, p.category, s.region
+ORDER BY d.quarter, p.category, s.region;
+
+-- 결과:
+-- year | quarter | category | region | total_sales
+-- 2024 | Q1      | 전자     | 서울   | 850000
+-- 2024 | Q1      | 전자     | 부산   | 620000
+-- 2024 | Q1      | 의류     | 서울   | 780000
+-- ...
+
+-- 이 결과를 3차원 공간에 배치하면 → OLAP 큐브!</code>
+            </div>
+
+            <h2>3. MOLAP, ROLAP, HOLAP</h2>
+            <p>
+                OLAP 구현 방식은 데이터를 <strong>어디에 저장</strong>하느냐에 따라 세 가지로 나뉩니다.
+            </p>
+
+            <h3>3.1 MOLAP (Multidimensional OLAP)</h3>
+            <p>
+                데이터를 <strong>전용 다차원 DB</strong>에 저장합니다. 큐브를 물리적으로 미리 계산하여 저장합니다.
+            </p>
+
+            <div class="success-box">
+                <h3>✅ MOLAP 장점</h3>
+                <ul>
+                    <li><strong>최고의 성능</strong>: 미리 계산된 집계, 밀리초 응답</li>
+                    <li><strong>최적화된 저장</strong>: 압축률 90% 이상</li>
+                    <li><strong>복잡한 계산</strong>: 시계열 분석, 비율 계산 최적화</li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <h3>⚠️ MOLAP 단점</h3>
+                <ul>
+                    <li><strong>차원의 저주</strong>: 차원이 많아지면 큐브 크기 폭발적 증가</li>
+                    <li><strong>실시간성 부족</strong>: 큐브 재계산에 시간 소요</li>
+                    <li><strong>저장 공간</strong>: 모든 조합을 미리 계산 (희소성 문제)</li>
+                    <li><strong>전용 기술</strong>: 특수한 DB 필요 (Microsoft SSAS, Oracle Essbase)</li>
+                </ul>
+            </div>
+
+            <h3>3.2 ROLAP (Relational OLAP)</h3>
+            <p>
+                데이터를 <strong>관계형 DB (RDBMS)</strong>에 Star Schema로 저장하고, 쿼리 시 실시간 계산합니다.
+            </p>
+
+            <div class="success-box">
+                <h3>✅ ROLAP 장점</h3>
+                <ul>
+                    <li><strong>확장성</strong>: 대량 데이터 처리 (페타바이트급)</li>
+                    <li><strong>실시간성</strong>: 최신 데이터 즉시 반영</li>
+                    <li><strong>유연성</strong>: 새 차원 추가 용이</li>
+                    <li><strong>표준 기술</strong>: SQL, 기존 RDBMS 활용</li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <h3>⚠️ ROLAP 단점</h3>
+                <ul>
+                    <li><strong>느린 성능</strong>: 복잡한 쿼리는 분 단위 소요 가능</li>
+                    <li><strong>DB 부하</strong>: 동시 사용자 증가 시 성능 저하</li>
+                    <li><strong>복잡한 쿼리</strong>: 다차원 분석을 SQL로 표현하기 어려움</li>
+                </ul>
+            </div>
+
+            <h3>3.3 HOLAP (Hybrid OLAP)</h3>
+            <p>
+                MOLAP과 ROLAP의 <strong>장점을 결합</strong>합니다. 집계 데이터는 MOLAP에, 상세 데이터는 ROLAP에 저장합니다.
+            </p>
+
+            <div class="info-box">
+                <h3>🎯 HOLAP 전략</h3>
+                <ul>
+                    <li><strong>Hot Data (MOLAP)</strong>: 최근 1년, 자주 조회되는 집계</li>
+                    <li><strong>Cold Data (ROLAP)</strong>: 과거 데이터, 상세 트랜잭션</li>
+                    <li><strong>자동 라우팅</strong>: 쿼리에 따라 MOLAP/ROLAP 선택</li>
+                    <li><strong>예시</strong>: Microsoft SSAS의 기본 모드</li>
+                </ul>
+            </div>
+
+            <h3>3.4 MOLAP vs ROLAP vs HOLAP 비교</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>항목</th>
+                        <th>MOLAP</th>
+                        <th>ROLAP</th>
+                        <th>HOLAP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>저장소</strong></td>
+                        <td>전용 다차원 DB</td>
+                        <td>관계형 DB (RDBMS)</td>
+                        <td>둘 다 사용</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쿼리 성능</strong></td>
+                        <td>⚡⚡⚡ 매우 빠름</td>
+                        <td>⚡ 느림</td>
+                        <td>⚡⚡ 빠름</td>
+                    </tr>
+                    <tr>
+                        <td><strong>확장성</strong></td>
+                        <td>제한적 (TB급)</td>
+                        <td>매우 좋음 (PB급)</td>
+                        <td>좋음</td>
+                    </tr>
+                    <tr>
+                        <td><strong>실시간성</strong></td>
+                        <td>낮음 (큐브 재계산 필요)</td>
+                        <td>높음 (즉시 반영)</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td><strong>저장 공간</strong></td>
+                        <td>높은 압축 (적음)</td>
+                        <td>중간</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td><strong>복잡도</strong></td>
+                        <td>높음 (전문 지식 필요)</td>
+                        <td>낮음 (SQL 사용)</td>
+                        <td>매우 높음</td>
+                    </tr>
+                    <tr>
+                        <td><strong>주요 도구</strong></td>
+                        <td>SSAS, Essbase, Palo</td>
+                        <td>Snowflake, BigQuery, 모든 RDBMS</td>
+                        <td>SSAS (Hybrid 모드)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>사용 사례</strong></td>
+                        <td>재무 분석, 예산</td>
+                        <td>대규모 DW, 실시간 분석</td>
+                        <td>중간 규모 DW</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4. MDX (Multidimensional Expressions)</h2>
+            <p>
+                MDX는 OLAP 큐브를 쿼리하기 위한 <strong>전용 쿼리 언어</strong>입니다.
+                SQL이 2차원 테이블을 쿼리한다면, MDX는 N차원 큐브를 쿼리합니다.
+            </p>
+
+            <h3>4.1 MDX 기본 구조</h3>
+            <div class="code-block">
+<code>-- 기본 MDX 쿼리 구조
+SELECT
+    [측정값] ON COLUMNS,        -- 열에 표시할 내용
+    [차원1].[계층1].Members ON ROWS     -- 행에 표시할 내용
+FROM [큐브명]
+WHERE ([차원2].[계층2].[멤버])  -- 필터 (슬라이서)
+
+-- 실전 예시 1: 2024년 제품 카테고리별 매출
+SELECT
+    [Measures].[Sales Amount] ON COLUMNS,
+    [Product].[Category].Members ON ROWS
+FROM [Sales Cube]
+WHERE [Time].[Year].[2024]
+
+-- 결과:
+--              Sales Amount
+-- 전자제품     $3,500,000
+-- 의류         $2,800,000
+-- 식품         $1,900,000</code>
+            </div>
+
+            <h3>4.2 MDX 핵심 함수</h3>
+            <div class="code-block">
+<code>-- 1. Children: 직속 하위 레벨
+SELECT
+    [Measures].[Sales Amount] ON COLUMNS,
+    [Time].[Year].[2024].Children ON ROWS  -- Q1, Q2, Q3, Q4
+FROM [Sales Cube]
+
+-- 2. Descendants: 모든 하위 레벨
+SELECT
+    [Measures].[Sales Amount] ON COLUMNS,
+    Descendants([Geography].[Country].[Korea], [Geography].[City]) ON ROWS
+FROM [Sales Cube]
+-- 결과: 서울, 부산, 대구, 인천...
+
+-- 3. TopCount: 상위 N개
+SELECT
+    [Measures].[Sales Amount] ON COLUMNS,
+    TopCount([Product].[Product Name].Members, 10, [Measures].[Sales Amount]) ON ROWS
+FROM [Sales Cube]
+-- 매출 상위 10개 제품
+
+-- 4. CrossJoin: 두 차원의 조합
+SELECT
+    [Measures].[Sales Amount] ON COLUMNS,
+    CrossJoin(
+        [Time].[Quarter].[2024].Children,
+        [Product].[Category].Members
+    ) ON ROWS
+FROM [Sales Cube]
+-- 결과: (Q1, 전자), (Q1, 의류), (Q1, 식품), (Q2, 전자), ...
+
+-- 5. Filter: 조건 필터링
+SELECT
+    [Measures].[Sales Amount] ON COLUMNS,
+    Filter(
+        [Product].[Product Name].Members,
+        [Measures].[Sales Amount] > 100000
+    ) ON ROWS
+FROM [Sales Cube]
+-- 매출 10만 이상 제품만
+
+-- 6. ParallelPeriod: 전년 동기 비교
+WITH MEMBER [Measures].[Sales Last Year] AS
+    ([Measures].[Sales Amount],
+     ParallelPeriod([Time].[Year], 1, [Time].[CurrentMember]))
+MEMBER [Measures].[YoY Growth] AS
+    ([Measures].[Sales Amount] - [Measures].[Sales Last Year]) /
+    [Measures].[Sales Last Year]
+SELECT
+    {[Measures].[Sales Amount],
+     [Measures].[Sales Last Year],
+     [Measures].[YoY Growth]} ON COLUMNS,
+    [Time].[Quarter].Members ON ROWS
+FROM [Sales Cube]
+WHERE [Time].[Year].[2024]</code>
+            </div>
+
+            <h2>5. OLAP 연산: Slice, Dice, Drill, Pivot</h2>
+            <p>
+                OLAP의 강력함은 다양한 <strong>다차원 연산</strong>에서 나옵니다.
+                이를 통해 데이터를 다양한 각도에서 빠르게 탐색할 수 있습니다.
+            </p>
+
+            <h3>5.1 Slice (슬라이스)</h3>
+            <p>
+                하나의 차원을 <strong>특정 값으로 고정</strong>하여 차원을 줄입니다.
+                3D 큐브 → 2D 슬라이스
+            </p>
+            <div class="code-block">
+<code>-- SQL로 Slice 표현
+SELECT
+    p.category,
+    s.region,
+    SUM(f.total_amount) AS sales
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_store s ON f.store_key = s.store_key
+WHERE d.year = 2024 AND d.quarter = 1  -- Time 차원을 2024-Q1로 고정 (Slice!)
+GROUP BY p.category, s.region;</code>
+            </div>
+
+            <h3>5.2 Dice (다이스)</h3>
+            <p>
+                여러 차원을 <strong>특정 범위로 제한</strong>하여 부분 큐브를 생성합니다.
+            </p>
+            <div class="code-block">
+<code>-- SQL로 Dice 표현
+SELECT
+    d.month,
+    p.brand,
+    s.city,
+    SUM(f.total_amount) AS sales
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_store s ON f.store_key = s.store_key
+WHERE d.year = 2024
+  AND d.quarter IN (1, 2)              -- Time 제한
+  AND p.category IN ('전자', '의류')    -- Product 제한
+  AND s.region IN ('서울', '경기')     -- Geography 제한
+GROUP BY d.month, p.brand, s.city;
+-- 큐브의 작은 조각만 추출 (Dice!)</code>
+            </div>
+
+            <h3>5.3 Drill-Down (드릴 다운)</h3>
+            <p>
+                계층의 <strong>상위에서 하위로</strong> 이동하여 더 세밀한 데이터를 봅니다.
+                연도 → 분기 → 월 → 일
+            </p>
+            <div class="code-block">
+<code>-- 1단계: 연도별 매출
+SELECT
+    d.year,
+    SUM(f.total_amount) AS sales
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+GROUP BY d.year;
+-- 결과: 2024 → $12,000,000
+
+-- 2단계: Drill-Down → 분기별 매출
+SELECT
+    d.year,
+    d.quarter,
+    SUM(f.total_amount) AS sales
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+WHERE d.year = 2024
+GROUP BY d.year, d.quarter;
+-- 결과: 2024-Q1 → $2,800,000, Q2 → $3,100,000...
+
+-- 3단계: Drill-Down → 월별 매출
+SELECT
+    d.year,
+    d.quarter,
+    d.month,
+    SUM(f.total_amount) AS sales
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+WHERE d.year = 2024 AND d.quarter = 1
+GROUP BY d.year, d.quarter, d.month;
+-- 결과: 2024-01 → $920K, 02 → $880K, 03 → $1,000K</code>
+            </div>
+
+            <h3>5.4 Roll-Up (롤 업)</h3>
+            <p>
+                Drill-Down의 반대로, 계층의 <strong>하위에서 상위로</strong> 이동하여 집계합니다.
+                일 → 월 → 분기 → 연도
+            </p>
+
+            <h3>5.5 Pivot (피벗)</h3>
+            <p>
+                차원의 <strong>축을 회전</strong>하여 다른 관점에서 데이터를 봅니다.
+                행 ↔ 열 교환
+            </p>
+            <div class="code-block">
+<code>-- 원래: 카테고리(행) x 지역(열)
+SELECT
+    p.category,
+    SUM(CASE WHEN s.region = '서울' THEN f.total_amount ELSE 0 END) AS seoul,
+    SUM(CASE WHEN s.region = '부산' THEN f.total_amount ELSE 0 END) AS busan
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_store s ON f.store_key = s.store_key
+GROUP BY p.category;
+
+-- Pivot 후: 지역(행) x 카테고리(열)
+SELECT
+    s.region,
+    SUM(CASE WHEN p.category = '전자' THEN f.total_amount ELSE 0 END) AS electronics,
+    SUM(CASE WHEN p.category = '의류' THEN f.total_amount ELSE 0 END) AS apparel
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_store s ON f.store_key = s.store_key
+GROUP BY s.region;</code>
+            </div>
+
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.75em;text-align:left;">
+OLAP 연산 시각화:
+
+원본 큐브 (3D):
+       Time
+        ↑
+        │    [2024-Q1]
+        │   ┌─────────┐
+        │   │ 전자 의류│
+        │   └─────────┘
+        └──→ Product
+       /
+      / Geography
+
+1. Slice (2024-Q1 고정):
+       Product
+        ↑
+        │   전자  의류
+        │  ┌───┬───┐
+        │  │850│780│ 서울
+        │  ├───┼───┤
+        │  │620│550│ 부산
+        └──→ Geography
+
+2. Drill-Down (Q1 → 월):
+   2024-Q1 → [Jan, Feb, Mar]
+   Jan → [Week1, Week2, Week3, Week4]
+
+3. Pivot (행↔열 교환):
+   Before: Category(행) x Region(열)
+   After:  Region(행) x Category(열)
+                </pre>
+            </div>
+
+            <h2>6. 주요 OLAP 도구</h2>
+
+            <h3>6.1 Microsoft SQL Server Analysis Services (SSAS)</h3>
+            <p>
+                가장 널리 사용되는 OLAP 플랫폼으로, MOLAP/ROLAP/HOLAP 모두 지원합니다.
+            </p>
+            <ul>
+                <li><strong>Tabular Model</strong>: DAX 쿼리, 인메모리 VertiPaq 엔진, Power BI와 통합</li>
+                <li><strong>Multidimensional Model</strong>: MDX 쿼리, 전통적인 큐브</li>
+                <li><strong>장점</strong>: Excel, Power BI 완벽 통합, 엔터프라이즈급 보안</li>
+                <li><strong>단점</strong>: Windows 종속, 라이선스 비용</li>
+            </ul>
+
+            <h3>6.2 Oracle Essbase</h3>
+            <p>
+                1992년부터 사용된 레거시 OLAP의 대명사입니다.
+            </p>
+            <ul>
+                <li><strong>강점</strong>: 재무 계획(FP&A), What-If 분석, Write-Back 지원</li>
+                <li><strong>사용자</strong>: Fortune 500 기업, 금융권</li>
+                <li><strong>단점</strong>: 구식 UI, 높은 학습 곡선, 비싼 라이선스</li>
+            </ul>
+
+            <h3>6.3 Apache Kylin</h3>
+            <p>
+                Hadoop 기반 오픈소스 OLAP 엔진으로, 빅데이터에 최적화되어 있습니다.
+            </p>
+            <ul>
+                <li><strong>아키텍처</strong>: Hive로 큐브 빌드, HBase에 저장, REST API 제공</li>
+                <li><strong>성능</strong>: TB급 데이터를 초 단위로 쿼리</li>
+                <li><strong>사용 사례</strong>: 중국 전자상거래 (JD.com, Meituan)</li>
+                <li><strong>단점</strong>: 큐브 빌드 시간이 김, 실시간 업데이트 어려움</li>
+            </ul>
+
+            <h3>6.4 ClickHouse</h3>
+            <p>
+                Yandex가 개발한 초고속 컬럼 지향 OLAP DB입니다.
+            </p>
+            <ul>
+                <li><strong>성능</strong>: 초당 10억 행 처리, 100PB급 데이터 지원</li>
+                <li><strong>특징</strong>: ROLAP 방식, SQL 지원, 실시간 삽입</li>
+                <li><strong>사용 사례</strong>: 로그 분석, 실시간 대시보드, IoT</li>
+                <li><strong>장점</strong>: 오픈소스, 수평 확장, 압축률 10:1</li>
+            </ul>
+
+            <div class="code-block">
+<code>-- ClickHouse 예시: 10억 행 쿼리가 0.2초
+SELECT
+    toStartOfMonth(event_time) AS month,
+    event_type,
+    count() AS event_count,
+    uniq(user_id) AS unique_users
+FROM events
+WHERE event_time >= '2024-01-01'
+GROUP BY month, event_type
+ORDER BY month DESC, event_count DESC
+LIMIT 100;
+
+-- Materialized View로 실시간 집계
+CREATE MATERIALIZED VIEW daily_summary
+ENGINE = SummingMergeTree()
+PARTITION BY toYYYYMM(event_date)
+ORDER BY (event_date, event_type)
+AS SELECT
+    toDate(event_time) AS event_date,
+    event_type,
+    count() AS event_count,
+    sum(revenue) AS total_revenue
+FROM events
+GROUP BY event_date, event_type;</code>
+            </div>
+
+            <h3>6.5 클라우드 OLAP: Snowflake, BigQuery, Redshift</h3>
+            <p>
+                현대 클라우드 DW는 ROLAP 방식으로 OLAP 기능을 제공합니다.
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>특징</th>
+                        <th>Snowflake</th>
+                        <th>BigQuery</th>
+                        <th>Redshift</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>아키텍처</strong></td>
+                        <td>컴퓨팅/스토리지 분리</td>
+                        <td>서버리스</td>
+                        <td>MPP (Massively Parallel)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>성능</strong></td>
+                        <td>⚡⚡⚡</td>
+                        <td>⚡⚡⚡</td>
+                        <td>⚡⚡</td>
+                    </tr>
+                    <tr>
+                        <td><strong>확장성</strong></td>
+                        <td>자동 스케일링</td>
+                        <td>무제한</td>
+                        <td>수동 리사이징</td>
+                    </tr>
+                    <tr>
+                        <td><strong>가격 모델</strong></td>
+                        <td>스토리지 + 컴퓨팅 시간</td>
+                        <td>스캔 데이터량</td>
+                        <td>노드 시간</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OLAP 기능</strong></td>
+                        <td>윈도우 함수, QUALIFY</td>
+                        <td>ROLLUP, CUBE, 머신러닝</td>
+                        <td>윈도우 함수, Spectrum</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-block">
+<code>-- BigQuery의 CUBE 연산 (자동 소계/총계)
+SELECT
+    product_category,
+    region,
+    SUM(sales) AS total_sales
+FROM sales_data
+WHERE year = 2024
+GROUP BY CUBE(product_category, region)
+ORDER BY product_category, region;
+
+-- 결과:
+-- category | region | total_sales
+-- 전자     | 서울   | 850000      (세부)
+-- 전자     | 부산   | 620000
+-- 전자     | NULL   | 1470000     (카테고리 소계)
+-- 의류     | 서울   | 780000
+-- 의류     | 부산   | 550000
+-- 의류     | NULL   | 1330000
+-- NULL     | 서울   | 1630000     (지역 소계)
+-- NULL     | 부산   | 1170000
+-- NULL     | NULL   | 2800000     (총계)</code>
+            </div>
+
+            <div class="review-section">
+                <h3>📝 복습 질문</h3>
+                <ol>
+                    <li>OLAP의 FASMI 5가지 특성을 설명하세요.</li>
+                    <li>OLAP 큐브의 구성 요소 4가지(차원, 계층, 측정값, 셀)를 예시와 함께 설명하세요.</li>
+                    <li>MOLAP, ROLAP, HOLAP의 차이점과 각각의 장단점을 비교하세요.</li>
+                    <li>MDX와 SQL의 차이는 무엇이며, MDX가 필요한 이유는?</li>
+                    <li>Slice와 Dice의 차이를 SQL 예시와 함께 설명하세요.</li>
+                    <li>Drill-Down과 Roll-Up의 차이를 계층 구조 예시로 설명하세요.</li>
+                    <li>Microsoft SSAS의 Tabular Model과 Multidimensional Model의 차이는?</li>
+                    <li>ClickHouse가 빠른 이유는 무엇이며, 어떤 사용 사례에 적합한가요?</li>
+                    <li>클라우드 DW (Snowflake, BigQuery)는 MOLAP인가 ROLAP인가? 그 이유는?</li>
+                    <li>"차원의 저주"란 무엇이며, MOLAP에서 왜 문제가 되나요?</li>
+                </ol>
+            </div>
+
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>OLAP은 다차원 분석</strong>: 시간, 제품, 지역 등 여러 축으로 데이터 탐색</li>
+                    <li><strong>MOLAP = 성능</strong>, <strong>ROLAP = 확장성</strong>, <strong>HOLAP = 균형</strong></li>
+                    <li><strong>OLAP 큐브</strong>: 차원(축) x 측정값(셀) = N차원 하이퍼큐브</li>
+                    <li><strong>MDX는 큐브 전용 쿼리 언어</strong>: SQL보다 다차원 분석에 적합</li>
+                    <li><strong>Slice/Dice</strong>: 큐브 자르기, <strong>Drill-Down/Roll-Up</strong>: 계층 이동</li>
+                    <li><strong>현대 트렌드</strong>: MOLAP → ROLAP (클라우드 DW의 성능 향상)</li>
+                    <li><strong>SSAS</strong>: 엔터프라이즈 표준, <strong>ClickHouse</strong>: 오픈소스 고성능</li>
+                    <li><strong>클라우드 DW</strong>: Snowflake, BigQuery는 ROLAP 방식으로 OLAP 구현</li>
+                    <li><strong>CUBE 연산</strong>: 자동으로 모든 조합의 소계/총계 생성</li>
+                    <li>弘益人間: 빠른 분석으로 더 나은 의사결정, 더 나은 세상 🌍</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-03.html" class="nav-button">← 03. ETL/ELT 프로세스</a>
+                <a href="chapter-05.html" class="nav-button">05. 데이터 마트 설계 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

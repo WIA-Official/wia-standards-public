@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: OpenLineage Standard | WIA-DATA-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        .nav a:hover { text-decoration: underline; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        .highlight-box strong { color: #10B981; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { background: none; padding: 0; }
+        .example { background: #0f1729; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; margin: 2rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 7</div>
+            <h1>OpenLineage Standard</h1>
+        </header>
+
+        <p>OpenLineage is an open standard for lineage metadata collection, designed to solve a critical problem: vendor lock-in and lack of interoperability in data lineage tools.</p>
+
+        <h2>The Interoperability Problem</h2>
+
+        <p>Before OpenLineage, each data tool maintained its own proprietary lineage format:</p>
+
+        <ul>
+            <li>Airflow tracked job lineage in its metadata database</li>
+            <li>dbt captured model lineage in its manifest files</li>
+            <li>Spark maintained execution graphs internally</li>
+            <li>BI tools tracked report dependencies separately</li>
+        </ul>
+
+        <p>Result: <strong>Fragmented lineage</strong> with no unified view across the data stack.</p>
+
+        <div class="highlight-box">
+            <strong>OpenLineage Solution:</strong> A common specification that any tool can emit and any lineage backend can consume, enabling end-to-end lineage across heterogeneous systems.
+        </div>
+
+        <h2>OpenLineage Architecture</h2>
+
+        <h3>Core Components</h3>
+
+        <ol>
+            <li><strong>Event Specification:</strong> JSON schema for lineage events</li>
+            <li><strong>Client Libraries:</strong> SDKs for emitting events (Python, Java, etc.)</li>
+            <li><strong>Integrations:</strong> Pre-built emitters for popular tools</li>
+            <li><strong>Backend:</strong> System that collects and stores lineage</li>
+        </ol>
+
+        <div class="example">
+            <div class="example-title">OpenLineage Flow</div>
+            <pre><code>┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│   Airflow    │─────▶│ OpenLineage  │─────▶│   Lineage    │
+│   (emitter)  │      │    Event     │      │   Backend    │
+└──────────────┘      └──────────────┘      └──────────────┘
+                             │
+┌──────────────┐             │               ┌──────────────┐
+│     dbt      │─────────────┤              │  Marquez     │
+│   (emitter)  │             │──────────────▶│  (consumer)  │
+└──────────────┘             │               └──────────────┘
+                             │
+┌──────────────┐             │               ┌──────────────┐
+│    Spark     │─────────────┘               │   Custom     │
+│   (emitter)  │                             │   System     │
+└──────────────┘                             └──────────────┘</code></pre>
+        </div>
+
+        <h2>OpenLineage Event Model</h2>
+
+        <h3>Event Structure</h3>
+
+        <p>Every OpenLineage event contains:</p>
+
+        <ul>
+            <li><strong>Event Type:</strong> START, COMPLETE, FAIL, ABORT</li>
+            <li><strong>Event Time:</strong> When the event occurred</li>
+            <li><strong>Run:</strong> Unique execution instance</li>
+            <li><strong>Job:</strong> The process or transformation</li>
+            <li><strong>Inputs:</strong> Source datasets</li>
+            <li><strong>Outputs:</strong> Destination datasets</li>
+        </ul>
+
+        <div class="example">
+            <div class="example-title">Complete OpenLineage Event</div>
+            <pre><code>{
+  "eventType": "COMPLETE",
+  "eventTime": "2025-12-26T10:30:15.123Z",
+  "run": {
+    "runId": "550e8400-e29b-41d4-a716-446655440000",
+    "facets": {
+      "nominalTime": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/NominalTimeRunFacet.json",
+        "nominalStartTime": "2025-12-26T10:00:00Z"
+      }
+    }
+  },
+  "job": {
+    "namespace": "my-scheduler",
+    "name": "etl.customer-data-pipeline",
+    "facets": {
+      "documentation": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/DocumentationJobFacet.json",
+        "description": "Daily customer data aggregation"
+      },
+      "sourceCode": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/SourceCodeJobFacet.json",
+        "language": "sql",
+        "source": "SELECT customer_id, COUNT(*) FROM orders GROUP BY customer_id"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "namespace": "postgres://warehouse.company.com:5432",
+      "name": "public.orders",
+      "facets": {
+        "schema": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/SchemaDatasetFacet.json",
+          "fields": [
+            {"name": "order_id", "type": "INTEGER"},
+            {"name": "customer_id", "type": "INTEGER"},
+            {"name": "amount", "type": "DECIMAL"}
+          ]
+        },
+        "dataQuality": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/DataQualityDatasetFacet.json",
+          "rowCount": 15247,
+          "bytes": 1048576,
+          "columnMetrics": {
+            "customer_id": {
+              "nullCount": 0,
+              "distinctCount": 1834
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "namespace": "postgres://warehouse.company.com:5432",
+      "name": "public.customer_summary",
+      "facets": {
+        "schema": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/SchemaDatasetFacet.json",
+          "fields": [
+            {"name": "customer_id", "type": "INTEGER"},
+            {"name": "order_count", "type": "INTEGER"}
+          ]
+        },
+        "outputStatistics": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/OutputStatisticsOutputDatasetFacet.json",
+          "rowCount": 1834,
+          "size": 73360
+        }
+      }
+    }
+  ],
+  "producer": "https://github.com/OpenLineage/OpenLineage/tree/1.0.0"
+}</code></pre>
+        </div>
+
+        <h2>Facets: Extensible Metadata</h2>
+
+        <p>Facets are the key to OpenLineage's flexibility. They allow adding custom metadata without breaking the core specification.</p>
+
+        <h3>Standard Facets</h3>
+
+        <h4>Run Facets</h4>
+        <ul>
+            <li><strong>nominalTime:</strong> Scheduled execution time</li>
+            <li><strong>parent:</strong> Parent job for nested workflows</li>
+            <li><strong>errorMessage:</strong> Failure details</li>
+        </ul>
+
+        <h4>Job Facets</h4>
+        <ul>
+            <li><strong>documentation:</strong> Job description</li>
+            <li><strong>sourceCode:</strong> Transformation logic</li>
+            <li><strong>sql:</strong> SQL query text</li>
+            <li><strong>ownership:</strong> Team responsible</li>
+        </ul>
+
+        <h4>Dataset Facets</h4>
+        <ul>
+            <li><strong>schema:</strong> Column definitions</li>
+            <li><strong>dataSource:</strong> Connection details</li>
+            <li><strong>lifecycleStateChange:</strong> CREATE, ALTER, DROP events</li>
+            <li><strong>dataQuality:</strong> Metrics and validation results</li>
+            <li><strong>columnLineage:</strong> Column-level dependencies</li>
+        </ul>
+
+        <h3>Custom Facets</h3>
+
+        <p>Organizations can define their own facets:</p>
+
+        <div class="example">
+            <div class="example-title">Custom Facet Example</div>
+            <pre><code>{
+  "customBusinessContext": {
+    "_producer": "https://company.com/lineage-extension/1.0.0",
+    "_schemaURL": "https://company.com/schemas/BusinessContextFacet.json",
+    "businessDomain": "finance",
+    "costCenter": "CC-1234",
+    "dataClassification": "confidential",
+    "retentionPeriod": "7_years",
+    "regulatoryFrameworks": ["GDPR", "SOX"]
+  }
+}</code></pre>
+        </div>
+
+        <h2>Integration Examples</h2>
+
+        <h3>Python Client</h3>
+
+        <div class="example">
+            <div class="example-title">Emitting OpenLineage Events in Python</div>
+            <pre><code>from openlineage.client import OpenLineageClient
+from openlineage.client.run import RunEvent, RunState, Run, Job
+from openlineage.client.facet import SqlJobFacet, SchemaDatasetFacet, SchemaField
+import uuid
+from datetime import datetime
+
+# Initialize client
+client = OpenLineageClient(url="http://lineage-backend:5000")
+
+# Create unique run ID
+run_id = str(uuid.uuid4())
+
+# START event
+client.emit(
+    RunEvent(
+        eventType=RunState.START,
+        eventTime=datetime.now().isoformat(),
+        run=Run(runId=run_id),
+        job=Job(
+            namespace="my-data-pipeline",
+            name="transform-customer-data",
+            facets={
+                "sql": SqlJobFacet(
+                    query="SELECT * FROM raw_customers WHERE active = true"
+                )
+            }
+        ),
+        inputs=[
+            Dataset(
+                namespace="postgres://db.company.com:5432",
+                name="public.raw_customers",
+                facets={
+                    "schema": SchemaDatasetFacet(
+                        fields=[
+                            SchemaField(name="id", type="INTEGER"),
+                            SchemaField(name="email", type="VARCHAR"),
+                            SchemaField(name="active", type="BOOLEAN")
+                        ]
+                    )
+                }
+            )
+        ],
+        outputs=[
+            Dataset(
+                namespace="postgres://db.company.com:5432",
+                name="public.active_customers"
+            )
+        ]
+    )
+)
+
+# ... perform transformation ...
+
+# COMPLETE event
+client.emit(
+    RunEvent(
+        eventType=RunState.COMPLETE,
+        eventTime=datetime.now().isoformat(),
+        run=Run(runId=run_id),
+        job=Job(namespace="my-data-pipeline", name="transform-customer-data"),
+        inputs=[...],
+        outputs=[...]
+    )
+)</code></pre>
+        </div>
+
+        <h3>Airflow Integration</h3>
+
+        <div class="example">
+            <div class="example-title">Airflow with OpenLineage</div>
+            <pre><code>from airflow import DAG
+from airflow.providers.openlineage.extractors import OperatorLineageExtractor
+
+# OpenLineage automatically captures lineage for:
+# - SQL operators
+# - Spark operators
+# - Python operators (with decorators)
+
+dag = DAG('customer_pipeline', ...)
+
+# SQL task - lineage extracted automatically
+sql_task = PostgresOperator(
+    task_id='aggregate_customers',
+    sql='INSERT INTO customer_summary SELECT ...',
+    postgres_conn_id='warehouse'
+)
+
+# Lineage event emitted automatically with:
+# - Input tables parsed from SQL
+# - Output tables parsed from SQL
+# - Execution timestamps
+# - Task metadata</code></pre>
+        </div>
+
+        <h2>OpenLineage Backends</h2>
+
+        <h3>Marquez</h3>
+        <p>Reference implementation of OpenLineage backend:</p>
+        <ul>
+            <li>Collects and stores lineage events</li>
+            <li>Provides REST API for queries</li>
+            <li>Web UI for visualization</li>
+            <li>PostgreSQL storage</li>
+        </ul>
+
+        <h3>Commercial Options</h3>
+        <ul>
+            <li>Atlan</li>
+            <li>Datafold</li>
+            <li>Monte Carlo</li>
+            <li>Metaphor</li>
+        </ul>
+
+        <h3>Custom Backend</h3>
+        <p>Build your own lineage collector:</p>
+        <pre><code>from flask import Flask, request
+app = Flask(__name__)
+
+@app.route('/api/v1/lineage', methods=['POST'])
+def collect_lineage():
+    event = request.json
+
+    # Validate OpenLineage schema
+    # Store in your database
+    # Update lineage graph
+    # Trigger impact analysis
+
+    return {'status': 'received'}, 200</code></pre>
+
+        <h2>Benefits of OpenLineage</h2>
+
+        <ol>
+            <li><strong>Vendor Neutrality:</strong> Not locked into proprietary format</li>
+            <li><strong>Ecosystem Growth:</strong> More tools adding support</li>
+            <li><strong>Best Practices:</strong> Standardized approach to lineage</li>
+            <li><strong>Community Support:</strong> Active open-source community</li>
+            <li><strong>Future-Proof:</strong> Adapts as data stack evolves</li>
+        </ol>
+
+        <h2>Adoption Strategy</h2>
+
+        <ol>
+            <li><strong>Start Small:</strong> One pipeline or tool</li>
+            <li><strong>Choose Backend:</strong> Marquez or commercial option</li>
+            <li><strong>Instrument Jobs:</strong> Add OpenLineage emitters</li>
+            <li><strong>Validate Events:</strong> Ensure quality metadata</li>
+            <li><strong>Expand Coverage:</strong> Add more integrations</li>
+            <li><strong>Build on Top:</strong> Impact analysis, visualization, etc.</li>
+        </ol>
+
+        <div class="highlight-box">
+            <strong>Key Takeaway:</strong> OpenLineage transforms lineage from a proprietary afterthought into a first-class, interoperable data product. It's the TCP/IP of data lineage.
+        </div>
+
+        </div>
+</body>
+</html>

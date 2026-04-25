@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: API Integration and Federation - WIA-ACCESS_CONTROL</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-success {
+            border-left-color: var(--success);
+        }
+        .highlight-warning {
+            border-left-color: var(--warning);
+        }
+        .highlight-error {
+            border-left-color: var(--error);
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: API Integration and Federation</h1>
+
+    <p>Modern organizations rarely operate in isolation. Access control systems must integrate with diverse applications, support single sign-on across platforms, and federate identities across organizational boundaries. This chapter explores the integration capabilities of the WIA-ACCESS_CONTROL standard, covering API security, single sign-on, and identity federation.</p>
+
+    <h2>WIA-ACCESS_CONTROL API</h2>
+
+    <p>The WIA-ACCESS_CONTROL standard defines a comprehensive REST API for programmatic access control operations. This API enables applications to authenticate users, check permissions, manage policies, and query audit logs.</p>
+
+    <h3>API Authentication</h3>
+
+    <pre>
+// API Authentication Methods
+const apiAuthMethods = {
+    // OAuth 2.0 Bearer Token
+    bearerToken: {
+        type: 'oauth2',
+        flows: {
+            clientCredentials: {
+                tokenUrl: '/oauth/token',
+                scopes: {
+                    'access:read': 'Read access control data',
+                    'access:write': 'Modify access control data',
+                    'policy:admin': 'Administer policies',
+                    'audit:read': 'Read audit logs'
+                }
+            },
+            authorizationCode: {
+                authorizationUrl: '/oauth/authorize',
+                tokenUrl: '/oauth/token',
+                scopes: { /* same as above */ }
+            }
+        }
+    },
+
+    // API Key (for service accounts)
+    apiKey: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-WIA-API-Key',
+        requirements: {
+            rotation: '90d',
+            rateLimit: 1000,
+            ipWhitelist: true
+        }
+    },
+
+    // Mutual TLS (for infrastructure)
+    mtls: {
+        type: 'mutualTLS',
+        certificateRequired: true,
+        validationMode: 'strict'
+    }
+};
+    </pre>
+
+    <h3>Core API Endpoints</h3>
+
+    <pre>
+// WIA-ACCESS_CONTROL REST API Specification
+const apiEndpoints = {
+    // Authorization Check
+    'POST /v1/access/check': {
+        description: 'Check if subject has access to resource',
+        request: {
+            subject: { id: 'user-123', type: 'user' },
+            resource: { id: 'doc-456', type: 'document' },
+            action: 'read',
+            context: { ip: '10.0.0.1', time: '2025-01-15T10:00:00Z' }
+        },
+        response: {
+            decision: 'Permit',
+            policyId: 'policy-doc-001',
+            obligations: [],
+            evaluationTime: 12 // milliseconds
+        }
+    },
+
+    // Batch Authorization
+    'POST /v1/access/check-batch': {
+        description: 'Check multiple access requests',
+        request: {
+            requests: [
+                { subject: '...', resource: '...', action: 'read' },
+                { subject: '...', resource: '...', action: 'write' }
+            ],
+            options: { parallel: true, maxConcurrent: 10 }
+        },
+        response: {
+            results: [
+                { requestIndex: 0, decision: 'Permit' },
+                { requestIndex: 1, decision: 'Deny', reason: 'Insufficient permission' }
+            ]
+        }
+    },
+
+    // List User Permissions
+    'GET /v1/subjects/{subjectId}/permissions': {
+        description: 'List all permissions for a subject',
+        parameters: {
+            resourceType: 'Filter by resource type',
+            action: 'Filter by action'
+        },
+        response: {
+            permissions: [
+                { resource: 'doc-*', actions: ['read', 'write'] },
+                { resource: 'project-alpha/*', actions: ['read'] }
+            ]
+        }
+    },
+
+    // Policy Management
+    'POST /v1/policies': {
+        description: 'Create new policy',
+        request: { /* WPL Policy */ },
+        response: { policyId: 'policy-xyz', version: 1, status: 'active' }
+    },
+
+    'PUT /v1/policies/{policyId}': {
+        description: 'Update existing policy',
+        request: { /* Updated WPL Policy */ },
+        response: { policyId: 'policy-xyz', version: 2, status: 'active' }
+    },
+
+    // Audit Logs
+    'GET /v1/audit/events': {
+        description: 'Query audit events',
+        parameters: {
+            startTime: 'ISO 8601 timestamp',
+            endTime: 'ISO 8601 timestamp',
+            subjectId: 'Filter by subject',
+            eventType: 'Filter by event type',
+            decision: 'Filter by decision'
+        },
+        response: {
+            events: [ /* Audit events */ ],
+            pagination: { cursor: '...', hasMore: true }
+        }
+    }
+};
+    </pre>
+
+    <h2>OAuth 2.0 Integration</h2>
+
+    <p>The WIA-ACCESS_CONTROL standard provides comprehensive OAuth 2.0 support for delegated authorization. This enables third-party applications to access protected resources on behalf of users without exposing credentials.</p>
+
+    <div class="highlight">
+        <strong>OAuth 2.0 Flows Supported:</strong>
+        <ul>
+            <li><strong>Authorization Code + PKCE:</strong> For web and mobile applications</li>
+            <li><strong>Client Credentials:</strong> For service-to-service authentication</li>
+            <li><strong>Device Authorization:</strong> For devices with limited input capability</li>
+            <li><strong>Token Exchange:</strong> For impersonation and delegation scenarios</li>
+        </ul>
+    </div>
+
+    <h3>Authorization Code Flow with PKCE</h3>
+
+    <pre>
+// OAuth 2.0 Authorization Code Flow with PKCE
+class OAuth2Client {
+    private config: OAuth2Config;
+
+    async initiateAuthorizationFlow(): Promise&lt;AuthorizationUrl&gt; {
+        // Generate PKCE code verifier and challenge
+        const codeVerifier = this.generateCodeVerifier();
+        const codeChallenge = await this.generateCodeChallenge(codeVerifier);
+
+        // Generate state for CSRF protection
+        const state = crypto.randomBytes(32).toString('base64url');
+
+        // Store verifier and state for validation
+        await this.sessionStore.save({
+            state: state,
+            codeVerifier: codeVerifier,
+            expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
+        });
+
+        // Construct authorization URL
+        const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: this.config.clientId,
+            redirect_uri: this.config.redirectUri,
+            scope: this.config.scopes.join(' '),
+            state: state,
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256'
+        });
+
+        return {
+            url: `${this.config.authorizationEndpoint}?${params}`,
+            state: state
+        };
+    }
+
+    async handleCallback(code: string, state: string): Promise&lt;TokenResponse&gt; {
+        // Validate state
+        const session = await this.sessionStore.get(state);
+        if (!session || session.expiresAt &lt; Date.now()) {
+            throw new OAuth2Error('invalid_state', 'State mismatch or expired');
+        }
+
+        // Exchange code for tokens
+        const response = await fetch(this.config.tokenEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                grant_type: 'authorization_code',
+                client_id: this.config.clientId,
+                client_secret: this.config.clientSecret,
+                code: code,
+                redirect_uri: this.config.redirectUri,
+                code_verifier: session.codeVerifier
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new OAuth2Error(error.error, error.error_description);
+        }
+
+        const tokens = await response.json();
+
+        // Clear session
+        await this.sessionStore.delete(state);
+
+        return tokens;
+    }
+
+    private generateCodeVerifier(): string {
+        return crypto.randomBytes(32).toString('base64url');
+    }
+
+    private async generateCodeChallenge(verifier: string): Promise&lt;string&gt; {
+        const hash = crypto.createHash('sha256').update(verifier).digest();
+        return hash.toString('base64url');
+    }
+}
+    </pre>
+
+    <h2>Single Sign-On (SSO)</h2>
+
+    <p>Single sign-on allows users to authenticate once and access multiple applications without re-entering credentials. The WIA-ACCESS_CONTROL standard supports SSO through OpenID Connect (OIDC) and SAML 2.0.</p>
+
+    <h3>OpenID Connect Implementation</h3>
+
+    <pre>
+// OpenID Connect Provider
+class OIDCProvider {
+    private config: OIDCConfig;
+    private keyStore: JWKStore;
+
+    // Discovery endpoint (/.well-known/openid-configuration)
+    getDiscoveryDocument(): OIDCDiscoveryDocument {
+        return {
+            issuer: this.config.issuer,
+            authorization_endpoint: `${this.config.baseUrl}/authorize`,
+            token_endpoint: `${this.config.baseUrl}/token`,
+            userinfo_endpoint: `${this.config.baseUrl}/userinfo`,
+            jwks_uri: `${this.config.baseUrl}/.well-known/jwks.json`,
+            registration_endpoint: `${this.config.baseUrl}/register`,
+            scopes_supported: ['openid', 'profile', 'email', 'roles'],
+            response_types_supported: ['code', 'token', 'id_token', 'code token', 'code id_token'],
+            grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials'],
+            subject_types_supported: ['public', 'pairwise'],
+            id_token_signing_alg_values_supported: ['RS256', 'ES256', 'EdDSA'],
+            claims_supported: [
+                'sub', 'iss', 'aud', 'exp', 'iat', 'auth_time',
+                'name', 'email', 'email_verified', 'roles', 'groups'
+            ]
+        };
+    }
+
+    async generateIdToken(user: User, client: Client, nonce?: string): Promise&lt;string&gt; {
+        const now = Math.floor(Date.now() / 1000);
+
+        const claims = {
+            // Standard claims
+            iss: this.config.issuer,
+            sub: this.generateSubject(user, client),
+            aud: client.clientId,
+            exp: now + 3600,
+            iat: now,
+            auth_time: user.authTime,
+
+            // Optional claims
+            nonce: nonce,
+            at_hash: this.generateAtHash(user.accessToken),
+
+            // User claims (based on scopes)
+            name: user.name,
+            email: user.email,
+            email_verified: user.emailVerified,
+            roles: user.roles,
+            groups: user.groups
+        };
+
+        // Sign with current key
+        const key = await this.keyStore.getCurrentSigningKey();
+        return JWT.sign(claims, key.privateKey, {
+            algorithm: key.algorithm,
+            keyid: key.kid
+        });
+    }
+
+    async validateIdToken(token: string, expectedNonce?: string): Promise&lt;IdTokenClaims&gt; {
+        // Get public keys
+        const jwks = await this.keyStore.getPublicKeys();
+
+        // Verify and decode token
+        const decoded = await JWT.verify(token, jwks, {
+            issuer: this.config.issuer,
+            algorithms: ['RS256', 'ES256', 'EdDSA']
+        });
+
+        // Validate nonce if provided
+        if (expectedNonce && decoded.nonce !== expectedNonce) {
+            throw new OIDCError('invalid_nonce', 'Nonce mismatch');
+        }
+
+        return decoded as IdTokenClaims;
+    }
+}
+    </pre>
+
+    <h3>SAML 2.0 Federation</h3>
+
+    <pre>
+// SAML 2.0 Service Provider
+class SAMLServiceProvider {
+    private config: SAMLConfig;
+    private metadataCache: Map&lt;string, IdPMetadata&gt;;
+
+    generateAuthnRequest(idpEntityId: string): SAMLAuthnRequest {
+        const idpMetadata = this.metadataCache.get(idpEntityId);
+        if (!idpMetadata) {
+            throw new SAMLError('Unknown identity provider');
+        }
+
+        const request = {
+            ID: `_${crypto.randomUUID()}`,
+            Version: '2.0',
+            IssueInstant: new Date().toISOString(),
+            Destination: idpMetadata.ssoUrl,
+            AssertionConsumerServiceURL: this.config.acsUrl,
+            ProtocolBinding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+            Issuer: this.config.entityId,
+            NameIDPolicy: {
+                Format: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+                AllowCreate: true
+            },
+            RequestedAuthnContext: {
+                Comparison: 'minimum',
+                AuthnContextClassRef: [
+                    'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport'
+                ]
+            }
+        };
+
+        return {
+            xml: this.buildXML(request),
+            relayState: crypto.randomBytes(16).toString('hex'),
+            destination: idpMetadata.ssoUrl
+        };
+    }
+
+    async processResponse(samlResponse: string, relayState: string): Promise&lt;SAMLAssertion&gt; {
+        // Decode and parse response
+        const xml = Buffer.from(samlResponse, 'base64').toString('utf8');
+        const response = this.parseXML(xml);
+
+        // Validate response
+        await this.validateResponse(response);
+
+        // Validate signature
+        const idpMetadata = this.getIdPFromIssuer(response.Issuer);
+        await this.validateSignature(xml, idpMetadata.signingCertificate);
+
+        // Extract and validate assertion
+        const assertion = response.Assertion;
+        await this.validateAssertion(assertion);
+
+        // Extract user attributes
+        return {
+            nameId: assertion.Subject.NameID,
+            sessionIndex: assertion.AuthnStatement.SessionIndex,
+            attributes: this.extractAttributes(assertion.AttributeStatement),
+            validUntil: new Date(assertion.Conditions.NotOnOrAfter)
+        };
+    }
+}
+    </pre>
+
+    <h2>Identity Federation</h2>
+
+    <p>Identity federation enables organizations to trust identities from external identity providers. This is essential for B2B scenarios, partnerships, and multi-organization deployments.</p>
+
+    <div class="highlight highlight-success">
+        <strong>Federation Benefits:</strong> Identity federation eliminates the need for users to maintain separate credentials for each organization. It enables seamless collaboration while maintaining security boundaries and audit trails.
+    </div>
+
+    <pre>
+// Identity Federation Manager
+class FederationManager {
+    private trustStore: TrustStore;
+    private claimsMappingEngine: ClaimsMappingEngine;
+
+    async processFederatedIdentity(
+        assertion: FederatedAssertion,
+        sourceIdP: string
+    ): Promise&lt;LocalIdentity&gt; {
+        // Verify trust relationship
+        const trustConfig = await this.trustStore.getTrustConfig(sourceIdP);
+        if (!trustConfig || !trustConfig.active) {
+            throw new FederationError('Untrusted identity provider');
+        }
+
+        // Validate assertion
+        await this.validateFederatedAssertion(assertion, trustConfig);
+
+        // Map claims to local format
+        const mappedClaims = await this.claimsMappingEngine.map(
+            assertion.claims,
+            trustConfig.claimsMapping
+        );
+
+        // Provision or link local identity
+        let localUser = await this.findLinkedUser(assertion.subject, sourceIdP);
+
+        if (!localUser) {
+            if (trustConfig.allowProvisioning) {
+                localUser = await this.provisionUser(mappedClaims, sourceIdP);
+            } else {
+                throw new FederationError('User not found and provisioning disabled');
+            }
+        }
+
+        // Update user attributes if configured
+        if (trustConfig.syncAttributes) {
+            await this.syncUserAttributes(localUser, mappedClaims);
+        }
+
+        // Create local session
+        return {
+            userId: localUser.id,
+            federatedFrom: sourceIdP,
+            originalSubject: assertion.subject,
+            claims: mappedClaims,
+            sessionExpiry: assertion.validUntil
+        };
+    }
+
+    async establishTrust(idpMetadata: IdPMetadata, config: TrustConfig): Promise&lt;void&gt; {
+        // Validate IdP metadata
+        await this.validateIdPMetadata(idpMetadata);
+
+        // Store trust configuration
+        await this.trustStore.saveTrustConfig({
+            entityId: idpMetadata.entityId,
+            displayName: config.displayName,
+            metadata: idpMetadata,
+            claimsMapping: config.claimsMapping,
+            allowProvisioning: config.allowProvisioning,
+            syncAttributes: config.syncAttributes,
+            roleMapping: config.roleMapping,
+            active: true,
+            createdAt: new Date()
+        });
+
+        // Audit trust establishment
+        await this.auditLog.log({
+            event: 'federation.trust.established',
+            idpEntityId: idpMetadata.entityId,
+            config: config
+        });
+    }
+}
+    </pre>
+
+    <h2>API Gateway Integration</h2>
+
+    <p>API gateways serve as centralized enforcement points for access control. The WIA-ACCESS_CONTROL standard provides integration patterns for popular API gateway platforms.</p>
+
+    <pre>
+// API Gateway Policy Enforcement
+const gatewayPolicy = {
+    // Pre-request authorization
+    preRequest: async (request: GatewayRequest): Promise&lt;GatewayDecision&gt; => {
+        // Extract authentication token
+        const token = extractToken(request.headers.authorization);
+        if (!token) {
+            return { allow: false, statusCode: 401, message: 'Missing authentication' };
+        }
+
+        // Validate token
+        const tokenInfo = await accessControl.validateToken(token);
+        if (!tokenInfo.valid) {
+            return { allow: false, statusCode: 401, message: 'Invalid token' };
+        }
+
+        // Check authorization
+        const decision = await accessControl.checkAccess({
+            subject: { id: tokenInfo.subject, attributes: tokenInfo.claims },
+            resource: { path: request.path, method: request.method },
+            action: methodToAction(request.method),
+            context: {
+                ip: request.clientIp,
+                headers: request.headers
+            }
+        });
+
+        if (decision.effect !== 'Permit') {
+            return { allow: false, statusCode: 403, message: decision.reason };
+        }
+
+        // Add identity headers for downstream services
+        return {
+            allow: true,
+            headers: {
+                'X-User-ID': tokenInfo.subject,
+                'X-User-Roles': tokenInfo.claims.roles.join(','),
+                'X-Request-ID': generateRequestId()
+            }
+        };
+    },
+
+    // Post-response processing
+    postResponse: async (request: GatewayRequest, response: GatewayResponse): Promise&lt;void&gt; => {
+        // Log access for audit
+        await auditLog.log({
+            type: 'api.access',
+            path: request.path,
+            method: request.method,
+            subject: request.headers['X-User-ID'],
+            statusCode: response.statusCode,
+            latency: response.latency
+        });
+    }
+};
+    </pre>
+
+    <h2>Summary</h2>
+
+    <p>This chapter has explored the integration and federation capabilities of the WIA-ACCESS_CONTROL standard. From the comprehensive REST API for programmatic access control to OAuth 2.0 and OpenID Connect for modern authentication, and SAML 2.0 for enterprise federation, the standard provides the tools needed to integrate access control into any environment.</p>
+
+    <div class="highlight">
+        <strong>Key Takeaways:</strong>
+        <ul>
+            <li>The WIA-ACCESS_CONTROL API enables programmatic access control operations</li>
+            <li>OAuth 2.0 provides delegated authorization for third-party applications</li>
+            <li>OpenID Connect and SAML 2.0 enable single sign-on across platforms</li>
+            <li>Identity federation allows trust relationships across organizations</li>
+            <li>API gateway integration provides centralized policy enforcement</li>
+        </ul>
+    </div>
+
+</body>
+</html>

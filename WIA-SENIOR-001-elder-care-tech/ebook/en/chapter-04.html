@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: API Interface Design for Elder Care Systems</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #6366F1;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg);
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+        .summary {
+            background: var(--bg);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        .summary h3 {
+            color: var(--primary);
+            margin-top: 0;
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        .nav-links {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+        .nav-links a {
+            color: var(--primary);
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover {
+            background: var(--primary);
+            color: white;
+        }
+        code {
+            background: var(--bg);
+            color: var(--primary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+        pre code {
+            padding: 0;
+            font-size: 0.85em;
+        }
+        .callout {
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .questions {
+            background: var(--bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        .questions ol {
+            margin-left: 1.5rem;
+        }
+        .philosophy {
+            text-align: center;
+            padding: 2rem;
+            margin: 2rem 0;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+        .philosophy-text {
+            font-size: 1.5rem;
+            color: var(--primary);
+            letter-spacing: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: API Interface Design for Elder Care Systems</h1>
+
+        <p>Having established standardized data formats for elder profiles, vital signs, alerts, medications, and activities in the previous chapters, we now transition to examining how systems exchange this data in practice. Application Programming Interfaces (APIs) define the contracts through which software components communicate, specify request and response formats, establish authentication and authorization mechanisms, and govern error handling and edge cases. The WIA-SENIOR-001 API Interface Design phase specifies comprehensive RESTful HTTP APIs that enable interoperable elder care systems to create, retrieve, update, and delete data while maintaining security, reliability, and performance. This chapter explores the architectural decisions, endpoint specifications, and implementation patterns that enable seamless integration across the elder care technology ecosystem.</p>
+
+        <p>API design presents fundamental tradeoffs between competing goals: simplicity versus expressiveness, consistency versus optimization, security versus usability, and standardization versus flexibility. The WIA-SENIOR-001 API strikes careful balances across these dimensions, prioritizing developer experience and implementation ease while ensuring the expressiveness required for sophisticated care delivery applications. REST architectural principles provide the foundation, augmented with modern best practices from the healthcare IT, consumer technology, and standards communities. The result is an API that feels familiar to developers experienced with modern web services while addressing the unique requirements of elder care data management.</p>
+
+        <h2>REST Architectural Principles</h2>
+
+        <p>Representational State Transfer (REST) has emerged as the dominant architectural style for web APIs through its elegant simplicity, scalability, and alignment with web infrastructure. RESTful APIs treat resources—in our case elders, vital signs, alerts, medications, and activities—as first-class entities addressed by URLs and manipulated through standard HTTP methods. This resource-oriented approach maps naturally to elder care domain concepts and enables intuitive API designs that developers can understand and implement quickly.</p>
+
+        <h3>Resource Identification Through URLs</h3>
+
+        <p>Every entity in the WIA-SENIOR-001 data model corresponds to a resource accessible via a hierarchical URL structure. The base URL <code>https://api.wia.org/senior-001</code> serves as the API root. Elder profiles are accessed via <code>/elders/{elderId}</code> where <code>{elderId}</code> is the UUID identifying a specific elder. Vital signs for an elder are accessed via <code>/elders/{elderId}/vitals</code>, creating a clear parent-child relationship. Individual vital signs records can be addressed as <code>/vitals/{vitalsId}</code> when needed. Alerts, medications, and activities follow similar patterns, creating a consistent and predictable URL structure throughout the API.</p>
+
+        <p>This hierarchical resource model enables both collection operations (listing all medications for an elder at <code>/elders/{elderId}/medications</code>) and individual resource operations (retrieving a specific medication at <code>/medications/{medicationId}</code>). Query parameters enable filtering, pagination, and sorting—for example, <code>/elders/{elderId}/vitals?startDate=2025-01-01&endDate=2025-01-15</code> retrieves vital signs within a date range. This RESTful approach provides flexibility and power while maintaining simplicity and discoverability.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.1: Core API Resource Endpoints</caption>
+            <thead>
+                <tr>
+                    <th>Resource</th>
+                    <th>Collection Endpoint</th>
+                    <th>Individual Endpoint</th>
+                    <th>Nested Access</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Elder Profiles</td>
+                    <td>GET /elders</td>
+                    <td>GET /elders/{elderId}</td>
+                    <td>N/A (root resource)</td>
+                </tr>
+                <tr>
+                    <td>Vital Signs</td>
+                    <td>GET /vitals</td>
+                    <td>GET /vitals/{vitalId}</td>
+                    <td>GET /elders/{elderId}/vitals</td>
+                </tr>
+                <tr>
+                    <td>Alerts</td>
+                    <td>GET /alerts</td>
+                    <td>GET /alerts/{alertId}</td>
+                    <td>GET /elders/{elderId}/alerts</td>
+                </tr>
+                <tr>
+                    <td>Medications</td>
+                    <td>GET /medications</td>
+                    <td>GET /medications/{medId}</td>
+                    <td>GET /elders/{elderId}/medications</td>
+                </tr>
+                <tr>
+                    <td>Activities</td>
+                    <td>GET /activities</td>
+                    <td>GET /activities/{activityId}</td>
+                    <td>GET /elders/{elderId}/activities</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Standard HTTP Methods</h3>
+
+        <p>RESTful APIs leverage HTTP's standard methods to perform operations on resources, providing consistent semantics across all endpoints. <code>GET</code> retrieves resource representations without modifying state—fetching an elder profile, retrieving vital signs history, listing alerts. <code>POST</code> creates new resources—registering a new elder, recording vital signs, generating alerts. <code>PUT</code> and <code>PATCH</code> update existing resources, with PUT replacing entire resources and PATCH performing partial updates. <code>DELETE</code> removes resources when appropriate and permitted by authorization rules.</p>
+
+        <p>This method-based approach enables powerful capabilities through simple combinations. Creating an elder profile: <code>POST /elders</code> with JSON payload containing profile data. Retrieving the profile: <code>GET /elders/{elderId}</code>. Updating emergency contact information: <code>PATCH /elders/{elderId}</code> with JSON containing only changed fields. Recording new vital signs: <code>POST /vitals</code> with vital signs data including elderId reference. The consistency across resources reduces cognitive load and enables generic client implementations that work across resource types.</p>
+
+        <h2>Authentication and Authorization</h2>
+
+        <p>Elder care systems handle Protected Health Information (PHI) subject to stringent security and privacy regulations including HIPAA, GDPR, and related frameworks. The WIA-SENIOR-001 API implements robust authentication to verify user and application identity, and fine-grained authorization to control access to sensitive data based on roles, relationships, and explicit consent grants.</p>
+
+        <h3>Authentication Mechanisms</h3>
+
+        <p>The standard supports multiple authentication mechanisms appropriate for different use cases. OAuth 2.0 and OpenID Connect provide industry-standard authentication for user-facing applications where elders, family caregivers, or healthcare providers authenticate through login flows. Service-to-service integration uses API keys or client credentials OAuth flows for system authentication. All authentication credentials are transmitted only over TLS 1.3 encrypted connections, and API keys must be treated as sensitive secrets stored securely rather than embedded in client-side code or version control.</p>
+
+        <pre><code>// Authentication via Bearer token
+GET /elders/elder-123/vitals/latest
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+X-WIA-Standard: SENIOR-001
+
+// Authentication via API key
+GET /elders/elder-123/vitals/latest
+X-API-Key: wia_senior_key_abc123xyz789
+X-WIA-Standard: SENIOR-001</code></pre>
+
+        <h3>Role-Based Access Control</h3>
+
+        <p>Authorization implements role-based access control (RBAC) defining permissions for different user types. The <code>ELDER</code> role grants access to the elder's own data with read access to all profile, vitals, alerts, medications, and activities, and limited write access (for example, dismissing alerts or confirming medication taking). The <code>FAMILY_CAREGIVER</code> role grants read access to elder data based on explicit consent relationships, with limited write capabilities like resolving alerts or adding notes. The <code>HEALTHCARE_PROVIDER</code> role enables reading clinical data and writing medical information like diagnoses, medications, and care plans. The <code>EMERGENCY_RESPONDER</code> role provides emergency-access to critical information during active emergency alerts. System administrators have elevated privileges for account management and configuration.</p>
+
+        <p>Consent management enables granular control beyond role-based permissions. Elders can grant specific family members access to specific data types—for example, allowing a daughter to view vital signs and alerts but not detailed activity tracking to preserve privacy. Healthcare providers require explicit consent to access data, with audit logging recording all access. Emergency override provisions enable responders to access critical information during emergencies even without pre-existing consent, with comprehensive audit trails and post-emergency review processes.</p>
+
+        <h2>Core API Endpoints</h2>
+
+        <p>The WIA-SENIOR-001 API defines comprehensive endpoints for all elder care data operations. This section examines key endpoints in detail, establishing patterns that extend consistently across the full API surface.</p>
+
+        <h3>Elder Profile Management</h3>
+
+        <p>Elder profile endpoints enable creating new elder registrations, retrieving profile information, updating profiles as circumstances change, and archiving profiles when appropriate. Creating a profile requires comprehensive data collection while allowing optional fields to be omitted initially and added later. Response bodies echo the created resource with system-generated fields like ID and timestamps populated.</p>
+
+        <pre><code>// Create elder profile
+POST /elders
+Content-Type: application/json
+
+{
+  "personalInfo": {
+    "firstName": "Margaret",
+    "lastName": "Johnson",
+    "dateOfBirth": "1945-06-15",
+    "gender": "female",
+    "language": "en"
+  },
+  "medicalInfo": {
+    "bloodType": "A+",
+    "allergies": ["Penicillin"],
+    "chronicConditions": ["Type 2 Diabetes Mellitus", "Essential Hypertension"]
+  },
+  "emergencyContacts": [
+    {
+      "priority": 1,
+      "name": "Robert Johnson",
+      "relationship": "Son",
+      "phoneMobile": "+1-555-0199",
+      "email": "robert.johnson@example.com"
+    }
+  ]
+}
+
+// Response: 201 Created
+{
+  "success": true,
+  "data": {
+    "id": "elder-123e4567",
+    "personalInfo": { /* ... */ },
+    "medicalInfo": { /* ... */ },
+    "emergencyContacts": [ /* ... */ ],
+    "createdAt": "2025-01-15T10:30:00Z",
+    "updatedAt": "2025-01-15T10:30:00Z"
+  },
+  "timestamp": "2025-01-15T10:30:00Z"
+}</code></pre>
+
+        <p>Profile retrieval returns complete elder profiles for authorized users. Partial updates via PATCH enable modifying specific profile sections without resending unchanged data. Common update operations include adding emergency contacts, updating addresses, modifying care preferences, and maintaining medication lists. The PATCH endpoint accepts partial JSON documents containing only changed fields, with deep merging semantics for nested objects.</p>
+
+        <h3>Vital Signs Recording and Retrieval</h3>
+
+        <p>Vital signs endpoints handle the high-volume data streams from wearable devices, home health equipment, and manual measurements. The recording endpoint accepts comprehensive vital signs objects with timestamp, elder ID, and measurement values. Retrieval endpoints support filtering by date range, vital sign type, and abnormality flags, with pagination for large result sets.</p>
+
+        <pre><code>// Record vital signs
+POST /vitals
+Content-Type: application/json
+
+{
+  "elderId": "elder-123e4567",
+  "timestamp": "2025-01-15T08:00:00Z",
+  "heartRate": {"bpm": 72, "rhythm": "regular"},
+  "bloodPressure": {"systolic": 128, "diastolic": 82},
+  "temperature": {"value": 36.8, "unit": "celsius", "location": "oral"},
+  "oxygenSaturation": {"percentage": 97}
+}
+
+// Get vital signs history with filters
+GET /elders/elder-123e4567/vitals?startDate=2025-01-01&endDate=2025-01-15&type=bloodPressure
+
+// Get latest vital signs (real-time monitoring)
+GET /elders/elder-123e4567/vitals/latest</code></pre>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.2: Standard Query Parameters</caption>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Purpose</th>
+                    <th>Example Values</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>startDate</td>
+                    <td>ISO 8601 date</td>
+                    <td>Filter results after date</td>
+                    <td>2025-01-01</td>
+                </tr>
+                <tr>
+                    <td>endDate</td>
+                    <td>ISO 8601 date</td>
+                    <td>Filter results before date</td>
+                    <td>2025-01-15</td>
+                </tr>
+                <tr>
+                    <td>limit</td>
+                    <td>integer</td>
+                    <td>Maximum results per page</td>
+                    <td>50 (default: 25, max: 100)</td>
+                </tr>
+                <tr>
+                    <td>offset</td>
+                    <td>integer</td>
+                    <td>Pagination offset</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td>sort</td>
+                    <td>string</td>
+                    <td>Sort field and direction</td>
+                    <td>timestamp:desc</td>
+                </tr>
+                <tr>
+                    <td>filter</td>
+                    <td>string</td>
+                    <td>Resource-specific filters</td>
+                    <td>severity=HIGH, resolved=false</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Alert Management</h3>
+
+        <p>Alert endpoints enable creating alerts from monitoring systems, retrieving alerts for dashboard displays, filtering by status and severity, and resolving alerts when addressed. The resolution workflow captures who resolved the alert, when, and optionally why, supporting quality improvement and false positive analysis.</p>
+
+        <pre><code>// Get unresolved high-severity alerts
+GET /elders/elder-123e4567/alerts?resolved=false&severity=HIGH
+
+// Resolve alert with metadata
+PATCH /alerts/alert-9876/resolve
+Content-Type: application/json
+
+{
+  "resolvedBy": "user-caregiverId",
+  "resolvedAt": "2025-01-15T14:45:00Z",
+  "resolutionNotes": "Contacted elder via phone. Elevated heart rate due to climbing stairs. Elder feels fine, no intervention needed.",
+  "falsePositive": false
+}</code></pre>
+
+        <h2>Error Handling and Response Formats</h2>
+
+        <p>Robust error handling enables clients to gracefully handle failures and present appropriate messaging to users. The WIA-SENIOR-001 API uses standard HTTP status codes with detailed error response bodies containing error codes, human-readable messages, and additional context. Success responses (2xx codes) return data in consistent formats with success flag, data payload, and timestamp. Error responses (4xx and 5xx codes) return error objects with code, message, and optional details array for validation errors.</p>
+
+        <pre><code>// Success response format
+{
+  "success": true,
+  "data": { /* resource data */ },
+  "timestamp": "2025-01-15T10:30:00Z"
+}
+
+// Error response format
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid vital signs data",
+    "details": [
+      {"field": "heartRate.bpm", "error": "Value 300 exceeds maximum 200"},
+      {"field": "timestamp", "error": "Timestamp cannot be in the future"}
+    ]
+  },
+  "timestamp": "2025-01-15T10:30:00Z"
+}</code></pre>
+
+        <h3>HTTP Status Codes</h3>
+
+        <p>Standard HTTP status codes communicate response semantics clearly. <code>200 OK</code> indicates successful GET, PATCH, or DELETE requests. <code>201 Created</code> confirms successful POST requests creating new resources, with the Location header containing the new resource's URL. <code>204 No Content</code> acknowledges successful requests with no response body needed. <code>400 Bad Request</code> signals client errors like invalid JSON, missing required fields, or validation failures. <code>401 Unauthorized</code> indicates missing or invalid authentication. <code>403 Forbidden</code> signals authorization failure—authenticated but insufficient permissions. <code>404 Not Found</code> indicates requested resources don't exist. <code>429 Too Many Requests</code> enforces rate limiting. <code>500 Internal Server Error</code> reports server-side failures.</p>
+
+        <h2>Pagination and Performance Optimization</h2>
+
+        <p>Elder care systems accumulate large volumes of vital signs, activities, and alerts over time. Efficiently retrieving this data requires pagination, filtering, and optimization strategies. The standard specifies limit/offset pagination with configurable page sizes, default limits preventing accidental large queries, and response metadata indicating total result counts and pagination links.</p>
+
+        <pre><code>// Paginated request
+GET /elders/elder-123e4567/vitals?limit=50&offset=100
+
+// Response with pagination metadata
+{
+  "success": true,
+  "data": [ /* 50 vital signs records */ ],
+  "pagination": {
+    "limit": 50,
+    "offset": 100,
+    "total": 1543,
+    "hasMore": true,
+    "nextUrl": "/elders/elder-123e4567/vitals?limit=50&offset=150"
+  },
+  "timestamp": "2025-01-15T10:30:00Z"
+}</code></pre>
+
+        <div class="callout">
+            <strong>Performance Best Practices:</strong> Clients should implement smart filtering to request only needed data—fetch recent data first and lazy-load historical records on demand. Use field selection to retrieve partial resources when full objects aren't needed. Implement caching with ETags and conditional requests to avoid redundant data transfer. For real-time monitoring, use WebSocket connections (covered in Chapter 5) instead of polling APIs repeatedly.
+        </div>
+
+        <div class="philosophy">
+            <div class="philosophy-text">弘益人間</div>
+            <p style="margin-top: 1rem; color: var(--text-dim);">Benefit All Humanity</p>
+            <p style="margin-top: 0.5rem; font-size: 0.95rem;">Well-designed APIs embody 弘益人間 by democratizing access to elder care technology. When APIs are simple, well-documented, and consistent, developers from small startups to large healthcare organizations can build innovative solutions that improve elder lives. Interoperability through standardized APIs prevents vendor lock-in, fostering competition that drives quality improvement and cost reduction while enabling elders and caregivers to choose best-of-breed solutions that meet their unique needs.</p>
+        </div>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li>The WIA-SENIOR-001 API follows REST architectural principles, treating resources (elders, vital signs, alerts, medications, activities) as first-class entities addressed by hierarchical URLs and manipulated through standard HTTP methods (GET, POST, PATCH, DELETE). This resource-oriented approach creates intuitive, discoverable APIs that map naturally to elder care domain concepts.</li>
+                <li>Authentication via OAuth 2.0/OpenID Connect for user applications and API keys for service integration, combined with role-based access control (RBAC) defining permissions for elders, family caregivers, healthcare providers, and emergency responders, ensures secure access to sensitive PHI while enabling appropriate information sharing. Granular consent management provides elder control over data access beyond coarse role-based permissions.</li>
+                <li>Core API endpoints for creating, retrieving, updating, and deleting elder profiles, recording and querying vital signs, managing alerts including resolution workflows, and tracking medications and activities provide comprehensive coverage of all elder care operations. Consistent patterns across endpoints reduce learning curves and enable generic client implementations.</li>
+                <li>Robust error handling using standard HTTP status codes (2xx success, 4xx client errors, 5xx server errors) with detailed error response bodies containing error codes, human-readable messages, and validation details enables graceful failure handling and appropriate user messaging. Consistent response formats across all endpoints simplify client implementation.</li>
+                <li>Pagination via limit/offset parameters with metadata indicating total counts and next page URLs, combined with filtering by date ranges and resource-specific criteria, enables efficient retrieval of large datasets. Performance optimization through field selection, caching with ETags, and real-time WebSocket connections for monitoring scenarios prevents unnecessary data transfer and server load.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain the key principles of REST architectural style and how they apply to the WIA-SENIOR-001 API design. Why is resource-oriented design particularly appropriate for elder care systems?</li>
+                <li>Compare and contrast the authentication mechanisms supported by WIA-SENIOR-001 (OAuth 2.0 vs API keys). When is each approach appropriate, and what security considerations apply to each?</li>
+                <li>Describe the role-based access control model defined in WIA-SENIOR-001. What permissions does each role (ELDER, FAMILY_CAREGIVER, HEALTHCARE_PROVIDER, EMERGENCY_RESPONDER) have, and why are these permission sets appropriate?</li>
+                <li>Why do APIs need robust error handling beyond simple success/failure indicators? How do detailed error responses with codes, messages, and validation details improve developer experience and application quality?</li>
+                <li>Explain the pagination strategy used in WIA-SENIOR-001 APIs. Why is pagination necessary for vital signs and activity endpoints, and how do limit/offset parameters with pagination metadata enable efficient data access?</li>
+                <li>How does the WIA-SENIOR-001 API design balance competing goals like security versus usability, simplicity versus expressiveness, and standardization versus flexibility? Give specific examples where the standard makes deliberate tradeoffs.</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 5 explores real-time communication capabilities through WebSocket protocols, event-driven architectures, and push notification systems that complement the request-response APIs examined in this chapter. Real-time monitoring and alerting require fundamentally different communication patterns than RESTful APIs provide.</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-03.html">← Previous Chapter</a>
+            <a href="chapter-05.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

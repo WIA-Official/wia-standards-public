@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 현재 과제와 문제점 | WIA-ROB-011 청소 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--cleaning-color:#06B6D4;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--cleaning-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--cleaning-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--cleaning-color);margin:40px 0 20px;border-bottom:2px solid var(--cleaning-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--cleaning-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--cleaning-color);text-decoration:none;padding:10px 20px;border:2px solid var(--cleaning-color);border-radius:5px}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--cleaning-color)}
+        strong{color:var(--cleaning-color)}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        code{font-family:monospace;color:#06B6D4}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--cleaning-color);margin:20px 0;font-size:18px}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--cleaning-color);padding:20px;margin:25px 0;border-radius:5px}
+        ul,ol{margin-left:30px;margin-top:15px}
+        li{margin:10px 0}
+        .warning-box{background:rgba(239, 68, 68, 0.1);border-left:4px solid #ef4444;padding:20px;margin:25px 0;border-radius:5px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제2장: 현재 과제와 문제점</h1>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) - 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>2.1 상호운용성 부재</h2>
+        <p>
+            현재 청소 로봇 시장의 가장 큰 문제는 제조사별로 독자적인 프로토콜과 데이터 형식을 사용한다는 것입니다.
+            이로 인해 다양한 제조사의 로봇을 하나의 시스템으로 통합하는 것이 사실상 불가능합니다.
+        </p>
+
+        <h3>2.1.1 비호환 데이터 형식</h3>
+        <p>
+            각 제조사는 고유한 데이터 구조를 사용하여 로봇 상태, 청소 이력, 지도 정보를 저장합니다.
+            이는 데이터 마이그레이션과 백업을 어렵게 만듭니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>제조사</th>
+                    <th>데이터 형식</th>
+                    <th>호환성</th>
+                    <th>개방성</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>제조사 A</td>
+                    <td>독자 바이너리</td>
+                    <td>폐쇄형</td>
+                    <td>없음</td>
+                </tr>
+                <tr>
+                    <td>제조사 B</td>
+                    <td>커스텀 JSON</td>
+                    <td>제한적</td>
+                    <td>부분 공개</td>
+                </tr>
+                <tr>
+                    <td>제조사 C</td>
+                    <td>XML 기반</td>
+                    <td>자체 생태계만</td>
+                    <td>없음</td>
+                </tr>
+                <tr>
+                    <td>제조사 D</td>
+                    <td>Protobuf</td>
+                    <td>제한적</td>
+                    <td>API만 공개</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="warning-box">
+            <strong>실제 사례:</strong> 사용자가 제조사 A의 청소기를 사용하다가 제조사 B의 모델로 교체할 경우,
+            이전에 저장된 모든 지도 데이터, 청소 기록, 금지 구역 설정 등을 완전히 잃게 됩니다.
+        </div>
+
+        <h3>2.1.2 API 인터페이스 파편화</h3>
+        <p>
+            스마트홈 시스템과 청소 로봇을 연동하려면 각 제조사마다 별도의 통합 작업이 필요합니다.
+            이는 개발 비용을 증가시키고 혁신을 저해합니다.
+        </p>
+
+        <pre><code>// 제조사별로 다른 API 호출 방식
+// 제조사 A
+vendorA.robot.start({ mode: 'auto', power: 'high' });
+
+// 제조사 B
+vendorB.vacuum.beginCleaning({
+  cleaningMode: 'AUTO',
+  suctionLevel: 3
+});
+
+// 제조사 C
+vendorC.device.execute('START_CLEAN', {
+  pattern: 'zigzag',
+  intensity: 'maximum'
+});
+
+// 모두 같은 작업을 수행하지만 완전히 다른 방식</code></pre>
+
+        <h2>2.2 스마트홈 통합의 어려움</h2>
+        <p>
+            청소 로봇을 스마트홈 생태계에 통합하는 것은 복잡하고 비용이 많이 드는 작업입니다.
+            각 스마트홈 플랫폼(Google Home, Amazon Alexa, Apple HomeKit 등)은 자체 표준을 요구합니다.
+        </p>
+
+        <h3>2.3.1 멀티 플랫폼 지원 부담</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>플랫폼</th>
+                    <th>개발 복잡도</th>
+                    <th>인증 비용</th>
+                    <th>유지보수 부담</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Google Home</td>
+                    <td>중간</td>
+                    <td>무료</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>Amazon Alexa</td>
+                    <td>중간</td>
+                    <td>무료</td>
+                    <td>중간</td>
+                </tr>
+                <tr>
+                    <td>Apple HomeKit</td>
+                    <td>높음</td>
+                    <td>높음</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td>Samsung SmartThings</td>
+                    <td>중간</td>
+                    <td>낮음</td>
+                    <td>중간</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2.3.2 제한된 기능 노출</h3>
+        <p>
+            스마트홈 플랫폼의 제약으로 인해 청소 로봇의 고급 기능(정밀 구역 청소, 청소 패턴 선택 등)을
+            제대로 활용할 수 없는 경우가 많습니다.
+        </p>
+
+        <div class="highlight-box">
+            <strong>기능 손실 예시:</strong>
+            <ul>
+                <li>로봇은 10가지 청소 모드를 지원하지만, 스마트홈 앱에서는 3가지만 선택 가능</li>
+                <li>정밀한 구역 지정 기능이 있지만, 음성 명령으로는 "거실 청소"만 가능</li>
+                <li>청소 이력과 통계를 확인할 수 없음</li>
+            </ul>
+        </div>
+
+        <h2>2.3 데이터 프라이버시 및 보안 우려</h2>
+        <p>
+            청소 로봇은 집안 구조, 생활 패턴 등 민감한 정보를 수집합니다.
+            통일된 보안 표준이 없어 데이터 유출 위험이 존재합니다.
+        </p>
+
+        <h3>2.3.1 수집되는 민감 정보</h3>
+        <ul>
+            <li><strong>공간 정보:</strong> 집안 구조, 가구 배치, 방 크기</li>
+            <li><strong>생활 패턴:</strong> 활동 시간, 주로 사용하는 공간</li>
+            <li><strong>개인 물품:</strong> 카메라가 촬영한 물건들</li>
+            <li><strong>네트워크 정보:</strong> Wi-Fi 설정, 연결된 기기 목록</li>
+        </ul>
+
+        <h3>2.3.2 보안 취약점</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>취약점 유형</th>
+                    <th>위험도</th>
+                    <th>잠재적 피해</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>약한 암호화</td>
+                    <td>높음</td>
+                    <td>데이터 가로채기</td>
+                </tr>
+                <tr>
+                    <td>인증 부재</td>
+                    <td>매우 높음</td>
+                    <td>무단 로봇 제어</td>
+                </tr>
+                <tr>
+                    <td>펌웨어 업데이트 취약점</td>
+                    <td>높음</td>
+                    <td>멀웨어 설치</td>
+                </tr>
+                <tr>
+                    <td>클라우드 보안 미흡</td>
+                    <td>중간</td>
+                    <td>개인정보 유출</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <pre><code>// 보안이 취약한 예시 (절대 사용 금지)
+// 평문 통신
+ws://robot.local:8080/control?cmd=start
+
+// 인증 없는 API
+fetch('http://192.168.1.100/clean', {
+  method: 'POST',
+  body: JSON.stringify({ room: 'bedroom' })
+});
+
+// 올바른 보안 구현
+wss://robot.local:8443/control
+Authorization: Bearer eyJhbGc...
+Content-Type: application/json
+{
+  "command": "start_cleaning",
+  "area": "bedroom",
+  "timestamp": "2025-12-29T10:00:00Z",
+  "signature": "sha256_hash..."
+}</code></pre>
+
+        <h2>2.4 소비자 관점의 문제점</h2>
+
+        <h3>2.4.1 벤더 종속성 (Vendor Lock-in)</h3>
+        <p>
+            한 제조사의 생태계에 투자하면, 다른 제조사로 전환하기 어렵습니다.
+            이는 소비자 선택권을 제한하고 가격 경쟁을 저해합니다.
+        </p>
+
+        <div class="warning-box">
+            <strong>실제 비용:</strong>
+            <ul>
+                <li>초기 투자: 청소 로봇 $500 + 전용 스테이션 $200</li>
+                <li>소모품: 연간 $120 (제조사 전용 필터, 브러시)</li>
+                <li>전환 비용: 새 생태계 재구축 $700 + 학습 곡선</li>
+                <li><strong>총 전환 장벽: $1,520 이상</strong></li>
+            </ul>
+        </div>
+
+        <h3>2.4.2 복잡한 사용자 경험</h3>
+        <p>
+            각 제조사마다 다른 앱, 인터페이스, 용어를 사용하여 사용자 혼란을 가중시킵니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>기능</th>
+                    <th>제조사 A</th>
+                    <th>제조사 B</th>
+                    <th>제조사 C</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>청소 시작</td>
+                    <td>"Clean"</td>
+                    <td>"Start"</td>
+                    <td>"Go"</td>
+                </tr>
+                <tr>
+                    <td>금지 구역</td>
+                    <td>"No-Go Zone"</td>
+                    <td>"Virtual Wall"</td>
+                    <td>"Barrier"</td>
+                </tr>
+                <tr>
+                    <td>특정 구역 청소</td>
+                    <td>"Zone Clean"</td>
+                    <td>"Room Select"</td>
+                    <td>"Area Mode"</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2.5 개발자 관점의 문제점</h2>
+
+        <h3>2.5.1 높은 진입 장벽</h3>
+        <p>
+            청소 로봇 앱이나 통합 서비스를 개발하려면 각 제조사의 SDK를 별도로 학습해야 합니다.
+            이는 개발 시간과 비용을 크게 증가시킵니다.
+        </p>
+
+        <pre><code>// 개발자가 지원해야 하는 다양한 SDK
+import VendorASDK from '@vendor-a/robot-sdk';
+import VendorBAPI from 'vendor-b-cleaning-api';
+import { VendorCClient } from 'vendor-c-smart-home';
+
+// 각각 다른 인증 방식
+const robotA = new VendorASDK({ apiKey: 'xxx', secret: 'yyy' });
+const robotB = new VendorBAPI({ token: 'zzz' });
+const robotC = new VendorCClient({ oauth: oauthConfig });
+
+// 같은 기능을 구현하기 위한 다른 코드
+await robotA.cleaning.start({ mode: 'auto' });
+await robotB.execute('CLEAN_START', { pattern: 'auto' });
+await robotC.sendCommand({ action: 'begin_cleaning' });</code></pre>
+
+        <h3>2.5.2 문서화 및 지원 부족</h3>
+        <p>
+            많은 제조사가 불완전하거나 오래된 API 문서를 제공합니다.
+            개발자 커뮤니티와 기술 지원도 부족한 경우가 많습니다.
+        </p>
+
+        <h2>2.6 산업 관점의 문제점</h2>
+
+        <h3>2.6.1 시장 파편화</h3>
+        <p>
+            표준 부재로 인해 시장이 제조사별로 분리되어 있습니다.
+            이는 규모의 경제를 달성하기 어렵게 만들고, 혁신 속도를 늦춥니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>영향 영역</th>
+                    <th>현재 상황</th>
+                    <th>표준화 시 개선 가능성</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>부품 호환성</td>
+                    <td>0-10%</td>
+                    <td>70-90%</td>
+                </tr>
+                <tr>
+                    <td>소프트웨어 재사용</td>
+                    <td>5-15%</td>
+                    <td>60-80%</td>
+                </tr>
+                <tr>
+                    <td>개발 비용</td>
+                    <td>기준점</td>
+                    <td>-40~60% 절감</td>
+                </tr>
+                <tr>
+                    <td>시장 출시 시간</td>
+                    <td>12-18개월</td>
+                    <td>6-9개월</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2.6.2 혁신 저해</h3>
+        <p>
+            각 제조사가 기본 인프라(통신 프로토콜, 데이터 형식 등)를 독자적으로 개발하는 데 자원을 낭비하고 있습니다.
+            표준이 있다면 이러한 자원을 실질적인 혁신(더 나은 청소 알고리즘, 새로운 기능 등)에 투자할 수 있습니다.
+        </p>
+
+        <h2>2.7 환경 및 지속가능성 문제</h2>
+
+        <h3>2.7.1 전자 폐기물 증가</h3>
+        <p>
+            벤더 종속성으로 인해 사용자는 소모품이나 부품 하나 때문에 전체 로봇을 교체하는 경우가 많습니다.
+            표준화된 부품과 인터페이스가 있다면 이를 크게 줄일 수 있습니다.
+        </p>
+
+        <div class="highlight-box">
+            <strong>환경 영향:</strong>
+            <ul>
+                <li>연간 약 500만 대의 청소 로봇이 조기 폐기됨</li>
+                <li>평균 사용 수명: 3-4년 (잠재적 수명 7-10년)</li>
+                <li>재활용률: 20% 미만</li>
+                <li>표준화로 예상 개선: 폐기물 40% 감소, 재활용률 60% 이상</li>
+            </ul>
+        </div>
+
+        <h2>2.8 표준화의 필요성</h2>
+        <p>
+            위에서 논의한 모든 문제는 통일된 산업 표준의 부재에서 비롯됩니다.
+            WIA-ROB-011 표준은 이러한 문제를 체계적으로 해결하기 위해 설계되었습니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>문제 영역</th>
+                    <th>현재 상태</th>
+                    <th>표준화 목표</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>상호운용성</td>
+                    <td>거의 없음</td>
+                    <td>완전 호환</td>
+                </tr>
+                <tr>
+                    <td>데이터 이동성</td>
+                    <td>불가능</td>
+                    <td>자유로운 이동</td>
+                </tr>
+                <tr>
+                    <td>보안 수준</td>
+                    <td>제조사마다 상이</td>
+                    <td>업계 최고 수준 보장</td>
+                </tr>
+                <tr>
+                    <td>개발 복잡도</td>
+                    <td>매우 높음</td>
+                    <td>단일 표준 학습</td>
+                </tr>
+                <tr>
+                    <td>소비자 선택권</td>
+                    <td>제한적</td>
+                    <td>자유로운 선택</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <h3>핵심 내용 요약</h3>
+            <ul>
+                <li>상호운용성 부재: 제조사별 독자 프로토콜로 통합 불가</li>
+                <li>스마트홈 통합 어려움: 멀티 플랫폼 지원 부담과 기능 제약</li>
+                <li>보안 우려: 통일된 보안 표준 부재로 데이터 유출 위험</li>
+                <li>벤더 종속성: 높은 전환 비용으로 소비자 선택권 제한</li>
+                <li>개발 복잡도: 각 제조사별 SDK 학습 필요</li>
+                <li>환경 문제: 조기 폐기로 인한 전자 폐기물 증가</li>
+                <li>표준화 필요성: 통일된 표준으로 모든 문제 해결 가능</li>
+            </ul>
+        </div>
+
+        <div class="highlight-box">
+            <h3>복습 질문</h3>
+            <ol>
+                <li>청소 로봇 시장에서 상호운용성이 없을 때 발생하는 주요 문제점은 무엇인가요?</li>
+                <li>벤더 종속성(Vendor Lock-in)의 경제적 영향을 설명하세요.</li>
+                <li>청소 로봇이 수집하는 민감한 정보에는 어떤 것들이 있나요?</li>
+                <li>개발자가 다중 제조사를 지원할 때 직면하는 주요 어려움은?</li>
+                <li>표준화가 환경에 미칠 수 있는 긍정적 영향을 설명하세요.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

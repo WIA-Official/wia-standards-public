@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4 - Transformers | WIA-AI-023</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 40px 20px;
+        }
+        .container { max-width: 850px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 50px; padding-bottom: 30px; border-bottom: 2px solid var(--border); }
+        .chapter-num { color: var(--primary); font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+        h1 { font-size: 2.5rem; margin-bottom: 15px; color: var(--text); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 40px 0 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        h3 { color: var(--text); font-size: 1.4rem; margin: 30px 0 15px; }
+        p { margin: 15px 0; color: var(--text-muted); font-size: 1.05rem; }
+        .highlight { background: var(--bg-card); border-left: 4px solid var(--primary); padding: 20px; margin: 25px 0; border-radius: 8px; }
+        code { background: var(--bg-card); padding: 3px 8px; border-radius: 4px; font-family: 'Courier New', monospace; color: var(--primary); }
+        pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; color: var(--text); }
+        ul, ol { margin: 15px 0; padding-left: 30px; }
+        li { margin: 10px 0; color: var(--text-muted); }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--bg-card); color: var(--primary); font-weight: 600; }
+        .summary { background: var(--bg-card); border: 2px solid var(--primary); border-radius: 12px; padding: 30px; margin: 40px 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        .review { background: var(--bg-card); border-radius: 12px; padding: 30px; margin: 40px 0; }
+        .review h2 { border: none; margin-top: 0; }
+        footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 2px solid var(--border); }
+        .philosophy { color: var(--primary); font-size: 1.2rem; margin-bottom: 15px; font-weight: 600; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-btn { padding: 12px 24px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; transition: all 0.3s; }
+        .nav-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-num">CHAPTER 4</div>
+            <h1>Transformers and Attention Mechanisms</h1>
+        </div>
+
+        <h2>4.1 The Transformer Revolution</h2>
+        <p>
+            The transformer architecture, introduced in "Attention is All You Need" (Vaswani et al., 2017), fundamentally changed NLP. By replacing recurrent and convolutional layers with attention mechanisms, transformers enabled parallel processing, captured long-range dependencies more effectively, and achieved state-of-the-art results across virtually all NLP tasks.
+        </p>
+        <p>
+            Before transformers, RNNs and LSTMs dominated sequence processing. However, they suffered from sequential computation bottlenecks, gradient vanishing/exploding problems, and difficulty capturing long-range dependencies. Transformers solved these issues through self-attention and positional encoding.
+        </p>
+
+        <div class="highlight">
+            <h3>Key Innovations in Transformers</h3>
+            <ul>
+                <li><strong>Self-Attention:</strong> Weighting input elements based on relevance</li>
+                <li><strong>Parallel Processing:</strong> No sequential dependencies like RNNs</li>
+                <li><strong>Positional Encoding:</strong> Incorporating sequence order information</li>
+                <li><strong>Multi-Head Attention:</strong> Learning multiple representation subspaces</li>
+                <li><strong>Layer Normalization:</strong> Stabilizing training of deep networks</li>
+            </ul>
+        </div>
+
+        <h2>4.2 Attention Mechanism Basics</h2>
+        <p>
+            Attention mechanisms allow models to focus on relevant parts of the input when producing outputs. Instead of encoding entire sequences into fixed-size vectors, attention computes weighted combinations of all input elements dynamically.
+        </p>
+
+        <h3>Attention Formula</h3>
+        <p>
+            The core attention mechanism computes scores between queries (Q), keys (K), and values (V):
+        </p>
+
+        <pre><code>Attention(Q, K, V) = softmax(QK^T / sqrt(d_k)) * V
+
+Where:
+- Q (Query): What we're looking for
+- K (Key): What we're comparing against
+- V (Value): The actual content to retrieve
+- d_k: Dimension of key vectors (for scaling)</code></pre>
+
+        <h3>Scaled Dot-Product Attention Implementation</h3>
+        <pre><code>import torch
+import torch.nn as nn
+import math
+
+def scaled_dot_product_attention(query, key, value, mask=None):
+    """
+    Compute scaled dot-product attention
+
+    Args:
+        query: (batch, heads, seq_len, d_k)
+        key: (batch, heads, seq_len, d_k)
+        value: (batch, heads, seq_len, d_v)
+        mask: Optional mask for padding/future tokens
+    """
+    d_k = query.size(-1)
+
+    # Compute attention scores
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+
+    # Apply mask if provided
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, -1e9)
+
+    # Apply softmax
+    attention_weights = torch.softmax(scores, dim=-1)
+
+    # Apply attention to values
+    output = torch.matmul(attention_weights, value)
+
+    return output, attention_weights</code></pre>
+
+        <h2>4.3 Multi-Head Attention</h2>
+        <p>
+            Multi-head attention runs multiple attention mechanisms in parallel, each learning different aspects of relationships between words. This allows the model to attend to information from different representation subspaces simultaneously.
+        </p>
+
+        <pre><code>class MultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super().__init__()
+        assert d_model % num_heads == 0
+
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+
+        # Linear layers for Q, K, V
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, d_model)
+        self.W_v = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_model)
+
+    def forward(self, query, key, value, mask=None):
+        batch_size = query.size(0)
+
+        # Linear projections and split into heads
+        Q = self.W_q(query).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+        K = self.W_k(key).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+        V = self.W_v(value).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+
+        # Apply attention
+        x, attention = scaled_dot_product_attention(Q, K, V, mask)
+
+        # Concatenate heads
+        x = x.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
+
+        # Final linear projection
+        return self.W_o(x)</code></pre>
+
+        <h2>4.4 Positional Encoding</h2>
+        <p>
+            Since transformers process all positions in parallel, they need explicit positional information. Positional encoding adds position-dependent patterns to input embeddings, allowing the model to utilize sequence order.
+        </p>
+
+        <pre><code>class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super().__init__()
+
+        # Create positional encoding matrix
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1).float()
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() *
+                           -(math.log(10000.0) / d_model))
+
+        # Apply sine to even indices
+        pe[:, 0::2] = torch.sin(position * div_term)
+        # Apply cosine to odd indices
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        # Add positional encoding to input
+        return x + self.pe[:, :x.size(1)]</code></pre>
+
+        <h2>4.5 Transformer Encoder Architecture</h2>
+        <p>
+            The transformer encoder consists of stacked layers, each containing multi-head attention followed by a position-wise feedforward network, with residual connections and layer normalization.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Purpose</th>
+                    <th>Key Parameters</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Input Embedding</td>
+                    <td>Convert tokens to vectors</td>
+                    <td>vocab_size, d_model</td>
+                </tr>
+                <tr>
+                    <td>Positional Encoding</td>
+                    <td>Add position information</td>
+                    <td>max_len, d_model</td>
+                </tr>
+                <tr>
+                    <td>Multi-Head Attention</td>
+                    <td>Attend to all positions</td>
+                    <td>num_heads, d_k, d_v</td>
+                </tr>
+                <tr>
+                    <td>Feedforward Network</td>
+                    <td>Position-wise transformation</td>
+                    <td>d_ff (typically 4*d_model)</td>
+                </tr>
+                <tr>
+                    <td>Layer Normalization</td>
+                    <td>Stabilize training</td>
+                    <td>epsilon</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.6 Transformer Decoder Architecture</h2>
+        <p>
+            The decoder includes an additional masked multi-head attention layer to prevent attending to future tokens, plus encoder-decoder attention to focus on relevant parts of the input sequence.
+        </p>
+
+        <h3>Masked Self-Attention</h3>
+        <p>
+            During training, the decoder must not see future tokens. Masked attention applies a triangular mask ensuring position i can only attend to positions ≤ i.
+        </p>
+
+        <pre><code>def create_causal_mask(seq_len):
+    """Create mask for causal (autoregressive) attention"""
+    mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+    return ~mask  # Invert: True means attend, False means mask
+
+# Example usage
+seq_len = 5
+mask = create_causal_mask(seq_len)
+print(mask)
+# Output:
+# tensor([[ True, False, False, False, False],
+#         [ True,  True, False, False, False],
+#         [ True,  True,  True, False, False],
+#         [ True,  True,  True,  True, False],
+#         [ True,  True,  True,  True,  True]])</code></pre>
+
+        <h2>4.7 BERT: Bidirectional Encoder Representations</h2>
+        <p>
+            BERT uses only the transformer encoder with bidirectional context. Pre-trained on masked language modeling and next sentence prediction, BERT learns deep bidirectional representations that transfer well to downstream tasks.
+        </p>
+
+        <div class="highlight">
+            <h3>BERT Pre-training Tasks</h3>
+            <ul>
+                <li><strong>Masked Language Modeling (MLM):</strong> Predict randomly masked tokens</li>
+                <li><strong>Next Sentence Prediction (NSP):</strong> Determine if two sentences are consecutive</li>
+            </ul>
+        </div>
+
+        <pre><code>from transformers import BertTokenizer, BertModel
+
+# Load pre-trained BERT
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertModel.from_pretrained('bert-base-uncased')
+
+# Encode text
+text = "Natural language processing with transformers"
+inputs = tokenizer(text, return_tensors='pt', padding=True)
+
+# Get embeddings
+outputs = model(**inputs)
+last_hidden_states = outputs.last_hidden_state
+pooled_output = outputs.pooler_output
+
+print(f"Last hidden state shape: {last_hidden_states.shape}")
+print(f"Pooled output shape: {pooled_output.shape}")</code></pre>
+
+        <h2>4.8 GPT: Generative Pre-trained Transformer</h2>
+        <p>
+            GPT uses the transformer decoder for autoregressive language modeling. Trained to predict the next token given previous tokens, GPT excels at text generation and few-shot learning.
+        </p>
+
+        <h3>GPT vs BERT</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>BERT</th>
+                    <th>GPT</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Architecture</td>
+                    <td>Encoder only</td>
+                    <td>Decoder only</td>
+                </tr>
+                <tr>
+                    <td>Attention</td>
+                    <td>Bidirectional</td>
+                    <td>Unidirectional (causal)</td>
+                </tr>
+                <tr>
+                    <td>Primary Use</td>
+                    <td>Understanding tasks</td>
+                    <td>Generation tasks</td>
+                </tr>
+                <tr>
+                    <td>Pre-training</td>
+                    <td>MLM + NSP</td>
+                    <td>Next token prediction</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.9 Transformer Variants</h2>
+        <p>
+            Since the original transformer, numerous variants have been developed to improve efficiency, performance, or specialize for specific tasks.
+        </p>
+
+        <h3>Notable Transformer Variants</h3>
+        <ul>
+            <li><strong>RoBERTa:</strong> Robustly optimized BERT with improved training</li>
+            <li><strong>ALBERT:</strong> Parameter-efficient BERT variant</li>
+            <li><strong>T5:</strong> Text-to-text transformer for unified task handling</li>
+            <li><strong>XLNet:</strong> Permutation-based language modeling</li>
+            <li><strong>Longformer:</strong> Efficient attention for long documents</li>
+            <li><strong>ELECTRA:</strong> Replaced token detection instead of MLM</li>
+        </ul>
+
+        <h2>4.10 WIA-AI-023 Transformer Standard</h2>
+        <p>
+            The WIA-AI-023 standard defines transformer model interfaces, ensuring interoperability and consistent behavior across implementations.
+        </p>
+
+        <pre><code>{
+  "standard": "WIA-AI-023",
+  "version": "1.0",
+  "transformer_spec": {
+    "model": {
+      "type": "encoder",
+      "architecture": "transformer",
+      "num_layers": 12,
+      "hidden_size": 768,
+      "num_attention_heads": 12,
+      "intermediate_size": 3072,
+      "max_position_embeddings": 512,
+      "vocab_size": 30522
+    },
+    "input": {
+      "text": "WIA-AI-023 standardizes NLP systems",
+      "token_ids": [101, 17953, 1011, 9932, 1011, 6185, 2509, 2629, 17953, 3343, 2361, 102],
+      "attention_mask": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "output": {
+      "last_hidden_state": "shape: [1, 12, 768]",
+      "pooler_output": "shape: [1, 768]",
+      "attention_weights": "shape: [1, 12, 12, 12]"
+    }
+  }
+}</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <p><strong>Key Takeaways:</strong></p>
+            <ul>
+                <li>Transformers revolutionized NLP through self-attention and parallel processing</li>
+                <li>Scaled dot-product attention weights input elements based on relevance</li>
+                <li>Multi-head attention learns multiple representation subspaces simultaneously</li>
+                <li>Positional encoding provides sequence order information to transformers</li>
+                <li>Encoder architecture (BERT) excels at understanding tasks with bidirectional context</li>
+                <li>Decoder architecture (GPT) excels at generation with causal attention</li>
+                <li>Numerous transformer variants optimize for efficiency, performance, or specific use cases</li>
+                <li>WIA-AI-023 standard ensures transformer interoperability across systems</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain how self-attention differs from RNN sequential processing.</li>
+                <li>Why is scaling applied in the dot-product attention formula?</li>
+                <li>How does multi-head attention improve upon single-head attention?</li>
+                <li>What problem does positional encoding solve in transformers?</li>
+                <li>Compare BERT and GPT architectures. What are their primary use cases?</li>
+                <li>Why is masked attention necessary in transformer decoders?</li>
+            </ol>
+        </div>
+
+        <div class="highlight">
+            <h3>Looking Ahead</h3>
+            <p>
+                In Chapter 5, we'll explore named entity recognition (NER) and part-of-speech (POS) tagging—fundamental sequence labeling tasks that identify and classify words in context. You'll learn about different NER approaches and how transformers achieve state-of-the-art performance.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

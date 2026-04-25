@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 06: 성능 최적화 - WIA-DATA_WAREHOUSE</title>
+    <style>:root{--primary:#6366f1;--primary-dark:#4f46e5;--primary-light:#818cf8;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--dark:#1e293b;--light:#f8fafc;--border:#e2e8f0;--text:#334155;--text-light:#64748b}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.6;color:var(--text);background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,.2)}.header p{font-size:1.2em;opacity:.95}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:var(--primary);margin:25px 0 15px}.content p{margin:15px 0;text-align:justify}.content ul,.content ol{margin:15px 0 15px 30px}.content li{margin:8px 0}.info-box{background:linear-gradient(135deg,#e0e7ff,#e0f2fe);border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:linear-gradient(135deg,#fef3c7,#fed7aa);border-left:5px solid var(--warning);padding:20px;margin:25px 0;border-radius:8px}.success-box{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-left:5px solid var(--success);padding:20px;margin:25px 0;border-radius:8px}.code-block{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border-left:4px solid var(--primary)}.code-block code{font-family:"Courier New",monospace;font-size:.9em;line-height:1.5}table{width:100%;border-collapse:collapse;margin:20px 0;box-shadow:0 2px 8px rgba(0,0,0,.1)}table th{background:var(--primary);color:white;padding:15px;text-align:left;font-weight:600}table td{padding:12px 15px;border-bottom:1px solid var(--border)}table tr:hover{background:var(--light)}.review-section{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--warning)}.review-section h3{color:#92400e;margin-bottom:20px}.review-section ol{margin-left:25px}.review-section li{margin:12px 0;color:#78350f}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px;border:2px solid var(--success)}.key-takeaways h3{color:#065f46;margin-bottom:20px}.key-takeaways ul{margin-left:25px}.key-takeaways li{margin:12px 0;color:#064e3b}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid var(--border)}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;transition:all .3s;display:inline-block}.nav-button:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 12px rgba(99,102,241,.4)}.footer{background:var(--dark);color:white;text-align:center;padding:30px;font-size:.9em}.footer p{margin:5px 0}.diagram{background:white;border:2px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;text-align:center}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ Chapter 06</h1>
+            <p>성능 최적화: 데이터 웨어하우스를 10배 빠르게</p>
+        </div>
+
+        <div class="content">
+            <h2>1. 인덱싱 전략</h2>
+            <p>
+                인덱스는 데이터베이스 성능의 핵심입니다. 하지만 DW에서는 OLTP와 <strong>다른 전략</strong>이 필요합니다.
+            </p>
+
+            <h3>1.1 OLTP vs DW 인덱싱</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>항목</th>
+                        <th>OLTP</th>
+                        <th>Data Warehouse</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>인덱스 수</strong></td>
+                        <td>많음 (5-10개/테이블)</td>
+                        <td>적음 (1-3개/테이블)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>인덱스 타입</strong></td>
+                        <td>B-Tree (기본)</td>
+                        <td>Bitmap, Columnstore</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쿼리 패턴</strong></td>
+                        <td>WHERE id = 123 (단일 행)</td>
+                        <td>WHERE year = 2024 (수백만 행)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쓰기 빈도</strong></td>
+                        <td>높음 (초당 수천건)</td>
+                        <td>낮음 (배치 적재)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>인덱스 유지보수</strong></td>
+                        <td>부담 (INSERT/UPDATE마다)</td>
+                        <td>배치 처리 시만</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>1.2 B-Tree Index (전통적 인덱스)</h3>
+            <p>
+                OLTP의 표준이지만, DW에서는 <strong>고카디널리티 컬럼</strong>에만 사용합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- B-Tree Index: Primary Key, Foreign Key에 적합
+CREATE INDEX idx_sales_customer
+ON fact_sales(customer_key);  -- 수백만 개의 고유값
+
+CREATE INDEX idx_sales_product
+ON fact_sales(product_key);   -- 수만 개의 고유값
+
+-- 사용 예시:
+EXPLAIN ANALYZE
+SELECT *
+FROM fact_sales
+WHERE customer_key = 12345;  -- Index Seek (빠름!)
+
+-- 실행 계획:
+-- Index Seek (idx_sales_customer)
+-- Rows: 50, Cost: 0.003 (매우 빠름)</code>
+            </div>
+
+            <h3>1.3 Bitmap Index (저카디널리티 최적화)</h3>
+            <p>
+                <strong>저카디널리티 컬럼</strong> (성별, 지역, 상태 등)에 최적화된 인덱스입니다.
+                Oracle, PostgreSQL, Snowflake 등이 지원합니다.
+            </p>
+
+            <div class="info-box">
+                <h3>🎯 Bitmap Index 원리</h3>
+                <p>각 고유값마다 비트맵을 생성합니다. 예: gender 컬럼 (M/F/Other)</p>
+                <pre style="font-family:monospace;background:rgba(255,255,255,0.5);padding:10px;border-radius:4px;">
+row_id | gender
+   1   |   M       →  Bitmap for 'M':     1 0 1 0 1 0 0
+   2   |   F       →  Bitmap for 'F':     0 1 0 1 0 1 0
+   3   |   M       →  Bitmap for 'Other': 0 0 0 0 0 0 1
+   4   |   F
+   5   |   M
+   6   |   F
+   7   |   Other
+
+쿼리: WHERE gender = 'M' AND region = 'Seoul'
+→ Bitmap AND 연산 (초고속!)
+                </pre>
+            </div>
+
+            <div class="code-block">
+<code>-- Bitmap Index 생성 (Oracle)
+CREATE BITMAP INDEX idx_sales_quarter
+ON fact_sales(quarter);  -- 4가지 값만 (Q1, Q2, Q3, Q4)
+
+CREATE BITMAP INDEX idx_sales_region
+ON fact_sales(region);   -- 10개 지역
+
+CREATE BITMAP INDEX idx_sales_category
+ON fact_sales(product_category);  -- 20개 카테고리
+
+-- 복합 조건 쿼리 (Bitmap의 강점!)
+SELECT
+    SUM(total_amount)
+FROM fact_sales
+WHERE quarter = 'Q1'
+  AND region = 'Seoul'
+  AND product_category = 'Electronics';
+
+-- Bitmap AND 연산으로 초고속 처리!
+-- B-Tree보다 100배 빠름</code>
+            </div>
+
+            <div class="warning-box">
+                <h3>⚠️ Bitmap Index 주의사항</h3>
+                <ul>
+                    <li><strong>OLTP에는 부적합</strong>: UPDATE/INSERT 시 전체 비트맵 재계산</li>
+                    <li><strong>저카디널리티 전용</strong>: 고유값이 많으면 (수만 개 이상) 오히려 느림</li>
+                    <li><strong>Lock 문제</strong>: 한 행 수정 시 전체 비트맵 Lock (DW는 배치라 괜찮음)</li>
+                </ul>
+            </div>
+
+            <h3>1.4 Covering Index (포함 인덱스)</h3>
+            <p>
+                쿼리에 필요한 <strong>모든 컬럼을 인덱스에 포함</strong>하여 테이블 접근을 제거합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- 자주 실행되는 쿼리
+SELECT
+    customer_key,
+    product_key,
+    total_amount
+FROM fact_sales
+WHERE date_key BETWEEN 20240101 AND 20241231;
+
+-- 일반 인덱스 (비효율적)
+CREATE INDEX idx_date ON fact_sales(date_key);
+-- 실행: Index Seek (date_key) → Table Lookup (customer_key, product_key, total_amount)
+-- 테이블 접근 필요 → 느림
+
+-- Covering Index (효율적!)
+CREATE INDEX idx_date_covering
+ON fact_sales(date_key)
+INCLUDE (customer_key, product_key, total_amount);
+-- 실행: Index Seek → 끝! (테이블 접근 불필요)
+-- 10배 빠름!</code>
+            </div>
+
+            <h2>2. 파티셔닝 (Partitioning)</h2>
+            <p>
+                파티셔닝은 대용량 테이블을 <strong>물리적으로 분할</strong>하여 쿼리 성능과 관리성을 높입니다.
+                DW에서 가장 중요한 최적화 기법입니다.
+            </p>
+
+            <h3>2.1 Range Partitioning (범위 파티셔닝)</h3>
+            <p>
+                가장 일반적인 방식으로, <strong>날짜</strong>나 숫자 범위로 분할합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- PostgreSQL Range Partitioning by Date
+CREATE TABLE fact_sales (
+    sale_key BIGINT,
+    sale_date DATE NOT NULL,
+    customer_key INT,
+    product_key INT,
+    total_amount DECIMAL(10,2)
+) PARTITION BY RANGE (sale_date);
+
+-- 월별 파티션 생성
+CREATE TABLE fact_sales_2024_01 PARTITION OF fact_sales
+    FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+CREATE TABLE fact_sales_2024_02 PARTITION OF fact_sales
+    FOR VALUES FROM ('2024-02-01') TO ('2024-03-01');
+
+CREATE TABLE fact_sales_2024_03 PARTITION OF fact_sales
+    FOR VALUES FROM ('2024-03-01') TO ('2024-04-01');
+
+-- ... 12개월치 파티션
+
+-- 쿼리 (Partition Pruning 발생!)
+SELECT SUM(total_amount)
+FROM fact_sales
+WHERE sale_date BETWEEN '2024-03-01' AND '2024-03-31';
+
+-- 실행 계획:
+-- Seq Scan on fact_sales_2024_03  ← 1개 파티션만 스캔!
+-- (나머지 11개 파티션은 무시)
+-- 성능: 12배 향상!</code>
+            </div>
+
+            <h3>2.2 Hash Partitioning (해시 파티셔닝)</h3>
+            <p>
+                컬럼 값을 해시하여 균등 분산합니다. <strong>병렬 처리</strong>에 유리합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- Hash Partitioning by customer_key
+CREATE TABLE fact_sales (
+    sale_key BIGINT,
+    sale_date DATE,
+    customer_key INT NOT NULL,
+    total_amount DECIMAL(10,2)
+) PARTITION BY HASH (customer_key);
+
+-- 4개 파티션으로 분산
+CREATE TABLE fact_sales_p0 PARTITION OF fact_sales
+    FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+
+CREATE TABLE fact_sales_p1 PARTITION OF fact_sales
+    FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+
+CREATE TABLE fact_sales_p2 PARTITION OF fact_sales
+    FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+
+CREATE TABLE fact_sales_p3 PARTITION OF fact_sales
+    FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+
+-- 장점: 4개 CPU 코어로 병렬 처리!
+-- 집계 쿼리가 4배 빠름</code>
+            </div>
+
+            <h3>2.3 List Partitioning (목록 파티셔닝)</h3>
+            <p>
+                특정 값 목록으로 분할합니다. <strong>지역</strong>이나 <strong>카테고리</strong>별 분할에 적합합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- List Partitioning by Region
+CREATE TABLE fact_sales (
+    sale_key BIGINT,
+    region VARCHAR(50) NOT NULL,
+    total_amount DECIMAL(10,2)
+) PARTITION BY LIST (region);
+
+-- 지역별 파티션
+CREATE TABLE fact_sales_apac PARTITION OF fact_sales
+    FOR VALUES IN ('Korea', 'Japan', 'China', 'Singapore');
+
+CREATE TABLE fact_sales_emea PARTITION OF fact_sales
+    FOR VALUES IN ('UK', 'Germany', 'France', 'UAE');
+
+CREATE TABLE fact_sales_americas PARTITION OF fact_sales
+    FOR VALUES IN ('USA', 'Canada', 'Brazil', 'Mexico');
+
+-- 쿼리: 한국 매출만
+SELECT SUM(total_amount)
+FROM fact_sales
+WHERE region = 'Korea';
+-- Seq Scan on fact_sales_apac만 (EMEA, Americas는 스킵!)</code>
+            </div>
+
+            <h3>2.4 파티셔닝의 이점</h3>
+            <div class="success-box">
+                <h3>✅ 파티셔닝 효과</h3>
+                <ul>
+                    <li><strong>Partition Pruning</strong>: 불필요한 파티션 스캔 제거 → 10-100배 빠름</li>
+                    <li><strong>병렬 처리</strong>: 각 파티션을 별도 스레드로 처리</li>
+                    <li><strong>빠른 데이터 삭제</strong>: DROP PARTITION (DELETE보다 1000배 빠름)</li>
+                    <li><strong>관리 용이성</strong>: 오래된 데이터만 아카이브</li>
+                    <li><strong>인덱스 크기 감소</strong>: 각 파티션의 인덱스가 작음</li>
+                </ul>
+            </div>
+
+            <div class="code-block">
+<code>-- 전통적 삭제 (매우 느림)
+DELETE FROM fact_sales
+WHERE sale_date < '2020-01-01';
+-- 10억 행 스캔 → 30분 소요
+
+-- 파티션 삭제 (초고속!)
+DROP TABLE fact_sales_2019_12;
+DROP TABLE fact_sales_2019_11;
+-- ... 2019년 12개월 파티션 삭제
+-- 12초 소요! (150배 빠름)</code>
+            </div>
+
+            <h2>3. Columnar Storage (컬럼 저장소)</h2>
+            <p>
+                전통적인 행 기반 저장소 대신 <strong>컬럼 단위로 저장</strong>하는 방식입니다.
+                분석 쿼리(OLAP)에서 혁명적인 성능을 제공합니다.
+            </p>
+
+            <h3>3.1 Row vs Column Storage</h3>
+            <div class="diagram">
+                <pre style="font-family:monospace;font-size:0.75em;text-align:left;">
+원본 테이블:
+id | name  | age | city    | salary
+1  | Alice | 30  | Seoul   | 50000
+2  | Bob   | 25  | Busan   | 45000
+3  | Carol | 35  | Seoul   | 60000
+
+── Row-Based Storage (OLTP 최적) ──────────────────
+디스크 블록 1: [1, Alice, 30, Seoul, 50000]
+디스크 블록 2: [2, Bob, 25, Busan, 45000]
+디스크 블록 3: [3, Carol, 35, Seoul, 60000]
+
+쿼리: SELECT AVG(salary) FROM employees;
+→ 모든 블록 읽기 (name, age, city도 불필요하게 읽음)
+
+── Column-Based Storage (OLAP 최적) ───────────────
+디스크 블록 1: [1, 2, 3]                 (id 컬럼)
+디스크 블록 2: [Alice, Bob, Carol]       (name 컬럼)
+디스크 블록 3: [30, 25, 35]              (age 컬럼)
+디스크 블록 4: [Seoul, Busan, Seoul]     (city 컬럼)
+디스크 블록 5: [50000, 45000, 60000]     (salary 컬럼)
+
+쿼리: SELECT AVG(salary) FROM employees;
+→ 블록 5만 읽기! (80% I/O 감소)
+                </pre>
+            </div>
+
+            <h3>3.2 Columnar Storage의 압축</h3>
+            <p>
+                같은 타입의 데이터가 연속되어 <strong>압축률이 극대화</strong>됩니다.
+            </p>
+
+            <div class="code-block">
+<code>-- 예시: city 컬럼
+-- Row Storage: [Seoul, Busan, Seoul, Seoul, Seoul, Busan, Seoul...]
+-- 압축 어려움 (다른 컬럼들과 섞여 있음)
+
+-- Column Storage: [Seoul, Busan, Seoul, Seoul, Seoul, Busan, Seoul...]
+-- Run-Length Encoding (RLE):
+-- Seoul:1, Busan:1, Seoul:3, Busan:1, Seoul:1
+-- → 70% 압축!
+
+-- 실제 압축률:
+-- Row Storage:    100GB
+-- Column Storage: 10GB (10:1 압축!)</code>
+            </div>
+
+            <h3>3.3 주요 Columnar DB</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>DB</th>
+                        <th>저장 방식</th>
+                        <th>압축률</th>
+                        <th>사용 사례</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Snowflake</strong></td>
+                        <td>Micro-partitions (Columnar)</td>
+                        <td>10:1</td>
+                        <td>클라우드 DW</td>
+                    </tr>
+                    <tr>
+                        <td><strong>BigQuery</strong></td>
+                        <td>Capacitor (Columnar)</td>
+                        <td>8:1</td>
+                        <td>구글 생태계</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Redshift</strong></td>
+                        <td>Columnar (AZ64)</td>
+                        <td>5:1</td>
+                        <td>AWS 생태계</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ClickHouse</strong></td>
+                        <td>MergeTree (Columnar)</td>
+                        <td>10:1</td>
+                        <td>실시간 분석</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Parquet</strong></td>
+                        <td>Apache Parquet (Columnar)</td>
+                        <td>7:1</td>
+                        <td>데이터 레이크</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>3.4 Columnstore Index (SQL Server)</h3>
+            <div class="code-block">
+<code>-- SQL Server Columnstore Index 생성
+CREATE CLUSTERED COLUMNSTORE INDEX cci_fact_sales
+ON fact_sales;
+
+-- 일반 테이블과 비교:
+-- 일반 B-Tree Index:  100GB, 쿼리 30초
+-- Columnstore Index:  10GB,  쿼리 0.5초
+-- → 60배 빠르고, 10배 적은 공간!</code>
+            </div>
+
+            <h2>4. Materialized Views (물리적 뷰)</h2>
+            <p>
+                쿼리 결과를 <strong>물리적으로 저장</strong>하여 복잡한 쿼리를 즉시 반환합니다.
+            </p>
+
+            <div class="code-block">
+<code>-- 일반 View (매번 재계산)
+CREATE VIEW v_monthly_sales AS
+SELECT
+    DATE_TRUNC('month', sale_date) AS month,
+    region,
+    SUM(total_amount) AS total_sales
+FROM fact_sales
+GROUP BY month, region;
+
+-- 쿼리 시마다 10억 행 집계 → 30초 소요
+
+-- Materialized View (결과 저장)
+CREATE MATERIALIZED VIEW mv_monthly_sales AS
+SELECT
+    DATE_TRUNC('month', sale_date) AS month,
+    region,
+    SUM(total_amount) AS total_sales
+FROM fact_sales
+GROUP BY month, region;
+
+-- 결과가 미리 계산되어 저장됨 → 0.1초 반환!
+
+-- 갱신 (증분 또는 전체)
+REFRESH MATERIALIZED VIEW mv_monthly_sales;
+
+-- PostgreSQL 동시 갱신 (서비스 중단 없음)
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_sales;</code>
+            </div>
+
+            <h3>4.1 Incremental Refresh (증분 갱신)</h3>
+            <div class="code-block">
+<code>-- Oracle Materialized View with Incremental Refresh
+CREATE MATERIALIZED VIEW mv_daily_sales
+BUILD IMMEDIATE
+REFRESH FAST ON COMMIT  -- 원본 테이블 변경 시 자동 갱신
+AS
+SELECT
+    sale_date,
+    product_key,
+    SUM(total_amount) AS total_sales,
+    COUNT(*) AS order_count
+FROM fact_sales
+GROUP BY sale_date, product_key;
+
+-- Materialized View Log (변경 추적)
+CREATE MATERIALIZED VIEW LOG ON fact_sales
+WITH ROWID, SEQUENCE (sale_date, product_key, total_amount)
+INCLUDING NEW VALUES;
+
+-- 이제 새 데이터만 갱신 → 100배 빠름!</code>
+            </div>
+
+            <h2>5. Query 최적화 기법</h2>
+
+            <h3>5.1 WHERE 절 최적화</h3>
+            <div class="code-block">
+<code>-- ❌ 나쁜 예: 함수 사용 (인덱스 무효화)
+SELECT * FROM fact_sales
+WHERE YEAR(sale_date) = 2024;
+-- → Full Table Scan (인덱스 사용 불가)
+
+-- ✅ 좋은 예: 컬럼 직접 비교
+SELECT * FROM fact_sales
+WHERE sale_date BETWEEN '2024-01-01' AND '2024-12-31';
+-- → Index Seek (인덱스 사용!)
+
+-- ❌ 나쁜 예: OR 조건
+SELECT * FROM fact_sales
+WHERE customer_key = 123 OR customer_key = 456 OR customer_key = 789;
+-- → 3번의 Index Seek
+
+-- ✅ 좋은 예: IN 절
+SELECT * FROM fact_sales
+WHERE customer_key IN (123, 456, 789);
+-- → 1번의 Index Seek (최적화됨)</code>
+            </div>
+
+            <h3>5.2 JOIN 최적화</h3>
+            <div class="code-block">
+<code>-- ❌ 나쁜 예: SELECT *
+SELECT *
+FROM fact_sales f
+JOIN dim_customer c ON f.customer_key = c.customer_key
+JOIN dim_product p ON f.product_key = p.product_key;
+-- 100개 컬럼 전송 → 네트워크 과부하
+
+-- ✅ 좋은 예: 필요한 컬럼만
+SELECT
+    f.sale_date,
+    c.customer_name,
+    p.product_name,
+    f.total_amount
+FROM fact_sales f
+JOIN dim_customer c ON f.customer_key = c.customer_key
+JOIN dim_product p ON f.product_key = p.product_key;
+-- 4개 컬럼만 → 10배 빠름
+
+-- ❌ 나쁜 예: 큰 테이블 먼저 조인
+SELECT ...
+FROM dim_product p  -- 10만 행
+JOIN fact_sales f ON p.product_key = f.product_key  -- 10억 행
+WHERE p.category = 'Electronics';
+
+-- ✅ 좋은 예: 작은 테이블/필터된 결과 먼저
+SELECT ...
+FROM (
+    SELECT * FROM dim_product
+    WHERE category = 'Electronics'  -- 1만 행으로 축소
+) p
+JOIN fact_sales f ON p.product_key = f.product_key;</code>
+            </div>
+
+            <h3>5.3 GROUP BY 최적화</h3>
+            <div class="code-block">
+<code>-- ❌ 나쁜 예: DISTINCT 남용
+SELECT DISTINCT
+    customer_id,
+    customer_name,
+    city,
+    state,
+    country
+FROM orders;
+-- → 정렬 필요, 느림
+
+-- ✅ 좋은 예: GROUP BY 사용 (인덱스 활용)
+SELECT
+    customer_id,
+    MAX(customer_name) AS customer_name,
+    MAX(city) AS city,
+    MAX(state) AS state,
+    MAX(country) AS country
+FROM orders
+GROUP BY customer_id;
+
+-- ❌ 나쁜 예: HAVING으로 필터링
+SELECT
+    product_key,
+    SUM(total_amount) AS total_sales
+FROM fact_sales
+GROUP BY product_key
+HAVING SUM(total_amount) > 100000;
+-- → 모든 제품 집계 후 필터링
+
+-- ✅ 좋은 예: WHERE로 미리 필터링
+SELECT
+    product_key,
+    SUM(total_amount) AS total_sales
+FROM fact_sales
+WHERE sale_date >= '2024-01-01'  -- 미리 필터링!
+GROUP BY product_key
+HAVING SUM(total_amount) > 100000;</code>
+            </div>
+
+            <h2>6. 모니터링 및 튜닝</h2>
+
+            <h3>6.1 느린 쿼리 식별</h3>
+            <div class="code-block">
+<code>-- PostgreSQL: 느린 쿼리 로그 활성화
+ALTER SYSTEM SET log_min_duration_statement = 1000;  -- 1초 이상 쿼리 로깅
+SELECT pg_reload_conf();
+
+-- 느린 쿼리 TOP 10 조회
+SELECT
+    calls,
+    total_exec_time,
+    mean_exec_time,
+    query
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+
+-- SQL Server: Query Store 활성화
+ALTER DATABASE SalesDW SET QUERY_STORE = ON;
+
+-- 리소스 많이 쓰는 쿼리 TOP 10
+SELECT TOP 10
+    qs.execution_count,
+    qs.total_elapsed_time / 1000000.0 AS total_sec,
+    qs.total_elapsed_time / qs.execution_count / 1000.0 AS avg_ms,
+    qt.query_sql_text
+FROM sys.query_store_query_text qt
+JOIN sys.query_store_query q ON qt.query_text_id = q.query_text_id
+JOIN sys.query_store_plan p ON q.query_id = p.query_id
+JOIN sys.query_store_runtime_stats qs ON p.plan_id = qs.plan_id
+ORDER BY qs.total_elapsed_time DESC;</code>
+            </div>
+
+            <h3>6.2 실행 계획 분석</h3>
+            <div class="code-block">
+<code>-- PostgreSQL 실행 계획
+EXPLAIN ANALYZE
+SELECT
+    p.category,
+    SUM(f.total_amount) AS total_sales
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+WHERE f.sale_date >= '2024-01-01'
+GROUP BY p.category;
+
+-- 출력 예시:
+-- HashAggregate  (cost=15234.56..15234.78 rows=18 width=40) (actual time=234.123..234.145 rows=18 loops=1)
+--   Group Key: p.category
+--   ->  Hash Join  (cost=456.00..12234.56 rows=300000 width=36) (actual time=12.345..156.789 rows=285432 loops=1)
+--         Hash Cond: (f.product_key = p.product_key)
+--         ->  Seq Scan on fact_sales f  ← 문제! Index Scan이어야 함
+--               Filter: (sale_date >= '2024-01-01'::date)
+--               Rows Removed by Filter: 5000000
+--         ->  Hash  (cost=234.00..234.00 rows=18 width=4)
+--               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+--               ->  Seq Scan on dim_product p
+
+-- 해결: fact_sales(sale_date)에 인덱스 생성
+CREATE INDEX idx_sales_date ON fact_sales(sale_date);</code>
+            </div>
+
+            <h3>6.3 통계 정보 갱신</h3>
+            <p>
+                옵티마이저는 <strong>통계 정보</strong>를 기반으로 실행 계획을 결정합니다.
+                통계가 오래되면 잘못된 계획이 생성됩니다.
+            </p>
+
+            <div class="code-block">
+<code>-- PostgreSQL: 통계 갱신
+ANALYZE fact_sales;
+
+-- 자동 갱신 설정 (권장)
+ALTER TABLE fact_sales SET (autovacuum_analyze_scale_factor = 0.05);
+
+-- SQL Server: 통계 갱신
+UPDATE STATISTICS fact_sales WITH FULLSCAN;
+
+-- 자동 갱신 (기본 활성화됨)
+EXEC sp_autostats 'fact_sales', 'ON';
+
+-- Snowflake: 자동 통계 (수동 불필요)
+-- Snowflake는 자동으로 통계 수집 및 갱신</code>
+            </div>
+
+            <h2>7. 클라우드 DW별 최적화 팁</h2>
+
+            <h3>7.1 Snowflake</h3>
+            <div class="code-block">
+<code>-- 1. Clustering Key 설정 (자주 필터링되는 컬럼)
+ALTER TABLE fact_sales CLUSTER BY (sale_date, region);
+
+-- 2. Search Optimization Service (포인트 쿼리 최적화)
+ALTER TABLE dim_customer ADD SEARCH OPTIMIZATION;
+
+-- 3. Result Cache 활용 (24시간 캐시)
+-- 동일 쿼리는 0.1초 반환!
+
+-- 4. Warehouse 크기 자동 조정
+ALTER WAREHOUSE compute_wh SET AUTO_SUSPEND = 60;  -- 60초 후 중지
+ALTER WAREHOUSE compute_wh SET AUTO_RESUME = TRUE;  -- 쿼리 시 자동 시작</code>
+            </div>
+
+            <h3>7.2 BigQuery</h3>
+            <div class="code-block">
+<code>-- 1. Partitioning by date
+CREATE TABLE sales_partitioned
+PARTITION BY DATE(sale_date)
+AS SELECT * FROM fact_sales;
+
+-- 2. Clustering (파티션 내 정렬)
+CREATE TABLE sales_clustered
+PARTITION BY DATE(sale_date)
+CLUSTER BY region, product_category
+AS SELECT * FROM fact_sales;
+
+-- 3. BI Engine (인메모리 캐시)
+-- 콘솔에서 활성화, GB당 $0.06/hour
+
+-- 4. 비용 절감: SELECT * 대신 필요한 컬럼만
+-- BigQuery는 스캔 데이터량으로 과금!
+SELECT customer_id, total_amount  -- $0.05
+-- vs
+SELECT *  -- $0.50 (10배 비쌈!)</code>
+            </div>
+
+            <h3>7.3 Redshift</h3>
+            <div class="code-block">
+<code>-- 1. Distribution Style 설정
+CREATE TABLE fact_sales (
+    sale_key BIGINT,
+    customer_key INT,
+    total_amount DECIMAL(10,2)
+)
+DISTSTYLE KEY  -- customer_key로 분산
+DISTKEY (customer_key)
+SORTKEY (sale_date);  -- 정렬 키
+
+-- 2. ANALYZE & VACUUM (필수!)
+ANALYZE fact_sales;
+VACUUM SORT ONLY fact_sales;  -- 정렬 복구
+
+-- 3. Workload Management (WLM)
+-- 쿼리 큐 설정으로 리소스 분배
+
+-- 4. Concurrency Scaling
+-- 동시 쿼리 증가 시 자동 클러스터 추가</code>
+            </div>
+
+            <div class="review-section">
+                <h3>📝 복습 질문</h3>
+                <ol>
+                    <li>OLTP와 DW에서 인덱싱 전략이 다른 이유는 무엇인가요?</li>
+                    <li>Bitmap Index는 언제 사용하며, B-Tree Index와의 차이점은?</li>
+                    <li>Covering Index가 성능을 향상시키는 원리를 설명하세요.</li>
+                    <li>파티셔닝의 3가지 타입(Range, Hash, List)을 예시와 함께 설명하세요.</li>
+                    <li>Partition Pruning이란 무엇이며, 어떻게 성능을 향상시키나요?</li>
+                    <li>Columnar Storage가 분석 쿼리에 유리한 이유를 3가지 드세요.</li>
+                    <li>Materialized View와 일반 View의 차이는 무엇인가요?</li>
+                    <li>WHERE 절에서 함수를 사용하면 왜 인덱스가 무효화되나요?</li>
+                    <li>통계 정보(Statistics)가 오래되면 어떤 문제가 발생하나요?</li>
+                    <li>클라우드 DW (Snowflake, BigQuery, Redshift)의 주요 최적화 기법을 각각 하나씩 설명하세요.</li>
+                </ol>
+            </div>
+
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>DW 인덱싱 = Bitmap + Covering</strong>: 저카디널리티는 Bitmap, 고카디널리티는 B-Tree</li>
+                    <li><strong>파티셔닝 필수</strong>: Range (날짜), Hash (병렬), List (카테고리)</li>
+                    <li><strong>Partition Pruning으로 10-100배 성능 향상</strong>: 불필요한 파티션 스킵</li>
+                    <li><strong>Columnar Storage 혁명</strong>: 압축 10:1, 쿼리 10배 빠름</li>
+                    <li><strong>Materialized View로 즉시 응답</strong>: 복잡한 집계 미리 계산</li>
+                    <li><strong>WHERE 최적화</strong>: 함수 사용 금지, 컬럼 직접 비교</li>
+                    <li><strong>필요한 컬럼만 SELECT</strong>: SELECT * 금지 (특히 BigQuery)</li>
+                    <li><strong>통계 정보 주기적 갱신</strong>: ANALYZE, UPDATE STATISTICS</li>
+                    <li><strong>실행 계획 분석</strong>: EXPLAIN ANALYZE로 병목 지점 식별</li>
+                    <li>弘益人間: 빠른 분석으로 시간 절약, 더 많은 가치 창출 🌍</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-05.html" class="nav-button">← 05. 데이터 마트 설계</a>
+                <a href="chapter-07.html" class="nav-button">07. 클라우드 데이터 웨어하우스 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

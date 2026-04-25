@@ -5,6 +5,7 @@
 
 use wia_ai::adapters::{create_test_agent, SimulatedAgent, SimulatedResponse};
 use wia_ai::prelude::*;
+use wia_ai::types::{RetryPolicy, BackoffStrategy};
 
 #[tokio::main]
 async fn main() -> Result<()> {

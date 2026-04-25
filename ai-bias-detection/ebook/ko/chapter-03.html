@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 데이터 편향 탐지 | WIA-AI-013</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="chapter-number">3장</div>
+            <h1>데이터 편향 탐지</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            AI 시스템의 대부분의 편향은 편향된 학습 데이터에서 비롯됩니다. 이 장에서는 데이터셋에서
+            편향을 탐지하는 기술을 다룹니다. 弘益人間 - 깨끗한 데이터는 공정한 AI로 이어집니다.
+        </p>
+
+        <h2>데이터 편향 이해하기</h2>
+        <p>
+            데이터 편향은 데이터 수집, 샘플링 또는 레이블링 프로세스의 체계적 오류로 인해 실제
+            모집단의 잘못된 표현을 초래합니다. 무작위 노이즈와 달리 데이터 편향은 ML 모델이 학습하고
+            증폭할 일관된 패턴을 생성합니다.
+        </p>
+
+        <h2>데이터 편향의 유형</h2>
+
+        <h3>1. 선택 편향</h3>
+        <p>
+            선택 편향은 데이터 수집 프로세스가 특정 그룹을 체계적으로 제외하거나 과소 대표할 때
+            발생합니다. 이는 가장 일반적이고 해로운 형태의 데이터 편향 중 하나입니다.
+        </p>
+
+        <pre><code># 선택 편향 탐지
+import pandas as pd
+import numpy as np
+
+def detect_selection_bias(df, population_stats, protected_attr):
+    """
+    데이터셋 분포를 알려진 모집단 통계와 비교
+    """
+    dataset_dist = df[protected_attr].value_counts(normalize=True)
+
+    print("선택 편향 분석")
+    print("=" * 60)
+    print(f"\n{'그룹':<20} {'데이터셋 %':<15} {'모집단 %':<15} {'편향'}")
+    print("-" * 60)
+
+    for group in population_stats.keys():
+        dataset_pct = dataset_dist.get(group, 0) * 100
+        population_pct = population_stats[group] * 100
+        bias = dataset_pct - population_pct
+
+        status = "⚠️" if abs(bias) > 5 else "✓"
+        print(f"{group:<20} {dataset_pct:<15.2f} {population_pct:<15.2f} {bias:+.2f}% {status}")
+
+    return dataset_dist
+
+# 예제
+population = {'그룹_A': 0.60, '그룹_B': 0.30, '그룹_C': 0.10}
+# detect_selection_bias(dataset, population, 'demographic')
+</code></pre>
+
+        <h3>2. 측정 편향</h3>
+        <p>
+            측정 편향은 피처가 그룹 간에 체계적으로 다르게 측정되거나 측정 도구의 정확도가 다른
+            모집단에 대해 다를 때 발생합니다.
+        </p>
+
+        <pre><code># 측정 편향 탐지
+def analyze_measurement_quality(df, feature, protected_attr):
+    """
+    그룹 전체에 걸친 측정 일관성 분석
+    """
+    groups = df[protected_attr].unique()
+
+    print(f"측정 품질 분석: {feature}")
+    print("=" * 60)
+
+    for group in groups:
+        group_data = df[df[protected_attr] == group][feature]
+
+        # 측정 문제를 시사하는 패턴 확인
+        missing_rate = group_data.isna().sum() / len(group_data)
+        outlier_rate = len(group_data[np.abs(group_data - group_data.mean()) > 3*group_data.std()]) / len(group_data)
+
+        print(f"\n{group}:")
+        print(f"  결측률: {missing_rate:.3f}")
+        print(f"  이상치율: {outlier_rate:.3f}")
+        print(f"  평균: {group_data.mean():.3f}")
+        print(f"  표준편차: {group_data.std():.3f}")
+
+        if missing_rate > 0.05:
+            print(f"  ⚠️ 높은 결측률은 측정 편향을 나타낼 수 있음")
+</code></pre>
+
+        <h3>3. 레이블 편향</h3>
+        <p>
+            레이블 편향은 레이블링 프로세스가 일관되지 않거나 편향될 때 발생합니다. 이는 레이블이
+            실제 값인 지도 학습에서 특히 문제가 됩니다.
+        </p>
+
+        <pre><code># 레이블 편향 탐지
+def detect_label_bias(df, label_col, protected_attr, feature_cols):
+    """
+    유사한 피처에도 불구하고 레이블이 다른 경우 찾기
+    """
+    from sklearn.neighbors import NearestNeighbors
+
+    groups = df[protected_attr].unique()
+
+    # 그룹 간 유사한 인스턴스 찾기
+    X = df[feature_cols].values
+    nbrs = NearestNeighbors(n_neighbors=5).fit(X)
+
+    disagreements = 0
+    total_pairs = 0
+
+    for i in range(len(df)):
+        distances, indices = nbrs.kneighbors([X[i]])
+
+        for idx in indices[0][1:]:  # 자신 제외
+            if df.iloc[i][protected_attr] != df.iloc[idx][protected_attr]:
+                total_pairs += 1
+                if df.iloc[i][label_col] != df.iloc[idx][label_col]:
+                    disagreements += 1
+
+    disagreement_rate = disagreements / total_pairs if total_pairs > 0 else 0
+    print(f"유사한 교차 그룹 쌍의 레이블 불일치율: {disagreement_rate:.3f}")
+
+    if disagreement_rate > 0.3:
+        print("⚠️ 높은 불일치는 잠재적 레이블 편향을 시사함")
+
+    return disagreement_rate
+</code></pre>
+
+        <h2>데이터셋 감사 기법</h2>
+
+        <h3>통계 분포 분석</h3>
+        <p>
+            보호 그룹 전체에 걸쳐 데이터가 어떻게 분포되어 있는지에 대한 포괄적 분석.
+        </p>
+
+        <pre><code># 포괄적인 데이터셋 감사
+def audit_dataset(df, protected_attributes, target):
+    """
+    데이터셋의 포괄적인 편향 감사 수행
+    """
+    print("데이터셋 편향 감사 보고서")
+    print("=" * 70)
+
+    # 1. 그룹별 샘플 크기 분석
+    print("\n1. 그룹별 샘플 크기")
+    print("-" * 70)
+    for attr in protected_attributes:
+        counts = df[attr].value_counts()
+        print(f"\n{attr}:")
+        for group, count in counts.items():
+            pct = count / len(df) * 100
+            warning = " ⚠️ 과소 대표됨" if pct < 10 else ""
+            print(f"  {group}: {count} ({pct:.2f}%){warning}")
+
+    # 2. 그룹별 레이블 분포
+    print("\n2. 그룹별 레이블 분포")
+    print("-" * 70)
+    for attr in protected_attributes:
+        print(f"\n{attr}:")
+        cross_tab = pd.crosstab(df[attr], df[target], normalize='index') * 100
+        print(cross_tab.round(2))
+
+        # 유의미한 불균형 확인
+        positive_rates = cross_tab[1] if 1 in cross_tab.columns else cross_tab.iloc[:, 1]
+        if positive_rates.max() - positive_rates.min() > 20:
+            print("  ⚠️ 그룹 간 유의미한 레이블 불균형 탐지됨")
+
+    # 3. 그룹별 결측 데이터 분석
+    print("\n3. 그룹별 결측 데이터")
+    print("-" * 70)
+    for attr in protected_attributes:
+        print(f"\n{attr}:")
+        for group in df[attr].unique():
+            group_df = df[df[attr] == group]
+            missing_pct = (group_df.isna().sum() / len(group_df) * 100).mean()
+            print(f"  {group}: {missing_pct:.2f}% 평균 결측")
+
+    # 4. 보호 속성과의 피처 상관관계
+    print("\n4. 보호 속성과의 피처 상관관계")
+    print("-" * 70)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for attr in protected_attributes:
+        if attr in numeric_cols:
+            continue
+        print(f"\n{attr}:")
+        # 상관관계를 위한 원-핫 인코딩
+        encoded = pd.get_dummies(df[attr], prefix=attr)
+        for col in numeric_cols:
+            if col != target:
+                corr = df[col].corr(encoded.iloc[:, 0])
+                if abs(corr) > 0.3:
+                    print(f"  {col}: {corr:.3f} ⚠️ 높은 상관관계")
+
+    print("\n" + "=" * 70)
+    print("감사 완료")
+    print("잠재적 편향 문제에 대한 위 경고를 검토하세요")
+    print("=" * 70)
+</code></pre>
+
+        <h2>대리 차별 탐지</h2>
+
+        <p>
+            보호 속성이 제외되더라도 대리 피처는 차별을 가능하게 할 수 있습니다.
+        </p>
+
+        <pre><code># 대리 피처 탐지
+def detect_proxy_features(df, protected_attr, feature_cols, threshold=0.5):
+    """
+    보호 속성의 대리 역할을 할 수 있는 피처 식별
+    """
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import cross_val_score
+
+    print("대리 피처 탐지")
+    print("=" * 60)
+
+    X = df[feature_cols]
+    y = df[protected_attr]
+
+    # 피처에서 보호 속성을 예측하도록 모델 학습
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    scores = cross_val_score(clf, X, y, cv=5)
+    mean_score = scores.mean()
+
+    print(f"피처에서 {protected_attr} 예측 가능: {mean_score:.3f} 정확도")
+
+    if mean_score > threshold:
+        print("⚠️ 경고: 피처에 보호 속성의 대리가 포함될 수 있음")
+
+        # 피처 중요도 얻기
+        clf.fit(X, y)
+        importance = pd.DataFrame({
+            'feature': feature_cols,
+            'importance': clf.feature_importances_
+        }).sort_values('importance', ascending=False)
+
+        print("\n가장 예측력 있는 피처 (잠재적 대리):")
+        print(importance.head(10))
+
+    return mean_score
+
+# 사용 예
+# detect_proxy_features(df, 'race', ['zipcode', 'income', 'education'])
+</code></pre>
+
+        <h2>시간적 편향 탐지</h2>
+
+        <p>
+            시간이 지남에 따라 수집된 데이터는 변화하는 편향을 반영하거나 구식이 될 수 있습니다.
+        </p>
+
+        <pre><code># 시간적 편향 분석
+def analyze_temporal_bias(df, timestamp_col, protected_attr, target):
+    """
+    시간이 지남에 따라 편향이 어떻게 진화하는지 분석
+    """
+    df['year'] = pd.to_datetime(df[timestamp_col]).dt.year
+
+    print("시간적 편향 분석")
+    print("=" * 60)
+
+    for group in df[protected_attr].unique():
+        group_df = df[df[protected_attr] == group]
+
+        yearly_stats = group_df.groupby('year').agg({
+            target: ['mean', 'count']
+        }).round(3)
+
+        print(f"\n{group}:")
+        print(yearly_stats)
+
+    # 추세 확인
+    print("\n⚠️ 다음을 확인하세요:")
+    print("  - 시간이 지남에 따라 레이블 분포 변화")
+    print("  - 연도별 대표성 변화")
+    print("  - 데이터 드리프트를 나타낼 수 있는 갑작스러운 변화")
+</code></pre>
+
+        <h2>교차성 편향</h2>
+
+        <p>
+            편향은 종종 여러 보호 속성에 걸쳐 복합됩니다. 교차성 분석은 속성의 조합을 검토합니다.
+        </p>
+
+        <pre><code># 교차성 편향 분석
+def intersectional_analysis(df, protected_attrs, target):
+    """
+    여러 보호 속성의 교차점에 걸친 편향 분석
+    """
+    print("교차성 편향 분석")
+    print("=" * 70)
+
+    # 교차 그룹 생성
+    df['intersection'] = df[protected_attrs].apply(
+        lambda x: '_'.join(x.astype(str)), axis=1
+    )
+
+    results = df.groupby('intersection').agg({
+        target: ['mean', 'count']
+    }).round(3)
+
+    results.columns = ['positive_rate', 'count']
+    results = results.sort_values('positive_rate')
+
+    print(results)
+
+    # 가장 불리한 교차점 식별
+    min_rate = results['positive_rate'].min()
+    max_rate = results['positive_rate'].max()
+    disparity = max_rate - min_rate
+
+    print(f"\n긍정률 범위: {min_rate:.3f} ~ {max_rate:.3f}")
+    print(f"불균형: {disparity:.3f}")
+
+    if disparity > 0.2:
+        print("⚠️ 유의미한 교차성 편향 탐지됨")
+
+        print("\n가장 불리한 그룹:")
+        print(results.head(3))
+
+    return results
+</code></pre>
+
+        <h2>데이터 품질 검사</h2>
+
+        <h3>완전성</h3>
+        <ul>
+            <li>모든 관련 그룹이 적절하게 대표되고 있습니까?</li>
+            <li>각 하위 그룹에 대한 충분한 데이터가 있습니까?</li>
+            <li>커버리지에 체계적인 공백이 있습니까?</li>
+        </ul>
+
+        <h3>일관성</h3>
+        <ul>
+            <li>측정이 그룹 전체에 걸쳐 표준화되어 있습니까?</li>
+            <li>레이블링 지침이 일관되게 적용됩니까?</li>
+            <li>데이터 수집 절차가 균일합니까?</li>
+        </ul>
+
+        <h3>타당성</h3>
+        <ul>
+            <li>피처가 측정하려고 주장하는 것을 측정합니까?</li>
+            <li>레이블이 정확하고 편향되지 않았습니까?</li>
+            <li>측정 도구가 모집단 전체에 걸쳐 검증되었습니까?</li>
+        </ul>
+
+        <h2>데이터 수집 모범 사례</h2>
+
+        <div class="callout">
+            <h3>弘益人間 데이터 원칙</h3>
+            <ul>
+                <li><strong>포괄적 샘플링:</strong> 모든 모집단이 적절하게 대표되도록 보장</li>
+                <li><strong>투명한 방법론:</strong> 모든 데이터 수집 절차 문서화</li>
+                <li><strong>정기 감사:</strong> 데이터 품질과 대표성을 지속적으로 모니터링</li>
+                <li><strong>다양한 팀:</strong> 데이터 수집 및 레이블링에 다양한 관점 포함</li>
+                <li><strong>윤리적 검토:</strong> 데이터 수집을 윤리적 검토 프로세스에 적용</li>
+            </ul>
+        </div>
+
+        <h2>데이터 편향 보고서 생성</h2>
+
+        <pre><code># 포괄적인 데이터 편향 보고서 생성
+def generate_data_bias_report(df, protected_attrs, target, feature_cols):
+    """
+    포괄적인 데이터 편향 평가 보고서 생성
+    """
+    report = {
+        'timestamp': pd.Timestamp.now(),
+        'total_samples': len(df),
+        'issues': []
+    }
+
+    print("\n" + "=" * 70)
+    print("데이터 편향 탐지 보고서")
+    print("=" * 70)
+    print(f"생성 시간: {report['timestamp']}")
+    print(f"전체 샘플: {report['total_samples']}")
+
+    # 모든 검사 실행
+    audit_dataset(df, protected_attrs, target)
+
+    for attr in protected_attrs:
+        proxy_score = detect_proxy_features(df, attr, feature_cols)
+        if proxy_score > 0.5:
+            report['issues'].append(f"{attr}에 대한 대리 피처 탐지됨")
+
+    # 교차성 분석
+    if len(protected_attrs) > 1:
+        intersectional_analysis(df, protected_attrs, target)
+
+    print("\n" + "=" * 70)
+    print("권장 사항")
+    print("=" * 70)
+    print("1. 추가 데이터 수집을 통해 과소 대표 그룹 해결")
+    print("2. 레이블링 절차 검토 및 표준화")
+    print("3. 대리 차별을 위한 높은 상관관계 피처 조사")
+    print("4. 향후 데이터 수집을 위한 층화 샘플링 고려")
+    print("5. 데이터 품질에 대한 지속적인 모니터링 구현")
+    print("\n弘益人間 - 공정한 데이터는 공정한 AI의 기초입니다")
+    print("=" * 70)
+
+    return report
+</code></pre>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">장 요약</h2>
+            <ul>
+                <li>데이터 편향은 AI 편향의 가장 일반적인 원인이며 조기에 해결해야 함</li>
+                <li>주요 유형에는 선택 편향, 측정 편향, 레이블 편향이 포함됨</li>
+                <li>통계 분석은 과소 대표와 체계적 오류를 드러낼 수 있음</li>
+                <li>대리 피처는 보호 속성이 제외되어도 차별을 가능하게 할 수 있음</li>
+                <li>시간적 분석은 시간이 지남에 따라 편향이 어떻게 변화하는지 드러내고 데이터 드리프트를 식별함</li>
+                <li>교차성 편향 분석은 여러 속성에 걸친 복합 차별을 검토함</li>
+                <li>포괄적인 감사는 완전성, 일관성, 타당성을 확인해야 함</li>
+                <li>모범 사례에는 포괄적 샘플링, 투명한 방법론, 정기 감사가 포함됨</li>
+                <li>弘益人間 원칙은 모든 그룹에 이익이 되는 공정한 데이터 수집을 강조함</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">복습 질문</h2>
+            <ol>
+                <li>선택 편향과 샘플링 편향의 차이점은 무엇입니까? 각각의 예를 제공하세요.</li>
+                <li>피처가 보호 속성의 대리 역할을 하는지 어떻게 탐지할 수 있습니까?</li>
+                <li>레이블 편향이 지도 학습에서 특히 문제가 되는 이유는 무엇입니까? 어떻게 탐지할 수 있습니까?</li>
+                <li>측정 편향이 얼굴 인식 시스템에 어떻게 영향을 미칠 수 있는 시나리오를 설명하세요.</li>
+                <li>교차성 편향이란 무엇이며 왜 분석하는 것이 중요합니까?</li>
+                <li>데이터셋이 한 인구통계학적 그룹에서 90% 대표성을 가지는 경우 어떤 문제가 발생할 수 있습니까?</li>
+                <li>학습 데이터가 배포 모집단을 대표하는지 어떻게 결정하시겠습니까?</li>
+                <li>시간적 분석이 편향 탐지에서 어떤 역할을 합니까? 시간이 지남에 따라 무엇이 변경될 수 있습니까?</li>
+                <li>弘益人間 원칙을 따르는 채용 AI를 위한 데이터 수집 전략을 설계하세요.</li>
+                <li>포괄적인 데이터 편향 감사 보고서에 무엇이 포함되어야 합니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-04.html" class="nav-button">다음 장 →</a>
+        </div>
+    </div>
+</body>
+</html>

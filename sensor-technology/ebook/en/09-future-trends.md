@@ -671,11 +671,7 @@ The convergence of these trends will create a world where trillions of sensors s
 ---
 
 **References:**
-- 선행 연구. *Event-Based Vision: A Survey*. IEEE TPAMI.
-- 선행 연구. *Quantum Sensing*. Reviews of Modern Physics.
-- 선행 연구. *Wearable and Implantable Biosensors*. Advanced Materials Technologies.
 - Paradiso, J. A., & Starner, T. (2005). *Energy Scavenging for Mobile and Wireless Electronics*. IEEE Pervasive Computing.
-- 선행 연구. *Low Power Wide Area Networks: An Overview*. IEEE Communications Surveys & Tutorials.
 
 © 2025 SmileStory Inc. / WIA
 弘益人間 · Benefit All Humanity

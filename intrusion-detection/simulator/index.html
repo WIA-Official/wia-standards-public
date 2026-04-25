@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SEC-016 Intrusion Detection Simulator | WIA Standards</title>
+    <style>
+        :root { --primary: #8B5CF6; --primary-dark: #7C3AED; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --gold: #ffd700; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .breadcrumb { display: flex; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb .current { color: var(--primary); }
+        .lang-switch { display: flex; gap: 5px; }
+        .lang-btn { padding: 6px 12px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); border-radius: 6px; cursor: pointer; }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .hero { text-align: center; margin-bottom: 40px; }
+        .hero h1 { font-size: 2.5rem; background: linear-gradient(90deg, var(--primary), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 15px; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: all 0.3s; }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .sim-container { background: var(--bg-card); border-radius: 16px; padding: 30px; border: 1px solid var(--border); }
+        .sim-title { font-size: 1.3rem; color: var(--primary); margin-bottom: 20px; }
+
+        .traffic-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .traffic-card { background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+        .traffic-icon { font-size: 2.5rem; text-align: center; margin-bottom: 15px; }
+        .traffic-type { font-size: 1.1rem; color: var(--primary); margin-bottom: 10px; text-align: center; font-weight: 600; }
+        .traffic-desc { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+        .traffic-status { margin-top: 15px; padding: 10px; border-radius: 6px; text-align: center; font-weight: 500; }
+        .status-normal { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-suspicious { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .status-malicious { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        .detection-panel { background: var(--bg); padding: 25px; border-radius: 12px; margin-top: 20px; border: 1px solid var(--border); }
+        .detection-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
+        .detection-row:last-child { border-bottom: none; margin-bottom: 0; }
+        .detection-label { color: var(--text-muted); font-size: 0.95rem; }
+        .detection-value { font-size: 1.2rem; font-weight: 600; }
+
+        .algorithm-card { background: var(--bg); padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border); }
+        .algorithm-name { font-size: 1.2rem; color: var(--success); margin-bottom: 10px; font-weight: 600; }
+        .algorithm-desc { color: var(--text-muted); line-height: 1.7; margin-bottom: 10px; }
+        .algorithm-metrics { display: flex; gap: 20px; margin-top: 15px; }
+        .metric { text-align: center; }
+        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+
+        .protocol-flow { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 20px 0; padding: 20px; background: var(--bg); border-radius: 12px; }
+        .flow-item { padding: 15px 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; text-align: center; min-width: 140px; }
+        .flow-arrow { color: var(--primary); font-size: 1.5rem; }
+
+        .code-block { background: #000; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: var(--success); overflow-x: auto; margin-top: 15px; }
+
+        .btn { padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; margin: 5px; }
+        .btn:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); }
+        .btn-danger { background: var(--danger); }
+
+        .alert-box { padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid; }
+        .alert-info { background: rgba(139, 92, 246, 0.1); border-color: var(--primary); }
+        .alert-warning { background: rgba(245, 158, 11, 0.1); border-color: var(--warning); }
+        .alert-danger { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); }
+        .alert-success { background: rgba(16, 185, 129, 0.1); border-color: var(--success); }
+
+        footer { margin-top: 50px; text-align: center; padding: 20px; border-top: 1px solid var(--border); }
+        footer p { color: var(--text-muted); font-size: 0.9rem; }
+        .philosophy { color: #ffd700; margin-bottom: 10px; font-size: 1.1rem; }
+
+        .packet-visual { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 20px 0; }
+        .packet { padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; text-align: center; font-size: 0.8rem; }
+        .packet.normal { border-color: var(--success); }
+        .packet.suspicious { border-color: var(--warning); }
+        .packet.malicious { border-color: var(--danger); }
+
+        .siem-dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .siem-stat { background: var(--bg); padding: 20px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+        .siem-stat-value { font-size: 2rem; font-weight: bold; color: var(--primary); margin-bottom: 5px; }
+        .siem-stat-label { font-size: 0.85rem; color: var(--text-muted); }
+
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; }
+            .traffic-grid, .algorithm-metrics { grid-template-columns: 1fr; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="/intrusion-detection/">WIA-SEC-016</a>
+                    <span>›</span>
+                    <span class="current">Simulator</span>
+                </div>
+            </div>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                <button class="lang-btn" onclick="setLang('ko')">KO</button>
+            </div>
+        </div>
+
+        <div class="hero">
+            <h1>🚨 Intrusion Detection Simulator</h1>
+            <p data-en="Interactive demonstration of IDS/IPS, anomaly detection, and network monitoring" data-ko="IDS/IPS, 이상 탐지 및 네트워크 모니터링의 대화형 시연">Interactive demonstration of IDS/IPS, anomaly detection, and network monitoring</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel('data-format')" data-en="Data Format" data-ko="데이터 형식">Data Format</div>
+            <div class="tab" onclick="showPanel('algorithms')" data-en="Detection Algorithms" data-ko="탐지 알고리즘">Detection Algorithms</div>
+            <div class="tab" onclick="showPanel('protocol')" data-en="IDS/IPS Protocol" data-ko="IDS/IPS 프로토콜">IDS/IPS Protocol</div>
+            <div class="tab" onclick="showPanel('integration')" data-en="SIEM Integration" data-ko="SIEM 통합">SIEM Integration</div>
+            <div class="tab" onclick="showPanel('qr-vc')" data-en="QR & VC" data-ko="QR 및 VC">QR & VC</div>
+        </div>
+
+        <!-- Tab 1: Data Format -->
+        <div id="data-format" class="panel active">
+            <div class="sim-container">
+                <div class="sim-title" data-en="Network Traffic Data Formats" data-ko="네트워크 트래픽 데이터 형식">Network Traffic Data Formats</div>
+
+                <div class="traffic-grid">
+                    <div class="traffic-card">
+                        <div class="traffic-icon">📦</div>
+                        <div class="traffic-type">Packet Capture</div>
+                        <div class="traffic-desc" data-en="Raw network packets in PCAP/PCAPNG format. Contains full packet headers and payload data." data-ko="PCAP/PCAPNG 형식의 원시 네트워크 패킷. 전체 패킷 헤더 및 페이로드 데이터 포함.">Raw network packets in PCAP/PCAPNG format. Contains full packet headers and payload data.</div>
+                        <div class="traffic-status status-normal">Normal Traffic</div>
+                    </div>
+
+                    <div class="traffic-card">
+                        <div class="traffic-icon">🌊</div>
+                        <div class="traffic-type">NetFlow/IPFIX</div>
+                        <div class="traffic-desc" data-en="Flow-based network telemetry. Aggregated traffic statistics including src/dst IP, ports, protocol, bytes." data-ko="플로우 기반 네트워크 텔레메트리. src/dst IP, 포트, 프로토콜, 바이트를 포함한 집계된 트래픽 통계.">Flow-based network telemetry. Aggregated traffic statistics including src/dst IP, ports, protocol, bytes.</div>
+                        <div class="traffic-status status-normal">Normal Traffic</div>
+                    </div>
+
+                    <div class="traffic-card">
+                        <div class="traffic-icon">📝</div>
+                        <div class="traffic-type">Syslog Events</div>
+                        <div class="traffic-desc" data-en="System and application logs in CEF/LEEF format. Authentication events, firewall logs, system errors." data-ko="CEF/LEEF 형식의 시스템 및 응용 프로그램 로그. 인증 이벤트, 방화벽 로그, 시스템 오류.">System and application logs in CEF/LEEF format. Authentication events, firewall logs, system errors.</div>
+                        <div class="traffic-status status-suspicious">⚠️ Auth Failure</div>
+                    </div>
+
+                    <div class="traffic-card">
+                        <div class="traffic-icon">🚨</div>
+                        <div class="traffic-type">Alert Events</div>
+                        <div class="traffic-desc" data-en="IDS/IPS alerts with signature ID, severity, source/destination, and matched rule details." data-ko="서명 ID, 심각도, 소스/대상 및 일치하는 규칙 세부 정보가 포함된 IDS/IPS 경고.">IDS/IPS alerts with signature ID, severity, source/destination, and matched rule details.</div>
+                        <div class="traffic-status status-malicious">🔴 SQL Injection</div>
+                    </div>
+                </div>
+
+                <div class="detection-panel">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;" data-en="PCAP Packet Structure" data-ko="PCAP 패킷 구조">PCAP Packet Structure</h3>
+                    <div class="packet-visual">
+                        <div class="packet normal">Ethernet<br>Header</div>
+                        <div class="packet normal">IP<br>Header</div>
+                        <div class="packet normal">TCP/UDP<br>Header</div>
+                        <div class="packet suspicious">Application<br>Payload</div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span style="color: #94a3b8;">// IDS Alert Format (JSON)</span>
+{
+  <span style="color: #06B6D4;">"timestamp"</span>: <span style="color: #ffd700;">"2025-12-25T10:30:15Z"</span>,
+  <span style="color: #06B6D4;">"signature_id"</span>: 2100498,
+  <span style="color: #06B6D4;">"signature"</span>: <span style="color: #ffd700;">"ET EXPLOIT SQL Injection Attempt"</span>,
+  <span style="color: #06B6D4;">"severity"</span>: <span style="color: #ffd700;">"HIGH"</span>,
+  <span style="color: #06B6D4;">"source_ip"</span>: <span style="color: #ffd700;">"203.0.113.45"</span>,
+  <span style="color: #06B6D4;">"dest_ip"</span>: <span style="color: #ffd700;">"192.168.1.100"</span>,
+  <span style="color: #06B6D4;">"dest_port"</span>: 3306,
+  <span style="color: #06B6D4;">"protocol"</span>: <span style="color: #ffd700;">"TCP"</span>,
+  <span style="color: #06B6D4;">"payload"</span>: <span style="color: #ffd700;">"' OR 1=1--"</span>
+}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Detection Algorithms -->
+        <div id="algorithms" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="Intrusion Detection Algorithms" data-ko="침입 탐지 알고리즘">Intrusion Detection Algorithms</div>
+
+                <div class="algorithm-card">
+                    <div class="algorithm-name">Signature-Based Detection</div>
+                    <div class="algorithm-desc" data-en="Matches network traffic against known attack signatures (rules). Fast and accurate for known threats. Uses Snort/Suricata rule syntax." data-ko="네트워크 트래픽을 알려진 공격 서명(규칙)과 비교. 알려진 위협에 대해 빠르고 정확. Snort/Suricata 규칙 구문 사용.">Matches network traffic against known attack signatures (rules). Fast and accurate for known threats. Uses Snort/Suricata rule syntax.</div>
+                    <div class="algorithm-metrics">
+                        <div class="metric">
+                            <div class="metric-value">99.5%</div>
+                            <div class="metric-label">Accuracy</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">0.1%</div>
+                            <div class="metric-label">False Positive</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">&lt;1ms</div>
+                            <div class="metric-label">Latency</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="algorithm-card">
+                    <div class="algorithm-name">Anomaly-Based Detection</div>
+                    <div class="algorithm-desc" data-en="Detects deviations from normal behavior baseline using statistical analysis or ML. Can identify zero-day attacks." data-ko="통계 분석 또는 ML을 사용하여 정상 행동 기준선의 편차를 감지. 제로데이 공격 식별 가능.">Detects deviations from normal behavior baseline using statistical analysis or ML. Can identify zero-day attacks.</div>
+                    <div class="algorithm-metrics">
+                        <div class="metric">
+                            <div class="metric-value">85%</div>
+                            <div class="metric-label">Detection Rate</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">5-10%</div>
+                            <div class="metric-label">False Positive</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">10-50ms</div>
+                            <div class="metric-label">Latency</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="algorithm-card">
+                    <div class="algorithm-name">Protocol Analysis</div>
+                    <div class="algorithm-desc" data-en="Deep packet inspection to validate protocol compliance (HTTP, DNS, TLS). Detects protocol anomalies and evasion techniques." data-ko="프로토콜 준수(HTTP, DNS, TLS) 확인을 위한 심층 패킷 검사. 프로토콜 이상 및 회피 기술 탐지.">Deep packet inspection to validate protocol compliance (HTTP, DNS, TLS). Detects protocol anomalies and evasion techniques.</div>
+                    <div class="algorithm-metrics">
+                        <div class="metric">
+                            <div class="metric-value">95%</div>
+                            <div class="metric-label">Coverage</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">1-2%</div>
+                            <div class="metric-label">False Positive</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">5ms</div>
+                            <div class="metric-label">Latency</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 20px;">
+<span style="color: #94a3b8;">// Anomaly Detection Algorithm (Simplified)</span>
+<span style="color: #06B6D4;">function</span> detectAnomaly(traffic) {
+    <span style="color: #06B6D4;">const</span> baseline = calculateBaseline(historicalData);
+    <span style="color: #06B6D4;">const</span> currentMetric = {
+        packetsPerSec: traffic.count / traffic.duration,
+        avgPacketSize: traffic.totalBytes / traffic.count,
+        uniqueIPs: <span style="color: #06B6D4;">new</span> Set(traffic.srcIPs).size
+    };
+
+    <span style="color: #06B6D4;">const</span> deviation = calculateDeviation(currentMetric, baseline);
+
+    <span style="color: #06B6D4;">if</span> (deviation > THRESHOLD) {
+        <span style="color: #06B6D4;">return</span> {
+            alert: <span style="color: #06B6D4;">true</span>,
+            severity: classifySeverity(deviation),
+            description: <span style="color: #ffd700;">"Abnormal traffic pattern detected"</span>
+        };
+    }
+    <span style="color: #06B6D4;">return</span> { alert: <span style="color: #06B6D4;">false</span> };
+}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: IDS/IPS Protocol -->
+        <div id="protocol" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="IDS/IPS Detection & Response Protocol" data-ko="IDS/IPS 탐지 및 대응 프로토콜">IDS/IPS Detection & Response Protocol</div>
+
+                <div class="protocol-flow">
+                    <div class="flow-item">1️⃣ Traffic<br>Capture</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-item">2️⃣ Packet<br>Analysis</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-item">3️⃣ Signature<br>Match</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-item">4️⃣ Alert<br>Generation</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-item">5️⃣ Response<br>Action</div>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;" data-en="Detection Pipeline Steps" data-ko="탐지 파이프라인 단계">Detection Pipeline Steps</h3>
+
+                    <div class="alert-box alert-info">
+                        <h4 style="color: var(--primary); margin-bottom: 10px;">Step 1: Traffic Capture</h4>
+                        <p style="color: var(--text-muted); line-height: 1.7;" data-en="Network tap or SPAN port captures all packets. Supports 1Gbps-100Gbps throughput with hardware acceleration." data-ko="네트워크 탭 또는 SPAN 포트가 모든 패킷 캡처. 하드웨어 가속으로 1Gbps-100Gbps 처리량 지원.">Network tap or SPAN port captures all packets. Supports 1Gbps-100Gbps throughput with hardware acceleration.</p>
+                    </div>
+
+                    <div class="alert-box alert-info">
+                        <h4 style="color: var(--primary); margin-bottom: 10px;">Step 2: Packet Analysis</h4>
+                        <p style="color: var(--text-muted); line-height: 1.7;" data-en="Decodes packet headers (L2-L7). Reassembles TCP streams and defragments IP packets for full payload inspection." data-ko="패킷 헤더(L2-L7) 디코딩. 전체 페이로드 검사를 위해 TCP 스트림 재조립 및 IP 패킷 조각 모음.">Decodes packet headers (L2-L7). Reassembles TCP streams and defragments IP packets for full payload inspection.</p>
+                    </div>
+
+                    <div class="alert-box alert-warning">
+                        <h4 style="color: var(--warning); margin-bottom: 10px;">Step 3: Signature Matching</h4>
+                        <p style="color: var(--text-muted); line-height: 1.7;" data-en="Applies 100,000+ signatures using Aho-Corasick multi-pattern matching. Checks both header fields and payload content." data-ko="Aho-Corasick 다중 패턴 매칭을 사용하여 100,000개 이상의 서명 적용. 헤더 필드와 페이로드 내용 모두 확인.">Applies 100,000+ signatures using Aho-Corasick multi-pattern matching. Checks both header fields and payload content.</p>
+                    </div>
+
+                    <div class="alert-box alert-danger">
+                        <h4 style="color: var(--danger); margin-bottom: 10px;">Step 4: Alert Generation</h4>
+                        <p style="color: var(--text-muted); line-height: 1.7;" data-en="Creates structured alert with signature ID, severity, source/dest, timestamp. Enriches with GeoIP and threat intelligence." data-ko="서명 ID, 심각도, 소스/대상, 타임스탬프로 구조화된 경고 생성. GeoIP 및 위협 인텔리전스로 보강.">Creates structured alert with signature ID, severity, source/dest, timestamp. Enriches with GeoIP and threat intelligence.</p>
+                    </div>
+
+                    <div class="alert-box alert-success">
+                        <h4 style="color: var(--success); margin-bottom: 10px;">Step 5: Response Action (IPS Mode)</h4>
+                        <p style="color: var(--text-muted); line-height: 1.7;" data-en="Drop malicious packets, reset TCP connections, block IPs via firewall, send SNMP trap to NOC." data-ko="악성 패킷 삭제, TCP 연결 재설정, 방화벽을 통한 IP 차단, NOC로 SNMP 트랩 전송.">Drop malicious packets, reset TCP connections, block IPs via firewall, send SNMP trap to NOC.</p>
+                    </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 20px;">
+<span style="color: #94a3b8;">// Snort Rule Example</span>
+alert tcp any any -> $HOME_NET 80 (
+    msg:<span style="color: #ffd700;">"ET EXPLOIT SQL Injection SELECT FROM"</span>;
+    flow:to_server,established;
+    content:<span style="color: #ffd700;">"SELECT"</span>; nocase; http_uri;
+    content:<span style="color: #ffd700;">"FROM"</span>; nocase; http_uri; distance:0;
+    classtype:web-application-attack;
+    sid:2100498;
+    rev:3;
+)
+
+<span style="color: #94a3b8;">// IPS Response Action</span>
+<span style="color: #06B6D4;">if</span> (alert.severity >= <span style="color: #ffd700;">"HIGH"</span>) {
+    dropPacket(packet);
+    blockIP(alert.source_ip, duration: <span style="color: #ffd700;">"1h"</span>);
+    sendAlert(alert, channels: [<span style="color: #ffd700;">"email"</span>, <span style="color: #ffd700;">"siem"</span>]);
+}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: SIEM Integration -->
+        <div id="integration" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="SIEM Integration & Correlation" data-ko="SIEM 통합 및 상관 관계">SIEM Integration & Correlation</div>
+
+                <div class="siem-dashboard">
+                    <div class="siem-stat">
+                        <div class="siem-stat-value">1,247</div>
+                        <div class="siem-stat-label" data-en="Events/sec" data-ko="이벤트/초">Events/sec</div>
+                    </div>
+                    <div class="siem-stat">
+                        <div class="siem-stat-value">23</div>
+                        <div class="siem-stat-label" data-en="Active Alerts" data-ko="활성 경고">Active Alerts</div>
+                    </div>
+                    <div class="siem-stat">
+                        <div class="siem-stat-value">5</div>
+                        <div class="siem-stat-label" data-en="High Severity" data-ko="높은 심각도">High Severity</div>
+                    </div>
+                    <div class="siem-stat">
+                        <div class="siem-stat-value">847GB</div>
+                        <div class="siem-stat-label" data-en="Data Indexed" data-ko="색인된 데이터">Data Indexed</div>
+                    </div>
+                </div>
+
+                <div class="detection-panel" style="margin-top: 30px;">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;" data-en="Supported SIEM Platforms" data-ko="지원되는 SIEM 플랫폼">Supported SIEM Platforms</h3>
+
+                    <div class="traffic-grid">
+                        <div class="traffic-card">
+                            <div class="traffic-icon">🔷</div>
+                            <div class="traffic-type">Splunk</div>
+                            <div class="traffic-desc" data-en="TCP/UDP syslog, HTTP Event Collector (HEC), Splunk Forwarder integration with custom dashboards." data-ko="사용자 정의 대시보드가 있는 TCP/UDP syslog, HTTP Event Collector(HEC), Splunk Forwarder 통합.">TCP/UDP syslog, HTTP Event Collector (HEC), Splunk Forwarder integration with custom dashboards.</div>
+                        </div>
+
+                        <div class="traffic-card">
+                            <div class="traffic-icon">🔶</div>
+                            <div class="traffic-type">Elastic SIEM</div>
+                            <div class="traffic-desc" data-en="Elasticsearch REST API, Beats agents (Filebeat, Packetbeat). Real-time indexing with ECS schema." data-ko="Elasticsearch REST API, Beats 에이전트(Filebeat, Packetbeat). ECS 스키마로 실시간 인덱싱.">Elasticsearch REST API, Beats agents (Filebeat, Packetbeat). Real-time indexing with ECS schema.</div>
+                        </div>
+
+                        <div class="traffic-card">
+                            <div class="traffic-icon">🔵</div>
+                            <div class="traffic-type">IBM QRadar</div>
+                            <div class="traffic-desc" data-en="Syslog, LEEF format support. QRadar DSM for normalized event parsing and correlation rules." data-ko="Syslog, LEEF 형식 지원. 정규화된 이벤트 파싱 및 상관 관계 규칙을 위한 QRadar DSM.">Syslog, LEEF format support. QRadar DSM for normalized event parsing and correlation rules.</div>
+                        </div>
+
+                        <div class="traffic-card">
+                            <div class="traffic-icon">🟢</div>
+                            <div class="traffic-type">Microsoft Sentinel</div>
+                            <div class="traffic-desc" data-en="Azure Monitor Agent, CEF over Syslog. KQL queries for hunting and automated playbooks." data-ko="Azure Monitor Agent, Syslog를 통한 CEF. 헌팅 및 자동화된 플레이북을 위한 KQL 쿼리.">Azure Monitor Agent, CEF over Syslog. KQL queries for hunting and automated playbooks.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 20px;">
+<span style="color: #94a3b8;">// SIEM Integration - Splunk HEC</span>
+<span style="color: #06B6D4;">const</span> sendToSplunk = <span style="color: #06B6D4;">async</span> (alert) => {
+    <span style="color: #06B6D4;">const</span> event = {
+        time: Date.now() / 1000,
+        source: <span style="color: #ffd700;">"wia-ids"</span>,
+        sourcetype: <span style="color: #ffd700;">"ids:alert"</span>,
+        event: {
+            signature_id: alert.signature_id,
+            signature: alert.signature,
+            severity: alert.severity,
+            src_ip: alert.source_ip,
+            dst_ip: alert.dest_ip,
+            protocol: alert.protocol
+        }
+    };
+
+    <span style="color: #06B6D4;">await</span> fetch(<span style="color: #ffd700;">"https://splunk:8088/services/collector"</span>, {
+        method: <span style="color: #ffd700;">"POST"</span>,
+        headers: { <span style="color: #ffd700;">"Authorization"</span>: <span style="color: #ffd700;">`Splunk ${HEC_TOKEN}`</span> },
+        body: JSON.stringify(event)
+    });
+};
+
+<span style="color: #94a3b8;">// Correlation Rule Example</span>
+<span style="color: #06B6D4;">if</span> (
+    countEvents(<span style="color: #ffd700;">"failed_login"</span>, source_ip, window: <span style="color: #ffd700;">"5m"</span>) > 5 &&
+    countEvents(<span style="color: #ffd700;">"port_scan"</span>, source_ip, window: <span style="color: #ffd700;">"10m"</span>) > 1
+) {
+    raiseCorrelatedAlert({
+        type: <span style="color: #ffd700;">"Brute Force + Recon Attack"</span>,
+        severity: <span style="color: #ffd700;">"CRITICAL"</span>
+    });
+}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: QR & VC -->
+        <div id="qr-vc" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="QR Codes & Verifiable Credentials" data-ko="QR 코드 및 검증 가능한 자격 증명">QR Codes & Verifiable Credentials</div>
+
+                <div class="alert-box alert-info">
+                    <h3 style="color: var(--primary); margin-bottom: 15px;" data-en="IDS Configuration QR Code" data-ko="IDS 구성 QR 코드">IDS Configuration QR Code</h3>
+                    <p style="color: var(--text-muted); line-height: 1.8;" data-en="Scan QR code to quickly configure IDS sensor settings, import signature rules, and establish SIEM connection parameters." data-ko="QR 코드를 스캔하여 IDS 센서 설정을 빠르게 구성하고, 서명 규칙을 가져오며, SIEM 연결 매개변수를 설정합니다.">Scan QR code to quickly configure IDS sensor settings, import signature rules, and establish SIEM connection parameters.</p>
+
+                    <div style="width: 200px; height: 200px; margin: 20px auto; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 4rem;">
+                        🚨
+                    </div>
+                    <div style="text-align: center; margin-top: 10px; font-family: monospace; color: var(--text-muted);">
+                        wia://sec-016/ids-config/v1
+                    </div>
+                </div>
+
+                <div class="detection-panel" style="margin-top: 30px;">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;" data-en="Verifiable Credential - IDS Certification" data-ko="검증 가능한 자격 증명 - IDS 인증">Verifiable Credential - IDS Certification</h3>
+
+                    <div class="alert-box alert-success">
+                        <h4 style="color: var(--success); margin-bottom: 10px;" data-en="Security Analyst Certification" data-ko="보안 분석가 인증">Security Analyst Certification</h4>
+                        <p style="color: var(--text-muted); line-height: 1.7;" data-en="W3C Verifiable Credential proving proficiency in intrusion detection, incident response, and SIEM analysis." data-ko="침입 탐지, 사고 대응 및 SIEM 분석 능력을 증명하는 W3C 검증 가능한 자격 증명.">W3C Verifiable Credential proving proficiency in intrusion detection, incident response, and SIEM analysis.</p>
+                    </div>
+
+                    <div class="detection-row">
+                        <span class="detection-label" data-en="Credential Type:" data-ko="자격 증명 유형:">Credential Type:</span>
+                        <span class="detection-value" style="color: var(--primary);">IDS Security Analyst</span>
+                    </div>
+                    <div class="detection-row">
+                        <span class="detection-label" data-en="Issuer:" data-ko="발급자:">Issuer:</span>
+                        <span class="detection-value" style="color: var(--success);">WIA (did:wia:sec)</span>
+                    </div>
+                    <div class="detection-row">
+                        <span class="detection-label" data-en="Validity:" data-ko="유효성:">Validity:</span>
+                        <span class="detection-value" style="color: var(--text);">2 years</span>
+                    </div>
+                    <div class="detection-row">
+                        <span class="detection-label" data-en="Skills Verified:" data-ko="검증된 기술:">Skills Verified:</span>
+                        <span class="detection-value" style="color: var(--text); font-size: 0.9rem;">Signature Analysis, Anomaly Detection, SIEM, Incident Response</span>
+                    </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 20px;">
+<span style="color: #94a3b8;">// Verifiable Credential Structure</span>
+{
+  <span style="color: #06B6D4;">"@context"</span>: [<span style="color: #ffd700;">"https://www.w3.org/2018/credentials/v1"</span>],
+  <span style="color: #06B6D4;">"type"</span>: [<span style="color: #ffd700;">"VerifiableCredential"</span>, <span style="color: #ffd700;">"IDSSecurityAnalystCertificate"</span>],
+  <span style="color: #06B6D4;">"issuer"</span>: <span style="color: #ffd700;">"did:wia:sec:016"</span>,
+  <span style="color: #06B6D4;">"issuanceDate"</span>: <span style="color: #ffd700;">"2025-12-25T00:00:00Z"</span>,
+  <span style="color: #06B6D4;">"expirationDate"</span>: <span style="color: #ffd700;">"2027-12-25T00:00:00Z"</span>,
+  <span style="color: #06B6D4;">"credentialSubject"</span>: {
+    <span style="color: #06B6D4;">"id"</span>: <span style="color: #ffd700;">"did:example:analyst123"</span>,
+    <span style="color: #06B6D4;">"skills"</span>: [
+      <span style="color: #ffd700;">"Signature-based Detection"</span>,
+      <span style="color: #ffd700;">"Anomaly Detection"</span>,
+      <span style="color: #ffd700;">"SIEM Administration"</span>,
+      <span style="color: #ffd700;">"Incident Response"</span>,
+      <span style="color: #ffd700;">"Network Traffic Analysis"</span>
+    ],
+    <span style="color: #06B6D4;">"certificationLevel"</span>: <span style="color: #ffd700;">"Professional"</span>
+  },
+  <span style="color: #06B6D4;">"proof"</span>: {
+    <span style="color: #06B6D4;">"type"</span>: <span style="color: #ffd700;">"Ed25519Signature2020"</span>,
+    <span style="color: #06B6D4;">"created"</span>: <span style="color: #ffd700;">"2025-12-25T00:00:00Z"</span>,
+    <span style="color: #06B6D4;">"proofPurpose"</span>: <span style="color: #ffd700;">"assertionMethod"</span>,
+    <span style="color: #06B6D4;">"verificationMethod"</span>: <span style="color: #ffd700;">"did:wia:sec:016#key-1"</span>
+  }
+}
+                </div>
+
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn" onclick="alert('QR Code generated for IDS configuration')" data-en="Generate Configuration QR" data-ko="구성 QR 생성">Generate Configuration QR</button>
+                    <button class="btn btn-secondary" onclick="alert('Verifiable Credential issued')" data-en="Issue VC Certificate" data-ko="VC 인증서 발급">Issue VC Certificate</button>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+            <p>© 2025 World Certification Industry Association (WIA)</p>
+        </footer>
+    </div>
+
+    <script>
+        function setLang(lang) {
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('[data-'+lang+']').forEach(el => el.textContent = el.getAttribute('data-'+lang));
+            localStorage.setItem('wia-lang', lang);
+        }
+
+        function showPanel(id) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Load saved language
+        const savedLang = localStorage.getItem('wia-lang');
+        if (savedLang) {
+            const buttons = document.querySelectorAll('.lang-btn');
+            buttons[savedLang === 'ko' ? 1 : 0].click();
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

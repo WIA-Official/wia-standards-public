@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Network-Based IDS - WIA Intrusion Detection Standard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e0e0e0; line-height: 1.8; min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+        .nav-header { background: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; margin-bottom: 30px; border-left: 5px solid #EF4444; }
+        .nav-header a { color: #EF4444; text-decoration: none; font-weight: bold; margin-right: 20px; }
+        h1 { font-size: 3em; color: #EF4444; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #EF4444; }
+        h2 { font-size: 2em; color: #EF4444; margin-top: 40px; margin-bottom: 20px; }
+        h3 { font-size: 1.5em; color: #f87171; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 15px; font-size: 1.1em; color: #d0d0d0; }
+        .highlight-box { background: rgba(239, 68, 68, 0.1); border-left: 5px solid #EF4444; padding: 25px; margin: 30px 0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th { background: #EF4444; color: white; padding: 15px; text-align: left; font-weight: bold; }
+        td { padding: 12px 15px; border-bottom: 1px solid #334155; }
+        tr:hover { background: rgba(239, 68, 68, 0.1); }
+        pre { background: #1e293b; border: 2px solid #EF4444; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 25px 0; font-size: 0.9em; }
+        code { color: #f87171; font-family: 'Courier New', monospace; }
+        .code-title { background: #EF4444; color: white; padding: 8px 15px; border-radius: 5px 5px 0 0; font-weight: bold; margin-bottom: -10px; display: inline-block; }
+        ul, ol { margin: 20px 0; padding-left: 30px; }
+        li { margin-bottom: 10px; color: #d0d0d0; }
+        .nav-footer { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 2px solid #334155; }
+        .nav-footer a { background: #EF4444; color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: all 0.3s ease; }
+        .nav-footer a:hover { background: #dc2626; transform: translateY(-2px); }
+        .review-questions { background: rgba(239, 68, 68, 0.05); border: 2px solid #EF4444; border-radius: 10px; padding: 30px; margin: 40px 0; }
+        .review-questions h3 { color: #EF4444; margin-top: 0; }
+        .review-questions ol { margin-top: 20px; }
+        .review-questions li { margin-bottom: 15px; font-weight: 500; }
+        footer { text-align: center; padding: 40px 20px; margin-top: 60px; border-top: 2px solid #334155; color: #888; }
+        .hongik { font-size: 1.5em; color: #EF4444; margin-bottom: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-header">
+            <a href="index.html">← Table of Contents</a>
+            <span style="color: #888;">Chapter 3 of 8</span>
+        </div>
+
+        <h1>Chapter 3: Network-Based IDS</h1>
+
+        <div class="highlight-box">
+            <h3>Chapter Overview</h3>
+            <p>This chapter explores Network-Based Intrusion Detection Systems (NIDS), which monitor network traffic at strategic points to detect malicious activity. We'll examine NIDS architecture, deployment models, packet capture techniques, preprocessors, detection engines, and performance optimization strategies.</p>
+        </div>
+
+        <h2>3.1 NIDS Architecture Overview</h2>
+
+        <p>A Network-Based IDS consists of several integrated components working together to capture, analyze, and alert on network traffic:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Function</th>
+                    <th>Technologies</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Packet Capture</strong></td>
+                    <td>Intercept network traffic for analysis</td>
+                    <td>Libpcap, PF_RING, DPDK, AF_PACKET</td>
+                </tr>
+                <tr>
+                    <td><strong>Packet Decoder</strong></td>
+                    <td>Parse protocol headers and payloads</td>
+                    <td>Protocol parsers for L2-L7</td>
+                </tr>
+                <tr>
+                    <td><strong>Preprocessors</strong></td>
+                    <td>Normalize and reassemble traffic</td>
+                    <td>Stream reassembly, defragmentation, HTTP normalization</td>
+                </tr>
+                <tr>
+                    <td><strong>Detection Engine</strong></td>
+                    <td>Apply signatures and anomaly detection</td>
+                    <td>Aho-Corasick, PCRE, statistical models</td>
+                </tr>
+                <tr>
+                    <td><strong>Alert Engine</strong></td>
+                    <td>Generate and transmit alerts</td>
+                    <td>Syslog, JSON, database output</td>
+                </tr>
+                <tr>
+                    <td><strong>Management Interface</strong></td>
+                    <td>Configuration and monitoring</td>
+                    <td>Web UI, CLI, API</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.2 Packet Capture Technologies</h2>
+
+        <p>High-performance packet capture is critical for NIDS effectiveness. Different technologies offer varying performance characteristics:</p>
+
+        <h3>Libpcap/WinPcap - Standard Packet Capture</h3>
+
+        <ul>
+            <li><strong>Platform:</strong> Unix/Linux (libpcap), Windows (WinPcap/Npcap)</li>
+            <li><strong>Performance:</strong> Up to 1 Gbps with modern hardware</li>
+            <li><strong>Interface:</strong> BPF (Berkeley Packet Filter) for packet filtering</li>
+            <li><strong>Use Cases:</strong> Small to medium deployments, development/testing</li>
+        </ul>
+
+        <div class="code-title">Example: Libpcap Capture with BPF Filter</div>
+<pre><code>#include <pcap.h>
+
+// Open network interface for capture
+pcap_t *handle = pcap_open_live("eth0", BUFSIZ, 1, 1000, errbuf);
+
+// Compile and apply BPF filter (capture only TCP port 80 traffic)
+struct bpf_program fp;
+pcap_compile(handle, &fp, "tcp port 80", 0, PCAP_NETMASK_UNKNOWN);
+pcap_setfilter(handle, &fp);
+
+// Capture packets
+pcap_loop(handle, -1, packet_handler, NULL);
+
+// BPF Filter Syntax Examples:
+// "tcp port 80"              - HTTP traffic
+// "host 192.168.1.100"       - Specific host
+// "net 10.0.0.0/8"           - Entire network
+// "tcp[tcpflags] & tcp-syn != 0" - SYN packets only
+</code></pre>
+
+        <h3>PF_RING - High-Performance Capture</h3>
+
+        <ul>
+            <li><strong>Performance:</strong> Up to 10 Gbps per core</li>
+            <li><strong>Features:</strong> Zero-copy, load balancing across CPU cores, hardware timestamping</li>
+            <li><strong>Architecture:</strong> Kernel module + user-space library</li>
+            <li><strong>Use Cases:</strong> Enterprise networks, high-speed monitoring</li>
+        </ul>
+
+        <h3>DPDK - Data Plane Development Kit</h3>
+
+        <ul>
+            <li><strong>Performance:</strong> 40-100+ Gbps throughput</li>
+            <li><strong>Architecture:</strong> Bypass kernel, direct NIC access via user-space drivers</li>
+            <li><strong>Features:</strong> Poll-mode drivers (PMD), huge pages, CPU affinity</li>
+            <li><strong>Use Cases:</strong> Carrier-grade networks, data centers, 100G+ environments</li>
+        </ul>
+
+        <h2>3.3 Deployment Models</h2>
+
+        <h3>Passive Monitoring via Network TAP</h3>
+
+        <p>A network TAP (Test Access Point) is a hardware device that creates an exact copy of network traffic:</p>
+
+        <div class="code-title">Network TAP Deployment</div>
+<pre><code>         Internet
+             |
+      [Router/Firewall]
+             |
+        +----+----+
+        |         |
+    [Network TAP] |
+        |         |
+     [NIDS]   [Switch] → Internal Network
+        ↑
+    (passive copy)
+
+Advantages:
+✓ Zero impact on network performance
+✓ Cannot cause network outage
+✓ Invisible to attackers
+✓ Full-duplex capture
+✓ No packet loss
+
+Disadvantages:
+✗ Hardware cost ($500-$5000+)
+✗ Cannot block attacks (detection only)
+✗ Requires physical installation
+</code></pre>
+
+        <h3>Passive Monitoring via SPAN/Mirror Port</h3>
+
+        <div class="code-title">SPAN Port Configuration (Cisco Example)</div>
+<pre><code>! Configure SPAN session on Cisco switch
+Switch(config)# monitor session 1 source interface Gi0/1 - 24
+Switch(config)# monitor session 1 destination interface Gi0/48
+Switch(config)# monitor session 1 filter vlan 10,20,30
+
+! Verify configuration
+Switch# show monitor session 1
+
+Advantages:
+✓ No additional hardware required
+✓ Flexible configuration via software
+✓ Can monitor multiple source ports
+✓ VLAN filtering capabilities
+
+Disadvantages:
+✗ Performance limited by switch CPU
+✗ May drop packets under heavy load
+✗ Typically unidirectional (ingress OR egress)
+✗ No guarantee of delivery during switch overload
+</code></pre>
+
+        <h3>Inline Deployment (IPS Mode)</h3>
+
+        <div class="code-title">Inline IPS Deployment</div>
+<pre><code>Internet → Firewall → [IPS] → Core Switch → Servers/Workstations
+                        ↑
+                 (inline, can block)
+
+Configuration Requirements:
+1. Fail-Open Hardware Bypass:
+   - If IPS fails, traffic continues flowing
+   - Network availability maintained
+
+2. High Availability (HA):
+   - Active-Passive or Active-Active clustering
+   - Sub-second failover time
+   - State synchronization between units
+
+3. Performance Sizing:
+   - IPS must handle peak traffic + 30% headroom
+   - Latency target: <5ms at line rate
+
+4. Interface Configuration:
+   - Transparent bridge mode (Layer 2)
+   - Or routed mode (Layer 3 with IP addressing)
+</code></pre>
+
+        <h2>3.4 Packet Preprocessing</h2>
+
+        <p>Preprocessors normalize and reassemble traffic before detection, preventing evasion techniques:</p>
+
+        <h3>TCP Stream Reassembly</h3>
+
+        <p>Reconstructs TCP data streams from individual packets, enabling detection of attacks split across multiple packets:</p>
+
+        <div class="code-title">Example: Stream Reassembly Configuration (Snort)</div>
+<pre><code>preprocessor stream5_global: \
+    track_tcp yes, \
+    track_udp yes, \
+    track_icmp no, \
+    max_tcp 262144, \
+    max_udp 131072
+
+preprocessor stream5_tcp: \
+    policy windows, \
+    detect_anomalies, \
+    require_3whs 180, \
+    overlap_limit 10, \
+    small_segments 3 bytes 150, \
+    timeout 180, \
+    max_window 0, \
+    use_static_footprint_sizes
+
+# Detection of attack split across packets:
+Packet 1: "SELE"
+Packet 2: "CT * "
+Packet 3: "FROM users"
+
+Stream reassembly combines: "SELECT * FROM users"
+Then signature matching can detect SQL injection
+</code></pre>
+
+        <h3>IP Defragmentation</h3>
+
+        <p>Reassembles IP fragments to detect attacks using fragmentation for evasion:</p>
+
+        <div class="code-title">Example: Fragment Reassembly (Snort frag3)</div>
+<pre><code>preprocessor frag3_global: \
+    max_frags 65536, \
+    memcap 4194304
+
+preprocessor frag3_engine: \
+    policy linux, \
+    detect_anomalies, \
+    overlap_limit 10, \
+    min_fragment_length 100, \
+    timeout 60
+
+# Fragmentation Attack Example:
+Fragment 1: IP header + "UN"
+Fragment 2: "ION SE"
+Fragment 3: "LECT"
+
+frag3 reassembles: "UNION SELECT"
+Enabling detection of SQL injection hidden in fragments
+</code></pre>
+
+        <h3>HTTP Normalization</h3>
+
+        <p>Decodes HTTP-specific encoding and handles protocol complexities:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Normalization Type</th>
+                    <th>Example</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>URL Decoding</td>
+                    <td>%2F%65%74%63 → /etc</td>
+                    <td>Reveal obfuscated paths</td>
+                </tr>
+                <tr>
+                    <td>Unicode Decoding</td>
+                    <td>%u002f → /</td>
+                    <td>Detect IIS Unicode attacks</td>
+                </tr>
+                <tr>
+                    <td>Directory Traversal</td>
+                    <td>/../../../ → normalize path</td>
+                    <td>Detect path traversal attempts</td>
+                </tr>
+                <tr>
+                    <td>Multiple Slashes</td>
+                    <td>////etc → /etc</td>
+                    <td>Standardize path format</td>
+                </tr>
+                <tr>
+                    <td>Chunked Encoding</td>
+                    <td>Reassemble chunked POST data</td>
+                    <td>Analyze complete request body</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.5 Detection Engine</h2>
+
+        <p>The detection engine is the core component that applies signatures and algorithms to identify threats:</p>
+
+        <h3>Multi-Pattern Matching - Aho-Corasick Algorithm</h3>
+
+        <p>Enables efficient matching of thousands of patterns simultaneously in O(n) time:</p>
+
+        <div class="code-title">Aho-Corasick Pattern Matching</div>
+<pre><code>// Build Aho-Corasick automaton from signature database
+patterns = ["SELECT", "UNION", "DROP TABLE", "0x31337"]
+automaton = build_aho_corasick(patterns)
+
+// Match all patterns in single pass through packet
+packet_data = "GET /app?id=1 UNION SELECT password FROM users"
+matches = automaton.match(packet_data)
+
+// Results: Found ["UNION", "SELECT"] at positions [15, 21]
+// Triggers signature(s) containing both patterns
+
+Performance:
+- Build time: O(m) where m = total pattern length
+- Match time: O(n) where n = packet size
+- Can match 50,000+ patterns in <1ms per packet
+</code></pre>
+
+        <h3>Regular Expression Matching - PCRE</h3>
+
+        <p>Provides powerful but computationally expensive pattern matching:</p>
+
+        <div class="code-title">PCRE Performance Considerations</div>
+<pre><code>// Efficient PCRE: Specific, anchored pattern
+pcre:"/^GET\s+\/admin\//";
+// Fast: Anchored at start, simple pattern
+
+// Inefficient PCRE: Backtracking-heavy pattern
+pcre:"/(a+)+b/";
+// Slow: Catastrophic backtracking on input "aaaaaaaaaaaa"
+
+// Optimization: Limit PCRE to subset of traffic
+alert tcp any any -> $HTTP_SERVERS 80 (
+    content:"admin";  // Fast pre-filter
+    pcre:"/\/admin\/[a-z]+\.php\?id=[0-9]{1,10}/i";  // PCRE only if content matches
+    sid:4000001;
+)
+
+Best Practices:
+1. Use content matches to pre-filter before PCRE
+2. Avoid nested quantifiers: (a+)+ or (a*)*
+3. Use non-capturing groups: (?:...) instead of (...)
+4. Anchor patterns when possible: ^ or $
+5. Limit PCRE depth and recursion
+</code></pre>
+
+        <h2>3.6 Strategic Sensor Placement</h2>
+
+        <p>Optimal sensor placement maximizes visibility while managing cost and complexity:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Location</th>
+                    <th>Visibility</th>
+                    <th>Primary Threats Detected</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Internet Perimeter</strong></td>
+                    <td>All inbound/outbound traffic</td>
+                    <td>External attacks, data exfiltration, C2 communications</td>
+                </tr>
+                <tr>
+                    <td><strong>DMZ Segments</strong></td>
+                    <td>Traffic to/from public servers</td>
+                    <td>Web attacks, email threats, DNS attacks</td>
+                </tr>
+                <tr>
+                    <td><strong>Internal Segments</strong></td>
+                    <td>East-west traffic between VLANs</td>
+                    <td>Lateral movement, insider threats, malware propagation</td>
+                </tr>
+                <tr>
+                    <td><strong>Data Center</strong></td>
+                    <td>Traffic to critical servers/databases</td>
+                    <td>Targeted attacks on critical assets, data theft</td>
+                </tr>
+                <tr>
+                    <td><strong>Remote Offices</strong></td>
+                    <td>Branch office Internet connections</td>
+                    <td>Remote user compromises, local attacks</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.7 Performance Optimization</h2>
+
+        <h3>Throughput Requirements by Environment</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Environment</th>
+                    <th>Throughput</th>
+                    <th>Packet Rate</th>
+                    <th>Recommended Hardware</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Small Business</td>
+                    <td>100 Mbps - 1 Gbps</td>
+                    <td>10K - 100K pps</td>
+                    <td>4-core CPU, 8GB RAM, 1GbE NIC</td>
+                </tr>
+                <tr>
+                    <td>Mid-size Enterprise</td>
+                    <td>1 - 10 Gbps</td>
+                    <td>100K - 1M pps</td>
+                    <td>16-core CPU, 32GB RAM, 10GbE NIC</td>
+                </tr>
+                <tr>
+                    <td>Large Enterprise</td>
+                    <td>10 - 40 Gbps</td>
+                    <td>1M - 10M pps</td>
+                    <td>32+ core CPU, 64GB+ RAM, 40GbE NIC, GPU</td>
+                </tr>
+                <tr>
+                    <td>Service Provider</td>
+                    <td>40 - 100+ Gbps</td>
+                    <td>10M+ pps</td>
+                    <td>FPGA/ASIC acceleration, DPDK, distributed architecture</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Multi-Threading and Load Balancing</h3>
+
+        <div class="code-title">Suricata Multi-Threading Configuration</div>
+<pre><code># Suricata threading configuration for 16-core system
+threading:
+  set-cpu-affinity: yes
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [ 0, 1 ]
+    - receive-cpu-set:
+        cpu: [ 2, 3, 4, 5 ]
+    - worker-cpu-set:
+        cpu: [ 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ]
+
+  detect-thread-ratio: 1.5
+
+# Thread Distribution:
+# 2 cores: Management, statistics, flow cleanup
+# 4 cores: Packet capture and initial processing
+# 10 cores: Detection engine (signatures, protocols)
+
+# RSS (Receive Side Scaling) on NIC:
+ethtool -X eth0 equal 10  # Distribute to 10 RX queues
+</code></pre>
+
+        <h3>Rule Optimization Techniques</h3>
+
+        <ul>
+            <li><strong>Fast Pattern Selection:</strong> Choose content patterns that appear early and are unique for efficient Aho-Corasick matching</li>
+            <li><strong>Rule Ordering:</strong> Place frequently-matched signatures earlier in evaluation order</li>
+            <li><strong>Rule Suppression:</strong> Disable signatures for protocols/services not present in environment</li>
+            <li><strong>Threshold Configuration:</strong> Reduce alert volume for known noisy signatures</li>
+            <li><strong>IP/Port Specificity:</strong> Use specific IP ranges and ports rather than "any any"</li>
+        </ul>
+
+        <h2>3.8 High Availability Configurations</h2>
+
+        <div class="code-title">HA Architecture for Inline IPS</div>
+<pre><code>                    Internet
+                        |
+                   [Load Balancer]
+                   /            \
+            [IPS-1]              [IPS-2]
+          (Active)              (Standby)
+                   \            /
+                [Aggregation Switch]
+                        |
+                 Internal Network
+
+Configuration:
+1. VRRP/HSRP for failover
+2. Connection state synchronization
+3. Heartbeat monitoring (1-second intervals)
+4. Automatic failover in <2 seconds
+5. Failback policy (manual or automatic)
+
+State Sync Protocol:
+- Share connection tracking table
+- Synchronize detection state
+- Replicate configuration changes
+- Coordinate signature updates
+</code></pre>
+
+        <h2>3.9 Popular NIDS Platforms</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>Type</th>
+                    <th>Key Features</th>
+                    <th>Best For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Snort</strong></td>
+                    <td>Open Source</td>
+                    <td>Most widely deployed, extensive ruleset, active community</td>
+                    <td>General purpose, learning, SMB</td>
+                </tr>
+                <tr>
+                    <td><strong>Suricata</strong></td>
+                    <td>Open Source</td>
+                    <td>Multi-threading, GPU support, IPS mode, protocol parsers</td>
+                    <td>High performance, modern protocols</td>
+                </tr>
+                <tr>
+                    <td><strong>Zeek (Bro)</strong></td>
+                    <td>Open Source</td>
+                    <td>Scripting language, network analysis, metadata extraction</td>
+                    <td>Threat hunting, research, SOC</td>
+                </tr>
+                <tr>
+                    <td><strong>Cisco Firepower</strong></td>
+                    <td>Commercial</td>
+                    <td>Integrated with firewall, Snort-based, threat intelligence</td>
+                    <td>Cisco environments, NGFW integration</td>
+                </tr>
+                <tr>
+                    <td><strong>Palo Alto</strong></td>
+                    <td>Commercial</td>
+                    <td>App-aware, SSL decryption, cloud integration</td>
+                    <td>Enterprise, cloud hybrid</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.10 Chapter Summary</h2>
+
+        <ul>
+            <li>NIDS monitors network traffic via passive (TAP/SPAN) or inline (IPS) deployment modes</li>
+            <li>Packet capture technologies range from standard libpcap (1Gbps) to DPDK (100Gbps+)</li>
+            <li>Preprocessors prevent evasion through stream reassembly, defragmentation, and protocol normalization</li>
+            <li>Detection engine uses multi-pattern matching (Aho-Corasick) and regular expressions (PCRE)</li>
+            <li>Strategic sensor placement at perimeter, DMZ, internal segments, and data centers maximizes visibility</li>
+            <li>Performance optimization through multi-threading, hardware acceleration, and rule tuning is essential</li>
+            <li>High availability configurations prevent network downtime during IPS failures</li>
+            <li>Popular platforms include Snort, Suricata, Zeek, and commercial NGFW solutions</li>
+        </ul>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Compare network TAP and SPAN port deployments in terms of reliability, cost, and packet capture completeness.</li>
+                <li>Why is TCP stream reassembly necessary for detecting attacks, and what evasion technique does it defeat?</li>
+                <li>Explain how the Aho-Corasick algorithm enables efficient multi-pattern matching in IDS.</li>
+                <li>What are the advantages and risks of inline IPS deployment compared to passive IDS?</li>
+                <li>Describe the role of HTTP normalization in preventing evasion through encoding techniques.</li>
+                <li>Calculate: If a NIDS processes traffic at 10 Gbps with average packet size of 1000 bytes, what packet rate (pps) must it handle?</li>
+                <li>Why is IP defragmentation necessary, and what attack technique does it mitigate?</li>
+                <li>Design a NIDS deployment for a company with: (a) Internet perimeter, (b) DMZ with web/email servers, (c) Internal network with 5 VLANs. Where would you place sensors?</li>
+                <li>Explain the difference between fail-open and fail-closed modes for inline IPS, and when each is appropriate.</li>
+                <li>What performance optimization techniques would you apply to a NIDS dropping 10% of packets at 5 Gbps throughput?</li>
+            </ol>
+        </div>
+
+        <div class="nav-footer">
+            <a href="chapter-02.html">← Chapter 2</a>
+            <a href="chapter-04.html">Next: Chapter 4 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

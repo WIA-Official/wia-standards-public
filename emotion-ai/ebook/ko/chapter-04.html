@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: Phase 1 - 감정 데이터 형식 - WIA 감정 AI 표준</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+</head>
+<body>
+
+<h1>제4장: Phase 1 - 감정 데이터 형식</h1>
+
+<blockquote>
+<p>"상호운용 가능한 데이터 형식은 감정 AI 표준의 기초입니다. Phase 1은 플랫폼, 공급업체, 애플리케이션 간에 감정 데이터를 교환하기 위한 공통 언어를 정의합니다."</p>
+</blockquote>
+
+<hr>
+
+<h2>4.1 JSON 스키마 구조</h2>
+
+<p>WIA 감정 AI 표준은 JSON 스키마를 사용하여 감정 데이터의 구조를 정의합니다. 모든 구현은 이 스키마를 준수해야 합니다.</p>
+
+<h3>4.1.1 루트 EmotionEvent 스키마</h3>
+
+<pre>
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://wiastandards.com/schemas/emotion-ai/v1/emotion-event.json",
+    "title": "WIA Emotion Event",
+    "description": "표준화된 감정 이벤트 데이터 형식",
+    "type": "object",
+    "required": ["event_id", "timestamp", "version", "emotions"],
+    "properties": {
+        "event_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "이벤트의 고유 식별자"
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 형식의 타임스탬프"
+        },
+        "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "스키마 버전 (SemVer)"
+        },
+        "session_id": {
+            "type": "string",
+            "description": "분석 세션 식별자"
+        },
+        "subject_id": {
+            "type": "string",
+            "description": "익명화된 대상 식별자"
+        },
+        "emotions": {
+            "$ref": "#/$defs/EmotionArray"
+        },
+        "action_units": {
+            "$ref": "#/$defs/ActionUnitArray"
+        },
+        "dimensional": {
+            "$ref": "#/$defs/DimensionalModel"
+        },
+        "modalities": {
+            "$ref": "#/$defs/ModalityArray"
+        },
+        "metadata": {
+            "$ref": "#/$defs/Metadata"
+        }
+    }
+}
+</pre>
+
+<h3>4.1.2 스키마 컴포넌트</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>컴포넌트</th>
+            <th>필수</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>event_id</td>
+            <td>예</td>
+            <td>UUID v4 형식의 고유 이벤트 식별자</td>
+        </tr>
+        <tr>
+            <td>timestamp</td>
+            <td>예</td>
+            <td>감정 감지 시점의 ISO 8601 타임스탬프</td>
+        </tr>
+        <tr>
+            <td>version</td>
+            <td>예</td>
+            <td>WIA 스키마 버전 (예: "1.0.0")</td>
+        </tr>
+        <tr>
+            <td>session_id</td>
+            <td>아니오</td>
+            <td>연속 분석 세션 그룹화</td>
+        </tr>
+        <tr>
+            <td>emotions</td>
+            <td>예</td>
+            <td>감지된 감정 배열</td>
+        </tr>
+        <tr>
+            <td>action_units</td>
+            <td>아니오</td>
+            <td>FACS Action Unit 데이터</td>
+        </tr>
+        <tr>
+            <td>dimensional</td>
+            <td>아니오</td>
+            <td>Valence-Arousal-Dominance 값</td>
+        </tr>
+        <tr>
+            <td>modalities</td>
+            <td>아니오</td>
+            <td>모달리티별 상세 데이터</td>
+        </tr>
+        <tr>
+            <td>metadata</td>
+            <td>아니오</td>
+            <td>추가 메타데이터</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>4.2 감정 분류 필드</h2>
+
+<h3>4.2.1 Emotion 객체 스키마</h3>
+
+<pre>
+{
+    "$defs": {
+        "Emotion": {
+            "type": "object",
+            "required": ["category", "intensity", "confidence"],
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "happiness", "sadness", "anger", "fear",
+                        "disgust", "surprise", "neutral", "contempt",
+                        "confusion", "interest", "boredom", "frustration",
+                        "excitement", "anxiety"
+                    ],
+                    "description": "감정 카테고리"
+                },
+                "intensity": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "감정 강도 (0-1)"
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "분류 신뢰도 (0-1)"
+                },
+                "onset_time": {
+                    "type": "number",
+                    "description": "감정 시작 시간 (초)"
+                },
+                "apex_time": {
+                    "type": "number",
+                    "description": "감정 최고점 시간 (초)"
+                },
+                "offset_time": {
+                    "type": "number",
+                    "description": "감정 종료 시간 (초)"
+                },
+                "source_modality": {
+                    "type": "string",
+                    "enum": ["facial", "voice", "text", "biosignal", "multimodal"],
+                    "description": "감정을 감지한 모달리티"
+                }
+            }
+        },
+        "EmotionArray": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/Emotion" },
+            "minItems": 1,
+            "description": "감지된 감정 배열"
+        }
+    }
+}
+</pre>
+
+<h3>4.2.2 감정 카테고리 정의</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>카테고리</th>
+            <th>한글</th>
+            <th>설명</th>
+            <th>타입</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>happiness</td>
+            <td>행복</td>
+            <td>기쁨, 즐거움, 만족</td>
+            <td>기본</td>
+        </tr>
+        <tr>
+            <td>sadness</td>
+            <td>슬픔</td>
+            <td>우울, 실망, 비통</td>
+            <td>기본</td>
+        </tr>
+        <tr>
+            <td>anger</td>
+            <td>분노</td>
+            <td>화남, 짜증, 격분</td>
+            <td>기본</td>
+        </tr>
+        <tr>
+            <td>fear</td>
+            <td>두려움</td>
+            <td>공포, 불안, 걱정</td>
+            <td>기본</td>
+        </tr>
+        <tr>
+            <td>disgust</td>
+            <td>혐오</td>
+            <td>역겨움, 거부감</td>
+            <td>기본</td>
+        </tr>
+        <tr>
+            <td>surprise</td>
+            <td>놀람</td>
+            <td>예상치 못한 반응</td>
+            <td>기본</td>
+        </tr>
+        <tr>
+            <td>neutral</td>
+            <td>중립</td>
+            <td>무표정, 감정 없음</td>
+            <td>확장</td>
+        </tr>
+        <tr>
+            <td>contempt</td>
+            <td>경멸</td>
+            <td>무시, 조롱</td>
+            <td>확장</td>
+        </tr>
+        <tr>
+            <td>confusion</td>
+            <td>혼란</td>
+            <td>이해 부족, 당혹</td>
+            <td>확장</td>
+        </tr>
+        <tr>
+            <td>interest</td>
+            <td>관심</td>
+            <td>호기심, 주의 집중</td>
+            <td>확장</td>
+        </tr>
+        <tr>
+            <td>boredom</td>
+            <td>지루함</td>
+            <td>무료함, 흥미 부족</td>
+            <td>확장</td>
+        </tr>
+        <tr>
+            <td>frustration</td>
+            <td>좌절</td>
+            <td>불만, 실패감</td>
+            <td>확장</td>
+        </tr>
+        <tr>
+            <td>excitement</td>
+            <td>흥분</td>
+            <td>열광, 설렘</td>
+            <td>확장</td>
+        </tr>
+        <tr>
+            <td>anxiety</td>
+            <td>불안</td>
+            <td>초조, 긴장</td>
+            <td>확장</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.2.3 감정 이벤트 예시</h3>
+
+<pre>
+{
+    "event_id": "550e8400-e29b-41d4-a716-446655440000",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "version": "1.0.0",
+    "session_id": "session-abc-123",
+    "subject_id": "anon-user-789",
+    "emotions": [
+        {
+            "category": "happiness",
+            "intensity": 0.85,
+            "confidence": 0.92,
+            "onset_time": 0.0,
+            "apex_time": 1.2,
+            "offset_time": 3.5,
+            "source_modality": "facial"
+        },
+        {
+            "category": "surprise",
+            "intensity": 0.45,
+            "confidence": 0.78,
+            "source_modality": "facial"
+        }
+    ]
+}
+</pre>
+
+<hr>
+
+<h2>4.3 Action Unit (AU) 인코딩</h2>
+
+<h3>4.3.1 ActionUnit 스키마</h3>
+
+<pre>
+{
+    "$defs": {
+        "ActionUnit": {
+            "type": "object",
+            "required": ["au", "intensity"],
+            "properties": {
+                "au": {
+                    "type": "string",
+                    "pattern": "^AU\\d{1,2}[LRAB]?$",
+                    "description": "Action Unit 코드 (예: AU6, AU12L)"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "AU 명칭"
+                },
+                "intensity": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "AU 강도 (0-1)"
+                },
+                "intensity_label": {
+                    "type": "string",
+                    "enum": ["A", "B", "C", "D", "E"],
+                    "description": "FACS 강도 레이블"
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "검출 신뢰도"
+                },
+                "symmetric": {
+                    "type": "boolean",
+                    "description": "양측 대칭 여부"
+                }
+            }
+        },
+        "ActionUnitArray": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/ActionUnit" },
+            "description": "검출된 Action Unit 배열"
+        }
+    }
+}
+</pre>
+
+<h3>4.3.2 AU 코드 형식</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>형식</th>
+            <th>설명</th>
+            <th>예시</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>AU{번호}</td>
+            <td>양측 대칭 AU</td>
+            <td>AU6, AU12</td>
+        </tr>
+        <tr>
+            <td>AU{번호}L</td>
+            <td>왼쪽만 활성화</td>
+            <td>AU12L (왼쪽 입꼬리)</td>
+        </tr>
+        <tr>
+            <td>AU{번호}R</td>
+            <td>오른쪽만 활성화</td>
+            <td>AU12R (오른쪽 입꼬리)</td>
+        </tr>
+        <tr>
+            <td>AU{번호}A/B</td>
+            <td>비대칭 양측</td>
+            <td>AU12A (비대칭 미소)</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.3.3 AU 데이터 예시</h3>
+
+<pre>
+{
+    "action_units": [
+        {
+            "au": "AU1",
+            "name": "Inner Brow Raiser",
+            "intensity": 0.35,
+            "intensity_label": "B",
+            "confidence": 0.88,
+            "symmetric": true
+        },
+        {
+            "au": "AU2",
+            "name": "Outer Brow Raiser",
+            "intensity": 0.42,
+            "intensity_label": "C",
+            "confidence": 0.91,
+            "symmetric": true
+        },
+        {
+            "au": "AU5",
+            "name": "Upper Lid Raiser",
+            "intensity": 0.65,
+            "intensity_label": "D",
+            "confidence": 0.94,
+            "symmetric": true
+        },
+        {
+            "au": "AU26",
+            "name": "Jaw Drop",
+            "intensity": 0.55,
+            "intensity_label": "C",
+            "confidence": 0.89,
+            "symmetric": true
+        }
+    ],
+    "facs_interpretation": {
+        "expression": "surprise",
+        "facs_code": "1B+2C+5D+26C",
+        "is_genuine": true,
+        "micro_expression": false
+    }
+}
+</pre>
+
+<hr>
+
+<h2>4.4 멀티모달 데이터 컨테이너</h2>
+
+<h3>4.4.1 Modality 스키마</h3>
+
+<pre>
+{
+    "$defs": {
+        "Modality": {
+            "type": "object",
+            "required": ["type", "confidence"],
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": ["facial", "voice", "text", "biosignal"],
+                    "description": "모달리티 타입"
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "모달리티 분석 신뢰도"
+                },
+                "weight": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "융합 시 가중치"
+                },
+                "data": {
+                    "oneOf": [
+                        { "$ref": "#/$defs/FacialData" },
+                        { "$ref": "#/$defs/VoiceData" },
+                        { "$ref": "#/$defs/TextData" },
+                        { "$ref": "#/$defs/BiosignalData" }
+                    ]
+                }
+            }
+        },
+        "ModalityArray": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/Modality" }
+        }
+    }
+}
+</pre>
+
+<h3>4.4.2 모달리티별 데이터 구조</h3>
+
+<h4>얼굴 모달리티 (Facial)</h4>
+
+<pre>
+{
+    "$defs": {
+        "FacialData": {
+            "type": "object",
+            "properties": {
+                "face_detected": { "type": "boolean" },
+                "face_count": { "type": "integer", "minimum": 0 },
+                "face_quality": { "type": "number", "minimum": 0, "maximum": 1 },
+                "landmarks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "x": { "type": "number" },
+                            "y": { "type": "number" },
+                            "confidence": { "type": "number" }
+                        }
+                    }
+                },
+                "head_pose": {
+                    "type": "object",
+                    "properties": {
+                        "pitch": { "type": "number" },
+                        "yaw": { "type": "number" },
+                        "roll": { "type": "number" }
+                    }
+                },
+                "gaze": {
+                    "type": "object",
+                    "properties": {
+                        "x": { "type": "number" },
+                        "y": { "type": "number" },
+                        "attention_score": { "type": "number" }
+                    }
+                },
+                "micro_expression_detected": { "type": "boolean" },
+                "frame_rate": { "type": "number" },
+                "resolution": { "type": "string" }
+            }
+        }
+    }
+}
+</pre>
+
+<h4>음성 모달리티 (Voice)</h4>
+
+<pre>
+{
+    "$defs": {
+        "VoiceData": {
+            "type": "object",
+            "properties": {
+                "duration_seconds": { "type": "number" },
+                "sample_rate": { "type": "integer" },
+                "pitch": {
+                    "type": "object",
+                    "properties": {
+                        "mean": { "type": "number" },
+                        "std": { "type": "number" },
+                        "min": { "type": "number" },
+                        "max": { "type": "number" }
+                    }
+                },
+                "intensity": {
+                    "type": "object",
+                    "properties": {
+                        "mean": { "type": "number" },
+                        "std": { "type": "number" }
+                    }
+                },
+                "speech_rate": { "type": "number" },
+                "pause_ratio": { "type": "number" },
+                "voice_quality": {
+                    "type": "object",
+                    "properties": {
+                        "jitter": { "type": "number" },
+                        "shimmer": { "type": "number" },
+                        "hnr": { "type": "number" }
+                    }
+                },
+                "mfcc_features": {
+                    "type": "array",
+                    "items": { "type": "number" }
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<h4>텍스트 모달리티 (Text)</h4>
+
+<pre>
+{
+    "$defs": {
+        "TextData": {
+            "type": "object",
+            "properties": {
+                "text": { "type": "string" },
+                "language": { "type": "string" },
+                "word_count": { "type": "integer" },
+                "sentiment_score": {
+                    "type": "number",
+                    "minimum": -1,
+                    "maximum": 1
+                },
+                "subjectivity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                },
+                "emotion_words": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "word": { "type": "string" },
+                            "emotion": { "type": "string" },
+                            "position": { "type": "integer" }
+                        }
+                    }
+                },
+                "emoji_analysis": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "emoji": { "type": "string" },
+                            "emotion": { "type": "string" },
+                            "count": { "type": "integer" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<h4>생체신호 모달리티 (Biosignal)</h4>
+
+<pre>
+{
+    "$defs": {
+        "BiosignalData": {
+            "type": "object",
+            "properties": {
+                "heart_rate": {
+                    "type": "object",
+                    "properties": {
+                        "bpm": { "type": "number" },
+                        "hrv_sdnn": { "type": "number" },
+                        "hrv_rmssd": { "type": "number" }
+                    }
+                },
+                "eda": {
+                    "type": "object",
+                    "properties": {
+                        "scl": { "type": "number" },
+                        "scr_count": { "type": "integer" },
+                        "scr_amplitude": { "type": "number" }
+                    }
+                },
+                "respiration": {
+                    "type": "object",
+                    "properties": {
+                        "rate": { "type": "number" },
+                        "depth": { "type": "number" }
+                    }
+                },
+                "temperature": {
+                    "type": "object",
+                    "properties": {
+                        "skin_temp": { "type": "number" },
+                        "finger_temp": { "type": "number" }
+                    }
+                },
+                "eeg": {
+                    "type": "object",
+                    "properties": {
+                        "alpha_power": { "type": "number" },
+                        "beta_power": { "type": "number" },
+                        "theta_power": { "type": "number" },
+                        "asymmetry_index": { "type": "number" }
+                    }
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<hr>
+
+<h2>4.5 타임스탬프 및 신뢰도 값</h2>
+
+<h3>4.5.1 타임스탬프 형식</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>필드</th>
+            <th>형식</th>
+            <th>예시</th>
+            <th>설명</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>timestamp</td>
+            <td>ISO 8601</td>
+            <td>2025-01-15T14:30:00.000Z</td>
+            <td>절대 시간 (UTC)</td>
+        </tr>
+        <tr>
+            <td>onset_time</td>
+            <td>Float (초)</td>
+            <td>0.0</td>
+            <td>세션 내 상대 시간</td>
+        </tr>
+        <tr>
+            <td>apex_time</td>
+            <td>Float (초)</td>
+            <td>1.2</td>
+            <td>감정 최고점 시간</td>
+        </tr>
+        <tr>
+            <td>offset_time</td>
+            <td>Float (초)</td>
+            <td>3.5</td>
+            <td>감정 종료 시간</td>
+        </tr>
+        <tr>
+            <td>frame_timestamp</td>
+            <td>Integer (ms)</td>
+            <td>1705329000000</td>
+            <td>프레임 타임스탬프</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.5.2 신뢰도 값 해석</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>범위</th>
+            <th>레벨</th>
+            <th>권장 사용</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>0.0 - 0.3</td>
+            <td>낮음</td>
+            <td>사용하지 않음, 추가 분석 필요</td>
+        </tr>
+        <tr>
+            <td>0.3 - 0.5</td>
+            <td>불확실</td>
+            <td>보조 지표로만 사용</td>
+        </tr>
+        <tr>
+            <td>0.5 - 0.7</td>
+            <td>중간</td>
+            <td>다른 모달리티와 함께 사용</td>
+        </tr>
+        <tr>
+            <td>0.7 - 0.85</td>
+            <td>높음</td>
+            <td>대부분의 애플리케이션에 적합</td>
+        </tr>
+        <tr>
+            <td>0.85 - 1.0</td>
+            <td>매우 높음</td>
+            <td>의료 등 민감한 애플리케이션에 적합</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.5.3 전체 이벤트 예시</h3>
+
+<pre>
+{
+    "event_id": "550e8400-e29b-41d4-a716-446655440000",
+    "timestamp": "2025-01-15T14:30:00.000Z",
+    "version": "1.0.0",
+    "session_id": "session-abc-123",
+    "subject_id": "anon-user-789",
+    "emotions": [
+        {
+            "category": "happiness",
+            "intensity": 0.85,
+            "confidence": 0.92,
+            "onset_time": 0.0,
+            "apex_time": 1.2,
+            "offset_time": 3.5,
+            "source_modality": "multimodal"
+        }
+    ],
+    "action_units": [
+        {
+            "au": "AU6",
+            "name": "Cheek Raiser",
+            "intensity": 0.75,
+            "confidence": 0.91
+        },
+        {
+            "au": "AU12",
+            "name": "Lip Corner Puller",
+            "intensity": 0.82,
+            "confidence": 0.94
+        }
+    ],
+    "dimensional": {
+        "valence": 0.78,
+        "arousal": 0.62,
+        "dominance": 0.71
+    },
+    "modalities": [
+        {
+            "type": "facial",
+            "confidence": 0.92,
+            "weight": 0.4,
+            "data": {
+                "face_detected": true,
+                "face_quality": 0.95,
+                "micro_expression_detected": false
+            }
+        },
+        {
+            "type": "voice",
+            "confidence": 0.85,
+            "weight": 0.3,
+            "data": {
+                "pitch": { "mean": 185.5, "std": 22.3 },
+                "speech_rate": 4.2
+            }
+        }
+    ],
+    "metadata": {
+        "provider": "WIA-Certified-Provider",
+        "model_version": "v2.1.0",
+        "processing_time_ms": 45,
+        "cultural_context": "ko-KR"
+    }
+}
+</pre>
+
+<hr>
+
+<h2>4.6 요약</h2>
+
+<p>Phase 1은 감정 AI 표준의 기초로, 다음을 정의합니다:</p>
+
+<ul>
+    <li><strong>EmotionEvent 스키마</strong>: 감정 데이터의 루트 구조</li>
+    <li><strong>감정 분류</strong>: 6가지 기본 + 확장 감정 카테고리</li>
+    <li><strong>Action Unit 인코딩</strong>: FACS 기반 AU 표현</li>
+    <li><strong>멀티모달 데이터</strong>: 4가지 모달리티별 데이터 구조</li>
+    <li><strong>차원 모델</strong>: Valence-Arousal-Dominance 지원</li>
+</ul>
+
+<blockquote>
+<p><strong>홍익인간 (弘益人間)</strong>: 널리 인간을 이롭게 하라</p>
+<p>표준화된 데이터 형식은 상호운용성의 기초이며, 모든 사람이 혜택을 받을 수 있는 열린 생태계를 가능하게 합니다.</p>
+</blockquote>
+
+<hr>
+
+<p><a href="chapter-03.html">← 이전: 제3장 - 표준 개요</a> | <a href="chapter-05.html">다음: 제5장 - Phase 2: API 인터페이스 →</a></p>
+</body>
+</html>

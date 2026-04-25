@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Decision Logging Architecture | WIA-AI-018</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; margin-bottom: 40px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 15px; }
+        .chapter-nav { background: #1e293b; padding: 15px 20px; border-radius: 8px; margin-bottom: 30px; display: flex; justify-content: space-between; }
+        .chapter-nav a { color: #10B981; text-decoration: none; padding: 8px 16px; border-radius: 5px; transition: all 0.3s; }
+        .chapter-nav a:hover { background: #10B981; color: #0f172a; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.4rem; margin: 30px 0 15px 0; }
+        p { margin-bottom: 15px; }
+        code { background: #1e293b; padding: 2px 8px; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        ul, ol { margin-left: 30px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .callout { background: #1e293b; border-left: 4px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        .summary { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #0f172a; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .summary h2 { color: #0f172a; border-bottom: 2px solid #0f172a; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        tr:nth-child(even) { background: #1e293b; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 3: Decision Logging Architecture</h1>
+            <p style="color: #94a3b8;">Designing Comprehensive Audit Capture Systems</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Foundations of Decision Logging</h2>
+        <p>Effective audit systems begin with comprehensive decision logging—capturing every critical piece of information needed to understand, verify, and analyze AI decisions. Poor logging design creates audit gaps, making compliance verification impossible and hiding potential problems until they cause harm.</p>
+
+        <p>The principle of 弘益人間 demands that we design logging systems serving all stakeholders: regulators need compliance evidence, affected individuals need explanations, data scientists need debugging information, and society needs transparency. Well-designed logging architecture satisfies all these needs efficiently.</p>
+
+        <h2>Core Data Schema Design</h2>
+        <p>A robust audit log schema captures essential decision attributes while remaining extensible for diverse use cases:</p>
+
+        <pre><code>interface DecisionAuditLog {
+  // Unique identification
+  decision_id: string;
+  correlation_id?: string;  // Links related decisions
+
+  // Temporal information
+  timestamp: string;  // ISO 8601 format
+  timezone: string;
+  processing_duration_ms: number;
+
+  // System information
+  system: {
+    name: string;
+    version: string;
+    environment: "production" | "staging" | "development";
+    deployment_id: string;
+  };
+
+  // Model information
+  model: {
+    name: string;
+    version: string;
+    type: "neural_network" | "decision_tree" | "ensemble" | "rule_based";
+    training_date: string;
+    training_dataset_id: string;
+  };
+
+  // Input data
+  input: {
+    raw_data: any;
+    preprocessed_data: any;
+    feature_vector?: number[];
+    data_sources: string[];
+  };
+
+  // Decision output
+  output: {
+    decision: any;
+    confidence: number;
+    alternatives?: Array<{decision: any; confidence: number}>;
+    flags: string[];  // "high_risk", "low_confidence", etc.
+  };
+
+  // Reasoning and explainability
+  reasoning: {
+    explanation: string;
+    key_features: Array<{name: string; importance: number; value: any}>;
+    decision_path?: string;  // For tree models
+    attention_weights?: number[];  // For neural networks
+    counterfactuals?: any[];
+  };
+
+  // Context
+  context: {
+    user_id?: string;
+    session_id?: string;
+    request_id?: string;
+    geographic_location?: string;
+    decision_type: string;
+    business_impact: "low" | "medium" | "high" | "critical";
+  };
+
+  // Compliance metadata
+  compliance: {
+    data_subject_consent: boolean;
+    purpose: string[];
+    legal_basis: string;
+    automated: boolean;
+    human_review_required: boolean;
+    human_reviewer_id?: string;
+  };
+
+  // Audit metadata
+  audit: {
+    log_version: string;
+    integrity_hash: string;
+    previous_hash?: string;  // For hash chaining
+    signature?: string;  // Cryptographic signature
+  };
+}</code></pre>
+
+        <h2>What to Log: The Five Essential Categories</h2>
+
+        <h3>1. Input Data and Context</h3>
+        <p>Capture all information that influenced the decision. This includes:</p>
+        <ul>
+            <li><strong>Raw input data:</strong> The original request or data before any processing</li>
+            <li><strong>Preprocessed data:</strong> Data after cleaning, normalization, or transformation</li>
+            <li><strong>Feature engineering:</strong> Derived features used by the model</li>
+            <li><strong>External data sources:</strong> APIs, databases, or services consulted</li>
+            <li><strong>Environmental context:</strong> Time, location, user session information</li>
+        </ul>
+
+        <h3>2. Decision Output and Alternatives</h3>
+        <p>Document not just what was decided, but what could have been decided:</p>
+        <ul>
+            <li><strong>Primary decision:</strong> The actual output</li>
+            <li><strong>Confidence scores:</strong> Model certainty in the decision</li>
+            <li><strong>Alternative outcomes:</strong> Other plausible decisions with their probabilities</li>
+            <li><strong>Decision flags:</strong> Markers for unusual or notable characteristics</li>
+        </ul>
+
+        <pre><code>// Example: Credit decision with alternatives
+{
+  "output": {
+    "decision": "APPROVED",
+    "credit_limit": 50000,
+    "confidence": 0.87,
+    "alternatives": [
+      {"decision": "APPROVED", "credit_limit": 40000, "confidence": 0.92},
+      {"decision": "MANUAL_REVIEW", "confidence": 0.11},
+      {"decision": "DENIED", "confidence": 0.02}
+    ],
+    "flags": ["near_threshold", "income_verification_recommended"]
+  }
+}</code></pre>
+
+        <h3>3. Reasoning and Explainability</h3>
+        <p>Provide interpretable explanations for the decision:</p>
+        <ul>
+            <li><strong>Natural language explanation:</strong> Human-readable reasoning</li>
+            <li><strong>Feature importance:</strong> Which inputs most influenced the decision</li>
+            <li><strong>Decision path:</strong> Logical flow from input to output</li>
+            <li><strong>Counterfactuals:</strong> What changes would alter the decision</li>
+        </ul>
+
+        <pre><code>// Feature importance example
+{
+  "reasoning": {
+    "explanation": "Application approved based on strong credit history and stable income.",
+    "key_features": [
+      {"name": "credit_score", "importance": 0.42, "value": 750},
+      {"name": "debt_to_income_ratio", "importance": 0.28, "value": 0.25},
+      {"name": "employment_years", "importance": 0.18, "value": 8},
+      {"name": "account_age_years", "importance": 0.12, "value": 12}
+    ],
+    "counterfactuals": [
+      "If credit_score were below 650, decision would be MANUAL_REVIEW",
+      "If debt_to_income_ratio exceeded 0.43, decision would be DENIED"
+    ]
+  }
+}</code></pre>
+
+        <h3>4. Model and System Metadata</h3>
+        <p>Track which version of which model made the decision:</p>
+        <ul>
+            <li><strong>Model identification:</strong> Name, version, type</li>
+            <li><strong>Training provenance:</strong> When and on what data the model was trained</li>
+            <li><strong>System environment:</strong> Production, staging, or development</li>
+            <li><strong>Performance characteristics:</strong> Processing time, resource usage</li>
+        </ul>
+
+        <h3>5. Compliance and Governance Information</h3>
+        <p>Document compliance with regulatory requirements:</p>
+        <ul>
+            <li><strong>Consent and authorization:</strong> Was proper consent obtained?</li>
+            <li><strong>Purpose limitation:</strong> What purpose justifies this processing?</li>
+            <li><strong>Human oversight:</strong> Was human review performed or required?</li>
+            <li><strong>Impact assessment:</strong> Risk level and business impact classification</li>
+        </ul>
+
+        <h2>Synchronous vs. Asynchronous Logging</h2>
+        <p>Logging strategy must balance completeness with performance:</p>
+
+        <h3>Synchronous Logging</h3>
+        <p>Decision logging occurs in the request path before returning results:</p>
+        <pre><code>async function makeDecision(input: any): Promise<Decision> {
+  const decision = await model.predict(input);
+
+  // Synchronous logging - blocks until logged
+  await auditLogger.log({
+    input,
+    decision,
+    timestamp: new Date().toISOString()
+  });
+
+  return decision;
+}</code></pre>
+
+        <p><strong>Advantages:</strong> Guaranteed logging, no lost decisions, immediate availability</p>
+        <p><strong>Disadvantages:</strong> Adds latency, can become bottleneck, failure impacts decision delivery</p>
+
+        <h3>Asynchronous Logging</h3>
+        <p>Decision logging happens in background after returning results:</p>
+        <pre><code>async function makeDecision(input: any): Promise<Decision> {
+  const decision = await model.predict(input);
+
+  // Asynchronous logging - doesn't block
+  auditLogger.logAsync({
+    input,
+    decision,
+    timestamp: new Date().toISOString()
+  }).catch(err => {
+    // Handle logging failures separately
+    errorReporter.report(err);
+  });
+
+  return decision;
+}</code></pre>
+
+        <p><strong>Advantages:</strong> Minimal latency impact, better throughput, resilient to logging failures</p>
+        <p><strong>Disadvantages:</strong> Potential log loss on system crash, delayed availability</p>
+
+        <h3>Hybrid Approach</h3>
+        <p>Many systems use a hybrid strategy:</p>
+        <ul>
+            <li>Critical metadata logged synchronously (lightweight)</li>
+            <li>Detailed context and reasoning logged asynchronously</li>
+            <li>In-memory buffer provides durability guarantee</li>
+            <li>Batch processing optimizes throughput</li>
+        </ul>
+
+        <pre><code>class HybridAuditLogger {
+  private buffer: DecisionAuditLog[] = [];
+  private flushInterval = 5000; // 5 seconds
+
+  async logDecision(decision: Decision): Promise<void> {
+    // Synchronous: minimal critical data
+    const quickLog = {
+      decision_id: generateId(),
+      timestamp: new Date().toISOString(),
+      decision: decision.outcome,
+      confidence: decision.confidence
+    };
+
+    await this.persistCritical(quickLog);
+
+    // Asynchronous: detailed data
+    const fullLog = this.buildFullLog(decision);
+    this.buffer.push(fullLog);
+
+    if (this.buffer.length >= 100) {
+      this.flush();  // Batch insert
+    }
+  }
+
+  private async flush(): Promise<void> {
+    const logs = this.buffer.splice(0);
+    await this.persistBatch(logs);
+  }
+}</code></pre>
+
+        <h2>Privacy-Preserving Logging</h2>
+        <p>Audit logs often contain sensitive personal data. Privacy-preserving techniques balance auditability with data protection:</p>
+
+        <h3>Pseudonymization</h3>
+        <p>Replace direct identifiers with pseudonyms:</p>
+        <pre><code>function pseudonymize(log: DecisionAuditLog): DecisionAuditLog {
+  return {
+    ...log,
+    context: {
+      ...log.context,
+      user_id: hashWithSalt(log.context.user_id, SECRET_SALT)
+    },
+    input: {
+      ...log.input,
+      raw_data: pseudonymizeFields(log.input.raw_data, ['name', 'email', 'phone'])
+    }
+  };
+}</code></pre>
+
+        <h3>Encryption at Rest</h3>
+        <p>Encrypt sensitive fields before storage:</p>
+        <pre><code>async function encryptSensitiveFields(log: DecisionAuditLog): Promise<DecisionAuditLog> {
+  const encryptedInput = await encrypt(
+    JSON.stringify(log.input),
+    ENCRYPTION_KEY
+  );
+
+  return {
+    ...log,
+    input: {
+      encrypted: true,
+      data: encryptedInput
+    }
+  };
+}</code></pre>
+
+        <h3>Differential Privacy</h3>
+        <p>Add carefully calibrated noise to protect individual privacy while maintaining statistical utility:</p>
+        <pre><code>function addDifferentialPrivacy(value: number, epsilon: number): number {
+  const sensitivity = 1.0;
+  const scale = sensitivity / epsilon;
+  const noise = laplacian(0, scale);
+  return value + noise;
+}</code></pre>
+
+        <h2>Structured vs. Unstructured Logging</h2>
+
+        <h3>Structured Logging (Recommended)</h3>
+        <p>Use consistent schema with typed fields:</p>
+        <pre><code>{
+  "decision_id": "DEC-2024-001247",
+  "timestamp": "2024-01-15T14:32:18.123Z",
+  "model": {"name": "credit-v3", "version": "3.2.1"},
+  "input": {"credit_score": 720},
+  "output": {"decision": "APPROVED", "confidence": 0.92}
+}</code></pre>
+        <p><strong>Benefits:</strong> Queryable, parseable, indexable, type-safe</p>
+
+        <h3>Unstructured Logging (Avoid)</h3>
+        <pre><code>"2024-01-15 14:32:18 - Credit decision: APPROVED for user with score 720 (confidence: 92%)"</code></pre>
+        <p><strong>Limitations:</strong> Difficult to query, requires parsing, error-prone, limited analysis capability</p>
+
+        <h2>Performance Optimization Strategies</h2>
+
+        <h3>Batching</h3>
+        <p>Group multiple log entries and write together:</p>
+        <pre><code>class BatchedLogger {
+  private batchSize = 100;
+  private batchTimeoutMs = 5000;
+
+  async logBatch(logs: DecisionAuditLog[]): Promise<void> {
+    // Single bulk insert instead of N individual inserts
+    await database.bulkInsert('audit_logs', logs);
+  }
+}</code></pre>
+
+        <h3>Compression</h3>
+        <p>Compress log data before storage:</p>
+        <pre><code>import { gzip } from 'zlib';
+
+async function compressLog(log: DecisionAuditLog): Promise<Buffer> {
+  const json = JSON.stringify(log);
+  return gzip(json);
+}</code></pre>
+
+        <h3>Sampling for High-Volume Systems</h3>
+        <p>For extremely high-volume systems, intelligent sampling reduces load:</p>
+        <pre><code>function shouldLog(decision: Decision): boolean {
+  // Always log high-risk decisions
+  if (decision.risk_level === 'high') return true;
+
+  // Always log decisions near confidence threshold
+  if (decision.confidence < 0.7 || decision.confidence > 0.95) return true;
+
+  // Sample 10% of routine decisions
+  if (Math.random() < 0.1) return true;
+
+  return false;
+}</code></pre>
+
+        <div class="callout">
+            <strong>⚠️ Warning:</strong> Sampling must comply with regulatory requirements. Some regulations mandate logging ALL decisions affecting individuals. Always check applicable regulations before implementing sampling.
+        </div>
+
+        <h2>Multi-Model Pipeline Logging</h2>
+        <p>Complex AI systems often chain multiple models. Audit logging must capture the entire pipeline:</p>
+
+        <pre><code>class PipelineLogger {
+  async logPipeline(request: any): Promise<void> {
+    const pipelineId = generateId();
+
+    // Step 1: Preprocessing
+    const preprocessed = await preprocessor.process(request);
+    await this.logStep({
+      pipeline_id: pipelineId,
+      step: 'preprocessing',
+      input: request,
+      output: preprocessed
+    });
+
+    // Step 2: Risk scoring
+    const riskScore = await riskModel.predict(preprocessed);
+    await this.logStep({
+      pipeline_id: pipelineId,
+      step: 'risk_scoring',
+      input: preprocessed,
+      output: riskScore
+    });
+
+    // Step 3: Final decision
+    const decision = await decisionModel.predict({
+      ...preprocessed,
+      risk_score: riskScore
+    });
+    await this.logStep({
+      pipeline_id: pipelineId,
+      step: 'decision',
+      input: { preprocessed, riskScore },
+      output: decision
+    });
+  }
+}</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Comprehensive decision logging captures inputs, outputs, reasoning, metadata, and compliance information</li>
+                <li>Core schema design should include unique identification, temporal data, system/model info, decision details, and audit metadata</li>
+                <li>Five essential logging categories: input data, decision output, reasoning, model metadata, and compliance information</li>
+                <li>Synchronous logging guarantees completeness but adds latency; asynchronous logging optimizes performance but risks log loss</li>
+                <li>Hybrid approaches combine critical synchronous logging with detailed asynchronous logging</li>
+                <li>Privacy-preserving techniques include pseudonymization, encryption, and differential privacy</li>
+                <li>Structured logging with consistent schemas enables efficient querying and analysis</li>
+                <li>Performance optimization strategies include batching, compression, and intelligent sampling</li>
+                <li>Multi-model pipelines require comprehensive logging across all stages with shared correlation IDs</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Design a decision audit log schema for a medical diagnosis AI system. What specific fields would you include beyond the core schema presented in this chapter?</li>
+                <li>Compare synchronous and asynchronous logging strategies. In what scenarios would you choose each approach?</li>
+                <li>How can organizations implement privacy-preserving logging while maintaining sufficient detail for regulatory compliance?</li>
+                <li>Explain the concept of counterfactual explanations in decision logging. Provide an example from a real-world use case.</li>
+                <li>Design a batching strategy for a high-volume fraud detection system processing 10,000 decisions per second.</li>
+                <li>What are the risks of implementing sampling in audit logging, and how can these risks be mitigated?</li>
+                <li>How should multi-model pipelines be logged to maintain traceability across all stages?</li>
+                <li>Implement a TypeScript function that encrypts sensitive fields in a decision log while keeping non-sensitive fields queryable.</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

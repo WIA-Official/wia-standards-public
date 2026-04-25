@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 웨어러블 기기 통합 | WIA-MED-010</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; border-bottom: 3px solid #10B981; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 1.2em; margin-bottom: 10px; }
+        h1 { color: #10B981; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #10B981; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; }
+        p { color: #cbd5e1; margin-bottom: 15px; }
+        .back-link { display: inline-block; color: #10B981; text-decoration: none; margin-bottom: 20px; }
+        code { background: #1e293b; color: #10B981; padding: 2px 8px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; padding: 0; }
+        .callout { background: #1e293b; border-left: 5px solid #10B981; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        ul, ol { margin-left: 30px; margin-bottom: 15px; }
+        li { color: #cbd5e1; margin-bottom: 10px; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions ol { counter-reset: question; list-style: none; margin-left: 0; }
+        .review-questions li { counter-increment: question; margin-bottom: 20px; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: counter(question); position: absolute; left: 0; top: 0; background: #10B981; color: #0f172a; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 2px solid #334155; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { color: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="chapter-number">3장</div>
+            <h1>웨어러블 기기 통합</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="font-size: 1.2em; color: #94a3b8; margin-bottom: 30px;">
+            웨어러블 기술은 원격 환자 모니터링의 근간을 이룹니다. 이 장에서는 다양한 웨어러블 기기의
+            종류, 통합 아키텍처, API 연동 방법, 데이터 동기화 전략, 그리고 기기 관리 모범 사례를
+            상세히 다룹니다.
+        </p>
+
+        <h2>웨어러블 기기의 분류</h2>
+
+        <h3>소비자용 vs 의료용 웨어러블</h3>
+        <p>
+            웨어러블 기기는 규제 상태와 임상적 검증 수준에 따라 구분됩니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>구분</th>
+                    <th>소비자용 (Wellness)</th>
+                    <th>의료용 (Medical)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>규제</td>
+                    <td>FDA 규제 없음</td>
+                    <td>FDA 승인 필요 (Class I/II)</td>
+                </tr>
+                <tr>
+                    <td>목적</td>
+                    <td>일반 건강 및 피트니스</td>
+                    <td>질병 진단/치료/모니터링</td>
+                </tr>
+                <tr>
+                    <td>정확도</td>
+                    <td>일반적 정확도</td>
+                    <td>임상적으로 검증된 정확도</td>
+                </tr>
+                <tr>
+                    <td>보험 청구</td>
+                    <td>불가능</td>
+                    <td>가능 (특정 조건)</td>
+                </tr>
+                <tr>
+                    <td>예시</td>
+                    <td>Fitbit, Garmin</td>
+                    <td>Dexcom CGM, KardiaMobile</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout">
+            <h3>의료용 웨어러블 선택 시 고려사항</h3>
+            <p>
+                RPM 프로그램에서는 가능한 한 FDA 승인을 받은 의료용 기기를 사용해야 합니다.
+                소비자용 기기는 트렌드 파악에는 유용하지만, 임상적 의사결정의 근거로 사용하기에는
+                정확도가 충분하지 않을 수 있습니다. 또한 의료용 기기만이 Medicare/Medicaid 보험
+                청구가 가능합니다.
+            </p>
+        </div>
+
+        <h3>폼팩터별 분류</h3>
+
+        <p>
+            <strong>1. 손목 착용형 (Wrist-worn)</strong>
+        </p>
+        <ul>
+            <li><strong>스마트워치:</strong> Apple Watch, Samsung Galaxy Watch, Fitbit Sense</li>
+            <li><strong>피트니스 밴드:</strong> Fitbit Charge, Xiaomi Mi Band, Garmin Vivosmart</li>
+            <li><strong>의료용 밴드:</strong> Biobeat, VivaLNK</li>
+            <li><strong>장점:</strong> 편의성, 높은 착용 순응도, 다중 센서 통합</li>
+            <li><strong>단점:</strong> 피부 자극, 배터리 수명 제한, 일부 측정 정확도 낮음</li>
+        </ul>
+
+        <p>
+            <strong>2. 가슴 착용형 (Chest-worn)</strong>
+        </p>
+        <ul>
+            <li><strong>심박 띠:</strong> Polar H10, Garmin HRM-Pro</li>
+            <li><strong>ECG 패치:</strong> Zio Patch, iRhythm, BioTelemetry MCOT</li>
+            <li><strong>장점:</strong> ECG 정확도 높음, 호흡 측정 가능</li>
+            <li><strong>단점:</strong> 불편함, 피부 자극, 장기 착용 어려움</li>
+        </ul>
+
+        <p>
+            <strong>3. 패치형 (Patch)</strong>
+        </p>
+        <ul>
+            <li><strong>CGM 패치:</strong> Dexcom G6/G7, FreeStyle Libre, Medtronic Guardian</li>
+            <li><strong>심장 모니터링:</strong> VitalPatch, HealthPatch</li>
+            <li><strong>장점:</strong> 방수, 장기 착용 (7-14일), 비침습적</li>
+            <li><strong>단점:</strong> 일회용, 피부 알레르기 가능성, 교체 필요</li>
+        </ul>
+
+        <p>
+            <strong>4. 클립형 및 기타</strong>
+        </p>
+        <ul>
+            <li><strong>손가락 클립:</strong> 맥박 산소측정기</li>
+            <li><strong>귀 착용형:</strong> Valencell 심박수 센서</li>
+            <li><strong>스마트 의류:</strong> Hexoskin, Sensoria 스마트 양말</li>
+            <li><strong>스마트 링:</strong> Oura Ring (수면, 활동, 체온)</li>
+        </ul>
+
+        <h2>주요 웨어러블 플랫폼</h2>
+
+        <h3>Apple Health / HealthKit</h3>
+        <p>
+            애플의 건강 데이터 플랫폼은 가장 널리 사용되는 건강 데이터 생태계 중 하나입니다.
+        </p>
+
+        <p>
+            <strong>주요 기능:</strong>
+        </p>
+        <ul>
+            <li>iPhone과 Apple Watch에서 자동 데이터 수집</li>
+            <li>70개 이상의 건강 데이터 유형 지원</li>
+            <li>서드파티 앱과의 데이터 공유</li>
+            <li>의료 기록(Health Records) 통합</li>
+            <li>ECG, 심방세동 감지, 낙상 감지, 소음 알림</li>
+        </ul>
+
+        <p>
+            <strong>API 통합:</strong>
+        </p>
+
+        <pre><code>import HealthKit
+
+class HealthKitManager {
+    let healthStore = HKHealthStore()
+
+    func requestAuthorization() {
+        let readTypes: Set<HKObjectType> = [
+            HKObjectType.quantityType(forIdentifier: .heartRate)!,
+            HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic)!,
+            HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic)!,
+            HKObjectType.quantityType(forIdentifier: .bloodGlucose)!,
+            HKObjectType.quantityType(forIdentifier: .oxygenSaturation)!,
+            HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
+        ]
+
+        healthStore.requestAuthorization(toShare: nil, read: readTypes) {
+            success, error in
+            if success {
+                print("HealthKit 권한 획득 성공")
+            }
+        }
+    }
+
+    func fetchHeartRate(completion: @escaping ([HKQuantitySample]?) -> Void) {
+        let heartRateType = HKQuantityType.quantityType(
+            forIdentifier: .heartRate
+        )!
+
+        let query = HKSampleQuery(
+            sampleType: heartRateType,
+            predicate: nil,
+            limit: HKObjectQueryNoLimit,
+            sortDescriptors: nil
+        ) { query, results, error in
+            completion(results as? [HKQuantitySample])
+        }
+
+        healthStore.execute(query)
+    }
+}
+</code></pre>
+
+        <h3>Google Fit / Health Connect</h3>
+        <p>
+            Google의 건강 데이터 플랫폼으로 Android 생태계를 지원합니다.
+        </p>
+
+        <p>
+            <strong>주요 기능:</strong>
+        </p>
+        <ul>
+            <li>Android 기기 및 Wear OS 웨어러블과 통합</li>
+            <li>활동, 수면, 영양, 심박수 등 데이터 수집</li>
+            <li>Health Connect (Android 14+)로 통합 데이터 플랫폼 제공</li>
+            <li>REST API 및 Android SDK 지원</li>
+        </ul>
+
+        <p>
+            <strong>API 통합:</strong>
+        </p>
+
+        <pre><code>// Health Connect (Android 14+) 사용 예제
+import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.time.TimeRangeFilter
+
+class HealthConnectManager(private val context: Context) {
+    private val healthConnectClient = HealthConnectClient.getOrCreate(context)
+
+    suspend fun readHeartRateData(): List<HeartRateRecord> {
+        val request = ReadRecordsRequest(
+            recordType = HeartRateRecord::class,
+            timeRangeFilter = TimeRangeFilter.between(
+                startTime = Instant.now().minus(24, ChronoUnit.HOURS),
+                endTime = Instant.now()
+            )
+        )
+
+        val response = healthConnectClient.readRecords(request)
+        return response.records
+    }
+
+    suspend fun checkPermissions(): Set<String> {
+        val permissions = setOf(
+            HealthPermission.getReadPermission(HeartRateRecord::class),
+            HealthPermission.getReadPermission(BloodPressureRecord::class),
+            HealthPermission.getReadPermission(SleepSessionRecord::class)
+        )
+
+        return healthConnectClient.permissionController
+            .getGrantedPermissions()
+    }
+}
+</code></pre>
+
+        <h3>Fitbit Web API</h3>
+        <p>
+            Fitbit은 개방형 API를 제공하여 서드파티 앱이 데이터에 접근할 수 있게 합니다.
+        </p>
+
+        <p>
+            <strong>OAuth 2.0 인증 흐름:</strong>
+        </p>
+
+        <pre><code>import requests
+from datetime import date
+
+class FitbitClient:
+    def __init__(self, access_token):
+        self.access_token = access_token
+        self.base_url = "https://api.fitbit.com/1/user/-"
+
+    def get_heart_rate(self, date_str=None):
+        """
+        특정 날짜의 심박수 데이터 가져오기
+        """
+        if not date_str:
+            date_str = date.today().isoformat()
+
+        endpoint = f"{self.base_url}/activities/heart/date/{date_str}/1d.json"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.get(endpoint, headers=headers)
+        return response.json()
+
+    def get_sleep_data(self, date_str=None):
+        """
+        수면 데이터 가져오기
+        """
+        if not date_str:
+            date_str = date.today().isoformat()
+
+        endpoint = f"{self.base_url}/sleep/date/{date_str}.json"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.get(endpoint, headers=headers)
+        return response.json()
+
+    def get_activity_summary(self, date_str=None):
+        """
+        일일 활동 요약 가져오기
+        """
+        if not date_str:
+            date_str = date.today().isoformat()
+
+        endpoint = f"{self.base_url}/activities/date/{date_str}.json"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.get(endpoint, headers=headers)
+        return response.json()
+</code></pre>
+
+        <h2>의료기기 통합 표준</h2>
+
+        <h3>HL7 FHIR (Fast Healthcare Interoperability Resources)</h3>
+        <p>
+            FHIR은 의료 정보 교환의 글로벌 표준으로, 웨어러블 데이터를 EHR 시스템과 통합하는 데
+            널리 사용됩니다.
+        </p>
+
+        <p>
+            <strong>FHIR Observation 리소스 예제:</strong>
+        </p>
+
+        <pre><code>{
+  "resourceType": "Observation",
+  "id": "heart-rate-001",
+  "status": "final",
+  "category": [{
+    "coding": [{
+      "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+      "code": "vital-signs",
+      "display": "Vital Signs"
+    }]
+  }],
+  "code": {
+    "coding": [{
+      "system": "http://loinc.org",
+      "code": "8867-4",
+      "display": "Heart rate"
+    }]
+  },
+  "subject": {
+    "reference": "Patient/12345"
+  },
+  "effectiveDateTime": "2025-12-26T10:30:00Z",
+  "valueQuantity": {
+    "value": 72,
+    "unit": "beats/minute",
+    "system": "http://unitsofmeasure.org",
+    "code": "/min"
+  },
+  "device": {
+    "reference": "Device/apple-watch-series-8",
+    "display": "Apple Watch Series 8"
+  }
+}
+</code></pre>
+
+        <h3>Continua Design Guidelines</h3>
+        <p>
+            Personal Connected Health Alliance의 상호운용성 표준으로, 의료기기 간 데이터 교환을
+            표준화합니다.
+        </p>
+
+        <ul>
+            <li>IEEE 11073 개인 건강 기기 통신 표준 기반</li>
+            <li>블루투스 저에너지(BLE) 및 기타 통신 프로토콜 지원</li>
+            <li>혈압계, 혈당계, 체중계, 맥박 산소측정기 등 다양한 기기 포함</li>
+        </ul>
+
+        <h2>데이터 동기화 전략</h2>
+
+        <h3>실시간 vs 배치 동기화</h3>
+
+        <p>
+            <strong>실시간 동기화 (Real-time):</strong>
+        </p>
+        <ul>
+            <li>데이터가 생성되는 즉시 서버로 전송</li>
+            <li>적용 사례: 중환자 모니터링, 급성기 환자, 긴급 알림이 필요한 경우</li>
+            <li>장점: 즉각적인 개입 가능, 최신 데이터 보장</li>
+            <li>단점: 배터리 소모 증가, 네트워크 대역폭 요구, 비용 증가</li>
+        </ul>
+
+        <p>
+            <strong>배치 동기화 (Batch):</strong>
+        </p>
+        <ul>
+            <li>일정 시간 간격(예: 매시간, 일일)으로 데이터 전송</li>
+            <li>적용 사례: 안정적 만성질환 환자, 일반 건강 추적</li>
+            <li>장점: 배터리 효율적, 네트워크 사용량 최소화</li>
+            <li>단점: 데이터 지연, 긴급 상황 대응 느림</li>
+        </ul>
+
+        <p>
+            <strong>하이브리드 접근:</strong> 대부분의 RPM 시스템은 두 방식을 혼합합니다.
+            일반 데이터는 배치로 동기화하고, 임계값을 초과하는 중요 이벤트는 즉시 전송합니다.
+        </p>
+
+        <h3>오프라인 동기화 및 충돌 해결</h3>
+
+        <p>
+            환자가 인터넷 연결이 없는 곳에 있을 때를 대비한 전략:
+        </p>
+
+        <pre><code>class SyncManager:
+    def __init__(self, local_db, remote_api):
+        self.local_db = local_db
+        self.remote_api = remote_api
+        self.sync_queue = []
+
+    def queue_for_sync(self, data):
+        """
+        오프라인 시 데이터를 로컬 큐에 저장
+        """
+        data['sync_status'] = 'pending'
+        data['queued_at'] = datetime.now().isoformat()
+        self.local_db.insert(data)
+        self.sync_queue.append(data)
+
+    def sync_data(self):
+        """
+        연결 복구 시 큐에 있는 데이터 동기화
+        """
+        if not self.is_online():
+            return False
+
+        synced_count = 0
+        failed_items = []
+
+        for item in self.sync_queue:
+            try:
+                # 서버에 데이터 전송
+                response = self.remote_api.post(item)
+
+                if response.status_code == 200:
+                    # 성공 시 로컬 DB 업데이트
+                    item['sync_status'] = 'synced'
+                    item['synced_at'] = datetime.now().isoformat()
+                    self.local_db.update(item)
+                    synced_count += 1
+                else:
+                    failed_items.append(item)
+
+            except Exception as e:
+                print(f"동기화 실패: {e}")
+                failed_items.append(item)
+
+        # 실패한 항목은 다음 동기화 시도를 위해 큐에 유지
+        self.sync_queue = failed_items
+
+        return {
+            'synced': synced_count,
+            'failed': len(failed_items)
+        }
+
+    def resolve_conflicts(self, local_data, server_data):
+        """
+        충돌 해결 전략
+        """
+        # 1. 타임스탬프 기준 (최신 우선)
+        if local_data['timestamp'] > server_data['timestamp']:
+            return local_data
+
+        # 2. 서버 우선 (기본 전략)
+        return server_data
+
+    def is_online(self):
+        """
+        인터넷 연결 확인
+        """
+        try:
+            requests.get('https://www.google.com', timeout=5)
+            return True
+        except:
+            return False
+</code></pre>
+
+        <h2>웨어러블 기기 관리</h2>
+
+        <h3>기기 등록 및 페어링</h3>
+
+        <p>
+            환자가 웨어러블을 RPM 시스템에 연결하는 프로세스:
+        </p>
+
+        <ol>
+            <li><strong>기기 식별:</strong> 제조사, 모델, 일련번호 확인</li>
+            <li><strong>호환성 확인:</strong> 플랫폼 지원 여부, OS 버전 확인</li>
+            <li><strong>인증:</strong> OAuth, Bluetooth 페어링, 또는 기기별 인증 코드</li>
+            <li><strong>권한 부여:</strong> 환자가 데이터 공유에 명시적 동의</li>
+            <li><strong>초기 동기화:</strong> 기존 데이터 가져오기</li>
+            <li><strong>설정 구성:</strong> 측정 빈도, 알림 임계값 등 설정</li>
+        </ol>
+
+        <h3>배터리 수명 최적화</h3>
+
+        <p>
+            웨어러블의 가장 큰 제약은 배터리 수명입니다. 최적화 전략:
+        </p>
+
+        <ul>
+            <li><strong>적응형 샘플링:</strong> 환자가 활동 중일 때는 더 자주, 수면 중에는 덜 자주 측정</li>
+            <li><strong>데이터 압축:</strong> 전송 전 데이터 압축으로 에너지 절약</li>
+            <li><strong>Wi-Fi 선호:</strong> 가능한 경우 셀룰러보다 Wi-Fi 사용</li>
+            <li><strong>백그라운드 활동 최소화:</strong> 불필요한 프로세스 제한</li>
+            <li><strong>화면 밝기 조절:</strong> 자동 밝기 또는 낮은 기본값</li>
+        </ul>
+
+        <h3>펌웨어 업데이트 관리</h3>
+
+        <p>
+            웨어러블 기기의 소프트웨어를 최신 상태로 유지하는 것이 중요합니다:
+        </p>
+
+        <ul>
+            <li><strong>자동 업데이트:</strong> 가능한 경우 자동 업데이트 활성화</li>
+            <li><strong>업데이트 알림:</strong> 환자에게 중요 업데이트 알림</li>
+            <li><strong>호환성 테스트:</strong> 업데이트 전 RPM 시스템과의 호환성 확인</li>
+            <li><strong>롤백 계획:</strong> 문제 발생 시 이전 버전으로 복구</li>
+        </ul>
+
+        <h2>데이터 보안 및 프라이버시</h2>
+
+        <h3>전송 중 암호화</h3>
+
+        <p>
+            웨어러블에서 서버로 데이터를 전송할 때 암호화는 필수입니다:
+        </p>
+
+        <ul>
+            <li><strong>TLS 1.3:</strong> 모든 API 통신에 TLS 사용</li>
+            <li><strong>인증서 피닝:</strong> 중간자 공격 방지</li>
+            <li><strong>End-to-End 암호화:</strong> 중요 건강 데이터는 E2EE 적용</li>
+        </ul>
+
+        <h3>저장 시 암호화</h3>
+
+        <p>
+            기기와 서버 모두에서 데이터를 암호화하여 저장:
+        </p>
+
+        <ul>
+            <li><strong>기기 내 저장:</strong> AES-256 암호화, 생체인증으로 접근 제어</li>
+            <li><strong>서버 저장:</strong> 암호화된 데이터베이스, 필드 레벨 암호화</li>
+            <li><strong>백업 암호화:</strong> 클라우드 백업도 암호화</li>
+        </ul>
+
+        <h3>HIPAA 준수</h3>
+
+        <p>
+            미국에서 RPM 시스템은 HIPAA (Health Insurance Portability and Accountability Act)를
+            준수해야 합니다:
+        </p>
+
+        <ul>
+            <li><strong>최소 필요 원칙:</strong> 필요한 최소한의 데이터만 수집 및 공유</li>
+            <li><strong>감사 로그:</strong> 모든 데이터 접근 및 변경 기록</li>
+            <li><strong>BAA (Business Associate Agreement):</strong> 서드파티 제공자와 계약</li>
+            <li><strong>환자 권리:</strong> 데이터 접근, 수정, 삭제 권한 보장</li>
+        </ul>
+
+        <div class="callout">
+            <h3>弘益人間: 디지털 접근성과 형평성</h3>
+            <p>
+                웨어러블 기술을 통합할 때, 모든 환자가 동등하게 접근할 수 있도록 해야 합니다.
+                고가의 최신 스마트워치만 지원하는 것이 아니라, 저렴한 기본 센서도 통합하여
+                경제적 장벽을 낮춰야 합니다. 또한 노인이나 기술에 익숙하지 않은 환자를 위한
+                간단한 인터페이스와 지원 시스템을 제공해야 합니다.
+            </p>
+        </div>
+
+        <div class="summary">
+            <h2 style="margin-top: 0;">장 요약</h2>
+            <ul>
+                <li>웨어러블은 소비자용(wellness)과 의료용(medical)으로 구분되며, RPM에는 FDA 승인 의료용 기기 권장</li>
+                <li>폼팩터: 손목 착용형, 가슴 착용형, 패치형, 클립형 등 다양한 형태</li>
+                <li>주요 플랫폼: Apple HealthKit, Google Health Connect, Fitbit API 등 개방형 API 제공</li>
+                <li>HL7 FHIR과 Continua Guidelines를 통해 EHR 시스템과 표준화된 통합 가능</li>
+                <li>데이터 동기화: 실시간(중환자)과 배치(안정 환자)를 혼합한 하이브리드 접근 권장</li>
+                <li>오프라인 동기화: 로컬 큐에 저장 후 연결 복구 시 전송, 충돌 해결 전략 필요</li>
+                <li>기기 관리: 등록/페어링 프로세스, 배터리 최적화, 펌웨어 업데이트 관리</li>
+                <li>보안: TLS 1.3 전송 암호화, AES-256 저장 암호화, HIPAA 준수 필수</li>
+                <li>접근성: 다양한 가격대의 기기 지원, 사용하기 쉬운 인터페이스로 디지털 격차 해소</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2 style="margin-top: 0;">복습 질문</h2>
+            <ol>
+                <li>소비자용 웨어러블과 의료용 웨어러블의 차이점을 규제, 정확도, 보험 청구 측면에서 비교하세요.</li>
+                <li>손목 착용형, 가슴 착용형, 패치형 웨어러블의 장단점을 설명하고, 각각이 적합한 사용 사례를 제시하세요.</li>
+                <li>Apple HealthKit에서 건강 데이터를 읽어오는 Swift 코드의 주요 단계를 설명하세요.</li>
+                <li>HL7 FHIR Observation 리소스의 구조를 설명하고, 왜 의료 정보 교환 표준으로 중요한지 논의하세요.</li>
+                <li>실시간 데이터 동기화와 배치 동기화를 비교하고, 각각이 적합한 임상 시나리오를 제시하세요.</li>
+                <li>오프라인 환경에서 웨어러블 데이터를 로컬에 저장했다가 나중에 동기화하는 전략을 설계하세요. 충돌 해결 방법도 포함하세요.</li>
+                <li>웨어러블 기기의 배터리 수명을 최적화하는 5가지 기술적 전략을 설명하세요.</li>
+                <li>웨어러블 데이터 전송 시 보안을 보장하기 위한 암호화 기법(전송 중, 저장 시)을 상세히 설명하세요.</li>
+                <li>HIPAA 준수를 위해 RPM 시스템이 구현해야 하는 4가지 핵심 요구사항을 나열하고 설명하세요.</li>
+                <li>웨어러블 기술의 접근성을 높여 디지털 격차를 줄이는 방법을 弘益人間 철학과 연결하여 논의하세요.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-04.html" class="nav-button">다음 장 →</a>
+        </div>
+    </div>
+</body>
+</html>
